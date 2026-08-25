@@ -34,7 +34,6 @@ import org.lwjgl.opengl.GL30.glGetInteger
 
 internal object SkikoHost {
   private const val SKIA_LAYER_CLASS = "org.jetbrains.skiko.SkiaLayer"
-  private const val COMPOSE_WINDOW_CLASS = "androidx.compose.ui.awt.ComposeWindow"
   private const val METAL_REDRAWER_CLASS = "org.jetbrains.skiko.redrawer.MetalRedrawer"
   private const val DIRECT3D_REDRAWER_CLASS = "org.jetbrains.skiko.redrawer.Direct3DRedrawer"
   private const val LINUX_OPENGL_REDRAWER_CLASS = "org.jetbrains.skiko.redrawer.LinuxOpenGLRedrawer"
@@ -48,12 +47,25 @@ internal object SkikoHost {
   private val direct3DPresenters = mutableMapOf<Long, Direct3DTexturePresenter>()
   private val openGlPresenters = mutableMapOf<Int, OpenGlTexturePresenter>()
   private var cachedSkiaLayer: Component? = null
+  private var boundWindow = WeakReference<Window>(null)
+
+  fun attachWindow(window: Window) {
+    boundWindow = WeakReference(window)
+    cachedSkiaLayer = null
+  }
+
+  fun detachWindow(window: Window) {
+    if (boundWindow.get() === window) {
+      boundWindow = WeakReference(null)
+      cachedSkiaLayer = null
+    }
+  }
 
   fun requireMetalDevice(): SkikoMetalDevice = onEdt {
     val layer =
       findSkiaLayer()
         ?: throw NativeSurfaceBridgeException(
-          "SkikoHost could not find a live $SKIA_LAYER_CLASS. ${describeWindows()}"
+          "SkikoHost could not find a live $SKIA_LAYER_CLASS. ${describeBoundWindow()}"
         )
     val contextHandler = requireMetalContextHandler(layer)
     val device =
@@ -81,7 +93,7 @@ internal object SkikoHost {
     val layer =
       findSkiaLayer()
         ?: throw NativeSurfaceBridgeException(
-          "SkikoHost could not find a live $SKIA_LAYER_CLASS. ${describeWindows()}"
+          "SkikoHost could not find a live $SKIA_LAYER_CLASS. ${describeBoundWindow()}"
         )
     val redrawer = requireDirect3DRedrawer(layer)
     val ptr =
@@ -167,7 +179,7 @@ internal object SkikoHost {
     val layer =
       findSkiaLayer()
         ?: throw NativeSurfaceBridgeException(
-          "SkikoHost could not find a live $SKIA_LAYER_CLASS. ${describeWindows()}"
+          "SkikoHost could not find a live $SKIA_LAYER_CLASS. ${describeBoundWindow()}"
         )
     readLinuxOpenGlContext(requireLinuxOpenGlRedrawer(layer))
   }
@@ -207,6 +219,7 @@ internal object SkikoHost {
     openGlPresenters.clear()
     glPresenters.forEach { it.close() }
     cachedSkiaLayer = null
+    boundWindow = WeakReference(null)
   }
 
   private fun findMetalContext(): DirectContext? = onEdt {
@@ -304,65 +317,44 @@ internal object SkikoHost {
     return redrawer
   }
 
-  // Walking every window's component tree is too expensive to repeat per frame, so the layer is
-  // remembered until AWT takes its peer away.
+  // The layer is remembered until AWT takes its peer away, so a bound window is not walked again
+  // on every frame.
   private fun findSkiaLayer(): Any? {
     cachedSkiaLayer?.let { cached ->
       if (cached.isDisplayable) {
         return cached
       }
     }
-    val layer = (findSkiaLayerComponent() ?: findComposeWindowSkiaLayer()) as Component?
+    val window = boundWindow.get()?.takeIf { it.isDisplayable } ?: return null
+    val layer = window.walkComponents().firstOrNull { isSkiaLayer(it) }
     cachedSkiaLayer = layer
     return layer
   }
 
-  private fun findSkiaLayerComponent(): Any? =
-    Window.getWindows()
-      .asSequence()
-      .filter { it.isDisplayable }
-      .flatMap { it.walkComponents() }
-      .firstOrNull { isSkiaLayer(it) }
-
-  private fun findComposeWindowSkiaLayer(): Any? =
-    Window.getWindows()
-      .asSequence()
-      .filter { it.isDisplayable && it.javaClass.name == COMPOSE_WINDOW_CLASS }
-      .mapNotNull { window ->
-        runCatching {
-            val composePanel = window.getField("composePanel") ?: return@mapNotNull null
-            val contentComponent =
-              composePanel.invokeDeclaredNoArg("getContentComponent") ?: return@mapNotNull null
-            if (isSkiaLayer(contentComponent)) {
-              contentComponent
-            } else {
-              (contentComponent as? Component)?.walkComponents()?.firstOrNull { isSkiaLayer(it) }
-            }
-          }
-          .getOrNull()
-      }
-      .firstOrNull()
-
   private fun isSkiaLayer(value: Any): Boolean = Class.forName(SKIA_LAYER_CLASS).isInstance(value)
 
-  private fun describeWindows(): String =
-    Window.getWindows().joinToString(prefix = "Windows: ", separator = " | ") { window ->
-      buildString {
-        append(window.javaClass.name)
-        append("(displayable=")
-        append(window.isDisplayable)
-        append(", showing=")
-        append(window.isShowing)
-        append(")")
-        append(" children=[")
-        append(
-          window.walkComponents().drop(1).take(12).joinToString { component ->
-            component.javaClass.name
-          }
-        )
-        append("]")
-      }
+  private fun describeBoundWindow(): String {
+    val window = boundWindow.get()
+    if (window == null) {
+      return "Bound AWT window: none"
     }
+    return buildString {
+      append("Bound AWT window: ")
+      append(window.javaClass.name)
+      append("(displayable=")
+      append(window.isDisplayable)
+      append(", showing=")
+      append(window.isShowing)
+      append(")")
+      append(" children=[")
+      append(
+        window.walkComponents().drop(1).take(12).joinToString { component ->
+          component.javaClass.name
+        }
+      )
+      append("]")
+    }
+  }
 
   private fun Component.walkComponents(): Sequence<Component> = sequence {
     yield(this@walkComponents)
