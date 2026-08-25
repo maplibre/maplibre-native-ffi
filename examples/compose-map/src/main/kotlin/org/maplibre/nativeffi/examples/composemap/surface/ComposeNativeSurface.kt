@@ -11,12 +11,15 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.awt.LocalAwtWindow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import javax.swing.SwingUtilities
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 public fun ComposeNativeSurface(
   renderer: NativeSurfaceRenderer,
@@ -26,6 +29,8 @@ public fun ComposeNativeSurface(
   val internalController = rememberNativeSurfaceController()
   val activeController = controller ?: internalController
   val density = LocalDensity.current
+  val awtWindow =
+    checkNotNull(LocalAwtWindow.current) { "ComposeNativeSurface requires a parent AWT window" }
   val drawState = remember { NativeSurfaceDrawState() }
   var extent by remember { mutableStateOf(SurfaceExtent.Empty) }
   var frameRequest by remember { mutableLongStateOf(0L) }
@@ -39,6 +44,11 @@ public fun ComposeNativeSurface(
     }
   val nativeSurfaceState by activeController.state.collectAsState()
   val surfaceReady = nativeSurfaceState is NativeSurfaceState.Ready
+
+  DisposableEffect(awtWindow) {
+    SkikoHost.attachWindow(awtWindow)
+    onDispose { SkikoHost.detachWindow(awtWindow) }
+  }
 
   DisposableEffect(renderer) {
     val participant = DesktopNativeRenderingLifecycle.register { renderer.close() }
