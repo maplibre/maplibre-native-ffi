@@ -212,7 +212,8 @@ Third-party GitHub Actions pins live in `.github/workflows/action-pins.yml`.
 `mise run ci:check-action-pins` verifies that every workflow and composite
 action agrees with that catalog, and `mise run ci:fix-action-pins` copies
 catalog pins onto consumers. On a Dependabot pull request from this repository,
-the hygiene job runs `mise run fix` and commits the result.
+the hygiene job runs `mise run fix`, regenerates `.github/workflows/ci.yml` from
+the catalog, and commits the result.
 
 [Astro](https://astro.build/) and [Starlight](https://starlight.astro.build/)
 build the documentation site. Generated API reference HTML is installed into

@@ -4,9 +4,12 @@ set -euo pipefail
 cd "${MISE_PROJECT_ROOT:-$(cd "$(dirname "$0")/../../.." && pwd)}"
 
 committed=false
+# Hygiene ignores runner-generated lockfile churn; keep that out of the commit.
+lockfile_exclude=':(exclude)mise*.lock'
 git update-index -q --refresh
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  git add --update
+if ! git diff --quiet -- . "${lockfile_exclude}" \
+  || ! git diff --cached --quiet -- . "${lockfile_exclude}"; then
+  git add --update -- . "${lockfile_exclude}"
   git -c user.name="github-actions[bot]" \
     -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
     commit --message "chore: apply hygiene fixes"
@@ -25,6 +28,9 @@ fi
 if [[ -z ${GH_TOKEN:-} || -z ${HEAD_REF:-} ]]; then
   exit 0
 fi
+# A clean tree whose tip is already a hygiene commit still pushes and
+# dispatches. That recovers a run that committed and pushed, then failed
+# before `gh workflow run` (maplibre-compose#1140).
 if [[ ${committed} != true && $(git log -1 --pretty=%s) != "chore: apply hygiene fixes" ]]; then
   exit 0
 fi

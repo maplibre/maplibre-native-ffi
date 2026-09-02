@@ -49,14 +49,15 @@ jobs:
           gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: dprint output-resolved-config > /dev/null
+      - run: mise run fix
+      - run: mise run ci:generate-workflow
       - run: mise run ci:generate-workflow --check
       - run: mise run ci:generate-devcontainer-tools --check
       - run: mise run ci:test-release-tools
       - run: mise run --force //bindings/dart:ffigen
       - run: mise run --force //bindings/dotnet:generate
       - run: mise run --force //bindings/kotlin:generate
-      - run: dprint output-resolved-config > /dev/null
-      - run: mise run fix
       - id: apply-fix
         if: env.DEPENDABOT_PR == 'true'
         env:
