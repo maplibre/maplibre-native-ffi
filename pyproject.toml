@@ -12,6 +12,6 @@ members = ["bindings/python"]
 
 [dependency-groups]
 dev = [
-  "ruff==0.16.3",
-  "ty==0.0.72",
+  "ruff==0.16.5",
+  "ty==0.0.75",
 ]
