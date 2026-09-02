@@ -20,7 +20,6 @@ static const uint64_t unknown_mask_bit = UINT64_C(1) << 63U;
 static const size_t style_pump_attempts = 200;
 static const int64_t park_timeout_milliseconds = 200;
 static const uint64_t park_floor_milliseconds = 100;
-static const char missing_database_path[] = "does-not-exist.db";
 static const size_t take_result_attempts = 5000;
 
 // The record layout every binding probes. A host reads a batch as two byte
@@ -645,10 +644,15 @@ static void the_message_arena_carries_one_range_per_event(void) {
 // the take-result diagnostic carries the same text as the completion event.
 static void a_take_result_reports_the_operations_failure_text(void) {
   mln_runtime runtime = mln_test_create_runtime();
+  char invalid_database_path[1024];
+  TEST_ASSERT_TRUE(mln_test_fixture_path(
+    "offline_database/corrupt-immediate.db", invalid_database_path,
+    sizeof(invalid_database_path)
+  ));
   mln_offline_operation_id operation_id = 0;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_runtime_offline_regions_merge_database_start(
-                     runtime, missing_database_path, &operation_id
+                     runtime, invalid_database_path, &operation_id
                    )
   );
   TEST_ASSERT_NOT_EQUAL(0, operation_id);
@@ -665,7 +669,7 @@ static void a_take_result_reports_the_operations_failure_text(void) {
     );
   }
   TEST_ASSERT_TRUE_MESSAGE(
-    completed, "Merging a missing database should report completion."
+    completed, "Merging an invalid database should report completion."
   );
   TEST_ASSERT_EQUAL_UINT64(
     operation_id, event.payload.offline_operation_completed.operation_id
@@ -697,7 +701,7 @@ static void a_take_result_reports_the_operations_failure_text(void) {
   operation_id = 0;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_runtime_offline_regions_merge_database_start(
-                     runtime, missing_database_path, &operation_id
+                     runtime, invalid_database_path, &operation_id
                    )
   );
   bool reported = false;

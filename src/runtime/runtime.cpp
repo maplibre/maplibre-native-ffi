@@ -29,6 +29,7 @@
 #include <mbgl/storage/offline.hpp>
 #include <mbgl/storage/resource_options.hpp>
 #include <mbgl/storage/response.hpp>
+#include <mbgl/storage/sqlite3.hpp>
 #include <mbgl/util/client_options.hpp>
 #include <mbgl/util/expected.hpp>
 #include <mbgl/util/geo.hpp>
@@ -1906,13 +1907,22 @@ auto offline_regions_merge_database_start(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
+  const auto path = std::string{side_database_path};
+  const auto side_database =
+    mapbox::sqlite::Database::tryOpen(path, mapbox::sqlite::ReadOnly);
+  if (std::holds_alternative<mapbox::sqlite::Exception>(side_database)) {
+    set_thread_error(
+      "side database path must identify an existing readable database file"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
   auto database = database_source_for_runtime(live);
   if (database == nullptr) {
     set_thread_error("database file source is unavailable");
     return MLN_STATUS_NATIVE_ERROR;
   }
 
-  const auto path = std::string{side_database_path};
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE,
     MLN_OFFLINE_OPERATION_RESULT_REGION_LIST, out_operation_id,

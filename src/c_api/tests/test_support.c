@@ -196,10 +196,9 @@ void mln_test_destroy_map(mln_map map) {
   untrack_map(map);
 }
 
-uint8_t* mln_test_read_fixture(const char* relative_path, size_t* out_size) {
-  if (out_size != NULL) {
-    *out_size = 0;
-  }
+bool mln_test_fixture_path(
+  const char* relative_path, char* out_path, size_t out_path_capacity
+) {
 #if defined(__EMSCRIPTEN__)
   // The browser suite embeds its fixtures in the module at a fixed virtual
   // path.
@@ -212,10 +211,17 @@ uint8_t* mln_test_read_fixture(const char* relative_path, size_t* out_size) {
   );
 #endif
 
-  char path[1024];
   const int written =
-    snprintf(path, sizeof(path), "%s/%s", fixture_dir, relative_path);
-  if (written < 0 || (size_t)written >= sizeof(path)) {
+    snprintf(out_path, out_path_capacity, "%s/%s", fixture_dir, relative_path);
+  return written >= 0 && (size_t)written < out_path_capacity;
+}
+
+uint8_t* mln_test_read_fixture(const char* relative_path, size_t* out_size) {
+  if (out_size != NULL) {
+    *out_size = 0;
+  }
+  char path[1024];
+  if (!mln_test_fixture_path(relative_path, path, sizeof(path))) {
     return NULL;
   }
 
