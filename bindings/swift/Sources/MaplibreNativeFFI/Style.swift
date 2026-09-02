@@ -655,6 +655,19 @@ public extension MapHandle {
     }
   }
 
+  /// Sets whether a style source stores fetched tiles in persistent storage.
+  func setStyleSourceVolatile(sourceId: String, isVolatile: Bool) throws {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      try checkStatus(mln_map_set_style_source_volatile(
+        requireLiveHandle().raw,
+        arena.view(sourceId),
+        isVolatile
+      ))
+    }
+  }
+
   func styleSourceAttribution(_ sourceId: String) throws -> String? {
     try mapNativeFailure {
       let arena = NativeInputArena()

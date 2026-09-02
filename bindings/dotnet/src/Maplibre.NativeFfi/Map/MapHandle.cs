@@ -782,6 +782,19 @@ public sealed unsafe class MapHandle : IDisposable
         return found ? (SourceType)sourceType : null;
     }
 
+    /// <summary>Sets whether a style source stores fetched tiles in persistent storage.</summary>
+    public void SetStyleSourceVolatile(string sourceId, bool isVolatile)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_style_source_volatile(
+                Handle,
+                nativeSourceId.Value,
+                isVolatile ? (byte)1 : (byte)0
+            )
+        );
+    }
+
     /// <summary>Gets copied style source metadata when the source exists.</summary>
     public SourceInfo? StyleSourceInfo(string sourceId)
     {

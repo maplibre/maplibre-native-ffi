@@ -94,6 +94,9 @@ auto map_get_style_source_info(
   mln_map map, mln_buffer_view source_id, mln_style_source_info* out_info,
   bool* out_found
 ) -> mln_status;
+auto map_set_style_source_volatile(
+  mln_map map, mln_buffer_view source_id, bool is_volatile
+) -> mln_status;
 auto map_copy_style_source_attribution(
   mln_map map, mln_buffer_view source_id, char* out_attribution,
   size_t attribution_capacity, size_t* out_attribution_size, bool* out_found

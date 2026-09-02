@@ -1,3 +1,4 @@
+using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Runtime;
@@ -52,6 +53,32 @@ public sealed class StyleJsonTests
         Assert.Equal(
             (uint)RasterDemEncoding.Mapbox,
             map.StyleSourceInfo("dem-tiles")?.RawRasterDemEncoding
+        );
+    }
+
+    [BindingSpecTest("BND-105")]
+    [Fact]
+    public void StyleSourceVolatilityReadsBackAndRejectsMissingSource()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        map.SetStyleJson(EmptyStyle());
+        map.AddVectorSourceTiles(
+            "volatile-source",
+            ["https://example.test/vector/{z}/{x}/{y}.pbf"],
+            new TileSourceOptions()
+        );
+
+        Assert.False(map.StyleSourceInfo("volatile-source")!.IsVolatile);
+
+        map.SetStyleSourceVolatile("volatile-source", true);
+        Assert.True(map.StyleSourceInfo("volatile-source")!.IsVolatile);
+
+        map.SetStyleSourceVolatile("volatile-source", false);
+        Assert.False(map.StyleSourceInfo("volatile-source")!.IsVolatile);
+
+        Assert.Throws<InvalidArgumentException>(() =>
+            map.SetStyleSourceVolatile("missing-source", true)
         );
     }
 

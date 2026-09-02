@@ -649,6 +649,7 @@
 --include-function mln_map_set_style_image
 --include-function mln_map_set_style_light_json
 --include-function mln_map_set_style_light_property
+--include-function mln_map_set_style_source_volatile
 --include-function mln_map_set_style_transition_options
 --include-function mln_map_style_image_exists
 --include-function mln_map_style_layer_exists

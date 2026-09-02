@@ -2004,6 +2004,27 @@ void main() {
     expect(RasterDemEncoding.fromRaw(93).rawValue, 93);
   });
 
+  test('style source volatility round-trips through the public API', () {
+    final runtime = RuntimeHandle.create();
+    addTearDown(runtime.close);
+    final map = runtime.createMap();
+    addTearDown(map.close);
+    map.setStyleJson(_jsonBytes(_emptyStyleJson));
+    map.addVectorSourceTiles('dart-volatile-source', const [
+      'https://example.com/{z}/{x}/{y}.mvt',
+    ]);
+
+    expect(map.getStyleSourceInfo('dart-volatile-source')!.isVolatile, isFalse);
+    map.setStyleSourceVolatile('dart-volatile-source', true);
+    expect(map.getStyleSourceInfo('dart-volatile-source')!.isVolatile, isTrue);
+    map.setStyleSourceVolatile('dart-volatile-source', false);
+    expect(map.getStyleSourceInfo('dart-volatile-source')!.isVolatile, isFalse);
+    expect(
+      () => map.setStyleSourceVolatile('missing-source', true),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+  });
+
   test('scoped native values validate before exposing borrowed values', () {
     var live = true;
     void checkLive() {

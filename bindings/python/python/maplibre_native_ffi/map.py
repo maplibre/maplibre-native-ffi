@@ -851,6 +851,10 @@ class MapHandle(NativeHandleMixin):
         raw = self._native.get_style_source_info(source_id)
         return StyleSourceInfo._from_native(raw) if raw is not None else None
 
+    def set_style_source_volatile(self, source_id: str, is_volatile: bool) -> None:
+        """Set whether a style source stores fetched tiles in persistent storage."""
+        self._native.set_style_source_volatile(source_id, is_volatile)
+
     def list_style_source_ids(self) -> tuple[str, ...]:
         """Return style source IDs in style order."""
         return tuple(self._native.list_style_source_ids())

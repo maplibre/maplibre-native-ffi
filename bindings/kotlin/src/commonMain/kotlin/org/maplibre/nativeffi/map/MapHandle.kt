@@ -100,6 +100,12 @@ public expect class MapHandle : AutoCloseable {
 
   public fun styleSourceInfo(sourceId: String): SourceInfo?
 
+  /**
+   * Sets whether [sourceId] stores fetched tiles in persistent storage. Source types that do not
+   * fetch tiles retain the value only for [styleSourceInfo].
+   */
+  public fun setStyleSourceVolatile(sourceId: String, isVolatile: Boolean)
+
   public fun styleSourceIds(): List<String>
 
   public fun addGeoJsonSourceUrl(sourceId: String, url: String, options: GeoJsonSourceOptions?)

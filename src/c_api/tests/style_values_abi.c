@@ -1206,6 +1206,55 @@ static void style_source_info_reports_url_backed_tile_source(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static void style_source_volatility_round_trips(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  const mln_buffer_view source_id = MLN_STRING_LITERAL("volatile-vector");
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_add_vector_source_tiles(
+                     map, source_id,
+                     (mln_buffer_view[]){
+                       MLN_STRING_LITERAL("https://example.com/{z}/{x}/{y}.mvt")
+                     },
+                     1, NULL
+                   )
+  );
+
+  mln_style_source_info info = {.size = sizeof(mln_style_source_info)};
+  bool found = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_source_info(map, source_id, &info, &found)
+  );
+  TEST_ASSERT_TRUE(found);
+  TEST_ASSERT_FALSE(info.is_volatile);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_source_volatile(map, source_id, true)
+  );
+  info = (mln_style_source_info){.size = sizeof(mln_style_source_info)};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_source_info(map, source_id, &info, &found)
+  );
+  TEST_ASSERT_TRUE(info.is_volatile);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_source_volatile(map, source_id, false)
+  );
+  info = (mln_style_source_info){.size = sizeof(mln_style_source_info)};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_source_info(map, source_id, &info, &found)
+  );
+  TEST_ASSERT_FALSE(info.is_volatile);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_source_volatile(map, MLN_STRING_LITERAL("missing"), true)
+  );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void style_source_info_reports_other_source_shapes(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -1657,6 +1706,7 @@ void run_style_values_abi_tests(void) {
   RUN_TEST(copy_entry_points_answer_a_null_buffer_as_a_size_probe);
   RUN_TEST(style_source_info_rebuilds_an_inline_tile_source);
   RUN_TEST(style_source_info_reports_url_backed_tile_source);
+  RUN_TEST(style_source_volatility_round_trips);
   RUN_TEST(style_source_info_reports_other_source_shapes);
   RUN_TEST(loaded_style_document_reports_the_parsed_bytes);
   RUN_TEST(style_url_reports_the_requested_url);
