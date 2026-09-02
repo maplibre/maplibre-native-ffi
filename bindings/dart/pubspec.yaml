@@ -18,9 +18,7 @@ dependencies:
   code_assets: ^1.2.1
   crypto: ^3.0.7
   ffi: ^2.1.4
-  # 2.1.0+ depends on record_use ^1.0.0, which needs meta ^1.19.0. Flutter
-  # still pins meta 1.18.0, so Flutter hosts must be able to select 2.0.2.
-  hooks: ^2.0.2
+  hooks: ^2.2.0
 
 dev_dependencies:
   ffigen: ^21.0.0

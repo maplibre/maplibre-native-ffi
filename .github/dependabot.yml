@@ -90,11 +90,6 @@ updates:
     groups:
       pub:
         patterns: ["*"]
-    # hooks 2.1.0+ pulls record_use ^1.0.0 (meta ^1.19.0). Flutter 3.44 still
-    # pins meta 1.18.0, so a floor above 2.0.2 makes flutter pub get fail.
-    ignore:
-      - dependency-name: hooks
-        versions: [">=2.1.0"]
   - package-ecosystem: swift
     directories: ["/bindings/swift", "/examples/swift-map"]
     schedule:
