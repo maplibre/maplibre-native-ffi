@@ -1,4 +1,4 @@
-"""Read and verify the third-party GitHub Actions pins catalog."""
+"""Read, verify, and rewrite the third-party GitHub Actions pins catalog."""
 
 from __future__ import annotations
 
@@ -106,3 +106,38 @@ def check_pins(root: pathlib.Path) -> list[str]:
             f"{CATALOG.as_posix()}: {action} is no longer used; remove the pin"
         )
     return problems
+
+
+# The SHA and version comment; indent, `- `, and `uses:` stay as they were.
+_PIN_REF = re.compile(r"@[0-9a-f]{40}\s+#\s*\S+")
+
+
+def _apply_pin(line: str, pin: Pin) -> str:
+    return _PIN_REF.sub(f"@{pin.sha} # {pin.version}", line, count=1)
+
+
+def fix_pins(root: pathlib.Path) -> list[pathlib.Path]:
+    """Rewrite consumer pins that disagree with the catalog.
+
+    Unpinned uses, actions missing from the catalog, and unused catalog
+    entries stay as they are. Those still fail ``check_pins``.
+    """
+    pins = catalog(root)
+    changed: list[pathlib.Path] = []
+    for path in consumers(root):
+        original = path.read_text()
+        rewritten: list[str] = []
+        dirty = False
+        for line in original.splitlines(keepends=True):
+            pinned = PINNED.match(line)
+            if pinned:
+                current = Pin(**pinned.groupdict())
+                expected = pins.get(current.action)
+                if expected is not None and current != expected:
+                    line = _apply_pin(line, expected)
+                    dirty = True
+            rewritten.append(line)
+        if dirty:
+            path.write_text("".join(rewritten), newline="\n")
+            changed.append(path)
+    return changed

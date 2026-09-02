@@ -68,13 +68,18 @@ def setup(
     zig: bool = False,
     gradle: bool = True,
     save_toolchains: bool = False,
+    checkout: bool = True,
 ) -> list[str]:
-    lines = [
-        f"      - uses: {CHECKOUT}",
-        "        with:",
-        "          persist-credentials: false",
-        "      - uses: ./.github/actions/setup-ci-deps",
-    ]
+    lines: list[str] = []
+    if checkout:
+        lines.extend(
+            [
+                f"      - uses: {CHECKOUT}",
+                "        with:",
+                "          persist-credentials: false",
+            ]
+        )
+    lines.append("      - uses: ./.github/actions/setup-ci-deps")
     if zig:
         lines.append("        id: setup")
     lines.append("        with:")
@@ -227,6 +232,10 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "      - synchronize",
         "      - reopened",
         "      - ready_for_review",
+        # GITHUB_TOKEN pushes from Dependabot hygiene healing do not start
+        # pull_request workflows, so that job dispatches CI on the updated
+        # branch after it commits.
+        "  workflow_dispatch:",
         "",
         "permissions:",
         "  contents: read",
@@ -240,10 +249,23 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "    name: hygiene",
         "    runs-on: ubuntu-latest",
         "    timeout-minutes: 30",
+        "    permissions:",
+        "      contents: write",
+        "      actions: write",
         SCCACHE_ENVIRONMENT,
         *gate(),
+        "    env:",
+        "      DEPENDABOT_PR: ${{ github.event_name == 'pull_request' && github.actor == 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository }}",
         "    steps:",
-        *setup(gradle=False),
+        f"      - uses: {CHECKOUT}",
+        "        if: env.DEPENDABOT_PR != 'true'",
+        "        with:",
+        "          persist-credentials: false",
+        f"      - uses: {CHECKOUT}",
+        "        if: env.DEPENDABOT_PR == 'true'",
+        "        with:",
+        "          ref: ${{ github.head_ref }}",
+        *setup(gradle=False, checkout=False),
         "      - run: mise run ci:generate-workflow --check",
         "      - run: mise run ci:generate-devcontainer-tools --check",
         "      - run: mise run ci:test-release-tools",
@@ -254,7 +276,14 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         # `mise run fix` provides the project-scoped formatter tools that the
         # dprint wrappers expect; calling hk directly leaves them uninstalled.
         "      - run: mise run fix",
+        "      - id: apply-fix",
+        "        if: env.DEPENDABOT_PR == 'true'",
+        "        env:",
+        "          GH_TOKEN: ${{ github.token }}",
+        "          HEAD_REF: ${{ github.head_ref }}",
+        "        run: mise run ci:commit-hygiene-fixes",
         "      - name: Check generated and formatted files",
+        "        if: steps.apply-fix.outputs.committed != 'true'",
         "        run: |",
         "          git update-index -q --refresh",
         "          git diff --exit-code -- . ':(exclude)mise*.lock'",

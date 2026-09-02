@@ -25,6 +25,7 @@ local lintSteps = new Mapping<String, Step> {
       ".github/actions/**/action.yaml",
     )
     check = "mise run ci:check-action-pins"
+    fix = "mise run ci:fix-action-pins"
   }
   // Whole-repository check: any added or removed file can break scope coverage,
   // so this runs on every invocation rather than filtering on a glob.

@@ -1,7 +1,8 @@
 # Single source of truth for third-party action pins. Dependabot only scans
 # `.github/workflows` and a root `action.yml`, so pins used elsewhere — the
 # composite actions, `ci:generate-workflow` — are listed here to keep them
-# updated. `mise run ci:check-action-pins` verifies every reference agrees.
+# updated. `mise run ci:check-action-pins` verifies every reference agrees, and
+# `mise run ci:fix-action-pins` copies catalog pins onto consumers.
 name: Action pins
 
 # Never runs. The trigger is a branch that is never created, and `!always()` is
