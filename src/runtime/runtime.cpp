@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstring>
 #include <exception>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -1908,6 +1909,16 @@ auto offline_regions_merge_database_start(
   }
 
   const auto path = std::string{side_database_path};
+  std::error_code filesystem_error;
+  if (
+    path.empty() || path.front() == ':' || path.compare(0, 5, "file:") == 0 ||
+    !std::filesystem::is_regular_file(path, filesystem_error)
+  ) {
+    set_thread_error(
+      "side database path must identify an existing readable database file"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   const auto side_database =
     mapbox::sqlite::Database::tryOpen(path, mapbox::sqlite::ReadOnly);
   if (std::holds_alternative<mapbox::sqlite::Exception>(side_database)) {
