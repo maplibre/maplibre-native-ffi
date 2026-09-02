@@ -717,6 +717,15 @@ internal object NativeAccess {
       )
     }
 
+  internal fun setStyleSourceVolatile(map: NativeMap, sourceId: String, isVolatile: Boolean) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewBooleanStatusFunction("mln_map_set_style_source_volatile")
+          .invokeNative(map, stringView(arena, sourceId), isVolatile) as Int
+      )
+    }
+  }
+
   internal fun styleSourceIds(map: NativeMap): List<String> =
     Arena.ofConfined().use { arena ->
       val outList = arena.allocate(ValueLayout.JAVA_LONG)

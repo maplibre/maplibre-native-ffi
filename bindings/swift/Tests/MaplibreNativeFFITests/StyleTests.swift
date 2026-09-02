@@ -156,6 +156,38 @@ import Testing
   #expect(remote.url == "https://example.com/source.json")
 }
 
+@Test func styleSourceVolatilityTogglesAndMissingSourceThrows() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 1, height: 1)
+  )
+  defer { try? map.close() }
+
+  try map.setStyleJSON(jsonData(#"{"version":8,"sources":{},"layers":[]}"#))
+  try map.addVectorSourceTiles(
+    sourceId: "tiles",
+    tiles: ["https://example.com/{z}/{x}/{y}.mvt"]
+  )
+
+  #expect(try map.styleSourceInfo("tiles")?.isVolatile == false)
+  try map.setStyleSourceVolatile(sourceId: "tiles", isVolatile: true)
+  #expect(try map.styleSourceInfo("tiles")?.isVolatile == true)
+  try map.setStyleSourceVolatile(sourceId: "tiles", isVolatile: false)
+  #expect(try map.styleSourceInfo("tiles")?.isVolatile == false)
+
+  do {
+    try map.setStyleSourceVolatile(sourceId: "missing", isVolatile: true)
+    Issue.record("missing source should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidArgument)
+  } catch {
+    Issue.record("unexpected error: \(error)")
+  }
+}
+
 @Test func styleImageDescriptorsMaterializeScopedPixelsAndOptions() throws {
   let image = StyleRGBA8Image(
     width: 1,

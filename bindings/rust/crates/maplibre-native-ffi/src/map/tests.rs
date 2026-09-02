@@ -629,6 +629,45 @@ fn style_source_type_and_info_call_real_c_api() {
 }
 
 #[test]
+// Spec coverage: BND-105.
+fn style_source_volatility_round_trips_through_public_api() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    map.add_vector_source_url("source", "https://example.com/source.json", None)
+        .unwrap();
+
+    assert!(
+        !map.style_source_info("source")
+            .unwrap()
+            .unwrap()
+            .is_volatile
+    );
+
+    map.set_style_source_volatile("source", true).unwrap();
+    assert!(
+        map.style_source_info("source")
+            .unwrap()
+            .unwrap()
+            .is_volatile
+    );
+
+    map.set_style_source_volatile("source", false).unwrap();
+    assert!(
+        !map.style_source_info("source")
+            .unwrap()
+            .unwrap()
+            .is_volatile
+    );
+
+    let error = map.set_style_source_volatile("missing", true).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
 // Spec coverage: BND-066, BND-109.
 fn style_source_info_copies_reconstructible_source_state() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();

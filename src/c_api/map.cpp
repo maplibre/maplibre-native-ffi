@@ -267,6 +267,16 @@ auto mln_map_get_style_source_info(
   });
 }
 
+auto mln_map_set_style_source_volatile(
+  mln_map map, mln_buffer_view source_id, bool is_volatile
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_set_style_source_volatile(
+      map, source_id, is_volatile
+    );
+  });
+}
+
 auto mln_map_copy_style_source_attribution(
   mln_map map, mln_buffer_view source_id, char* out_attribution,
   size_t attribution_capacity, size_t* out_attribution_size, bool* out_found

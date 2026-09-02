@@ -190,6 +190,7 @@ typedef struct mln_style_source_info {
   uint32_t fields;
   /** Source ID byte length, excluding any null terminator. */
   size_t id_size;
+  /** Whether the source is marked volatile. */
   bool is_volatile;
   bool has_attribution;
   /** Attribution byte length, excluding any null terminator. */
@@ -688,6 +689,26 @@ MLN_API mln_status mln_map_get_style_source_type(
 MLN_API mln_status mln_map_get_style_source_info(
   mln_map map, mln_buffer_view source_id, mln_style_source_info* out_info,
   bool* out_found
+) MLN_NOEXCEPT;
+
+/**
+ * Sets whether one style source stores fetched tiles in the persistent cache.
+ *
+ * source_id is borrowed for the call. When is_volatile is true, source
+ * implementations that fetch tiles do not store fetched tiles in persistent
+ * storage. Other source types retain the value for inspection without changing
+ * their loading behavior.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ *   invalid or empty, or the source does not exist.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_set_style_source_volatile(
+  mln_map map, mln_buffer_view source_id, bool is_volatile
 ) MLN_NOEXCEPT;
 
 /**

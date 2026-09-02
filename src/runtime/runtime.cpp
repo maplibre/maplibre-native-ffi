@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstring>
 #include <exception>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -29,6 +30,7 @@
 #include <mln/storage/offline.hpp>
 #include <mln/storage/resource_options.hpp>
 #include <mln/storage/response.hpp>
+#include <mln/storage/sqlite3.hpp>
 #include <mln/util/client_options.hpp>
 #include <mln/util/expected.hpp>
 #include <mln/util/geo.hpp>
@@ -1906,13 +1908,32 @@ auto offline_regions_merge_database_start(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
+  const auto path = std::string{side_database_path};
+  std::error_code filesystem_error;
+  if (
+    path.empty() || path.front() == ':' || path.compare(0, 5, "file:") == 0 ||
+    !std::filesystem::is_regular_file(path, filesystem_error)
+  ) {
+    set_thread_error(
+      "side database path must identify an existing readable database file"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto side_database =
+    mapbox::sqlite::Database::tryOpen(path, mapbox::sqlite::ReadOnly);
+  if (std::holds_alternative<mapbox::sqlite::Exception>(side_database)) {
+    set_thread_error(
+      "side database path must identify an existing readable database file"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
   auto database = database_source_for_runtime(live);
   if (database == nullptr) {
     set_thread_error("database file source is unavailable");
     return MLN_STATUS_NATIVE_ERROR;
   }
 
-  const auto path = std::string{side_database_path};
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE,
     MLN_OFFLINE_OPERATION_RESULT_REGION_LIST, out_operation_id,

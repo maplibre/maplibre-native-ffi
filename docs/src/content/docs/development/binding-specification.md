@@ -562,6 +562,13 @@ encoding, and raster encoding values through the binding's ordinary unknown-enum
 representation. A returned value remains valid after source removal, style
 replacement, and map release.
 
+A binding that exposes style source metadata MUST expose the source volatility
+setter as one map operation. The operation takes a source ID and a Boolean
+value, then reports native status through the binding's ordinary error model. A
+volatile tile-backed source does not store fetched tiles in persistent storage.
+Other source types retain the value for inspection without changing their
+loading behavior.
+
 ## Callbacks And Requests
 
 Callbacks and request handles preserve C lifetimes while protecting

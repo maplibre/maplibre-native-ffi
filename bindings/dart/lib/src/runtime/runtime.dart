@@ -3143,6 +3143,20 @@ final class MapHandle {
     });
   }
 
+  /// Sets whether a style source stores fetched tiles in persistent storage.
+  void setStyleSourceVolatile(String sourceId, bool isVolatile) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      _check(
+        raw.mln_map_set_style_source_volatile(
+          _handle.raw,
+          nativeId.value,
+          isVolatile,
+        ),
+      );
+    });
+  }
+
   /// Reports whether a style source ID exists.
   bool styleSourceExists(String sourceId) {
     return withNativeArena((arena) {

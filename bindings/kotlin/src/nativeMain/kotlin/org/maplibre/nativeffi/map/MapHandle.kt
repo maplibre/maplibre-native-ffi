@@ -161,6 +161,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_style_image
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_json
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_light_json
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_light_property
+import org.maplibre.nativeffi.internal.c.mln_map_set_style_source_volatile
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_url
 import org.maplibre.nativeffi.internal.c.mln_map_set_tile_options
@@ -374,6 +375,18 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     val url = copyStyleSourceUrl(sourceId, outInfo)
     val tileUrls = copyStyleSourceTileUrls(sourceId, outInfo)
     StyleStructs.sourceInfo(outInfo, attribution, url, tileUrls)
+  }
+
+  public actual fun setStyleSourceVolatile(sourceId: String, isVolatile: Boolean) {
+    memScoped {
+      Status.check(
+        mln_map_set_style_source_volatile(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          isVolatile,
+        )
+      )
+    }
   }
 
   public actual fun styleSourceIds(): List<String> = memScoped {

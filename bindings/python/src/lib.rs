@@ -2819,6 +2819,17 @@ impl MapHandle {
         source_info_to_py(py, copied).map(Some)
     }
 
+    fn set_style_source_volatile(&self, source_id: String, is_volatile: bool) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        // SAFETY: The C API validates the map handle, source ID view, and
+        // owner-thread affinity.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_style_source_volatile(state.handle(), source_id.raw(), is_volatile)
+        })
+        .map_err(map_error)
+    }
+
     fn list_style_source_ids(&self) -> PyResult<Vec<String>> {
         let state = self.state();
         let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_id_list>::new();

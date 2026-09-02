@@ -133,6 +133,11 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     return NativeAccess.styleSourceInfo(requireLiveHandle(), sourceId)
   }
 
+  public actual fun setStyleSourceVolatile(sourceId: String, isVolatile: Boolean) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setStyleSourceVolatile(requireLiveHandle(), sourceId, isVolatile)
+  }
+
   public actual fun styleSourceIds(): List<String> {
     NativeAccess.ensureLoaded()
     return NativeAccess.styleSourceIds(requireLiveHandle())

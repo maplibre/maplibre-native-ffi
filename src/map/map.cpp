@@ -4456,6 +4456,29 @@ auto map_get_style_source_info(
   return MLN_STATUS_OK;
 }
 
+auto map_set_style_source_volatile(
+  mln_map map, mln_buffer_view source_id, bool is_volatile
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  const auto source_id_status = validate_source_id(source_id);
+  if (source_id_status != MLN_STATUS_OK) {
+    return source_id_status;
+  }
+
+  auto* source = live->map->getStyle().getSource(string_from_view(source_id));
+  if (source == nullptr) {
+    set_thread_error("source does not exist");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  source->setVolatile(is_volatile);
+  return MLN_STATUS_OK;
+}
+
 auto map_copy_style_source_attribution(
   mln_map map, mln_buffer_view source_id, char* out_attribution,
   size_t attribution_capacity, size_t* out_attribution_size, bool* out_found

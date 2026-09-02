@@ -285,6 +285,19 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     }
   }
 
+  public actual fun setStyleSourceVolatile(sourceId: String, isVolatile: Boolean) {
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      Status.check(
+        MaplibreNativeC.mln_map_set_style_source_volatile(
+          requireLiveHandle(),
+          nativeSourceId.view,
+          isVolatile,
+        )
+      )
+    }
+  }
+
   public actual fun styleSourceIds(): List<String> {
     NativeAccess.ensureLoaded()
     LongPointer(1).use { outList ->

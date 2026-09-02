@@ -787,6 +787,26 @@ pub const MapHandle = enum(c.mln_map) {
         };
     }
 
+    /// Sets whether one style source stores fetched tiles in persistent
+    /// storage.
+    pub fn setStyleSourceVolatile(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        is_volatile: bool,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_style_source_volatile(
+                try native(self),
+                try temp.stringView(source_id),
+                is_volatile,
+            ),
+            diagnosticStore(self),
+        );
+    }
+
     pub fn copyStyleSourceAttribution(
         self: *MapHandle,
         allocator: std.mem.Allocator,
