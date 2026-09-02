@@ -5,6 +5,7 @@
 
 #include <stdatomic.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "abi_tests.h"
@@ -313,6 +314,49 @@ static void offline_database_merge_rejects_raw_null_path(void) {
     )
   );
   TEST_ASSERT_EQUAL_UINT64(0, operation_id);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void offline_database_merge_rejects_a_missing_file(void) {
+  static const char missing_path[] = "mln-ffi-missing-offline-side-database.db";
+  (void)remove(missing_path);
+
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_offline_operation_id operation_id = 123;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_offline_regions_merge_database_start(
+      runtime, missing_path, &operation_id
+    )
+  );
+  TEST_ASSERT_EQUAL_UINT64(0, operation_id);
+  FILE* unexpected = fopen(missing_path, "rb");
+  TEST_ASSERT_NULL_MESSAGE(
+    unexpected, "The rejected merge created its missing side database."
+  );
+  if (unexpected != NULL) {
+    fclose(unexpected);
+    (void)remove(missing_path);
+  }
+  mln_test_destroy_runtime(runtime);
+}
+
+static void offline_database_merge_rejects_sqlite_pseudo_paths(void) {
+  static const char* const pseudo_paths[] = {"", ":memory:", "file::memory:"};
+  mln_runtime runtime = mln_test_create_runtime();
+
+  for (size_t index = 0; index < sizeof(pseudo_paths) / sizeof(pseudo_paths[0]);
+       ++index) {
+    mln_offline_operation_id operation_id = 123;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_INVALID_ARGUMENT,
+      mln_runtime_offline_regions_merge_database_start(
+        runtime, pseudo_paths[index], &operation_id
+      )
+    );
+    TEST_ASSERT_EQUAL_UINT64(0, operation_id);
+  }
+
   mln_test_destroy_runtime(runtime);
 }
 
@@ -1156,6 +1200,8 @@ void run_resources_abi_tests(void) {
   RUN_TEST(set_maximum_ambient_cache_size_rejects_raw_null_output);
   RUN_TEST(offline_regions_reject_raw_invalid_descriptors);
   RUN_TEST(offline_database_merge_rejects_raw_null_path);
+  RUN_TEST(offline_database_merge_rejects_a_missing_file);
+  RUN_TEST(offline_database_merge_rejects_sqlite_pseudo_paths);
   RUN_TEST(offline_take_rejects_mismatched_result_kind);
   RUN_TEST(resource_transform_rejects_raw_invalid_descriptors);
   RUN_TEST(http_header_transform_registration_follows_the_transport);

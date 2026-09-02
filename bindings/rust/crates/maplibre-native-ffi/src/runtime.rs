@@ -1453,7 +1453,7 @@ mod tests {
 
     #[test]
     // Spec coverage: BND-084.
-    fn offline_region_merge_database_uses_real_c_abi() {
+    fn offline_region_merge_database_accepts_read_only_source_through_real_c_abi() {
         let base = TempDir::new("maplibre-rust-offline-merge");
         let main_cache = base.path().join("main.db");
         let side_cache = base.path().join("side.db");
@@ -1476,6 +1476,16 @@ mod tests {
             create.take().unwrap();
             side_runtime.close().unwrap();
         }
+        let side_database_before = std::fs::read(&side_cache).unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            let mut permissions = std::fs::metadata(&side_cache).unwrap().permissions();
+            permissions.set_mode(0o444);
+            std::fs::set_permissions(&side_cache, permissions).unwrap();
+        }
 
         let mut main_options = RuntimeOptions::default();
         main_options.cache_path = Some(main_cache.to_string_lossy().into_owned());
@@ -1494,6 +1504,7 @@ mod tests {
         assert_eq!(merged.len(), 1);
         assert_eq!(merged[0].definition, definition);
         assert_eq!(merged[0].metadata, b"merge");
+        assert_eq!(std::fs::read(&side_cache).unwrap(), side_database_before);
         main_runtime.close().unwrap();
     }
 

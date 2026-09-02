@@ -498,15 +498,26 @@ MLN_API mln_status mln_runtime_offline_regions_list_start(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts merging offline regions from another database path.
+ * Starts merging offline regions from another MapLibre offline database.
  *
- * The side database may be upgraded in place by native code and must be
- * writable when native merge requires it.
+ * side_database_path must identify an existing, readable MapLibre offline
+ * database whose schema version matches this library. The runtime opens the
+ * database read-only and leaves its contents unchanged. Keep the file present
+ * and unchanged until the operation completes.
+ *
+ * The merge copies only tiles and resources assigned to a region. It does not
+ * accept an MBTiles database, which uses a different schema.
+ *
+ * This function validates that the database can be opened read-only and copies
+ * side_database_path before returning. It does not inspect the schema
+ * synchronously. Format, schema, and later filesystem errors appear in the
+ * operation-completed event's result status and message.
  *
  * Returns:
  * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live,
- *   side_database_path is null, or out_operation_id is null.
+ *   side_database_path is null, does not identify an existing readable
+ *   database file, or out_operation_id is null.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.

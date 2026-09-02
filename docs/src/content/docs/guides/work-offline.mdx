@@ -77,6 +77,22 @@ continues. Drain both from the runtime that owns the region, as described in
 Set the download state to inactive to pause. Set it to active to resume from the
 resources that MapLibre has stored.
 
+## Import downloaded regions
+
+A host can download a MapLibre offline database that another runtime prepared,
+then merge its regions into the runtime database. Keep the downloaded file
+present and unchanged until the merge completes. The file may be read-only.
+
+The databases must use the same MapLibre offline schema version. MBTiles uses a
+different schema, so load an MBTiles file through an `mbtiles://` source
+instead.
+
+The start call opens the downloaded database read-only. A missing or unreadable
+file fails immediately. The merge then copies the tiles and resources assigned
+to each region, combines duplicate region definitions, and leaves the downloaded
+file unchanged. Format, schema, and later filesystem errors arrive in the
+operation-completed event.
+
 ## Read what the database holds
 
 List the regions in the database to learn what an earlier run of the host

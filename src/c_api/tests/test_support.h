@@ -44,9 +44,15 @@ void mln_test_destroy_runtime(mln_runtime runtime);
 void mln_test_destroy_map(mln_map map);
 void mln_test_sleep_millisecond(void);
 
-// Reads relative_path under the directory named by MLN_FFI_TEST_FIXTURE_DIR,
-// which ctest sets. Returns malloc'd bytes the caller frees and sets *out_size,
-// or null when the file cannot be read.
+// Resolves relative_path under the fixture directory into out_path. Returns
+// false when out_path is too small.
+bool mln_test_fixture_path(
+  const char* relative_path, char* out_path, size_t out_path_capacity
+);
+
+// Reads relative_path under the fixture directory. On success, returns bytes
+// that the caller frees and writes their length to out_size. Returns null when
+// the file cannot be read.
 uint8_t* mln_test_read_fixture(const char* relative_path, size_t* out_size);
 
 bool mln_test_render_fixture_create(

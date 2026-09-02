@@ -13,13 +13,17 @@
 function(mln_ffi_configure_browser_c_api_test)
   set(fixture_dir
       "${PROJECT_SOURCE_DIR}/third_party/maplibre-native/test/fixtures")
-  # Only the tile fixtures the suite decodes travel into the module. Embedding
-  # the whole fixtures tree would carry 81MB of unrelated render-test images.
+  # Embed only the fixtures that the suite reads. Embedding the whole fixture
+  # tree would carry 81MB of unrelated render-test images.
   file(GLOB_RECURSE embedded_fixtures RELATIVE "${fixture_dir}"
        CONFIGURE_DEPENDS "${fixture_dir}/*.mlt")
   if(NOT embedded_fixtures)
     message(FATAL_ERROR "no MLT tile fixtures found under ${fixture_dir}")
   endif()
+  if(NOT EXISTS "${fixture_dir}/offline_database/corrupt-immediate.db")
+    message(FATAL_ERROR "offline database fixture is missing")
+  endif()
+  list(APPEND embedded_fixtures "offline_database/corrupt-immediate.db")
   # SHELL: keeps each flag with its value: CMake deduplicates repeated link
   # options, which would otherwise collapse the second --embed-file and leave
   # its path standing alone as an input file.
