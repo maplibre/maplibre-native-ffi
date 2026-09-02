@@ -242,6 +242,35 @@ class MapHandleTest {
     }
   }
 
+  @Test
+  fun styleSourceVolatilityCanBeToggled() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
+      map.addStyleSourceJson("places", geoJsonSource())
+
+      assertFalse(assertNotNull(map.styleSourceInfo("places")).volatileSource)
+      map.setStyleSourceVolatile("places", true)
+      assertTrue(assertNotNull(map.styleSourceInfo("places")).volatileSource)
+      map.setStyleSourceVolatile("places", false)
+      assertFalse(assertNotNull(map.styleSourceInfo("places")).volatileSource)
+      assertFailsWith<InvalidArgumentException> { map.setStyleSourceVolatile("missing", true) }
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
   // BND-109.
 
   @Test

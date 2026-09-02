@@ -1562,6 +1562,13 @@ external int mln_map_set_style_light_property(
   mln_buffer_view value,
 );
 
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Bool)>()
+external int mln_map_set_style_source_volatile(
+  int map,
+  mln_buffer_view source_id,
+  bool is_volatile,
+);
+
 @ffi.Native<
   ffi.Int32 Function(mln_map, ffi.Pointer<mln_style_transition_options>)
 >()

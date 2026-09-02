@@ -829,6 +829,21 @@ impl super::MapHandle {
         )))
     }
 
+    /// Sets whether a style source stores fetched tiles in persistent storage.
+    ///
+    /// When `is_volatile` is true, source implementations that fetch tiles do
+    /// not store fetched tiles in persistent storage. Other source types retain
+    /// the value for inspection without changing their loading behavior.
+    pub fn set_style_source_volatile(&self, source_id: &str, is_volatile: bool) -> Result<()> {
+        let map = self.inner.native()?;
+        let source_id = maplibre_core::string::string_view(source_id);
+        // SAFETY: map is live and source_id is an explicit-length view valid
+        // for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_style_source_volatile(map, source_id.raw(), is_volatile)
+        })
+    }
+
     fn copy_style_source_attribution(
         &self,
         map: sys::mln_map,

@@ -1719,6 +1719,22 @@ func (m *MapHandle) StyleSourceInfo(sourceID string) (StyleSourceInfo, bool, err
 	return result, true, nil
 }
 
+// SetStyleSourceVolatile sets whether one style source stores fetched tiles in
+// persistent cache.
+func (m *MapHandle) SetStyleSourceVolatile(sourceID string, isVolatile bool) error {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	sourceView := newCStringView(sourceID)
+	defer sourceView.free()
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_style_source_volatile(C.mln_map(ptr), sourceView.raw(), C.bool(isVolatile)))
+	})
+}
+
 func copyStyleSourceString(copy func(*C.char, C.size_t, *C.size_t, *C.bool) int32) (string, bool, error) {
 	var required C.size_t
 	var found C.bool

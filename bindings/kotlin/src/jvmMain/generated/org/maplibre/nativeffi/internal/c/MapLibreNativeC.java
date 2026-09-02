@@ -13165,6 +13165,68 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
+    private static class mln_map_set_style_source_volatile {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_buffer_view.layout(),
+            MapLibreNativeC.C_BOOL
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_set_style_source_volatile");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_style_source_volatile(mln_map map, mln_buffer_view source_id, bool is_volatile)
+     * }
+     */
+    public static FunctionDescriptor mln_map_set_style_source_volatile$descriptor() {
+        return mln_map_set_style_source_volatile.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_style_source_volatile(mln_map map, mln_buffer_view source_id, bool is_volatile)
+     * }
+     */
+    public static MethodHandle mln_map_set_style_source_volatile$handle() {
+        return mln_map_set_style_source_volatile.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_style_source_volatile(mln_map map, mln_buffer_view source_id, bool is_volatile)
+     * }
+     */
+    public static MemorySegment mln_map_set_style_source_volatile$address() {
+        return mln_map_set_style_source_volatile.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_set_style_source_volatile(mln_map map, mln_buffer_view source_id, bool is_volatile)
+     * }
+     */
+    public static int mln_map_set_style_source_volatile(long map, MemorySegment source_id, boolean is_volatile) {
+        var mh$ = mln_map_set_style_source_volatile.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_set_style_source_volatile", map, source_id, is_volatile);
+            }
+            return (int)mh$.invokeExact(map, source_id, is_volatile);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mln_map_copy_style_source_attribution {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,

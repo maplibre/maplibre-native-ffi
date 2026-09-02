@@ -1116,6 +1116,31 @@ def test_style_source_metadata_enums_preserve_unknown_values() -> None:
         assert value.native_code == 999_040
 
 
+def test_style_source_volatility_round_trips_through_public_api() -> None:
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        map_handle.add_vector_source_tiles(
+            "volatile-source", ("https://example.test/tiles/{z}/{x}/{y}.mvt",)
+        )
+
+        info = map_handle.get_style_source_info("volatile-source")
+        assert info is not None
+        assert info.is_volatile is False
+
+        map_handle.set_style_source_volatile("volatile-source", True)
+        info = map_handle.get_style_source_info("volatile-source")
+        assert info is not None
+        assert info.is_volatile is True
+
+        map_handle.set_style_source_volatile("volatile-source", False)
+        info = map_handle.get_style_source_info("volatile-source")
+        assert info is not None
+        assert info.is_volatile is False
+
+        with pytest.raises(mln.InvalidArgumentError):
+            map_handle.set_style_source_volatile("missing-source", True)
+
+
 def test_loaded_style_document_and_url_read_back_what_was_loaded() -> None:
     style_json = _EMPTY_STYLE_BYTES
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:

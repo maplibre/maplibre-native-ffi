@@ -52,6 +52,41 @@ test "style source removal reports state and copies missing results" {
     try testing.expect((try map.copyStyleSourceUrl(testing.allocator, "remove-me")) == null);
 }
 
+test "style source volatility round trips through the public API" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try support.createLoadedMap(&runtime);
+    defer map.close() catch @panic("map close failed");
+
+    const tiles = [_][]const u8{"https://example.com/{z}/{x}/{y}.mvt"};
+    try map.addVectorSourceTiles(testing.allocator, "volatile-source", tiles[0..], null);
+
+    {
+        var info = (try map.getStyleSourceInfo(testing.allocator, "volatile-source")).?;
+        defer info.deinit();
+        try testing.expect(!info.is_volatile);
+    }
+
+    try map.setStyleSourceVolatile(testing.allocator, "volatile-source", true);
+    {
+        var info = (try map.getStyleSourceInfo(testing.allocator, "volatile-source")).?;
+        defer info.deinit();
+        try testing.expect(info.is_volatile);
+    }
+
+    try map.setStyleSourceVolatile(testing.allocator, "volatile-source", false);
+    {
+        var info = (try map.getStyleSourceInfo(testing.allocator, "volatile-source")).?;
+        defer info.deinit();
+        try testing.expect(!info.is_volatile);
+    }
+
+    try testing.expectError(
+        error.InvalidArgument,
+        map.setStyleSourceVolatile(testing.allocator, "missing-source", true),
+    );
+}
+
 test "tile source helpers expose copied reconstructible source information" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
