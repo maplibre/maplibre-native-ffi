@@ -127,7 +127,7 @@ endfunction()
 
 function(mln_ffi_configure_platform target)
   set(MLN_FFI_VENDOR_APPLE_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/qt/src/mbgl/bidi.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/qt/src/mln/bidi.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/async_task.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/collator.mm
       ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../../src/platform/apple/http_file_source.mm

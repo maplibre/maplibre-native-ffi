@@ -6,19 +6,19 @@
 #include <string>
 #include <utility>
 
-#include <mbgl/gfx/backend_scope.hpp>
-#include <mbgl/gfx/headless_backend.hpp>
-#include <mbgl/gfx/renderable.hpp>
-#include <mbgl/gl/context.hpp>
-#include <mbgl/gl/defines.hpp>
-#include <mbgl/gl/framebuffer.hpp>
-#include <mbgl/gl/renderable_resource.hpp>
-#include <mbgl/gl/renderbuffer_resource.hpp>
-#include <mbgl/gl/renderer_backend.hpp>
-#include <mbgl/gl/texture2d.hpp>
-#include <mbgl/platform/gl_functions.hpp>
-#include <mbgl/util/image.hpp>
-#include <mbgl/util/size.hpp>
+#include <mln/gfx/backend_scope.hpp>
+#include <mln/gfx/headless_backend.hpp>
+#include <mln/gfx/renderable.hpp>
+#include <mln/gl/context.hpp>
+#include <mln/gl/defines.hpp>
+#include <mln/gl/framebuffer.hpp>
+#include <mln/gl/renderable_resource.hpp>
+#include <mln/gl/renderbuffer_resource.hpp>
+#include <mln/gl/renderer_backend.hpp>
+#include <mln/gl/texture2d.hpp>
+#include <mln/platform/gl_functions.hpp>
+#include <mln/util/image.hpp>
+#include <mln/util/size.hpp>
 
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
 #ifndef WIN32_LEAN_AND_MEAN

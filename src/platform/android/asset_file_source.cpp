@@ -7,20 +7,19 @@
 #include <string_view>
 #include <utility>
 
-#include <mbgl/actor/actor.hpp>
-#include <mbgl/platform/settings.hpp>
-#include <mbgl/storage/asset_file_source.hpp>
-#include <mbgl/storage/file_source_request.hpp>
-#include <mbgl/storage/resource.hpp>
-#include <mbgl/storage/resource_options.hpp>
-#include <mbgl/storage/response.hpp>
-#include <mbgl/util/async_request.hpp>
-#include <mbgl/util/client_options.hpp>
-#include <mbgl/util/constants.hpp>
-#include <mbgl/util/thread.hpp>
-#include <mbgl/util/url.hpp>
-
 #include <android/asset_manager.h>
+#include <mln/actor/actor.hpp>
+#include <mln/platform/settings.hpp>
+#include <mln/storage/asset_file_source.hpp>
+#include <mln/storage/file_source_request.hpp>
+#include <mln/storage/resource.hpp>
+#include <mln/storage/resource_options.hpp>
+#include <mln/storage/response.hpp>
+#include <mln/util/async_request.hpp>
+#include <mln/util/client_options.hpp>
+#include <mln/util/constants.hpp>
+#include <mln/util/thread.hpp>
+#include <mln/util/url.hpp>
 #include <sys/types.h>
 
 #include "platform/android/asset_manager.hpp"

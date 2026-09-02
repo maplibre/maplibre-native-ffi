@@ -16,11 +16,11 @@
 #include <webgpu/webgpu.h>
 #include <webgpu/webgpu_cpp.h>
 
-#include <mbgl/gfx/headless_backend.hpp>
-#include <mbgl/util/image.hpp>
-#include <mbgl/util/size.hpp>
-#include <mbgl/webgpu/renderable_resource.hpp>
-#include <mbgl/webgpu/renderer_backend.hpp>
+#include <mln/gfx/headless_backend.hpp>
+#include <mln/util/image.hpp>
+#include <mln/util/size.hpp>
+#include <mln/webgpu/renderable_resource.hpp>
+#include <mln/webgpu/renderer_backend.hpp>
 
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"

@@ -2,8 +2,8 @@
 #include <cstring>
 #include <limits>
 
-#include <mbgl/gfx/backend_scope.hpp>
-#include <mbgl/util/image.hpp>
+#include <mln/gfx/backend_scope.hpp>
+#include <mln/util/image.hpp>
 
 #include "render/texture_session.hpp"
 

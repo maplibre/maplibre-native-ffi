@@ -2,8 +2,8 @@
 
 #include <optional>
 
-#include <mbgl/style/conversion.hpp>
-#include <mbgl/style/filter.hpp>
+#include <mln/style/conversion.hpp>
+#include <mln/style/filter.hpp>
 
 #include "maplibre_native_c/base.h"
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <mbgl/gfx/headless_backend.hpp>
-#include <mbgl/mtl/headless_backend.hpp>
+#include <mln/gfx/headless_backend.hpp>
+#include <mln/mtl/headless_backend.hpp>
 
 #include <Metal/MTLDevice.hpp>
 #include <Metal/MTLTexture.hpp>

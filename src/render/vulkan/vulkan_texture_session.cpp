@@ -3,9 +3,8 @@
 #include <utility>
 #include <vector>
 
-#include <mbgl/gfx/headless_backend.hpp>
-#include <mbgl/util/size.hpp>
-
+#include <mln/gfx/headless_backend.hpp>
+#include <mln/util/size.hpp>
 #include <vulkan/vulkan_core.h>
 
 #include "diagnostics/diagnostics.hpp"

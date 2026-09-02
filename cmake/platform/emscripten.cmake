@@ -45,13 +45,13 @@ function(mln_ffi_configure_platform target)
   # built on libuv, whose event loop has no browser backing. src/platform/
   # emscripten supplies them instead.
   set(MLN_FFI_VENDOR_EMSCRIPTEN_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/collator.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/text/bidi.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/text/local_glyph_rasterizer.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/monotonic_timer.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/png_writer.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/string_stdlib.cpp)
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/collator.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/bidi.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/local_glyph_rasterizer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/monotonic_timer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/png_writer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/string_stdlib.cpp)
 
   set(MLN_FFI_EMSCRIPTEN_SOURCES
       ${PROJECT_SOURCE_DIR}/src/platform/emscripten/async_task.cpp
@@ -65,7 +65,7 @@ function(mln_ffi_configure_platform target)
   mln_ffi_target_project_sources(${target} ${MLN_FFI_EMSCRIPTEN_SOURCES})
 
   set_source_files_properties(
-    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
+    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
     PROPERTIES COMPILE_DEFINITIONS MBGL_USE_BUILTIN_ICU)
 
   target_include_directories(

@@ -17,8 +17,8 @@
 #include <utility>
 #include <vector>
 
-#include <mbgl/storage/resource_options.hpp>
-#include <mbgl/util/run_loop.hpp>
+#include <mln/storage/resource_options.hpp>
+#include <mln/util/run_loop.hpp>
 
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"

@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include <mbgl/util/feature.hpp>
+#include <mln/util/feature.hpp>
 
 #include "maplibre_native_c.h"
 

@@ -1,10 +1,9 @@
 #include <memory>
 
-#include <mbgl/util/size.hpp>
-
 #include <Metal/MTLDevice.hpp>
 #include <Metal/MTLPixelFormat.hpp>
 #include <Metal/MTLTexture.hpp>
+#include <mln/util/size.hpp>
 
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"

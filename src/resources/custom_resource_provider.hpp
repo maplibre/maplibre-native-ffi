@@ -3,9 +3,9 @@
 #include <memory>
 #include <string>
 
-#include <mbgl/storage/file_source.hpp>
-#include <mbgl/storage/resource.hpp>
-#include <mbgl/util/async_request.hpp>
+#include <mln/storage/file_source.hpp>
+#include <mln/storage/resource.hpp>
+#include <mln/util/async_request.hpp>
 
 #include "maplibre_native_c.h"
 

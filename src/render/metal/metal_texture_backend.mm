@@ -1,16 +1,15 @@
 #include <memory>
 
-#include <mbgl/gfx/backend_scope.hpp>
-#include <mbgl/gfx/offscreen_texture.hpp>
-#include <mbgl/mtl/context.hpp>
-#include <mbgl/mtl/renderable_resource.hpp>
-#include <mbgl/mtl/texture2d.hpp>
-
 #include <Metal/MTLBlitPass.hpp>
 #include <Metal/MTLCommandBuffer.hpp>
 #include <Metal/MTLCommandQueue.hpp>
 #include <Metal/MTLRenderPass.hpp>
 #include <TargetConditionals.h>
+#include <mln/gfx/backend_scope.hpp>
+#include <mln/gfx/offscreen_texture.hpp>
+#include <mln/mtl/context.hpp>
+#include <mln/mtl/renderable_resource.hpp>
+#include <mln/mtl/texture2d.hpp>
 
 #include "render/metal/metal_texture_backend.inc"
 

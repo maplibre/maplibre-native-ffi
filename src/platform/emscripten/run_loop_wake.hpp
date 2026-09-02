@@ -8,7 +8,7 @@
 #include <mutex>
 #include <vector>
 
-#include <mbgl/util/chrono.hpp>
+#include <mln/util/chrono.hpp>
 
 namespace mln::platform::emscripten {
 

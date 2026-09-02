@@ -3,18 +3,17 @@
 #include <string_view>
 #include <vector>
 
-#include <mbgl/style/conversion/geojson.hpp>
-#include <mbgl/style/conversion/stringify.hpp>
-#include <mbgl/style/conversion_impl.hpp>
-#include <mbgl/style/rapidjson_conversion.hpp>
-#include <mbgl/util/feature.hpp>
-#include <mbgl/util/geo.hpp>
-#include <mbgl/util/geojson.hpp>
-#include <mbgl/util/geometry.hpp>
-#include <mbgl/util/rapidjson.hpp>
-
 #include <mapbox/geojson.hpp>
 #include <mapbox/geojson/rapidjson.hpp>
+#include <mln/style/conversion/geojson.hpp>
+#include <mln/style/conversion/stringify.hpp>
+#include <mln/style/conversion_impl.hpp>
+#include <mln/style/rapidjson_conversion.hpp>
+#include <mln/util/feature.hpp>
+#include <mln/util/geo.hpp>
+#include <mln/util/geojson.hpp>
+#include <mln/util/geometry.hpp>
+#include <mln/util/rapidjson.hpp>
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>
 #include <rapidjson/stringbuffer.h>
