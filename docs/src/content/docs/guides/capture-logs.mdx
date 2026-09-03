@@ -10,8 +10,9 @@ import { region } from "../../../snippets";
 
 import logCallback from "../../../../snippets/c/log-callback.c?raw";
 
-MapLibre Native sends records to the platform logger by default. Android and
-Apple platforms use the system log; other platforms use the console. Install a
+MapLibre Native sends records to the platform logger by default: logcat on
+Android, the system log on Apple platforms, hilog on OpenHarmony, stderr and the
+debugger output stream on Windows, and stderr on Linux and Emscripten. Install a
 callback to send records to a host logger, file, crash reporter, or test.
 
 A record contains a severity, category, optional numeric code, and message. The
