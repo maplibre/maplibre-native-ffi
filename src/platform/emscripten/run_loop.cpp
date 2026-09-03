@@ -17,13 +17,12 @@
 #include <set>
 #include <stdexcept>
 
-#include <mbgl/actor/scheduler.hpp>
-#include <mbgl/util/chrono.hpp>
-#include <mbgl/util/run_loop.hpp>
-
 #include <emscripten/eventloop.h>
 #include <emscripten/proxying.h>
 #include <emscripten/threading.h>
+#include <mln/actor/scheduler.hpp>
+#include <mln/util/chrono.hpp>
+#include <mln/util/run_loop.hpp>
 
 #include "run_loop_wake.hpp"
 

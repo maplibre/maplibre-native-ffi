@@ -1,14 +1,14 @@
 #include <exception>
 #include <memory>
 
-#include <mbgl/storage/asset_file_source.hpp>
-#include <mbgl/storage/file_source.hpp>
-#include <mbgl/storage/file_source_manager.hpp>
-#include <mbgl/storage/local_file_source.hpp>
-#include <mbgl/storage/mbtiles_file_source.hpp>
-#include <mbgl/storage/pmtiles_file_source.hpp>
-#include <mbgl/storage/resource_options.hpp>
-#include <mbgl/util/client_options.hpp>
+#include <mln/storage/asset_file_source.hpp>
+#include <mln/storage/file_source.hpp>
+#include <mln/storage/file_source_manager.hpp>
+#include <mln/storage/local_file_source.hpp>
+#include <mln/storage/mbtiles_file_source.hpp>
+#include <mln/storage/pmtiles_file_source.hpp>
+#include <mln/storage/resource_options.hpp>
+#include <mln/util/client_options.hpp>
 
 #include "resources/resource_loader.hpp"
 

@@ -1,7 +1,7 @@
-diff --git a/platform/default/src/mbgl/storage/local_file_request.cpp b/platform/default/src/mbgl/storage/local_file_request.cpp
+diff --git a/platform/default/src/mln/storage/local_file_request.cpp b/platform/default/src/mln/storage/local_file_request.cpp
 index 8c6cf43..325e1aa 100644
---- a/platform/default/src/mbgl/storage/local_file_request.cpp
-+++ b/platform/default/src/mbgl/storage/local_file_request.cpp
+--- a/platform/default/src/mln/storage/local_file_request.cpp
++++ b/platform/default/src/mln/storage/local_file_request.cpp
 @@ -5,6 +5,10 @@
  #include <sys/types.h>
  #include <sys/stat.h>
@@ -28,10 +28,10 @@ index 8c6cf43..325e1aa 100644
  
      if (result == 0 && (S_IFDIR & buf.st_mode)) {
          response.error = std::make_unique<Response::Error>(Response::Error::Reason::NotFound);
-diff --git a/platform/default/src/mbgl/storage/local_file_source.cpp b/platform/default/src/mbgl/storage/local_file_source.cpp
+diff --git a/platform/default/src/mln/storage/local_file_source.cpp b/platform/default/src/mln/storage/local_file_source.cpp
 index e855e06..26f9c84 100644
---- a/platform/default/src/mbgl/storage/local_file_source.cpp
-+++ b/platform/default/src/mbgl/storage/local_file_source.cpp
+--- a/platform/default/src/mln/storage/local_file_source.cpp
++++ b/platform/default/src/mln/storage/local_file_source.cpp
 @@ -34,8 +34,16 @@ public:
          }
  
@@ -50,10 +50,10 @@ index e855e06..26f9c84 100644
          requestLocalFile(path, req, resource.dataRange);
      }
  
-diff --git a/src/mbgl/util/io.cpp b/src/mbgl/util/io.cpp
+diff --git a/src/mln/util/io.cpp b/src/mln/util/io.cpp
 index af44566..e705eea 100644
---- a/src/mbgl/util/io.cpp
-+++ b/src/mbgl/util/io.cpp
+--- a/src/mln/util/io.cpp
++++ b/src/mln/util/io.cpp
 @@ -8,6 +8,10 @@
  #include <sstream>
  #include <fstream>

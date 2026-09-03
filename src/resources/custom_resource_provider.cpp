@@ -10,13 +10,13 @@
 #include <string>
 #include <utility>
 
-#include <mbgl/actor/actor_ref.hpp>
-#include <mbgl/storage/file_source.hpp>
-#include <mbgl/storage/file_source_request.hpp>
-#include <mbgl/storage/resource.hpp>
-#include <mbgl/storage/response.hpp>
-#include <mbgl/util/async_request.hpp>
-#include <mbgl/util/chrono.hpp>
+#include <mln/actor/actor_ref.hpp>
+#include <mln/storage/file_source.hpp>
+#include <mln/storage/file_source_request.hpp>
+#include <mln/storage/resource.hpp>
+#include <mln/storage/response.hpp>
+#include <mln/util/async_request.hpp>
+#include <mln/util/chrono.hpp>
 
 #include "resources/custom_resource_provider.hpp"
 

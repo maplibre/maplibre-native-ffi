@@ -1,10 +1,10 @@
 #include <optional>
 #include <string>
 
-#include <mbgl/style/conversion.hpp>
-#include <mbgl/style/conversion/filter.hpp>
-#include <mbgl/style/conversion/json.hpp>
-#include <mbgl/style/filter.hpp>
+#include <mln/style/conversion.hpp>
+#include <mln/style/conversion/filter.hpp>
+#include <mln/style/conversion/json.hpp>
+#include <mln/style/filter.hpp>
 
 #include "style/style_value.hpp"
 

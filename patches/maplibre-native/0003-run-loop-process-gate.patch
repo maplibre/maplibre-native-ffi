@@ -1,7 +1,7 @@
-diff --git a/include/mbgl/util/run_loop.hpp b/include/mbgl/util/run_loop.hpp
+diff --git a/include/mln/util/run_loop.hpp b/include/mln/util/run_loop.hpp
 index 88b3a35..968c0aa 100644
---- a/include/mbgl/util/run_loop.hpp
-+++ b/include/mbgl/util/run_loop.hpp
+--- a/include/mln/util/run_loop.hpp
++++ b/include/mln/util/run_loop.hpp
 @@ -56,6 +56,12 @@ public:
      /// same thread as the Map object lives.
      void setPlatformCallback(std::function<void()> callback) { platformCallback = std::move(callback); }

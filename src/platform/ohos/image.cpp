@@ -5,9 +5,8 @@
 #include <string>
 #include <vector>
 
-#include <mbgl/util/image.hpp>
-#include <mbgl/util/premultiply.hpp>
-
+#include <mln/util/image.hpp>
+#include <mln/util/premultiply.hpp>
 #include <multimedia/image_framework/image/image_source_native.h>
 #include <multimedia/image_framework/image/pixelmap_native.h>
 

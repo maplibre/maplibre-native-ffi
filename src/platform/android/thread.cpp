@@ -2,11 +2,10 @@
 #include <cmath>
 #include <string>
 
-#include <mbgl/platform/thread.hpp>
-#include <mbgl/util/event.hpp>
-#include <mbgl/util/logging.hpp>
-#include <mbgl/util/platform.hpp>
-
+#include <mln/platform/thread.hpp>
+#include <mln/util/event.hpp>
+#include <mln/util/logging.hpp>
+#include <mln/util/platform.hpp>
 #include <sys/prctl.h>
 #include <sys/resource.h>
 

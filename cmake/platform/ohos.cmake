@@ -66,20 +66,20 @@ function(mln_ffi_configure_platform target)
   include("${MLN_FFI_SOURCE_DIR}/vendor/icu.cmake")
 
   set_source_files_properties(
-    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
+    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
     PROPERTIES COMPILE_DEFINITIONS MBGL_USE_BUILTIN_ICU)
 
   set(MLN_FFI_VENDOR_OHOS_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/collator.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/text/bidi.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/text/local_glyph_rasterizer.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/async_task.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/png_writer.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/run_loop.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/string_stdlib.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/thread.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp)
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/collator.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/bidi.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/local_glyph_rasterizer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/async_task.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/png_writer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/run_loop.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/string_stdlib.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/thread.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/timer.cpp)
   set(MLN_FFI_OHOS_SOURCES
       ${PROJECT_SOURCE_DIR}/src/platform/ohos/http_file_source.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/ohos/image.cpp
