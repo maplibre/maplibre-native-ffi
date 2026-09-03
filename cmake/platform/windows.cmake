@@ -36,7 +36,7 @@ function(mln_ffi_configure_platform_dependencies target)
     ${target}
     PROPERTIES
       MLN_FFI_DEFAULT_LOGGING_STDERR
-      TRUE
+      FALSE
       MLN_FFI_DEFAULT_THREAD_LOCAL
       FALSE
       MLN_FFI_SHARED_SUPPORTED
@@ -88,7 +88,8 @@ function(mln_ffi_configure_platform target)
 
   set(MLN_FFI_WINDOWS_SOURCES
       ${PROJECT_SOURCE_DIR}/src/platform/rust/http_file_source.cpp
-      ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp)
+      ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/windows/logging_debugger.cpp)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_WINDOWS_SOURCES})
   mln_ffi_target_project_sources(${target} ${MLN_FFI_WINDOWS_SOURCES})

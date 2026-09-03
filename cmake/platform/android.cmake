@@ -1,5 +1,5 @@
 function(mln_ffi_configure_platform_dependencies target)
-  target_link_libraries(${target} INTERFACE android atomic z)
+  target_link_libraries(${target} INTERFACE android atomic log z)
   mln_ffi_bundle_clang_cxx_runtime(${target} "${CMAKE_ANDROID_NDK}/NOTICE")
   string(REGEX REPLACE "^android-" "" android_api_level "${ANDROID_PLATFORM}")
   # The emulator this repository boots runs x86_64 with SwiftShader drivers for
@@ -23,7 +23,7 @@ function(mln_ffi_configure_platform_dependencies target)
     ${target}
     PROPERTIES
       MLN_FFI_DEFAULT_LOGGING_STDERR
-      TRUE
+      FALSE
       MLN_FFI_DEFAULT_THREAD_LOCAL
       TRUE
       MLN_FFI_SHARED_SUPPORTED
@@ -58,6 +58,7 @@ function(mln_ffi_configure_platform target)
   set(MLN_FFI_ANDROID_SOURCES
       ${PROJECT_SOURCE_DIR}/src/platform/android/asset_file_source.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/asset_manager.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/android/logging_logcat.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/thread.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/rust/http_file_source.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp)
