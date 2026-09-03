@@ -57,6 +57,7 @@ mlt_vendor_paths=(
 mln_patches=(
   "$repo_root/patches/maplibre-native/0002-windows-local-file-urls.patch"
   "$repo_root/patches/maplibre-native/0003-run-loop-process-gate.patch"
+  "$repo_root/patches/maplibre-native/0004-opengl-valid-api-calls.patch"
 )
 
 # A patch counts as applied when it reverses cleanly, which is also what makes

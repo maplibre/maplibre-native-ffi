@@ -37,9 +37,14 @@ go vet ./...
 shopt -s nullglob
 test_binaries=("$test_dir"/*.test)
 if [[ "$platform" == android ]]; then
+  emulator_args=()
+  if [[ "$preset" == android-x64-egl ]]; then
+    emulator_args+=(--api 26)
+  fi
   exec "$MISE_MONOREPO_ROOT/scripts/run-android-emulator-test.sh" \
     180 \
     "$native_install_dir/lib/libmaplibre-native-c.so" \
+    ${emulator_args[@]+"${emulator_args[@]}"} \
     -test.v -- ${test_binaries[@]+"${test_binaries[@]}"}
 fi
 exec "$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \

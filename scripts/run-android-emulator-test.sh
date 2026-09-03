@@ -5,13 +5,18 @@
 set -euo pipefail
 
 if [[ $# -lt 3 ]]; then
-  echo "usage: $0 <timeout-seconds> <native-library> [test-argument ...] -- <test-executable ...>" >&2
+  echo "usage: $0 <timeout-seconds> <native-library> [--api <api>] [test-argument ...] -- <test-executable ...>" >&2
   exit 2
 fi
 
 timeout_seconds=$1
 native_library=$2
 shift 2
+emulator_api=
+if [[ ${1:-} == --api ]]; then
+  emulator_api=${2:?--api requires an Android API level}
+  shift 2
+fi
 test_arguments=()
 while (($#)) && [[ $1 != -- ]]; do
   test_arguments+=("$1")
@@ -41,6 +46,10 @@ if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
   echo "Invalid timeout: $timeout_seconds" >&2
   exit 2
 fi
+if [[ -n "$emulator_api" && ! "$emulator_api" =~ ^[0-9]+$ ]]; then
+  echo "Invalid Android API level: $emulator_api" >&2
+  exit 2
+fi
 if [[ -n "$fixture_dir" && ! -d "$fixture_dir" ]]; then
   echo "Android emulator fixture directory does not exist: $fixture_dir" >&2
   exit 2
@@ -48,10 +57,14 @@ fi
 
 # platform-tools arrives with the first boot, so a missing adb means boot, not
 # failure.
-if [[ ! -x "$adb" ]] ||
+if [[ -n "$emulator_api" ]] || [[ ! -x "$adb" ]] ||
   ! "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
   tr -d '\r' | grep -qx 1; then
-  mise run //:android-emulator:boot
+  emulator_args=(x86_64)
+  if [[ -n "$emulator_api" ]]; then
+    emulator_args+=(--api "$emulator_api")
+  fi
+  mise run //:android-emulator:boot "${emulator_args[@]}"
 fi
 
 # The shell user may execute what it owns under /data/local/tmp. The Android

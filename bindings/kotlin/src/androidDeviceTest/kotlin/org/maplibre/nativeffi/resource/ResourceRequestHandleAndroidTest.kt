@@ -93,9 +93,11 @@ class ResourceRequestHandleAndroidTest {
   }
 
   private fun awaitRelease(released: CountDownLatch): Boolean {
+    val runtime = Runtime.getRuntime()
     repeat(ATTEMPTS) {
+      runtime.gc()
+      runtime.runFinalization()
       if (released.await(POLL_MILLIS, TimeUnit.MILLISECONDS)) return true
-      System.gc()
     }
     return released.count == 0L
   }
