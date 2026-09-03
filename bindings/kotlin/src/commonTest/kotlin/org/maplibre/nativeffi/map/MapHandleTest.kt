@@ -18,6 +18,8 @@ import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.camera.UnitBezier
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.error.WrongThreadException
+import org.maplibre.nativeffi.failureFromBackgroundThread
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
@@ -1174,6 +1176,66 @@ class MapHandleTest {
   }
 
   @Test
+  fun unwrappedCoordinateConversionsPreserveVisibleWorldCopies() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 1024
+          height = 512
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      map.jumpTo(
+        CameraOptions().apply {
+          center = LatLng(0.0, 180.0)
+          zoom = 0.0
+        }
+      )
+      val points = listOf(ScreenPoint(0.0, 256.0), ScreenPoint(1024.0, 256.0))
+      val wrapped = map.latLngsForPixels(points)
+      val unwrapped = map.latLngsForPixelsUnwrapped(points)
+
+      assertTrue(wrapped.all { it.longitude in -180.0..180.0 })
+      assertTrue(unwrapped[1].longitude - unwrapped[0].longitude > 360.0)
+      assertTrue(map.latLngForPixel(points[1]).longitude in -180.0..180.0)
+      assertEquals(unwrapped[1].longitude, map.latLngForPixelUnwrapped(points[1]).longitude, 1e-10)
+      map.createProjection().use { projection ->
+        assertTrue(projection.latLngForPixel(points[1]).longitude in -180.0..180.0)
+        assertEquals(
+          unwrapped[1].longitude,
+          projection.latLngForPixelUnwrapped(points[1]).longitude,
+          1e-10,
+        )
+      }
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun emptyBatchConversionsFromAnotherThreadReportWrongThread() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map = MapHandle.create(runtime, MapOptions())
+    try {
+      val calls =
+        listOf<() -> Unit>(
+          { map.pixelsForLatLngs(emptyList()) },
+          { map.latLngsForPixels(emptyList()) },
+          { map.latLngsForPixelsUnwrapped(emptyList()) },
+        )
+      calls.forEach { call -> assertIs<WrongThreadException>(failureFromBackgroundThread(call)) }
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
   fun mapProjectionCoordinateConversionsCanBeRoundTrippedAndClosed() {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     val map =
@@ -1195,6 +1257,9 @@ class MapHandleTest {
       assertNear(coordinate, roundTrip)
 
       map.close()
+      assertFailsWith<InvalidStateException> { map.pixelsForLatLngs(emptyList()) }
+      assertFailsWith<InvalidStateException> { map.latLngsForPixels(emptyList()) }
+      assertFailsWith<InvalidStateException> { map.latLngsForPixelsUnwrapped(emptyList()) }
       val detachedPoint = projection.pixelForLatLng(coordinate)
       assertNear(coordinate, projection.latLngForPixel(detachedPoint))
 

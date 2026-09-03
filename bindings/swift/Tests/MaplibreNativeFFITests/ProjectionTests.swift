@@ -47,6 +47,37 @@ import Testing
   #expect(projection.isClosed)
 }
 
+@Test func unwrappedCoordinateConversionsPreserveVisibleWorldCopies() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 1024, height: 512)
+  )
+  defer { try? map.close() }
+  try map.jump(to: CameraOptions(
+    center: LatLng(latitude: 0, longitude: 180),
+    zoom: 0
+  ))
+  let points = [ScreenPoint(x: 0, y: 256), ScreenPoint(x: 1024, y: 256)]
+
+  let wrapped = try map.latLngs(for: points)
+  let unwrapped = try map.latLngsUnwrapped(for: points)
+  #expect(wrapped.allSatisfy { (-180 ... 180).contains($0.longitude) })
+  #expect(unwrapped[1].longitude - unwrapped[0].longitude > 360)
+  #expect(try (-180 ... 180).contains(map.latLng(for: points[1]).longitude))
+  let right = try map.latLngUnwrapped(for: points[1])
+  #expect(abs(right.longitude - unwrapped[1].longitude) < 0.0000000001)
+
+  let projection = try MapProjectionHandle(map: map)
+  defer { try? projection.close() }
+  #expect(try (-180 ... 180)
+    .contains(projection.latLng(for: points[1]).longitude))
+  let projectedRight = try projection.latLngUnwrapped(for: points[1])
+  #expect(abs(projectedRight.longitude - right.longitude) < 0.0000000001)
+}
+
 @Test func mapProjectionSetVisibleCoordinatesRejectsEmptyInputBeforeCallingC(
 ) throws {
   let runtime =

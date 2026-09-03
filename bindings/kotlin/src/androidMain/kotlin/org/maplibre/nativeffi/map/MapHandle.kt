@@ -1742,6 +1742,20 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     }
   }
 
+  public actual fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng {
+    NativeAccess.ensureLoaded()
+    MaplibreNativeC.mln_lat_lng().use { outCoordinate ->
+      Status.check(
+        MaplibreNativeC.mln_map_lat_lng_for_pixel_unwrapped(
+          requireLiveHandle(),
+          screenPoint(point),
+          outCoordinate,
+        )
+      )
+      return latLng(outCoordinate)
+    }
+  }
+
   public actual fun pixelsForLatLngs(coordinates: List<LatLng>): List<ScreenPoint> {
     NativeAccess.ensureLoaded()
     val coordinateSnapshot = coordinates.toList()
@@ -1775,6 +1789,30 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
       LatLngArrayScope(nativePoints.count).use { outCoordinates ->
         Status.check(
           MaplibreNativeC.mln_map_lat_lngs_for_pixels(
+            requireLiveHandle(),
+            nativePoints.points,
+            nativePoints.count,
+            outCoordinates.coordinates,
+          )
+        )
+        return outCoordinates.toList(Math.toIntExact(nativePoints.count))
+      }
+    }
+  }
+
+  public actual fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): List<LatLng> {
+    NativeAccess.ensureLoaded()
+    val pointSnapshot = points.toList()
+    if (pointSnapshot.isEmpty()) {
+      Status.check(
+        MaplibreNativeC.mln_map_lat_lngs_for_pixels_unwrapped(requireLiveHandle(), null, 0L, null)
+      )
+      return emptyList()
+    }
+    ScreenPointArrayScope(pointSnapshot).use { nativePoints ->
+      LatLngArrayScope(nativePoints.count).use { outCoordinates ->
+        Status.check(
+          MaplibreNativeC.mln_map_lat_lngs_for_pixels_unwrapped(
             requireLiveHandle(),
             nativePoints.points,
             nativePoints.count,

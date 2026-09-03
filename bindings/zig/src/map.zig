@@ -1972,10 +1972,22 @@ pub const MapHandle = enum(c.mln_map) {
         return values.screenPointFromNative(point);
     }
 
+    /// Converts a screen point to a coordinate with longitude wrapped to -180 through 180.
     pub fn latLngForPixel(self: *MapHandle, point: values.ScreenPoint) status.Error!values.LatLng {
         var coordinate: c.mln_lat_lng = undefined;
         try status.checkStatus(
             c.mln_map_lat_lng_for_pixel(try native(self), values.screenPointToNative(point), &coordinate),
+            diagnosticStore(self),
+        );
+        return values.latLngFromNative(coordinate);
+    }
+
+    /// Converts a screen point to an unwrapped geographic coordinate.
+    /// The longitude preserves the visible world copy.
+    pub fn latLngForPixelUnwrapped(self: *MapHandle, point: values.ScreenPoint) status.Error!values.LatLng {
+        var coordinate: c.mln_lat_lng = undefined;
+        try status.checkStatus(
+            c.mln_map_lat_lng_for_pixel_unwrapped(try native(self), values.screenPointToNative(point), &coordinate),
             diagnosticStore(self),
         );
         return values.latLngFromNative(coordinate);
@@ -2004,6 +2016,7 @@ pub const MapHandle = enum(c.mln_map) {
         for (raw_points, out_points) |raw_point, *out_point| out_point.* = values.screenPointFromNative(raw_point);
     }
 
+    /// Converts screen points to coordinates with longitudes wrapped to -180 through 180.
     pub fn latLngsForPixels(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -2022,6 +2035,31 @@ pub const MapHandle = enum(c.mln_map) {
         defer allocator.free(raw_coordinates);
         try status.checkStatus(
             c.mln_map_lat_lngs_for_pixels(try native(self), raw_points.ptr, raw_points.len, raw_coordinates.ptr),
+            diagnosticStore(self),
+        );
+        for (raw_coordinates, out_coordinates) |raw_coordinate, *out_coordinate| out_coordinate.* = values.latLngFromNative(raw_coordinate);
+    }
+
+    /// Converts screen points to unwrapped geographic coordinates.
+    /// Each longitude preserves its visible world copy.
+    pub fn latLngsForPixelsUnwrapped(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        points: []const values.ScreenPoint,
+        out_coordinates: []values.LatLng,
+    ) status.Error!void {
+        if (points.len != out_coordinates.len) return error.InvalidArgument;
+        if (points.len == 0) {
+            try status.checkStatus(c.mln_map_lat_lngs_for_pixels_unwrapped(try native(self), null, 0, null), diagnosticStore(self));
+            return;
+        }
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        const raw_points = try temp.screenPoints(points);
+        const raw_coordinates = try allocator.alloc(c.mln_lat_lng, out_coordinates.len);
+        defer allocator.free(raw_coordinates);
+        try status.checkStatus(
+            c.mln_map_lat_lngs_for_pixels_unwrapped(try native(self), raw_points.ptr, raw_points.len, raw_coordinates.ptr),
             diagnosticStore(self),
         );
         for (raw_coordinates, out_coordinates) |raw_coordinate, *out_coordinate| out_coordinate.* = values.latLngFromNative(raw_coordinate);

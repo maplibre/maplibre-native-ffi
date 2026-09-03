@@ -17,7 +17,11 @@ public expect class MapProjectionHandle : AutoCloseable {
 
   public fun pixelForLatLng(coordinate: LatLng): ScreenPoint
 
+  /** Converts a screen point to a coordinate with longitude wrapped to -180 through 180. */
   public fun latLngForPixel(point: ScreenPoint): LatLng
+
+  /** Converts a screen point to an unwrapped coordinate that preserves its visible world copy. */
+  public fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng
 
   public val isClosed: Boolean
 

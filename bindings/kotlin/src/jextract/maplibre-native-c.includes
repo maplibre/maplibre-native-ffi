@@ -50,7 +50,9 @@
 --include-function mln_map_lat_lng_bounds_for_camera
 --include-function mln_map_lat_lng_bounds_for_camera_unwrapped
 --include-function mln_map_lat_lng_for_pixel
+--include-function mln_map_lat_lng_for_pixel_unwrapped
 --include-function mln_map_lat_lngs_for_pixels
+--include-function mln_map_lat_lngs_for_pixels_unwrapped
 --include-function mln_map_move_by
 --include-function mln_map_move_by_animated
 --include-function mln_map_pitch_by
@@ -281,6 +283,7 @@
 --include-function mln_map_projection_destroy
 --include-function mln_map_projection_get_camera
 --include-function mln_map_projection_lat_lng_for_pixel
+--include-function mln_map_projection_lat_lng_for_pixel_unwrapped
 --include-function mln_map_projection_pixel_for_lat_lng
 --include-function mln_map_projection_set_camera
 --include-function mln_map_projection_set_visible_coordinates

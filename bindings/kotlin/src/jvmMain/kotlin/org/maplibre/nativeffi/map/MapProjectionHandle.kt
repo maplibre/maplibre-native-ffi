@@ -53,6 +53,13 @@ internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
     return withLiveHandle { handle -> NativeAccess.projectionLatLngForPixel(handle, point) }
   }
 
+  public actual fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng {
+    NativeAccess.ensureLoaded()
+    return withLiveHandle { handle ->
+      NativeAccess.projectionLatLngForPixelUnwrapped(handle, point)
+    }
+  }
+
   public actual val isClosed: Boolean
     get() = core.isReleased()
 

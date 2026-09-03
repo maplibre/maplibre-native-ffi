@@ -114,6 +114,9 @@ public final class MapProjectionHandle: @unchecked Sendable {
     }
   }
 
+  /// Converts a screen point to a geographic coordinate.
+  ///
+  /// The longitude is wrapped to the range from -180 to 180 degrees.
   public func latLng(for point: ScreenPoint) throws -> LatLng {
     try mapNativeFailure {
       try handle.withLive { projection in
@@ -121,6 +124,22 @@ public final class MapProjectionHandle: @unchecked Sendable {
           projection,
           point: point.nativeInput.native
         )))
+      }
+    }
+  }
+
+  /// Converts a screen point to an unwrapped geographic coordinate.
+  ///
+  /// The longitude preserves the visible world copy and may fall outside
+  /// -180 to 180.
+  public func latLngUnwrapped(for point: ScreenPoint) throws -> LatLng {
+    try mapNativeFailure {
+      try handle.withLive { projection in
+        try LatLng(native: NativeLatLng(NativeProjection
+            .latLngForPixelUnwrapped(
+              projection,
+              point: point.nativeInput.native
+            )))
       }
     }
   }

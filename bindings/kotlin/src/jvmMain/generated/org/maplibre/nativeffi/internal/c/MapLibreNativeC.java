@@ -8802,6 +8802,68 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
+    private static class mln_map_lat_lng_for_pixel_unwrapped {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_screen_point.layout(),
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_lat_lng_for_pixel_unwrapped");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_lat_lng_for_pixel_unwrapped(mln_map map, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * }
+     */
+    public static FunctionDescriptor mln_map_lat_lng_for_pixel_unwrapped$descriptor() {
+        return mln_map_lat_lng_for_pixel_unwrapped.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_lat_lng_for_pixel_unwrapped(mln_map map, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * }
+     */
+    public static MethodHandle mln_map_lat_lng_for_pixel_unwrapped$handle() {
+        return mln_map_lat_lng_for_pixel_unwrapped.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_lat_lng_for_pixel_unwrapped(mln_map map, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * }
+     */
+    public static MemorySegment mln_map_lat_lng_for_pixel_unwrapped$address() {
+        return mln_map_lat_lng_for_pixel_unwrapped.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_lat_lng_for_pixel_unwrapped(mln_map map, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * }
+     */
+    public static int mln_map_lat_lng_for_pixel_unwrapped(long map, MemorySegment point, MemorySegment out_coordinate) {
+        var mh$ = mln_map_lat_lng_for_pixel_unwrapped.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_lat_lng_for_pixel_unwrapped", map, point, out_coordinate);
+            }
+            return (int)mh$.invokeExact(map, point, out_coordinate);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mln_map_pixels_for_lat_lngs {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
@@ -8919,6 +8981,69 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         try {
             if (TRACE_DOWNCALLS) {
                 traceDowncall("mln_map_lat_lngs_for_pixels", map, points, point_count, out_coordinates);
+            }
+            return (int)mh$.invokeExact(map, points, point_count, out_coordinates);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_lat_lngs_for_pixels_unwrapped {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_lat_lngs_for_pixels_unwrapped");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_lat_lngs_for_pixels_unwrapped(mln_map map, const mln_screen_point *points, size_t point_count, mln_lat_lng *out_coordinates)
+     * }
+     */
+    public static FunctionDescriptor mln_map_lat_lngs_for_pixels_unwrapped$descriptor() {
+        return mln_map_lat_lngs_for_pixels_unwrapped.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_lat_lngs_for_pixels_unwrapped(mln_map map, const mln_screen_point *points, size_t point_count, mln_lat_lng *out_coordinates)
+     * }
+     */
+    public static MethodHandle mln_map_lat_lngs_for_pixels_unwrapped$handle() {
+        return mln_map_lat_lngs_for_pixels_unwrapped.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_lat_lngs_for_pixels_unwrapped(mln_map map, const mln_screen_point *points, size_t point_count, mln_lat_lng *out_coordinates)
+     * }
+     */
+    public static MemorySegment mln_map_lat_lngs_for_pixels_unwrapped$address() {
+        return mln_map_lat_lngs_for_pixels_unwrapped.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_lat_lngs_for_pixels_unwrapped(mln_map map, const mln_screen_point *points, size_t point_count, mln_lat_lng *out_coordinates)
+     * }
+     */
+    public static int mln_map_lat_lngs_for_pixels_unwrapped(long map, MemorySegment points, long point_count, MemorySegment out_coordinates) {
+        var mh$ = mln_map_lat_lngs_for_pixels_unwrapped.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_lat_lngs_for_pixels_unwrapped", map, points, point_count, out_coordinates);
             }
             return (int)mh$.invokeExact(map, points, point_count, out_coordinates);
         } catch (Error | RuntimeException ex) {
@@ -9873,6 +9998,68 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         try {
             if (TRACE_DOWNCALLS) {
                 traceDowncall("mln_map_projection_lat_lng_for_pixel", projection, point, out_coordinate);
+            }
+            return (int)mh$.invokeExact(projection, point, out_coordinate);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_projection_lat_lng_for_pixel_unwrapped {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_screen_point.layout(),
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_projection_lat_lng_for_pixel_unwrapped");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * }
+     */
+    public static FunctionDescriptor mln_map_projection_lat_lng_for_pixel_unwrapped$descriptor() {
+        return mln_map_projection_lat_lng_for_pixel_unwrapped.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * }
+     */
+    public static MethodHandle mln_map_projection_lat_lng_for_pixel_unwrapped$handle() {
+        return mln_map_projection_lat_lng_for_pixel_unwrapped.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * }
+     */
+    public static MemorySegment mln_map_projection_lat_lng_for_pixel_unwrapped$address() {
+        return mln_map_projection_lat_lng_for_pixel_unwrapped.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * }
+     */
+    public static int mln_map_projection_lat_lng_for_pixel_unwrapped(long projection, MemorySegment point, MemorySegment out_coordinate) {
+        var mh$ = mln_map_projection_lat_lng_for_pixel_unwrapped.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_projection_lat_lng_for_pixel_unwrapped", projection, point, out_coordinate);
             }
             return (int)mh$.invokeExact(projection, point, out_coordinate);
         } catch (Error | RuntimeException ex) {

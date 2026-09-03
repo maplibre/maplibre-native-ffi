@@ -767,6 +767,11 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     return NativeAccess.latLngForPixel(requireLiveHandle(), point)
   }
 
+  public actual fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.latLngForPixelUnwrapped(requireLiveHandle(), point)
+  }
+
   public actual fun pixelsForLatLngs(coordinates: List<LatLng>): List<ScreenPoint> {
     NativeAccess.ensureLoaded()
     return NativeAccess.pixelsForLatLngs(requireLiveHandle(), coordinates)
@@ -775,6 +780,11 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   public actual fun latLngsForPixels(points: List<ScreenPoint>): List<LatLng> {
     NativeAccess.ensureLoaded()
     return NativeAccess.latLngsForPixels(requireLiveHandle(), points)
+  }
+
+  public actual fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): List<LatLng> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.latLngsForPixelsUnwrapped(requireLiveHandle(), points)
   }
 
   public actual fun attachMetalOwnedTexture(

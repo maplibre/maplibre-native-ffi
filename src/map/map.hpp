@@ -375,11 +375,18 @@ auto map_pixel_for_lat_lng(
 auto map_lat_lng_for_pixel(
   mln_map map, mln_screen_point point, mln_lat_lng* out_coordinate
 ) -> mln_status;
+auto map_lat_lng_for_pixel_unwrapped(
+  mln_map map, mln_screen_point point, mln_lat_lng* out_coordinate
+) -> mln_status;
 auto map_pixels_for_lat_lngs(
   mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
   mln_screen_point* out_points
 ) -> mln_status;
 auto map_lat_lngs_for_pixels(
+  mln_map map, const mln_screen_point* points, size_t point_count,
+  mln_lat_lng* out_coordinates
+) -> mln_status;
+auto map_lat_lngs_for_pixels_unwrapped(
   mln_map map, const mln_screen_point* points, size_t point_count,
   mln_lat_lng* out_coordinates
 ) -> mln_status;
@@ -405,6 +412,10 @@ auto map_projection_pixel_for_lat_lng(
   mln_screen_point* out_point
 ) -> mln_status;
 auto map_projection_lat_lng_for_pixel(
+  mln_map_projection projection, mln_screen_point point,
+  mln_lat_lng* out_coordinate
+) -> mln_status;
+auto map_projection_lat_lng_for_pixel_unwrapped(
   mln_map_projection projection, mln_screen_point point,
   mln_lat_lng* out_coordinate
 ) -> mln_status;

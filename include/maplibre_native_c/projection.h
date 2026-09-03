@@ -150,7 +150,8 @@ MLN_API mln_status mln_map_projection_pixel_for_lat_lng(
  * Converts a screen point using a standalone projection helper.
  *
  * The input point uses logical map pixels with an origin at the top-left of the
- * helper viewport. This function may be called from any thread.
+ * helper viewport. The output longitude is wrapped to the range from -180 to
+ * 180 degrees. This function may be called from any thread.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -159,6 +160,26 @@ MLN_API mln_status mln_map_projection_pixel_for_lat_lng(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_projection_lat_lng_for_pixel(
+  mln_map_projection projection, mln_screen_point point,
+  mln_lat_lng* out_coordinate
+) MLN_NOEXCEPT;
+
+/**
+ * Converts a screen point to an unwrapped geographic world coordinate using a
+ * standalone projection helper.
+ *
+ * The input point uses logical map pixels with an origin at the top-left of the
+ * helper viewport. The output longitude preserves the visible world copy and
+ * may fall outside the range from -180 to 180 degrees. This function may be
+ * called from any thread.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live,
+ *   out_coordinate is null, or point contains non-finite values.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(
   mln_map_projection projection, mln_screen_point point,
   mln_lat_lng* out_coordinate
 ) MLN_NOEXCEPT;

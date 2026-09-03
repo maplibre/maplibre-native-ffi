@@ -1,0 +1,75 @@
+diff --git a/include/mln/map/map.hpp b/include/mln/map/map.hpp
+--- a/include/mln/map/map.hpp
++++ b/include/mln/map/map.hpp
+@@ -118,8 +118,10 @@ public:
+     // Projection
+     ScreenCoordinate pixelForLatLng(const LatLng&) const;
+     LatLng latLngForPixel(const ScreenCoordinate&) const;
++    LatLng latLngForPixel(const ScreenCoordinate&, LatLng::WrapMode) const;
+     std::vector<ScreenCoordinate> pixelsForLatLngs(const std::vector<LatLng>&) const;
+     std::vector<LatLng> latLngsForPixels(const std::vector<ScreenCoordinate>&) const;
++    std::vector<LatLng> latLngsForPixels(const std::vector<ScreenCoordinate>&, LatLng::WrapMode) const;
+ 
+     // Transform
+     TransformState getTransfromState() const;
+diff --git a/include/mln/map/map_projection.hpp b/include/mln/map/map_projection.hpp
+--- a/include/mln/map/map_projection.hpp
++++ b/include/mln/map/map_projection.hpp
+@@ -16,6 +16,7 @@ public:
+ 
+     ScreenCoordinate pixelForLatLng(const LatLng&) const;
+     LatLng latLngForPixel(const ScreenCoordinate&) const;
++    LatLng latLngForPixel(const ScreenCoordinate&, LatLng::WrapMode) const;
+ 
+     void setCamera(const CameraOptions&);
+     CameraOptions getCamera() const;
+diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
+--- a/src/mln/map/map.cpp
++++ b/src/mln/map/map.cpp
+@@ -433,7 +433,11 @@ ScreenCoordinate Map::pixelForLatLng(const LatLng& latLng) const {
+ }
+ 
+ LatLng Map::latLngForPixel(const ScreenCoordinate& pixel) const {
+-    return impl->transform.screenCoordinateToLatLng(pixel);
++    return latLngForPixel(pixel, LatLng::Wrapped);
++}
++
++LatLng Map::latLngForPixel(const ScreenCoordinate& pixel, LatLng::WrapMode wrapMode) const {
++    return impl->transform.screenCoordinateToLatLng(pixel, wrapMode);
+ }
+ 
+ std::vector<ScreenCoordinate> Map::pixelsForLatLngs(const std::vector<LatLng>& latLngs) const {
+@@ -446,10 +450,15 @@ std::vector<ScreenCoordinate> Map::pixelsForLatLngs(const std::vector<LatLng>& l
+ }
+ 
+ std::vector<LatLng> Map::latLngsForPixels(const std::vector<ScreenCoordinate>& screenCoords) const {
++    return latLngsForPixels(screenCoords, LatLng::Wrapped);
++}
++
++std::vector<LatLng> Map::latLngsForPixels(const std::vector<ScreenCoordinate>& screenCoords,
++                                          LatLng::WrapMode wrapMode) const {
+     std::vector<LatLng> ret;
+     ret.reserve(screenCoords.size());
+     for (const auto& point : screenCoords) {
+-        ret.emplace_back(latLngForPixel(point));
++        ret.emplace_back(latLngForPixel(point, wrapMode));
+     }
+     return ret;
+ }
+diff --git a/src/mln/map/map_projection.cpp b/src/mln/map/map_projection.cpp
+--- a/src/mln/map/map_projection.cpp
++++ b/src/mln/map/map_projection.cpp
+@@ -18,8 +18,12 @@ ScreenCoordinate MapProjection::pixelForLatLng(const LatLng& latLng) const {
+ }
+ 
+ LatLng MapProjection::latLngForPixel(const ScreenCoordinate& pixel) const {
++    return latLngForPixel(pixel, LatLng::Wrapped);
++}
++
++LatLng MapProjection::latLngForPixel(const ScreenCoordinate& pixel, LatLng::WrapMode wrapMode) const {
+     // The implementation is just a copy from map.cpp
+-    return transform->screenCoordinateToLatLng(pixel);
++    return transform->screenCoordinateToLatLng(pixel, wrapMode);
+ }
+ 
+ void MapProjection::setCamera(const CameraOptions& camera) {

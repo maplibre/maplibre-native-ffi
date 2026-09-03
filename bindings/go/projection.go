@@ -169,6 +169,7 @@ func (projection *MapProjectionHandle) PixelForLatLng(coordinate LatLng) (Screen
 }
 
 // LatLngForPixel converts a logical screen point to a geographic coordinate.
+// The longitude is wrapped to the range from -180 to 180 degrees.
 func (projection *MapProjectionHandle) LatLngForPixel(point ScreenPoint) (LatLng, error) {
 	ptr, release, err := projection.ptr()
 	if err != nil {
@@ -180,6 +181,29 @@ func (projection *MapProjectionHandle) LatLngForPixel(point ScreenPoint) (LatLng
 	var coordinate C.mln_lat_lng
 	if err := checkNative(func() int32 {
 		return int32(C.mln_map_projection_lat_lng_for_pixel(
+			C.mln_map_projection(ptr),
+			cScreenPoint(point),
+			&coordinate,
+		))
+	}); err != nil {
+		return LatLng{}, err
+	}
+	return goLatLng(coordinate), nil
+}
+
+// LatLngForPixelUnwrapped converts a logical screen point to an unwrapped
+// geographic coordinate. The longitude preserves the visible world copy.
+func (projection *MapProjectionHandle) LatLngForPixelUnwrapped(point ScreenPoint) (LatLng, error) {
+	ptr, release, err := projection.ptr()
+	if err != nil {
+		return LatLng{}, err
+	}
+	defer release()
+	defer projection.state.KeepAlive()
+
+	var coordinate C.mln_lat_lng
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_projection_lat_lng_for_pixel_unwrapped(
 			C.mln_map_projection(ptr),
 			cScreenPoint(point),
 			&coordinate,

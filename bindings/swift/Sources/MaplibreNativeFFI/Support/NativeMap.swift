@@ -200,6 +200,20 @@ enum NativeMap {
     return NativeLatLng(output.value)
   }
 
+  static func latLngForPixelUnwrapped(
+    _ map: NativeMapHandle,
+    point: NativeScreenPoint
+  ) throws -> NativeLatLng {
+    let output = try NativeMemory.withTemporary(mln_lat_lng()) { coordinate in
+      try checkStatus(mln_map_lat_lng_for_pixel_unwrapped(
+        map.raw,
+        point.native,
+        coordinate
+      ))
+    }
+    return NativeLatLng(output.value)
+  }
+
   static func pixelsForLatLngs(
     _ map: NativeMapHandle,
     coordinates: [NativeLatLng]
@@ -234,6 +248,28 @@ enum NativeMap {
     try rawPoints.withUnsafeBufferPointer { points in
       try rawCoordinates.withUnsafeMutableBufferPointer { coordinates in
         try checkStatus(mln_map_lat_lngs_for_pixels(
+          map.raw,
+          points.baseAddress,
+          points.count,
+          coordinates.baseAddress
+        ))
+      }
+    }
+    return rawCoordinates.map(NativeLatLng.init)
+  }
+
+  static func latLngsForPixelsUnwrapped(
+    _ map: NativeMapHandle,
+    points: [NativeScreenPoint]
+  ) throws -> [NativeLatLng] {
+    let rawPoints = points.map(\.native)
+    var rawCoordinates = [mln_lat_lng](
+      repeating: mln_lat_lng(),
+      count: rawPoints.count
+    )
+    try rawPoints.withUnsafeBufferPointer { points in
+      try rawCoordinates.withUnsafeMutableBufferPointer { coordinates in
+        try checkStatus(mln_map_lat_lngs_for_pixels_unwrapped(
           map.raw,
           points.baseAddress,
           points.count,

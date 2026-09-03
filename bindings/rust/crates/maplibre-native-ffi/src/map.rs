@@ -679,6 +679,8 @@ impl MapHandle {
     }
 
     /// Converts a screen point to a geographic world coordinate for the current map.
+    ///
+    /// The longitude is wrapped to the range from -180 to 180 degrees.
     pub fn lat_lng_for_pixel(&self, point: ScreenPoint) -> Result<LatLng> {
         let map = self.inner.native()?;
         let mut raw_coordinate = empty_lat_lng();
@@ -686,6 +688,21 @@ impl MapHandle {
         // writable storage for the output.
         maplibre_core::check(unsafe {
             sys::mln_map_lat_lng_for_pixel(map, point.to_native(), &mut raw_coordinate)
+        })?;
+        Ok(LatLng::from_native(raw_coordinate))
+    }
+
+    /// Converts a screen point to an unwrapped geographic coordinate.
+    ///
+    /// The longitude preserves the visible world copy and may fall outside
+    /// -180 to 180.
+    pub fn lat_lng_for_pixel_unwrapped(&self, point: ScreenPoint) -> Result<LatLng> {
+        let map = self.inner.native()?;
+        let mut raw_coordinate = empty_lat_lng();
+        // SAFETY: map is live, point is passed by value, and raw_coordinate is
+        // writable storage for the output.
+        maplibre_core::check(unsafe {
+            sys::mln_map_lat_lng_for_pixel_unwrapped(map, point.to_native(), &mut raw_coordinate)
         })?;
         Ok(LatLng::from_native(raw_coordinate))
     }
@@ -712,6 +729,8 @@ impl MapHandle {
     }
 
     /// Converts screen points to geographic world coordinates for the current map.
+    ///
+    /// Each longitude is wrapped to the range from -180 to 180 degrees.
     pub fn lat_lngs_for_pixels(&self, points: &[ScreenPoint]) -> Result<Vec<LatLng>> {
         let map = self.inner.native()?;
         let raw_points = screen_points_to_native(points);
@@ -720,6 +739,30 @@ impl MapHandle {
         // entries, or null when len is 0.
         maplibre_core::check(unsafe {
             sys::mln_map_lat_lngs_for_pixels(
+                map,
+                const_ptr_or_null(&raw_points),
+                raw_points.len(),
+                mut_ptr_or_null(&mut raw_coordinates),
+            )
+        })?;
+        Ok(raw_coordinates
+            .into_iter()
+            .map(LatLng::from_native)
+            .collect())
+    }
+
+    /// Converts screen points to unwrapped geographic coordinates.
+    ///
+    /// Each longitude preserves its visible world copy and may fall outside
+    /// -180 to 180.
+    pub fn lat_lngs_for_pixels_unwrapped(&self, points: &[ScreenPoint]) -> Result<Vec<LatLng>> {
+        let map = self.inner.native()?;
+        let raw_points = screen_points_to_native(points);
+        let mut raw_coordinates = vec![empty_lat_lng(); points.len()];
+        // SAFETY: map is live. Input and output arrays are valid for len
+        // entries, or null when len is 0.
+        maplibre_core::check(unsafe {
+            sys::mln_map_lat_lngs_for_pixels_unwrapped(
                 map,
                 const_ptr_or_null(&raw_points),
                 raw_points.len(),

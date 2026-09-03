@@ -14,6 +14,7 @@ import org.maplibre.nativeffi.internal.c.mln_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_map_projection_destroy
 import org.maplibre.nativeffi.internal.c.mln_map_projection_get_camera
 import org.maplibre.nativeffi.internal.c.mln_map_projection_lat_lng_for_pixel
+import org.maplibre.nativeffi.internal.c.mln_map_projection_lat_lng_for_pixel_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_projection_pixel_for_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_map_projection_set_camera
 import org.maplibre.nativeffi.internal.c.mln_map_projection_set_visible_coordinates
@@ -105,6 +106,20 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
     state.withLive { handle ->
       Status.check(
         mln_map_projection_lat_lng_for_pixel(
+          handle.rawHandleValue,
+          CoreStructs.screenPoint(point),
+          outCoordinate.ptr,
+        )
+      )
+    }
+    CoreStructs.latLng(outCoordinate)
+  }
+
+  public actual fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng = memScoped {
+    val outCoordinate = alloc<mln_lat_lng>()
+    state.withLive { handle ->
+      Status.check(
+        mln_map_projection_lat_lng_for_pixel_unwrapped(
           handle.rawHandleValue,
           CoreStructs.screenPoint(point),
           outCoordinate.ptr,

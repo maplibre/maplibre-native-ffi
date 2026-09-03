@@ -2067,6 +2067,16 @@ internal object NativeAccess {
       latLng(outCoordinate)
     }
 
+  internal fun latLngForPixelUnwrapped(map: NativeMap, point: ScreenPoint): LatLng =
+    Arena.ofConfined().use { arena ->
+      val outCoordinate = arena.allocate(latLngLayout)
+      Status.check(
+        mapScreenPointAddressStatusFunction("mln_map_lat_lng_for_pixel_unwrapped")
+          .invokeNative(map, screenPoint(point, arena), outCoordinate) as Int
+      )
+      latLng(outCoordinate)
+    }
+
   internal fun pixelsForLatLngs(map: NativeMap, coordinates: List<LatLng>): List<ScreenPoint> {
     val coordinateSnapshot = coordinates.toList()
     if (coordinateSnapshot.isEmpty()) {
@@ -2108,6 +2118,32 @@ internal object NativeAccess {
       val outCoordinates = arena.allocate(latLngLayout.byteSize() * pointSnapshot.size)
       Status.check(
         mapAddressLongAddressStatusFunction("mln_map_lat_lngs_for_pixels")
+          .invokeNative(
+            map,
+            screenPointArray(arena, pointSnapshot),
+            pointSnapshot.size.toLong(),
+            outCoordinates,
+          ) as Int
+      )
+      latLngArray(outCoordinates, pointSnapshot.size)
+    }
+  }
+
+  internal fun latLngsForPixelsUnwrapped(map: NativeMap, points: List<ScreenPoint>): List<LatLng> {
+    val pointSnapshot = points.toList()
+    if (pointSnapshot.isEmpty()) {
+      Arena.ofConfined().use {
+        Status.check(
+          mapAddressLongAddressStatusFunction("mln_map_lat_lngs_for_pixels_unwrapped")
+            .invokeNative(map, MemorySegment.NULL, 0L, MemorySegment.NULL) as Int
+        )
+      }
+      return emptyList()
+    }
+    return Arena.ofConfined().use { arena ->
+      val outCoordinates = arena.allocate(latLngLayout.byteSize() * pointSnapshot.size)
+      Status.check(
+        mapAddressLongAddressStatusFunction("mln_map_lat_lngs_for_pixels_unwrapped")
           .invokeNative(
             map,
             screenPointArray(arena, pointSnapshot),
@@ -2609,6 +2645,19 @@ internal object NativeAccess {
       val outCoordinate = arena.allocate(latLngLayout)
       Status.check(
         projectionScreenPointAddressStatusFunction("mln_map_projection_lat_lng_for_pixel")
+          .invokeNative(projection, screenPoint(point, arena), outCoordinate) as Int
+      )
+      latLng(outCoordinate)
+    }
+
+  internal fun projectionLatLngForPixelUnwrapped(
+    projection: NativeMapProjection,
+    point: ScreenPoint,
+  ): LatLng =
+    Arena.ofConfined().use { arena ->
+      val outCoordinate = arena.allocate(latLngLayout)
+      Status.check(
+        projectionScreenPointAddressStatusFunction("mln_map_projection_lat_lng_for_pixel_unwrapped")
           .invokeNative(projection, screenPoint(point, arena), outCoordinate) as Int
       )
       latLng(outCoordinate)
