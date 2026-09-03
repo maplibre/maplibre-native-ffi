@@ -1937,6 +1937,10 @@ impl OpenGLTestContext {
         }
     }
 
+    fn clear_gl_errors(&self) {
+        while unsafe { self.gl.get_error() } != gl_api::NO_ERROR {}
+    }
+
     /// Reads the surface this context presents to.
     ///
     /// The browser reads the context's own drawing buffer, which is what its
@@ -1994,6 +1998,7 @@ impl OpenGLBorrowedTexture {
         height: u32,
     ) -> std::result::Result<gl_api::NativeTexture, Box<dyn StdError>> {
         context.make_current()?;
+        context.clear_gl_errors();
         let texture = unsafe {
             let texture = context.gl.create_texture()?;
             context.gl.bind_texture(gl_api::TEXTURE_2D, Some(texture));
@@ -2069,6 +2074,7 @@ impl OpenGLBorrowedTexture {
 
     fn read_rgba(&self) -> std::result::Result<Vec<u8>, Box<dyn StdError>> {
         self.context.make_current()?;
+        self.context.clear_gl_errors();
         let mut pixels = vec![0_u8; self.width as usize * self.height as usize * 4];
         let texture = self.texture.ok_or("borrowed texture has been deleted")?;
         unsafe {

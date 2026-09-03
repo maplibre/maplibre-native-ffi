@@ -15,6 +15,12 @@ resources whose paths contain spaces or non-ASCII characters.
 uses it to bound one pump's drain; the budget logic stays on the C API side, and
 an unset gate keeps upstream behavior.
 
+`0004-opengl-valid-api-calls.patch` uses indexed extension enumeration on OpenGL
+ES, allocates storage before copying a uniform buffer, and isolates allocation
+errors from earlier OpenGL calls. This prevents strict implementations and the
+API 26 Android emulator from turning stale errors into false allocation
+failures.
+
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
 before applying the list again. A pin bump, an edit to a patch, and a dropped

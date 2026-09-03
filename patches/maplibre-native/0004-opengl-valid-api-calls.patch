@@ -1,0 +1,108 @@
+diff --git a/src/mln/gl/context.cpp b/src/mln/gl/context.cpp
+index 02efd92..be82bff 100644
+--- a/src/mln/gl/context.cpp
++++ b/src/mln/gl/context.cpp
+@@ -151,10 +151,26 @@ void Context::endFrame() {
+ void Context::initializeExtensions(const std::function<gl::ProcAddress(const char*)>& getProcAddress) {
+     MLN_TRACE_FUNC();
+ 
+-    if (const auto* extensions = reinterpret_cast<const char*>(MBGL_CHECK_ERROR(glGetString(GL_EXTENSIONS)))) {
++    std::string extensions;
++#if defined(__ANDROID__) || defined(__EMSCRIPTEN__) || defined(__OHOS__)
++    GLint extensionCount = 0;
++    MBGL_CHECK_ERROR(glGetIntegerv(GL_NUM_EXTENSIONS, &extensionCount));
++    for (GLint index = 0; index < extensionCount; ++index) {
++        if (const auto* extension = reinterpret_cast<const char*>(MBGL_CHECK_ERROR(glGetStringi(GL_EXTENSIONS, index)))) {
++            extensions.append(extension);
++            extensions.push_back(' ');
++        }
++    }
++#else
++    if (const auto* extensionList = reinterpret_cast<const char*>(MBGL_CHECK_ERROR(glGetString(GL_EXTENSIONS)))) {
++        extensions = extensionList;
++    }
++#endif
++
++    if (!extensions.empty()) {
+         auto fn = [&](std::initializer_list<std::pair<const char*, const char*>> probes) -> ProcAddress {
+             for (auto probe : probes) {
+-                if (strstr(extensions, probe.first) != nullptr) {
++                if (extensions.find(probe.first) != std::string::npos) {
+                     if (ProcAddress ptr = getProcAddress(probe.second)) {
+                         return ptr;
+                     }
+diff --git a/src/mln/gl/resource_pool.cpp b/src/mln/gl/resource_pool.cpp
+index 5c9fb64..df311df 100644
+--- a/src/mln/gl/resource_pool.cpp
++++ b/src/mln/gl/resource_pool.cpp
+@@ -145,15 +145,18 @@ TextureID Texture2DPool::allocateGLMemory(const Texture2DDesc& desc) {
+     // Bind to TU 0 and upload
+     context->activeTextureUnit = 0;
+     context->texture[0] = id;
+-    MBGL_CHECK_ERROR(glTexImage2D(GL_TEXTURE_2D,
+-                                  0,
+-                                  Enum<gfx::TexturePixelType>::sizedFor(desc.pixelFormat, desc.channelType),
+-                                  desc.size.width,
+-                                  desc.size.height,
+-                                  0,
+-                                  Enum<gfx::TexturePixelType>::to(desc.pixelFormat),
+-                                  Enum<gfx::TextureChannelDataType>::to(desc.channelType),
+-                                  nullptr));
++    // Attribute only errors from this allocation to allocation failure.
++    while (glGetError() != GL_NO_ERROR) {
++    }
++    glTexImage2D(GL_TEXTURE_2D,
++                 0,
++                 Enum<gfx::TexturePixelType>::sizedFor(desc.pixelFormat, desc.channelType),
++                 desc.size.width,
++                 desc.size.height,
++                 0,
++                 Enum<gfx::TexturePixelType>::to(desc.pixelFormat),
++                 Enum<gfx::TextureChannelDataType>::to(desc.channelType),
++                 nullptr);
+     if (glGetError()) {
+         throw std::bad_alloc();
+     }
+diff --git a/src/mln/gl/uniform_buffer_gl.cpp b/src/mln/gl/uniform_buffer_gl.cpp
+index 3ebafe8..0797706 100644
+--- a/src/mln/gl/uniform_buffer_gl.cpp
++++ b/src/mln/gl/uniform_buffer_gl.cpp
+@@ -89,9 +89,9 @@ UniformBufferGL::UniformBufferGL(const UniformBufferGL& other)
+         managedBuffer.allocate(other.managedBuffer.getContents().data(), other.size);
+     } else {
+         MBGL_CHECK_ERROR(glGenBuffers(1, &localID));
+-        MBGL_CHECK_ERROR(glCopyBufferSubData(other.localID, localID, 0, 0, size));
+         MBGL_CHECK_ERROR(glBindBuffer(GL_COPY_READ_BUFFER, other.localID));
+         MBGL_CHECK_ERROR(glBindBuffer(GL_COPY_WRITE_BUFFER, localID));
++        MBGL_CHECK_ERROR(glBufferData(GL_COPY_WRITE_BUFFER, size, nullptr, GL_DYNAMIC_DRAW));
+         MBGL_CHECK_ERROR(glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, size));
+     }
+ }
+diff --git a/src/mln/gl/upload_pass.cpp b/src/mln/gl/upload_pass.cpp
+index 2eb6ef7..3940ae2 100644
+--- a/src/mln/gl/upload_pass.cpp
++++ b/src/mln/gl/upload_pass.cpp
+@@ -35,7 +35,10 @@ std::unique_ptr<gfx::VertexBufferResource> UploadPass::createVertexBufferResourc
+     // NOLINTNEXTLINE(performance-move-const-arg)
+     UniqueBuffer result{std::move(id), {commandEncoder.context}};
+     commandEncoder.context.vertexBuffer = result;
+-    MBGL_CHECK_ERROR(glBufferData(GL_ARRAY_BUFFER, size, data, Enum<gfx::BufferUsageType>::to(usage)));
++    // Attribute only errors from this allocation to allocation failure.
++    while (glGetError() != GL_NO_ERROR) {
++    }
++    glBufferData(GL_ARRAY_BUFFER, size, data, Enum<gfx::BufferUsageType>::to(usage));
+     if (glGetError()) {
+         throw std::bad_alloc();
+     }
+@@ -63,7 +66,10 @@ std::unique_ptr<gfx::IndexBufferResource> UploadPass::createIndexBufferResource(
+     UniqueBuffer result{std::move(id), {commandEncoder.context}};
+     commandEncoder.context.bindVertexArray = 0;
+     commandEncoder.context.globalVertexArrayState.indexBuffer = result;
+-    MBGL_CHECK_ERROR(glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, data, Enum<gfx::BufferUsageType>::to(usage)));
++    // Attribute only errors from this allocation to allocation failure.
++    while (glGetError() != GL_NO_ERROR) {
++    }
++    glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, data, Enum<gfx::BufferUsageType>::to(usage));
+     if (glGetError()) {
+         throw std::bad_alloc();
+     }
