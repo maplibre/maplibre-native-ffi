@@ -344,9 +344,15 @@ elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-x64-* ]]; 
       "$OHOS_SDK_NATIVE/llvm/lib/x86_64-linux-ohos/libc++_shared.so" \
       -- "$MISE_MONOREPO_ROOT/build/$usage_preset/mln_ffi_c_api_tests"
   fi
+  emulator_args=()
+  if [[ "$usage_preset" == android-x64-egl ]]; then
+    mise run //:android-emulator:boot x86_64 --api 26
+    emulator_args+=(--api 26)
+  fi
   exec "$MISE_MONOREPO_ROOT/scripts/run-android-emulator-test.sh" \
     300 \
     "$MISE_MONOREPO_ROOT/build/$usage_preset/install/lib/libmaplibre-native-c.so" \
+    ${emulator_args[@]+"${emulator_args[@]}"} \
     -- "$MISE_MONOREPO_ROOT/build/$usage_preset/mln_ffi_c_api_tests"
 fi
 ctest --preset "$usage_preset"
@@ -364,6 +370,7 @@ usage = '''
 arg "[abi]" default="x86_64" {
   choices "arm64-v8a" "x86_64"
 }
+flag "--api <api>" default="{{vars.android_system_image_api}}"
 '''
 # sdkmanager and avdmanager run on a JVM. The emulator and its system image are
 # not part of what .mise/bin/sync-android-packages installs, so asking for a
@@ -371,7 +378,7 @@ arg "[abi]" default="x86_64" {
 tools = { "core:java" = "{{vars.java_version}}" }
 run = '''
 "$MISE_MONOREPO_ROOT/scripts/boot-android-emulator.sh" \
-  "{{vars.android_system_image_api}}" \
+  "$usage_api" \
   "$usage_abi"
 '''
 

@@ -26,7 +26,11 @@ case "$preset" in
     ;;
 esac
 
-mise run //:android-emulator:boot "$abi"
+emulator_args=("$abi")
+if [[ "$preset" == android-x64-egl ]]; then
+  emulator_args+=(--api 26)
+fi
+mise run //:android-emulator:boot "${emulator_args[@]}"
 exec ./gradlew \
   -Pmaplibre.android.backend="$backend" \
   -Pmaplibre.android.abis="$abi" \

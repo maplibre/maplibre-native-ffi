@@ -16,10 +16,10 @@ case "$image_arch" in
 esac
 image="system-images;android-$api;default;$image_arch"
 serial=emulator-5554
-avd_name="mln-ffi-${image_arch//_/-}"
+avd_name="mln-ffi-api-$api-${image_arch//_/-}"
 sdk_root="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}"
 state_root="$MISE_MONOREPO_ROOT/build/android-emulator"
-state_dir="$state_root/$image_arch"
+state_dir="$state_root/$avd_name"
 pid_file="$state_dir/emulator.pid"
 log_file="$state_dir/emulator.log"
 # The AVD lives in the build tree rather than the user's ~/.android, so a
