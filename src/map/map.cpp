@@ -7420,8 +7420,11 @@ auto map_pixel_for_lat_lng(
   return MLN_STATUS_OK;
 }
 
-auto map_lat_lng_for_pixel(
-  mln_map map, mln_screen_point point, mln_lat_lng* out_coordinate
+namespace {
+
+auto map_lat_lng_for_pixel_with_wrap_mode(
+  mln_map map, mln_screen_point point, mln_lat_lng* out_coordinate,
+  mln::LatLng::WrapMode wrap_mode
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -7438,9 +7441,27 @@ auto map_lat_lng_for_pixel(
   }
 
   *out_coordinate = from_native_lat_lng(
-    live->map->latLngForPixel(to_native_screen_point(point))
+    live->map->latLngForPixel(to_native_screen_point(point), wrap_mode)
   );
   return MLN_STATUS_OK;
+}
+
+}  // namespace
+
+auto map_lat_lng_for_pixel(
+  mln_map map, mln_screen_point point, mln_lat_lng* out_coordinate
+) -> mln_status {
+  return map_lat_lng_for_pixel_with_wrap_mode(
+    map, point, out_coordinate, mln::LatLng::Wrapped
+  );
+}
+
+auto map_lat_lng_for_pixel_unwrapped(
+  mln_map map, mln_screen_point point, mln_lat_lng* out_coordinate
+) -> mln_status {
+  return map_lat_lng_for_pixel_with_wrap_mode(
+    map, point, out_coordinate, mln::LatLng::Unwrapped
+  );
 }
 
 auto map_pixels_for_lat_lngs(
@@ -7479,9 +7500,11 @@ auto map_pixels_for_lat_lngs(
   return MLN_STATUS_OK;
 }
 
-auto map_lat_lngs_for_pixels(
+namespace {
+
+auto map_lat_lngs_for_pixels_with_wrap_mode(
   mln_map map, const mln_screen_point* points, size_t point_count,
-  mln_lat_lng* out_coordinates
+  mln_lat_lng* out_coordinates, mln::LatLng::WrapMode wrap_mode
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -7503,7 +7526,8 @@ auto map_lat_lngs_for_pixels(
   }
 
   const auto native_points = to_native_screen_points(points, point_count);
-  const auto coordinates = live->map->latLngsForPixels(native_points);
+  const auto coordinates =
+    live->map->latLngsForPixels(native_points, wrap_mode);
   auto output = std::span<mln_lat_lng>{out_coordinates, coordinates.size()};
   auto output_position = output.begin();
   for (const auto& coordinate : coordinates) {
@@ -7511,6 +7535,26 @@ auto map_lat_lngs_for_pixels(
     ++output_position;
   }
   return MLN_STATUS_OK;
+}
+
+}  // namespace
+
+auto map_lat_lngs_for_pixels(
+  mln_map map, const mln_screen_point* points, size_t point_count,
+  mln_lat_lng* out_coordinates
+) -> mln_status {
+  return map_lat_lngs_for_pixels_with_wrap_mode(
+    map, points, point_count, out_coordinates, mln::LatLng::Wrapped
+  );
+}
+
+auto map_lat_lngs_for_pixels_unwrapped(
+  mln_map map, const mln_screen_point* points, size_t point_count,
+  mln_lat_lng* out_coordinates
+) -> mln_status {
+  return map_lat_lngs_for_pixels_with_wrap_mode(
+    map, points, point_count, out_coordinates, mln::LatLng::Unwrapped
+  );
 }
 
 auto map_projection_create(mln_map map, mln_map_projection* out_projection)
@@ -7665,13 +7709,15 @@ auto map_projection_pixel_for_lat_lng(
   );
 }
 
-auto map_projection_lat_lng_for_pixel(
+namespace {
+
+auto map_projection_lat_lng_for_pixel_with_wrap_mode(
   mln_map_projection projection, mln_screen_point point,
-  mln_lat_lng* out_coordinate
+  mln_lat_lng* out_coordinate, mln::LatLng::WrapMode wrap_mode
 ) -> mln_status {
   return with_map_projection(
     projection,
-    [point, out_coordinate](mln::MapProjection& live) -> mln_status {
+    [point, out_coordinate, wrap_mode](mln::MapProjection& live) -> mln_status {
       if (out_coordinate == nullptr) {
         set_thread_error("out_coordinate must not be null");
         return MLN_STATUS_INVALID_ARGUMENT;
@@ -7680,10 +7726,31 @@ auto map_projection_lat_lng_for_pixel(
       if (point_status != MLN_STATUS_OK) {
         return point_status;
       }
-      *out_coordinate =
-        from_native_lat_lng(live.latLngForPixel(to_native_screen_point(point)));
+      *out_coordinate = from_native_lat_lng(
+        live.latLngForPixel(to_native_screen_point(point), wrap_mode)
+      );
       return MLN_STATUS_OK;
     }
+  );
+}
+
+}  // namespace
+
+auto map_projection_lat_lng_for_pixel(
+  mln_map_projection projection, mln_screen_point point,
+  mln_lat_lng* out_coordinate
+) -> mln_status {
+  return map_projection_lat_lng_for_pixel_with_wrap_mode(
+    projection, point, out_coordinate, mln::LatLng::Wrapped
+  );
+}
+
+auto map_projection_lat_lng_for_pixel_unwrapped(
+  mln_map_projection projection, mln_screen_point point,
+  mln_lat_lng* out_coordinate
+) -> mln_status {
+  return map_projection_lat_lng_for_pixel_with_wrap_mode(
+    projection, point, out_coordinate, mln::LatLng::Unwrapped
   );
 }
 

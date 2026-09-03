@@ -21,6 +21,10 @@ errors from earlier OpenGL calls. This prevents strict implementations and the
 API 26 Android emulator from turning stale errors into false allocation
 failures.
 
+`0005-unwrapped-unprojection.patch` adds wrap-mode overloads to map and
+standalone projection coordinate conversion. The C API uses them to expose
+continuous longitudes while the existing overloads keep wrapped behavior.
+
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
 before applying the list again. A pin bump, an edit to a patch, and a dropped

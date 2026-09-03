@@ -117,12 +117,26 @@ pub const MapProjectionHandle = enum(c.mln_map_projection) {
         return values.screenPointFromNative(point);
     }
 
+    /// Converts a screen point to a coordinate with longitude wrapped to -180 through 180.
     pub fn latLngForPixel(self: *MapProjectionHandle, point: values.ScreenPoint) status.Error!values.LatLng {
         var coordinate: c.mln_lat_lng = undefined;
         const lease = try projectionLease(self.*);
         defer lease.release();
         try status.checkStatus(
             c.mln_map_projection_lat_lng_for_pixel(lease.native, values.screenPointToNative(point), &coordinate),
+            lease.diagnostic_store,
+        );
+        return values.latLngFromNative(coordinate);
+    }
+
+    /// Converts a screen point to an unwrapped geographic coordinate.
+    /// The longitude preserves the visible world copy.
+    pub fn latLngForPixelUnwrapped(self: *MapProjectionHandle, point: values.ScreenPoint) status.Error!values.LatLng {
+        var coordinate: c.mln_lat_lng = undefined;
+        const lease = try projectionLease(self.*);
+        defer lease.release();
+        try status.checkStatus(
+            c.mln_map_projection_lat_lng_for_pixel_unwrapped(lease.native, values.screenPointToNative(point), &coordinate),
             lease.diagnostic_store,
         );
         return values.latLngFromNative(coordinate);

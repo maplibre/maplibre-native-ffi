@@ -1048,6 +1048,15 @@ external int mln_map_lat_lng_for_pixel(
 );
 
 @ffi.Native<
+  ffi.Int32 Function(mln_map, mln_screen_point, ffi.Pointer<mln_lat_lng>)
+>()
+external int mln_map_lat_lng_for_pixel_unwrapped(
+  int map,
+  mln_screen_point point,
+  ffi.Pointer<mln_lat_lng> out_coordinate,
+);
+
+@ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_screen_point>,
@@ -1056,6 +1065,21 @@ external int mln_map_lat_lng_for_pixel(
   )
 >()
 external int mln_map_lat_lngs_for_pixels(
+  int map,
+  ffi.Pointer<mln_screen_point> points,
+  int point_count,
+  ffi.Pointer<mln_lat_lng> out_coordinates,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_screen_point>,
+    ffi.Size,
+    ffi.Pointer<mln_lat_lng>,
+  )
+>()
+external int mln_map_lat_lngs_for_pixels_unwrapped(
   int map,
   ffi.Pointer<mln_screen_point> points,
   int point_count,
@@ -1163,6 +1187,19 @@ external int mln_map_projection_get_camera(
   )
 >()
 external int mln_map_projection_lat_lng_for_pixel(
+  int projection,
+  mln_screen_point point,
+  ffi.Pointer<mln_lat_lng> out_coordinate,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map_projection,
+    mln_screen_point,
+    ffi.Pointer<mln_lat_lng>,
+  )
+>()
+external int mln_map_projection_lat_lng_for_pixel_unwrapped(
   int projection,
   mln_screen_point point,
   ffi.Pointer<mln_lat_lng> out_coordinate,

@@ -1282,6 +1282,41 @@ fn camera_jump_and_coordinate_conversions_round_trip() {
     runtime.close().unwrap();
 }
 
+#[test]
+// Spec coverage: BND-103.
+fn unwrapped_coordinate_conversions_preserve_visible_world_copies() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(1024, 512, 1.0)).unwrap();
+    let mut camera = CameraOptions::default();
+    camera.center = Some(LatLng::new(0.0, 180.0));
+    camera.zoom = Some(0.0);
+    map.jump_to(&camera).unwrap();
+
+    let points = [
+        ScreenPoint::new(0.0, 256.0),
+        ScreenPoint::new(1024.0, 256.0),
+    ];
+    let wrapped = map.lat_lngs_for_pixels(&points).unwrap();
+    let unwrapped = map.lat_lngs_for_pixels_unwrapped(&points).unwrap();
+    assert!(
+        wrapped
+            .iter()
+            .all(|coordinate| (-180.0..=180.0).contains(&coordinate.longitude))
+    );
+    assert!(unwrapped[1].longitude - unwrapped[0].longitude > 360.0);
+    assert!((-180.0..=180.0).contains(&map.lat_lng_for_pixel(points[1]).unwrap().longitude));
+    let right = map.lat_lng_for_pixel_unwrapped(points[1]).unwrap();
+    assert!((right.longitude - unwrapped[1].longitude).abs() < 1e-10);
+
+    let projection = map.create_projection().unwrap();
+    assert!((-180.0..=180.0).contains(&projection.lat_lng_for_pixel(points[1]).unwrap().longitude));
+    let projected_right = projection.lat_lng_for_pixel_unwrapped(points[1]).unwrap();
+    assert!((projected_right.longitude - right.longitude).abs() < 1e-10);
+    projection.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
 /// Camera events drained from one runtime queue, in arrival order.
 #[derive(Default)]
 struct CameraEventTally {

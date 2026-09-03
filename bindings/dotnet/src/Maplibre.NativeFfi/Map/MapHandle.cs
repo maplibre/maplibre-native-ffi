@@ -510,6 +510,7 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Converts a screen pixel to a geographic coordinate using the current map projection.</summary>
+    /// <remarks>The longitude is wrapped to the range from -180 to 180 degrees.</remarks>
     public LatLng LatLngForPixel(ScreenPoint point)
     {
         var nativePoint = MapStructs.ToNative(point);
@@ -520,20 +521,35 @@ public sealed unsafe class MapHandle : IDisposable
         return CoreStructs.FromNative(coordinate);
     }
 
+    /// <summary>Converts a screen pixel to an unwrapped geographic coordinate.</summary>
+    /// <remarks>The longitude preserves the visible world copy and may fall outside -180 to 180.</remarks>
+    public LatLng LatLngForPixelUnwrapped(ScreenPoint point)
+    {
+        var nativePoint = MapStructs.ToNative(point);
+        mln_lat_lng coordinate = default;
+        NativeStatus.Check(
+            NativeMethods.mln_map_lat_lng_for_pixel_unwrapped(Handle, nativePoint, &coordinate)
+        );
+        return CoreStructs.FromNative(coordinate);
+    }
+
     /// <summary>Converts geographic coordinates to screen pixels using the current map projection.</summary>
     public ScreenPoint[] PixelsForLatLngs(IReadOnlyList<LatLng> coordinates)
     {
         ArgumentNullException.ThrowIfNull(coordinates);
-        if (coordinates.Count == 0)
+        var coordinateSnapshot = coordinates.ToArray();
+        var handle = Handle;
+        if (coordinateSnapshot.Length == 0)
         {
+            NativeStatus.Check(NativeMethods.mln_map_pixels_for_lat_lngs(handle, null, 0, null));
             return [];
         }
 
-        var nativeCoordinates = new mln_lat_lng[coordinates.Count];
-        var points = new mln_screen_point[coordinates.Count];
-        for (var index = 0; index < coordinates.Count; index++)
+        var nativeCoordinates = new mln_lat_lng[coordinateSnapshot.Length];
+        var points = new mln_screen_point[coordinateSnapshot.Length];
+        for (var index = 0; index < coordinateSnapshot.Length; index++)
         {
-            nativeCoordinates[index] = CoreStructs.ToNative(coordinates[index]);
+            nativeCoordinates[index] = CoreStructs.ToNative(coordinateSnapshot[index]);
         }
 
         fixed (mln_lat_lng* coordinatesPointer = nativeCoordinates)
@@ -541,7 +557,7 @@ public sealed unsafe class MapHandle : IDisposable
         {
             NativeStatus.Check(
                 NativeMethods.mln_map_pixels_for_lat_lngs(
-                    Handle,
+                    handle,
                     coordinatesPointer,
                     (nuint)nativeCoordinates.Length,
                     pointsPointer
@@ -558,19 +574,23 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Converts screen pixels to geographic coordinates using the current map projection.</summary>
+    /// <remarks>Each longitude is wrapped to the range from -180 to 180 degrees.</remarks>
     public LatLng[] LatLngsForPixels(IReadOnlyList<ScreenPoint> points)
     {
         ArgumentNullException.ThrowIfNull(points);
-        if (points.Count == 0)
+        var pointSnapshot = points.ToArray();
+        var handle = Handle;
+        if (pointSnapshot.Length == 0)
         {
+            NativeStatus.Check(NativeMethods.mln_map_lat_lngs_for_pixels(handle, null, 0, null));
             return [];
         }
 
-        var nativePoints = new mln_screen_point[points.Count];
-        var coordinates = new mln_lat_lng[points.Count];
-        for (var index = 0; index < points.Count; index++)
+        var nativePoints = new mln_screen_point[pointSnapshot.Length];
+        var coordinates = new mln_lat_lng[pointSnapshot.Length];
+        for (var index = 0; index < pointSnapshot.Length; index++)
         {
-            nativePoints[index] = MapStructs.ToNative(points[index]);
+            nativePoints[index] = MapStructs.ToNative(pointSnapshot[index]);
         }
 
         fixed (mln_screen_point* pointsPointer = nativePoints)
@@ -578,7 +598,50 @@ public sealed unsafe class MapHandle : IDisposable
         {
             NativeStatus.Check(
                 NativeMethods.mln_map_lat_lngs_for_pixels(
-                    Handle,
+                    handle,
+                    pointsPointer,
+                    (nuint)nativePoints.Length,
+                    coordinatesPointer
+                )
+            );
+        }
+
+        var result = new LatLng[coordinates.Length];
+        for (var index = 0; index < result.Length; index++)
+        {
+            result[index] = CoreStructs.FromNative(coordinates[index]);
+        }
+        return result;
+    }
+
+    /// <summary>Converts screen pixels to unwrapped geographic coordinates.</summary>
+    /// <remarks>Each longitude preserves its visible world copy and may fall outside -180 to 180.</remarks>
+    public LatLng[] LatLngsForPixelsUnwrapped(IReadOnlyList<ScreenPoint> points)
+    {
+        ArgumentNullException.ThrowIfNull(points);
+        var pointSnapshot = points.ToArray();
+        var handle = Handle;
+        if (pointSnapshot.Length == 0)
+        {
+            NativeStatus.Check(
+                NativeMethods.mln_map_lat_lngs_for_pixels_unwrapped(handle, null, 0, null)
+            );
+            return [];
+        }
+
+        var nativePoints = new mln_screen_point[pointSnapshot.Length];
+        var coordinates = new mln_lat_lng[pointSnapshot.Length];
+        for (var index = 0; index < pointSnapshot.Length; index++)
+        {
+            nativePoints[index] = MapStructs.ToNative(pointSnapshot[index]);
+        }
+
+        fixed (mln_screen_point* pointsPointer = nativePoints)
+        fixed (mln_lat_lng* coordinatesPointer = coordinates)
+        {
+            NativeStatus.Check(
+                NativeMethods.mln_map_lat_lngs_for_pixels_unwrapped(
+                    handle,
                     pointsPointer,
                     (nuint)nativePoints.Length,
                     coordinatesPointer

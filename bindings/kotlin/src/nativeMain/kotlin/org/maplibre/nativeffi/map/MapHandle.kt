@@ -106,7 +106,9 @@ import org.maplibre.nativeffi.internal.c.mln_map_jump_to
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_bounds_for_camera
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_bounds_for_camera_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_for_pixel
+import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_for_pixel_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels
+import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_layer_ids
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids
 import org.maplibre.nativeffi.internal.c.mln_map_move_by
@@ -1854,13 +1856,29 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     CoreStructs.latLng(outCoordinate)
   }
 
+  public actual fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng = memScoped {
+    val outCoordinate = alloc<mln_lat_lng>()
+    Status.check(
+      mln_map_lat_lng_for_pixel_unwrapped(
+        state.requireLive().rawHandleValue,
+        CoreStructs.screenPoint(point),
+        outCoordinate.ptr,
+      )
+    )
+    CoreStructs.latLng(outCoordinate)
+  }
+
   public actual fun pixelsForLatLngs(coordinates: List<LatLng>): List<ScreenPoint> = memScoped {
     val coordinateSnapshot = coordinates.toList()
-    if (coordinateSnapshot.isEmpty()) return@memScoped emptyList()
+    val handle = state.requireLive().rawHandleValue
+    if (coordinateSnapshot.isEmpty()) {
+      Status.check(mln_map_pixels_for_lat_lngs(handle, null, 0.toCSize(), null))
+      return@memScoped emptyList()
+    }
     val outPoints = allocArray<mln_screen_point>(coordinateSnapshot.size)
     Status.check(
       mln_map_pixels_for_lat_lngs(
-        state.requireLive().rawHandleValue,
+        handle,
         CoreStructs.latLngArray(coordinateSnapshot, this),
         coordinateSnapshot.size.toCSize(),
         outPoints,
@@ -1871,11 +1889,34 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
 
   public actual fun latLngsForPixels(points: List<ScreenPoint>): List<LatLng> = memScoped {
     val pointSnapshot = points.toList()
-    if (pointSnapshot.isEmpty()) return@memScoped emptyList()
+    val handle = state.requireLive().rawHandleValue
+    if (pointSnapshot.isEmpty()) {
+      Status.check(mln_map_lat_lngs_for_pixels(handle, null, 0.toCSize(), null))
+      return@memScoped emptyList()
+    }
     val outCoordinates = allocArray<mln_lat_lng>(pointSnapshot.size)
     Status.check(
       mln_map_lat_lngs_for_pixels(
-        state.requireLive().rawHandleValue,
+        handle,
+        CoreStructs.screenPointArray(pointSnapshot, this),
+        pointSnapshot.size.toCSize(),
+        outCoordinates,
+      )
+    )
+    CoreStructs.latLngArray(outCoordinates, pointSnapshot.size)
+  }
+
+  public actual fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): List<LatLng> = memScoped {
+    val pointSnapshot = points.toList()
+    val handle = state.requireLive().rawHandleValue
+    if (pointSnapshot.isEmpty()) {
+      Status.check(mln_map_lat_lngs_for_pixels_unwrapped(handle, null, 0.toCSize(), null))
+      return@memScoped emptyList()
+    }
+    val outCoordinates = allocArray<mln_lat_lng>(pointSnapshot.size)
+    Status.check(
+      mln_map_lat_lngs_for_pixels_unwrapped(
+        handle,
         CoreStructs.screenPointArray(pointSnapshot, this),
         pointSnapshot.size.toCSize(),
         outCoordinates,

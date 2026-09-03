@@ -449,11 +449,19 @@ public expect class MapHandle : AutoCloseable {
 
   public fun pixelForLatLng(coordinate: LatLng): ScreenPoint
 
+  /** Converts a screen point to a coordinate with longitude wrapped to -180 through 180. */
   public fun latLngForPixel(point: ScreenPoint): LatLng
+
+  /** Converts a screen point to an unwrapped coordinate that preserves its visible world copy. */
+  public fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng
 
   public fun pixelsForLatLngs(coordinates: List<LatLng>): List<ScreenPoint>
 
+  /** Converts screen points to coordinates with longitudes wrapped to -180 through 180. */
   public fun latLngsForPixels(points: List<ScreenPoint>): List<LatLng>
+
+  /** Converts screen points to unwrapped coordinates that preserve their visible world copies. */
+  public fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): List<LatLng>
 
   /**
    * Attaches a render target to this map, returning the map's one live render session.

@@ -748,7 +748,8 @@ MLN_API mln_status mln_map_pixel_for_lat_lng(
  * Converts a screen point to a geographic world coordinate for the current map.
  *
  * The input point uses logical map pixels with an origin at the top-left of the
- * map viewport.
+ * map viewport. The output longitude is wrapped to the range from -180 to 180
+ * degrees.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -759,6 +760,26 @@ MLN_API mln_status mln_map_pixel_for_lat_lng(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_lat_lng_for_pixel(
+  mln_map map, mln_screen_point point, mln_lat_lng* out_coordinate
+) MLN_NOEXCEPT;
+
+/**
+ * Converts a screen point to an unwrapped geographic world coordinate for the
+ * current map.
+ *
+ * The input point uses logical map pixels with an origin at the top-left of the
+ * map viewport. The output longitude preserves the visible world copy and may
+ * fall outside the range from -180 to 180 degrees.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_coordinate is
+ *   null, or point contains non-finite values.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_lat_lng_for_pixel_unwrapped(
   mln_map map, mln_screen_point point, mln_lat_lng* out_coordinate
 ) MLN_NOEXCEPT;
 
@@ -786,7 +807,8 @@ MLN_API mln_status mln_map_pixels_for_lat_lngs(
  * Converts screen points to geographic world coordinates for the current map.
  *
  * The caller owns both arrays. On success, out_coordinates receives point_count
- * entries. points and out_coordinates may be null only when point_count is 0.
+ * entries whose longitudes are wrapped to the range from -180 to 180 degrees.
+ * points and out_coordinates may be null only when point_count is 0.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -797,6 +819,28 @@ MLN_API mln_status mln_map_pixels_for_lat_lngs(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_lat_lngs_for_pixels(
+  mln_map map, const mln_screen_point* points, size_t point_count,
+  mln_lat_lng* out_coordinates
+) MLN_NOEXCEPT;
+
+/**
+ * Converts screen points to unwrapped geographic world coordinates for the
+ * current map.
+ *
+ * The caller owns both arrays. On success, out_coordinates receives point_count
+ * entries whose longitudes preserve their visible world copies and may fall
+ * outside the range from -180 to 180 degrees. points and out_coordinates may be
+ * null only when point_count is 0.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, a required array
+ *   is null, or any point contains non-finite values.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_lat_lngs_for_pixels_unwrapped(
   mln_map map, const mln_screen_point* points, size_t point_count,
   mln_lat_lng* out_coordinates
 ) MLN_NOEXCEPT;

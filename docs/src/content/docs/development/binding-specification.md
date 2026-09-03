@@ -1065,17 +1065,17 @@ the other isolate, which makes its id stale rather than live.
 
 ### Map, camera, projection, style, and query
 
-| ID      | Test                                                                                                                                                                                                    |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                                                                                       |
-| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through a drain.                                                                                 |
-| BND-102 | Camera set/get, animated camera commands, transition cancellation, and gesture-in-progress bracketing produce the expected native camera state and statuses.                                            |
-| BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance.                                                                     |
-| BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.                                                                          |
-| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.                                                                         |
-| BND-106 | Query workflows return copied queried-feature values. Each value contains a GeoJSON Feature buffer, optional source and source-layer identifiers, and optional feature-state JSON.                      |
-| BND-108 | The loaded style document reads back byte-for-byte through public map APIs, the style URL reads back the last requested URL, and both report empty when absent.                                         |
-| BND-109 | Source inspection copies a URL-backed source URL and inline tile-source metadata, including multiple tile URLs and absent fields, and the result remains valid after the map no longer owns the source. |
+| ID      | Test                                                                                                                                                                                                          |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                                                                                             |
+| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through a drain.                                                                                       |
+| BND-102 | Camera set/get, animated camera commands, transition cancellation, and gesture-in-progress bracketing produce the expected native camera state and statuses.                                                  |
+| BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance. Unwrapped screen-to-coordinate conversion preserves visible world copies. |
+| BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.                                                                                |
+| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.                                                                               |
+| BND-106 | Query workflows return copied queried-feature values. Each value contains a GeoJSON Feature buffer, optional source and source-layer identifiers, and optional feature-state JSON.                            |
+| BND-108 | The loaded style document reads back byte-for-byte through public map APIs, the style URL reads back the last requested URL, and both report empty when absent.                                               |
+| BND-109 | Source inspection copies a URL-backed source URL and inline tile-source metadata, including multiple tile URLs and absent fields, and the result remains valid after the map no longer owns the source.       |
 
 ### Logging and callbacks
 

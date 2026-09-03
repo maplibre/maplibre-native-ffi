@@ -596,8 +596,22 @@ public extension MapHandle {
     )) }
   }
 
+  /// Converts a screen point to a geographic coordinate.
+  ///
+  /// The longitude is wrapped to the range from -180 to 180 degrees.
   func latLng(for point: ScreenPoint) throws -> LatLng {
     try mapNativeFailure { try LatLng(native: NativeMap.latLngForPixel(
+      requireLiveHandle(),
+      point: point.nativeInput
+    )) }
+  }
+
+  /// Converts a screen point to an unwrapped geographic coordinate.
+  ///
+  /// The longitude preserves the visible world copy and may fall outside
+  /// -180 to 180.
+  func latLngUnwrapped(for point: ScreenPoint) throws -> LatLng {
+    try mapNativeFailure { try LatLng(native: NativeMap.latLngForPixelUnwrapped(
       requireLiveHandle(),
       point: point.nativeInput
     )) }
@@ -612,9 +626,25 @@ public extension MapHandle {
     }
   }
 
+  /// Converts screen points to geographic coordinates.
+  ///
+  /// Each longitude is wrapped to the range from -180 to 180 degrees.
   func latLngs(for points: [ScreenPoint]) throws -> [LatLng] {
     try mapNativeFailure {
       try NativeMap.latLngsForPixels(
+        requireLiveHandle(),
+        points: points.map(\.nativeInput)
+      ).map(LatLng.init(native:))
+    }
+  }
+
+  /// Converts screen points to unwrapped geographic coordinates.
+  ///
+  /// Each longitude preserves its visible world copy and may fall outside
+  /// -180 to 180.
+  func latLngsUnwrapped(for points: [ScreenPoint]) throws -> [LatLng] {
+    try mapNativeFailure {
+      try NativeMap.latLngsForPixelsUnwrapped(
         requireLiveHandle(),
         points: points.map(\.nativeInput)
       ).map(LatLng.init(native:))

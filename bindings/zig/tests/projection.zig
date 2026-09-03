@@ -80,6 +80,44 @@ test "map converts between lat lngs and screen points" {
     try map.latLngsForPixels(testing.allocator, &.{}, &.{});
 }
 
+test "unwrapped coordinate conversions preserve visible world copies" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 1024, .height = 512 });
+    defer map.close() catch @panic("map close failed");
+
+    try map.jumpTo(.{ .center = .{ .latitude = 0.0, .longitude = 180.0 }, .zoom = 0.0 });
+
+    const points = [_]maplibre.ScreenPoint{
+        .{ .x = 0.0, .y = 256.0 },
+        .{ .x = 1024.0, .y = 256.0 },
+    };
+    var wrapped: [points.len]maplibre.LatLng = undefined;
+    try map.latLngsForPixels(testing.allocator, points[0..], wrapped[0..]);
+    for (wrapped) |coordinate| {
+        try testing.expect(coordinate.longitude >= -180.0);
+        try testing.expect(coordinate.longitude <= 180.0);
+    }
+
+    var unwrapped: [points.len]maplibre.LatLng = undefined;
+    try map.latLngsForPixelsUnwrapped(testing.allocator, points[0..], unwrapped[0..]);
+    try testing.expect(unwrapped[1].longitude - unwrapped[0].longitude > 360.0);
+
+    const wrapped_right = try map.latLngForPixel(points[1]);
+    try testing.expect(wrapped_right.longitude >= -180.0);
+    try testing.expect(wrapped_right.longitude <= 180.0);
+    const right = try map.latLngForPixelUnwrapped(points[1]);
+    try expectLatLngApprox(unwrapped[1], right);
+
+    var projection = try maplibre.MapProjectionHandle.create(&map);
+    defer projection.close() catch @panic("projection close failed");
+    const projected_wrapped_right = try projection.latLngForPixel(points[1]);
+    try testing.expect(projected_wrapped_right.longitude >= -180.0);
+    try testing.expect(projected_wrapped_right.longitude <= 180.0);
+    const projected_right = try projection.latLngForPixelUnwrapped(points[1]);
+    try expectLatLngApprox(right, projected_right);
+}
+
 test "standalone projection converts and updates camera" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");

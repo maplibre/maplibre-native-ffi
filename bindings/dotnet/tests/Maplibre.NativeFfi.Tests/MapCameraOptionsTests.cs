@@ -229,6 +229,49 @@ public sealed class MapCameraOptionsTests
 
     [BindingSpecTest("BND-103")]
     [Fact]
+    public void UnwrappedCoordinateConversionsPreserveVisibleWorldCopies()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 1024, Height = 512 });
+        map.JumpTo(new CameraOptions { Center = new LatLng(0, 180), Zoom = 0 });
+        ScreenPoint[] points = [new(0, 256), new(1024, 256)];
+
+        var wrapped = map.LatLngsForPixels(points);
+        var unwrapped = map.LatLngsForPixelsUnwrapped(points);
+        Assert.All(wrapped, coordinate => Assert.InRange(coordinate.Longitude, -180, 180));
+        Assert.True(unwrapped[1].Longitude - unwrapped[0].Longitude > 360);
+        Assert.InRange(map.LatLngForPixel(points[1]).Longitude, -180, 180);
+        var right = map.LatLngForPixelUnwrapped(points[1]);
+        Assert.Equal(unwrapped[1].Longitude, right.Longitude, CoordinatePrecision);
+
+        using var projection = map.CreateProjection();
+        Assert.InRange(projection.LatLngForPixel(points[1]).Longitude, -180, 180);
+        var projectedRight = projection.LatLngForPixelUnwrapped(points[1]);
+        Assert.Equal(right.Longitude, projectedRight.Longitude, CoordinatePrecision);
+    }
+
+    [BindingSpecTest("BND-103")]
+    [Fact]
+    public void EmptyBatchConversionsFromAnotherThreadReportWrongThread()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions());
+        var failures = new Exception?[3];
+        var thread = new Thread(() =>
+        {
+            failures[0] = Record.Exception(() => map.PixelsForLatLngs([]));
+            failures[1] = Record.Exception(() => map.LatLngsForPixels([]));
+            failures[2] = Record.Exception(() => map.LatLngsForPixelsUnwrapped([]));
+        });
+
+        thread.Start();
+        thread.Join();
+
+        Assert.All(failures, failure => Assert.IsType<WrongThreadException>(failure));
+    }
+
+    [BindingSpecTest("BND-103")]
+    [Fact]
     public void ProjectionSnapshotSupportsCameraAndCoordinateConversions()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
@@ -265,6 +308,9 @@ public sealed class MapCameraOptionsTests
         var coordinate = new LatLng(12.5, 34.25);
 
         map.Close();
+        Assert.Throws<InvalidStateException>(() => map.PixelsForLatLngs([]));
+        Assert.Throws<InvalidStateException>(() => map.LatLngsForPixels([]));
+        Assert.Throws<InvalidStateException>(() => map.LatLngsForPixelsUnwrapped([]));
 
         Exception? failure = null;
         var worker = new Thread(() =>

@@ -825,6 +825,47 @@ void main() {
     projection.close();
   });
 
+  test('unwrapped coordinate conversions preserve visible world copies', () {
+    final runtime = RuntimeHandle.create();
+    final map = runtime.createMap(
+      options: const MapOptions(width: 1024, height: 512),
+    );
+    addTearDown(() {
+      map.close();
+      runtime.close();
+    });
+    map.jumpTo(const CameraOptions(center: LatLng(0, 180), zoom: 0));
+    const points = [ScreenPoint(0, 256), ScreenPoint(1024, 256)];
+
+    final wrapped = map.latLngsForPixels(points);
+    final unwrapped = map.latLngsForPixelsUnwrapped(points);
+    expect(
+      wrapped.every(
+        (coordinate) =>
+            coordinate.longitude >= -180 && coordinate.longitude <= 180,
+      ),
+      isTrue,
+    );
+    expect(unwrapped[1].longitude - unwrapped[0].longitude, greaterThan(360));
+    expect(
+      map.latLngForPixel(points[1]).longitude,
+      inInclusiveRange(-180, 180),
+    );
+    final right = map.latLngForPixelUnwrapped(points[1]);
+    expect(right.longitude, closeTo(unwrapped[1].longitude, 1e-10));
+
+    final projection = map.createProjection();
+    addTearDown(projection.close);
+    expect(
+      projection.latLngForPixel(points[1]).longitude,
+      inInclusiveRange(-180, 180),
+    );
+    expect(
+      projection.latLngForPixelUnwrapped(points[1]).longitude,
+      closeTo(right.longitude, 1e-10),
+    );
+  });
+
   test('custom geometry tile callbacks reach their isolate', () async {
     final deliveredTiles = <CanonicalTileId>[];
     final callback =

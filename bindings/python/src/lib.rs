@@ -2330,6 +2330,24 @@ impl MapHandle {
         lat_lng_to_py(py, coordinate)
     }
 
+    fn lat_lng_for_pixel_unwrapped(&self, py: Python<'_>, x: f64, y: f64) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        let mut coordinate = sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        };
+        // SAFETY: The C API validates the map pointer, point, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_lat_lng_for_pixel_unwrapped(
+                state.handle(),
+                sys::mln_screen_point { x, y },
+                &mut coordinate,
+            )
+        })
+        .map_err(map_error)?;
+        lat_lng_to_py(py, coordinate)
+    }
+
     fn pixels_for_lat_lngs(
         &self,
         py: Python<'_>,
@@ -2364,6 +2382,33 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer and point/output slices.
         maplibre_core::check(unsafe {
             sys::mln_map_lat_lngs_for_pixels(
+                state.handle(),
+                points.as_ptr(),
+                points.len(),
+                coordinates.as_mut_ptr(),
+            )
+        })
+        .map_err(map_error)?;
+        lat_lng_list_to_py(py, &coordinates)
+    }
+
+    fn lat_lngs_for_pixels_unwrapped(
+        &self,
+        py: Python<'_>,
+        points: Vec<(f64, f64)>,
+    ) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        let points: Vec<_> = points.into_iter().map(screen_point_from_tuple).collect();
+        let mut coordinates = vec![
+            sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 0.0
+            };
+            points.len()
+        ];
+        // SAFETY: The C API validates the map pointer and point/output slices.
+        maplibre_core::check(unsafe {
+            sys::mln_map_lat_lngs_for_pixels_unwrapped(
                 state.handle(),
                 points.as_ptr(),
                 points.len(),
@@ -4034,6 +4079,25 @@ impl MapProjectionHandle {
         // pointer.
         maplibre_core::check(unsafe {
             sys::mln_map_projection_lat_lng_for_pixel(
+                state.handle(),
+                sys::mln_screen_point { x, y },
+                &mut coordinate,
+            )
+        })
+        .map_err(map_error)?;
+        lat_lng_to_py(py, coordinate)
+    }
+
+    fn lat_lng_for_pixel_unwrapped(&self, py: Python<'_>, x: f64, y: f64) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        let mut coordinate = sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        };
+        // SAFETY: The C API validates the projection pointer, point, and output
+        // pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_lat_lng_for_pixel_unwrapped(
                 state.handle(),
                 sys::mln_screen_point { x, y },
                 &mut coordinate,

@@ -1095,6 +1095,16 @@ auto mln_map_lat_lng_for_pixel(
   });
 }
 
+auto mln_map_lat_lng_for_pixel_unwrapped(
+  mln_map map, mln_screen_point point, mln_lat_lng* out_coordinate
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_lat_lng_for_pixel_unwrapped(
+      map, point, out_coordinate
+    );
+  });
+}
+
 auto mln_map_pixels_for_lat_lngs(
   mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
   mln_screen_point* out_points
@@ -1112,6 +1122,17 @@ auto mln_map_lat_lngs_for_pixels(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_lat_lngs_for_pixels(
+      map, points, point_count, out_coordinates
+    );
+  });
+}
+
+auto mln_map_lat_lngs_for_pixels_unwrapped(
+  mln_map map, const mln_screen_point* points, size_t point_count,
+  mln_lat_lng* out_coordinates
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_lat_lngs_for_pixels_unwrapped(
       map, points, point_count, out_coordinates
     );
   });
@@ -1187,6 +1208,17 @@ auto mln_map_projection_lat_lng_for_pixel(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_projection_lat_lng_for_pixel(
+      projection, point, out_coordinate
+    );
+  });
+}
+
+auto mln_map_projection_lat_lng_for_pixel_unwrapped(
+  mln_map_projection projection, mln_screen_point point,
+  mln_lat_lng* out_coordinate
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_projection_lat_lng_for_pixel_unwrapped(
       projection, point, out_coordinate
     );
   });

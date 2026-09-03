@@ -105,12 +105,31 @@ final class MapProjectionHandle {
     });
   }
 
-  /// Converts a screen point to a geographic world coordinate.
+  /// Converts a screen point to a geographic coordinate with longitude wrapped
+  /// to the range from -180 to 180 degrees.
   LatLng latLngForPixel(ScreenPoint point) {
     return withNativeArena((arena) {
       final outCoordinate = arena<raw.mln_lat_lng>();
       _check(
         raw.mln_map_projection_lat_lng_for_pixel(
+          _handle.raw,
+          native_struct.screenPointToNative(point),
+          outCoordinate,
+        ),
+      );
+      return native_struct.latLngFromNative(outCoordinate.ref);
+    });
+  }
+
+  /// Converts a screen point to an unwrapped geographic coordinate.
+  ///
+  /// The longitude preserves the visible world copy and may fall outside
+  /// -180 to 180.
+  LatLng latLngForPixelUnwrapped(ScreenPoint point) {
+    return withNativeArena((arena) {
+      final outCoordinate = arena<raw.mln_lat_lng>();
+      _check(
+        raw.mln_map_projection_lat_lng_for_pixel_unwrapped(
           _handle.raw,
           native_struct.screenPointToNative(point),
           outCoordinate,

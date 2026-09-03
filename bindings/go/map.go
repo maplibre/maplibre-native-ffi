@@ -989,7 +989,8 @@ func (m *MapHandle) PixelForLatLng(coordinate LatLng) (ScreenPoint, error) {
 }
 
 // LatLngForPixel converts a logical screen point to a geographic coordinate for
-// the current map.
+// the current map. The longitude is wrapped to the range from -180 to 180
+// degrees.
 func (m *MapHandle) LatLngForPixel(point ScreenPoint) (LatLng, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -1000,6 +1001,24 @@ func (m *MapHandle) LatLngForPixel(point ScreenPoint) (LatLng, error) {
 	var raw C.mln_lat_lng
 	if err := checkNative(func() int32 {
 		return int32(C.mln_map_lat_lng_for_pixel(C.mln_map(ptr), cScreenPoint(point), &raw))
+	}); err != nil {
+		return LatLng{}, err
+	}
+	return goLatLng(raw), nil
+}
+
+// LatLngForPixelUnwrapped converts a logical screen point to an unwrapped
+// geographic coordinate. The longitude preserves the visible world copy.
+func (m *MapHandle) LatLngForPixelUnwrapped(point ScreenPoint) (LatLng, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return LatLng{}, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	var raw C.mln_lat_lng
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_lat_lng_for_pixel_unwrapped(C.mln_map(ptr), cScreenPoint(point), &raw))
 	}); err != nil {
 		return LatLng{}, err
 	}
@@ -1037,7 +1056,8 @@ func (m *MapHandle) PixelsForLatLngs(coordinates []LatLng) ([]ScreenPoint, error
 }
 
 // LatLngsForPixels converts logical screen points to geographic coordinates for
-// the current map.
+// the current map. Each longitude is wrapped to the range from -180 to 180
+// degrees.
 func (m *MapHandle) LatLngsForPixels(points []ScreenPoint) ([]LatLng, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -1055,6 +1075,36 @@ func (m *MapHandle) LatLngsForPixels(points []ScreenPoint) ([]LatLng, error) {
 	}
 	if err := checkNative(func() int32 {
 		return int32(C.mln_map_lat_lngs_for_pixels(
+			C.mln_map(ptr),
+			rawPointsPtr,
+			C.size_t(len(points)),
+			rawCoordinatesPtr,
+		))
+	}); err != nil {
+		return nil, err
+	}
+	return goLatLngSlice(rawCoordinates), nil
+}
+
+// LatLngsForPixelsUnwrapped converts logical screen points to unwrapped
+// geographic coordinates. Each longitude preserves its visible world copy.
+func (m *MapHandle) LatLngsForPixelsUnwrapped(points []ScreenPoint) ([]LatLng, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	rawPoints := cScreenPointSlice(points)
+	rawCoordinates := make([]C.mln_lat_lng, len(points))
+	var rawPointsPtr *C.mln_screen_point
+	var rawCoordinatesPtr *C.mln_lat_lng
+	if len(points) > 0 {
+		rawPointsPtr = &rawPoints[0]
+		rawCoordinatesPtr = &rawCoordinates[0]
+	}
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_lat_lngs_for_pixels_unwrapped(
 			C.mln_map(ptr),
 			rawPointsPtr,
 			C.size_t(len(points)),

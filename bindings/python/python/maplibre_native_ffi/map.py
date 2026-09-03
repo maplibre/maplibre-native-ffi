@@ -452,10 +452,17 @@ class MapProjectionHandle(NativeHandleMixin):
         return ScreenPoint(x=raw["x"], y=raw["y"])
 
     def lat_lng_for_pixel(self, point: ScreenPoint) -> LatLng:
-        """Convert a screen-space point to a geographic coordinate."""
+        """Convert a screen-space point to a coordinate with longitude wrapped to [-180, 180]."""
         from .geo import LatLng
 
         raw = self._native.lat_lng_for_pixel(point.x, point.y)
+        return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
+
+    def lat_lng_for_pixel_unwrapped(self, point: ScreenPoint) -> LatLng:
+        """Convert a screen point to a coordinate that preserves its visible world copy."""
+        from .geo import LatLng
+
+        raw = self._native.lat_lng_for_pixel_unwrapped(point.x, point.y)
         return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
 
 
@@ -1464,10 +1471,17 @@ class MapHandle(NativeHandleMixin):
         return ScreenPoint(x=raw["x"], y=raw["y"])
 
     def lat_lng_for_pixel(self, point: ScreenPoint) -> LatLng:
-        """Convert a screen point to a geographic world coordinate for this map."""
+        """Convert a screen point to a coordinate with longitude wrapped to [-180, 180]."""
         from .geo import LatLng
 
         raw = self._native.lat_lng_for_pixel(point.x, point.y)
+        return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
+
+    def lat_lng_for_pixel_unwrapped(self, point: ScreenPoint) -> LatLng:
+        """Convert a screen point to a coordinate that preserves its visible world copy."""
+        from .geo import LatLng
+
+        raw = self._native.lat_lng_for_pixel_unwrapped(point.x, point.y)
         return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
 
     def pixels_for_lat_lngs(
@@ -1484,10 +1498,22 @@ class MapHandle(NativeHandleMixin):
         self,
         points: list[ScreenPoint] | tuple[ScreenPoint, ...],
     ) -> tuple[LatLng, ...]:
-        """Convert screen points to geographic world coordinates for this map."""
+        """Convert screen points to coordinates with longitudes wrapped to [-180, 180]."""
         from .geo import LatLng
 
         raw = self._native.lat_lngs_for_pixels([(point.x, point.y) for point in points])
+        return tuple(LatLng(**coordinate) for coordinate in raw)
+
+    def lat_lngs_for_pixels_unwrapped(
+        self,
+        points: list[ScreenPoint] | tuple[ScreenPoint, ...],
+    ) -> tuple[LatLng, ...]:
+        """Convert screen points to coordinates that preserve their visible world copies."""
+        from .geo import LatLng
+
+        raw = self._native.lat_lngs_for_pixels_unwrapped(
+            [(point.x, point.y) for point in points]
+        )
         return tuple(LatLng(**coordinate) for coordinate in raw)
 
     def add_custom_geometry_source(

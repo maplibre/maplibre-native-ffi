@@ -2645,6 +2645,30 @@ def test_map_coordinate_conversions_round_trip_public_values() -> None:
         assert all(isinstance(item, geo.LatLng) for item in coordinates)
 
 
+def test_unwrapped_coordinate_conversions_preserve_visible_world_copies() -> None:
+    options = map_module.MapOptions(width=1024, height=512)
+    with mln.RuntimeHandle() as runtime, runtime.create_map(options) as map_handle:
+        map_handle.jump_to(
+            camera.CameraOptions(center=geo.LatLng(0.0, 180.0), zoom=0.0)
+        )
+        points = (camera.ScreenPoint(0.0, 256.0), camera.ScreenPoint(1024.0, 256.0))
+
+        wrapped = map_handle.lat_lngs_for_pixels(points)
+        unwrapped = map_handle.lat_lngs_for_pixels_unwrapped(points)
+        assert all(-180.0 <= coordinate.longitude <= 180.0 for coordinate in wrapped)
+        assert unwrapped[1].longitude - unwrapped[0].longitude > 360.0
+        assert -180.0 <= map_handle.lat_lng_for_pixel(points[1]).longitude <= 180.0
+        right = map_handle.lat_lng_for_pixel_unwrapped(points[1])
+        assert math.isclose(right.longitude, unwrapped[1].longitude, abs_tol=1e-10)
+
+        with map_handle.create_projection() as projection:
+            assert -180.0 <= projection.lat_lng_for_pixel(points[1]).longitude <= 180.0
+            projected_right = projection.lat_lng_for_pixel_unwrapped(points[1])
+            assert math.isclose(
+                projected_right.longitude, right.longitude, abs_tol=1e-10
+            )
+
+
 def test_map_projection_converts_coordinates_and_closes() -> None:
     coordinate = geo.LatLng(0.0, 0.0)
     meters = map_module.projected_meters_for_lat_lng(coordinate)
