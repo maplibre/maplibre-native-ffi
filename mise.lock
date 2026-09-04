@@ -1070,20 +1070,20 @@ version = "10.0.203"
 backend = "core:dotnet"
 
 [[tools.flutter]]
-version = "3.44.8"
+version = "3.47.2"
 backend = "http:flutter"
 
 [tools.flutter."platforms.linux-x64"]
-checksum = "sha256:672089e001571a9fbb209a495c583580c0c6c73ef98999264ba07fa93ace332d"
-url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.44.8-stable.tar.xz"
+checksum = "sha256:447878859d01ca9bfdb99a85f245af07ed8a15fedcd9d189c4749e8e92d1f185"
+url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.47.2-stable.tar.xz"
 
 [tools.flutter."platforms.macos-arm64"]
-checksum = "sha256:c3d6fe95078f7001d947a31d42527de91d5bfe62e4cf444a1493a2e8f1fb199d"
-url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_arm64_3.44.8-stable.zip"
+checksum = "sha256:f456fd6733053d9301828a2e702d6cbec872923126809aa8c48eb0a696d6cc01"
+url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_arm64_3.47.2-stable.zip"
 
 [tools.flutter."platforms.windows-x64"]
-checksum = "sha256:095c108a08e0377d8a6501fed65aeb288908a070ed3f135e525dc6431c7686e4"
-url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.44.8-stable.zip"
+checksum = "sha256:37934f2128a55d77a38baba12fd611157ed23a47bf7d2b7d17e9e84da118409d"
+url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.47.2-stable.zip"
 
 [[tools."github:EmbarkStudios/cargo-about"]]
 version = "0.9.1"
