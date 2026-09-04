@@ -479,6 +479,10 @@ auto complete_resource_request(
   auto native_response = response_from_abi(*response);
   {
     const std::scoped_lock lock(live->mutex);
+    if (live->retired) {
+      set_thread_error("resource request handle is released");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     if (live->completed) {
       set_thread_error("resource request is already completed");
       return MLN_STATUS_INVALID_STATE;
@@ -512,6 +516,10 @@ auto resource_request_cancelled(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const std::scoped_lock lock(live->mutex);
+  if (live->retired) {
+    set_thread_error("resource request handle is released");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   *out_cancelled = live->cancelled && !live->completed;
   return MLN_STATUS_OK;
 }
@@ -535,6 +543,7 @@ auto set_resource_request_cancel_callback(
   }
   const std::scoped_lock lock(live->mutex);
   if (live->retired) {
+    set_thread_error("resource request handle is released");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (live->cancel_callback_registered) {
@@ -562,8 +571,12 @@ auto wait_for_resource_request_retired(mln_resource_request_handle handle)
   if (live == nullptr) {
     return MLN_STATUS_OK;
   }
+  // A callback that released its own request leaves the entry in place until
+  // it returns, so a drained request is one whose callback has also returned.
   auto lock = std::unique_lock{live->mutex};
-  live->state_changed.wait(lock, [&live] { return live->retired; });
+  live->state_changed.wait(lock, [&live] {
+    return live->retired && !live->cancel_callback_running;
+  });
   return MLN_STATUS_OK;
 }
 

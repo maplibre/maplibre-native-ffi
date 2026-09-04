@@ -1426,6 +1426,9 @@ static void cancel_callback_skips_a_completed_request(void) {
 typedef struct blocking_cancel_probe {
   cancel_probe base;
   atomic_bool self_release;
+  atomic_bool waiter_drains_instead_of_releasing;
+  atomic_int status_after_self_release;
+  atomic_int complete_status_after_self_release;
   atomic_bool callback_entered;
   atomic_bool release_started;
   atomic_bool release_returned;
@@ -1440,7 +1443,20 @@ typedef struct blocking_cancel_probe {
 static void block_in_cancel(void* user_data) {
   blocking_cancel_probe* probe = user_data;
   if (atomic_load(&probe->self_release)) {
-    mln_resource_request_release(atomic_load(&probe->base.handle));
+    const mln_resource_request_handle handle = atomic_load(&probe->base.handle);
+    mln_resource_request_release(handle);
+    // The entry outlives this callback, but the handle is released: every
+    // other entry point reports it as such.
+    bool cancelled = false;
+    atomic_store(
+      &probe->status_after_self_release,
+      mln_resource_request_cancelled(handle, &cancelled)
+    );
+    const mln_resource_response response = style_response();
+    atomic_store(
+      &probe->complete_status_after_self_release,
+      mln_resource_request_complete(handle, &response)
+    );
   }
   atomic_store(&probe->callback_entered, true);
   wait_for_flag(&probe->release_started);
@@ -1474,7 +1490,13 @@ static void release_during_cancel_callback_entry(void* argument) {
   blocking_cancel_probe* probe = argument;
   wait_for_flag(&probe->callback_entered);
   atomic_store(&probe->release_started, true);
-  mln_resource_request_release(atomic_load(&probe->base.handle));
+  if (atomic_load(&probe->waiter_drains_instead_of_releasing)) {
+    (void)mln_resource_request_wait_until_retired(
+      atomic_load(&probe->base.handle)
+    );
+  } else {
+    mln_resource_request_release(atomic_load(&probe->base.handle));
+  }
   atomic_store(
     &probe->callback_returned_before_release,
     atomic_load(&probe->callback_returned)
@@ -1514,7 +1536,16 @@ static void run_release_waits_for_in_flight_cancel_callback(
     "releasing the request returned while the cancel callback was running"
   );
   TEST_ASSERT_TRUE(atomic_load(&probe->callback_returned_before_release));
-  if (!atomic_load(&probe->self_release)) {
+  if (atomic_load(&probe->self_release)) {
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_INVALID_ARGUMENT,
+      atomic_load(&probe->status_after_self_release)
+    );
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_INVALID_ARGUMENT,
+      atomic_load(&probe->complete_status_after_self_release)
+    );
+  } else {
     mln_resource_request_release(atomic_load(&probe->base.handle));
   }
   bool cancelled = false;
@@ -1534,10 +1565,23 @@ static void release_waits_for_in_flight_cancel_callback(void) {
 }
 
 // Release is idempotent, so a release on another thread must still find the
-// request and wait after the callback released it from inside.
+// request and wait after the callback released it from inside. Inside that
+// window the released handle already rejects every other entry point.
 static void release_waits_for_a_cancel_callback_that_released_itself(void) {
   blocking_cancel_probe probe = {0};
   atomic_store(&probe.self_release, true);
+  run_release_waits_for_in_flight_cancel_callback(&probe);
+}
+
+// Teardown drains requests through the wait-until-retired call, so a request
+// whose callback released it from inside is drained only once the callback
+// returns.
+static void wait_until_retired_waits_for_a_self_releasing_cancel_callback(
+  void
+) {
+  blocking_cancel_probe probe = {0};
+  atomic_store(&probe.self_release, true);
+  atomic_store(&probe.waiter_drains_instead_of_releasing, true);
   run_release_waits_for_in_flight_cancel_callback(&probe);
 }
 
@@ -1570,4 +1614,5 @@ void run_resources_abi_tests(void) {
   RUN_TEST(cancel_callback_skips_a_completed_request);
   RUN_TEST(release_waits_for_in_flight_cancel_callback);
   RUN_TEST(release_waits_for_a_cancel_callback_that_released_itself);
+  RUN_TEST(wait_until_retired_waits_for_a_self_releasing_cancel_callback);
 }
