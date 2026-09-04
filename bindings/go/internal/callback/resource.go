@@ -21,6 +21,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"unsafe"
+	"weak"
 )
 
 // ResourceTransformCallback is the internal shape for resource URL transforms.
@@ -213,27 +214,32 @@ type ResourceProviderState struct {
 
 // ResourceRequestHandle owns a provider request handle selected for handling.
 //
-// The handle counts the uses that are inside a C API call and drains them
-// before it releases the request, instead of holding mu across that call. The
-// C API release waits for a cancel callback running on another thread, and that
-// callback may use the same handle, so a lock held across release would
-// deadlock against it.
+// mu is held across the native complete, cancelled, and set-cancel-callback
+// calls, which never block on host code, so none of them can overlap the native
+// release. mu is never held across the native release or a cancel callback:
+// release waits for a cancel callback running on another thread, and that
+// callback may call back into this handle.
 type ResourceRequestHandle struct {
-	cancel            atomic.Pointer[resourceCancelState]
 	mu                sync.Mutex
-	idle              sync.Cond
-	uses              int
 	handle            C.mln_resource_request_handle
 	decisionFinalized bool
 	providerOwned     bool
 	releaseAccounted  bool
 	closed            bool
 	completed         bool
+
+	// cancelCallback is the one registration this request accepts. The
+	// trampoline takes it out before running it, so it runs at most once.
+	cancelCallback func()
+	// cancelToken is the registry key native code holds as user_data, or zero
+	// when no registration reached native code.
+	cancelToken uint64
 }
 
 var (
-	ErrResourceRequestCompleted = errors.New("resource request already completed")
-	ErrResourceRequestClosed    = errors.New("resource request handle is closed")
+	ErrResourceRequestCompleted                = errors.New("resource request already completed")
+	ErrResourceRequestClosed                   = errors.New("resource request handle is closed")
+	ErrResourceRequestCancelCallbackRegistered = errors.New("resource request already has a cancel callback")
 
 	completeResourceRequest = func(handle C.mln_resource_request_handle, response *C.mln_resource_response) int32 {
 		return int32(C.mln_resource_request_complete(handle, response))
@@ -241,62 +247,45 @@ var (
 	releaseResourceRequest = func(handle C.mln_resource_request_handle) {
 		C.mln_resource_request_release(handle)
 	}
-	setResourceRequestCancelCallback = func(handle C.mln_resource_request_handle, state *resourceCancelState) int32 {
-		if state == nil {
-			return int32(C.mln_resource_request_set_cancel_callback(handle, nil, nil))
-		}
-		return int32(C.mln_resource_request_set_cancel_callback(
+	setResourceRequestCancelCallback = func(handle C.mln_resource_request_handle, token uint64) (int32, bool) {
+		var cancelled C.bool
+		status := int32(C.mln_resource_request_set_cancel_callback(
 			handle,
 			C.mln_resource_request_cancel_callback(C.goMaplibreResourceRequestCancel),
-			C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
+			C.mln_go_handle_to_pointer(C.uintptr_t(token)),
+			&cancelled,
 		))
+		return status, bool(cancelled)
 	}
 )
 
-// liveResourceCancelStates counts the cancel callback states this package holds
-// a cgo handle for. ResourceCancelStateLiveCountForTest reads it.
-var liveResourceCancelStates atomic.Int64
+// cancelRegistry resolves the token native code holds as cancel user_data to
+// the request handle that owns the callback. It holds weak pointers, so a
+// registration never keeps a request handle reachable; the handle owns the
+// callback and removes its entry when it releases the request.
+var (
+	cancelRegistry  sync.Map // uint64 -> weak.Pointer[ResourceRequestHandle]
+	lastCancelToken atomic.Uint64
+)
 
-// ResourceCancelStateLiveCountForTest reports how many cancel callback states
-// are still alive.
-func ResourceCancelStateLiveCountForTest() int64 {
-	return liveResourceCancelStates.Load()
+func registerCancelToken(handle *ResourceRequestHandle) uint64 {
+	token := lastCancelToken.Add(1)
+	cancelRegistry.Store(token, weak.Make(handle))
+	return token
 }
 
-// resourceCancelState owns the Go side of one cancel callback registration.
-// Native code holds its cgo handle until the registration is replaced or the
-// request is released.
-type resourceCancelState struct {
-	callback func()
-	handle   cgo.Handle
-	once     sync.Once
-}
-
-func newResourceCancelState(callback func()) *resourceCancelState {
-	state := &resourceCancelState{callback: callback}
-	state.handle = cgo.NewHandle(state)
-	liveResourceCancelStates.Add(1)
-	return state
-}
-
-// release frees the registration state. The C API waits for a cancel callback
-// running on another thread before release returns, and a callback running on
-// this goroutine keeps its own reference, so this never waits.
-func (state *resourceCancelState) release() {
-	if state == nil {
-		return
+func lookupCancelToken(token uint64) *ResourceRequestHandle {
+	value, ok := cancelRegistry.Load(token)
+	if !ok {
+		return nil
 	}
-	state.once.Do(func() {
-		state.handle.Delete()
-		liveResourceCancelStates.Add(-1)
-	})
+	return value.(weak.Pointer[ResourceRequestHandle]).Value()
 }
 
-func (state *resourceCancelState) invoke() {
-	if state == nil || state.callback == nil {
-		return
+func unregisterCancelToken(token uint64) {
+	if token != 0 {
+		cancelRegistry.Delete(token)
 	}
-	state.callback()
 }
 
 func newResourceProviderState(callback ResourceProviderCallback) *ResourceProviderState {
@@ -346,13 +335,7 @@ func newResourceRequestHandle(handle C.mln_resource_request_handle) (*ResourceRe
 	if handle == 0 {
 		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
-	return newResourceRequestHandleFor(handle), int32(C.MLN_STATUS_OK)
-}
-
-func newResourceRequestHandleFor(raw C.mln_resource_request_handle) *ResourceRequestHandle {
-	handle := &ResourceRequestHandle{handle: raw}
-	handle.idle.L = &handle.mu
-	return handle
+	return &ResourceRequestHandle{handle: handle}, int32(C.MLN_STATUS_OK)
 }
 
 // A synthetic request handle for tests. It reaches only the test hooks below,
@@ -361,7 +344,7 @@ func newResourceRequestHandleFor(raw C.mln_resource_request_handle) *ResourceReq
 const testResourceRequestHandle = C.mln_resource_request_handle(0x0c00_0000_0000_0034)
 
 func newResourceRequestHandleForTest() *ResourceRequestHandle {
-	return newResourceRequestHandleFor(testResourceRequestHandle)
+	return &ResourceRequestHandle{handle: testResourceRequestHandle}
 }
 
 func freeResourceRequestHandleForTest(handle *ResourceRequestHandle) {
@@ -371,18 +354,21 @@ func freeResourceRequestHandleForTest(handle *ResourceRequestHandle) {
 	handle.handle = 0
 }
 
-func setResourceRequestCancelHookForTest(set func(state *resourceCancelState) int32) func() {
+// setResourceRequestCancelHookForTest replaces the native set-cancel-callback
+// call. The hook receives the registry token native code would hold and returns
+// the status and the already-cancelled report.
+func setResourceRequestCancelHookForTest(set func(token uint64) (int32, bool)) func() {
 	previous := setResourceRequestCancelCallback
-	setResourceRequestCancelCallback = func(_ C.mln_resource_request_handle, state *resourceCancelState) int32 {
-		return set(state)
+	setResourceRequestCancelCallback = func(_ C.mln_resource_request_handle, token uint64) (int32, bool) {
+		return set(token)
 	}
 	return func() {
 		setResourceRequestCancelCallback = previous
 	}
 }
 
-func invokeResourceRequestCancelTrampolineForTest(state *resourceCancelState) {
-	goMaplibreResourceRequestCancel(C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)))
+func invokeResourceRequestCancelTrampolineForTest(token uint64) {
+	goMaplibreResourceRequestCancel(C.mln_go_handle_to_pointer(C.uintptr_t(token)))
 }
 
 func setResourceRequestHooksForTest(complete func() int32, release func()) func() {
@@ -432,28 +418,28 @@ func (handle *ResourceRequestHandle) CompleteChecked(response ResourceResponse, 
 			return 0, err
 		}
 	}
-	// Retiring the handle before the C call keeps a second completion out and
-	// reports the closed error to a cancel callback that reaches this handle
-	// while completion is in flight.
-	handle.completed = true
-	handle.closed = true
-	handle.uses++
-	handle.mu.Unlock()
-
 	raw, allocations := resourceResponseToC(response)
 	status := completeResourceRequest(handle.handle, &raw)
 	freeAllocations(allocations)
-
-	handle.mu.Lock()
-	handle.endUseLocked()
-	release := handle.takeReleaseLocked()
+	handle.completed = true
+	handle.closed = true
+	handle.cancelCallback = nil
+	release, token := handle.takeReleaseLocked()
 	handle.mu.Unlock()
 
+	handle.releaseNative(release, token)
+	return status, nil
+}
+
+// releaseNative releases the request when this handle owes the release, then
+// removes its cancel registration. The caller holds no lock: release waits for
+// a cancel callback running on another thread, and that callback may use this
+// handle. Once release returns native code no longer holds the token.
+func (handle *ResourceRequestHandle) releaseNative(release bool, token uint64) {
 	if release {
 		releaseResourceRequest(handle.handle)
 	}
-	handle.dropCancelState()
-	return status, nil
+	unregisterCancelToken(token)
 }
 
 // Complete completes the request with copied response data.
@@ -482,76 +468,62 @@ func (handle *ResourceRequestHandle) Cancelled() (int32, bool) {
 
 // CancelledChecked reports whether native cancelled the request.
 func (handle *ResourceRequestHandle) CancelledChecked() (int32, bool, error) {
-	if err := handle.beginUse(); err != nil {
-		return 0, false, err
+	handle.mu.Lock()
+	defer handle.mu.Unlock()
+	if handle.closed {
+		return 0, false, ErrResourceRequestClosed
 	}
-	defer handle.endUse()
-
 	var cancelled C.bool
 	status := int32(C.mln_resource_request_cancelled(handle.handle, &cancelled))
 	return status, bool(cancelled), nil
 }
 
-// SetCancelCallbackChecked registers the callback that runs when native code
-// cancels the request, or clears the registration when callback is nil.
+// SetCancelCallbackChecked registers the one callback that runs when native
+// code cancels the request. When native code reports that the request was
+// already cancelled, the callback runs before this method returns, on the
+// calling goroutine with no lock held.
 func (handle *ResourceRequestHandle) SetCancelCallbackChecked(callback func()) (int32, error) {
-	if handle == nil {
+	if callback == nil {
+		return int32(C.MLN_STATUS_INVALID_ARGUMENT), nil
+	}
+	handle.mu.Lock()
+	if handle.closed {
+		handle.mu.Unlock()
 		return 0, ErrResourceRequestClosed
 	}
-	if err := handle.beginUse(); err != nil {
-		return 0, err
+	if handle.cancelToken != 0 {
+		handle.mu.Unlock()
+		return 0, ErrResourceRequestCancelCallbackRegistered
 	}
-
-	var next *resourceCancelState
-	if callback != nil {
-		next = newResourceCancelState(callback)
-	}
-	// Publish before the C call, because native code can invoke the callback
-	// before that call returns for a request it already cancelled.
-	previous := handle.cancel.Swap(next)
-
-	// No binding lock is held across the C call: the callback may run on this
-	// goroutine and complete or close the same request.
-	status := setResourceRequestCancelCallback(handle.handle, next)
-
-	previous.release()
-	handle.mu.Lock()
-	handle.endUseLocked()
-	closed := handle.closed
-	handle.mu.Unlock()
-	if status != int32(C.MLN_STATUS_OK) || closed {
-		if handle.cancel.CompareAndSwap(next, nil) {
-			next.release()
+	token := registerCancelToken(handle)
+	status, cancelled := setResourceRequestCancelCallback(handle.handle, token)
+	if status != int32(C.MLN_STATUS_OK) || cancelled {
+		handle.mu.Unlock()
+		unregisterCancelToken(token)
+		if cancelled {
+			runCancelCallback(callback)
 		}
+		return status, nil
 	}
+	handle.cancelCallback = callback
+	handle.cancelToken = token
+	handle.mu.Unlock()
 	return status, nil
 }
 
-func (handle *ResourceRequestHandle) beginUse() error {
+// takeCancelCallback removes the registered callback so it runs at most once.
+func (handle *ResourceRequestHandle) takeCancelCallback() func() {
 	handle.mu.Lock()
 	defer handle.mu.Unlock()
-	if handle.closed {
-		return ErrResourceRequestClosed
-	}
-	handle.uses++
-	return nil
+	callback := handle.cancelCallback
+	handle.cancelCallback = nil
+	return callback
 }
 
-func (handle *ResourceRequestHandle) endUse() {
-	handle.mu.Lock()
-	defer handle.mu.Unlock()
-	handle.endUseLocked()
-}
-
-func (handle *ResourceRequestHandle) endUseLocked() {
-	handle.uses--
-	if handle.uses == 0 {
-		handle.idle.Broadcast()
-	}
-}
-
-func (handle *ResourceRequestHandle) dropCancelState() {
-	handle.cancel.Swap(nil).release()
+// runCancelCallback contains a host panic so it cannot unwind into C.
+func runCancelCallback(callback func()) {
+	defer func() { _ = recover() }()
+	callback()
 }
 
 // Close releases the provider-owned handle without completing it.
@@ -565,13 +537,11 @@ func (handle *ResourceRequestHandle) Close() {
 		return
 	}
 	handle.closed = true
-	release := handle.takeReleaseLocked()
+	handle.cancelCallback = nil
+	release, token := handle.takeReleaseLocked()
 	handle.mu.Unlock()
 
-	if release {
-		releaseResourceRequest(handle.handle)
-	}
-	handle.dropCancelState()
+	handle.releaseNative(release, token)
 }
 
 func (handle *ResourceRequestHandle) finishProviderDecision(decision uint32) uint32 {
@@ -587,55 +557,57 @@ func (handle *ResourceRequestHandle) finishProviderDecision(decision uint32) uin
 	if handle.completed || decision == uint32(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
 		handle.decisionFinalized = true
 		handle.providerOwned = true
-		release := false
+		release, token := false, uint64(0)
 		if handle.closed {
-			release = handle.takeReleaseLocked()
+			release, token = handle.takeReleaseLocked()
 		}
 		handle.mu.Unlock()
-		if release {
-			releaseResourceRequest(handle.handle)
-		}
+		handle.releaseNative(release, token)
 		return uint32(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE)
 	}
 	handle.decisionFinalized = true
 	handle.releaseAccounted = true
 	handle.closed = true
+	handle.cancelCallback = nil
+	token := handle.cancelToken
+	handle.cancelToken = 0
 	handle.mu.Unlock()
-	handle.dropCancelState()
+	unregisterCancelToken(token)
 	return decision
 }
 
 func (handle *ResourceRequestHandle) finishProviderException() uint32 {
 	handle.mu.Lock()
 	completed := handle.completed
+	token := uint64(0)
 	if !completed {
 		handle.decisionFinalized = true
 		handle.releaseAccounted = true
 		handle.closed = true
+		handle.cancelCallback = nil
+		token = handle.cancelToken
+		handle.cancelToken = 0
 	}
 	handle.mu.Unlock()
-	if !completed {
-		handle.dropCancelState()
-	}
 	if completed {
 		return handle.finishProviderDecision(uint32(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE))
 	}
+	unregisterCancelToken(token)
 	return ^uint32(0)
 }
 
-// takeReleaseLocked claims the one release this handle owes native code, once
-// the in-flight uses have drained. The caller runs the release itself, after it
-// unlocks: the C API release waits for a cancel callback running on another
-// thread, and that callback may use this handle.
-func (handle *ResourceRequestHandle) takeReleaseLocked() bool {
+// takeReleaseLocked claims the one release this handle owes native code and
+// the cancel token native code holds, so the caller can perform both after it
+// unlocks. A handle that owes no release keeps its token until native code
+// stops holding it.
+func (handle *ResourceRequestHandle) takeReleaseLocked() (release bool, token uint64) {
 	if handle.releaseAccounted || !handle.decisionFinalized || !handle.providerOwned {
-		return false
-	}
-	for handle.uses > 0 {
-		handle.idle.Wait()
+		return false, 0
 	}
 	handle.releaseAccounted = true
-	return true
+	token = handle.cancelToken
+	handle.cancelToken = 0
+	return true, token
 }
 
 func (handle *ResourceRequestHandle) invokeProvider(state *ResourceProviderState, request *C.mln_resource_request) (decision uint32) {

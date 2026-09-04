@@ -243,24 +243,24 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
             )
         return bool(self._native.is_cancelled())
 
-    def set_cancel_callback(self, callback: ResourceCancelCallback | None) -> None:
-        """Register or clear this request's cancellation callback.
+    def set_cancel_callback(self, callback: ResourceCancelCallback) -> None:
+        """Register this request's one cancellation callback.
 
         The callback takes no arguments and runs at most once, on the thread
         that cancels the request. That thread is the runtime owner thread inside
-        a map or runtime call and a MapLibre thread otherwise. Registering on an
-        already cancelled request runs the callback before this call returns.
+        a map or runtime call and a MapLibre thread otherwise. A request the
+        provider completed never runs it. Registering on an already cancelled
+        request runs the callback before this call returns.
 
-        Each call replaces the previous registration, and ``None`` clears it.
-        :meth:`complete` and :meth:`close` both close this handle, and a
-        registration on a closed handle raises :class:`InvalidStateError`.
+        A request accepts one registration: a second one raises
+        :class:`InvalidStateError`, as does a registration on a handle that
+        :meth:`complete` or :meth:`close` already closed.
 
         The callback may call :meth:`complete`, which reports an invalid state
         for a cancelled request, and :meth:`close` on this handle. Runtime and
-        map calls belong outside the callback.
-
-        An exception raised by the callback stays inside it: the binding
-        discards the exception rather than returning it to MapLibre.
+        map calls belong outside the callback. An exception raised by the
+        callback stays inside it: the binding discards the exception rather
+        than returning it to MapLibre.
         """
         if self._closed:
             from .errors import InvalidStateError
@@ -269,8 +269,8 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
                 None,
                 "resource request handle is already closed",
             )
-        if callback is not None and not callable(callback):
-            msg = "cancel callback must be callable or None"
+        if not callable(callback):
+            msg = "cancel callback must be callable"
             raise TypeError(msg)
         self._native.set_cancel_callback(callback)
 

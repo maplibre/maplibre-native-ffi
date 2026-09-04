@@ -231,21 +231,20 @@ public final class ResourceRequestHandle: @unchecked Sendable {
     }
   }
 
-  /// Registers a callback that runs when MapLibre cancels this request, and
-  /// replaces any callback registered before it. Pass `nil` to clear the
-  /// registration.
+  /// Registers the callback that runs when MapLibre cancels this request.
   ///
-  /// The callback runs at most once per request, on the thread that cancels
-  /// it, and only for a request the provider has not completed. That thread is
-  /// the runtime owner thread inside a map or runtime call and a MapLibre
-  /// thread otherwise.
-  /// Registering on a request that MapLibre already cancelled runs the callback
-  /// before this method returns.
+  /// A request accepts one registration. A second call throws an
+  /// invalid-state error, and a closed request throws as closed. The callback
+  /// runs at most once, on the thread that cancels the request: the runtime
+  /// owner thread inside a map or runtime call, and a MapLibre thread
+  /// otherwise. It never runs for a request the provider completed. When
+  /// MapLibre has already cancelled the request, the callback runs on the
+  /// calling thread before this method returns.
   ///
   /// The callback may complete or close this request. It must return quickly,
   /// and it must not call any map, runtime, or other request handle.
   public func setCancelCallback(
-    _ callback: ResourceRequestCancelCallback?
+    _ callback: @escaping ResourceRequestCancelCallback
   ) throws {
     try mapNativeFailure {
       try state.setCancelCallback(callback)

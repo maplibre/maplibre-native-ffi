@@ -248,6 +248,7 @@ private final class ResolvedURLCapture: @unchecked Sendable {
     release: { _ in counters.released() },
     setCancelCallback: { _, _, _ in
       Issue.record("this test registers no cancel callback")
+      return false
     }
   )
   let state = NativeResourceProviderState(handleFunctions: functions) { _, _ in
@@ -275,6 +276,7 @@ private final class ResolvedURLCapture: @unchecked Sendable {
     release: { _ in counters.released() },
     setCancelCallback: { _, _, _ in
       Issue.record("this test registers no cancel callback")
+      return false
     }
   )
   let state = try NativeResourceRequestHandleState(
@@ -317,6 +319,7 @@ private final class ResolvedURLCapture: @unchecked Sendable {
     release: { _ in counters.released() },
     setCancelCallback: { _, _, _ in
       Issue.record("this test registers no cancel callback")
+      return false
     }
   )
   let state = try NativeResourceRequestHandleState(
@@ -368,6 +371,7 @@ private final class ResolvedURLCapture: @unchecked Sendable {
     release: { _ in counters.released() },
     setCancelCallback: { _, _, _ in
       Issue.record("this test registers no cancel callback")
+      return false
     }
   )
   let state = try NativeResourceRequestHandleState(
@@ -424,6 +428,7 @@ private final class ResolvedURLCapture: @unchecked Sendable {
     release: { _ in counters.released() },
     setCancelCallback: { _, _, _ in
       Issue.record("this test registers no cancel callback")
+      return false
     }
   )
   let state =
@@ -491,6 +496,7 @@ private final class ResolvedURLCapture: @unchecked Sendable {
     release: { _ in counters.released() },
     setCancelCallback: { _, _, _ in
       Issue.record("this test registers no cancel callback")
+      return false
     }
   )
   let escapedState = ResourceHandleStateCapture()
@@ -537,6 +543,7 @@ private final class ResolvedURLCapture: @unchecked Sendable {
     release: { _ in counters.released() },
     setCancelCallback: { _, _, _ in
       Issue.record("this test registers no cancel callback")
+      return false
     }
   )
   let state =
@@ -601,16 +608,16 @@ private func pumpUntil(
   _ runtime: RuntimeHandle,
   waitingFor subject: String,
   timeout: TimeInterval = 10,
-  condition: () -> Bool
+  condition: () throws -> Bool
 ) throws -> Bool {
   let deadline = Date().addingTimeInterval(timeout)
   while Date() < deadline {
-    if condition() { return true }
+    if try condition() { return true }
     try runtime.pump()
     _ = try runtime.drainEvents()
     Thread.sleep(forTimeInterval: 0.001)
   }
-  if condition() { return true }
+  if try condition() { return true }
   Issue.record("timed out waiting for \(subject)")
   return false
 }
@@ -628,24 +635,19 @@ private func pumpTurns(
   }
 }
 
-/// Installs a provider that takes every request, keeps the handle, and
-/// registers `onCancel`. The request stays open unless the caller completes it.
+/// Installs a provider that takes every request and keeps the handle, then
+/// requests a style through it. `configure` runs inside the provider callback
+/// with the handle, before the provider returns. The request stays open unless
+/// `configure` completes it.
 private func startCancelProbeRequest(
   runtime: RuntimeHandle,
   map: MapHandle,
   probe: CancelProbe,
-  completeInline: Bool = false,
-  onCancel: @escaping @Sendable () -> Void
+  configure: @escaping @Sendable (ResourceRequestHandle) -> Void = { _ in }
 ) throws -> Bool {
   try runtime.setResourceProvider { _, handle in
     probe.store(handle)
-    try? handle.setCancelCallback(onCancel)
-    if completeInline {
-      try? handle.complete(ResourceResponse(
-        status: .ok,
-        bytes: Data(providerStyleJSON.utf8)
-      ))
-    }
+    configure(handle)
     return .handle
   }
   try map.setStyleURL("custom://cancel-style.json")
@@ -656,9 +658,9 @@ private func startCancelProbeRequest(
 }
 
 /// BND-198: closing a map discards its pending style request, and MapLibre
-/// cancels the request the provider still holds. Registering again once the
-/// request is cancelled runs the callback before the call returns, and a
-/// closed request rejects a registration.
+/// runs the registered cancel callback once for the request the provider still
+/// holds. A second registration reports invalid state and leaves the first in
+/// place, and a closed request rejects a registration.
 @Test func resourceRequestCancelCallbackRunsWhenTheMapDiscardsTheRequest(
 ) throws {
   let runtime =
@@ -670,31 +672,46 @@ private func startCancelProbeRequest(
   )
 
   let probe = CancelProbe()
+  let secondCalls = ResourceProviderCallCounter()
+  let secondRegistration = ResourceCancellationResult()
+  let configure: @Sendable (ResourceRequestHandle) -> Void = { handle in
+    try? handle.setCancelCallback { probe.recordCancel() }
+    secondRegistration.store(Result {
+      try handle.setCancelCallback { secondCalls.recordCall() }
+      return true
+    })
+  }
   #expect(try startCancelProbeRequest(
     runtime: runtime,
     map: map,
-    probe: probe
-  ) { probe.recordCancel() })
+    probe: probe,
+    configure: configure
+  ))
   #expect(probe.cancels == 0)
+  switch secondRegistration.load() {
+  case let .failure(error as MaplibreError):
+    #expect(error.kind == .invalidState)
+  case let other:
+    Issue
+      .record(
+        "a second registration should report invalid state: \(other.debugDescription)"
+      )
+  }
 
   try map.close()
   #expect(try pumpUntil(runtime, waitingFor: "the cancel callback") {
     probe.cancels > 0
   })
+  try pumpTurns(runtime, count: 50)
   #expect(probe.cancels == 1)
+  #expect(secondCalls.callCount == 0)
 
   let handle = try #require(probe.handle)
   #expect(try handle.isCancelled())
-
-  // A registration that arrives after the cancellation runs at once.
-  try handle.setCancelCallback { probe.recordCancel() }
-  #expect(probe.cancels == 2)
-
-  // A cancelled request rejects a response, and the attempt retires the
-  // binding handle along with the request.
   #expect(throws: MaplibreError.self) {
     try handle.complete(ResourceResponse(status: .ok, bytes: emptyStyleJSON))
   }
+
   handle.close()
   do {
     try handle.setCancelCallback { probe.recordCancel() }
@@ -702,11 +719,11 @@ private func startCancelProbeRequest(
   } catch let error as MaplibreError {
     #expect(error.diagnostic.contains("closed"))
   }
-  #expect(probe.cancels == 2)
+  #expect(probe.cancels == 1)
 }
 
-/// BND-198: the cancel callback may close its own request, which retires the
-/// request instead of waiting for the callback that carries the close.
+/// BND-198: the cancel callback may close its own request. Native release
+/// returns at once from inside the callback instead of waiting for it.
 @Test func resourceRequestCancelCallbackMayCloseTheRequest() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
@@ -721,9 +738,11 @@ private func startCancelProbeRequest(
     runtime: runtime,
     map: map,
     probe: probe
-  ) {
-    probe.recordCancel()
-    probe.handle?.close()
+  ) { handle in
+    try? handle.setCancelCallback {
+      probe.recordCancel()
+      handle.close()
+    }
   })
 
   try map.close()
@@ -732,10 +751,48 @@ private func startCancelProbeRequest(
   })
 
   let handle = try #require(probe.handle)
-  #expect(throws: MaplibreError.self) {
+  do {
     try handle.setCancelCallback { probe.recordCancel() }
+    Issue.record("a closed request should reject a cancel callback")
+  } catch let error as MaplibreError {
+    #expect(error.diagnostic.contains("closed"))
   }
   #expect(probe.cancels == 1)
+}
+
+/// BND-198: registering on a request that MapLibre already cancelled runs the
+/// callback on the calling thread before the registration returns.
+@Test func resourceRequestCancelCallbackRunsInlineForACancelledRequest(
+) throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 64, height: 64)
+  )
+
+  let probe = CancelProbe()
+  #expect(try startCancelProbeRequest(
+    runtime: runtime,
+    map: map,
+    probe: probe
+  ))
+  let handle = try #require(probe.handle)
+
+  try map.close()
+  #expect(try pumpUntil(runtime, waitingFor: "the request to be cancelled") {
+    try handle.isCancelled()
+  })
+
+  let callbackThread = ResolvedURLCapture()
+  try handle.setCancelCallback {
+    probe.recordCancel()
+    callbackThread.store(Thread.current.description)
+  }
+  #expect(probe.cancels == 1)
+  #expect(callbackThread.value == Thread.current.description)
+  handle.close()
 }
 
 /// BND-198: MapLibre retires a request the provider answered, and that
@@ -753,9 +810,14 @@ private func startCancelProbeRequest(
   #expect(try startCancelProbeRequest(
     runtime: runtime,
     map: map,
-    probe: probe,
-    completeInline: true
-  ) { probe.recordCancel() })
+    probe: probe
+  ) { handle in
+    try? handle.setCancelCallback { probe.recordCancel() }
+    try? handle.complete(ResourceResponse(
+      status: .ok,
+      bytes: Data(providerStyleJSON.utf8)
+    ))
+  })
   #expect(try pumpUntilEvent(runtime, waitingFor: "the provider-served style") {
     $0.type == .mapStyleLoaded
   } != nil)
@@ -791,13 +853,20 @@ private final class CancelRegistrationRecorder: @unchecked Sendable {
     lock.withLock { registrations.count }
   }
 
-  func registration(_ index: Int) -> Registration? {
-    lock.withLock { index < registrations.count ? registrations[index] : nil }
+  func token(_ index: Int) -> UInt? {
+    lock.withLock {
+      index < registrations.count
+        ? registrations[index].userData.map { UInt(bitPattern: $0) }
+        : nil
+    }
   }
 
   /// Calls a registration the way the MapLibre thread does.
   func invoke(_ index: Int) {
-    guard let registration = registration(index) else {
+    let registration = lock.withLock {
+      index < registrations.count ? registrations[index] : nil
+    }
+    guard let registration else {
       Issue.record("no registration at index \(index)")
       return
     }
@@ -805,92 +874,84 @@ private final class CancelRegistrationRecorder: @unchecked Sendable {
   }
 }
 
-/// BND-198: a released request turns a registration away before it reaches
-/// the C API.
-@Test func resourceRequestSetCancelCallbackRejectsAClosedHandle() throws {
-  let recorder = CancelRegistrationRecorder()
-  let counters = ResourceCounters()
+private func makeRecordedHandleState(
+  recorder: CancelRegistrationRecorder,
+  counters: ResourceCounters,
+  ordinal: UInt64,
+  alreadyCancelled: Bool = false
+) throws -> NativeResourceRequestHandleState {
   let state = try NativeResourceRequestHandleState(
-    handle: SyntheticHandles.resourceRequest(0xA),
+    handle: SyntheticHandles.resourceRequest(ordinal),
     functions: NativeResourceRequestHandleFunctions(
       complete: { _, _ in counters.completed() },
-      cancelled: { _ in false },
+      cancelled: { _ in alreadyCancelled },
       release: { _ in counters.released() },
       setCancelCallback: { _, callback, userData in
         recorder.record(callback, userData)
+        return alreadyCancelled
       }
     )
   )
   _ = state
     .finishProviderDecision(MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue)
-  state.release()
-
-  do {
-    try state.setCancelCallback {}
-    Issue.record("a released request should reject a registration")
-  } catch let failure as NativeStatusFailure {
-    #expect(failure.diagnostic.contains("closed"))
-  }
-  #expect(recorder.count == 0)
-  #expect(counters.snapshot().release == 1)
+  return state
 }
 
-/// BND-198: the C API can still be running a replaced callback, so the
-/// binding keeps every registration reachable while the request is open.
-@Test func resourceRequestKeepsAReplacedCancelCallbackReachable() throws {
+/// BND-198: the `user_data` that crosses into C is a registry token rather
+/// than a pointer into the binding's memory. The token resolves the request
+/// weakly, so a repeated invocation runs the callback once, and a token whose
+/// request is gone is a no-op instead of a dangling access.
+@Test func resourceRequestCancelTokenResolvesWeaklyAndRunsOnce() throws {
   let recorder = CancelRegistrationRecorder()
-  let firstCalls = ResourceProviderCallCounter()
-  let secondCalls = ResourceProviderCallCounter()
-  let state = try NativeResourceRequestHandleState(
-    handle: SyntheticHandles.resourceRequest(0xB),
-    functions: NativeResourceRequestHandleFunctions(
-      complete: { _, _ in },
-      cancelled: { _ in false },
-      release: { _ in },
-      setCancelCallback: { _, callback, userData in
-        recorder.record(callback, userData)
-      }
-    )
+  let counters = ResourceCounters()
+  let calls = ResourceProviderCallCounter()
+
+  var state: NativeResourceRequestHandleState? = try makeRecordedHandleState(
+    recorder: recorder,
+    counters: counters,
+    ordinal: 0xA
   )
-  _ = state
-    .finishProviderDecision(MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue)
+  try state?.setCancelCallback { calls.recordCall() }
+  let token = try #require(recorder.token(0))
+  #expect(token != 0)
+  #expect(ResourceRequestCancelRegistry.shared.contains(token))
 
-  try state.setCancelCallback { firstCalls.recordCall() }
-  try state.setCancelCallback { secondCalls.recordCall() }
-  try state.setCancelCallback(nil)
-
-  #expect(recorder.count == 3)
-  #expect(recorder.registration(2)?.callback == nil)
   recorder.invoke(0)
-  recorder.invoke(1)
+  recorder.invoke(0)
+  #expect(calls.callCount == 1)
+  #expect(!ResourceRequestCancelRegistry.shared.contains(token))
 
-  #expect(firstCalls.callCount == 1)
-  #expect(secondCalls.callCount == 1)
-  state.release()
+  // A registration whose request is released and freed leaves nothing behind
+  // for a token to reach.
+  state = try makeRecordedHandleState(
+    recorder: recorder,
+    counters: counters,
+    ordinal: 0xB
+  )
+  try state?.setCancelCallback { calls.recordCall() }
+  let secondToken = try #require(recorder.token(1))
+  #expect(secondToken != token)
+  state?.release()
+  #expect(!ResourceRequestCancelRegistry.shared.contains(secondToken))
+  state = nil
+  recorder.invoke(1)
+  #expect(calls.callCount == 1)
+  #expect(counters.snapshot().release == 2)
 }
 
-/// BND-198: a request that is already cancelled runs the callback inside the
-/// registration call. A close from there completes without waiting for the
+/// BND-198: when the C API reports that the request is already cancelled, the
+/// binding runs the callback inside the registration call with no lock held,
+/// so a release from inside the callback completes without waiting on the
 /// registration that carries it.
 @Test func resourceRequestCancelCallbackClosesFromInsideRegistration() throws {
   let recorder = CancelRegistrationRecorder()
   let counters = ResourceCounters()
-  let functions = NativeResourceRequestHandleFunctions(
-    complete: { _, _ in counters.completed() },
-    cancelled: { _ in true },
-    release: { _ in counters.released() },
-    setCancelCallback: { _, callback, userData in
-      recorder.record(callback, userData)
-      // A cancelled request runs the callback before registration returns.
-      callback?(userData)
-    }
+  let state = try makeRecordedHandleState(
+    recorder: recorder,
+    counters: counters,
+    ordinal: 0xC,
+    alreadyCancelled: true
   )
-  let state = try NativeResourceRequestHandleState(
-    handle: SyntheticHandles.resourceRequest(0xC),
-    functions: functions
-  )
-  _ = state
-    .finishProviderDecision(MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue)
 
   let registrationFinished = DispatchSemaphore(value: 0)
   let cancels = ResourceProviderCallCounter()
@@ -906,6 +967,8 @@ private final class CancelRegistrationRecorder: @unchecked Sendable {
     .wait(timeout: .now() + .seconds(5)) == .success)
   #expect(cancels.callCount == 1)
   #expect(counters.snapshot().release == 1)
+  let token = try #require(recorder.token(0))
+  #expect(!ResourceRequestCancelRegistry.shared.contains(token))
 
   do {
     try state.setCancelCallback {}

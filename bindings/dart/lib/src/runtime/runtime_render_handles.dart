@@ -747,52 +747,54 @@ extension type const ResourceRequestHandle._(NativeResourceRequest _handle) {
     });
   }
 
-  /// Registers [callback] to run once when MapLibre cancels this request, or
-  /// clears the registration when [callback] is null.
+  /// Registers [callback] to run once when MapLibre cancels this request.
   ///
-  /// Each call replaces the previous registration. The callback runs on the
-  /// isolate that registered it, after MapLibre discards a request that this
-  /// provider has left open. A request that is already cancelled schedules the
-  /// callback immediately. A request the provider completed is never reported.
+  /// A request accepts one registration, and a second call throws
+  /// [InvalidStateException]. Registration on a closed request throws
+  /// [InvalidArgumentException], the same as [complete] and [cancelled].
   ///
-  /// The callback may use this handle, including [complete], which reports
-  /// [InvalidStateException] for a cancelled request, and [close]. An exception
-  /// the callback throws is contained rather than delivered to the isolate.
+  /// MapLibre cancels a request on the thread that discards it, so the binding
+  /// queues the callback to the isolate that registered it, the same way it
+  /// queues provider callbacks. The callback runs on a later event-loop turn,
+  /// only for a request the provider has not completed, and not after this
+  /// isolate has called [complete] or [close]. When this request is already
+  /// cancelled, the callback runs before this method returns.
   ///
-  /// Register, replace, clear, and retire one request on the same isolate.
-  void setCancelCallback(ResourceRequestCancelCallback? callback) {
+  /// The callback may use this handle, including [close]. An exception the
+  /// callback throws is contained inside the binding. Register, complete, and
+  /// release a request that has a cancel callback on the same isolate.
+  void setCancelCallback(ResourceRequestCancelCallback callback) {
     final requestId = _checked.raw;
-    final previous = _resourceRequestCancelStates[requestId];
-    if (callback == null) {
-      try {
+    if (_resourceRequestCancelStates.containsKey(requestId)) {
+      throwInvalidState('ResourceRequestHandle already has a cancel callback');
+    }
+    final state = _ResourceRequestCancelState(requestId, callback);
+    _resourceRequestCancelStates[requestId] = state;
+    final bool alreadyCancelled;
+    try {
+      alreadyCancelled = withNativeArena((arena) {
+        final outCancelled = arena<Bool>();
         _check(
           raw.mln_resource_request_set_cancel_callback(
             requestId,
+            state.listener.nativeFunction,
             nullptr,
-            nullptr,
+            outCancelled,
           ),
         );
-      } finally {
-        _resourceRequestCancelStates.remove(requestId);
-        previous?.close();
-      }
-      return;
-    }
-    final state = _ResourceRequestCancelState(requestId, callback);
-    try {
-      _check(
-        raw.mln_resource_request_set_cancel_callback(
-          requestId,
-          state.listener.nativeFunction,
-          nullptr,
-        ),
-      );
+        return outCancelled.value;
+      });
     } catch (_) {
+      _resourceRequestCancelStates.remove(requestId);
       state.close();
       rethrow;
     }
-    _resourceRequestCancelStates[requestId] = state;
-    previous?.close();
+    if (alreadyCancelled) {
+      // Native stored nothing, so the cancellation is reported here instead.
+      _resourceRequestCancelStates.remove(requestId);
+      state.runCallback();
+      state.close();
+    }
   }
 
   /// Releases the provider reference without completing it.

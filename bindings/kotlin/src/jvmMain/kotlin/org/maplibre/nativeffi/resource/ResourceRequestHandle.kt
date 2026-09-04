@@ -1,9 +1,9 @@
 package org.maplibre.nativeffi.resource
 
-import java.lang.foreign.MemorySegment
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelBridge
 import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelRegistration
+import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelSetResult
 import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelState
 import org.maplibre.nativeffi.internal.lifecycle.NativeResourceRequest
 import org.maplibre.nativeffi.internal.lifecycle.UnreachableActions
@@ -18,8 +18,15 @@ internal constructor(
     NativeAccess::completeResourceRequest,
   private val cancellationChecker: (NativeResourceRequest) -> Boolean =
     NativeAccess::isResourceRequestCancelled,
-  private val cancelCallbackSetter: (NativeResourceRequest, MemorySegment, MemorySegment) -> Int =
-    NativeAccess::setResourceRequestCancelCallback,
+  private val cancelCallbackSetter:
+    (NativeResourceRequest, Long) -> ResourceRequestCancelSetResult =
+    { requestHandle, token ->
+      NativeAccess.setResourceRequestCancelCallback(
+        requestHandle,
+        ResourceRequestCancelBridge.stub,
+        ResourceRequestCancelBridge.userData(token),
+      )
+    },
   releaser: (NativeResourceRequest) -> Unit = NativeAccess::releaseResourceRequest,
 ) : AutoCloseable {
   private val cancelRegistration = ResourceRequestCancelRegistration()
@@ -49,6 +56,7 @@ internal constructor(
       }
       throw error
     } finally {
+      if (reachedNative) cancelState.drop()
       operation.close()
     }
   }
@@ -58,25 +66,17 @@ internal constructor(
     return core.withLiveHandle { cancellationChecker(handle) }
   }
 
-  public actual fun setCancelCallback(callback: (() -> Unit)?) {
+  public actual fun setCancelCallback(callback: () -> Unit) {
     NativeAccess.ensureLoaded()
-    core.withLiveHandle {
-      cancelState.store(callback)
-      val status =
-        if (callback == null) {
-          cancelCallbackSetter(handle, MemorySegment.NULL, MemorySegment.NULL)
-        } else {
-          cancelCallbackSetter(
-            handle,
-            ResourceRequestCancelBridge.stub,
-            ResourceRequestCancelBridge.userData(cancelState.token()),
-          )
-        }
-      Status.check(status)
+    val alreadyCancelled = core.withLiveHandle {
+      cancelState.register(callback) { token -> cancelCallbackSetter(handle, token) }
     }
+    // The borrow has ended, so the callback may close this handle and release it immediately.
+    alreadyCancelled?.let(ResourceRequestCancelState::runContained)
   }
 
   public actual override fun close() {
+    cancelState.drop()
     core.close()
   }
 
@@ -84,17 +84,20 @@ internal constructor(
     finishProvider(core.finishProviderDecision(decision))
 
   internal fun finishProviderException(): Int =
-    core.finishProviderException()?.let(::finishProvider)
-      ?: run {
-        // A provider failure also hands the request back to MapLibre, and the binding's release
-        // path never runs for it.
-        cancelRegistration.dispose()
-        UNKNOWN_DECISION
-      }
+    core.finishProviderException()?.let(::finishProvider) ?: handedBackToNative(UNKNOWN_DECISION)
 
-  private fun finishProvider(decision: ResourceProviderDecision): Int {
-    if (decision == ResourceProviderDecision.PASS_THROUGH) cancelRegistration.dispose()
-    return decision.nativeValue
+  private fun finishProvider(decision: ResourceProviderDecision): Int =
+    if (decision == ResourceProviderDecision.PASS_THROUGH) {
+      handedBackToNative(decision.nativeValue)
+    } else {
+      decision.nativeValue
+    }
+
+  /** MapLibre retires a request the provider did not handle, so the release path never runs. */
+  private fun handedBackToNative(result: Int): Int {
+    cancelState.drop()
+    cancelRegistration.dispose()
+    return result
   }
 
   /**
@@ -110,6 +113,13 @@ internal constructor(
     }
   }
 
+  /**
+   * Releases the native request and then drops its registry token.
+   *
+   * Native release returns once a cancel callback running on another thread has returned, so no
+   * native use of the token outlives this call. This holds the token alone; the callback state
+   * would reach the host callback and whatever it captures.
+   */
   private class ReleaseNativeRequest(
     private val handle: NativeResourceRequest,
     private val releaser: (NativeResourceRequest) -> Unit,
@@ -119,8 +129,6 @@ internal constructor(
       try {
         releaser(handle)
       } finally {
-        // The native release returns once a cancel callback running elsewhere has returned, so
-        // the token outlives every native use of it.
         cancelRegistration.dispose()
       }
     }

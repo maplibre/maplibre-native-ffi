@@ -119,22 +119,19 @@ func goMaplibreResourceProvider(userData unsafe.Pointer, request *C.mln_resource
 }
 
 // goMaplibreResourceRequestCancel reports one cancelled provider request. The C
-// API invokes it at most once per registration, on the MapLibre thread that
-// retires the request, and a host panic inside the callback stops here rather
-// than unwinding into C.
+// API invokes it at most once per request, on the thread that discards the
+// request, with no native lock held. The token resolves through a weak registry
+// entry, so a request handle Go already collected is a no-op here, and the
+// callback runs with no binding lock held because it may close or complete the
+// same request.
 //
 //export goMaplibreResourceRequestCancel
 func goMaplibreResourceRequestCancel(userData unsafe.Pointer) {
-	defer func() { _ = recover() }()
-
-	if userData == nil {
+	handle := lookupCancelToken(uint64(uintptr(userData)))
+	if handle == nil {
 		return
 	}
-	// Value panics for a registration this binding already freed, which the
-	// recover above contains.
-	state, ok := cgo.Handle(uintptr(userData)).Value().(*resourceCancelState)
-	if !ok {
-		return
+	if callback := handle.takeCancelCallback(); callback != nil {
+		runCancelCallback(callback)
 	}
-	state.invoke()
 }

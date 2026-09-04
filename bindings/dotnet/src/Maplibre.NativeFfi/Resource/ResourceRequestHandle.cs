@@ -19,7 +19,8 @@ internal unsafe delegate mln_status ResourceRequestCancelled(
 internal unsafe delegate mln_status ResourceRequestSetCancelCallback(
     MlnResourceRequest handle,
     delegate* unmanaged[Cdecl]<void*, void> callback,
-    void* userData
+    void* userData,
+    bool* outCancelled
 );
 
 internal unsafe delegate void ResourceRequestRelease(MlnResourceRequest handle);
@@ -36,8 +37,15 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
     private static readonly ResourceRequestSetCancelCallback DefaultSetCancelCallback = static (
         request,
         callback,
-        userData
-    ) => NativeMethods.mln_resource_request_set_cancel_callback(request, callback, userData);
+        userData,
+        outCancelled
+    ) =>
+        NativeMethods.mln_resource_request_set_cancel_callback(
+            request,
+            callback,
+            userData,
+            outCancelled
+        );
     private static readonly ResourceRequestRelease DefaultRelease = static request =>
         NativeMethods.mln_resource_request_release(request);
 
@@ -47,15 +55,15 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
     private readonly ResourceRequestSetCancelCallback setCancelCallback;
     private readonly ResourceRequestRelease release;
     private MlnResourceRequest handle;
-    private ResourceRequestCancelState? cancelState;
+    private Action? cancelCallback;
+    private nint cancelToken;
     private bool providerDecisionFinalized;
     private bool releaseAccountedFor;
-    private bool releaseInProgress;
     private bool closed;
     private bool completed;
 
     internal ResourceRequestHandle(MlnResourceRequest handle)
-        : this(handle, null, null, null, null) { }
+        : this(handle, null, null, null) { }
 
     internal ResourceRequestHandle(
         MlnResourceRequest handle,
@@ -98,38 +106,33 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
         ArgumentNullException.ThrowIfNull(response);
         MlnResourceRequest pendingRelease = default;
         mln_status status;
-        try
+        lock (gate)
         {
-            lock (gate)
+            if (completed)
             {
-                if (completed)
-                {
-                    throw new InvalidStateException(
-                        MaplibreStatus.InvalidState,
-                        null,
-                        "ResourceRequestHandle is already completed.",
-                        null
-                    );
-                }
-
-                ThrowIfClosed();
-                using var nativeResponse = NativeResourceResponse.From(response);
-                var value = nativeResponse.Value;
-                status = complete(handle, &value);
-                completed = true;
-                closed = true;
-                if (providerDecisionFinalized)
-                {
-                    pendingRelease = TakeHandleForReleaseLocked();
-                }
-                GC.SuppressFinalize(this);
+                throw new InvalidStateException(
+                    MaplibreStatus.InvalidState,
+                    null,
+                    "ResourceRequestHandle is already completed.",
+                    null
+                );
             }
-        }
-        finally
-        {
-            ReleaseTaken(pendingRelease);
+
+            ThrowIfClosed();
+            using var nativeResponse = NativeResourceResponse.From(response);
+            var value = nativeResponse.Value;
+            status = complete(handle, &value);
+            completed = true;
+            closed = true;
+            DropCancelCallbackLocked();
+            if (providerDecisionFinalized)
+            {
+                pendingRelease = TakeHandleLocked();
+            }
+            GC.SuppressFinalize(this);
         }
 
+        Release(pendingRelease);
         NativeStatus.Check(status);
     }
 
@@ -146,69 +149,58 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
     }
 
     /// <summary>
-    /// Registers <paramref name="callback" /> to run when MapLibre cancels this
-    /// request, or clears the registration when it is <see langword="null" />.
+    /// Registers a callback that runs once when MapLibre cancels this request.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// The callback runs at most once, on the thread that cancels the request,
-    /// which is the runtime owner thread inside a map or runtime call and a
-    /// MapLibre thread otherwise. It runs only while the request is still open:
-    /// a request this handle already completed never reports cancellation.
-    /// Registering on a request MapLibre already cancelled runs the callback
-    /// before this method returns.
-    /// </para>
-    /// <para>
-    /// Each call replaces the previous registration. The callback may complete
-    /// or close this request, and it must not call other MapLibre operations.
-    /// The binding discards an exception that the callback throws.
-    /// </para>
+    /// The callback runs on the thread that discards the request: the runtime
+    /// owner thread inside a map or runtime call, and a MapLibre thread
+    /// otherwise. It runs only for a request the provider has not completed,
+    /// and it may complete or close this handle. When the request is already
+    /// cancelled, the callback runs on the calling thread before this method
+    /// returns. A request accepts one registration, and a second registration
+    /// throws <see cref="InvalidStateException" />.
     /// </remarks>
-    /// <param name="callback">The callback to run, or <see langword="null" /> to clear.</param>
-    /// <exception cref="InvalidStateException">
-    /// The handle is already completed or released.
-    /// </exception>
-    public void SetCancelCallback(Action? callback)
+    public void SetCancelCallback(Action callback)
     {
-        var replacement = callback is null ? null : new ResourceRequestCancelState(callback);
-        ResourceRequestCancelState? previous;
-        try
+        ArgumentNullException.ThrowIfNull(callback);
+        MlnResourceRequest current;
+        nint token;
+        lock (gate)
         {
-            lock (gate)
+            ThrowIfClosed();
+            if (cancelCallback is not null)
             {
-                ThrowIfClosed();
-                var observed = Volatile.Read(ref cancelState);
-
-                NativeStatus.Check(
-                    setCancelCallback(
-                        handle,
-                        replacement is null ? null : ResourceRequestCancelState.NativeCallback,
-                        replacement is null ? null : replacement.UserData
-                    )
+                throw new InvalidStateException(
+                    MaplibreStatus.InvalidState,
+                    null,
+                    "ResourceRequestHandle already has a cancel callback.",
+                    null
                 );
-
-                var current = Interlocked.CompareExchange(ref cancelState, replacement, observed);
-                if (!ReferenceEquals(current, observed))
-                {
-                    replacement?.Retire();
-                    return;
-                }
-
-                previous = observed;
-                if (closed && replacement is not null)
-                {
-                    Interlocked.CompareExchange(ref cancelState, null, replacement);
-                    replacement.Retire();
-                }
             }
-        }
-        catch
-        {
-            replacement?.Retire();
-            throw;
+
+            token = ResourceRequestCancelRegistry.Register(this);
+            cancelCallback = callback;
+            cancelToken = token;
+            current = handle;
         }
 
-        previous?.Retire();
+        bool alreadyCancelled = false;
+        var status = setCancelCallback(
+            current,
+            ResourceRequestCancelRegistry.NativeCallback,
+            (void*)token,
+            &alreadyCancelled
+        );
+        if (status != mln_status.MLN_STATUS_OK)
+        {
+            TakeCancelCallback(token);
+            NativeStatus.Check(status);
+        }
+
+        if (alreadyCancelled)
+        {
+            RunCancelCallback(TakeCancelCallback(token));
+        }
     }
 
     /// <summary>Releases the native request handle without completing it.</summary>
@@ -217,21 +209,21 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
         MlnResourceRequest pendingRelease = default;
         lock (gate)
         {
-            WaitForReleaseLocked();
             if (closed)
             {
                 return;
             }
 
             closed = true;
+            DropCancelCallbackLocked();
             if (providerDecisionFinalized)
             {
-                pendingRelease = TakeHandleForReleaseLocked();
+                pendingRelease = TakeHandleLocked();
             }
             GC.SuppressFinalize(this);
         }
 
-        ReleaseTaken(pendingRelease);
+        Release(pendingRelease);
     }
 
     /// <inheritdoc />
@@ -243,34 +235,37 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
 
     ~ResourceRequestHandle()
     {
-        MlnResourceRequest pendingRelease;
+        MlnResourceRequest pendingRelease = default;
         lock (gate)
         {
-            pendingRelease = providerDecisionFinalized ? TakeHandleForReleaseLocked() : default;
+            DropCancelCallbackLocked();
+            if (providerDecisionFinalized)
+            {
+                pendingRelease = TakeHandleLocked();
+            }
         }
 
-        ReleaseTaken(pendingRelease);
+        Release(pendingRelease);
     }
 
     internal uint FinishProviderDecision(ResourceProviderDecision decision)
     {
         MlnResourceRequest pendingRelease = default;
         uint result;
-        try
+        lock (gate)
         {
-            lock (gate)
+            if (completed || decision == ResourceProviderDecision.Handle)
             {
-                if (completed || decision == ResourceProviderDecision.Handle)
+                providerDecisionFinalized = true;
+                if (closed)
                 {
-                    providerDecisionFinalized = true;
-                    if (closed)
-                    {
-                        pendingRelease = TakeHandleForReleaseLocked();
-                    }
-
-                    return (uint)ResourceProviderDecision.Handle;
+                    pendingRelease = TakeHandleLocked();
                 }
 
+                result = (uint)ResourceProviderDecision.Handle;
+            }
+            else
+            {
                 MarkNativeWillReleaseLocked();
                 result =
                     decision == ResourceProviderDecision.PassThrough
@@ -278,60 +273,87 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
                         : uint.MaxValue;
             }
         }
-        finally
-        {
-            ReleaseTaken(pendingRelease);
-        }
 
+        Release(pendingRelease);
         return result;
     }
 
     internal uint FinishProviderException()
     {
         MlnResourceRequest pendingRelease = default;
-        try
+        uint result;
+        lock (gate)
+        {
+            if (completed)
+            {
+                providerDecisionFinalized = true;
+                if (closed)
+                {
+                    pendingRelease = TakeHandleLocked();
+                }
+
+                result = (uint)ResourceProviderDecision.Handle;
+            }
+            else
+            {
+                MarkNativeWillReleaseLocked();
+                result = uint.MaxValue;
+            }
+        }
+
+        Release(pendingRelease);
+        return result;
+    }
+
+    // Runs the host callback for a native cancellation that names this handle's
+    // token. The callback leaves its slot under the lock and runs outside it, so
+    // it runs at most once and may complete or close this handle.
+    internal void DispatchCancel(nint token) => RunCancelCallback(TakeCancelCallback(token));
+
+    internal bool HasCancelCallbackForTest
+    {
+        get
         {
             lock (gate)
             {
-                if (completed)
-                {
-                    providerDecisionFinalized = true;
-                    if (closed)
-                    {
-                        pendingRelease = TakeHandleForReleaseLocked();
-                    }
-
-                    return (uint)ResourceProviderDecision.Handle;
-                }
-
-                MarkNativeWillReleaseLocked();
+                return cancelCallback is not null;
             }
         }
-        finally
-        {
-            ReleaseTaken(pendingRelease);
-        }
-
-        return uint.MaxValue;
     }
 
-    internal bool HasCancelCallbackForTest => Volatile.Read(ref cancelState) is not null;
-
-    // Waits for a release another thread started, so a second close returns only
-    // once the native handle is retired. The cancel callback skips the wait,
-    // because native release returns without waiting when the callback calls it.
-    private void WaitForReleaseLocked()
+    private Action? TakeCancelCallback(nint token)
     {
-        while (releaseInProgress && !ResourceRequestCancelState.IsDispatchingOnCurrentThread)
+        lock (gate)
         {
-            Monitor.Wait(gate);
+            return cancelToken == token ? DropCancelCallbackLocked() : null;
         }
     }
 
-    // Hands the native handle to the caller to release outside the lock, so a
-    // release that waits for a cancel callback cannot block that callback from
-    // reentering this handle.
-    private MlnResourceRequest TakeHandleForReleaseLocked()
+    private Action? DropCancelCallbackLocked()
+    {
+        var taken = cancelCallback;
+        cancelCallback = null;
+        ResourceRequestCancelRegistry.Remove(cancelToken);
+        cancelToken = 0;
+        return taken;
+    }
+
+    private static void RunCancelCallback(Action? callback)
+    {
+        try
+        {
+            callback?.Invoke();
+        }
+        catch
+        {
+            // A host failure must not unwind into the MapLibre cancel path.
+        }
+    }
+
+    // Hands the native handle to the caller for release outside the lock.
+    // Native release waits for a cancel callback running on another thread, and
+    // that callback may call back into this handle.
+    private MlnResourceRequest TakeHandleLocked()
     {
         if (releaseAccountedFor)
         {
@@ -342,36 +364,14 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
         var current = handle;
         handle = default;
         closed = true;
-        if (!current.IsNull)
-        {
-            releaseInProgress = true;
-        }
-
         return current;
     }
 
-    private void ReleaseTaken(MlnResourceRequest taken)
+    private void Release(MlnResourceRequest taken)
     {
-        if (taken.IsNull)
-        {
-            return;
-        }
-
-        try
+        if (!taken.IsNull)
         {
             release(taken);
-        }
-        finally
-        {
-            lock (gate)
-            {
-                releaseInProgress = false;
-                Monitor.PulseAll(gate);
-            }
-
-            // Native release waits for a cancel callback running on another
-            // thread, so the registration is unreachable once it returns.
-            Interlocked.Exchange(ref cancelState, null)?.Retire();
         }
     }
 
@@ -381,7 +381,7 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
         releaseAccountedFor = true;
         handle = default;
         closed = true;
-        Interlocked.Exchange(ref cancelState, null)?.Retire();
+        DropCancelCallbackLocked();
     }
 
     private void ThrowIfClosed()

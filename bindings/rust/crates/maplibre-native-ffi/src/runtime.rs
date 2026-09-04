@@ -2238,32 +2238,41 @@ mod tests {
 
     #[test]
     // Spec coverage: BND-198.
-    fn provider_panic_after_a_cancel_registration_fails_the_style_load() {
+    fn cancel_registration_on_a_cancelled_request_runs_before_returning() {
         let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let (sender, receiver) = std::sync::mpsc::channel();
         runtime
             .set_resource_provider(move |request, handle| {
                 if request.requested_url != "custom://cancel-style.json" {
                     return ResourceProviderDecision::PassThrough;
                 }
-                handle.set_cancel_callback(|| {}).unwrap();
-                panic!("provider failed after registering a cancel callback");
+                sender.send(handle).unwrap();
+                ResourceProviderDecision::Handle
             })
             .unwrap();
 
         let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-        let map_id = map.id();
         map.set_style_url("custom://cancel-style.json").unwrap();
-
-        let event = wait_for_map_loading_failure(&mut runtime);
-
-        assert_eq!(event.source, RuntimeEventSource::Map(map_id));
-        assert!(
-            event
-                .message
-                .as_deref()
-                .is_some_and(|message| message.contains("unknown decision"))
-        );
+        let handle = receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("provider should send handled request");
         map.close().unwrap();
+        assert!(pump_until(&mut runtime, || handle.is_cancelled().unwrap()));
+
+        let cancels = Arc::new(AtomicUsize::new(0));
+        let callback_cancels = Arc::clone(&cancels);
+        handle
+            .set_cancel_callback(move || {
+                callback_cancels.fetch_add(1, Ordering::SeqCst);
+            })
+            .unwrap();
+        assert_eq!(cancels.load(Ordering::SeqCst), 1);
+
+        // The request keeps its one registration after the callback ran.
+        assert_eq!(
+            handle.set_cancel_callback(|| {}).unwrap_err().kind(),
+            ErrorKind::InvalidState
+        );
         runtime.close().unwrap();
     }
 

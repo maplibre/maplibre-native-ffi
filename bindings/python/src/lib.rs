@@ -9,13 +9,13 @@ use maplibre_native_ffi_sys as sys;
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::ffi::{c_char, c_void};
 use std::mem::ManuallyDrop;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, LazyLock, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 
 /// Wire shape for `maplibre_native_ffi.camera.AnimationOptions`.
 ///
@@ -85,10 +85,6 @@ struct PyHttpHeaderTransformState {
 struct ResourceRequestHandle {
     // Dropped by hand, with the GIL released; see the Drop impl below.
     state: ManuallyDrop<Arc<maplibre_core::resource::ResourceRequestHandleState>>,
-    handle: u64,
-    // Declared after `state` so the registry entry outlives the release the
-    // Drop impl performs, which waits for a running cancel callback.
-    cancel: CancelCallbackSlot,
 }
 
 impl Drop for ResourceRequestHandle {
@@ -101,69 +97,6 @@ impl Drop for ResourceRequestHandle {
         // release runs detached.
         Python::attach(|py| py.detach(move || drop(state)));
     }
-}
-
-/// Registered cancel callbacks, keyed by a token handed to C as `user_data`.
-///
-/// A token, not a pointer, crosses the C boundary: a callback that arrives
-/// after its request handle went away finds no entry and does nothing, so no
-/// registration can outlive the Python object it belongs to.
-static CANCEL_CALLBACKS: LazyLock<Mutex<HashMap<usize, Py<PyAny>>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-static NEXT_CANCEL_TOKEN: AtomicUsize = AtomicUsize::new(1);
-
-fn lock_cancel_callbacks() -> MutexGuard<'static, HashMap<usize, Py<PyAny>>> {
-    CANCEL_CALLBACKS
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-}
-
-/// One request's slot in the cancel callback registry.
-///
-/// The slot owns the token for the life of the Python request handle and clears
-/// the registry entry when that handle goes away.
-struct CancelCallbackSlot {
-    token: usize,
-}
-
-impl CancelCallbackSlot {
-    fn new() -> Self {
-        Self {
-            token: NEXT_CANCEL_TOKEN.fetch_add(1, Ordering::Relaxed),
-        }
-    }
-
-    fn store(&self, callback: Py<PyAny>) {
-        lock_cancel_callbacks().insert(self.token, callback);
-    }
-
-    fn clear(&self) {
-        lock_cancel_callbacks().remove(&self.token);
-    }
-
-    fn take(token: usize) -> Option<Py<PyAny>> {
-        lock_cancel_callbacks().remove(&token)
-    }
-}
-
-impl Drop for CancelCallbackSlot {
-    fn drop(&mut self) {
-        self.clear();
-    }
-}
-
-unsafe extern "C" fn resource_request_cancel_trampoline(user_data: *mut c_void) {
-    let token = user_data as usize;
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        let Some(callback) = CancelCallbackSlot::take(token) else {
-            return;
-        };
-        // A host failure is contained here: unwinding into MapLibre's cancel
-        // path is undefined, and the request is already going away.
-        Python::attach(|py| {
-            let _ = callback.bind(py).call0();
-        });
-    }));
 }
 
 // The C API accepts signals and destruction from any thread, so this pyclass is
@@ -5054,49 +4987,26 @@ impl ResourceRequestHandle {
         let state = &*self.state;
         // Completion retires the request, which waits for a cancel callback
         // running on a MapLibre thread, and that callback needs the GIL.
-        let result = py.detach(|| state.complete(&response));
-        if result.is_ok() {
-            // A retired request can no longer run a cancel callback.
-            self.cancel.clear();
-        }
-        result.map_err(map_error)
+        py.detach(|| state.complete(&response)).map_err(map_error)
     }
 
     fn is_cancelled(&self) -> PyResult<bool> {
         self.state.is_cancelled().map_err(map_error)
     }
 
-    fn set_cancel_callback(&self, py: Python<'_>, callback: Option<Py<PyAny>>) -> PyResult<()> {
-        let registered = callback.is_some();
-        match callback {
-            Some(callback) => self.cancel.store(callback),
-            // Clear first: a cancel racing this call then finds no entry, which
-            // is what clearing asks for.
-            None => self.cancel.clear(),
-        }
-        let handle = sys::mln_resource_request_handle(self.handle);
-        let token = self.cancel.token;
-        let native_callback: sys::mln_resource_request_cancel_callback =
-            registered.then_some(resource_request_cancel_trampoline);
-        // Detached: a cancel callback already running on a MapLibre thread
-        // holds the request's native lock while it waits for this thread's GIL.
-        let status = py.detach(|| {
-            // SAFETY: the handle is a generational id, so a released id resolves
-            // to no request rather than to a later one, and the trampoline reads
-            // only the token passed as user_data.
-            unsafe {
-                sys::mln_resource_request_set_cancel_callback(
-                    handle,
-                    native_callback,
-                    token as *mut c_void,
-                )
-            }
-        });
-        let result = maplibre_core::check(status).map_err(map_error);
-        if result.is_err() {
-            self.cancel.clear();
-        }
-        result
+    /// Registers the request's one cancel callback. The core state owns the
+    /// callable and hands the C API a weak reference to itself, so nothing
+    /// outside this handle keeps the callable or the handle alive.
+    fn set_cancel_callback(&self, callback: Py<PyAny>) -> PyResult<()> {
+        self.state
+            .set_cancel_callback(Box::new(move || {
+                // The cancel path reports no status, so a host exception is
+                // discarded here like other void callbacks in this binding.
+                Python::attach(|py| {
+                    let _ = callback.bind(py).call0();
+                });
+            }))
+            .map_err(map_error)
     }
 
     fn close(&self, py: Python<'_>) {
@@ -5105,8 +5015,6 @@ impl ResourceRequestHandle {
         // that callback needs the GIL. From inside the callback it returns
         // without waiting.
         py.detach(|| state.close());
-        // Release has retired the request, so no callback can start now.
-        self.cancel.clear();
     }
 }
 
@@ -5194,8 +5102,6 @@ impl PyResourceProviderState {
                 py,
                 ResourceRequestHandle {
                     state: ManuallyDrop::new(Arc::clone(&handle_state)),
-                    handle: handle.0,
-                    cancel: CancelCallbackSlot::new(),
                 },
             )?;
             let decision = self

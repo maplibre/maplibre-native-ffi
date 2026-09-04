@@ -264,9 +264,10 @@ func TestRuntimeResourceTransformRejectsNilCallback(t *testing.T) {
 	}
 }
 
-// BND-198: a request that the provider handled but never completed reports one
-// cancellation when the map that asked for it goes away, and the callback can
-// close that request from inside itself.
+// BND-198: a request the provider handled but never completed reports one
+// cancellation when the map that asked for it goes away, the callback can
+// close that request from inside itself, and a second registration on the same
+// request reports invalid state.
 func TestResourceRequestCancelCallbackReportsDiscardedRequest(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -274,7 +275,7 @@ func TestResourceRequestCancelCallbackReportsDiscardedRequest(t *testing.T) {
 	requested := make(chan struct{}, 1)
 	cancelled := make(chan struct{}, 4)
 	var cancelCalls atomic.Int64
-	var registerErr atomic.Value
+	var registerErr, secondRegisterErr atomic.Value
 
 	runtime, err := NewRuntime()
 	if err != nil {
@@ -295,6 +296,9 @@ func TestResourceRequestCancelCallbackReportsDiscardedRequest(t *testing.T) {
 			cancelled <- struct{}{}
 		}); err != nil {
 			registerErr.Store(err)
+		}
+		if err := handle.SetCancelCallback(func() { cancelCalls.Add(1) }); err != nil {
+			secondRegisterErr.Store(err)
 		}
 		select {
 		case requested <- struct{}{}:
@@ -322,9 +326,74 @@ func TestResourceRequestCancelCallbackReportsDiscardedRequest(t *testing.T) {
 	if err, ok := registerErr.Load().(error); ok {
 		t.Fatalf("SetCancelCallback(): %v", err)
 	}
+	if err, ok := secondRegisterErr.Load().(error); !ok || !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("second SetCancelCallback() error = %v, want ErrInvalidState", err)
+	}
 	pumpRuntimeFor(t, runtime, 200)
 	if got := cancelCalls.Load(); got != 1 {
 		t.Fatalf("cancel callback calls = %d, want 1", got)
+	}
+}
+
+// BND-198: registering on a request MapLibre already cancelled runs the
+// callback before SetCancelCallback returns, and a closed request rejects
+// registration as closed.
+func TestResourceRequestCancelCallbackRunsForAlreadyCancelledRequest(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	const styleURL = "jar:file:/packaged/late-cancel-style.json"
+	handles := make(chan *ResourceRequestHandle, 1)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	defer func() {
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+	if err := runtime.SetResourceProvider(func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+		if request.RequestedURL != styleURL {
+			return ResourceProviderDecisionPassThrough
+		}
+		select {
+		case handles <- handle:
+		default:
+		}
+		return ResourceProviderDecisionHandle
+	}); err != nil {
+		t.Fatalf("SetResourceProvider(): %v", err)
+	}
+
+	m, err := runtime.NewMap()
+	if err != nil {
+		t.Fatalf("NewMap(): %v", err)
+	}
+	if err := m.SetStyleURL(styleURL); err != nil {
+		t.Fatalf("SetStyleURL(): %v", err)
+	}
+	var handle *ResourceRequestHandle
+	waitForResourceSignalValue(t, runtime, handles, &handle, "the provider to receive the style request")
+	if err := m.Close(); err != nil {
+		t.Fatalf("Map Close(): %v", err)
+	}
+	waitForResourceRequestCancelled(t, runtime, handle)
+
+	var calls int
+	if err := handle.SetCancelCallback(func() { calls++ }); err != nil {
+		t.Fatalf("SetCancelCallback() on a cancelled request: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("cancel callback calls = %d, want 1 before SetCancelCallback returned", calls)
+	}
+
+	handle.Close()
+	if err := handle.SetCancelCallback(func() { calls++ }); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetCancelCallback() after Close error = %v, want ErrInvalidArgument", err)
+	}
+	if calls != 1 {
+		t.Fatalf("cancel callback calls after Close = %d, want 1", calls)
 	}
 }
 
@@ -389,9 +458,16 @@ func TestResourceRequestCancelCallbackSkipsCompletedRequest(t *testing.T) {
 // callbacks that native code delivers on the runtime's thread can arrive.
 func waitForResourceSignal(t *testing.T, runtime *RuntimeHandle, signal <-chan struct{}, what string) {
 	t.Helper()
+	var ignored struct{}
+	waitForResourceSignalValue(t, runtime, signal, &ignored, what)
+}
+
+func waitForResourceSignalValue[T any](t *testing.T, runtime *RuntimeHandle, signal <-chan T, out *T, what string) {
+	t.Helper()
 	for range make([]struct{}, 5000) {
 		select {
-		case <-signal:
+		case value := <-signal:
+			*out = value
 			return
 		default:
 		}
@@ -401,6 +477,26 @@ func waitForResourceSignal(t *testing.T, runtime *RuntimeHandle, signal <-chan s
 		time.Sleep(time.Millisecond)
 	}
 	t.Fatalf("timed out waiting for %s", what)
+}
+
+// waitForResourceRequestCancelled pumps the runtime until native code reports
+// the request as cancelled.
+func waitForResourceRequestCancelled(t *testing.T, runtime *RuntimeHandle, handle *ResourceRequestHandle) {
+	t.Helper()
+	for range make([]struct{}, 5000) {
+		cancelled, err := handle.Cancelled()
+		if err != nil {
+			t.Fatalf("Cancelled(): %v", err)
+		}
+		if cancelled {
+			return
+		}
+		if err := runtime.Pump(0, -1); err != nil {
+			t.Fatalf("Pump(): %v", err)
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for the request to be cancelled")
 }
 
 // pumpRuntimeFor drains work that a late callback would arrive with.

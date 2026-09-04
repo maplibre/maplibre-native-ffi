@@ -103,6 +103,7 @@ import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_descriptor
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_frame
 import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_descriptor
 import org.maplibre.nativeffi.internal.c.mln_wgl_context_descriptor
+import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelSetResult
 import org.maplibre.nativeffi.internal.lifecycle.NativeGeoJsonSourceData
 import org.maplibre.nativeffi.internal.lifecycle.NativeHandle
 import org.maplibre.nativeffi.internal.lifecycle.NativeMap
@@ -532,8 +533,14 @@ internal object NativeAccess {
     handle: NativeResourceRequest,
     callback: MemorySegment,
     userData: MemorySegment,
-  ): Int =
-    resourceRequestSetCancelCallbackFunction().invokeNative(handle, callback, userData) as Int
+  ): ResourceRequestCancelSetResult =
+    Arena.ofConfined().use { arena ->
+      val outCancelled = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      val status =
+        resourceRequestSetCancelCallbackFunction()
+          .invokeNative(handle, callback, userData, outCancelled) as Int
+      ResourceRequestCancelSetResult(status, outCancelled.get(ValueLayout.JAVA_BOOLEAN, 0))
+    }
 
   internal fun releaseResourceRequest(handle: NativeResourceRequest) {
     resourceRequestReleaseFunction().invokeNative(handle)

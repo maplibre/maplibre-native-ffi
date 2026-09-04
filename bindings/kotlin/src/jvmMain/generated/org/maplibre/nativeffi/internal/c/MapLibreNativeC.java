@@ -2189,6 +2189,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -2200,7 +2201,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data)
+     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data, bool *out_cancelled)
      * }
      */
     public static FunctionDescriptor mln_resource_request_set_cancel_callback$descriptor() {
@@ -2210,7 +2211,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data)
+     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data, bool *out_cancelled)
      * }
      */
     public static MethodHandle mln_resource_request_set_cancel_callback$handle() {
@@ -2220,7 +2221,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data)
+     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data, bool *out_cancelled)
      * }
      */
     public static MemorySegment mln_resource_request_set_cancel_callback$address() {
@@ -2229,16 +2230,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data)
+     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data, bool *out_cancelled)
      * }
      */
-    public static int mln_resource_request_set_cancel_callback(long handle, MemorySegment callback, MemorySegment user_data) {
+    public static int mln_resource_request_set_cancel_callback(long handle, MemorySegment callback, MemorySegment user_data, MemorySegment out_cancelled) {
         var mh$ = mln_resource_request_set_cancel_callback.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_resource_request_set_cancel_callback", handle, callback, user_data);
+                traceDowncall("mln_resource_request_set_cancel_callback", handle, callback, user_data, out_cancelled);
             }
-            return (int)mh$.invokeExact(handle, callback, user_data);
+            return (int)mh$.invokeExact(handle, callback, user_data, out_cancelled);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

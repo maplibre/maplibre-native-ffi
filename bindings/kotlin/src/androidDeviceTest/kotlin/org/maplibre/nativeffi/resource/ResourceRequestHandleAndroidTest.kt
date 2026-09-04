@@ -84,34 +84,6 @@ class ResourceRequestHandleAndroidTest {
     assertFailsWith<InvalidStateException> { handle.isCancelled() }
   }
 
-  // BND-198.
-  @Test
-  fun closedHandleRejectsCancelCallbackRegistrationBeforeReachingNative() {
-    val registrations = AtomicInteger(0)
-    val handle =
-      ResourceRequestHandle(
-        1L,
-        cancelCallbackSetter = { _, _, _ ->
-          registrations.incrementAndGet()
-          MaplibreStatus.OK.nativeCode
-        },
-        releaser = {},
-      )
-    assertEquals(
-      ResourceProviderDecision.HANDLE.nativeValue,
-      handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
-    )
-
-    handle.setCancelCallback {}
-    handle.setCancelCallback(null)
-    assertEquals(2, registrations.get())
-
-    handle.close()
-
-    assertFailsWith<InvalidStateException> { handle.setCancelCallback {} }
-    assertEquals(2, registrations.get())
-  }
-
   private fun registerUnreachableProviderOwnedHandle(released: CountDownLatch) {
     val handle = ResourceRequestHandle(1L, releaser = { released.countDown() })
     assertEquals(

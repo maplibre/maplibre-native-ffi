@@ -171,10 +171,10 @@ type HttpHeaderTransformCallback func(HttpHeaderTransformRequest) []HttpHeader
 type ResourceProviderCallback func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision
 
 // ResourceRequestCancelCallback reports that MapLibre cancelled a handled
-// resource request. Native code invokes it on the thread that retires the
+// resource request. Native code invokes it on the thread that discards the
 // request: the runtime owner thread inside a map or runtime call, and a MapLibre
-// thread otherwise. The callback must not call MapLibre map or runtime APIs.
-// It may complete or close the cancelled request. Panics are contained and
+// thread otherwise. The callback must not call MapLibre map or runtime APIs. It
+// may complete or close the cancelled request. Panics are contained and
 // discarded.
 type ResourceRequestCancelCallback func()
 
@@ -233,6 +233,8 @@ func resourceRequestStateError(err error) error {
 		return newBindingError(ErrInvalidState, "ResourceRequestHandle is already completed")
 	case errors.Is(err, callback.ErrResourceRequestClosed):
 		return newBindingError(ErrInvalidArgument, "ResourceRequestHandle is closed")
+	case errors.Is(err, callback.ErrResourceRequestCancelCallbackRegistered):
+		return newBindingError(ErrInvalidState, "ResourceRequestHandle already has a cancel callback")
 	default:
 		return err
 	}
@@ -273,22 +275,25 @@ func (handle *ResourceRequestHandle) Cancelled() (bool, error) {
 	return cancelled, nil
 }
 
-// SetCancelCallback registers the callback that runs when MapLibre cancels the
-// request, and replaces any previous registration. A nil callback clears the
-// registration. Registering on an already cancelled request runs the callback
-// before this method returns.
-func (handle *ResourceRequestHandle) SetCancelCallback(callback ResourceRequestCancelCallback) error {
+// SetCancelCallback registers the one callback that runs when MapLibre cancels
+// the request. A second registration reports ErrInvalidState, and a closed
+// handle reports ErrInvalidArgument. When the request was already cancelled,
+// the callback runs on the calling goroutine before this method returns.
+func (handle *ResourceRequestHandle) SetCancelCallback(cancel ResourceRequestCancelCallback) error {
 	if handle == nil || handle.state == nil {
 		return newBindingError(ErrInvalidArgument, "ResourceRequestHandle is nil")
 	}
+	if cancel == nil {
+		return newBindingError(ErrInvalidArgument, "ResourceRequestCancelCallback is nil")
+	}
 	var bindingErr error
 	if err := checkNative(func() int32 {
-		status, err := handle.state.SetCancelCallbackChecked(callback)
+		status, err := handle.state.SetCancelCallbackChecked(cancel)
 		if err != nil {
 			bindingErr = resourceRequestStateError(err)
 			return int32(C.MLN_STATUS_OK)
 		}
-		return int32(status)
+		return status
 	}); err != nil {
 		return err
 	}

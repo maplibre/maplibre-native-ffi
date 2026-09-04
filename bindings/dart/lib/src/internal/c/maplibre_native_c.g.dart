@@ -2091,12 +2091,14 @@ external void mln_resource_request_release(int handle);
     mln_resource_request_handle,
     mln_resource_request_cancel_callback,
     ffi.Pointer<ffi.Void>,
+    ffi.Pointer<ffi.Bool>,
   )
 >()
 external int mln_resource_request_set_cancel_callback(
   int handle,
   mln_resource_request_cancel_callback callback,
   ffi.Pointer<ffi.Void> user_data,
+  ffi.Pointer<ffi.Bool> out_cancelled,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_resource_request_handle)>()

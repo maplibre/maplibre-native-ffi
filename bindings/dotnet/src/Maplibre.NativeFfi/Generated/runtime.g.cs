@@ -666,7 +666,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_resource_request_cancelled([NativeTypeName("mln_resource_request_handle")] MlnResourceRequest handle, bool* out_cancelled);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_resource_request_set_cancel_callback([NativeTypeName("mln_resource_request_handle")] MlnResourceRequest handle, [NativeTypeName("mln_resource_request_cancel_callback")] delegate* unmanaged[Cdecl]<void*, void> callback, void* user_data);
+        public static extern mln_status mln_resource_request_set_cancel_callback([NativeTypeName("mln_resource_request_handle")] MlnResourceRequest handle, [NativeTypeName("mln_resource_request_cancel_callback")] delegate* unmanaged[Cdecl]<void*, void> callback, void* user_data, bool* out_cancelled);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern void mln_resource_request_release([NativeTypeName("mln_resource_request_handle")] MlnResourceRequest handle);

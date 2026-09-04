@@ -2,7 +2,7 @@ package callback
 
 import (
 	"errors"
-	"sync/atomic"
+	stdruntime "runtime"
 	"testing"
 	"time"
 )
@@ -242,42 +242,64 @@ func TestResourceTransformStateReleaseIsIdempotent(t *testing.T) {
 	state.Release()
 }
 
-// BND-198: a released request rejects a cancel callback registration before the
-// call reaches native code.
-func TestResourceRequestSetCancelCallbackAfterCloseFailsBeforeNative(t *testing.T) {
-	handle := newResourceRequestHandleForTest()
-	defer freeResourceRequestHandleForTest(handle)
-
+// BND-198: a closed request rejects a cancel callback before the call reaches
+// native code, and a request with a registration rejects a second one the same
+// way, leaving the first registration in place.
+func TestResourceRequestSetCancelCallbackRejectsClosedAndSecondRegistration(t *testing.T) {
 	var sets int
-	restore := setResourceRequestCancelHookForTest(func(*resourceCancelState) int32 {
+	restore := setResourceRequestCancelHookForTest(func(uint64) (int32, bool) {
 		sets++
-		return testStatusOK
+		return testStatusOK, false
 	})
 	defer restore()
 
-	handle.Close()
-	status, err := handle.SetCancelCallbackChecked(func() {})
-	if !errors.Is(err, ErrResourceRequestClosed) || status != 0 {
+	closed := newResourceRequestHandleForTest()
+	defer freeResourceRequestHandleForTest(closed)
+	closed.Close()
+	if status, err := closed.SetCancelCallbackChecked(func() {}); !errors.Is(err, ErrResourceRequestClosed) || status != 0 {
 		t.Fatalf("SetCancelCallbackChecked after Close = (%v, %v), want closed", status, err)
 	}
 	if sets != 0 {
-		t.Fatalf("native registrations = %d, want 0", sets)
+		t.Fatalf("native registrations after closed handle = %d, want 0", sets)
 	}
-}
 
-// BND-198: a request cancelled before registration runs the callback while the
-// registration is still in flight, and that callback can close the same request
-// without deadlocking against the registration.
-func TestResourceRequestCancelCallbackRunsDuringRegistrationAndMayClose(t *testing.T) {
 	handle := newResourceRequestHandleForTest()
 	defer freeResourceRequestHandleForTest(handle)
-	live := ResourceCancelStateLiveCountForTest()
+	var firstCalls, secondCalls int
+	if status, err := handle.SetCancelCallbackChecked(func() { firstCalls++ }); err != nil || status != testStatusOK {
+		t.Fatalf("first SetCancelCallbackChecked = (%v, %v), want OK nil", status, err)
+	}
+	if status, err := handle.SetCancelCallbackChecked(func() { secondCalls++ }); !errors.Is(err, ErrResourceRequestCancelCallbackRegistered) || status != 0 {
+		t.Fatalf("second SetCancelCallbackChecked = (%v, %v), want already registered", status, err)
+	}
+	if sets != 1 {
+		t.Fatalf("native registrations = %d, want 1", sets)
+	}
+	invokeResourceRequestCancelTrampolineForTest(handle.cancelToken)
+	if firstCalls != 1 || secondCalls != 0 {
+		t.Fatalf("callback calls = (%d, %d), want the first registration to run once", firstCalls, secondCalls)
+	}
+	handle.Close()
+}
 
-	restore := setResourceRequestCancelHookForTest(func(state *resourceCancelState) int32 {
-		invokeResourceRequestCancelTrampolineForTest(state)
-		return testStatusOK
+// BND-198: when native code reports that the request was already cancelled, the
+// callback runs before registration returns, and it may close the same request
+// from inside itself.
+func TestResourceRequestCancelCallbackRunsBeforeRegistrationWhenAlreadyCancelled(t *testing.T) {
+	handle := newResourceRequestHandleForTest()
+	defer freeResourceRequestHandleForTest(handle)
+	handle.decisionFinalized = true
+	handle.providerOwned = true
+
+	var registeredToken uint64
+	restoreCancel := setResourceRequestCancelHookForTest(func(token uint64) (int32, bool) {
+		registeredToken = token
+		return testStatusOK, true
 	})
-	defer restore()
+	defer restoreCancel()
+	var releases int
+	restoreRequest := setResourceRequestHooksForTest(nil, func() { releases++ })
+	defer restoreRequest()
 
 	var calls int
 	status, err := handle.SetCancelCallbackChecked(func() {
@@ -288,116 +310,102 @@ func TestResourceRequestCancelCallbackRunsDuringRegistrationAndMayClose(t *testi
 		t.Fatalf("SetCancelCallbackChecked = (%v, %v), want OK nil", status, err)
 	}
 	if calls != 1 {
-		t.Fatalf("cancel callback calls = %d, want 1", calls)
+		t.Fatalf("cancel callback calls = %d, want 1 before registration returned", calls)
 	}
-	if got := ResourceCancelStateLiveCountForTest(); got != live {
-		t.Fatalf("live cancel states = %d, want %d", got, live)
+	if releases != 1 {
+		t.Fatalf("releases = %d, want 1 from the callback's Close", releases)
+	}
+	if lookupCancelToken(registeredToken) != nil {
+		t.Fatalf("registry still resolves the token native code never stored")
+	}
+	if handle.cancelToken != 0 || handle.cancelCallback != nil {
+		t.Fatalf("handle kept a registration native code never stored")
 	}
 }
 
-// BND-198: a panic inside the cancel callback stops at the trampoline rather
-// than unwinding into C.
-func TestResourceRequestCancelTrampolineRecoversPanic(t *testing.T) {
+// BND-198: the trampoline runs the callback once, contains its panic, and
+// ignores a token the request already released.
+func TestResourceRequestCancelTrampolineRunsOnceAndRecoversPanic(t *testing.T) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			t.Fatalf("cancel trampoline propagated panic: %v", recovered)
 		}
 	}()
-
-	restore := setResourceRequestCancelHookForTest(func(state *resourceCancelState) int32 {
-		invokeResourceRequestCancelTrampolineForTest(state)
-		return testStatusOK
+	restore := setResourceRequestCancelHookForTest(func(uint64) (int32, bool) {
+		return testStatusOK, false
 	})
 	defer restore()
 
 	handle := newResourceRequestHandleForTest()
 	defer freeResourceRequestHandleForTest(handle)
+	handle.decisionFinalized = true
+	handle.providerOwned = true
+	var calls int
 	if status, err := handle.SetCancelCallbackChecked(func() {
+		calls++
 		panic("boom")
 	}); err != nil || status != testStatusOK {
 		t.Fatalf("SetCancelCallbackChecked = (%v, %v), want OK nil", status, err)
 	}
-	handle.Close()
-}
+	token := handle.cancelToken
 
-// BND-198: a replacement keeps the replaced registration alive until the native
-// call that replaces it returns, because native code may be invoking it.
-func TestResourceRequestCancelCallbackReplacementOutlivesNativeCall(t *testing.T) {
-	handle := newResourceRequestHandleForTest()
-	defer freeResourceRequestHandleForTest(handle)
-	live := ResourceCancelStateLiveCountForTest()
-
-	var previous *resourceCancelState
-	var replacedCalls int
-	restore := setResourceRequestCancelHookForTest(func(state *resourceCancelState) int32 {
-		if previous != nil {
-			// Stands in for a native cancellation that is already running the
-			// replaced registration while the replacement is installed.
-			invokeResourceRequestCancelTrampolineForTest(previous)
-		}
-		previous = state
-		return testStatusOK
-	})
-	defer restore()
-
-	if status, err := handle.SetCancelCallbackChecked(func() { replacedCalls++ }); err != nil || status != testStatusOK {
-		t.Fatalf("first SetCancelCallbackChecked = (%v, %v), want OK nil", status, err)
-	}
-	if status, err := handle.SetCancelCallbackChecked(func() {}); err != nil || status != testStatusOK {
-		t.Fatalf("second SetCancelCallbackChecked = (%v, %v), want OK nil", status, err)
-	}
-	if replacedCalls != 1 {
-		t.Fatalf("replaced callback calls = %d, want 1", replacedCalls)
-	}
-	if got := ResourceCancelStateLiveCountForTest(); got != live+1 {
-		t.Fatalf("live cancel states after replacement = %d, want %d", got, live+1)
+	invokeResourceRequestCancelTrampolineForTest(token)
+	invokeResourceRequestCancelTrampolineForTest(token)
+	if calls != 1 {
+		t.Fatalf("cancel callback calls = %d, want 1", calls)
 	}
 
 	handle.Close()
-	if got := ResourceCancelStateLiveCountForTest(); got != live {
-		t.Fatalf("live cancel states after Close = %d, want %d", got, live)
+	if lookupCancelToken(token) != nil {
+		t.Fatalf("registry still resolves the token after Close")
+	}
+	invokeResourceRequestCancelTrampolineForTest(token)
+	if calls != 1 {
+		t.Fatalf("cancel callback calls after Close = %d, want 1", calls)
 	}
 }
 
-// BND-197, BND-198: a close that races a running cancel callback releases the
-// request without deadlocking, and the callback's use of the same handle
-// reports the closed error rather than blocking on the release.
+// BND-198: a close that races a running cancel callback releases the request
+// with no lock held, so the callback's use of the same handle reports the
+// closed error instead of deadlocking against the release that waits for it.
 func TestResourceRequestCloseDuringCancelCallbackDoesNotDeadlock(t *testing.T) {
 	handle := newResourceRequestHandleForTest()
 	defer freeResourceRequestHandleForTest(handle)
 	handle.decisionFinalized = true
 	handle.providerOwned = true
 
-	var registered *resourceCancelState
-	restoreCancel := setResourceRequestCancelHookForTest(func(state *resourceCancelState) int32 {
-		registered = state
-		return testStatusOK
+	restoreCancel := setResourceRequestCancelHookForTest(func(uint64) (int32, bool) {
+		return testStatusOK, false
 	})
 	defer restoreCancel()
 
 	releasing := make(chan struct{})
 	callbackDone := make(chan struct{})
+	var releases int
 	restoreRequest := setResourceRequestHooksForTest(func() int32 {
 		return testStatusInvalidState
 	}, func() {
 		// Stands in for the C API release, which waits for a cancel callback
 		// running on another thread.
+		releases++
 		close(releasing)
 		<-callbackDone
 	})
 	defer restoreRequest()
 
+	callbackStarted := make(chan struct{})
 	var completeErr error
 	if status, err := handle.SetCancelCallbackChecked(func() {
+		close(callbackStarted)
 		<-releasing
-		_, completeErr = handle.CompleteChecked(ResourceResponse{Status: 0}, nil)
+		_, completeErr = handle.CompleteChecked(ResourceResponse{}, nil)
 		handle.Close()
 		close(callbackDone)
 	}); err != nil || status != testStatusOK {
 		t.Fatalf("SetCancelCallbackChecked = (%v, %v), want OK nil", status, err)
 	}
-
-	go invokeResourceRequestCancelTrampolineForTest(registered)
+	go invokeResourceRequestCancelTrampolineForTest(handle.cancelToken)
+	<-callbackStarted
 
 	closed := make(chan struct{})
 	go func() {
@@ -414,55 +422,34 @@ func TestResourceRequestCloseDuringCancelCallbackDoesNotDeadlock(t *testing.T) {
 	if !errors.Is(completeErr, ErrResourceRequestClosed) {
 		t.Fatalf("CompleteChecked from the cancel callback = %v, want closed", completeErr)
 	}
+	if releases != 1 {
+		t.Fatalf("releases = %d, want 1", releases)
+	}
 }
 
-// BND-197: a close that races a cancel callback registration waits for the
-// registration to leave the C API before it releases the request.
-func TestResourceRequestCloseDrainsInFlightCancelRegistration(t *testing.T) {
+// BND-198: the registry resolves the native token through a weak reference, so
+// a registration whose callback captures its own handle does not keep that
+// handle alive.
+func TestResourceRequestCancelRegistryDoesNotRootHandle(t *testing.T) {
+	restore := setResourceRequestCancelHookForTest(func(uint64) (int32, bool) {
+		return testStatusOK, false
+	})
+	defer restore()
+
 	handle := newResourceRequestHandleForTest()
-	defer freeResourceRequestHandleForTest(handle)
-	handle.decisionFinalized = true
-	handle.providerOwned = true
-
-	registering := make(chan struct{})
-	finishRegistration := make(chan struct{})
-	restoreCancel := setResourceRequestCancelHookForTest(func(*resourceCancelState) int32 {
-		close(registering)
-		<-finishRegistration
-		return testStatusOK
-	})
-	defer restoreCancel()
-
-	var released atomic.Bool
-	restoreRequest := setResourceRequestHooksForTest(nil, func() {
-		released.Store(true)
-	})
-	defer restoreRequest()
-
-	registrationDone := make(chan struct{})
-	go func() {
-		defer close(registrationDone)
-		if status, err := handle.SetCancelCallbackChecked(func() {}); err != nil || status != testStatusOK {
-			t.Errorf("SetCancelCallbackChecked = (%v, %v), want OK nil", status, err)
-		}
-	}()
-	<-registering
-
-	closed := make(chan struct{})
-	go func() {
-		defer close(closed)
-		handle.Close()
-	}()
-	// A close that fails to drain the registration would release here.
-	time.Sleep(50 * time.Millisecond)
-	if released.Load() {
-		t.Fatalf("release ran while a registration was still in the C API")
+	if status, err := handle.SetCancelCallbackChecked(func() { handle.Close() }); err != nil || status != testStatusOK {
+		t.Fatalf("SetCancelCallbackChecked = (%v, %v), want OK nil", status, err)
 	}
-
-	close(finishRegistration)
-	<-registrationDone
-	<-closed
-	if !released.Load() {
-		t.Fatalf("release did not run after the registration returned")
+	token := handle.cancelToken
+	if lookupCancelToken(token) != handle {
+		t.Fatalf("registry does not resolve the live handle")
 	}
+	handle = nil
+
+	stdruntime.GC()
+	stdruntime.GC()
+	if lookupCancelToken(token) != nil {
+		t.Fatalf("registry kept the handle reachable after its owner dropped it")
+	}
+	unregisterCancelToken(token)
 }

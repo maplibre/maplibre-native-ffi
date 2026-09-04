@@ -3725,7 +3725,7 @@ def test_resource_provider_can_complete_request_from_another_thread() -> None:
 
 
 def test_resource_request_cancel_callback_reports_discarded_request() -> None:
-    """BND-198: a discarded request reports cancellation once, and the callback
+    """BND-198: a discarded request runs its callback once, and the callback
     releases its own handle."""
     handles: list[resource.ResourceRequestHandle] = []
     cancellations: list[str] = []
@@ -3756,6 +3756,8 @@ def test_resource_request_cancel_callback_reports_discarded_request() -> None:
                 cancelled.set()
 
             handle.set_cancel_callback(on_cancel)
+            with pytest.raises(mln.InvalidStateError):
+                handle.set_cancel_callback(on_cancel)
             assert handle.is_cancelled() is False
 
         assert cancelled.wait(timeout=5), "cancel callback did not run"
@@ -3786,6 +3788,7 @@ def test_resource_request_cancel_callback_registered_after_cancellation_runs_now
         with runtime.create_map() as map_handle:
             map_handle.set_style_url("custom://late-cancel-style.json")
             handle = _wait_for_provider_handle(runtime, handles)
+        assert handle.is_cancelled() is True
 
         def on_cancel() -> None:
             cancellations.append("cancelled")
@@ -3794,10 +3797,13 @@ def test_resource_request_cancel_callback_registered_after_cancellation_runs_now
 
         handle.set_cancel_callback(on_cancel)
         assert cancellations == ["cancelled"]
-        assert handle.is_cancelled() is True
+
+        # The request keeps its one registration after the callback ran.
+        with pytest.raises(mln.InvalidStateError):
+            handle.set_cancel_callback(on_cancel)
+        assert cancellations == ["cancelled"]
 
         # The contained exception leaves the request and the runtime usable.
-        handle.set_cancel_callback(None)
         handle.close()
         with runtime.create_map() as second_map:
             second_map.set_style_json(_EMPTY_STYLE_BYTES)
@@ -3805,7 +3811,8 @@ def test_resource_request_cancel_callback_registered_after_cancellation_runs_now
 
 
 def test_resource_request_cancel_callback_skips_completed_request() -> None:
-    """BND-198: a request the provider completed reports no cancellation."""
+    """BND-198: a request the provider completed never runs its callback, and
+    the completed handle rejects registration as closed."""
     handles: list[resource.ResourceRequestHandle] = []
     cancellations: list[str] = []
 
@@ -3929,9 +3936,6 @@ def test_resource_request_cancel_callback_registration_guards_public_handle() ->
         def __init__(self) -> None:
             self.callbacks: list[object] = []
 
-        def is_cancelled(self) -> bool:
-            return False
-
         def set_cancel_callback(self, callback: object) -> None:
             self.callbacks.append(callback)
 
@@ -3944,18 +3948,17 @@ def test_resource_request_cancel_callback_registration_guards_public_handle() ->
     def on_cancel() -> None:
         return
 
-    handle.set_cancel_callback(on_cancel)
-    handle.set_cancel_callback(None)
-    assert native.callbacks == [on_cancel, None]
-
     with pytest.raises(TypeError, match="must be callable"):
         handle.set_cancel_callback(object())  # type: ignore[arg-type]
-    assert len(native.callbacks) == 2
+    assert native.callbacks == []
+
+    handle.set_cancel_callback(on_cancel)
+    assert native.callbacks == [on_cancel]
 
     handle.close()
     with pytest.raises(mln.InvalidStateError, match="already closed"):
         handle.set_cancel_callback(on_cancel)
-    assert len(native.callbacks) == 2
+    assert native.callbacks == [on_cancel]
 
 
 def test_resource_provider_error_response_reports_loading_failure_event() -> None:
