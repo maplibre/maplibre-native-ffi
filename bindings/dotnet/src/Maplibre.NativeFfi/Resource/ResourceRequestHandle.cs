@@ -157,8 +157,10 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
     /// otherwise. It runs only for a request the provider has not completed,
     /// and it may complete or close this handle. When the request is already
     /// cancelled, the callback runs on the calling thread before this method
-    /// returns. A request accepts one registration, and a second registration
-    /// throws <see cref="InvalidStateException" />.
+    /// returns, as part of this call: a concurrent <see cref="Close" /> on
+    /// another thread does not wait for it. A request accepts one
+    /// registration, and a second registration throws
+    /// <see cref="InvalidStateException" />.
     /// </remarks>
     public void SetCancelCallback(Action callback)
     {
@@ -199,7 +201,12 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
 
         if (alreadyCancelled)
         {
-            RunCancelCallback(TakeCancelCallback(token));
+            // Native stored nothing, so this call runs the callback in its
+            // place. A concurrent Close may already have emptied the slot,
+            // which only stops a later dispatch; the registration still runs
+            // its callback once, on this thread.
+            TakeCancelCallback(token);
+            RunCancelCallback(callback);
         }
     }
 

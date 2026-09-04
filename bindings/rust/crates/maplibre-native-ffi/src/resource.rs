@@ -76,7 +76,9 @@ impl ResourceRequestHandle {
     /// [`ErrorKind::InvalidState`](crate::ErrorKind::InvalidState). MapLibre
     /// runs the callback at most once, on the thread that discards the request,
     /// and never for a request the provider completed. Registering on a request
-    /// MapLibre already cancelled runs the callback before this call returns. A
+    /// MapLibre already cancelled runs the callback before this call returns, as
+    /// part of this call: a concurrent `close` on another thread does not wait
+    /// for it. A
     /// panic inside the callback is contained and discarded, because unwinding
     /// into native code is undefined behavior and the cancel path reports no
     /// status.

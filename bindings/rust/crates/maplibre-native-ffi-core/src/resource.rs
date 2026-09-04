@@ -582,13 +582,17 @@ impl ResourceRequestHandleState {
             drop(inner.cancel_callback.take());
             return Err(error);
         }
+        // Native stored nothing for a request MapLibre already cancelled, so
+        // this call runs the callback itself. Taking it back under the lock
+        // keeps a racing close from dropping it unrun.
+        let inline = if cancelled {
+            inner.cancel_callback.take()
+        } else {
+            None
+        };
         drop(inner);
-        if cancelled {
-            // Native stored nothing for a request MapLibre already cancelled,
-            // so the binding runs the callback itself.
-            if let Some(callback) = self.take_cancel_callback() {
-                run_cancel_callback_contained(callback);
-            }
+        if let Some(callback) = inline {
+            run_cancel_callback_contained(callback);
         }
         Ok(())
     }

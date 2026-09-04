@@ -576,8 +576,11 @@ pub const ResourceRequestHandle = enum(c.mln_resource_request_handle) {
     /// A request accepts one registration; a second reports
     /// `error.InvalidState` and leaves the first in place. Registering on a
     /// request MapLibre already cancelled runs the handler on the calling
-    /// thread before this call returns. The handler's context must stay valid
-    /// until `release` returns. A released handle reports `error.ClosedHandle`.
+    /// thread before this call returns, as part of this call: a concurrent
+    /// `release` on another thread does not wait for it. The handler's context
+    /// must stay valid until `release` returns, and until this call returns
+    /// when it runs the handler itself. A released handle reports
+    /// `error.ClosedHandle`.
     pub fn setCancelCallback(self: ResourceRequestHandle, callback: ResourceRequestCancelCallback) status.Error!void {
         lockResourceRequestRegistry();
         var registry_locked = true;

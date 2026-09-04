@@ -278,7 +278,9 @@ func (handle *ResourceRequestHandle) Cancelled() (bool, error) {
 // SetCancelCallback registers the one callback that runs when MapLibre cancels
 // the request. A second registration reports ErrInvalidState, and a closed
 // handle reports ErrInvalidArgument. When the request was already cancelled,
-// the callback runs on the calling goroutine before this method returns.
+// the callback runs on the calling goroutine before this method returns, as
+// part of this call: a concurrent Close on another goroutine does not wait for
+// it.
 //
 // The request owns the callback until it runs or the request is completed or
 // closed. A callback that captures this handle therefore keeps the handle

@@ -341,11 +341,13 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
       return
     }
     // Native stored nothing, so this call runs the callback in its place. The
-    // operation finishes first so the callback can close the request.
-    let taken = condition.withLock { takeCancelCallbackLocked() }
+    // operation finishes first so the callback can close the request. A
+    // concurrent release may already have emptied the slot, which only stops
+    // a later dispatch; the registration still runs its callback once here.
+    _ = condition.withLock { takeCancelCallbackLocked() }
     finishNativeOperation()
     registry.remove(token)
-    taken.callback?()
+    callback()
   }
 
   /// Runs the registered callback once. Native invokes this at most once per

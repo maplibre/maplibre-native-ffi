@@ -705,14 +705,16 @@ thread that cancels the request, which is the owner thread inside a map or
 runtime call and a MapLibre thread otherwise, and contains host failures inside
 the callback. The callback may complete or release the same request. When the C
 API reports that the request was already cancelled, the binding runs the
-callback itself before registration returns. The binding holds no lock of its
-own while it runs the callback or while it calls native release, because native
-release waits for a cancel callback running on another thread and that callback
-may call back into the same request handle. A binding that blocks native threads
-on a host lock, such as an interpreter lock, releases that lock around the map
-and runtime calls that can cancel requests. Callback state does not keep the
-request handle reachable: the request handle owns the callback, and any registry
-the binding uses to resolve a native token holds a weak reference.
+callback itself before registration returns, as part of that call: release from
+another thread does not wait for it, and a concurrent release cannot stop it
+from running. The binding holds no lock of its own while it runs the callback or
+while it calls native release, because native release waits for a cancel
+callback running on another thread and that callback may call back into the same
+request handle. A binding that blocks native threads on a host lock, such as an
+interpreter lock, releases that lock around the map and runtime calls that can
+cancel requests. Callback state does not keep the request handle reachable: the
+request handle owns the callback, and any registry the binding uses to resolve a
+native token holds a weak reference.
 
 A binding whose host runtime moves a handled request between execution contexts
 passes the request handle id itself, and exposes the C API's wait-until-retired

@@ -52,7 +52,10 @@ internal class ResourceRequestCancelState(
     }
     if (!result.alreadyCancelled) return null
     registration.dispose()
-    return slot.exchange(null)
+    // A concurrent close may already have emptied the slot, which only stops a later dispatch. The
+    // registration still hands its callback back to run once.
+    slot.store(null)
+    return callback
   }
 
   /** Takes the callback out of the slot, or returns null when it already ran or was dropped. */

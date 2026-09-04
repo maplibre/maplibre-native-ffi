@@ -255,7 +255,9 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
         that cancels the request. That thread is the runtime owner thread inside
         a map or runtime call and a MapLibre thread otherwise. A request the
         provider completed never runs it. Registering on an already cancelled
-        request runs the callback before this call returns.
+        request runs the callback before this call returns, as part of this
+        call: a concurrent :meth:`close` on another thread does not wait for
+        it.
 
         A request accepts one registration: a second one raises
         :class:`InvalidStateError`, as does a registration on a handle that
