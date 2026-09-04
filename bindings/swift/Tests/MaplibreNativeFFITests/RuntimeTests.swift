@@ -579,10 +579,13 @@ private final class CancelProbe: @unchecked Sendable {
   private var providerCalled = false
 
   func store(_ handle: ResourceRequestHandle) {
-    lock.withLock {
-      storedHandle = handle
-      providerCalled = true
-    }
+    lock.withLock { storedHandle = handle }
+  }
+
+  /// Marks the provider callback finished, after `configure` has run, so a
+  /// test that waits on this flag also sees everything `configure` recorded.
+  func finishProviderCall() {
+    lock.withLock { providerCalled = true }
   }
 
   var handle: ResourceRequestHandle? {
@@ -648,6 +651,7 @@ private func startCancelProbeRequest(
   try runtime.setResourceProvider { _, handle in
     probe.store(handle)
     configure(handle)
+    probe.finishProviderCall()
     return .handle
   }
   try map.setStyleURL("custom://cancel-style.json")

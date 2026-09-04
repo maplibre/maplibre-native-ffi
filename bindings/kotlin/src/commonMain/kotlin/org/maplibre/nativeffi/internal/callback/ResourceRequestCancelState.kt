@@ -4,7 +4,6 @@ import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.internal.lifecycle.PlatformLock
 import org.maplibre.nativeffi.internal.lifecycle.WeakBox
 import org.maplibre.nativeffi.internal.status.Status
 
@@ -118,35 +117,56 @@ internal class ResourceRequestCancelRegistration {
  * Routes native resource request cancellations to the request that registered them.
  *
  * Platform bridges install one process-wide C callback and pass a token as its user data, so a
- * cancellation never dereferences per-request host memory.
+ * cancellation never dereferences per-request host memory. The table is a copy-on-write map behind
+ * one atomic reference, so no lock is held on either side of the C boundary: it only ever holds the
+ * requests with an open registration, and each update is one small copy.
  */
+@OptIn(ExperimentalAtomicApi::class)
 internal object ResourceRequestCancelRegistry {
-  private val lock = PlatformLock()
-  private val states = HashMap<Long, WeakBox<ResourceRequestCancelState>>()
-  private var nextToken = 1L
+  private val states = AtomicReference<Map<Long, WeakBox<ResourceRequestCancelState>>>(emptyMap())
+  private val nextToken = AtomicLong(1L)
 
-  fun register(state: ResourceRequestCancelState): Long = lock.withLock {
-    val token = nextToken++
-    states[token] = WeakBox(state)
-    token
+  fun register(state: ResourceRequestCancelState): Long {
+    val token = nextToken.fetchAndAdd(1L)
+    update { it + (token to WeakBox(state)) }
+    return token
   }
 
   fun unregister(token: Long) {
-    lock.withLock { states.remove(token) }
+    update { it - token }
   }
 
   /**
    * Runs the callback registered for a token, once.
    *
-   * The lookup holds the registry lock and the callback does not, because the callback may close
-   * its request and closing unregisters the token. A token without a live state is a request whose
-   * handle the host dropped without closing, so its callback stays unrun.
+   * Removing the entry first makes the dispatch exclusive, and the callback then runs with nothing
+   * held, because it may close its request and closing unregisters the token. A token without a
+   * live state is a request whose handle the host dropped without closing, so its callback stays
+   * unrun.
    */
   fun dispatch(token: Long) {
-    val state = lock.withLock { states.remove(token)?.get() }
-    val callback = state?.take() ?: return
+    var removed: WeakBox<ResourceRequestCancelState>? = null
+    update { current ->
+      removed = current[token]
+      if (removed == null) current else current - token
+    }
+    val callback = removed?.get()?.take() ?: return
     ResourceRequestCancelState.runContained(callback)
   }
 
-  fun isRegisteredForTesting(token: Long): Boolean = lock.withLock { states[token]?.get() != null }
+  fun isRegisteredForTesting(token: Long): Boolean = states.load()[token]?.get() != null
+
+  private inline fun update(
+    transform:
+      (Map<Long, WeakBox<ResourceRequestCancelState>>) -> Map<
+          Long,
+          WeakBox<ResourceRequestCancelState>,
+        >
+  ) {
+    while (true) {
+      val current = states.load()
+      val next = transform(current)
+      if (next === current || states.compareAndSet(current, next)) return
+    }
+  }
 }
