@@ -249,8 +249,7 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
         The callback takes no arguments and runs at most once, on the thread
         that cancels the request. That thread is the runtime owner thread inside
         a map or runtime call and a MapLibre thread otherwise. Registering on an
-        already cancelled
-        request runs the callback before this call returns.
+        already cancelled request runs the callback before this call returns.
 
         Each call replaces the previous registration, and ``None`` clears it.
         :meth:`complete` and :meth:`close` both close this handle, and a

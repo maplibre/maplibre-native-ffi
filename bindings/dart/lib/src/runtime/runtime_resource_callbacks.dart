@@ -348,10 +348,8 @@ ResourceRequest _copyResourceRequest(
 /// Dart callback run when MapLibre cancels a provider resource request.
 typedef ResourceRequestCancelCallback = void Function();
 
-/// Cancel registrations this isolate owns, keyed by resource request id.
 final Map<int, _ResourceRequestCancelState> _resourceRequestCancelStates = {};
 
-/// Retains the native trampoline for one resource request cancel registration.
 final class _ResourceRequestCancelState extends RetainedCallbackState {
   _ResourceRequestCancelState(
     this._requestId,
@@ -361,8 +359,6 @@ final class _ResourceRequestCancelState extends RetainedCallbackState {
         NativeCallable<
           raw.mln_resource_request_cancel_callbackFunction
         >.listener((Pointer<Void> _) {
-          // The C API reports a cancellation at most once per request, so the
-          // registration retires as soon as native delivery reaches Dart.
           _forgetResourceRequestCancelState(_requestId, this);
           runUpcall(() {
             try {
@@ -385,7 +381,6 @@ final class _ResourceRequestCancelState extends RetainedCallbackState {
   }
 }
 
-/// Drops [state] from the registry when it is still the live registration.
 void _forgetResourceRequestCancelState(
   int requestId,
   _ResourceRequestCancelState state,
@@ -395,7 +390,6 @@ void _forgetResourceRequestCancelState(
   }
 }
 
-/// Retires the registration [requestId] owns on this isolate, if any.
 void _retireResourceRequestCancelState(int requestId) {
   _resourceRequestCancelStates.remove(requestId)?.close();
 }

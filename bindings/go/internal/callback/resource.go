@@ -258,8 +258,7 @@ var (
 var liveResourceCancelStates atomic.Int64
 
 // ResourceCancelStateLiveCountForTest reports how many cancel callback states
-// are still alive, which is how a test observes that a replacement or a release
-// freed one.
+// are still alive.
 func ResourceCancelStateLiveCountForTest() int64 {
 	return liveResourceCancelStates.Load()
 }
@@ -515,16 +514,12 @@ func (handle *ResourceRequestHandle) SetCancelCallbackChecked(callback func()) (
 	// goroutine and complete or close the same request.
 	status := setResourceRequestCancelCallback(handle.handle, next)
 
-	// Native code stops referencing the replaced registration once the call
-	// that replaced it returns.
 	previous.release()
 	handle.mu.Lock()
 	handle.endUseLocked()
 	closed := handle.closed
 	handle.mu.Unlock()
 	if status != int32(C.MLN_STATUS_OK) || closed {
-		// Native code refused the registration, or the request retired while
-		// this call was in flight.
 		if handle.cancel.CompareAndSwap(next, nil) {
 			next.release()
 		}
@@ -532,9 +527,6 @@ func (handle *ResourceRequestHandle) SetCancelCallbackChecked(callback func()) (
 	return status, nil
 }
 
-// beginUse registers one in-flight C API use of the handle, which a release
-// drains before it retires the request. A use that starts after the request
-// retired reports the closed error instead of reaching the C API.
 func (handle *ResourceRequestHandle) beginUse() error {
 	handle.mu.Lock()
 	defer handle.mu.Unlock()
@@ -558,9 +550,6 @@ func (handle *ResourceRequestHandle) endUseLocked() {
 	}
 }
 
-// dropCancelState frees the current registration once the request is terminal.
-// Native code no longer reports cancellation for a completed or released
-// request, and a callback running on this goroutine keeps its own reference.
 func (handle *ResourceRequestHandle) dropCancelState() {
 	handle.cancel.Swap(nil).release()
 }

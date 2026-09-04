@@ -855,8 +855,6 @@ void main() {
       expect(insideError, isNull);
       expect(cancelledInsideCallback, isTrue);
       expect(cancels, 1);
-      // The callback released the request, so a later registration or clear is
-      // rejected.
       expect(
         () => liveToken.setCancelCallback(() {}),
         throwsA(isA<InvalidArgumentException>()),

@@ -58,10 +58,8 @@ internal sealed unsafe class ResourceRequestCancelState
 
     internal bool IsRetiredForTest => retired;
 
-    /// <summary>Runs the dispatch path a native cancellation notification takes.</summary>
     internal static void DispatchForTest(nint token) => Dispatch((void*)token);
 
-    /// <summary>Drops the registration, so a later dispatch reaches nothing.</summary>
     internal void Retire()
     {
         lock (RegistryGate)

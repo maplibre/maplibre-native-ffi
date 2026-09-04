@@ -51,7 +51,6 @@ const ResourceRequestState = struct {
     native: c.mln_resource_request_handle,
     completed: bool,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
-    /// Registered cancel callback, kept alive until release.
     cancel_state: ?*ResourceRequestCancelState,
     /// Registrations this request replaced. Native replacement does not wait
     /// for a cancel callback it already started, so replaced registrations
@@ -67,7 +66,6 @@ const ResourceRequestCancelState = struct {
     native: c.mln_resource_request_handle,
     handler: ResourceRequestCancelHandler,
     context: ?*anyopaque,
-    /// Links replaced registrations into their request's retired list.
     next: ?*ResourceRequestCancelState = null,
 };
 
@@ -627,7 +625,6 @@ pub const ResourceRequestHandle = enum(c.mln_resource_request_handle) {
             replacement,
         );
         if (native_status != c.MLN_STATUS_OK) {
-            // The native side rejected the registration, so nothing reaches it.
             retireResourceRequestCancelState(request_state, replacement);
         }
         try status.checkStatus(native_status, request_state.diagnostic_store);
@@ -2200,7 +2197,6 @@ fn retireResourceRequestCancelState(
     request_state.retired_cancel_states = registration;
 }
 
-/// Takes every registration this request still owns, as one list.
 fn takeResourceRequestCancelStates(request_state: *ResourceRequestState) ?*ResourceRequestCancelState {
     lockResourceRequestRegistry();
     defer unlockResourceRequestRegistry();

@@ -12,7 +12,6 @@ import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
  * would exhaust after ten live requests.
  */
 internal object ResourceRequestCancelBridge {
-  /** The C callback to register, valid for the life of the process. */
   val stub: MaplibreNativeC.mln_resource_request_cancel_callback =
     object : MaplibreNativeC.mln_resource_request_cancel_callback() {
       override fun call(userData: Pointer?) {
@@ -20,6 +19,5 @@ internal object ResourceRequestCancelBridge {
       }
     }
 
-  /** Returns the user data that routes a cancellation back to one request's state. */
   fun userData(token: Long): Pointer = JavaCppSupport.addressPointer(token)
 }

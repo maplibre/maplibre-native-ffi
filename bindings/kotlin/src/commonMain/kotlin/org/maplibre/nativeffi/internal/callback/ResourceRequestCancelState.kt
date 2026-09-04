@@ -18,10 +18,8 @@ internal class ResourceRequestCancelState(
 ) {
   private val current = AtomicReference<(() -> Unit)?>(null)
 
-  /** Returns the registry token for this state, registering it on first use. */
   fun token(): Long = registration.token(this)
 
-  /** Stores the callback that the next cancellation runs, or null to run none. */
   fun store(callback: (() -> Unit)?) {
     current.store(callback)
   }
@@ -54,7 +52,6 @@ internal class ResourceRequestCancelState(
 internal class ResourceRequestCancelRegistration {
   private val token = AtomicLong(UNREGISTERED)
 
-  /** Returns the token that routes cancellations to [state], registering it on first use. */
   fun token(state: ResourceRequestCancelState): Long {
     val existing = token.load()
     if (existing != UNREGISTERED) return existing
@@ -124,9 +121,7 @@ internal object ResourceRequestCancelRegistry {
   fun isRegisteredForTesting(token: Long): Boolean = withUpdateLock { states[token]?.get() != null }
 
   private inline fun <R> withUpdateLock(block: () -> R): R {
-    while (!updateLock.compareAndSet(0, 1)) {
-      // Spin briefly; cancel callback registration and cancellation are both infrequent.
-    }
+    while (!updateLock.compareAndSet(0, 1)) continue
     try {
       return block()
     } finally {

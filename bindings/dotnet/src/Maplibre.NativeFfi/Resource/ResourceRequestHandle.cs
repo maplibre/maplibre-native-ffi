@@ -153,9 +153,10 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
     /// <para>
     /// The callback runs at most once, on the thread that cancels the request,
     /// which is the runtime owner thread inside a map or runtime call and a
-    /// MapLibre thread otherwise. It runs only while the request is still open: a request this handle
-    /// already completed never reports cancellation. Registering on a request
-    /// MapLibre already cancelled runs the callback before this method returns.
+    /// MapLibre thread otherwise. It runs only while the request is still open:
+    /// a request this handle already completed never reports cancellation.
+    /// Registering on a request MapLibre already cancelled runs the callback
+    /// before this method returns.
     /// </para>
     /// <para>
     /// Each call replaces the previous registration. The callback may complete
@@ -178,9 +179,6 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
                 ThrowIfClosed();
                 var observed = Volatile.Read(ref cancelState);
 
-                // A request MapLibre already cancelled runs the callback before
-                // the C call returns, on this thread. The callback dispatch takes
-                // no lock of its own, so it may reenter this handle.
                 NativeStatus.Check(
                     setCancelCallback(
                         handle,
@@ -192,8 +190,6 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
                 var current = Interlocked.CompareExchange(ref cancelState, replacement, observed);
                 if (!ReferenceEquals(current, observed))
                 {
-                    // The callback registered again while it ran, and MapLibre
-                    // holds that later registration.
                     replacement?.Retire();
                     return;
                 }
@@ -201,8 +197,6 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
                 previous = observed;
                 if (closed && replacement is not null)
                 {
-                    // The callback closed this handle while it ran, so the
-                    // registration it replaced is already unreachable.
                     Interlocked.CompareExchange(ref cancelState, null, replacement);
                     replacement.Retire();
                 }
@@ -214,8 +208,6 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
             throw;
         }
 
-        // The C call has returned, so MapLibre can no longer reach the
-        // registration it replaced.
         previous?.Retire();
     }
 

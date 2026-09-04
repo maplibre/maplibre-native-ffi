@@ -7,6 +7,5 @@ package org.maplibre.nativeffi.internal.lifecycle
  * entry never keeps its handle reachable and never suppresses the unreachable-handle cleanup.
  */
 internal expect class WeakBox<T : Any>(value: T) {
-  /** Returns the value, or null once it became unreachable. */
   fun get(): T?
 }

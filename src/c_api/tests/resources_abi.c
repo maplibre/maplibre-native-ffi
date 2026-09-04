@@ -1213,8 +1213,6 @@ static void count_cancel(void* user_data) {
   }
 }
 
-// Handles the request, registers the cancel callback, and either keeps the
-// request open or completes it inline without releasing the handle.
 static uint32_t cancel_probe_resource_provider(
   void* user_data, const mln_resource_request* request,
   mln_resource_request_handle handle
@@ -1240,8 +1238,6 @@ static uint32_t cancel_probe_resource_provider(
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
-// Loads a style through the probe provider and returns once the provider has
-// taken the request.
 static mln_map start_cancel_probe_request(
   mln_runtime runtime, cancel_probe* probe
 ) {

@@ -17,10 +17,8 @@ import org.maplibre.nativeffi.internal.c.mln_resource_request_cancel_callback
  */
 @OptIn(ExperimentalForeignApi::class)
 internal object ResourceRequestCancelBridge {
-  /** The C callback pointer to register, valid for the life of the process. */
   val stub: mln_resource_request_cancel_callback = staticCFunction(::dispatchResourceRequestCancel)
 
-  /** Returns the user data that routes a cancellation back to one request's state. */
   fun userData(token: Long): COpaquePointer? = token.toCPointer<CPointed>()
 }
 

@@ -2237,9 +2237,7 @@ mod tests {
     }
 
     #[test]
-    // Spec coverage: BND-198. Registering makes the binding retire the request
-    // itself, so a provider that then panics has to answer the request here:
-    // otherwise the style load would wait for a response that never arrives.
+    // Spec coverage: BND-198.
     fn provider_panic_after_a_cancel_registration_fails_the_style_load() {
         let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         runtime

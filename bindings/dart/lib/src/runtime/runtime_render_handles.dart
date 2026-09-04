@@ -759,10 +759,7 @@ extension type const ResourceRequestHandle._(NativeResourceRequest _handle) {
   /// [InvalidStateException] for a cancelled request, and [close]. An exception
   /// the callback throws is contained rather than delivered to the isolate.
   ///
-  /// Register, replace, clear, and retire one request on the same isolate. The
-  /// binding releases the native callback trampoline when the callback runs,
-  /// when another registration replaces it, or when [complete] or [close]
-  /// retires the request on the registering isolate.
+  /// Register, replace, clear, and retire one request on the same isolate.
   void setCancelCallback(ResourceRequestCancelCallback? callback) {
     final requestId = _checked.raw;
     final previous = _resourceRequestCancelStates[requestId];
@@ -776,8 +773,6 @@ extension type const ResourceRequestHandle._(NativeResourceRequest _handle) {
           ),
         );
       } finally {
-        // The clearing call has returned, whatever its status, so MapLibre
-        // reaches the previous trampoline no longer.
         _resourceRequestCancelStates.remove(requestId);
         previous?.close();
       }
@@ -797,8 +792,6 @@ extension type const ResourceRequestHandle._(NativeResourceRequest _handle) {
       rethrow;
     }
     _resourceRequestCancelStates[requestId] = state;
-    // The replacing call has returned, so MapLibre reaches the previous
-    // trampoline no longer.
     previous?.close();
   }
 

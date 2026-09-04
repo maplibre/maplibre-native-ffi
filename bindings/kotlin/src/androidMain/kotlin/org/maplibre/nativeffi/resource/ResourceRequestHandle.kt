@@ -67,8 +67,6 @@ internal constructor(
 
   public actual fun setCancelCallback(callback: (() -> Unit)?) {
     core.withLiveHandle {
-      // The callback lands before C hears about it, so a request that MapLibre already cancelled
-      // runs it inside this call.
       cancelState.store(callback)
       val status =
         if (callback == null) {
@@ -100,10 +98,6 @@ internal constructor(
         UNKNOWN_DECISION
       }
 
-  /**
-   * Drops cancel routing for a request that goes back to MapLibre. Native releases that request, so
-   * the binding's release path never runs.
-   */
   private fun finishProvider(decision: ResourceProviderDecision): Int {
     if (decision == ResourceProviderDecision.PASS_THROUGH) cancelRegistration.dispose()
     return decision.nativeValue

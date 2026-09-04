@@ -32,17 +32,13 @@ struct ResourceRequestObject {
       : actor(std::move(actor_)) {}
 
   mutable std::mutex mutex;
-  // Signals retirement and the end of an in-flight cancel callback.
   std::condition_variable state_changed;
   bool cancelled = false;
   bool completed = false;
   bool retired = false;
   mln_resource_request_cancel_callback cancel_callback = nullptr;
   void* cancel_user_data = nullptr;
-  // Counts cancel callbacks in progress, so release and replacement can wait
-  // for them from a foreign thread and return immediately from inside one.
-  // A depth rather than a flag: a callback may register another callback,
-  // which runs nested when the request is already cancelled.
+  // Depth rather than a flag: a callback may register another callback.
   int cancel_callbacks_running = 0;
   std::thread::id cancel_callback_thread;
   mln::ActorRef<mln::FileSourceRequest> actor;
@@ -216,8 +212,6 @@ struct TakenCancelCallback {
   void* user_data = nullptr;
 };
 
-// Takes the registered callback for invocation. Marks it running in the same
-// critical section, so a release on another thread waits for it.
 auto take_cancel_callback_locked(ResourceRequestObject& object)
   -> TakenCancelCallback {
   auto taken = TakenCancelCallback{
@@ -231,9 +225,6 @@ auto take_cancel_callback_locked(ResourceRequestObject& object)
   return taken;
 }
 
-// Runs a callback taken by take_cancel_callback_locked(). The callback runs
-// unlocked so it may call request functions, including release, for the same
-// handle.
 void run_cancel_callback(
   ResourceRequestObject& object, const TakenCancelCallback& taken
 ) noexcept {
@@ -249,8 +240,6 @@ void run_cancel_callback(
   object.state_changed.notify_all();
 }
 
-// Blocks until no cancel callback runs on another thread. Called with the
-// object mutex held. From inside a callback this returns at once.
 void wait_for_foreign_cancel_callback_locked(
   ResourceRequestObject& object, std::unique_lock<std::mutex>& lock
 ) {
@@ -263,10 +252,6 @@ void wait_for_foreign_cancel_callback_locked(
 }
 
 // Retires the id so no later call can reach this request. Idempotent.
-//
-// Waits for a cancel callback running on another thread, so the host may free
-// the callback's user_data once release returns. From inside the callback the
-// retirement completes without waiting.
 void retire_request(mln_resource_request_handle handle) noexcept {
   auto object = handle_table<ResourceRequestObject>().remove(handle);
   if (object == nullptr) {
@@ -540,7 +525,6 @@ auto set_resource_request_cancel_callback(
   auto taken = TakenCancelCallback{};
   {
     auto lock = std::unique_lock{live->mutex};
-    // The previous callback's user_data may be freed once this returns.
     wait_for_foreign_cancel_callback_locked(*live, lock);
     live->cancel_callback = callback;
     live->cancel_user_data = user_data;

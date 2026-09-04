@@ -173,8 +173,9 @@ type ResourceProviderCallback func(ResourceRequest, *ResourceRequestHandle) Reso
 // ResourceRequestCancelCallback reports that MapLibre cancelled a handled
 // resource request. Native code invokes it on the thread that retires the
 // request: the runtime owner thread inside a map or runtime call, and a MapLibre
-// thread otherwise. The callback must not call MapLibre map or runtime APIs. It may
-// complete or close the cancelled request. Panics are contained and discarded.
+// thread otherwise. The callback must not call MapLibre map or runtime APIs.
+// It may complete or close the cancelled request. Panics are contained and
+// discarded.
 type ResourceRequestCancelCallback func()
 
 // ResourceRequestHandle owns a provider-selected native request handle.

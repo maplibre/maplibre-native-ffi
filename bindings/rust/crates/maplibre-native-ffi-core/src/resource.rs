@@ -599,10 +599,6 @@ impl ResourceRequestHandleState {
         // new callback, and the previous one stays alive until the C call
         // returns. An invocation already running holds its own reference.
         let previous = self.cancel.replace(callback);
-        // The C API keeps the slot pointer until native release, so once this
-        // state has registered a callback it releases the request itself even
-        // when the provider passes it through. Clearing does not wait for a
-        // callback already running, so the obligation never goes away again.
         inner.cancel_registered |= registering;
         self.cancel.begin_registration();
         // SAFETY: handle is live while not closed, and the slot pointer stays
@@ -697,11 +693,6 @@ impl ResourceRequestHandleState {
             inner.closed = true;
             let handle = Self::native_handle(&inner);
             let release = Self::take_release_pass_through_locked(&mut inner);
-            // The release below retires the request, so the error response the
-            // C API sends for an unknown decision would no longer reach it.
-            // Send that response from here first, keeping the failure visible
-            // to MapLibre as a loading failure instead of a request that never
-            // answers.
             if release {
                 inner.completed = true;
             }
@@ -731,8 +722,6 @@ impl ResourceRequestHandleState {
         let _ = unsafe { (self.fns.complete)(handle, native.as_ptr()) };
     }
 
-    /// Claims the one native release for this handle, reporting whether the
-    /// caller owes the call.
     fn take_release_locked(inner: &mut ResourceRequestHandleInner) -> bool {
         if inner.release_accounted_for {
             return false;
@@ -741,10 +730,6 @@ impl ResourceRequestHandleState {
         true
     }
 
-    /// Accounts for release on a request native retires itself. A registered
-    /// cancel callback still needs the explicit release, which clears the
-    /// registration and waits for an in-flight callback before this state can
-    /// drop the slot the C API points at.
     fn take_release_pass_through_locked(inner: &mut ResourceRequestHandleInner) -> bool {
         if inner.cancel_registered {
             return Self::take_release_locked(inner);
@@ -1225,9 +1210,6 @@ mod tests {
     }
 
     #[test]
-    // Rust regression: the C API points at binding-owned callback storage, so a
-    // registration makes even a passed-through request release explicitly. The
-    // release clears the registration before the storage goes away.
     fn cancel_registration_makes_a_passed_through_request_release() {
         let _guard = HANDLE_TEST_LOCK.lock().unwrap();
         let state = fake_state();
@@ -1244,10 +1226,6 @@ mod tests {
     }
 
     #[test]
-    // Rust regression: the explicit release a registration adds retires the
-    // request, so this state, not the C API, has to answer a provider that
-    // failed before it decided. Without the completion below MapLibre would
-    // wait forever for a response.
     fn provider_failure_after_a_cancel_registration_answers_before_releasing() {
         let _guard = HANDLE_TEST_LOCK.lock().unwrap();
         let state = fake_state();
@@ -1263,8 +1241,6 @@ mod tests {
     }
 
     #[test]
-    // Rust regression: without a registration the C API still owns the request
-    // after a provider failure, so this state neither answers nor releases it.
     fn provider_failure_leaves_an_unregistered_request_to_native() {
         let _guard = HANDLE_TEST_LOCK.lock().unwrap();
         let state = fake_state();

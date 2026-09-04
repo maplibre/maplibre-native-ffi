@@ -12,13 +12,11 @@ import org.maplibre.nativeffi.internal.c.mln_resource_request_cancel_callback
  * still runs, on a MapLibre thread that no binding call brackets.
  */
 internal object ResourceRequestCancelBridge {
-  /** The C callback pointer to register, valid for the life of the process. */
   val stub: MemorySegment =
     mln_resource_request_cancel_callback.allocate(
       { userData -> ResourceRequestCancelRegistry.dispatch(userData.address()) },
       Arena.global(),
     )
 
-  /** Returns the user data that routes a cancellation back to one request's state. */
   fun userData(token: Long): MemorySegment = MemorySegment.ofAddress(token)
 }
