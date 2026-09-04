@@ -833,14 +833,13 @@ typedef uint32_t (*mln_resource_provider_callback)(
 /**
  * Reports that MapLibre cancelled a C API resource provider request.
  *
- * The callback runs at most once per request, on the thread that retires the
- * request, and only while the request is still open: a request the provider
- * already completed is not reported. That thread is the runtime owner thread
- * when a map or runtime call discards the request, such as a style change or
- * map destruction, and a MapLibre worker thread otherwise. The callback must
- * be thread-safe, return quickly, and must not call map or runtime C API
- * functions. It may call resource request handle functions for the cancelled
- * handle, including mln_resource_request_release().
+ * The callback runs at most once per request, on the thread that discards the
+ * request, and only for a request the provider has not completed. That thread
+ * is the runtime owner thread when a map or runtime call discards the request,
+ * such as a style change or map destruction, and a MapLibre worker thread
+ * otherwise. The callback must be thread-safe, return quickly, and must not
+ * call map or runtime C API functions. It may call resource request handle
+ * functions for the cancelled handle, including mln_resource_request_release().
  */
 typedef void (*mln_resource_request_cancel_callback)(void* user_data);
 
@@ -965,25 +964,30 @@ MLN_API mln_status mln_resource_request_cancelled(
  * provider request.
  *
  * This function may be called from any thread while the provider still owns the
- * handle. Each call replaces the previous callback and user_data. Passing a
- * null callback clears the registration. A request that is already cancelled
- * and not completed invokes the callback synchronously before this function
- * returns.
+ * handle. A request accepts one registration: a later call fails and leaves the
+ * first registration in place. The registration stays in place until the
+ * request is released, and the callback and user_data must stay valid until
+ * mln_resource_request_release() returns.
  *
- * The callback and user_data are stored by reference and stay reachable until
- * the request is released, replaced by another registration, or invoked. This
- * function and mln_resource_request_release() wait for a cancel callback
- * running on another thread to return, so the previous user_data may be freed
- * once either call returns. Called from inside the callback, both return
- * without waiting.
+ * A request that is already cancelled and not completed stores nothing and
+ * reports true through out_cancelled, so the caller handles the cancellation
+ * itself and the callback never runs. Any other request reports false. This
+ * function never invokes the callback.
+ *
+ * mln_resource_request_release() waits for a cancel callback running on another
+ * thread to return, so the callback and user_data are unused once release
+ * returns. Called from inside the callback, release returns without waiting.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when handle is stale or released.
+ * - MLN_STATUS_INVALID_ARGUMENT when handle is stale or released, or when
+ *   callback or out_cancelled is null.
+ * - MLN_STATUS_INVALID_STATE when the request already has a cancel callback.
  */
 MLN_API mln_status mln_resource_request_set_cancel_callback(
   mln_resource_request_handle handle,
-  mln_resource_request_cancel_callback callback, void* user_data
+  mln_resource_request_cancel_callback callback, void* user_data,
+  bool* out_cancelled
 ) MLN_NOEXCEPT;
 
 /**

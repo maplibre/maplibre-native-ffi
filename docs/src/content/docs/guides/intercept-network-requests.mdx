@@ -106,11 +106,13 @@ exactly once, after completion or cancellation.
 
 MapLibre cancels a request when the map stops wanting the resource, for example
 after a style change or map teardown. Check for cancellation before expensive
-work, or register a cancel callback to abort an in-flight fetch. The callback
-runs once, for a request the provider has not completed, on the thread that
-discards the request. That is the owner thread inside a map call such as a
-style change or map destruction, and a MapLibre thread otherwise. The callback
-may complete or release the same handle.
+work, or register a cancel callback to abort an in-flight fetch. A request takes
+one callback. It runs once, for a request the provider has not completed, on the
+thread that discards the request. That is the owner thread inside a map call
+such as a style change or map destruction, and a MapLibre thread otherwise. The
+callback may complete or release the same handle. A request that was cancelled
+before the registration reports that through the out-parameter instead, and the
+callback never runs.
 
 <Code code={region(providerSnippet, "cancel")} lang="c" title="resource-provider.c" />
 

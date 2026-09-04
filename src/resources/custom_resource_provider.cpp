@@ -38,8 +38,8 @@ struct ResourceRequestObject {
   bool retired = false;
   mln_resource_request_cancel_callback cancel_callback = nullptr;
   void* cancel_user_data = nullptr;
-  // Depth rather than a flag: a callback may register another callback.
-  int cancel_callbacks_running = 0;
+  bool cancel_callback_registered = false;
+  bool cancel_callback_running = false;
   std::thread::id cancel_callback_thread;
   mln::ActorRef<mln::FileSourceRequest> actor;
 };
@@ -207,39 +207,36 @@ auto response_from_abi(const mln_resource_response& provider_response)
   return response;
 }
 
-struct TakenCancelCallback {
+// Runs the registered cancel callback, if any, for a request that has not been
+// completed. Callers hold no lock; the callback may call back into this handle.
+void run_cancel_callback(ResourceRequestObject& object) noexcept {
   mln_resource_request_cancel_callback callback = nullptr;
   void* user_data = nullptr;
-};
-
-auto take_cancel_callback_locked(ResourceRequestObject& object)
-  -> TakenCancelCallback {
-  auto taken = TakenCancelCallback{
-    .callback = std::exchange(object.cancel_callback, nullptr),
-    .user_data = std::exchange(object.cancel_user_data, nullptr),
-  };
-  if (taken.callback != nullptr) {
-    object.cancel_callbacks_running += 1;
+  {
+    const std::scoped_lock lock(object.mutex);
+    if (object.completed || object.cancel_callback == nullptr) {
+      return;
+    }
+    callback = std::exchange(object.cancel_callback, nullptr);
+    user_data = std::exchange(object.cancel_user_data, nullptr);
+    object.cancel_callback_running = true;
     object.cancel_callback_thread = std::this_thread::get_id();
   }
-  return taken;
-}
-
-void run_cancel_callback(
-  ResourceRequestObject& object, const TakenCancelCallback& taken
-) noexcept {
   try {
-    taken.callback(taken.user_data);
+    callback(user_data);
   } catch (...) {
     // Host callbacks must not unwind through MapLibre's cancel path.
   }
   {
     const std::scoped_lock lock(object.mutex);
-    object.cancel_callbacks_running -= 1;
+    object.cancel_callback_running = false;
   }
   object.state_changed.notify_all();
 }
 
+// Release from inside the callback returns without waiting; release from any
+// other thread returns only after the callback does, so its user_data is
+// unused afterwards.
 void wait_for_foreign_cancel_callback_locked(
   ResourceRequestObject& object, std::unique_lock<std::mutex>& lock
 ) {
@@ -247,7 +244,7 @@ void wait_for_foreign_cancel_callback_locked(
     return;
   }
   object.state_changed.wait(lock, [&object] {
-    return object.cancel_callbacks_running == 0;
+    return !object.cancel_callback_running;
   });
 }
 
@@ -416,17 +413,11 @@ auto request_custom_resource(
   // mbgl runs this on every request destruction, including after a response
   // was delivered, so a completed request does not report cancellation.
   request->onCancel([object]() noexcept -> void {
-    auto taken = TakenCancelCallback{};
     {
       const std::scoped_lock lock(object->mutex);
       object->cancelled = true;
-      if (!object->completed) {
-        taken = take_cancel_callback_locked(*object);
-      }
     }
-    if (taken.callback != nullptr) {
-      run_cancel_callback(*object, taken);
-    }
+    run_cancel_callback(*object);
   });
   try {
     const auto handled = invoke_custom_provider(
@@ -516,24 +507,34 @@ auto resource_request_cancelled(
 
 auto set_resource_request_cancel_callback(
   mln_resource_request_handle handle,
-  mln_resource_request_cancel_callback callback, void* user_data
+  mln_resource_request_cancel_callback callback, void* user_data,
+  bool* out_cancelled
 ) -> mln_status {
+  if (callback == nullptr) {
+    set_thread_error("callback must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (out_cancelled == nullptr) {
+    set_thread_error("out_cancelled must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   const auto live = handle_table<ResourceRequestObject>().lease(handle);
   if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto taken = TakenCancelCallback{};
-  {
-    auto lock = std::unique_lock{live->mutex};
-    wait_for_foreign_cancel_callback_locked(*live, lock);
+  const std::scoped_lock lock(live->mutex);
+  if (live->retired) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (live->cancel_callback_registered) {
+    set_thread_error("resource request already has a cancel callback");
+    return MLN_STATUS_INVALID_STATE;
+  }
+  live->cancel_callback_registered = true;
+  *out_cancelled = live->cancelled && !live->completed;
+  if (!*out_cancelled) {
     live->cancel_callback = callback;
     live->cancel_user_data = user_data;
-    if (live->cancelled && !live->completed) {
-      taken = take_cancel_callback_locked(*live);
-    }
-  }
-  if (taken.callback != nullptr) {
-    run_cancel_callback(*live, taken);
   }
   return MLN_STATUS_OK;
 }

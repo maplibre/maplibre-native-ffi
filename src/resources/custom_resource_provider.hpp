@@ -28,7 +28,8 @@ auto resource_request_cancelled(
 ) -> mln_status;
 auto set_resource_request_cancel_callback(
   mln_resource_request_handle handle,
-  mln_resource_request_cancel_callback callback, void* user_data
+  mln_resource_request_cancel_callback callback, void* user_data,
+  bool* out_cancelled
 ) -> mln_status;
 void release_resource_request(mln_resource_request_handle handle) noexcept;
 auto wait_for_resource_request_retired(mln_resource_request_handle handle)

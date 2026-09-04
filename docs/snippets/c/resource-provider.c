@@ -55,11 +55,20 @@ static void abort_pending_fetch(void* user_data) {
 }
 
 // Registers the abort hook for a request the provider retained. MapLibre runs
-// the hook on one of its threads when the map stops wanting the resource.
+// the hook on one of its threads when the map stops wanting the resource. A
+// request that was cancelled before the registration reports that instead.
 void watch_for_cancellation(
   mln_resource_request_handle handle, pending_fetch* fetch
 ) {
-  mln_resource_request_set_cancel_callback(handle, abort_pending_fetch, fetch);
+  bool already_cancelled = false;
+  if (
+    mln_resource_request_set_cancel_callback(
+      handle, abort_pending_fetch, fetch, &already_cancelled
+    ) == MLN_STATUS_OK &&
+    already_cancelled
+  ) {
+    pending_fetch_abort(fetch);
+  }
 }
 // #endregion cancel
 
