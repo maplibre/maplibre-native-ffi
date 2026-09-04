@@ -4,13 +4,15 @@ import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CValue
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
+import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.cValue
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.toCValues
+import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_BUFFER
@@ -108,18 +110,22 @@ internal object StyleStructs {
   fun canonicalTileId(value: mln_canonical_tile_id): CanonicalTileId =
     CanonicalTileId(checkedInt(value.z, "canonical tile z"), value.x.toLong(), value.y.toLong())
 
-  fun premultipliedRgba8Image(
+  fun withPremultipliedRgba8Image(
     value: PremultipliedRgba8Image,
     scope: MemScope,
-  ): CPointer<mln_premultiplied_rgba8_image> {
-    val native = scope.alloc<mln_premultiplied_rgba8_image>()
-    mln_premultiplied_rgba8_image_default().place(native.ptr)
-    native.width = value.width.toUInt()
-    native.height = value.height.toUInt()
-    native.stride = value.stride.toUInt()
-    native.pixels = value.pixels.toUByteArray().toCValues().getPointer(scope)
-    native.byte_length = value.pixels.size.toCSize()
-    return native.ptr
+    block: (CPointer<mln_premultiplied_rgba8_image>) -> Unit,
+  ) {
+    val pixels = value.pixelsTransit
+    pixels.usePinned { pinnedPixels ->
+      val native = scope.alloc<mln_premultiplied_rgba8_image>()
+      mln_premultiplied_rgba8_image_default().place(native.ptr)
+      native.width = value.width.toUInt()
+      native.height = value.height.toUInt()
+      native.stride = value.stride.toUInt()
+      native.pixels = pinnedPixels.addressOf(0).reinterpret()
+      native.byte_length = pixels.size.toCSize()
+      block(native.ptr)
+    }
   }
 
   fun styleImageOptions(

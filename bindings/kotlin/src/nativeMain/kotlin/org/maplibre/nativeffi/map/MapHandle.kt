@@ -702,14 +702,16 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     options: StyleImageOptions,
   ) {
     memScoped {
-      Status.check(
-        mln_map_set_style_image(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(imageId, this),
-          StyleStructs.premultipliedRgba8Image(image, this),
-          StyleStructs.styleImageOptions(options, this),
+      StyleStructs.withPremultipliedRgba8Image(image, this) { nativeImage ->
+        Status.check(
+          mln_map_set_style_image(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(imageId, this),
+            nativeImage,
+            StyleStructs.styleImageOptions(options, this),
+          )
         )
-      )
+      }
     }
   }
 
@@ -849,15 +851,17 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
   ) {
     val coordinateSnapshot = coordinates.toList()
     memScoped {
-      Status.check(
-        mln_map_add_image_source_image(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          CoreStructs.latLngArray(coordinateSnapshot, this),
-          coordinateSnapshot.size.toCSize(),
-          StyleStructs.premultipliedRgba8Image(image, this),
+      StyleStructs.withPremultipliedRgba8Image(image, this) { nativeImage ->
+        Status.check(
+          mln_map_add_image_source_image(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            CoreStructs.latLngArray(coordinateSnapshot, this),
+            coordinateSnapshot.size.toCSize(),
+            nativeImage,
+          )
         )
-      )
+      }
     }
   }
 
@@ -875,13 +879,15 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
 
   public actual fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image) {
     memScoped {
-      Status.check(
-        mln_map_set_image_source_image(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          StyleStructs.premultipliedRgba8Image(image, this),
+      StyleStructs.withPremultipliedRgba8Image(image, this) { nativeImage ->
+        Status.check(
+          mln_map_set_image_source_image(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            nativeImage,
+          )
         )
-      )
+      }
     }
   }
 

@@ -6,12 +6,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.rawValue
 import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
+import kotlinx.cinterop.usePinned
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
@@ -34,6 +37,7 @@ import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.memory.CSizeVar
 import org.maplibre.nativeffi.internal.memory.toCSize
+import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
@@ -42,6 +46,20 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 @OptIn(ExperimentalForeignApi::class)
 class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-060, BND-061, BND-062, BND-066.
+
+  @Test
+  fun premultipliedImageBorrowsBackingPixelsForBlock() {
+    val image = PremultipliedRgba8Image(1, 1, 4, byteArrayOf(1, 2, 3, 4))
+
+    image.pixelsTransit.usePinned { expectedPixels ->
+      memScoped {
+        StyleStructs.withPremultipliedRgba8Image(image, this) { nativeImage ->
+          assertEquals(expectedPixels.addressOf(0).rawValue, nativeImage.pointed.pixels?.rawValue)
+          assertEquals(4.toCSize(), nativeImage.pointed.byte_length)
+        }
+      }
+    }
+  }
 
   @Test
   fun styleOptionsInitializeDefaultsAndPresentZeroMasks() {
