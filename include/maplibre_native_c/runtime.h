@@ -949,7 +949,8 @@ MLN_API mln_status mln_resource_request_complete(
  *
  * This function may be called from any thread while the provider still owns the
  * handle. A cancelled request no longer wants a response; later completion is
- * ignored with MLN_STATUS_INVALID_STATE.
+ * ignored with MLN_STATUS_INVALID_STATE. A request the provider already
+ * completed is never reported as cancelled, even after MapLibre discards it.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

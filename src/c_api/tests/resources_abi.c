@@ -1412,6 +1412,11 @@ static void cancel_callback_skips_a_completed_request(void) {
   }
   mln_test_destroy_map(map);
   TEST_ASSERT_FALSE(wait_for_cancel_count(runtime, &probe, 1, 200));
+  bool cancelled = true;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_resource_request_cancelled(handle, &cancelled)
+  );
+  TEST_ASSERT_FALSE(cancelled);
 
   mln_resource_request_release(handle);
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.cancel_count));

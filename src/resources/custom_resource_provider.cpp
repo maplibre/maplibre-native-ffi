@@ -468,12 +468,12 @@ auto complete_resource_request(
   auto native_response = response_from_abi(*response);
   {
     const std::scoped_lock lock(live->mutex);
-    if (live->cancelled) {
-      set_thread_error("resource request is cancelled");
-      return MLN_STATUS_INVALID_STATE;
-    }
     if (live->completed) {
       set_thread_error("resource request is already completed");
+      return MLN_STATUS_INVALID_STATE;
+    }
+    if (live->cancelled) {
+      set_thread_error("resource request is cancelled");
       return MLN_STATUS_INVALID_STATE;
     }
     live->completed = true;
@@ -501,7 +501,7 @@ auto resource_request_cancelled(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const std::scoped_lock lock(live->mutex);
-  *out_cancelled = live->cancelled;
+  *out_cancelled = live->cancelled && !live->completed;
   return MLN_STATUS_OK;
 }
 
