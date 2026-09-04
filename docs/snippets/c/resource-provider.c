@@ -43,6 +43,35 @@ static uint32_t serve_bundled_asset(
   // #endregion complete
 }
 
+// #region cancel
+typedef struct pending_fetch pending_fetch;
+
+// The host's I/O pool aborts the fetch. Its completion path then releases the
+// handle exactly once, whether the fetch finished or was aborted.
+void pending_fetch_abort(pending_fetch* fetch);
+
+static void abort_pending_fetch(void* user_data) {
+  pending_fetch_abort(user_data);
+}
+
+// Registers the abort hook for a request the provider retained. MapLibre runs
+// the hook on one of its threads when the map stops wanting the resource. A
+// request that was cancelled before the registration reports that instead.
+void watch_for_cancellation(
+  mln_resource_request_handle handle, pending_fetch* fetch
+) {
+  bool already_cancelled = false;
+  if (
+    mln_resource_request_set_cancel_callback(
+      handle, abort_pending_fetch, fetch, &already_cancelled
+    ) == MLN_STATUS_OK &&
+    already_cancelled
+  ) {
+    pending_fetch_abort(fetch);
+  }
+}
+// #endregion cancel
+
 // #region install
 void install_provider(mln_runtime runtime, asset_store* store) {
   const mln_resource_provider provider = {

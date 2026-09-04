@@ -480,6 +480,7 @@
 --include-function mln_resource_request_cancelled
 --include-function mln_resource_request_complete
 --include-function mln_resource_request_release
+--include-function mln_resource_request_set_cancel_callback
 --include-function mln_resource_transform_response_set_url
 --include-function mln_http_header_transform_response_set
 --include-function mln_runtime_clear_http_header_transform
@@ -527,6 +528,7 @@
 --include-typedef mln_offline_operation_id
 --include-typedef mln_offline_region_id
 --include-typedef mln_resource_provider_callback
+--include-typedef mln_resource_request_cancel_callback
 --include-typedef mln_resource_transform_callback
 --include-typedef mln_http_header_transform_callback
 

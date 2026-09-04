@@ -201,10 +201,12 @@ static mln_status http_header_transform_stub(
   return out_response == NULL ? MLN_STATUS_INVALID_ARGUMENT : MLN_STATUS_OK;
 }
 
+static void ignore_cancel(void* user_data) { (void)user_data; }
+
 static void custom_provider_request_handles_reject_raw_null_handles(void) {
   mln_resource_request_release(MLN_HANDLE_NULL);
-  bool cancelled = true;
   const mln_resource_response response = style_response();
+  bool cancelled = false;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_resource_request_cancelled(MLN_HANDLE_NULL, &cancelled)
@@ -212,6 +214,12 @@ static void custom_provider_request_handles_reject_raw_null_handles(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_resource_request_complete(MLN_HANDLE_NULL, &response)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_resource_request_set_cancel_callback(
+      MLN_HANDLE_NULL, ignore_cancel, NULL, &cancelled
+    )
   );
 }
 
@@ -1192,6 +1200,391 @@ static void runtime_teardown_waits_for_in_flight_provider_callback(void) {
   );
 }
 
+typedef struct cancel_probe {
+  atomic_bool provider_entered;
+  atomic_int cancel_count;
+  atomic_bool release_inside_callback;
+  atomic_bool complete_inline;
+  atomic_bool skip_register;
+  atomic_int register_status;
+  atomic_bool register_reported_cancelled;
+  _Atomic mln_resource_request_handle handle;
+} cancel_probe;
+
+static void count_cancel(void* user_data) {
+  cancel_probe* probe = user_data;
+  atomic_fetch_add(&probe->cancel_count, 1);
+  if (atomic_load(&probe->release_inside_callback)) {
+    mln_resource_request_release(atomic_load(&probe->handle));
+  }
+}
+
+static uint32_t cancel_probe_resource_provider(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle handle
+) {
+  (void)request;
+  cancel_probe* probe = user_data;
+  atomic_store(&probe->handle, handle);
+  if (!atomic_load(&probe->skip_register)) {
+    bool cancelled = true;
+    atomic_store(
+      &probe->register_status, mln_resource_request_set_cancel_callback(
+                                 handle, count_cancel, probe, &cancelled
+                               )
+    );
+    atomic_store(&probe->register_reported_cancelled, cancelled);
+  }
+  if (atomic_load(&probe->complete_inline)) {
+    const mln_resource_response response = {
+      .size = sizeof(mln_resource_response),
+      .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+      .error_reason = MLN_RESOURCE_ERROR_REASON_NONE,
+      .bytes = inline_style_json,
+      .byte_count = sizeof(inline_style_json) - 1,
+    };
+    (void)mln_resource_request_complete(handle, &response);
+  }
+  atomic_store(&probe->provider_entered, true);
+  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+}
+
+static mln_map start_cancel_probe_request(
+  mln_runtime runtime, cancel_probe* probe
+) {
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = cancel_probe_resource_provider,
+    .user_data = probe,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
+  );
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_url(map, "custom://cancel-style.json")
+  );
+  TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe->provider_entered));
+  if (!atomic_load(&probe->skip_register)) {
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&probe->register_status));
+    TEST_ASSERT_FALSE(atomic_load(&probe->register_reported_cancelled));
+  }
+  return map;
+}
+
+static bool wait_for_cancel_count(
+  mln_runtime runtime, cancel_probe* probe, int expected, size_t attempts
+) {
+  for (size_t attempt = 0; attempt < attempts; attempt += 1) {
+    if (atomic_load(&probe->cancel_count) >= expected) {
+      return true;
+    }
+    if (mln_runtime_pump(runtime, 0, -1) != MLN_STATUS_OK) {
+      return false;
+    }
+    mln_test_sleep_millisecond();
+  }
+  return false;
+}
+
+// Destroying the map discards its pending style request. MapLibre then cancels
+// the handled request, which runs the registered callback once. The request
+// keeps that single registration, and rejects a late completion.
+static void cancel_callback_runs_when_map_discards_request(void) {
+  cancel_probe probe = {0};
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = start_cancel_probe_request(runtime, &probe);
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.cancel_count));
+
+  mln_test_destroy_map(map);
+  TEST_ASSERT_TRUE(
+    wait_for_cancel_count(runtime, &probe, 1, teardown_probe_wait_attempts)
+  );
+  const mln_resource_request_handle handle = atomic_load(&probe.handle);
+
+  bool cancelled = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_resource_request_cancelled(handle, &cancelled)
+  );
+  TEST_ASSERT_TRUE(cancelled);
+  const mln_resource_response response = style_response();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_STATE, mln_resource_request_complete(handle, &response)
+  );
+
+  cancelled = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_STATE, mln_resource_request_set_cancel_callback(
+                                handle, count_cancel, &probe, &cancelled
+                              )
+  );
+  TEST_ASSERT_FALSE(cancelled);
+  TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
+
+  mln_resource_request_release(handle);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_resource_request_set_cancel_callback(
+                                   handle, count_cancel, &probe, &cancelled
+                                 )
+  );
+  TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
+  mln_test_destroy_runtime(runtime);
+}
+
+// A registration that arrives after cancellation stores nothing and reports
+// the cancellation through out_cancelled instead of invoking the callback.
+static void late_cancel_callback_registration_reports_cancelled(void) {
+  cancel_probe probe = {0};
+  atomic_store(&probe.skip_register, true);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = start_cancel_probe_request(runtime, &probe);
+  mln_test_destroy_map(map);
+  const mln_resource_request_handle handle = atomic_load(&probe.handle);
+
+  bool cancelled = false;
+  for (size_t attempt = 0; attempt < teardown_probe_wait_attempts;
+       attempt += 1) {
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_resource_request_cancelled(handle, &cancelled)
+    );
+    if (cancelled) {
+      break;
+    }
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
+    mln_test_sleep_millisecond();
+  }
+  TEST_ASSERT_TRUE(cancelled);
+
+  cancelled = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_resource_request_set_cancel_callback(
+                     handle, count_cancel, &probe, &cancelled
+                   )
+  );
+  TEST_ASSERT_TRUE(cancelled);
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.cancel_count));
+
+  mln_resource_request_release(handle);
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.cancel_count));
+  mln_test_destroy_runtime(runtime);
+}
+
+// The callback runs unlocked, so releasing the cancelled handle from inside it
+// retires the request without deadlocking.
+static void cancel_callback_may_release_the_request(void) {
+  cancel_probe probe = {0};
+  atomic_store(&probe.release_inside_callback, true);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = start_cancel_probe_request(runtime, &probe);
+
+  mln_test_destroy_map(map);
+  TEST_ASSERT_TRUE(
+    wait_for_cancel_count(runtime, &probe, 1, teardown_probe_wait_attempts)
+  );
+  const mln_resource_request_handle handle = atomic_load(&probe.handle);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_resource_request_wait_until_retired(handle)
+  );
+  bool cancelled = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_resource_request_set_cancel_callback(
+                                   handle, count_cancel, &probe, &cancelled
+                                 )
+  );
+  TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
+  mln_test_destroy_runtime(runtime);
+}
+
+// MapLibre runs its cancel hook on every request teardown, including after the
+// response was delivered. The C API reports cancellation only for a request the
+// provider has not completed.
+static void cancel_callback_skips_a_completed_request(void) {
+  cancel_probe probe = {0};
+  atomic_store(&probe.complete_inline, true);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = start_cancel_probe_request(runtime, &probe);
+  const mln_resource_request_handle handle = atomic_load(&probe.handle);
+
+  // Let the response reach the style before the map goes away.
+  for (size_t attempt = 0; attempt < 50; attempt += 1) {
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
+    mln_test_sleep_millisecond();
+  }
+  mln_test_destroy_map(map);
+  TEST_ASSERT_FALSE(wait_for_cancel_count(runtime, &probe, 1, 200));
+  bool cancelled = true;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_resource_request_cancelled(handle, &cancelled)
+  );
+  TEST_ASSERT_FALSE(cancelled);
+
+  mln_resource_request_release(handle);
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.cancel_count));
+  mln_test_destroy_runtime(runtime);
+}
+
+typedef struct blocking_cancel_probe {
+  cancel_probe base;
+  atomic_bool self_release;
+  atomic_bool waiter_drains_instead_of_releasing;
+  atomic_int status_after_self_release;
+  atomic_int complete_status_after_self_release;
+  atomic_bool callback_entered;
+  atomic_bool release_started;
+  atomic_bool release_returned;
+  atomic_bool release_returned_during_callback;
+  atomic_bool callback_returned;
+  atomic_bool callback_returned_before_release;
+} blocking_cancel_probe;
+
+// Runs on the map owner thread inside map destruction. Waits for the releasing
+// thread to enter its release call, gives it time to return, and records
+// whether it did.
+static void block_in_cancel(void* user_data) {
+  blocking_cancel_probe* probe = user_data;
+  if (atomic_load(&probe->self_release)) {
+    const mln_resource_request_handle handle = atomic_load(&probe->base.handle);
+    mln_resource_request_release(handle);
+    // The entry outlives this callback, but the handle is released: every
+    // other entry point reports it as such.
+    bool cancelled = false;
+    atomic_store(
+      &probe->status_after_self_release,
+      mln_resource_request_cancelled(handle, &cancelled)
+    );
+    const mln_resource_response response = style_response();
+    atomic_store(
+      &probe->complete_status_after_self_release,
+      mln_resource_request_complete(handle, &response)
+    );
+  }
+  atomic_store(&probe->callback_entered, true);
+  wait_for_flag(&probe->release_started);
+  mln_test_sleep_milliseconds(provider_teardown_block_milliseconds);
+  atomic_store(
+    &probe->release_returned_during_callback,
+    atomic_load(&probe->release_returned)
+  );
+  atomic_store(&probe->callback_returned, true);
+}
+
+static uint32_t blocking_cancel_resource_provider(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle handle
+) {
+  (void)request;
+  blocking_cancel_probe* probe = user_data;
+  atomic_store(&probe->base.handle, handle);
+  bool cancelled = true;
+  atomic_store(
+    &probe->base.register_status, mln_resource_request_set_cancel_callback(
+                                    handle, block_in_cancel, probe, &cancelled
+                                  )
+  );
+  atomic_store(&probe->base.register_reported_cancelled, cancelled);
+  atomic_store(&probe->base.provider_entered, true);
+  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+}
+
+static void release_during_cancel_callback_entry(void* argument) {
+  blocking_cancel_probe* probe = argument;
+  wait_for_flag(&probe->callback_entered);
+  atomic_store(&probe->release_started, true);
+  if (atomic_load(&probe->waiter_drains_instead_of_releasing)) {
+    (void)mln_resource_request_wait_until_retired(
+      atomic_load(&probe->base.handle)
+    );
+  } else {
+    mln_resource_request_release(atomic_load(&probe->base.handle));
+  }
+  atomic_store(
+    &probe->callback_returned_before_release,
+    atomic_load(&probe->callback_returned)
+  );
+  atomic_store(&probe->release_returned, true);
+}
+
+static void run_release_waits_for_in_flight_cancel_callback(
+  blocking_cancel_probe* probe
+) {
+  mln_runtime runtime = mln_test_create_runtime();
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = blocking_cancel_resource_provider,
+    .user_data = probe,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
+  );
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_url(map, "custom://blocking-cancel.json")
+  );
+  TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe->base.provider_entered));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, atomic_load(&probe->base.register_status)
+  );
+  TEST_ASSERT_FALSE(atomic_load(&probe->base.register_reported_cancelled));
+
+  mln_test_thread* releaser =
+    mln_test_thread_start(release_during_cancel_callback_entry, probe);
+  mln_test_destroy_map(map);
+  TEST_ASSERT_TRUE(atomic_load(&probe->callback_entered));
+  mln_test_thread_join(releaser);
+  TEST_ASSERT_FALSE_MESSAGE(
+    atomic_load(&probe->release_returned_during_callback),
+    "releasing the request returned while the cancel callback was running"
+  );
+  TEST_ASSERT_TRUE(atomic_load(&probe->callback_returned_before_release));
+  if (atomic_load(&probe->self_release)) {
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_INVALID_ARGUMENT,
+      atomic_load(&probe->status_after_self_release)
+    );
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_INVALID_ARGUMENT,
+      atomic_load(&probe->complete_status_after_self_release)
+    );
+  } else {
+    mln_resource_request_release(atomic_load(&probe->base.handle));
+  }
+  bool cancelled = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_resource_request_cancelled(atomic_load(&probe->base.handle), &cancelled)
+  );
+  mln_test_destroy_runtime(runtime);
+}
+
+// user_data may be freed once release returns, so release waits for a callback
+// still running on another thread. Destroying the map cancels its style request
+// on the owner thread, so the release runs on a helper thread.
+static void release_waits_for_in_flight_cancel_callback(void) {
+  blocking_cancel_probe probe = {0};
+  run_release_waits_for_in_flight_cancel_callback(&probe);
+}
+
+// Release is idempotent, so a release on another thread must still find the
+// request and wait after the callback released it from inside. Inside that
+// window the released handle already rejects every other entry point.
+static void release_waits_for_a_cancel_callback_that_released_itself(void) {
+  blocking_cancel_probe probe = {0};
+  atomic_store(&probe.self_release, true);
+  run_release_waits_for_in_flight_cancel_callback(&probe);
+}
+
+// Teardown drains requests through the wait-until-retired call, so a request
+// whose callback released it from inside is drained only once the callback
+// returns.
+static void wait_until_retired_waits_for_a_self_releasing_cancel_callback(
+  void
+) {
+  blocking_cancel_probe probe = {0};
+  atomic_store(&probe.self_release, true);
+  atomic_store(&probe.waiter_drains_instead_of_releasing, true);
+  run_release_waits_for_in_flight_cancel_callback(&probe);
+}
+
 void run_resources_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(custom_provider_request_handles_reject_raw_null_handles);
@@ -1215,4 +1608,11 @@ void run_resources_abi_tests(void) {
   RUN_TEST(unsupported_style_url_names_declining_provider);
   RUN_TEST(resource_provider_defers_inline_release_until_callback_returns);
   RUN_TEST(runtime_teardown_waits_for_in_flight_provider_callback);
+  RUN_TEST(cancel_callback_runs_when_map_discards_request);
+  RUN_TEST(late_cancel_callback_registration_reports_cancelled);
+  RUN_TEST(cancel_callback_may_release_the_request);
+  RUN_TEST(cancel_callback_skips_a_completed_request);
+  RUN_TEST(release_waits_for_in_flight_cancel_callback);
+  RUN_TEST(release_waits_for_a_cancel_callback_that_released_itself);
+  RUN_TEST(wait_until_retired_waits_for_a_self_releasing_cancel_callback);
 }

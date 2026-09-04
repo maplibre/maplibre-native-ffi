@@ -810,6 +810,137 @@ void main() {
     runtime.close();
   });
 
+  // BND-198: a cancel callback registered on a handled request runs once when
+  // MapLibre discards the request, may release the request from inside, and
+  // keeps an exception it throws inside the binding.
+  test(
+    'resource request cancel callbacks report a discarded request',
+    () async {
+      const styleUrl = 'custom://dart-provider-cancel-reported.json';
+      final runtime = RuntimeHandle.create();
+      ResourceRequestHandle? token;
+      var cancels = 0;
+      var cancelledInsideCallback = false;
+      Object? insideError;
+
+      runtime.setResourceProvider(
+        ResourceProvider(
+          routes: const [
+            ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+          ],
+          callback: (_, handle) {
+            token = handle;
+            handle.setCancelCallback(() {
+              cancels += 1;
+              try {
+                cancelledInsideCallback = handle.cancelled();
+              } catch (error) {
+                insideError = error;
+              }
+              handle.close();
+              throw StateError('cancel callback failed');
+            });
+          },
+        ),
+      );
+
+      final map = runtime.createMap();
+      map.setStyleUrl(styleUrl);
+      await _pumpUntil(runtime, () => token != null);
+      final liveToken = token!;
+      expect(
+        () => liveToken.setCancelCallback(() {}),
+        throwsA(isA<InvalidStateException>()),
+      );
+
+      map.close();
+      runtime.close();
+      await _waitUntil(() => cancels > 0);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(insideError, isNull);
+      expect(cancelledInsideCallback, isTrue);
+      expect(cancels, 1);
+      expect(
+        () => liveToken.setCancelCallback(() {}),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+    },
+  );
+
+  // BND-198: a request the provider completed is never reported as cancelled.
+  test('resource request cancel callbacks end at completion', () async {
+    const styleUrl = 'custom://dart-provider-cancel-completed.json';
+    final runtime = RuntimeHandle.create();
+    var cancels = 0;
+
+    runtime.setResourceProvider(
+      ResourceProvider(
+        routes: const [
+          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+        ],
+        callback: (_, handle) {
+          handle.setCancelCallback(() => cancels += 1);
+          handle.complete(
+            ResourceResponse(
+              status: ResourceResponseStatus.ok,
+              bytes: Uint8List.fromList(_emptyStyleJson.codeUnits),
+            ),
+          );
+        },
+      ),
+    );
+
+    final map = runtime.createMap();
+    map.setStyleUrl(styleUrl);
+    await _pumpUntilEvent(
+      runtime,
+      (candidate) => candidate.eventType == RuntimeEventType.mapStyleLoaded,
+    );
+
+    map.close();
+    runtime.close();
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+
+    expect(cancels, 0);
+  });
+
+  // BND-198: a registration on a request MapLibre already cancelled runs the
+  // callback before registration returns.
+  test('cancel callbacks registered after cancellation run inline', () async {
+    const styleUrl = 'custom://dart-provider-cancel-late.json';
+    final runtime = RuntimeHandle.create();
+    ResourceRequestHandle? token;
+    var cancels = 0;
+
+    runtime.setResourceProvider(
+      ResourceProvider(
+        routes: const [
+          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+        ],
+        callback: (_, handle) {
+          token = handle;
+        },
+      ),
+    );
+
+    final map = runtime.createMap();
+    map.setStyleUrl(styleUrl);
+    await _pumpUntil(runtime, () => token != null);
+    final liveToken = token!;
+
+    map.close();
+    runtime.close();
+    await _waitUntil(liveToken.cancelled);
+
+    liveToken.setCancelCallback(() => cancels += 1);
+    expect(cancels, 1);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(cancels, 1);
+
+    liveToken.close();
+  });
+
   test('projection remains usable after its source map closes', () async {
     final runtime = RuntimeHandle.create();
     final map = runtime.createMap();

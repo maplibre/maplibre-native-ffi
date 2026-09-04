@@ -336,6 +336,125 @@ class RuntimeHandleTest {
     }
   }
 
+  // BND-198.
+  @Test
+  fun cancelCallbackRunsOnceWhenTheMapDiscardsItsRequest() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      val handledRequest = captureHandledRequest(runtime, "custom://cancel-callback-style.json")
+      val map = createSmallMap(runtime)
+      map.setStyleUrl("custom://cancel-callback-style.json")
+      val handle = waitForHandledRequest(runtime, handledRequest)
+      val cancels = AtomicInt(0)
+      val rejectedCancels = AtomicInt(0)
+      handle.setCancelCallback { cancels.addAndFetch(1) }
+      // The request keeps its first callback.
+      assertFailsWith<InvalidStateException> {
+        handle.setCancelCallback { rejectedCancels.addAndFetch(1) }
+      }
+
+      map.close()
+
+      assertTrue(
+        waitForCondition {
+          runtime.pump(1)
+          cancels.load() == 1
+        }
+      )
+      assertTrue(handle.isCancelled())
+      repeat(CANCEL_SETTLE_PUMPS) {
+        runtime.pump(1)
+        waitForAsyncTestWork()
+      }
+      assertEquals(1, cancels.load())
+      assertEquals(0, rejectedCancels.load())
+
+      handle.close()
+
+      assertFailsWith<InvalidStateException> { handle.setCancelCallback {} }
+    }
+  }
+
+  // BND-198.
+  @Test
+  fun cancelCallbackMayCloseItsOwnRequest() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      val handledRequest = captureHandledRequest(runtime, "custom://self-closing-style.json")
+      val map = createSmallMap(runtime)
+      map.setStyleUrl("custom://self-closing-style.json")
+      val handle = waitForHandledRequest(runtime, handledRequest)
+      val closes = AtomicInt(0)
+      handle.setCancelCallback {
+        handle.close()
+        closes.addAndFetch(1)
+      }
+
+      map.close()
+
+      assertTrue(
+        waitForCondition {
+          runtime.pump(1)
+          closes.load() == 1
+        }
+      )
+      assertFailsWith<InvalidStateException> { handle.isCancelled() }
+      handle.close()
+    }
+  }
+
+  // BND-198.
+  @Test
+  fun cancelCallbackRegisteredAfterCancellationRunsBeforeRegistrationReturns() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      val handledRequest =
+        captureHandledRequest(runtime, "custom://late-cancel-callback-style.json")
+      val map = createSmallMap(runtime)
+      map.setStyleUrl("custom://late-cancel-callback-style.json")
+      val handle = waitForHandledRequest(runtime, handledRequest)
+      map.close()
+      assertTrue(waitForRequestCancellation(runtime, handle))
+
+      val cancels = AtomicInt(0)
+      val completionFailure = AtomicReference<Throwable?>(null)
+      handle.setCancelCallback {
+        cancels.addAndFetch(1)
+        completionFailure.store(
+          runCatching { handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT)) }
+            .exceptionOrNull()
+        )
+      }
+
+      assertEquals(1, cancels.load())
+      assertTrue(completionFailure.load() is InvalidStateException)
+      handle.close()
+    }
+  }
+
+  // BND-198.
+  @Test
+  fun cancelCallbackStaysUninvokedForACompletedRequest() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      val handledRequest = captureHandledRequest(runtime, "custom://completed-cancel-style.json")
+      val map = createSmallMap(runtime)
+      map.setStyleUrl("custom://completed-cancel-style.json")
+      val handle = waitForHandledRequest(runtime, handledRequest)
+      val cancels = AtomicInt(0)
+      handle.setCancelCallback { cancels.addAndFetch(1) }
+      handle.complete(
+        ResourceResponse(ResourceResponseStatus.OK).apply { bytes = STYLE_JSON.encodeToByteArray() }
+      )
+      assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED))
+
+      // MapLibre runs its cancel hook on every request teardown, including a completed one.
+      map.close()
+
+      repeat(CANCEL_SETTLE_PUMPS) {
+        runtime.pump(1)
+        waitForAsyncTestWork()
+      }
+      assertEquals(0, cancels.load())
+    }
+  }
+
   // BND-154.
   @Test
   fun resourceProviderIsConsultedUntilClearedWhileMapIsLive() {
@@ -597,6 +716,33 @@ class RuntimeHandleTest {
     error("runtime event $type did not arrive")
   }
 
+  /** Installs a provider that handles [url] without completing it and hands the request out. */
+  private fun captureHandledRequest(
+    runtime: RuntimeHandle,
+    url: String,
+  ): AtomicReference<ResourceRequestHandle?> {
+    val handledRequest = AtomicReference<ResourceRequestHandle?>(null)
+    runtime.setResourceProvider(
+      ResourceProviderCallback { request, handle ->
+        if (request.requestedUrl != url) {
+          return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
+        }
+        handledRequest.store(handle)
+        ResourceProviderDecision.HANDLE
+      }
+    )
+    return handledRequest
+  }
+
+  private fun createSmallMap(runtime: RuntimeHandle): MapHandle =
+    MapHandle.create(
+      runtime,
+      MapOptions().apply {
+        width = 64
+        height = 64
+      },
+    )
+
   private fun waitForHandledRequest(
     runtime: RuntimeHandle,
     handledRequest: AtomicReference<ResourceRequestHandle?>,
@@ -664,4 +810,5 @@ class RuntimeHandleTest {
   }
 }
 
+private const val CANCEL_SETTLE_PUMPS = 50
 private const val STYLE_JSON = """{"version":8,"sources":{},"layers":[]}"""

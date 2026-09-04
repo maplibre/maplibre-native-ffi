@@ -11,6 +11,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
 use std::collections::VecDeque;
 use std::ffi::{c_char, c_void};
+use std::mem::ManuallyDrop;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -82,7 +83,20 @@ struct PyHttpHeaderTransformState {
 
 #[pyclass(name = "_ResourceRequestHandle")]
 struct ResourceRequestHandle {
-    state: Arc<maplibre_core::resource::ResourceRequestHandleState>,
+    // Dropped by hand, with the GIL released; see the Drop impl below.
+    state: ManuallyDrop<Arc<maplibre_core::resource::ResourceRequestHandleState>>,
+}
+
+impl Drop for ResourceRequestHandle {
+    fn drop(&mut self) {
+        // SAFETY: drop runs once, and nothing reads the field after this take.
+        let state = unsafe { ManuallyDrop::take(&mut self.state) };
+        // The last reference releases the native request, and release waits for
+        // a cancel callback running on a MapLibre thread. That callback needs
+        // the GIL this thread holds while collecting the Python handle, so the
+        // release runs detached.
+        Python::attach(|py| py.detach(move || drop(state)));
+    }
 }
 
 // The C API accepts signals and destruction from any thread, so this pyclass is
@@ -1528,11 +1542,25 @@ impl RuntimeHandle {
 
 #[pymethods]
 impl MapHandle {
-    fn close(&self) -> PyResult<()> {
-        let state = self.state();
+    fn close(&self, py: Python<'_>) -> PyResult<()> {
+        let map_handle = {
+            let state = self.state();
+            let Some(map_handle) = state.live_handle() else {
+                return Ok(());
+            };
+            state.mark_closed();
+            map_handle
+        };
         // SAFETY: state owns an mln_map handle created by mln_map_create and
         // pairs it with the matching status-returning destroy function.
-        unsafe { state.close_status(sys::mln_map_destroy) }.map_err(map_error)?;
+        // Destroy discards the map's resource requests, which can run a host
+        // cancel callback on a MapLibre thread, so it runs with neither the GIL
+        // nor the state mutex held.
+        let status = py.detach(move || unsafe { sys::mln_map_destroy(map_handle) });
+        if let Err(error) = maplibre_core::check(status) {
+            self.state().restore_handle_for_retry(map_handle);
+            return Err(map_error(error));
+        }
         Ok(())
     }
 
@@ -4954,17 +4982,39 @@ impl ResourceRequestHandle {
         Ok(())
     }
 
-    fn complete(&self, response: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn complete(&self, py: Python<'_>, response: &Bound<'_, PyAny>) -> PyResult<()> {
         let response = resource_response_from_py(response)?;
-        self.state.complete(&response).map_err(map_error)
+        let state = &*self.state;
+        // Completion retires the request, which waits for a cancel callback
+        // running on a MapLibre thread, and that callback needs the GIL.
+        py.detach(|| state.complete(&response)).map_err(map_error)
     }
 
     fn is_cancelled(&self) -> PyResult<bool> {
         self.state.is_cancelled().map_err(map_error)
     }
 
-    fn close(&self) {
-        self.state.close();
+    /// Registers the request's one cancel callback. The core state owns the
+    /// callable and hands the C API a weak reference to itself, so nothing
+    /// outside this handle keeps the callable or the handle alive.
+    fn set_cancel_callback(&self, callback: Py<PyAny>) -> PyResult<()> {
+        self.state
+            .set_cancel_callback(Box::new(move || {
+                // The cancel path reports no status, so a host exception is
+                // discarded here like other void callbacks in this binding.
+                Python::attach(|py| {
+                    let _ = callback.bind(py).call0();
+                });
+            }))
+            .map_err(map_error)
+    }
+
+    fn close(&self, py: Python<'_>) {
+        let state = &*self.state;
+        // Release waits for a cancel callback running on a MapLibre thread, and
+        // that callback needs the GIL. From inside the callback it returns
+        // without waiting.
+        py.detach(|| state.close());
     }
 }
 
@@ -5051,7 +5101,7 @@ impl PyResourceProviderState {
             let py_handle = Py::new(
                 py,
                 ResourceRequestHandle {
-                    state: Arc::clone(&handle_state),
+                    state: ManuallyDrop::new(Arc::clone(&handle_state)),
                 },
             )?;
             let decision = self

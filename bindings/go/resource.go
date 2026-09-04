@@ -170,6 +170,14 @@ type HttpHeaderTransformCallback func(HttpHeaderTransformRequest) []HttpHeader
 // handle was already completed.
 type ResourceProviderCallback func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision
 
+// ResourceRequestCancelCallback reports that MapLibre cancelled a handled
+// resource request. Native code invokes it on the thread that discards the
+// request: the runtime owner thread inside a map or runtime call, and a MapLibre
+// thread otherwise. The callback must not call MapLibre map or runtime APIs. It
+// may complete or close the cancelled request. Panics are contained and
+// discarded.
+type ResourceRequestCancelCallback func()
+
 // ResourceRequestHandle owns a provider-selected native request handle.
 type ResourceRequestHandle struct {
 	state *callback.ResourceRequestHandle
@@ -225,6 +233,8 @@ func resourceRequestStateError(err error) error {
 		return newBindingError(ErrInvalidState, "ResourceRequestHandle is already completed")
 	case errors.Is(err, callback.ErrResourceRequestClosed):
 		return newBindingError(ErrInvalidArgument, "ResourceRequestHandle is closed")
+	case errors.Is(err, callback.ErrResourceRequestCancelCallbackRegistered):
+		return newBindingError(ErrInvalidState, "ResourceRequestHandle already has a cancel callback")
 	default:
 		return err
 	}
@@ -263,6 +273,39 @@ func (handle *ResourceRequestHandle) Cancelled() (bool, error) {
 		return false, bindingErr
 	}
 	return cancelled, nil
+}
+
+// SetCancelCallback registers the one callback that runs when MapLibre cancels
+// the request. A second registration reports ErrInvalidState, and a closed
+// handle reports ErrInvalidArgument. When the request was already cancelled,
+// the callback runs on the calling goroutine before this method returns, as
+// part of this call: a concurrent Close on another goroutine does not wait for
+// it.
+//
+// The request owns the callback until it runs or the request is completed or
+// closed. A callback that captures this handle therefore keeps the handle
+// reachable until then, and the finalizer that closes an unreachable handle
+// never runs for such a cycle: a host that drops the handle without completing
+// or closing it leaks the native request.
+func (handle *ResourceRequestHandle) SetCancelCallback(cancel ResourceRequestCancelCallback) error {
+	if handle == nil || handle.state == nil {
+		return newBindingError(ErrInvalidArgument, "ResourceRequestHandle is nil")
+	}
+	if cancel == nil {
+		return newBindingError(ErrInvalidArgument, "ResourceRequestCancelCallback is nil")
+	}
+	var bindingErr error
+	if err := checkNative(func() int32 {
+		status, err := handle.state.SetCancelCallbackChecked(cancel)
+		if err != nil {
+			bindingErr = resourceRequestStateError(err)
+			return int32(C.MLN_STATUS_OK)
+		}
+		return status
+	}); err != nil {
+		return err
+	}
+	return bindingErr
 }
 
 // Close releases the provider-owned request handle without completing it.

@@ -123,6 +123,13 @@ struct NativeResourceRequestHandleFunctions {
     -> Void
   let cancelled: @Sendable (NativeResourceRequestHandle) throws -> Bool
   let release: @Sendable (NativeResourceRequestHandle) -> Void
+  /// Registers the cancel callback and returns the C API's `out_cancelled`:
+  /// true when the request was already cancelled and native stored nothing.
+  let setCancelCallback: @Sendable (
+    NativeResourceRequestHandle,
+    mln_resource_request_cancel_callback?,
+    UnsafeMutableRawPointer?
+  ) throws -> Bool
 
   static let native = Self(
     complete: { handle, response in
@@ -140,8 +147,65 @@ struct NativeResourceRequestHandleFunctions {
     },
     release: { handle in
       mln_resource_request_release(handle.raw)
+    },
+    setCancelCallback: { handle, callback, userData in
+      try NativeMemory.withTemporary(false) { cancelled in
+        try checkStatus(mln_resource_request_set_cancel_callback(
+          handle.raw,
+          callback,
+          userData,
+          cancelled
+        ))
+      }.value
     }
   )
+}
+
+/// Resolves the integer tokens the binding passes to the C API as cancel
+/// callback `user_data`. Each entry holds the request state weakly, so a token
+/// never keeps a request reachable and a token for a request that is gone
+/// resolves to nothing.
+final class ResourceRequestCancelRegistry: @unchecked Sendable {
+  static let shared = ResourceRequestCancelRegistry()
+
+  private final class Entry {
+    weak var state: NativeResourceRequestHandleState?
+
+    init(_ state: NativeResourceRequestHandleState) {
+      self.state = state
+    }
+  }
+
+  private let lock = NSLock()
+  private var nextToken: UInt = 1
+  private var entries: [UInt: Entry] = [:]
+
+  func register(_ state: NativeResourceRequestHandleState) -> UInt {
+    lock.withLock {
+      let token = nextToken
+      nextToken += 1
+      entries[token] = Entry(state)
+      return token
+    }
+  }
+
+  func resolve(_ token: UInt) -> NativeResourceRequestHandleState? {
+    lock.withLock { entries[token]?.state }
+  }
+
+  func remove(_ token: UInt) {
+    lock.withLock { _ = entries.removeValue(forKey: token) }
+  }
+
+  func contains(_ token: UInt) -> Bool {
+    lock.withLock { entries[token] != nil }
+  }
+}
+
+func resourceRequestCancelTrampoline(userData: UnsafeMutableRawPointer?) {
+  guard let userData else { return }
+  let token = UInt(bitPattern: userData)
+  ResourceRequestCancelRegistry.shared.resolve(token)?.runCancelCallback()
 }
 
 final class NativeResourceRequestHandleState: @unchecked Sendable {
@@ -159,6 +223,17 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
   private var completed = false
   private var releaseRequested = false
   private var inFlightOperations = 0
+  private var cancelCallback: (@Sendable () -> Void)?
+  private var cancelToken: UInt?
+
+  /// The native handle and registry token a retired request gives up. The
+  /// native release runs outside the state lock because it waits for a cancel
+  /// callback on another thread, and that callback may call back into this
+  /// state.
+  private struct Retirement {
+    let handle: NativeResourceRequestHandle
+    let cancelToken: UInt?
+  }
 
   init(
     handle: NativeResourceRequestHandle,
@@ -186,9 +261,11 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
       if let finalizedProviderDecision {
         return (
           decision: finalizedProviderDecision,
-          handle: takeReleasableHandleLocked()
+          retirement: takeRetirementLocked(),
+          abandonedToken: UInt?.none
         )
       }
+      var abandonedToken: UInt?
       if completed || decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE
         .rawValue
       {
@@ -196,18 +273,25 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
         finalizedProviderDecision = MLN_RESOURCE_PROVIDER_DECISION_HANDLE
           .rawValue
       } else {
+        // Native retires a pass-through request itself, and a cancel callback
+        // registered on it belongs to a request the provider did not take.
         providerOwnership = .nativeWillRelease
         finalizedProviderDecision = decision
         handle = nil
         releaseRequested = true
+        abandonedToken = takeCancelCallbackLocked().token
       }
       return (
         decision: finalizedProviderDecision ?? decision,
-        handle: takeReleasableHandleLocked()
+        retirement: takeRetirementLocked(),
+        abandonedToken: abandonedToken
       )
     }
-    if let handle = result.handle {
-      functions.release(handle)
+    if let abandonedToken = result.abandonedToken {
+      ResourceRequestCancelRegistry.shared.remove(abandonedToken)
+    }
+    if let retirement = result.retirement {
+      retire(retirement)
     }
     return result.decision
   }
@@ -229,16 +313,63 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
     return try functions.cancelled(handle)
   }
 
+  func setCancelCallback(_ callback: @escaping @Sendable () -> Void) throws {
+    let registry = ResourceRequestCancelRegistry.shared
+    let token = registry.register(self)
+    let handle: NativeResourceRequestHandle
+    do {
+      handle = try beginCancelRegistration(callback, token: token)
+    } catch {
+      registry.remove(token)
+      throw error
+    }
+    let alreadyCancelled: Bool
+    do {
+      alreadyCancelled = try functions.setCancelCallback(
+        handle,
+        resourceRequestCancelTrampoline,
+        UnsafeMutableRawPointer(bitPattern: token)
+      )
+    } catch {
+      _ = condition.withLock { takeCancelCallbackLocked() }
+      finishNativeOperation()
+      registry.remove(token)
+      throw error
+    }
+    guard alreadyCancelled else {
+      finishNativeOperation()
+      return
+    }
+    // Native stored nothing, so this call runs the callback in its place. The
+    // operation finishes first so the callback can close the request. A
+    // concurrent release may already have emptied the slot, which only stops
+    // a later dispatch; the registration still runs its callback once here.
+    _ = condition.withLock { takeCancelCallbackLocked() }
+    finishNativeOperation()
+    registry.remove(token)
+    callback()
+  }
+
+  /// Runs the registered callback once. Native invokes this at most once per
+  /// request, on the thread that cancels it, and never after release returns.
+  func runCancelCallback() {
+    let taken = condition.withLock { takeCancelCallbackLocked() }
+    if let token = taken.token {
+      ResourceRequestCancelRegistry.shared.remove(token)
+    }
+    taken.callback?()
+  }
+
   func release() {
-    let handle = condition.withLock {
+    let retirement = condition.withLock {
       releaseRequested = true
       while providerOwnership == .providerOwned, inFlightOperations > 0 {
         condition.wait()
       }
-      return takeReleasableHandleLocked()
+      return takeRetirementLocked()
     }
-    if let handle {
-      functions.release(handle)
+    if let retirement {
+      retire(retirement)
     }
   }
 
@@ -250,6 +381,31 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
           diagnostic: "resource request handle is closed"
         )
       }
+      inFlightOperations += 1
+      return handle
+    }
+  }
+
+  private func beginCancelRegistration(
+    _ callback: @escaping @Sendable () -> Void,
+    token: UInt
+  ) throws -> NativeResourceRequestHandle {
+    try condition.withLock {
+      guard !releaseRequested, let handle else {
+        throw NativeStatusFailure(
+          rawStatus: 0,
+          diagnostic: "resource request handle is closed"
+        )
+      }
+      guard cancelCallback == nil else {
+        throw NativeStatusFailure(
+          rawStatus: MLN_STATUS_INVALID_STATE.rawValue,
+          diagnostic: "resource request handle already has a cancel callback",
+          isNativeStatus: false
+        )
+      }
+      cancelCallback = callback
+      cancelToken = token
       inFlightOperations += 1
       return handle
     }
@@ -278,23 +434,46 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
   }
 
   private func finishNativeOperation() {
-    let handle = condition.withLock {
+    let retirement = condition.withLock {
       inFlightOperations -= 1
-      let handle = takeReleasableHandleLocked()
+      let retirement = takeRetirementLocked()
       condition.broadcast()
-      return handle
+      return retirement
     }
-    if let handle {
-      functions.release(handle)
+    if let retirement {
+      retire(retirement)
     }
   }
 
-  private func takeReleasableHandleLocked() -> NativeResourceRequestHandle? {
+  private func takeRetirementLocked() -> Retirement? {
     guard providerOwnership == .providerOwned, inFlightOperations == 0,
-          completed || releaseRequested else { return nil }
-    let releasable = handle
+          completed || releaseRequested, let releasable = handle
+    else { return nil }
     handle = nil
-    return releasable
+    return Retirement(
+      handle: releasable,
+      cancelToken: takeCancelCallbackLocked().token
+    )
+  }
+
+  private func takeCancelCallbackLocked()
+    -> (callback: (@Sendable () -> Void)?, token: UInt?)
+  {
+    defer {
+      cancelCallback = nil
+      cancelToken = nil
+    }
+    return (cancelCallback, cancelToken)
+  }
+
+  /// Native release waits for a cancel callback running on another thread and
+  /// returns at once from inside that callback. The registry entry goes after
+  /// release returns, when native can no longer resolve the token.
+  private func retire(_ retirement: Retirement) {
+    functions.release(retirement.handle)
+    if let token = retirement.cancelToken {
+      ResourceRequestCancelRegistry.shared.remove(token)
+    }
   }
 }
 

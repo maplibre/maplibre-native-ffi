@@ -109,6 +109,13 @@ releases the provider reference even when completion reports a native error.
 Callback exceptions are contained at the native boundary and reported through
 the native diagnostic path.
 
+`ResourceRequestHandle.setCancelCallback()` registers one callback per request
+that runs when MapLibre discards a request the provider left open. The binding
+queues the callback to the isolate that registered it, and a request that is
+already cancelled runs the callback before registration returns. Register,
+complete, and release such a request on that isolate. An exception the callback
+throws is contained inside the binding.
+
 Unsigned C `uint64_t` JSON values, feature identifiers, and camera transition
 IDs use Dart `BigInt` so the complete native range is preserved. Native buffers
 return copied bytes; direct pointer access is explicitly unsafe and ends at

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using Maplibre.NativeFfi.Error;
@@ -535,6 +536,330 @@ public sealed unsafe class ResourceProviderTests
         Assert.Contains("style", runtimeEvent.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [BindingSpecTest("BND-198")]
+    [Fact]
+    public void CancelCallbackRunsOnceAndMayCloseTheDiscardedRequest()
+    {
+        using var providerCalled = new ManualResetEventSlim(false);
+        var cancelCalls = 0;
+        ResourceRequestHandle? handled = null;
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        runtime.SetResourceProvider(
+            (_, handle) =>
+            {
+                handled = handle;
+                providerCalled.Set();
+                return ResourceProviderDecision.Handle;
+            }
+        );
+        var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        map.SetStyleUrl(StyleUrl);
+        DriveRuntimeUntil(runtime, providerCalled);
+        Assert.NotNull(handled);
+        var request = handled;
+        request.SetCancelCallback(() =>
+        {
+            Interlocked.Increment(ref cancelCalls);
+            request.Close();
+        });
+
+        // Destroying the map discards the style request the provider never
+        // completed, which is the cancellation the callback reports.
+        map.Dispose();
+        DriveRuntimeUntil(runtime, () => Volatile.Read(ref cancelCalls) > 0);
+        RuntimeEventTestHelpers.DrainUntilIdle(runtime);
+
+        Assert.Equal(1, Volatile.Read(ref cancelCalls));
+        Assert.True(request.IsClosed);
+        Assert.False(request.HasCancelCallbackForTest);
+    }
+
+    [BindingSpecTest("BND-198")]
+    [Fact]
+    public void CancelCallbackIsNotInvokedForACompletedRequest()
+    {
+        var cancelCalls = 0;
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        runtime.SetResourceProvider(
+            (_, handle) =>
+            {
+                handle.SetCancelCallback(() => Interlocked.Increment(ref cancelCalls));
+                handle.Complete(StyleResponse());
+                return ResourceProviderDecision.Handle;
+            }
+        );
+        var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        map.SetStyleUrl(StyleUrl);
+        RuntimeEventTestHelpers.WaitForMapEvent(runtime, map, RuntimeEventType.MapStyleLoaded);
+        map.Dispose();
+        RuntimeEventTestHelpers.DrainUntilIdle(runtime);
+
+        Assert.Equal(0, Volatile.Read(ref cancelCalls));
+    }
+
+    [BindingSpecTest("BND-198")]
+    [Fact]
+    public void RegisteringOnAnAlreadyCancelledRequestRunsTheCallbackBeforeReturning()
+    {
+        using var providerCalled = new ManualResetEventSlim(false);
+        var callbackThread = 0;
+        var cancelCalls = 0;
+        ResourceRequestHandle? handled = null;
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        runtime.SetResourceProvider(
+            (_, handle) =>
+            {
+                handled = handle;
+                providerCalled.Set();
+                return ResourceProviderDecision.Handle;
+            }
+        );
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        map.SetStyleUrl(StyleUrl);
+        DriveRuntimeUntil(runtime, providerCalled);
+        Assert.NotNull(handled);
+        map.SetStyleJson(Encoding.UTF8.GetBytes(StyleJson));
+        DriveRuntimeUntilCancelled(runtime, handled);
+
+        handled.SetCancelCallback(() =>
+        {
+            cancelCalls++;
+            callbackThread = Environment.CurrentManagedThreadId;
+        });
+
+        Assert.Equal(1, cancelCalls);
+        Assert.Equal(Environment.CurrentManagedThreadId, callbackThread);
+        Assert.False(handled.HasCancelCallbackForTest);
+        handled.Close();
+        RuntimeEventTestHelpers.DrainUntilIdle(runtime);
+        Assert.Equal(1, cancelCalls);
+    }
+
+    [BindingSpecTest("BND-198")]
+    [Fact]
+    public void RequestAcceptsOneCancelCallbackAndRejectsRegistrationOnceClosed()
+    {
+        var setCalls = 0;
+        var handle = new ResourceRequestHandle(
+            SyntheticHandles.ResourceRequest(1234),
+            null,
+            null,
+            static _ => { },
+            (_, _, _, _) =>
+            {
+                setCalls++;
+                return mln_status.MLN_STATUS_OK;
+            }
+        );
+        Assert.Equal(
+            (uint)ResourceProviderDecision.Handle,
+            handle.FinishProviderDecision(ResourceProviderDecision.Handle)
+        );
+
+        handle.SetCancelCallback(static () => { });
+        var second = Assert.Throws<InvalidStateException>(() =>
+            handle.SetCancelCallback(static () => { })
+        );
+        Assert.Equal(MaplibreStatus.InvalidState, second.Status);
+        Assert.Null(second.RawStatus);
+        Assert.True(handle.HasCancelCallbackForTest);
+
+        handle.Close();
+
+        var closed = Assert.Throws<InvalidStateException>(() =>
+            handle.SetCancelCallback(static () => { })
+        );
+        Assert.Equal(MaplibreStatus.InvalidState, closed.Status);
+        Assert.Null(closed.RawStatus);
+        Assert.Equal(1, setCalls);
+        Assert.False(handle.HasCancelCallbackForTest);
+    }
+
+    [BindingSpecTest("BND-198")]
+    [Fact]
+    public void FailedNativeRegistrationLeavesTheRequestWithoutACancelCallback()
+    {
+        nint userData = 0;
+        var handle = new ResourceRequestHandle(
+            SyntheticHandles.ResourceRequest(1234),
+            null,
+            null,
+            static _ => { },
+            (_, _, data, _) =>
+            {
+                userData = (nint)data;
+                return mln_status.MLN_STATUS_INVALID_ARGUMENT;
+            }
+        );
+
+        var error = Assert.Throws<InvalidArgumentException>(() =>
+            handle.SetCancelCallback(static () => { })
+        );
+
+        Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
+        Assert.False(handle.HasCancelCallbackForTest);
+        Assert.False(ResourceRequestCancelRegistry.IsRegisteredForTest(userData));
+    }
+
+    [BindingSpecTest("BND-198")]
+    [Fact]
+    public void CancelCallbackContainsHostExceptionAndRunsAtMostOnce()
+    {
+        nint nativeCallback = 0;
+        nint userData = 0;
+        var releaseCalls = 0;
+        var cancelCalls = 0;
+        var handle = new ResourceRequestHandle(
+            SyntheticHandles.ResourceRequest(1234),
+            null,
+            null,
+            _ => releaseCalls++,
+            (_, callback, data, _) =>
+            {
+                nativeCallback = (nint)callback;
+                userData = (nint)data;
+                return mln_status.MLN_STATUS_OK;
+            }
+        );
+        Assert.Equal(
+            (uint)ResourceProviderDecision.Handle,
+            handle.FinishProviderDecision(ResourceProviderDecision.Handle)
+        );
+
+        handle.SetCancelCallback(() =>
+        {
+            cancelCalls++;
+            throw new InvalidOperationException("boom");
+        });
+        Assert.Equal((nint)ResourceRequestCancelRegistry.NativeCallback, nativeCallback);
+        Assert.True(ResourceRequestCancelRegistry.IsRegisteredForTest(userData));
+
+        Dispatch(nativeCallback, userData);
+        Dispatch(nativeCallback, userData);
+
+        Assert.Equal(1, cancelCalls);
+        Assert.False(handle.HasCancelCallbackForTest);
+        Assert.False(ResourceRequestCancelRegistry.IsRegisteredForTest(userData));
+        handle.Close();
+        Assert.Equal(1, releaseCalls);
+    }
+
+    [BindingSpecTest("BND-198")]
+    [Fact]
+    public void CancelCallbackClosesTheRequestWhileAnotherThreadWaitsInRelease()
+    {
+        using var callbackStarted = new ManualResetEventSlim(false);
+        using var releaseStarted = new ManualResetEventSlim(false);
+        using var callbackFinished = new ManualResetEventSlim(false);
+        nint userData = 0;
+        var cancelCalls = 0;
+        var releaseCalls = 0;
+        var handle = new ResourceRequestHandle(
+            SyntheticHandles.ResourceRequest(1234),
+            null,
+            null,
+            _ =>
+            {
+                // Stands in for a native release that waits for the cancel
+                // callback running on a MapLibre thread.
+                Interlocked.Increment(ref releaseCalls);
+                releaseStarted.Set();
+                Assert.True(callbackFinished.Wait(TimeSpan.FromSeconds(5)));
+            },
+            (_, _, data, _) =>
+            {
+                userData = (nint)data;
+                return mln_status.MLN_STATUS_OK;
+            }
+        );
+        Assert.Equal(
+            (uint)ResourceProviderDecision.Handle,
+            handle.FinishProviderDecision(ResourceProviderDecision.Handle)
+        );
+        handle.SetCancelCallback(() =>
+        {
+            Interlocked.Increment(ref cancelCalls);
+            callbackStarted.Set();
+            Assert.True(releaseStarted.Wait(TimeSpan.FromSeconds(5)));
+            handle.Close();
+            Assert.True(handle.IsClosed);
+        });
+
+        var cancel = Task.Run(() =>
+        {
+            try
+            {
+                handle.DispatchCancel(userData);
+            }
+            finally
+            {
+                callbackFinished.Set();
+            }
+        });
+        Assert.True(callbackStarted.Wait(TimeSpan.FromSeconds(5)));
+        var close = Task.Run(handle.Close);
+
+        Assert.True(cancel.Wait(TimeSpan.FromSeconds(5)));
+        close.GetAwaiter().GetResult();
+        Assert.Equal(1, Volatile.Read(ref cancelCalls));
+        Assert.Equal(1, Volatile.Read(ref releaseCalls));
+        Assert.False(handle.HasCancelCallbackForTest);
+    }
+
+    [BindingSpecTest("BND-198")]
+    [Fact]
+    public void CancelCallbackRegistrationDoesNotKeepTheRequestHandleReachable()
+    {
+        var releaseCalls = 0;
+        var cancelCalls = 0;
+        var (weak, token) = CreateUnreferencedRequestWithCancelCallback(
+            () => Interlocked.Increment(ref releaseCalls),
+            () => Interlocked.Increment(ref cancelCalls)
+        );
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        Assert.False(weak.TryGetTarget(out _));
+        Assert.False(ResourceRequestCancelRegistry.IsRegisteredForTest(token));
+        Assert.Equal(1, Volatile.Read(ref releaseCalls));
+        ResourceRequestCancelRegistry.DispatchForTest(token);
+        Assert.Equal(0, Volatile.Read(ref cancelCalls));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (
+        WeakReference<ResourceRequestHandle> Weak,
+        nint Token
+    ) CreateUnreferencedRequestWithCancelCallback(Action onRelease, Action onCancel)
+    {
+        nint token = 0;
+        var handle = new ResourceRequestHandle(
+            SyntheticHandles.ResourceRequest(1234),
+            null,
+            null,
+            _ => onRelease(),
+            (_, _, data, _) =>
+            {
+                token = (nint)data;
+                return mln_status.MLN_STATUS_OK;
+            }
+        );
+        Assert.Equal(
+            (uint)ResourceProviderDecision.Handle,
+            handle.FinishProviderDecision(ResourceProviderDecision.Handle)
+        );
+        handle.SetCancelCallback(onCancel);
+        return (new WeakReference<ResourceRequestHandle>(handle), token);
+    }
+
+    private static void Dispatch(nint callback, nint userData) =>
+        ((delegate* unmanaged[Cdecl]<void*, void>)callback)((void*)userData);
+
     // Requests a style whose scheme no file source serves, so the loading
     // failure that follows proves the request reached the network file source.
     private static void LoadProbeStyle(RuntimeHandle runtime, MapHandle map, string styleUrl)
@@ -554,6 +879,22 @@ public sealed unsafe class ResourceProviderTests
 
     private static ResourceResponse StyleResponse() =>
         new(ResourceResponseStatus.Ok) { Bytes = Encoding.UTF8.GetBytes(StyleJson) };
+
+    private static void DriveRuntimeUntil(RuntimeHandle runtime, Func<bool> condition)
+    {
+        for (var attempt = 0; attempt < 1000; attempt++)
+        {
+            runtime.Pump(TimeSpan.Zero);
+            if (condition())
+            {
+                return;
+            }
+
+            Thread.Sleep(1);
+        }
+
+        Assert.True(condition());
+    }
 
     private static void DriveRuntimeUntil(RuntimeHandle runtime, ManualResetEventSlim signal)
     {

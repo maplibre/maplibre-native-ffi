@@ -697,6 +697,25 @@ non-OK. Release runs once, waits for in-flight completion or cancellation
 checks, and makes later completion or cancellation checks fail before crossing
 into C. Stale public request handles cannot affect later native requests.
 
+A handled request accepts one cancel callback, registered through the public
+request handle and mirroring the C API's set-cancel-callback operation. A second
+registration reports the binding's invalid-state error, and a released request
+rejects registration as closed. The binding invokes the host callback on the
+thread that cancels the request, which is the owner thread inside a map or
+runtime call and a MapLibre thread otherwise, and contains host failures inside
+the callback. The callback may complete or release the same request. When the C
+API reports that the request was already cancelled, the binding runs the
+callback itself before registration returns, as part of that call: release from
+another thread does not wait for it, and a concurrent release cannot stop it
+from running. The binding holds no lock of its own while it runs the callback or
+while it calls native release, because native release waits for a cancel
+callback running on another thread and that callback may call back into the same
+request handle. A binding that blocks native threads on a host lock, such as an
+interpreter lock, releases that lock around the map and runtime calls that can
+cancel requests. Callback state does not keep the request handle reachable: the
+request handle owns the callback, and any registry the binding uses to resolve a
+native token holds a weak reference.
+
 A binding whose host runtime moves a handled request between execution contexts
 passes the request handle id itself, and exposes the C API's wait-until-retired
 operation for teardown. A released or completed request id reports invalid
@@ -1089,26 +1108,27 @@ the other isolate, which makes its id stale rather than live.
 
 ### Resources
 
-| ID      | Test                                                                                                                                                                                                  |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-140 | Resource transform can rewrite a URL and can be cleared after registration.                                                                                                                           |
-| BND-141 | Resource transform request data is copied into language-owned values before user code receives it.                                                                                                    |
-| BND-142 | Resource provider pass-through delegates to native loading without retaining a request handle.                                                                                                        |
-| BND-143 | Resource provider handled request can complete inline and load a style.                                                                                                                               |
-| BND-144 | Resource provider handled request can complete later and load a style.                                                                                                                                |
-| BND-145 | Handled request can complete from another thread.                                                                                                                                                     |
-| BND-146 | Completing a handled request twice reports the binding's already-completed error before crossing into C.                                                                                              |
-| BND-147 | Releasing a handled request makes later completion and cancellation checks fail as closed.                                                                                                            |
-| BND-148 | Request cancellation is observable before a late completion, and late completion maps native status.                                                                                                  |
-| BND-149 | Resource error responses become copied runtime loading-failure or offline-error events.                                                                                                               |
-| BND-150 | Inline completion during the provider callback finalizes handled ownership even when the callback's later return path would otherwise pass through.                                                   |
-| BND-151 | Stale request handles cannot complete, cancel, or release later native requests.                                                                                                                      |
-| BND-152 | Completion that reaches C is terminal even when native completion returns a non-OK status.                                                                                                            |
-| BND-153 | Releasing a request waits for in-flight completion or cancellation checks before native release.                                                                                                      |
-| BND-154 | Resource provider can be replaced while maps are live and can be cleared, and a cleared provider stops receiving requests.                                                                            |
-| BND-155 | A request for a configured URI-scheme alias exposes the alias as the requested URL and the tile-server-normalized URL as the resolved URL.                                                            |
-| BND-158 | HTTP header transform requests and returned headers cross the callback boundary as copied language-owned values, reject duplicate field names case-insensitively, and contain host-language failures. |
-| BND-159 | HTTP header transforms can be installed, replaced, and cleared while maps are live; transformed headers reach matching requests and no request after clear.                                           |
+| ID      | Test                                                                                                                                                                                                                                                                           |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| BND-140 | Resource transform can rewrite a URL and can be cleared after registration.                                                                                                                                                                                                    |
+| BND-141 | Resource transform request data is copied into language-owned values before user code receives it.                                                                                                                                                                             |
+| BND-142 | Resource provider pass-through delegates to native loading without retaining a request handle.                                                                                                                                                                                 |
+| BND-143 | Resource provider handled request can complete inline and load a style.                                                                                                                                                                                                        |
+| BND-144 | Resource provider handled request can complete later and load a style.                                                                                                                                                                                                         |
+| BND-145 | Handled request can complete from another thread.                                                                                                                                                                                                                              |
+| BND-146 | Completing a handled request twice reports the binding's already-completed error before crossing into C.                                                                                                                                                                       |
+| BND-147 | Releasing a handled request makes later completion and cancellation checks fail as closed.                                                                                                                                                                                     |
+| BND-148 | Request cancellation is observable before a late completion, and late completion maps native status.                                                                                                                                                                           |
+| BND-149 | Resource error responses become copied runtime loading-failure or offline-error events.                                                                                                                                                                                        |
+| BND-150 | Inline completion during the provider callback finalizes handled ownership even when the callback's later return path would otherwise pass through.                                                                                                                            |
+| BND-151 | Stale request handles cannot complete, cancel, or release later native requests.                                                                                                                                                                                               |
+| BND-152 | Completion that reaches C is terminal even when native completion returns a non-OK status.                                                                                                                                                                                     |
+| BND-153 | Releasing a request waits for in-flight completion or cancellation checks before native release.                                                                                                                                                                               |
+| BND-154 | Resource provider can be replaced while maps are live and can be cleared, and a cleared provider stops receiving requests.                                                                                                                                                     |
+| BND-155 | A request for a configured URI-scheme alias exposes the alias as the requested URL and the tile-server-normalized URL as the resolved URL.                                                                                                                                     |
+| BND-158 | HTTP header transform requests and returned headers cross the callback boundary as copied language-owned values, reject duplicate field names case-insensitively, and contain host-language failures.                                                                          |
+| BND-159 | HTTP header transforms can be installed, replaced, and cleared while maps are live; transformed headers reach matching requests and no request after clear.                                                                                                                    |
+| BND-198 | A cancel callback registered on a handled request runs once when MapLibre discards the request, may release that request from inside the callback, runs before registration returns for an already-cancelled request, and is not invoked for a request the provider completed. |
 
 #### Queued provider routes
 

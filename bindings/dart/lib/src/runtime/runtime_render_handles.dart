@@ -742,8 +742,59 @@ extension type const ResourceRequestHandle._(NativeResourceRequest _handle) {
         _check(raw.mln_resource_request_complete(_checked.raw, nativeResponse));
       } finally {
         raw.mln_resource_request_release(_checked.raw);
+        _retireResourceRequestCancelState(_handle.raw);
       }
     });
+  }
+
+  /// Registers [callback] to run once when MapLibre cancels this request.
+  ///
+  /// A request accepts one registration, and a second call throws
+  /// [InvalidStateException]. Registration on a closed request throws
+  /// [InvalidArgumentException], the same as [complete] and [cancelled].
+  ///
+  /// MapLibre cancels a request on the thread that discards it, so the binding
+  /// queues the callback to the isolate that registered it, the same way it
+  /// queues provider callbacks. The callback runs on a later event-loop turn,
+  /// only for a request the provider has not completed, and not after this
+  /// isolate has called [complete] or [close]. When this request is already
+  /// cancelled, the callback runs before this method returns.
+  ///
+  /// The callback may use this handle, including [close]. An exception the
+  /// callback throws is contained inside the binding. Register, complete, and
+  /// release a request that has a cancel callback on the same isolate.
+  void setCancelCallback(ResourceRequestCancelCallback callback) {
+    final requestId = _checked.raw;
+    if (_resourceRequestCancelStates.containsKey(requestId)) {
+      throwInvalidState('ResourceRequestHandle already has a cancel callback');
+    }
+    final state = _ResourceRequestCancelState(requestId, callback);
+    _resourceRequestCancelStates[requestId] = state;
+    final bool alreadyCancelled;
+    try {
+      alreadyCancelled = withNativeArena((arena) {
+        final outCancelled = arena<Bool>();
+        _check(
+          raw.mln_resource_request_set_cancel_callback(
+            requestId,
+            state.listener.nativeFunction,
+            nullptr,
+            outCancelled,
+          ),
+        );
+        return outCancelled.value;
+      });
+    } catch (_) {
+      _resourceRequestCancelStates.remove(requestId);
+      state.close();
+      rethrow;
+    }
+    if (alreadyCancelled) {
+      // Native stored nothing, so the cancellation is reported here instead.
+      _resourceRequestCancelStates.remove(requestId);
+      state.runCallback();
+      state.close();
+    }
   }
 
   /// Releases the provider reference without completing it.
@@ -752,6 +803,7 @@ extension type const ResourceRequestHandle._(NativeResourceRequest _handle) {
   /// safe to call from any isolate holding a copy.
   void close() {
     raw.mln_resource_request_release(_checked.raw);
+    _retireResourceRequestCancelState(_handle.raw);
   }
 
   /// Blocks until this request is completed or released, wherever that happens.

@@ -29,6 +29,10 @@ internal class ResourceRequestHandleCore(private val releaseNative: () -> Unit) 
     }
   }
 
+  /** Whether close or completion has marked this handle, even while borrows still drain. */
+  val isClosed: Boolean
+    get() = state.load() and CLOSED_FLAG != 0
+
   fun <T> withLiveHandle(block: () -> T): T {
     val borrow = retainLive()
     try {

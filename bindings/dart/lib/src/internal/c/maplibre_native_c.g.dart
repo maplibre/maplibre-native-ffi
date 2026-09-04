@@ -2086,6 +2086,21 @@ external int mln_resource_request_complete(
 @ffi.Native<ffi.Void Function(mln_resource_request_handle)>()
 external void mln_resource_request_release(int handle);
 
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_resource_request_handle,
+    mln_resource_request_cancel_callback,
+    ffi.Pointer<ffi.Void>,
+    ffi.Pointer<ffi.Bool>,
+  )
+>()
+external int mln_resource_request_set_cancel_callback(
+  int handle,
+  mln_resource_request_cancel_callback callback,
+  ffi.Pointer<ffi.Void> user_data,
+  ffi.Pointer<ffi.Bool> out_cancelled,
+);
+
 @ffi.Native<ffi.Int32 Function(mln_resource_request_handle)>()
 external int mln_resource_request_wait_until_retired(int handle);
 
@@ -5339,6 +5354,14 @@ final class mln_resource_request extends ffi.Struct {
     ..ref.prior_data_size = prior_data_size;
 }
 
+typedef mln_resource_request_cancel_callback =
+    ffi.Pointer<
+      ffi.NativeFunction<mln_resource_request_cancel_callbackFunction>
+    >;
+typedef mln_resource_request_cancel_callbackFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
+typedef Dartmln_resource_request_cancel_callbackFunction =
+    void Function(ffi.Pointer<ffi.Void> user_data);
 typedef mln_resource_request_handle = ffi.Uint64;
 typedef Dartmln_resource_request_handle = int;
 

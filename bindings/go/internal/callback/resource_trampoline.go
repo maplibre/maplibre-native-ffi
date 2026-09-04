@@ -117,3 +117,21 @@ func goMaplibreResourceProvider(userData unsafe.Pointer, request *C.mln_resource
 	}
 	return C.uint32_t(handle.invokeProvider(state, request))
 }
+
+// goMaplibreResourceRequestCancel reports one cancelled provider request. The C
+// API invokes it at most once per request, on the thread that discards the
+// request, with no native lock held. The token resolves through a weak registry
+// entry, so a request handle Go already collected is a no-op here, and the
+// callback runs with no binding lock held because it may close or complete the
+// same request.
+//
+//export goMaplibreResourceRequestCancel
+func goMaplibreResourceRequestCancel(userData unsafe.Pointer) {
+	handle := lookupCancelToken(uint64(uintptr(userData)))
+	if handle == nil {
+		return
+	}
+	if callback := handle.takeCancelCallback(); callback != nil {
+		runCancelCallback(callback)
+	}
+}

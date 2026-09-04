@@ -1,5 +1,6 @@
 import concurrent.futures
 import contextlib
+import gc
 import http.server
 import json
 import math
@@ -10,6 +11,7 @@ import threading
 import time
 import typing
 import warnings
+import weakref
 from collections.abc import Callable
 from pathlib import Path
 
@@ -3722,6 +3724,284 @@ def test_resource_provider_can_complete_request_from_another_thread() -> None:
             thread.join(timeout=2)
             assert not thread.is_alive()
             _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
+
+
+def test_resource_request_cancel_callback_reports_discarded_request() -> None:
+    """BND-198: a discarded request runs its callback once, and the callback
+    releases its own handle."""
+    handles: list[resource.ResourceRequestHandle] = []
+    cancellations: list[str] = []
+    cancelled = threading.Event()
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        if request.requested_url != "custom://cancel-callback-style.json":
+            return resource.ResourceProviderDecision.PASS_THROUGH
+        handles.append(handle)
+        return resource.ResourceProviderDecision.HANDLE
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_provider(provider, max_pending_callbacks=4)
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_url("custom://cancel-callback-style.json")
+            handle = _wait_for_provider_handle(runtime, handles)
+
+            def on_cancel() -> None:
+                cancellations.append("cancelled")
+                # Completing a cancelled request reports its state, and
+                # releasing from inside the callback returns without waiting.
+                with pytest.raises(mln.InvalidStateError):
+                    handle.complete(resource.ResourceResponse(bytes=_EMPTY_STYLE_BYTES))
+                handle.close()
+                cancelled.set()
+
+            handle.set_cancel_callback(on_cancel)
+            with pytest.raises(mln.InvalidStateError):
+                handle.set_cancel_callback(on_cancel)
+            assert handle.is_cancelled() is False
+
+        assert cancelled.wait(timeout=5), "cancel callback did not run"
+
+    assert cancellations == ["cancelled"]
+    assert handle.closed is True
+
+
+def test_resource_request_cancel_callback_registered_after_cancellation_runs_now() -> (
+    None
+):
+    """BND-198: registering on an already cancelled request runs the callback
+    before the registration returns, and a host exception stays inside it."""
+    handles: list[resource.ResourceRequestHandle] = []
+    cancellations: list[str] = []
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        if request.requested_url != "custom://late-cancel-style.json":
+            return resource.ResourceProviderDecision.PASS_THROUGH
+        handles.append(handle)
+        return resource.ResourceProviderDecision.HANDLE
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_provider(provider, max_pending_callbacks=4)
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_url("custom://late-cancel-style.json")
+            handle = _wait_for_provider_handle(runtime, handles)
+        assert handle.is_cancelled() is True
+
+        def on_cancel() -> None:
+            cancellations.append("cancelled")
+            msg = "host failure inside the cancel callback"
+            raise RuntimeError(msg)
+
+        handle.set_cancel_callback(on_cancel)
+        assert cancellations == ["cancelled"]
+
+        # The request keeps its one registration after the callback ran.
+        with pytest.raises(mln.InvalidStateError):
+            handle.set_cancel_callback(on_cancel)
+        assert cancellations == ["cancelled"]
+
+        # The contained exception leaves the request and the runtime usable.
+        handle.close()
+        with runtime.create_map() as second_map:
+            second_map.set_style_json(_EMPTY_STYLE_BYTES)
+            _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
+
+
+def test_resource_request_cancel_callback_skips_completed_request() -> None:
+    """BND-198: a request the provider completed never runs its callback, and
+    the completed handle rejects registration as closed."""
+    handles: list[resource.ResourceRequestHandle] = []
+    cancellations: list[str] = []
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        if request.requested_url != "custom://completed-style.json":
+            return resource.ResourceProviderDecision.PASS_THROUGH
+        handles.append(handle)
+        return resource.ResourceProviderDecision.HANDLE
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_provider(provider, max_pending_callbacks=4)
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_url("custom://completed-style.json")
+            handle = _wait_for_provider_handle(runtime, handles)
+            handle.set_cancel_callback(lambda: cancellations.append("cancelled"))
+            handle.complete(resource.ResourceResponse(bytes=_EMPTY_STYLE_BYTES))
+            _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
+
+    assert cancellations == []
+    with pytest.raises(mln.InvalidStateError, match="already closed"):
+        handle.set_cancel_callback(lambda: None)
+
+
+def test_resource_request_cancel_callback_close_waits_from_another_thread() -> None:
+    """BND-198: closing a request while its cancel callback runs on a MapLibre
+    thread waits for the callback and returns."""
+    handles: list[resource.ResourceRequestHandle] = []
+    running = threading.Event()
+    finished = threading.Event()
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        if request.requested_url != "custom://close-during-cancel-style.json":
+            return resource.ResourceProviderDecision.PASS_THROUGH
+        handles.append(handle)
+        return resource.ResourceProviderDecision.HANDLE
+
+    def on_cancel() -> None:
+        running.set()
+        # The callback holds its MapLibre thread while the close below waits.
+        time.sleep(0.2)
+        finished.set()
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_provider(provider, max_pending_callbacks=4)
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_url("custom://close-during-cancel-style.json")
+            handle = _wait_for_provider_handle(runtime, handles)
+            handle.set_cancel_callback(on_cancel)
+
+            # A second style discards the pending request of the first one.
+            map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+            for _ in range(5000):
+                runtime.pump()
+                if running.is_set():
+                    break
+                time.sleep(0.001)
+            assert running.is_set(), "cancel callback did not run"
+
+            handle.close()
+            assert finished.is_set()
+            assert handle.closed is True
+
+
+def test_resource_request_cancel_callback_allows_map_use_while_closing() -> None:
+    """BND-198: another thread can read map state while a map close waits for a
+    cancel callback."""
+    handles: list[resource.ResourceRequestHandle] = []
+    running = threading.Event()
+    stop_reader = threading.Event()
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        if request.requested_url != "custom://close-map-during-cancel-style.json":
+            return resource.ResourceProviderDecision.PASS_THROUGH
+        handles.append(handle)
+        return resource.ResourceProviderDecision.HANDLE
+
+    def on_cancel() -> None:
+        running.set()
+        time.sleep(0.2)
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_provider(provider, max_pending_callbacks=4)
+        map_handle = runtime.create_map()
+        map_handle.set_style_url("custom://close-map-during-cancel-style.json")
+        handle = _wait_for_provider_handle(runtime, handles)
+        handle.set_cancel_callback(on_cancel)
+
+        reads: list[bool] = []
+
+        def read_map_state() -> None:
+            while not stop_reader.is_set():
+                reads.append(map_handle.closed)
+
+        reader = threading.Thread(target=read_map_state, daemon=True)
+        reader.start()
+        try:
+            map_handle.close()
+        finally:
+            stop_reader.set()
+            reader.join(timeout=2)
+        assert running.is_set(), "cancel callback did not run"
+        assert reads, "the reader thread never observed map state"
+        assert map_handle.closed is True
+        handle.close()
+
+
+def test_resource_request_cancel_callback_registration_guards_public_handle() -> None:
+    """BND-198: registration validates the callable, rejects a second
+    registration and a closed handle before crossing into C, and runs the
+    callback at most once through the dispatcher native code receives."""
+
+    class FakeNativeRequest:
+        def __init__(self) -> None:
+            self.callbacks: list[Callable[[], None]] = []
+
+        def set_cancel_callback(self, callback: Callable[[], None]) -> None:
+            self.callbacks.append(callback)
+
+        def close(self) -> None:
+            return
+
+    native = FakeNativeRequest()
+    handle = resource.ResourceRequestHandle._from_native(native)
+    calls: list[str] = []
+
+    with pytest.raises(TypeError, match="must be callable"):
+        handle.set_cancel_callback(object())  # type: ignore[arg-type]
+    assert native.callbacks == []
+
+    handle.set_cancel_callback(lambda: calls.append("cancelled"))
+    assert len(native.callbacks) == 1
+    with pytest.raises(mln.InvalidStateError, match="already has a cancel callback"):
+        handle.set_cancel_callback(lambda: calls.append("second"))
+    assert len(native.callbacks) == 1
+
+    native.callbacks[0]()
+    native.callbacks[0]()
+    assert calls == ["cancelled"]
+
+    handle.close()
+    with pytest.raises(mln.InvalidStateError, match="already closed"):
+        handle.set_cancel_callback(lambda: calls.append("late"))
+    assert len(native.callbacks) == 1
+
+
+def test_resource_request_cancel_callback_keeps_handle_collectable() -> None:
+    """BND-198: native code reaches the callback through a weak reference, so a
+    callback that captures its own handle stays collectable and a late native
+    dispatch after collection is a no-op."""
+
+    class FakeNativeRequest:
+        def __init__(self) -> None:
+            self.callbacks: list[Callable[[], None]] = []
+            self.closed = False
+
+        def set_cancel_callback(self, callback: Callable[[], None]) -> None:
+            self.callbacks.append(callback)
+
+        def close(self) -> None:
+            self.closed = True
+
+    def register_self_closing_callback(
+        native: FakeNativeRequest,
+    ) -> weakref.ref[resource.ResourceRequestHandle]:
+        handle = resource.ResourceRequestHandle._from_native(native)
+        handle.set_cancel_callback(lambda: handle.close())
+        return weakref.ref(handle)
+
+    native = FakeNativeRequest()
+    handle_ref = register_self_closing_callback(native)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ResourceWarning)
+        gc.collect()
+
+    assert handle_ref() is None
+    native.callbacks[0]()
+    assert not native.closed
 
 
 def test_resource_provider_error_response_reports_loading_failure_event() -> None:

@@ -1,7 +1,9 @@
 use std::ffi::{CString, c_char, c_void};
+use std::fmt;
 use std::marker::PhantomData;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 
 use maplibre_native_ffi_sys as sys;
 
@@ -355,11 +357,21 @@ pub type CompleteRequestFn = unsafe extern "C" fn(
 pub type CancelledRequestFn =
     unsafe extern "C" fn(sys::mln_resource_request_handle, *mut bool) -> sys::mln_status;
 pub type ReleaseRequestFn = unsafe extern "C" fn(sys::mln_resource_request_handle);
+pub type SetCancelCallbackFn = unsafe extern "C" fn(
+    sys::mln_resource_request_handle,
+    sys::mln_resource_request_cancel_callback,
+    *mut c_void,
+    *mut bool,
+) -> sys::mln_status;
+
+/// Host callback that runs once when MapLibre cancels a handled request.
+pub type CancelCallback = dyn FnOnce() + Send + 'static;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ResourceRequestHandleFns {
     complete: CompleteRequestFn,
     cancelled: CancelledRequestFn,
+    set_cancel_callback: SetCancelCallbackFn,
     release: ReleaseRequestFn,
 }
 
@@ -367,6 +379,7 @@ impl ResourceRequestHandleFns {
     pub const NATIVE: Self = Self {
         complete: sys::mln_resource_request_complete,
         cancelled: sys::mln_resource_request_cancelled,
+        set_cancel_callback: sys::mln_resource_request_set_cancel_callback,
         release: sys::mln_resource_request_release,
     };
 
@@ -375,22 +388,55 @@ impl ResourceRequestHandleFns {
     /// # Safety
     ///
     /// The functions must implement the same ownership contract as the C API:
-    /// `complete` and `cancelled` operate on the matching handle type, and
-    /// `release` releases a provider-owned handle exactly once.
+    /// `complete`, `cancelled`, and `set_cancel_callback` operate on the
+    /// matching handle type, `set_cancel_callback` never invokes the callback
+    /// and stops using its `user_data` once `release` returns, and `release`
+    /// releases a provider-owned handle exactly once.
     pub const unsafe fn new(
         complete: CompleteRequestFn,
         cancelled: CancelledRequestFn,
+        set_cancel_callback: SetCancelCallbackFn,
         release: ReleaseRequestFn,
     ) -> Self {
         Self {
             complete,
             cancelled,
+            set_cancel_callback,
             release,
         }
     }
 }
 
-#[derive(Debug)]
+/// Runs the host cancel callback for a request.
+///
+/// # Safety
+///
+/// `user_data` must be the pointer `ResourceRequestHandleState` registered
+/// with the C API, which the C API stops using once the request's release
+/// returns.
+unsafe extern "C" fn cancel_callback_trampoline(user_data: *mut c_void) {
+    let Some(token) = ptr::NonNull::new(user_data.cast::<ResourceRequestHandleState>()) else {
+        return;
+    };
+    // SAFETY: The token came from Weak::into_raw in set_cancel_callback, and
+    // the state reclaims it only after native release returns, when the C API
+    // no longer invokes this callback. Handing the weak reference back through
+    // into_raw leaves the registration's count untouched.
+    let weak = unsafe { Weak::from_raw(token.as_ptr()) };
+    let state = weak.upgrade();
+    let _ = Weak::into_raw(weak);
+    if let Some(state) = state {
+        state.run_cancel_callback();
+    }
+}
+
+/// Runs a host cancel callback with no binding lock held. A panic is contained
+/// here: unwinding into C is undefined behavior, and the cancel path has no
+/// status to report the failure through.
+fn run_cancel_callback_contained(callback: Box<CancelCallback>) {
+    let _ = catch_unwind(AssertUnwindSafe(callback));
+}
+
 struct ResourceRequestHandleInner {
     handle: u64,
     decision_finalized: bool,
@@ -398,8 +444,32 @@ struct ResourceRequestHandleInner {
     release_accounted_for: bool,
     closed: bool,
     completed: bool,
+    /// The registered host callback. Taken before it runs, so it runs once.
+    cancel_callback: Option<Box<CancelCallback>>,
+    /// `Weak<ResourceRequestHandleState>` handed to the C API as `user_data`,
+    /// or zero before the first registration. Reclaimed when the state drops.
+    cancel_token: usize,
 }
 
+impl fmt::Debug for ResourceRequestHandleInner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ResourceRequestHandleInner")
+            .field("handle", &self.handle)
+            .field("decision_finalized", &self.decision_finalized)
+            .field("provider_owned", &self.provider_owned)
+            .field("release_accounted_for", &self.release_accounted_for)
+            .field("closed", &self.closed)
+            .field("completed", &self.completed)
+            .field("cancel_registered", &self.cancel_callback.is_some())
+            .finish()
+    }
+}
+
+/// Shared state behind a resource request handle.
+///
+/// The `inner` lock is never held while host code runs or while native release
+/// runs: native release waits for a cancel callback running on another thread,
+/// and that callback may call back into this same state.
 #[derive(Debug)]
 pub struct ResourceRequestHandleState {
     inner: Mutex<ResourceRequestHandleInner>,
@@ -430,6 +500,8 @@ impl ResourceRequestHandleState {
                 release_accounted_for: false,
                 closed: false,
                 completed: false,
+                cancel_callback: None,
+                cancel_token: 0,
             }),
             fns,
         }))
@@ -455,14 +527,74 @@ impl ResourceRequestHandleState {
 
         inner.completed = true;
         inner.closed = true;
+        let handle = Self::native_handle(&inner);
         // SAFETY: handle is live while not closed/released, and native response
         // points to storage retained for this call. The C API copies contents.
-        let status = unsafe { (self.fns.complete)(Self::native_handle(&inner), native.as_ptr()) };
-        let result = crate::check(status);
-        if inner.decision_finalized && inner.provider_owned {
-            self.release_if_owned_locked(&mut inner);
+        let status = unsafe { (self.fns.complete)(handle, native.as_ptr()) };
+        // A completed request never runs its cancel callback.
+        let callback = inner.cancel_callback.take();
+        let release = inner.decision_finalized
+            && inner.provider_owned
+            && Self::take_release_locked(&mut inner);
+        drop(inner);
+        self.release_now(release, handle);
+        drop(callback);
+        crate::check(status)
+    }
+
+    /// Registers the host callback that runs when MapLibre cancels the request.
+    ///
+    /// A request accepts one registration. When the C API reports that the
+    /// request was already cancelled, the callback runs before this returns.
+    pub fn set_cancel_callback(self: &Arc<Self>, callback: Box<CancelCallback>) -> Result<()> {
+        let mut inner = self.lock_inner()?;
+        if inner.closed {
+            return Err(Error::invalid_argument("ResourceRequestHandle is closed"));
         }
-        result
+        if inner.cancel_callback.is_some() {
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                None,
+                "ResourceRequestHandle already has a cancel callback",
+            ));
+        }
+        inner.cancel_callback = Some(callback);
+        if inner.cancel_token == 0 {
+            inner.cancel_token = Weak::into_raw(Arc::downgrade(self)) as usize;
+        }
+        let mut cancelled = false;
+        // The native setter never blocks or calls back into the host, so the
+        // lock stays held across it and a concurrent close waits for this
+        // registration like any other in-flight use.
+        // SAFETY: handle is live while not closed. user_data is a weak
+        // reference this state reclaims only after native release returns, and
+        // cancelled points to writable bool storage for this call.
+        let status = unsafe {
+            (self.fns.set_cancel_callback)(
+                Self::native_handle(&inner),
+                Some(cancel_callback_trampoline),
+                inner.cancel_token as *mut c_void,
+                &mut cancelled,
+            )
+        };
+        if let Err(error) = crate::check(status) {
+            // Native stored nothing, so the slot goes back to empty.
+            drop(inner.cancel_callback.take());
+            return Err(error);
+        }
+        // Native stored nothing for a request MapLibre already cancelled, so
+        // this call runs the callback itself. Taking it back under the lock
+        // keeps a racing close from dropping it unrun.
+        let inline = if cancelled {
+            inner.cancel_callback.take()
+        } else {
+            None
+        };
+        drop(inner);
+        if let Some(callback) = inline {
+            run_cancel_callback_contained(callback);
+        }
+        Ok(())
     }
 
     pub fn is_cancelled(&self) -> Result<bool> {
@@ -485,9 +617,14 @@ impl ResourceRequestHandleState {
             return;
         }
         inner.closed = true;
-        if inner.decision_finalized && inner.provider_owned {
-            self.release_if_owned_locked(&mut inner);
-        }
+        let callback = inner.cancel_callback.take();
+        let handle = Self::native_handle(&inner);
+        let release = inner.decision_finalized
+            && inner.provider_owned
+            && Self::take_release_locked(&mut inner);
+        drop(inner);
+        self.release_now(release, handle);
+        drop(callback);
     }
 
     pub fn finish_provider_decision(&self, decision: ResourceProviderDecision) -> u32 {
@@ -504,14 +641,17 @@ impl ResourceRequestHandleState {
         if inner.completed || matches!(decision, ResourceProviderDecision::Handle) {
             inner.decision_finalized = true;
             inner.provider_owned = true;
-            if inner.closed {
-                self.release_if_owned_locked(&mut inner);
-            }
+            let handle = Self::native_handle(&inner);
+            let release = inner.closed && Self::take_release_locked(&mut inner);
+            drop(inner);
+            self.release_now(release, handle);
             sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
         } else {
-            inner.decision_finalized = true;
-            inner.release_accounted_for = true;
-            inner.closed = true;
+            // The C API releases a passed-through request itself, and its
+            // release retires any cancel registration.
+            let callback = Self::finish_unowned_locked(&mut inner);
+            drop(inner);
+            drop(callback);
             sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH
         }
     }
@@ -523,23 +663,60 @@ impl ResourceRequestHandleState {
             .map(|inner| inner.completed)
             .unwrap_or(false);
         if completed {
-            self.finish_provider_decision(ResourceProviderDecision::Handle)
-        } else {
-            if let Ok(mut inner) = self.inner.lock() {
-                inner.decision_finalized = true;
-                inner.release_accounted_for = true;
-                inner.closed = true;
-            }
-            UNKNOWN_PROVIDER_DECISION
+            return self.finish_provider_decision(ResourceProviderDecision::Handle);
+        }
+        if let Ok(mut inner) = self.inner.lock() {
+            // The C API releases the request it gets no decision for.
+            let callback = Self::finish_unowned_locked(&mut inner);
+            drop(inner);
+            drop(callback);
+        }
+        UNKNOWN_PROVIDER_DECISION
+    }
+
+    /// Records a decision that leaves the release to the C API, returning the
+    /// cancel callback that can no longer run.
+    fn finish_unowned_locked(
+        inner: &mut ResourceRequestHandleInner,
+    ) -> Option<Box<CancelCallback>> {
+        inner.decision_finalized = true;
+        inner.release_accounted_for = true;
+        inner.closed = true;
+        inner.cancel_callback.take()
+    }
+
+    fn take_release_locked(inner: &mut ResourceRequestHandleInner) -> bool {
+        if inner.release_accounted_for {
+            return false;
+        }
+        inner.release_accounted_for = true;
+        true
+    }
+
+    fn take_cancel_callback(&self) -> Option<Box<CancelCallback>> {
+        self.inner
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .cancel_callback
+            .take()
+    }
+
+    /// Runs the registered callback once, outside the handle lock, so it can
+    /// complete or close this same request.
+    fn run_cancel_callback(&self) {
+        if let Some(callback) = self.take_cancel_callback() {
+            run_cancel_callback_contained(callback);
         }
     }
 
-    fn release_if_owned_locked(&self, inner: &mut ResourceRequestHandleInner) {
-        if !inner.release_accounted_for {
-            inner.release_accounted_for = true;
-            // SAFETY: release is called exactly once for provider-owned handles.
-            unsafe { (self.fns.release)(Self::native_handle(inner)) };
+    /// Calls native release with no lock held. Release waits for a cancel
+    /// callback running on another thread, and that callback may take the lock.
+    fn release_now(&self, release: bool, handle: sys::mln_resource_request_handle) {
+        if !release {
+            return;
         }
+        // SAFETY: take_release_locked grants this call exactly once per handle.
+        unsafe { (self.fns.release)(handle) };
     }
 
     fn lock_inner(&self) -> Result<std::sync::MutexGuard<'_, ResourceRequestHandleInner>> {
@@ -555,11 +732,20 @@ impl ResourceRequestHandleState {
 
 impl Drop for ResourceRequestHandleState {
     fn drop(&mut self) {
-        let Ok(mut inner) = self.inner.lock() else {
-            return;
-        };
-        if inner.provider_owned {
-            self.release_if_owned_locked(&mut inner);
+        let inner = self
+            .inner
+            .get_mut()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let handle = Self::native_handle(inner);
+        let release = inner.provider_owned && Self::take_release_locked(inner);
+        let token = inner.cancel_token;
+        self.release_now(release, handle);
+        if token != 0 {
+            // SAFETY: The token came from Weak::into_raw in set_cancel_callback.
+            // Every path that lets this state drop has released the native
+            // request first, and the C API stops using user_data once release
+            // returns, so no cancel callback can still be arriving.
+            drop(unsafe { Weak::from_raw(token as *const Self) });
         }
     }
 }
@@ -652,6 +838,15 @@ mod tests {
     static CANCELLED_SLEEP_MS: AtomicUsize = AtomicUsize::new(0);
     static CANCELLED_STARTED: AtomicBool = AtomicBool::new(false);
     static CANCELLED_FINISHED: AtomicBool = AtomicBool::new(false);
+    static SET_CANCEL_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static ALREADY_CANCELLED: AtomicBool = AtomicBool::new(false);
+    /// The registration the fake C API stored, as (callback, user_data).
+    static REGISTERED_CANCEL: StdMutex<Option<(sys::mln_resource_request_cancel_callback, usize)>> =
+        StdMutex::new(None);
+    /// When set, the fake release waits for this flag like the C API waits for
+    /// a cancel callback running on another thread.
+    static RELEASE_WAITS_FOR_CALLBACK: AtomicBool = AtomicBool::new(false);
+    static CALLBACK_FINISHED: AtomicBool = AtomicBool::new(false);
 
     unsafe extern "C" fn fake_complete(
         _handle: sys::mln_resource_request_handle,
@@ -675,17 +870,64 @@ mod tests {
             CANCELLED_FINISHED.store(true, Ordering::SeqCst);
         }
         // SAFETY: out_cancelled is non-null and points to caller-owned output storage.
-        unsafe { *out_cancelled = false };
+        unsafe { *out_cancelled = ALREADY_CANCELLED.load(Ordering::SeqCst) };
         sys::MLN_STATUS_OK
     }
 
     unsafe extern "C" fn fake_release(_handle: sys::mln_resource_request_handle) {
+        if RELEASE_WAITS_FOR_CALLBACK.load(Ordering::SeqCst) {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while !CALLBACK_FINISHED.load(Ordering::SeqCst) && Instant::now() < deadline {
+                std::thread::yield_now();
+            }
+        }
+        *REGISTERED_CANCEL.lock().unwrap() = None;
         RELEASE_COUNT.fetch_add(1, Ordering::SeqCst);
+    }
+
+    /// Stands in for the C API's registration: it stores the callback for a
+    /// live request and reports an already cancelled one without storing it.
+    unsafe extern "C" fn fake_set_cancel_callback(
+        _handle: sys::mln_resource_request_handle,
+        callback: sys::mln_resource_request_cancel_callback,
+        user_data: *mut c_void,
+        out_cancelled: *mut bool,
+    ) -> sys::mln_status {
+        SET_CANCEL_COUNT.fetch_add(1, Ordering::SeqCst);
+        if callback.is_none() || out_cancelled.is_null() {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let cancelled = ALREADY_CANCELLED.load(Ordering::SeqCst);
+        // SAFETY: out_cancelled is non-null and points to caller-owned output storage.
+        unsafe { *out_cancelled = cancelled };
+        if !cancelled {
+            *REGISTERED_CANCEL.lock().unwrap() = Some((callback, user_data as usize));
+        }
+        sys::MLN_STATUS_OK
+    }
+
+    /// Invokes the stored registration the way the C API does when MapLibre
+    /// discards the request.
+    fn fire_registered_cancel() {
+        let (callback, user_data) = REGISTERED_CANCEL
+            .lock()
+            .unwrap()
+            .expect("a registered cancel callback");
+        // SAFETY: The fake registration stored this pair from the state under
+        // test, which is still alive and unreleased.
+        unsafe { callback.unwrap()(user_data as *mut c_void) };
     }
 
     fn fake_fns() -> ResourceRequestHandleFns {
         // SAFETY: These fake functions implement the native handle contract for tests.
-        unsafe { ResourceRequestHandleFns::new(fake_complete, fake_cancelled, fake_release) }
+        unsafe {
+            ResourceRequestHandleFns::new(
+                fake_complete,
+                fake_cancelled,
+                fake_set_cancel_callback,
+                fake_release,
+            )
+        }
     }
 
     fn fake_state() -> Arc<ResourceRequestHandleState> {
@@ -695,6 +937,11 @@ mod tests {
         CANCELLED_SLEEP_MS.store(0, Ordering::SeqCst);
         CANCELLED_STARTED.store(false, Ordering::SeqCst);
         CANCELLED_FINISHED.store(false, Ordering::SeqCst);
+        SET_CANCEL_COUNT.store(0, Ordering::SeqCst);
+        ALREADY_CANCELLED.store(false, Ordering::SeqCst);
+        *REGISTERED_CANCEL.lock().unwrap() = None;
+        RELEASE_WAITS_FOR_CALLBACK.store(false, Ordering::SeqCst);
+        CALLBACK_FINISHED.store(false, Ordering::SeqCst);
         // SAFETY: This synthetic handle reaches only the fake functions above,
         // never the C API.
         unsafe {
@@ -706,6 +953,22 @@ mod tests {
         .unwrap()
     }
 
+    fn handled_fake_state() -> Arc<ResourceRequestHandleState> {
+        let state = fake_state();
+        assert_eq!(
+            state.finish_provider_decision(ResourceProviderDecision::Handle),
+            sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
+        );
+        state
+    }
+
+    fn wait_until(flag: &AtomicBool, what: &str) {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !flag.load(Ordering::SeqCst) {
+            assert!(Instant::now() < deadline, "timed out waiting for {what}");
+            std::thread::yield_now();
+        }
+    }
     #[test]
     fn resource_request_handle_preserves_all_64_bits() {
         let state = fake_state();
@@ -909,6 +1172,156 @@ mod tests {
         assert!(CANCELLED_FINISHED.load(Ordering::SeqCst));
         assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
         thread.join().unwrap();
+    }
+
+    #[test]
+    // Spec coverage: BND-198. The C API reports a request cancelled before
+    // registration instead of storing the callback, so the binding runs the
+    // callback itself, with no lock held, before registration returns.
+    fn cancel_registration_on_a_cancelled_request_runs_the_callback_before_returning() {
+        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
+        let state = handled_fake_state();
+        ALREADY_CANCELLED.store(true, Ordering::SeqCst);
+        COMPLETE_STATUS.store(sys::MLN_STATUS_INVALID_STATE, Ordering::SeqCst);
+        let callback_state = Arc::clone(&state);
+        let calls = Arc::new(AtomicUsize::new(0));
+        let callback_calls = Arc::clone(&calls);
+
+        state
+            .set_cancel_callback(Box::new(move || {
+                callback_calls.fetch_add(1, Ordering::SeqCst);
+                assert_eq!(
+                    callback_state
+                        .complete(&ResourceResponse::no_content())
+                        .unwrap_err()
+                        .kind(),
+                    ErrorKind::InvalidState
+                );
+                callback_state.close();
+            }))
+            .unwrap();
+
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    // Spec coverage: BND-198. A closed request rejects registration, and a
+    // second registration reports invalid state, both without reaching C.
+    fn cancel_registration_rejects_closed_and_registered_requests() {
+        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
+        let state = handled_fake_state();
+        state.set_cancel_callback(Box::new(|| {})).unwrap();
+        assert_eq!(SET_CANCEL_COUNT.load(Ordering::SeqCst), 1);
+
+        let error = state.set_cancel_callback(Box::new(|| {})).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
+        assert_eq!(SET_CANCEL_COUNT.load(Ordering::SeqCst), 1);
+
+        state.close();
+        let error = state.set_cancel_callback(Box::new(|| {})).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert_eq!(SET_CANCEL_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    // Spec coverage: BND-198. MapLibre's cancel path runs the callback on its
+    // own thread, and the callback closes the request it belongs to.
+    fn cancel_callback_from_another_thread_may_close_its_request() {
+        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
+        let state = handled_fake_state();
+        let callback_state = Arc::clone(&state);
+        let calls = Arc::new(AtomicUsize::new(0));
+        let callback_calls = Arc::clone(&calls);
+        state
+            .set_cancel_callback(Box::new(move || {
+                callback_calls.fetch_add(1, Ordering::SeqCst);
+                callback_state.close();
+            }))
+            .unwrap();
+
+        std::thread::spawn(fire_registered_cancel).join().unwrap();
+
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+        state.close();
+        drop(state);
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    // Spec coverage: BND-153 and BND-198. Native release waits for a cancel
+    // callback running on another thread, so close must not hold the handle
+    // lock across it when that callback calls back into the same handle.
+    fn close_holds_no_lock_while_native_release_waits_for_the_callback() {
+        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
+        let state = handled_fake_state();
+        RELEASE_WAITS_FOR_CALLBACK.store(true, Ordering::SeqCst);
+        let callback_started = Arc::new(AtomicBool::new(false));
+        let callback_state = Arc::clone(&state);
+        let started = Arc::clone(&callback_started);
+        let observed_closed = Arc::new(AtomicBool::new(false));
+        let callback_observed_closed = Arc::clone(&observed_closed);
+        state
+            .set_cancel_callback(Box::new(move || {
+                started.store(true, Ordering::SeqCst);
+                // Let close begin its release before this takes the lock.
+                std::thread::sleep(Duration::from_millis(50));
+                let closed = callback_state.is_cancelled().is_err();
+                callback_observed_closed.store(closed, Ordering::SeqCst);
+                CALLBACK_FINISHED.store(true, Ordering::SeqCst);
+            }))
+            .unwrap();
+        let callback_thread = std::thread::spawn(fire_registered_cancel);
+        wait_until(&callback_started, "the cancel callback to start");
+
+        state.close();
+
+        assert!(CALLBACK_FINISHED.load(Ordering::SeqCst));
+        assert!(observed_closed.load(Ordering::SeqCst));
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+        callback_thread.join().unwrap();
+    }
+
+    #[test]
+    // Spec coverage: BND-198. A completed request never runs its callback, and
+    // completion drops the callback's captures.
+    fn completion_drops_the_cancel_callback() {
+        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
+        let state = handled_fake_state();
+        let token = Arc::new(());
+        let callback_token = Arc::clone(&token);
+        state
+            .set_cancel_callback(Box::new(move || {
+                let _ = &callback_token;
+                panic!("a completed request must not run its cancel callback");
+            }))
+            .unwrap();
+        assert_eq!(Arc::strong_count(&token), 2);
+
+        state.complete(&ResourceResponse::no_content()).unwrap();
+
+        assert_eq!(Arc::strong_count(&token), 1);
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    // Spec coverage: BND-142 and BND-198. The C API releases a passed-through
+    // request itself, and that release retires the registration.
+    fn cancel_registration_leaves_a_passed_through_release_to_native() {
+        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
+        let state = fake_state();
+        state.set_cancel_callback(Box::new(|| {})).unwrap();
+
+        assert_eq!(
+            state.finish_provider_decision(ResourceProviderDecision::PassThrough),
+            sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH
+        );
+        drop(state);
+
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
     }
 
     #[test]
