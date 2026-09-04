@@ -77,6 +77,9 @@ internal constructor(
     val alreadyCancelled = core.withLiveHandle {
       cancelState.register(callback) { token -> cancelCallbackSetter(handleId, token) }
     }
+    // Close or completion may have marked the handle while this borrow was live and dropped an
+    // empty slot. They release native once the borrow ends, so the callback never runs: drop it.
+    if (core.isClosed) cancelState.drop()
     // The borrow has ended, so the callback may close this handle and release it immediately.
     alreadyCancelled?.let(ResourceRequestCancelState::runContained)
   }
