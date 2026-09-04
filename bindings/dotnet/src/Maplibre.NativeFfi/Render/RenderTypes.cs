@@ -107,6 +107,8 @@ public sealed record PremultipliedRgba8Image
 
     public byte[] Bytes => (byte[])bytes.Clone();
 
+    internal byte[] BytesTransit => bytes;
+
     public TextureImageInfo Info { get; }
 
     public bool Equals(PremultipliedRgba8Image? other) =>

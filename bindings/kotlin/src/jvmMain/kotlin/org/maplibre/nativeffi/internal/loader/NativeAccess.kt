@@ -4328,7 +4328,7 @@ internal object NativeAccess {
   }
 
   private fun premultipliedRgba8Image(arena: Arena, value: PremultipliedRgba8Image): MemorySegment {
-    val pixels = value.pixels
+    val pixels = value.pixelsTransit
     val segment = MapLibreNativeC.mln_premultiplied_rgba8_image_default(arena)
     mln_premultiplied_rgba8_image.width(segment, value.width)
     mln_premultiplied_rgba8_image.height(segment, value.height)

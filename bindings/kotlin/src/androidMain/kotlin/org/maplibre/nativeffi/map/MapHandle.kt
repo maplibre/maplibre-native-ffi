@@ -3065,7 +3065,7 @@ private class PremultipliedImageScope(value: PremultipliedRgba8Image) : AutoClos
     MaplibreNativeC.mln_premultiplied_rgba8_image_default()
 
   init {
-    val bytes = value.pixels
+    val bytes = value.pixelsTransit
     pixels = BytePointer(bytes.size.toLong())
     pixels.put(bytes, 0, bytes.size)
     image.width(value.width)
