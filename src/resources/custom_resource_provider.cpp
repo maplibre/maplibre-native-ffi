@@ -40,7 +40,11 @@ struct ResourceRequestObject {
   void* cancel_user_data = nullptr;
   bool cancel_callback_registered = false;
   bool cancel_callback_running = false;
+  // Set when the callback released its own request: the callback wrapper
+  // removes the table entry once the callback returns.
+  bool remove_after_cancel_callback = false;
   std::thread::id cancel_callback_thread;
+  mln_resource_request_handle handle = MLN_HANDLE_NULL;
   mln::ActorRef<mln::FileSourceRequest> actor;
 };
 
@@ -227,30 +231,27 @@ void run_cancel_callback(ResourceRequestObject& object) noexcept {
   } catch (...) {
     // Host callbacks must not unwind through MapLibre's cancel path.
   }
+  auto remove_from_table = false;
   {
     const std::scoped_lock lock(object.mutex);
     object.cancel_callback_running = false;
+    remove_from_table =
+      std::exchange(object.remove_after_cancel_callback, false);
   }
   object.state_changed.notify_all();
-}
-
-// Release from inside the callback returns without waiting; release from any
-// other thread returns only after the callback does, so its user_data is
-// unused afterwards.
-void wait_for_foreign_cancel_callback_locked(
-  ResourceRequestObject& object, std::unique_lock<std::mutex>& lock
-) {
-  if (object.cancel_callback_thread == std::this_thread::get_id()) {
-    return;
+  if (remove_from_table) {
+    handle_table<ResourceRequestObject>().remove(object.handle);
   }
-  object.state_changed.wait(lock, [&object] {
-    return !object.cancel_callback_running;
-  });
 }
 
 // Retires the id so no later call can reach this request. Idempotent.
+//
+// The table entry stays until a running cancel callback returns, so a release
+// on any other thread finds the object and waits, whether or not an earlier
+// release already retired it. Release from inside the callback returns without
+// waiting and leaves the removal to the callback wrapper.
 void retire_request(mln_resource_request_handle handle) noexcept {
-  auto object = handle_table<ResourceRequestObject>().remove(handle);
+  auto object = handle_table<ResourceRequestObject>().try_lease(handle);
   if (object == nullptr) {
     return;
   }
@@ -259,9 +260,20 @@ void retire_request(mln_resource_request_handle handle) noexcept {
     object->retired = true;
     object->cancel_callback = nullptr;
     object->cancel_user_data = nullptr;
-    wait_for_foreign_cancel_callback_locked(*object, lock);
+    if (object->cancel_callback_running) {
+      if (object->cancel_callback_thread == std::this_thread::get_id()) {
+        object->remove_after_cancel_callback = true;
+        lock.unlock();
+        object->state_changed.notify_all();
+        return;
+      }
+      object->state_changed.wait(lock, [&object] {
+        return !object->cancel_callback_running;
+      });
+    }
   }
   object->state_changed.notify_all();
+  handle_table<ResourceRequestObject>().remove(handle);
 }
 
 auto bytes_from_string(const std::string& value) -> const std::uint8_t* {
@@ -408,8 +420,7 @@ auto request_custom_resource(
     std::make_unique<mln::FileSourceRequest>(std::move(file_source_callback));
   auto object = std::make_shared<ResourceRequestObject>(request->actor());
   const auto handle = handle_table<ResourceRequestObject>().insert(object);
-  // Capturing the object rather than the id keeps the cancel path off the
-  // handle table, adding no lock-ordering edge against mbgl's own locks.
+  object->handle = handle;
   // mbgl runs this on every request destruction, including after a response
   // was delivered, so a completed request does not report cancellation.
   request->onCancel([object]() noexcept -> void {

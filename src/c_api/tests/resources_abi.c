@@ -1425,6 +1425,7 @@ static void cancel_callback_skips_a_completed_request(void) {
 
 typedef struct blocking_cancel_probe {
   cancel_probe base;
+  atomic_bool self_release;
   atomic_bool callback_entered;
   atomic_bool release_started;
   atomic_bool release_returned;
@@ -1438,6 +1439,9 @@ typedef struct blocking_cancel_probe {
 // whether it did.
 static void block_in_cancel(void* user_data) {
   blocking_cancel_probe* probe = user_data;
+  if (atomic_load(&probe->self_release)) {
+    mln_resource_request_release(atomic_load(&probe->base.handle));
+  }
   atomic_store(&probe->callback_entered, true);
   wait_for_flag(&probe->release_started);
   mln_test_sleep_milliseconds(provider_teardown_block_milliseconds);
@@ -1478,16 +1482,14 @@ static void release_during_cancel_callback_entry(void* argument) {
   atomic_store(&probe->release_returned, true);
 }
 
-// user_data may be freed once release returns, so release waits for a callback
-// still running on another thread. Destroying the map cancels its style request
-// on the owner thread, so the release runs on a helper thread.
-static void release_waits_for_in_flight_cancel_callback(void) {
-  blocking_cancel_probe probe = {0};
+static void run_release_waits_for_in_flight_cancel_callback(
+  blocking_cancel_probe* probe
+) {
   mln_runtime runtime = mln_test_create_runtime();
   const mln_resource_provider provider = {
     .size = sizeof(mln_resource_provider),
     .callback = blocking_cancel_resource_provider,
-    .user_data = &probe,
+    .user_data = probe,
   };
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
@@ -1496,23 +1498,47 @@ static void release_waits_for_in_flight_cancel_callback(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_style_url(map, "custom://blocking-cancel.json")
   );
-  TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe.base.provider_entered));
+  TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe->base.provider_entered));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, atomic_load(&probe.base.register_status)
+    MLN_STATUS_OK, atomic_load(&probe->base.register_status)
   );
-  TEST_ASSERT_FALSE(atomic_load(&probe.base.register_reported_cancelled));
+  TEST_ASSERT_FALSE(atomic_load(&probe->base.register_reported_cancelled));
 
   mln_test_thread* releaser =
-    mln_test_thread_start(release_during_cancel_callback_entry, &probe);
+    mln_test_thread_start(release_during_cancel_callback_entry, probe);
   mln_test_destroy_map(map);
-  TEST_ASSERT_TRUE(atomic_load(&probe.callback_entered));
+  TEST_ASSERT_TRUE(atomic_load(&probe->callback_entered));
   mln_test_thread_join(releaser);
   TEST_ASSERT_FALSE_MESSAGE(
-    atomic_load(&probe.release_returned_during_callback),
+    atomic_load(&probe->release_returned_during_callback),
     "releasing the request returned while the cancel callback was running"
   );
-  TEST_ASSERT_TRUE(atomic_load(&probe.callback_returned_before_release));
+  TEST_ASSERT_TRUE(atomic_load(&probe->callback_returned_before_release));
+  if (!atomic_load(&probe->self_release)) {
+    mln_resource_request_release(atomic_load(&probe->base.handle));
+  }
+  bool cancelled = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_resource_request_cancelled(atomic_load(&probe->base.handle), &cancelled)
+  );
   mln_test_destroy_runtime(runtime);
+}
+
+// user_data may be freed once release returns, so release waits for a callback
+// still running on another thread. Destroying the map cancels its style request
+// on the owner thread, so the release runs on a helper thread.
+static void release_waits_for_in_flight_cancel_callback(void) {
+  blocking_cancel_probe probe = {0};
+  run_release_waits_for_in_flight_cancel_callback(&probe);
+}
+
+// Release is idempotent, so a release on another thread must still find the
+// request and wait after the callback released it from inside.
+static void release_waits_for_a_cancel_callback_that_released_itself(void) {
+  blocking_cancel_probe probe = {0};
+  atomic_store(&probe.self_release, true);
+  run_release_waits_for_in_flight_cancel_callback(&probe);
 }
 
 void run_resources_abi_tests(void) {
@@ -1543,4 +1569,5 @@ void run_resources_abi_tests(void) {
   RUN_TEST(cancel_callback_may_release_the_request);
   RUN_TEST(cancel_callback_skips_a_completed_request);
   RUN_TEST(release_waits_for_in_flight_cancel_callback);
+  RUN_TEST(release_waits_for_a_cancel_callback_that_released_itself);
 }

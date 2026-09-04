@@ -279,6 +279,12 @@ func (handle *ResourceRequestHandle) Cancelled() (bool, error) {
 // the request. A second registration reports ErrInvalidState, and a closed
 // handle reports ErrInvalidArgument. When the request was already cancelled,
 // the callback runs on the calling goroutine before this method returns.
+//
+// The request owns the callback until it runs or the request is completed or
+// closed. A callback that captures this handle therefore keeps the handle
+// reachable until then, and the finalizer that closes an unreachable handle
+// never runs for such a cycle: a host that drops the handle without completing
+// or closing it leaks the native request.
 func (handle *ResourceRequestHandle) SetCancelCallback(cancel ResourceRequestCancelCallback) error {
 	if handle == nil || handle.state == nil {
 		return newBindingError(ErrInvalidArgument, "ResourceRequestHandle is nil")

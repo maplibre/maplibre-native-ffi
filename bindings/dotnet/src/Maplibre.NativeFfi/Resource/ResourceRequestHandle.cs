@@ -163,8 +163,11 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
     public void SetCancelCallback(Action callback)
     {
         ArgumentNullException.ThrowIfNull(callback);
-        MlnResourceRequest current;
         nint token;
+        bool alreadyCancelled = false;
+        // The native setter never blocks or calls back into the host, so the
+        // gate stays held across it: a concurrent Close then waits for this
+        // registration the way it waits for any other in-flight use.
         lock (gate)
         {
             ThrowIfClosed();
@@ -181,20 +184,17 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
             token = ResourceRequestCancelRegistry.Register(this);
             cancelCallback = callback;
             cancelToken = token;
-            current = handle;
-        }
-
-        bool alreadyCancelled = false;
-        var status = setCancelCallback(
-            current,
-            ResourceRequestCancelRegistry.NativeCallback,
-            (void*)token,
-            &alreadyCancelled
-        );
-        if (status != mln_status.MLN_STATUS_OK)
-        {
-            TakeCancelCallback(token);
-            NativeStatus.Check(status);
+            var status = setCancelCallback(
+                handle,
+                ResourceRequestCancelRegistry.NativeCallback,
+                (void*)token,
+                &alreadyCancelled
+            );
+            if (status != mln_status.MLN_STATUS_OK)
+            {
+                DropCancelCallbackLocked();
+                NativeStatus.Check(status);
+            }
         }
 
         if (alreadyCancelled)

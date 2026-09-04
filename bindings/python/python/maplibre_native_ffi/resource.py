@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+import weakref
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -204,6 +206,8 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
             raise TypeError(msg)
         self._native = native
         self._closed = False
+        self._cancel_callback: ResourceCancelCallback | None = None
+        self._cancel_lock = threading.Lock()
 
     @classmethod
     def _from_native(cls, native: Any) -> ResourceRequestHandle:
@@ -231,6 +235,7 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
             self.close()
             raise
         self._closed = True
+        self._take_cancel_callback()
 
     def is_cancelled(self) -> bool:
         """Return whether native code has cancelled the request."""
@@ -261,6 +266,11 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
         map calls belong outside the callback. An exception raised by the
         callback stays inside it: the binding discards the exception rather
         than returning it to MapLibre.
+
+        This handle owns the callback until it runs or the handle is completed
+        or closed. Native code reaches the callback through a weak reference to
+        this handle, so a callback that captures the handle forms a cycle the
+        garbage collector can still reclaim.
         """
         if self._closed:
             from .errors import InvalidStateError
@@ -272,7 +282,36 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
         if not callable(callback):
             msg = "cancel callback must be callable"
             raise TypeError(msg)
-        self._native.set_cancel_callback(callback)
+        with self._cancel_lock:
+            if self._cancel_callback is not None:
+                from .errors import InvalidStateError
+
+                raise InvalidStateError(
+                    None,
+                    "resource request handle already has a cancel callback",
+                )
+            self._cancel_callback = callback
+        handle_ref = weakref.ref(self)
+
+        def dispatch() -> None:
+            handle = handle_ref()
+            if handle is None:
+                return
+            pending = handle._take_cancel_callback()
+            if pending is not None:
+                pending()
+
+        try:
+            self._native.set_cancel_callback(dispatch)
+        except BaseException:
+            self._take_cancel_callback()
+            raise
+
+    def _take_cancel_callback(self) -> ResourceCancelCallback | None:
+        with self._cancel_lock:
+            pending = self._cancel_callback
+            self._cancel_callback = None
+            return pending
 
     def close(self) -> None:
         """Release this request handle without completing it."""
@@ -280,6 +319,7 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
             return
         self._native.close()
         self._closed = True
+        self._take_cancel_callback()
 
 
 ResourceCancelCallback = Callable[[], None]

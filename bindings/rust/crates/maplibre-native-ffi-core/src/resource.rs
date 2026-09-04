@@ -547,41 +547,42 @@ impl ResourceRequestHandleState {
     /// A request accepts one registration. When the C API reports that the
     /// request was already cancelled, the callback runs before this returns.
     pub fn set_cancel_callback(self: &Arc<Self>, callback: Box<CancelCallback>) -> Result<()> {
-        let (handle, user_data) = {
-            let mut inner = self.lock_inner()?;
-            if inner.closed {
-                return Err(Error::invalid_argument("ResourceRequestHandle is closed"));
-            }
-            if inner.cancel_callback.is_some() {
-                return Err(Error::new(
-                    ErrorKind::InvalidState,
-                    None,
-                    "ResourceRequestHandle already has a cancel callback",
-                ));
-            }
-            inner.cancel_callback = Some(callback);
-            if inner.cancel_token == 0 {
-                inner.cancel_token = Weak::into_raw(Arc::downgrade(self)) as usize;
-            }
-            (Self::native_handle(&inner), inner.cancel_token)
-        };
+        let mut inner = self.lock_inner()?;
+        if inner.closed {
+            return Err(Error::invalid_argument("ResourceRequestHandle is closed"));
+        }
+        if inner.cancel_callback.is_some() {
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                None,
+                "ResourceRequestHandle already has a cancel callback",
+            ));
+        }
+        inner.cancel_callback = Some(callback);
+        if inner.cancel_token == 0 {
+            inner.cancel_token = Weak::into_raw(Arc::downgrade(self)) as usize;
+        }
         let mut cancelled = false;
+        // The native setter never blocks or calls back into the host, so the
+        // lock stays held across it and a concurrent close waits for this
+        // registration like any other in-flight use.
         // SAFETY: handle is live while not closed. user_data is a weak
         // reference this state reclaims only after native release returns, and
         // cancelled points to writable bool storage for this call.
         let status = unsafe {
             (self.fns.set_cancel_callback)(
-                handle,
+                Self::native_handle(&inner),
                 Some(cancel_callback_trampoline),
-                user_data as *mut c_void,
+                inner.cancel_token as *mut c_void,
                 &mut cancelled,
             )
         };
         if let Err(error) = crate::check(status) {
             // Native stored nothing, so the slot goes back to empty.
-            drop(self.take_cancel_callback());
+            drop(inner.cancel_callback.take());
             return Err(error);
         }
+        drop(inner);
         if cancelled {
             // Native stored nothing for a request MapLibre already cancelled,
             // so the binding runs the callback itself.

@@ -1,5 +1,6 @@
 import concurrent.futures
 import contextlib
+import gc
 import http.server
 import json
 import math
@@ -10,6 +11,7 @@ import threading
 import time
 import typing
 import warnings
+import weakref
 from collections.abc import Callable
 from pathlib import Path
 
@@ -3929,14 +3931,15 @@ def test_resource_request_cancel_callback_allows_map_use_while_closing() -> None
 
 
 def test_resource_request_cancel_callback_registration_guards_public_handle() -> None:
-    """BND-198: registration validates the callable and rejects a closed
-    handle before crossing into C."""
+    """BND-198: registration validates the callable, rejects a second
+    registration and a closed handle before crossing into C, and runs the
+    callback at most once through the dispatcher native code receives."""
 
     class FakeNativeRequest:
         def __init__(self) -> None:
-            self.callbacks: list[object] = []
+            self.callbacks: list[Callable[[], None]] = []
 
-        def set_cancel_callback(self, callback: object) -> None:
+        def set_cancel_callback(self, callback: Callable[[], None]) -> None:
             self.callbacks.append(callback)
 
         def close(self) -> None:
@@ -3944,21 +3947,61 @@ def test_resource_request_cancel_callback_registration_guards_public_handle() ->
 
     native = FakeNativeRequest()
     handle = resource.ResourceRequestHandle._from_native(native)
-
-    def on_cancel() -> None:
-        return
+    calls: list[str] = []
 
     with pytest.raises(TypeError, match="must be callable"):
         handle.set_cancel_callback(object())  # type: ignore[arg-type]
     assert native.callbacks == []
 
-    handle.set_cancel_callback(on_cancel)
-    assert native.callbacks == [on_cancel]
+    handle.set_cancel_callback(lambda: calls.append("cancelled"))
+    assert len(native.callbacks) == 1
+    with pytest.raises(mln.InvalidStateError, match="already has a cancel callback"):
+        handle.set_cancel_callback(lambda: calls.append("second"))
+    assert len(native.callbacks) == 1
+
+    native.callbacks[0]()
+    native.callbacks[0]()
+    assert calls == ["cancelled"]
 
     handle.close()
     with pytest.raises(mln.InvalidStateError, match="already closed"):
-        handle.set_cancel_callback(on_cancel)
-    assert native.callbacks == [on_cancel]
+        handle.set_cancel_callback(lambda: calls.append("late"))
+    assert len(native.callbacks) == 1
+
+
+def test_resource_request_cancel_callback_keeps_handle_collectable() -> None:
+    """BND-198: native code reaches the callback through a weak reference, so a
+    callback that captures its own handle stays collectable and a late native
+    dispatch after collection is a no-op."""
+
+    class FakeNativeRequest:
+        def __init__(self) -> None:
+            self.callbacks: list[Callable[[], None]] = []
+            self.closed = False
+
+        def set_cancel_callback(self, callback: Callable[[], None]) -> None:
+            self.callbacks.append(callback)
+
+        def close(self) -> None:
+            self.closed = True
+
+    def register_self_closing_callback(
+        native: FakeNativeRequest,
+    ) -> weakref.ref[resource.ResourceRequestHandle]:
+        handle = resource.ResourceRequestHandle._from_native(native)
+        handle.set_cancel_callback(lambda: handle.close())
+        return weakref.ref(handle)
+
+    native = FakeNativeRequest()
+    handle_ref = register_self_closing_callback(native)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ResourceWarning)
+        gc.collect()
+
+    assert handle_ref() is None
+    native.callbacks[0]()
+    assert not native.closed
 
 
 def test_resource_provider_error_response_reports_loading_failure_event() -> None:

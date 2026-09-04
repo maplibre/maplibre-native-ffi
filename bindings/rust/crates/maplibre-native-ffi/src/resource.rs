@@ -84,7 +84,10 @@ impl ResourceRequestHandle {
     /// The callback may complete or close this same request, which is how a
     /// host retires it early: share the handle through `Arc<Mutex<Option<_>>>`
     /// and take it from inside the callback. It must not use the map or runtime
-    /// the request came from.
+    /// the request came from. The request owns the callback until it runs or
+    /// the request is completed or closed, so a callback that captures its own
+    /// handle keeps that handle alive until then: a host that drops such a
+    /// handle without completing or closing it leaks the native request.
     pub fn set_cancel_callback<F>(&self, callback: F) -> Result<()>
     where
         F: FnOnce() + Send + 'static,

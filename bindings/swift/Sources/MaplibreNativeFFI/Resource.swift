@@ -242,7 +242,11 @@ public final class ResourceRequestHandle: @unchecked Sendable {
   /// calling thread before this method returns.
   ///
   /// The callback may complete or close this request. It must return quickly,
-  /// and it must not call any map, runtime, or other request handle.
+  /// and it must not call any map, runtime, or other request handle. The
+  /// request retains the callback until it runs or the request is completed or
+  /// closed, so capture this handle weakly inside the callback: a strong
+  /// capture forms a retain cycle that keeps the native request alive when the
+  /// host drops the handle without completing or closing it.
   public func setCancelCallback(
     _ callback: @escaping ResourceRequestCancelCallback
   ) throws {

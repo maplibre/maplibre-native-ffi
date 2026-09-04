@@ -109,6 +109,9 @@ internal constructor(
   public actual override fun close() {
     cancelState.drop()
     core.close()
+    // A registration that held a borrow while this close began may have filled the slot after the
+    // first drop. The borrow has drained and native release has returned, so nothing runs it now.
+    cancelState.drop()
   }
 
   internal fun finishProviderDecision(decision: ResourceProviderDecision): UInt =
