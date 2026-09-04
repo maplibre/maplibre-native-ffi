@@ -1,7 +1,11 @@
 package org.maplibre.nativeffi.resource
 
 import org.bytedeco.javacpp.BytePointer
+import org.bytedeco.javacpp.Pointer
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelBridge
+import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelRegistration
+import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelState
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.UnreachableActions
@@ -21,9 +25,17 @@ internal constructor(
     Status.check(MaplibreNativeC.mln_resource_request_cancelled(handle, outCancelled))
     outCancelled[0]
   },
+  private val cancelCallbackSetter:
+    (Long, MaplibreNativeC.mln_resource_request_cancel_callback?, Pointer?) -> Int =
+    { handle, callback, userData ->
+      MaplibreNativeC.mln_resource_request_set_cancel_callback(handle, callback, userData)
+    },
   releaser: (Long) -> Unit = MaplibreNativeC::mln_resource_request_release,
 ) : AutoCloseable {
-  private val core = ResourceRequestHandleCore(ReleaseNativeRequest(handleId, releaser))
+  private val cancelRegistration = ResourceRequestCancelRegistration()
+  private val cancelState = ResourceRequestCancelState(cancelRegistration)
+  private val core =
+    ResourceRequestHandleCore(ReleaseNativeRequest(handleId, releaser, cancelRegistration))
 
   init {
     require(handleId != 0L) { "Resource request handle is null" }
@@ -53,15 +65,49 @@ internal constructor(
 
   public actual fun isCancelled(): Boolean = core.withLiveHandle { cancellationChecker(handleId) }
 
+  public actual fun setCancelCallback(callback: (() -> Unit)?) {
+    core.withLiveHandle {
+      // The callback lands before C hears about it, so a request that MapLibre already cancelled
+      // runs it inside this call.
+      cancelState.store(callback)
+      val status =
+        if (callback == null) {
+          cancelCallbackSetter(handleId, null, null)
+        } else {
+          cancelCallbackSetter(
+            handleId,
+            ResourceRequestCancelBridge.stub,
+            ResourceRequestCancelBridge.userData(cancelState.token()),
+          )
+        }
+      Status.check(status)
+    }
+  }
+
   public actual override fun close() {
     core.close()
   }
 
   internal fun finishProviderDecision(decision: ResourceProviderDecision): Int =
-    core.finishProviderDecision(decision).nativeValue
+    finishProvider(core.finishProviderDecision(decision))
 
   internal fun finishProviderException(): Int =
-    core.finishProviderException()?.nativeValue ?: UNKNOWN_DECISION
+    core.finishProviderException()?.let(::finishProvider)
+      ?: run {
+        // A provider failure also hands the request back to MapLibre, and the binding's release
+        // path never runs for it.
+        cancelRegistration.dispose()
+        UNKNOWN_DECISION
+      }
+
+  /**
+   * Drops cancel routing for a request that goes back to MapLibre. Native releases that request, so
+   * the binding's release path never runs.
+   */
+  private fun finishProvider(decision: ResourceProviderDecision): Int {
+    if (decision == ResourceProviderDecision.PASS_THROUGH) cancelRegistration.dispose()
+    return decision.nativeValue
+  }
 
   internal class NativeResourceResponseScope(value: ResourceResponse) : AutoCloseable {
     val response: MaplibreNativeC.mln_resource_response = MaplibreNativeC.mln_resource_response()
@@ -140,9 +186,16 @@ internal constructor(
   private class ReleaseNativeRequest(
     private val handleId: Long,
     private val releaser: (Long) -> Unit,
+    private val cancelRegistration: ResourceRequestCancelRegistration,
   ) : () -> Unit {
     override fun invoke() {
-      releaser(handleId)
+      try {
+        releaser(handleId)
+      } finally {
+        // The native release returns once a cancel callback running elsewhere has returned, so
+        // the token outlives every native use of it.
+        cancelRegistration.dispose()
+      }
     }
   }
 

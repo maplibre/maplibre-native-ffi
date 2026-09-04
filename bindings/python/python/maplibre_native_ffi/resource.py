@@ -243,6 +243,38 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
             )
         return bool(self._native.is_cancelled())
 
+    def set_cancel_callback(self, callback: ResourceCancelCallback | None) -> None:
+        """Register or clear this request's cancellation callback.
+
+        The callback takes no arguments and runs at most once, on the thread
+        that cancels the request. That thread is the runtime owner thread inside
+        a map or runtime call and a MapLibre thread otherwise. Registering on an
+        already cancelled
+        request runs the callback before this call returns.
+
+        Each call replaces the previous registration, and ``None`` clears it.
+        :meth:`complete` and :meth:`close` both close this handle, and a
+        registration on a closed handle raises :class:`InvalidStateError`.
+
+        The callback may call :meth:`complete`, which reports an invalid state
+        for a cancelled request, and :meth:`close` on this handle. Runtime and
+        map calls belong outside the callback.
+
+        An exception raised by the callback stays inside it: the binding
+        discards the exception rather than returning it to MapLibre.
+        """
+        if self._closed:
+            from .errors import InvalidStateError
+
+            raise InvalidStateError(
+                None,
+                "resource request handle is already closed",
+            )
+        if callback is not None and not callable(callback):
+            msg = "cancel callback must be callable or None"
+            raise TypeError(msg)
+        self._native.set_cancel_callback(callback)
+
     def close(self) -> None:
         """Release this request handle without completing it."""
         if self._closed:
@@ -251,6 +283,7 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
         self._closed = True
 
 
+ResourceCancelCallback = Callable[[], None]
 ResourceTransformCallback = Callable[[ResourceTransformRequest], str | None]
 HttpHeaderTransformCallback = Callable[[HttpHeaderTransformRequest], list[HttpHeader]]
 ResourceProviderCallback = Callable[
@@ -304,6 +337,7 @@ __all__ = [
     "HttpHeader",
     "HttpHeaderTransformCallback",
     "HttpHeaderTransformRequest",
+    "ResourceCancelCallback",
     "ResourceErrorReason",
     "ResourceKind",
     "ResourceLoadingMethod",

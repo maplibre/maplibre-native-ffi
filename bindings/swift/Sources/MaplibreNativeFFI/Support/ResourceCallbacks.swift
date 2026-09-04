@@ -115,6 +115,30 @@ struct NativeResourceResponseInput: Equatable {
   }
 }
 
+/// Holds a host cancel callback for the C API, which reaches it back through
+/// the retained pointer this box hands to `user_data`.
+final class NativeResourceRequestCancelBox: @unchecked Sendable {
+  private let callback: @Sendable () -> Void
+
+  init(_ callback: @escaping @Sendable () -> Void) {
+    self.callback = callback
+  }
+
+  func invoke() {
+    callback()
+  }
+}
+
+/// A registration the binding replaces can still be running on the MapLibre
+/// thread, so the trampoline holds its own reference while the call runs.
+func resourceRequestCancelTrampoline(userData: UnsafeMutableRawPointer?) {
+  guard let userData else { return }
+  let box = Unmanaged<NativeResourceRequestCancelBox>.fromOpaque(userData)
+  box.retain()
+  defer { box.release() }
+  box.takeUnretainedValue().invoke()
+}
+
 struct NativeResourceRequestHandleFunctions {
   let complete: @Sendable (
     NativeResourceRequestHandle,
@@ -123,6 +147,11 @@ struct NativeResourceRequestHandleFunctions {
     -> Void
   let cancelled: @Sendable (NativeResourceRequestHandle) throws -> Bool
   let release: @Sendable (NativeResourceRequestHandle) -> Void
+  let setCancelCallback: @Sendable (
+    NativeResourceRequestHandle,
+    mln_resource_request_cancel_callback?,
+    UnsafeMutableRawPointer?
+  ) throws -> Void
 
   static let native = Self(
     complete: { handle, response in
@@ -140,6 +169,13 @@ struct NativeResourceRequestHandleFunctions {
     },
     release: { handle in
       mln_resource_request_release(handle.raw)
+    },
+    setCancelCallback: { handle, callback, userData in
+      try checkStatus(mln_resource_request_set_cancel_callback(
+        handle.raw,
+        callback,
+        userData
+      ))
     }
   )
 }
@@ -159,6 +195,10 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
   private var completed = false
   private var releaseRequested = false
   private var inFlightOperations = 0
+  // Every registration stays retained until the handle is released, because a
+  // replaced registration can still be running on the MapLibre thread.
+  private var cancelBoxes: [Unmanaged<NativeResourceRequestCancelBox>] = []
+  private var cancelCallbackThreads: [ObjectIdentifier: Int] = [:]
 
   init(
     handle: NativeResourceRequestHandle,
@@ -176,6 +216,9 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
 
   deinit {
     release()
+    for box in takeCancelBoxes() {
+      box.release()
+    }
   }
 
   func finishProviderDecision(_ decision: UInt32) -> UInt32 {
@@ -186,9 +229,11 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
       if let finalizedProviderDecision {
         return (
           decision: finalizedProviderDecision,
-          handle: takeReleasableHandleLocked()
+          handle: takeReleasableHandleLocked(),
+          abandoned: NativeResourceRequestHandle?.none
         )
       }
+      var abandoned: NativeResourceRequestHandle?
       if completed || decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE
         .rawValue
       {
@@ -198,16 +243,27 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
       } else {
         providerOwnership = .nativeWillRelease
         finalizedProviderDecision = decision
+        abandoned = cancelBoxes.isEmpty ? nil : handle
         handle = nil
         releaseRequested = true
       }
       return (
         decision: finalizedProviderDecision ?? decision,
-        handle: takeReleasableHandleLocked()
+        handle: takeReleasableHandleLocked(),
+        abandoned: abandoned
       )
     }
+    // A pass-through request goes back to native, which releases it once this
+    // callback returns. Clearing the registration first keeps native from
+    // reaching a box that this state is about to free.
+    if let abandoned = result.abandoned {
+      try? functions.setCancelCallback(abandoned, nil, nil)
+      for box in takeCancelBoxes() {
+        box.release()
+      }
+    }
     if let handle = result.handle {
-      functions.release(handle)
+      releaseHandle(handle)
     }
     return result.decision
   }
@@ -229,16 +285,51 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
     return try functions.cancelled(handle)
   }
 
+  func setCancelCallback(_ callback: (@Sendable () -> Void)?) throws {
+    let replacement = callback.map { callback in
+      Unmanaged.passRetained(NativeResourceRequestCancelBox { [weak self] in
+        guard let self else {
+          callback()
+          return
+        }
+        beginCancelCallback()
+        defer { endCancelCallback() }
+        callback()
+      })
+    }
+    let handle: NativeResourceRequestHandle
+    do {
+      handle = try beginNativeOperation()
+    } catch {
+      replacement?.release()
+      throw error
+    }
+    if let replacement {
+      condition.withLock { cancelBoxes.append(replacement) }
+    }
+    defer { finishNativeOperation() }
+    try functions.setCancelCallback(
+      handle,
+      replacement == nil ? nil : resourceRequestCancelTrampoline,
+      replacement?.toOpaque()
+    )
+  }
+
   func release() {
     let handle = condition.withLock {
       releaseRequested = true
-      while providerOwnership == .providerOwned, inFlightOperations > 0 {
+      // A cancel callback that runs while this state holds an in-flight
+      // operation carries the release on this thread, so waiting for that
+      // operation would wait for this call.
+      while providerOwnership == .providerOwned, inFlightOperations > 0,
+            cancelCallbackThreads[ObjectIdentifier(Thread.current)] == nil
+      {
         condition.wait()
       }
       return takeReleasableHandleLocked()
     }
     if let handle {
-      functions.release(handle)
+      releaseHandle(handle)
     }
   }
 
@@ -285,7 +376,47 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
       return handle
     }
     if let handle {
-      functions.release(handle)
+      releaseHandle(handle)
+    }
+  }
+
+  /// Native release returns once a cancel callback on another thread has
+  /// returned and clears the registration, so the boxes are unreachable after
+  /// it. A callback that releases its own request keeps its box alive through
+  /// the reference the trampoline holds.
+  private func releaseHandle(_ handle: NativeResourceRequestHandle) {
+    functions.release(handle)
+    for box in takeCancelBoxes() {
+      box.release()
+    }
+  }
+
+  private func takeCancelBoxes()
+    -> [Unmanaged<NativeResourceRequestCancelBox>]
+  {
+    condition.withLock {
+      let boxes = cancelBoxes
+      cancelBoxes = []
+      return boxes
+    }
+  }
+
+  private func beginCancelCallback() {
+    condition.withLock {
+      cancelCallbackThreads[ObjectIdentifier(Thread.current), default: 0] += 1
+    }
+  }
+
+  private func endCancelCallback() {
+    condition.withLock {
+      let thread = ObjectIdentifier(Thread.current)
+      let depth = (cancelCallbackThreads[thread] ?? 1) - 1
+      if depth > 0 {
+        cancelCallbackThreads[thread] = depth
+      } else {
+        cancelCallbackThreads.removeValue(forKey: thread)
+      }
+      condition.broadcast()
     }
   }
 

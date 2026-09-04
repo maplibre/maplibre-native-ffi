@@ -528,6 +528,13 @@ internal object NativeAccess {
       outCancelled.get(ValueLayout.JAVA_BOOLEAN, 0)
     }
 
+  internal fun setResourceRequestCancelCallback(
+    handle: NativeResourceRequest,
+    callback: MemorySegment,
+    userData: MemorySegment,
+  ): Int =
+    resourceRequestSetCancelCallbackFunction().invokeNative(handle, callback, userData) as Int
+
   internal fun releaseResourceRequest(handle: NativeResourceRequest) {
     resourceRequestReleaseFunction().invokeNative(handle)
   }
@@ -3434,6 +3441,9 @@ internal object NativeAccess {
 
   private fun resourceRequestCancelledFunction(): MethodHandle =
     downcall("mln_resource_request_cancelled")
+
+  private fun resourceRequestSetCancelCallbackFunction(): MethodHandle =
+    downcall("mln_resource_request_set_cancel_callback")
 
   private fun resourceRequestReleaseFunction(): MethodHandle =
     downcall("mln_resource_request_release")

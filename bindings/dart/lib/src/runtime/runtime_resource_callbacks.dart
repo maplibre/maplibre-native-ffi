@@ -344,3 +344,58 @@ ResourceRequest _copyResourceRequest(
     priorData: priorData,
   );
 }
+
+/// Dart callback run when MapLibre cancels a provider resource request.
+typedef ResourceRequestCancelCallback = void Function();
+
+/// Cancel registrations this isolate owns, keyed by resource request id.
+final Map<int, _ResourceRequestCancelState> _resourceRequestCancelStates = {};
+
+/// Retains the native trampoline for one resource request cancel registration.
+final class _ResourceRequestCancelState extends RetainedCallbackState {
+  _ResourceRequestCancelState(
+    this._requestId,
+    ResourceRequestCancelCallback callback,
+  ) {
+    listener =
+        NativeCallable<
+          raw.mln_resource_request_cancel_callbackFunction
+        >.listener((Pointer<Void> _) {
+          // The C API reports a cancellation at most once per request, so the
+          // registration retires as soon as native delivery reaches Dart.
+          _forgetResourceRequestCancelState(_requestId, this);
+          runUpcall(() {
+            try {
+              callback();
+            } catch (_) {
+              // An exception must not escape into native callback delivery.
+            }
+          });
+          close();
+        });
+  }
+
+  final int _requestId;
+  late final NativeCallable<raw.mln_resource_request_cancel_callbackFunction>
+  listener;
+
+  @override
+  void closeResources() {
+    listener.close();
+  }
+}
+
+/// Drops [state] from the registry when it is still the live registration.
+void _forgetResourceRequestCancelState(
+  int requestId,
+  _ResourceRequestCancelState state,
+) {
+  if (identical(_resourceRequestCancelStates[requestId], state)) {
+    _resourceRequestCancelStates.remove(requestId);
+  }
+}
+
+/// Retires the registration [requestId] owns on this isolate, if any.
+void _retireResourceRequestCancelState(int requestId) {
+  _resourceRequestCancelStates.remove(requestId)?.close();
+}

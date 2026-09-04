@@ -117,3 +117,24 @@ func goMaplibreResourceProvider(userData unsafe.Pointer, request *C.mln_resource
 	}
 	return C.uint32_t(handle.invokeProvider(state, request))
 }
+
+// goMaplibreResourceRequestCancel reports one cancelled provider request. The C
+// API invokes it at most once per registration, on the MapLibre thread that
+// retires the request, and a host panic inside the callback stops here rather
+// than unwinding into C.
+//
+//export goMaplibreResourceRequestCancel
+func goMaplibreResourceRequestCancel(userData unsafe.Pointer) {
+	defer func() { _ = recover() }()
+
+	if userData == nil {
+		return
+	}
+	// Value panics for a registration this binding already freed, which the
+	// recover above contains.
+	state, ok := cgo.Handle(uintptr(userData)).Value().(*resourceCancelState)
+	if !ok {
+		return
+	}
+	state.invoke()
+}

@@ -58,6 +58,17 @@ auto mln_resource_request_cancelled(
   });
 }
 
+auto mln_resource_request_set_cancel_callback(
+  mln_resource_request_handle handle,
+  mln_resource_request_cancel_callback callback, void* user_data
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::set_resource_request_cancel_callback(
+      handle, callback, user_data
+    );
+  });
+}
+
 auto mln_resource_request_wait_until_retired(
   mln_resource_request_handle handle
 ) noexcept -> mln_status {

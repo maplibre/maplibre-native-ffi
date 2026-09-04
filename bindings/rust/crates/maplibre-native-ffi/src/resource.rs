@@ -70,7 +70,35 @@ impl ResourceRequestHandle {
         self.state.is_cancelled()
     }
 
+    /// Registers the callback that runs when MapLibre cancels this request,
+    /// replacing any previous one.
+    ///
+    /// MapLibre runs the callback at most once per request, on the thread that
+    /// cancels it, and skips a request the provider already completed.
+    /// Registering on a request MapLibre already cancelled runs the callback
+    /// before this call returns. A panic inside the callback is contained and
+    /// discarded, because unwinding into native code is undefined behavior and
+    /// the cancel path reports no status.
+    ///
+    /// The callback may complete or close this same request, which is how a
+    /// host retires it early: share the handle through `Arc<Mutex<Option<_>>>`
+    /// and take it from inside the callback. It must not use the map or runtime
+    /// the request came from.
+    pub fn set_cancel_callback<F>(&self, callback: F) -> Result<()>
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        self.state.set_cancel_callback(Some(Arc::new(callback)))
+    }
+
+    /// Clears the registered cancel callback. The request keeps running.
+    pub fn clear_cancel_callback(&self) -> Result<()> {
+        self.state.set_cancel_callback(None)
+    }
+
     /// Releases the provider-owned request handle without completing it.
+    /// Releasing waits for a cancel callback running on another thread, and
+    /// returns without waiting from inside that callback.
     pub fn close(self) {
         self.state.close();
     }
@@ -369,6 +397,7 @@ mod tests {
     static COMPLETE_COUNT: AtomicUsize = AtomicUsize::new(0);
     static CANCELLED_COUNT: AtomicUsize = AtomicUsize::new(0);
     static RELEASE_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static SET_CANCEL_COUNT: AtomicUsize = AtomicUsize::new(0);
     static CANCELLED_VALUE: AtomicBool = AtomicBool::new(false);
     static COMPLETE_STATUS: AtomicI32 = AtomicI32::new(sys::MLN_STATUS_OK);
 
@@ -397,16 +426,41 @@ mod tests {
         RELEASE_COUNT.fetch_add(1, Ordering::SeqCst);
     }
 
+    /// Stands in for the C API's registration, running the callback inline when
+    /// the request is already cancelled.
+    unsafe extern "C" fn fake_set_cancel_callback(
+        _handle: sys::mln_resource_request_handle,
+        callback: sys::mln_resource_request_cancel_callback,
+        user_data: *mut c_void,
+    ) -> sys::mln_status {
+        SET_CANCEL_COUNT.fetch_add(1, Ordering::SeqCst);
+        if let Some(callback) = callback
+            && CANCELLED_VALUE.load(Ordering::SeqCst)
+        {
+            // SAFETY: user_data is the callback storage the binding registered.
+            unsafe { callback(user_data) };
+        }
+        sys::MLN_STATUS_OK
+    }
+
     fn fake_fns() -> ResourceRequestHandleFns {
         // SAFETY: These fake functions implement the same ownership contract as
         // the native handle functions for tests.
-        unsafe { ResourceRequestHandleFns::new(fake_complete, fake_cancelled, fake_release) }
+        unsafe {
+            ResourceRequestHandleFns::new(
+                fake_complete,
+                fake_cancelled,
+                fake_set_cancel_callback,
+                fake_release,
+            )
+        }
     }
 
     fn reset_fake_handle_state() {
         COMPLETE_COUNT.store(0, Ordering::SeqCst);
         CANCELLED_COUNT.store(0, Ordering::SeqCst);
         RELEASE_COUNT.store(0, Ordering::SeqCst);
+        SET_CANCEL_COUNT.store(0, Ordering::SeqCst);
         CANCELLED_VALUE.store(false, Ordering::SeqCst);
         COMPLETE_STATUS.store(sys::MLN_STATUS_OK, Ordering::SeqCst);
     }
@@ -715,6 +769,102 @@ mod tests {
 
         assert_eq!(decision, UNKNOWN_PROVIDER_DECISION);
         assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    // Spec coverage: BND-198.
+    fn stale_request_rejects_cancel_registration_as_closed() {
+        let _guard = FAKE_HANDLE_TEST_LOCK.lock().unwrap();
+        reset_fake_handle_state();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let state = ResourceProviderState {
+            callback: Box::new(move |_, handle| {
+                sender.send(handle).unwrap();
+                ResourceProviderDecision::PassThrough
+            }),
+            handle_fns: fake_fns(),
+        };
+        let raw_request = request();
+        let decision = state.invoke(
+            &raw_request,
+            sys::mln_resource_request_handle(0x0c00_0000_0000_0034),
+        );
+        let handle = receiver.recv().unwrap();
+        assert_eq!(decision, sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH);
+
+        let error = handle.set_cancel_callback(|| {}).unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert_eq!(SET_CANCEL_COUNT.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    // Spec coverage: BND-198 and BND-121. Cancellation reports no status, so a
+    // panic inside the callback is contained and discarded.
+    fn cancel_callback_panic_does_not_unwind_into_c() {
+        let _guard = FAKE_HANDLE_TEST_LOCK.lock().unwrap();
+        let handle = fake_handle();
+        assert_eq!(
+            handle
+                .state
+                .finish_provider_decision(ResourceProviderDecision::Handle),
+            sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
+        );
+        // The fake registration runs the callback inline, like a request
+        // MapLibre cancelled before the host registered.
+        CANCELLED_VALUE.store(true, Ordering::SeqCst);
+        let calls = Arc::new(AtomicUsize::new(0));
+        let callback_calls = Arc::clone(&calls);
+
+        handle
+            .set_cancel_callback(move || {
+                callback_calls.fetch_add(1, Ordering::SeqCst);
+                panic!("boom");
+            })
+            .unwrap();
+
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        handle.close();
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    // Spec coverage: BND-198. Replacing a registration keeps the previous
+    // callback alive across the C call that replaces it, and only the current
+    // callback runs afterwards.
+    fn replacing_the_cancel_callback_releases_the_previous_one() {
+        let _guard = FAKE_HANDLE_TEST_LOCK.lock().unwrap();
+        let handle = fake_handle();
+        assert_eq!(
+            handle
+                .state
+                .finish_provider_decision(ResourceProviderDecision::Handle),
+            sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
+        );
+        let first_token = Arc::new(());
+        let callback_token = Arc::clone(&first_token);
+        handle
+            .set_cancel_callback(move || {
+                let _ = &callback_token;
+                panic!("the replaced callback must not run");
+            })
+            .unwrap();
+        assert_eq!(Arc::strong_count(&first_token), 2);
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        let callback_calls = Arc::clone(&calls);
+        CANCELLED_VALUE.store(true, Ordering::SeqCst);
+        handle
+            .set_cancel_callback(move || {
+                callback_calls.fetch_add(1, Ordering::SeqCst);
+            })
+            .unwrap();
+
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(Arc::strong_count(&first_token), 1);
+        handle.clear_cancel_callback().unwrap();
+        assert_eq!(SET_CANCEL_COUNT.load(Ordering::SeqCst), 3);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 
     #[test]

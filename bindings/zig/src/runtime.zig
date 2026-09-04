@@ -51,7 +51,29 @@ const ResourceRequestState = struct {
     native: c.mln_resource_request_handle,
     completed: bool,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
+    /// Registered cancel callback, kept alive until release.
+    cancel_state: ?*ResourceRequestCancelState,
+    /// Registrations this request replaced. Native replacement does not wait
+    /// for a cancel callback it already started, so replaced registrations
+    /// stay alive until the native release that does wait returns.
+    retired_cancel_states: ?*ResourceRequestCancelState,
+    /// Binding operations running on this request. The last one out frees this
+    /// state once the request is released.
+    active_operations: usize,
+    released: bool,
 };
+
+const ResourceRequestCancelState = struct {
+    native: c.mln_resource_request_handle,
+    handler: ResourceRequestCancelHandler,
+    context: ?*anyopaque,
+    /// Links replaced registrations into their request's retired list.
+    next: ?*ResourceRequestCancelState = null,
+};
+
+/// Native request whose cancel callback runs on this thread, or 0. Release
+/// reads it to skip a wait it would otherwise deadlock on.
+threadlocal var running_cancel_callback: c.mln_resource_request_handle = 0;
 
 const WakeSourceState = struct {
     native: c.mln_wake_source,
@@ -523,6 +545,23 @@ pub const ResourceProvider = struct {
     context: ?*anyopaque = null,
 };
 
+/// Reports that MapLibre cancelled a handled resource request.
+///
+/// The handler runs at most once per request, on the thread that cancels it,
+/// and never for a request the provider already completed. That thread is the
+/// runtime owner thread inside a map or runtime call and a MapLibre thread
+/// otherwise. It must
+/// be thread-safe, return quickly, and must not call map or runtime functions.
+/// It may complete or release the cancelled request. The handler returns
+/// normally; a panic inside it aborts the process rather than unwinding into
+/// the C API.
+pub const ResourceRequestCancelHandler = *const fn (context: ?*anyopaque) void;
+
+pub const ResourceRequestCancelCallback = struct {
+    handler: ResourceRequestCancelHandler,
+    context: ?*anyopaque = null,
+};
+
 pub const ResourceRequestHandle = enum(c.mln_resource_request_handle) {
     _,
 
@@ -551,13 +590,80 @@ pub const ResourceRequestHandle = enum(c.mln_resource_request_handle) {
         return is_cancelled;
     }
 
+    /// Registers, replaces, or clears the callback MapLibre runs when it
+    /// cancels this request; passing null clears it. Usable from any thread
+    /// while the provider owns the handle.
+    ///
+    /// The binding keeps the handler and context alive until release returns,
+    /// including after a replacement, because MapLibre may already be running
+    /// the registration being replaced. Registering on a request MapLibre
+    /// already cancelled runs the handler on the calling thread before this
+    /// call returns. A released handle reports `error.ClosedHandle`.
+    pub fn setCancelCallback(self: ResourceRequestHandle, callback: ?ResourceRequestCancelCallback) status.Error!void {
+        const request_state = beginResourceRequestOperation(self) orelse return error.ClosedHandle;
+        defer endResourceRequestOperation(request_state);
+        if (request_state.native == 0) return error.ClosedHandle;
+
+        var replacement: ?*ResourceRequestCancelState = null;
+        if (callback) |value| {
+            replacement = try std.heap.smp_allocator.create(ResourceRequestCancelState);
+            replacement.?.* = .{
+                .native = request_state.native,
+                .handler = value.handler,
+                .context = value.context,
+            };
+        }
+
+        // The registry lock stays unheld across the C call: a request MapLibre
+        // already cancelled runs the handler before the call returns, and that
+        // handler may complete or release this same request. Any registration
+        // this one replaces moves to the retired list rather than being freed:
+        // native replacement returns without waiting for a cancel callback it
+        // already handed to the MapLibre thread.
+        swapResourceRequestCancelState(request_state, replacement);
+        const native_status = c.mln_resource_request_set_cancel_callback(
+            request_state.native,
+            if (replacement == null) null else resourceRequestCancelTrampoline,
+            replacement,
+        );
+        if (native_status != c.MLN_STATUS_OK) {
+            // The native side rejected the registration, so nothing reaches it.
+            retireResourceRequestCancelState(request_state, replacement);
+        }
+        try status.checkStatus(native_status, request_state.diagnostic_store);
+    }
+
+    /// Releases the provider's reference to this request. Later operations on
+    /// it report `error.ClosedHandle`.
+    ///
+    /// Release waits for binding operations and a cancel callback running on
+    /// another thread, so the handler's context may be freed once it returns.
+    /// Release from inside this request's cancel callback returns without
+    /// waiting.
     pub fn release(self: ResourceRequestHandle) void {
         lockResourceRequestRegistry();
-        defer unlockResourceRequestRegistry();
+        const request_state = unregisterResourceRequestState(self) orelse {
+            unlockResourceRequestRegistry();
+            return;
+        };
+        unlockResourceRequestRegistry();
 
-        const request_state = unregisterResourceRequestState(self) orelse return;
-        defer std.heap.smp_allocator.destroy(request_state);
-        c.mln_resource_request_release(request_state.native);
+        // A release from inside this request's cancel callback cannot wait: the
+        // registration that invoked the callback still holds an operation on
+        // this thread's stack.
+        if (running_cancel_callback != request_state.native) {
+            waitForResourceRequestOperations(request_state);
+        }
+        const native_handle = request_state.native;
+        const registrations = takeResourceRequestCancelStates(request_state);
+        c.mln_resource_request_release(native_handle);
+        // The native release returned, so no cancel callback can still read the
+        // registrations behind it.
+        freeResourceRequestCancelStates(registrations);
+        // A concurrent registration that raced this release owns nothing the
+        // native side can still reach, so it is freed here too.
+        freeResourceRequestCancelStates(takeResourceRequestCancelStates(request_state));
+        finishResourceRequestState(request_state);
     }
 };
 
@@ -2018,17 +2124,149 @@ fn createResourceRequestHandle(
     if (native_handle == 0) return null;
     const request_handle = native_handle;
     const request_state = try std.heap.smp_allocator.create(ResourceRequestState);
-    request_state.* = .{ .native = request_handle, .completed = false, .diagnostic_store = diagnostic_store };
+    request_state.* = .{
+        .native = request_handle,
+        .completed = false,
+        .diagnostic_store = diagnostic_store,
+        .cancel_state = null,
+        .retired_cancel_states = null,
+        .active_operations = 0,
+        .released = false,
+    };
     errdefer std.heap.smp_allocator.destroy(request_state);
     return try registerResourceRequestState(request_handle, request_state);
 }
 
 fn destroyUnreleasedResourceRequestHandle(handle: ResourceRequestHandle) void {
     lockResourceRequestRegistry();
+    const request_state = unregisterResourceRequestState(handle) orelse {
+        unlockResourceRequestRegistry();
+        return;
+    };
+    unlockResourceRequestRegistry();
+
+    const native_handle = request_state.native;
+    const registrations = takeResourceRequestCancelStates(request_state);
+    if (registrations != null) {
+        // Clearing never runs the callback, and stops the passed-through
+        // request from reaching the registrations freed below.
+        _ = c.mln_resource_request_set_cancel_callback(native_handle, null, null);
+    }
+    freeResourceRequestCancelStates(registrations);
+    finishResourceRequestState(request_state);
+}
+
+fn resourceRequestCancelTrampoline(user_data: ?*anyopaque) callconv(.c) void {
+    const cancel_state: *ResourceRequestCancelState = @ptrCast(@alignCast(user_data orelse return));
+    // Read the registration before the handler runs: the handler may release
+    // this request, which frees the state behind it.
+    const native_handle = cancel_state.native;
+    const handler = cancel_state.handler;
+    const context = cancel_state.context;
+    const previous = running_cancel_callback;
+    running_cancel_callback = native_handle;
+    defer running_cancel_callback = previous;
+    handler(context);
+}
+
+/// Installs a registration and retires the one it replaces. Retiring under the
+/// same lock keeps every registration owned by exactly one list.
+fn swapResourceRequestCancelState(
+    request_state: *ResourceRequestState,
+    replacement: ?*ResourceRequestCancelState,
+) void {
+    lockResourceRequestRegistry();
     defer unlockResourceRequestRegistry();
 
-    const request_state = unregisterResourceRequestState(handle) orelse return;
+    if (request_state.cancel_state) |previous| {
+        previous.next = request_state.retired_cancel_states;
+        request_state.retired_cancel_states = previous;
+    }
+    request_state.cancel_state = replacement;
+}
+
+/// Retires a registration the native side rejected, unless another thread
+/// already replaced it and owns it.
+fn retireResourceRequestCancelState(
+    request_state: *ResourceRequestState,
+    registration: ?*ResourceRequestCancelState,
+) void {
+    lockResourceRequestRegistry();
+    defer unlockResourceRequestRegistry();
+
+    if (registration == null or request_state.cancel_state != registration) return;
+    request_state.cancel_state = null;
+    registration.?.next = request_state.retired_cancel_states;
+    request_state.retired_cancel_states = registration;
+}
+
+/// Takes every registration this request still owns, as one list.
+fn takeResourceRequestCancelStates(request_state: *ResourceRequestState) ?*ResourceRequestCancelState {
+    lockResourceRequestRegistry();
+    defer unlockResourceRequestRegistry();
+
+    var head = request_state.retired_cancel_states;
+    request_state.retired_cancel_states = null;
+    if (request_state.cancel_state) |current| {
+        current.next = head;
+        head = current;
+        request_state.cancel_state = null;
+    }
+    return head;
+}
+
+fn freeResourceRequestCancelStates(head: ?*ResourceRequestCancelState) void {
+    var next = head;
+    while (next) |state| {
+        next = state.next;
+        std.heap.smp_allocator.destroy(state);
+    }
+}
+
+fn beginResourceRequestOperation(handle: ResourceRequestHandle) ?*ResourceRequestState {
+    lockResourceRequestRegistry();
+    defer unlockResourceRequestRegistry();
+
+    const request_state = resourceRequestState(handle) orelse return null;
+    request_state.active_operations += 1;
+    return request_state;
+}
+
+fn endResourceRequestOperation(request_state: *ResourceRequestState) void {
+    lockResourceRequestRegistry();
+    request_state.active_operations -= 1;
+    const abandoned = request_state.released and request_state.active_operations == 0;
+    unlockResourceRequestRegistry();
+
+    if (abandoned) destroyResourceRequestState(request_state);
+}
+
+/// Marks an unregistered request released and frees its state, unless an
+/// operation is still running on it. That operation frees the state instead.
+fn finishResourceRequestState(request_state: *ResourceRequestState) void {
+    lockResourceRequestRegistry();
+    request_state.released = true;
+    const abandoned = request_state.active_operations == 0;
+    unlockResourceRequestRegistry();
+
+    if (abandoned) destroyResourceRequestState(request_state);
+}
+
+/// Frees a released request no other thread can reach, with any registration
+/// left behind by an operation that raced the release.
+fn destroyResourceRequestState(request_state: *ResourceRequestState) void {
+    freeResourceRequestCancelStates(takeResourceRequestCancelStates(request_state));
     std.heap.smp_allocator.destroy(request_state);
+}
+
+fn waitForResourceRequestOperations(request_state: *ResourceRequestState) void {
+    while (true) {
+        lockResourceRequestRegistry();
+        const active_operations = request_state.active_operations;
+        unlockResourceRequestRegistry();
+        if (active_operations == 0) return;
+        std.Thread.yield() catch {};
+    }
 }
 
 fn registerRuntimeState(native_handle: c.mln_runtime, runtime_state: *RuntimeState) std.mem.Allocator.Error!RuntimeHandle {

@@ -336,6 +336,139 @@ class RuntimeHandleTest {
     }
   }
 
+  // BND-198.
+  @Test
+  fun cancelCallbackRunsOnceAndClosesItsRequestFromInside() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      val handledRequest = AtomicReference<ResourceRequestHandle?>(null)
+      val cancels = AtomicInt(0)
+      runtime.setResourceProvider(
+        ResourceProviderCallback { request, handle ->
+          if (request.requestedUrl != "custom://cancel-callback-style.json") {
+            return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
+          }
+          handledRequest.store(handle)
+          ResourceProviderDecision.HANDLE
+        }
+      )
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+          },
+        )
+      map.setStyleUrl("custom://cancel-callback-style.json")
+      val handle = waitForHandledRequest(runtime, handledRequest)
+      handle.setCancelCallback {
+        cancels.addAndFetch(1)
+        handle.close()
+      }
+
+      map.close()
+
+      assertTrue(
+        waitForCondition {
+          runtime.pump(1)
+          cancels.load() == 1
+        }
+      )
+      // The callback closed the request, so a later use reports the closed handle.
+      assertFailsWith<InvalidStateException> { handle.isCancelled() }
+      repeat(CANCEL_SETTLE_PUMPS) {
+        runtime.pump(1)
+        waitForAsyncTestWork()
+      }
+      assertEquals(1, cancels.load())
+    }
+  }
+
+  // BND-198.
+  @Test
+  fun cancelCallbackRegisteredAfterCancellationRunsBeforeRegistrationReturns() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      val handledRequest = AtomicReference<ResourceRequestHandle?>(null)
+      runtime.setResourceProvider(
+        ResourceProviderCallback { request, handle ->
+          if (request.requestedUrl != "custom://late-cancel-callback-style.json") {
+            return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
+          }
+          handledRequest.store(handle)
+          ResourceProviderDecision.HANDLE
+        }
+      )
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+          },
+        )
+      map.setStyleUrl("custom://late-cancel-callback-style.json")
+      val handle = waitForHandledRequest(runtime, handledRequest)
+      map.close()
+      assertTrue(waitForRequestCancellation(runtime, handle))
+
+      val cancels = AtomicInt(0)
+      val completionFailure = AtomicReference<Throwable?>(null)
+      handle.setCancelCallback {
+        cancels.addAndFetch(1)
+        completionFailure.store(
+          assertFailsWith<InvalidStateException> {
+            handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
+          }
+        )
+      }
+
+      assertEquals(1, cancels.load())
+      assertTrue(completionFailure.load() is InvalidStateException)
+      handle.close()
+    }
+  }
+
+  // BND-198.
+  @Test
+  fun cancelCallbackStaysUninvokedForACompletedRequest() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      val handledRequest = AtomicReference<ResourceRequestHandle?>(null)
+      val cancels = AtomicInt(0)
+      runtime.setResourceProvider(
+        ResourceProviderCallback { request, handle ->
+          if (request.requestedUrl != "custom://completed-cancel-callback-style.json") {
+            return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
+          }
+          handledRequest.store(handle)
+          ResourceProviderDecision.HANDLE
+        }
+      )
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+          },
+        )
+      map.setStyleUrl("custom://completed-cancel-callback-style.json")
+      val handle = waitForHandledRequest(runtime, handledRequest)
+      handle.setCancelCallback { cancels.addAndFetch(1) }
+      handle.complete(
+        ResourceResponse(ResourceResponseStatus.OK).apply { bytes = STYLE_JSON.encodeToByteArray() }
+      )
+      assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED))
+
+      map.close()
+
+      repeat(CANCEL_SETTLE_PUMPS) {
+        runtime.pump(1)
+        waitForAsyncTestWork()
+      }
+      assertEquals(0, cancels.load())
+    }
+  }
+
   // BND-154.
   @Test
   fun resourceProviderIsConsultedUntilClearedWhileMapIsLive() {
@@ -664,4 +797,5 @@ class RuntimeHandleTest {
   }
 }
 
+private const val CANCEL_SETTLE_PUMPS = 50
 private const val STYLE_JSON = """{"version":8,"sources":{},"layers":[]}"""

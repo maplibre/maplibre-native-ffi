@@ -2095,6 +2095,180 @@ mod tests {
         runtime.close().unwrap();
     }
 
+    /// Pumps the runtime until the condition holds, returning whether it did.
+    fn pump_until(runtime: &mut RuntimeHandle, condition: impl Fn() -> bool) -> bool {
+        for _ in 0..100 {
+            if condition() {
+                return true;
+            }
+            runtime.pump(Some(Duration::ZERO), None).unwrap();
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        condition()
+    }
+
+    #[test]
+    // Spec coverage: BND-198.
+    fn cancel_callback_runs_once_when_the_map_discards_the_request() {
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let cancels = Arc::new(AtomicUsize::new(0));
+        let callback_cancels = Arc::clone(&cancels);
+        let (sender, receiver) = std::sync::mpsc::channel();
+        runtime
+            .set_resource_provider(move |request, handle| {
+                if request.requested_url != "custom://cancel-style.json" {
+                    return ResourceProviderDecision::PassThrough;
+                }
+                let cancels = Arc::clone(&callback_cancels);
+                handle
+                    .set_cancel_callback(move || {
+                        cancels.fetch_add(1, Ordering::SeqCst);
+                    })
+                    .unwrap();
+                sender.send(handle).unwrap();
+                ResourceProviderDecision::Handle
+            })
+            .unwrap();
+
+        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+        map.set_style_url("custom://cancel-style.json").unwrap();
+        let handle = receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("provider should send handled request");
+        assert_eq!(cancels.load(Ordering::SeqCst), 0);
+
+        map.close().unwrap();
+
+        assert!(pump_until(&mut runtime, || cancels.load(Ordering::SeqCst) == 1));
+        assert!(handle.is_cancelled().unwrap());
+        // The cancelled request rejects a late completion and stays at one call.
+        assert_eq!(
+            handle
+                .complete(ResourceResponse::no_content())
+                .unwrap_err()
+                .kind(),
+            ErrorKind::InvalidState
+        );
+        assert_eq!(cancels.load(Ordering::SeqCst), 1);
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    // Spec coverage: BND-198.
+    fn cancel_callback_may_close_its_own_request() {
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let cancelled_request: Arc<Mutex<Option<crate::ResourceRequestHandle>>> =
+            Arc::new(Mutex::new(None));
+        let provider_request = Arc::clone(&cancelled_request);
+        let closed = Arc::new(AtomicUsize::new(0));
+        let callback_closed = Arc::clone(&closed);
+        runtime
+            .set_resource_provider(move |request, handle| {
+                if request.requested_url != "custom://cancel-style.json" {
+                    return ResourceProviderDecision::PassThrough;
+                }
+                let callback_request = Arc::clone(&provider_request);
+                let closed = Arc::clone(&callback_closed);
+                handle
+                    .set_cancel_callback(move || {
+                        let request = callback_request.lock().unwrap().take();
+                        request.expect("the cancelled request").close();
+                        closed.fetch_add(1, Ordering::SeqCst);
+                    })
+                    .unwrap();
+                *provider_request.lock().unwrap() = Some(handle);
+                ResourceProviderDecision::Handle
+            })
+            .unwrap();
+
+        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+        map.set_style_url("custom://cancel-style.json").unwrap();
+        assert!(pump_until(&mut runtime, || cancelled_request
+            .lock()
+            .unwrap()
+            .is_some()));
+
+        map.close().unwrap();
+
+        assert!(pump_until(&mut runtime, || closed.load(Ordering::SeqCst) == 1));
+        assert!(cancelled_request.lock().unwrap().is_none());
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    // Spec coverage: BND-198.
+    fn cancel_callback_skips_a_completed_request() {
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let cancels = Arc::new(AtomicUsize::new(0));
+        let callback_cancels = Arc::clone(&cancels);
+        runtime
+            .set_resource_provider(move |request, handle| {
+                if request.requested_url != "custom://cancel-style.json" {
+                    return ResourceProviderDecision::PassThrough;
+                }
+                let cancels = Arc::clone(&callback_cancels);
+                handle
+                    .set_cancel_callback(move || {
+                        cancels.fetch_add(1, Ordering::SeqCst);
+                    })
+                    .unwrap();
+                handle
+                    .complete(ResourceResponse::ok(
+                        PROVIDER_STYLE_JSON.as_bytes().to_vec(),
+                    ))
+                    .unwrap();
+                ResourceProviderDecision::Handle
+            })
+            .unwrap();
+
+        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+        map.set_style_url("custom://cancel-style.json").unwrap();
+        assert!(wait_for_runtime_event(
+            &mut runtime,
+            RuntimeEventType::MapStyleLoaded
+        ));
+
+        map.close().unwrap();
+
+        // MapLibre runs its cancel hook on every request teardown, so this
+        // proves the completed request reports no cancellation.
+        assert!(!pump_until(&mut runtime, || cancels.load(Ordering::SeqCst) > 0));
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    // Spec coverage: BND-198. Registering makes the binding retire the request
+    // itself, so a provider that then panics has to answer the request here:
+    // otherwise the style load would wait for a response that never arrives.
+    fn provider_panic_after_a_cancel_registration_fails_the_style_load() {
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        runtime
+            .set_resource_provider(move |request, handle| {
+                if request.requested_url != "custom://cancel-style.json" {
+                    return ResourceProviderDecision::PassThrough;
+                }
+                handle.set_cancel_callback(|| {}).unwrap();
+                panic!("provider failed after registering a cancel callback");
+            })
+            .unwrap();
+
+        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+        let map_id = map.id();
+        map.set_style_url("custom://cancel-style.json").unwrap();
+
+        let event = wait_for_map_loading_failure(&mut runtime);
+
+        assert_eq!(event.source, RuntimeEventSource::Map(map_id));
+        assert!(
+            event
+                .message
+                .as_deref()
+                .is_some_and(|message| message.contains("unknown decision"))
+        );
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
     #[test]
     // Spec coverage: BND-149.
     fn resource_provider_error_response_becomes_copied_loading_failure_event() {

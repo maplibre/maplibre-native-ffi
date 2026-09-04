@@ -8,6 +8,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <thread>
 #include <utility>
 
 #include <mln/actor/actor_ref.hpp>
@@ -31,10 +32,19 @@ struct ResourceRequestObject {
       : actor(std::move(actor_)) {}
 
   mutable std::mutex mutex;
-  std::condition_variable retired_changed;
+  // Signals retirement and the end of an in-flight cancel callback.
+  std::condition_variable state_changed;
   bool cancelled = false;
   bool completed = false;
   bool retired = false;
+  mln_resource_request_cancel_callback cancel_callback = nullptr;
+  void* cancel_user_data = nullptr;
+  // Counts cancel callbacks in progress, so release and replacement can wait
+  // for them from a foreign thread and return immediately from inside one.
+  // A depth rather than a flag: a callback may register another callback,
+  // which runs nested when the request is already cancelled.
+  int cancel_callbacks_running = 0;
+  std::thread::id cancel_callback_thread;
   mln::ActorRef<mln::FileSourceRequest> actor;
 };
 
@@ -201,17 +211,75 @@ auto response_from_abi(const mln_resource_response& provider_response)
   return response;
 }
 
+struct TakenCancelCallback {
+  mln_resource_request_cancel_callback callback = nullptr;
+  void* user_data = nullptr;
+};
+
+// Takes the registered callback for invocation. Marks it running in the same
+// critical section, so a release on another thread waits for it.
+auto take_cancel_callback_locked(ResourceRequestObject& object)
+  -> TakenCancelCallback {
+  auto taken = TakenCancelCallback{
+    .callback = std::exchange(object.cancel_callback, nullptr),
+    .user_data = std::exchange(object.cancel_user_data, nullptr),
+  };
+  if (taken.callback != nullptr) {
+    object.cancel_callbacks_running += 1;
+    object.cancel_callback_thread = std::this_thread::get_id();
+  }
+  return taken;
+}
+
+// Runs a callback taken by take_cancel_callback_locked(). The callback runs
+// unlocked so it may call request functions, including release, for the same
+// handle.
+void run_cancel_callback(
+  ResourceRequestObject& object, const TakenCancelCallback& taken
+) noexcept {
+  try {
+    taken.callback(taken.user_data);
+  } catch (...) {
+    // Host callbacks must not unwind through MapLibre's cancel path.
+  }
+  {
+    const std::scoped_lock lock(object.mutex);
+    object.cancel_callbacks_running -= 1;
+  }
+  object.state_changed.notify_all();
+}
+
+// Blocks until no cancel callback runs on another thread. Called with the
+// object mutex held. From inside a callback this returns at once.
+void wait_for_foreign_cancel_callback_locked(
+  ResourceRequestObject& object, std::unique_lock<std::mutex>& lock
+) {
+  if (object.cancel_callback_thread == std::this_thread::get_id()) {
+    return;
+  }
+  object.state_changed.wait(lock, [&object] {
+    return object.cancel_callbacks_running == 0;
+  });
+}
+
 // Retires the id so no later call can reach this request. Idempotent.
+//
+// Waits for a cancel callback running on another thread, so the host may free
+// the callback's user_data once release returns. From inside the callback the
+// retirement completes without waiting.
 void retire_request(mln_resource_request_handle handle) noexcept {
   auto object = handle_table<ResourceRequestObject>().remove(handle);
   if (object == nullptr) {
     return;
   }
   {
-    const std::scoped_lock lock(object->mutex);
+    auto lock = std::unique_lock{object->mutex};
     object->retired = true;
+    object->cancel_callback = nullptr;
+    object->cancel_user_data = nullptr;
+    wait_for_foreign_cancel_callback_locked(*object, lock);
   }
-  object->retired_changed.notify_all();
+  object->state_changed.notify_all();
 }
 
 auto bytes_from_string(const std::string& value) -> const std::uint8_t* {
@@ -360,9 +428,20 @@ auto request_custom_resource(
   const auto handle = handle_table<ResourceRequestObject>().insert(object);
   // Capturing the object rather than the id keeps the cancel path off the
   // handle table, adding no lock-ordering edge against mbgl's own locks.
+  // mbgl runs this on every request destruction, including after a response
+  // was delivered, so a completed request does not report cancellation.
   request->onCancel([object]() noexcept -> void {
-    const std::scoped_lock lock(object->mutex);
-    object->cancelled = true;
+    auto taken = TakenCancelCallback{};
+    {
+      const std::scoped_lock lock(object->mutex);
+      object->cancelled = true;
+      if (!object->completed) {
+        taken = take_cancel_callback_locked(*object);
+      }
+    }
+    if (taken.callback != nullptr) {
+      run_cancel_callback(*object, taken);
+    }
   });
   try {
     const auto handled = invoke_custom_provider(
@@ -450,6 +529,31 @@ auto resource_request_cancelled(
   return MLN_STATUS_OK;
 }
 
+auto set_resource_request_cancel_callback(
+  mln_resource_request_handle handle,
+  mln_resource_request_cancel_callback callback, void* user_data
+) -> mln_status {
+  const auto live = handle_table<ResourceRequestObject>().lease(handle);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto taken = TakenCancelCallback{};
+  {
+    auto lock = std::unique_lock{live->mutex};
+    // The previous callback's user_data may be freed once this returns.
+    wait_for_foreign_cancel_callback_locked(*live, lock);
+    live->cancel_callback = callback;
+    live->cancel_user_data = user_data;
+    if (live->cancelled && !live->completed) {
+      taken = take_cancel_callback_locked(*live);
+    }
+  }
+  if (taken.callback != nullptr) {
+    run_cancel_callback(*live, taken);
+  }
+  return MLN_STATUS_OK;
+}
+
 auto wait_for_resource_request_retired(mln_resource_request_handle handle)
   -> mln_status {
   if (handle == MLN_HANDLE_NULL) {
@@ -463,7 +567,7 @@ auto wait_for_resource_request_retired(mln_resource_request_handle handle)
     return MLN_STATUS_OK;
   }
   auto lock = std::unique_lock{live->mutex};
-  live->retired_changed.wait(lock, [&live] { return live->retired; });
+  live->state_changed.wait(lock, [&live] { return live->retired; });
   return MLN_STATUS_OK;
 }
 

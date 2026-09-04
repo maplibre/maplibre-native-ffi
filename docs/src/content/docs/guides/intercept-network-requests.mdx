@@ -101,9 +101,18 @@ provider took stay valid. Complete and release each of them as usual.
 <Code code={region(providerSnippet, "install")} lang="c" title="resource-provider.c" />
 
 A provider with an I/O pool reports the same decision and retains the handle.
-Complete the request from any thread when the bytes arrive. Check for
-cancellation before expensive work. Release each handle exactly once, after
-completion or cancellation.
+Complete the request from any thread when the bytes arrive. Release each handle
+exactly once, after completion or cancellation.
+
+MapLibre cancels a request when the map stops wanting the resource, for example
+after a style change or map teardown. Check for cancellation before expensive
+work, or register a cancel callback to abort an in-flight fetch. The callback
+runs once, for a request the provider has not completed, on the thread that
+discards the request. That is the owner thread inside a map call such as a
+style change or map destruction, and a MapLibre thread otherwise. The callback
+may complete or release the same handle.
+
+<Code code={region(providerSnippet, "cancel")} lang="c" title="resource-provider.c" />
 
 ## Keep callback state reachable
 

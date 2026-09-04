@@ -742,8 +742,64 @@ extension type const ResourceRequestHandle._(NativeResourceRequest _handle) {
         _check(raw.mln_resource_request_complete(_checked.raw, nativeResponse));
       } finally {
         raw.mln_resource_request_release(_checked.raw);
+        _retireResourceRequestCancelState(_handle.raw);
       }
     });
+  }
+
+  /// Registers [callback] to run once when MapLibre cancels this request, or
+  /// clears the registration when [callback] is null.
+  ///
+  /// Each call replaces the previous registration. The callback runs on the
+  /// isolate that registered it, after MapLibre discards a request that this
+  /// provider has left open. A request that is already cancelled schedules the
+  /// callback immediately. A request the provider completed is never reported.
+  ///
+  /// The callback may use this handle, including [complete], which reports
+  /// [InvalidStateException] for a cancelled request, and [close]. An exception
+  /// the callback throws is contained rather than delivered to the isolate.
+  ///
+  /// Register, replace, clear, and retire one request on the same isolate. The
+  /// binding releases the native callback trampoline when the callback runs,
+  /// when another registration replaces it, or when [complete] or [close]
+  /// retires the request on the registering isolate.
+  void setCancelCallback(ResourceRequestCancelCallback? callback) {
+    final requestId = _checked.raw;
+    final previous = _resourceRequestCancelStates[requestId];
+    if (callback == null) {
+      try {
+        _check(
+          raw.mln_resource_request_set_cancel_callback(
+            requestId,
+            nullptr,
+            nullptr,
+          ),
+        );
+      } finally {
+        // The clearing call has returned, whatever its status, so MapLibre
+        // reaches the previous trampoline no longer.
+        _resourceRequestCancelStates.remove(requestId);
+        previous?.close();
+      }
+      return;
+    }
+    final state = _ResourceRequestCancelState(requestId, callback);
+    try {
+      _check(
+        raw.mln_resource_request_set_cancel_callback(
+          requestId,
+          state.listener.nativeFunction,
+          nullptr,
+        ),
+      );
+    } catch (_) {
+      state.close();
+      rethrow;
+    }
+    _resourceRequestCancelStates[requestId] = state;
+    // The replacing call has returned, so MapLibre reaches the previous
+    // trampoline no longer.
+    previous?.close();
   }
 
   /// Releases the provider reference without completing it.
@@ -752,6 +808,7 @@ extension type const ResourceRequestHandle._(NativeResourceRequest _handle) {
   /// safe to call from any isolate holding a copy.
   void close() {
     raw.mln_resource_request_release(_checked.raw);
+    _retireResourceRequestCancelState(_handle.raw);
   }
 
   /// Blocks until this request is completed or released, wherever that happens.

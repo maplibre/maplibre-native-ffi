@@ -9,12 +9,13 @@ use maplibre_native_ffi_sys as sys;
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::ffi::{c_char, c_void};
+use std::mem::ManuallyDrop;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, LazyLock, Mutex, MutexGuard};
 
 /// Wire shape for `maplibre_native_ffi.camera.AnimationOptions`.
 ///
@@ -82,7 +83,87 @@ struct PyHttpHeaderTransformState {
 
 #[pyclass(name = "_ResourceRequestHandle")]
 struct ResourceRequestHandle {
-    state: Arc<maplibre_core::resource::ResourceRequestHandleState>,
+    // Dropped by hand, with the GIL released; see the Drop impl below.
+    state: ManuallyDrop<Arc<maplibre_core::resource::ResourceRequestHandleState>>,
+    handle: u64,
+    // Declared after `state` so the registry entry outlives the release the
+    // Drop impl performs, which waits for a running cancel callback.
+    cancel: CancelCallbackSlot,
+}
+
+impl Drop for ResourceRequestHandle {
+    fn drop(&mut self) {
+        // SAFETY: drop runs once, and nothing reads the field after this take.
+        let state = unsafe { ManuallyDrop::take(&mut self.state) };
+        // The last reference releases the native request, and release waits for
+        // a cancel callback running on a MapLibre thread. That callback needs
+        // the GIL this thread holds while collecting the Python handle, so the
+        // release runs detached.
+        Python::attach(|py| py.detach(move || drop(state)));
+    }
+}
+
+/// Registered cancel callbacks, keyed by a token handed to C as `user_data`.
+///
+/// A token, not a pointer, crosses the C boundary: a callback that arrives
+/// after its request handle went away finds no entry and does nothing, so no
+/// registration can outlive the Python object it belongs to.
+static CANCEL_CALLBACKS: LazyLock<Mutex<HashMap<usize, Py<PyAny>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static NEXT_CANCEL_TOKEN: AtomicUsize = AtomicUsize::new(1);
+
+fn lock_cancel_callbacks() -> MutexGuard<'static, HashMap<usize, Py<PyAny>>> {
+    CANCEL_CALLBACKS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// One request's slot in the cancel callback registry.
+///
+/// The slot owns the token for the life of the Python request handle and clears
+/// the registry entry when that handle goes away.
+struct CancelCallbackSlot {
+    token: usize,
+}
+
+impl CancelCallbackSlot {
+    fn new() -> Self {
+        Self {
+            token: NEXT_CANCEL_TOKEN.fetch_add(1, Ordering::Relaxed),
+        }
+    }
+
+    fn store(&self, callback: Py<PyAny>) {
+        lock_cancel_callbacks().insert(self.token, callback);
+    }
+
+    fn clear(&self) {
+        lock_cancel_callbacks().remove(&self.token);
+    }
+
+    fn take(token: usize) -> Option<Py<PyAny>> {
+        lock_cancel_callbacks().remove(&token)
+    }
+}
+
+impl Drop for CancelCallbackSlot {
+    fn drop(&mut self) {
+        self.clear();
+    }
+}
+
+unsafe extern "C" fn resource_request_cancel_trampoline(user_data: *mut c_void) {
+    let token = user_data as usize;
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let Some(callback) = CancelCallbackSlot::take(token) else {
+            return;
+        };
+        // A host failure is contained here: unwinding into MapLibre's cancel
+        // path is undefined, and the request is already going away.
+        Python::attach(|py| {
+            let _ = callback.bind(py).call0();
+        });
+    }));
 }
 
 // The C API accepts signals and destruction from any thread, so this pyclass is
@@ -1528,11 +1609,25 @@ impl RuntimeHandle {
 
 #[pymethods]
 impl MapHandle {
-    fn close(&self) -> PyResult<()> {
-        let state = self.state();
+    fn close(&self, py: Python<'_>) -> PyResult<()> {
+        let map_handle = {
+            let state = self.state();
+            let Some(map_handle) = state.live_handle() else {
+                return Ok(());
+            };
+            state.mark_closed();
+            map_handle
+        };
         // SAFETY: state owns an mln_map handle created by mln_map_create and
         // pairs it with the matching status-returning destroy function.
-        unsafe { state.close_status(sys::mln_map_destroy) }.map_err(map_error)?;
+        // Destroy discards the map's resource requests, which can run a host
+        // cancel callback on a MapLibre thread, so it runs with neither the GIL
+        // nor the state mutex held.
+        let status = py.detach(move || unsafe { sys::mln_map_destroy(map_handle) });
+        if let Err(error) = maplibre_core::check(status) {
+            self.state().restore_handle_for_retry(map_handle);
+            return Err(map_error(error));
+        }
         Ok(())
     }
 
@@ -4954,17 +5049,64 @@ impl ResourceRequestHandle {
         Ok(())
     }
 
-    fn complete(&self, response: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn complete(&self, py: Python<'_>, response: &Bound<'_, PyAny>) -> PyResult<()> {
         let response = resource_response_from_py(response)?;
-        self.state.complete(&response).map_err(map_error)
+        let state = &*self.state;
+        // Completion retires the request, which waits for a cancel callback
+        // running on a MapLibre thread, and that callback needs the GIL.
+        let result = py.detach(|| state.complete(&response));
+        if result.is_ok() {
+            // A retired request can no longer run a cancel callback.
+            self.cancel.clear();
+        }
+        result.map_err(map_error)
     }
 
     fn is_cancelled(&self) -> PyResult<bool> {
         self.state.is_cancelled().map_err(map_error)
     }
 
-    fn close(&self) {
-        self.state.close();
+    fn set_cancel_callback(&self, py: Python<'_>, callback: Option<Py<PyAny>>) -> PyResult<()> {
+        let registered = callback.is_some();
+        match callback {
+            Some(callback) => self.cancel.store(callback),
+            // Clear first: a cancel racing this call then finds no entry, which
+            // is what clearing asks for.
+            None => self.cancel.clear(),
+        }
+        let handle = sys::mln_resource_request_handle(self.handle);
+        let token = self.cancel.token;
+        let native_callback: sys::mln_resource_request_cancel_callback =
+            registered.then_some(resource_request_cancel_trampoline);
+        // Detached: a cancel callback already running on a MapLibre thread
+        // holds the request's native lock while it waits for this thread's GIL.
+        let status = py.detach(|| {
+            // SAFETY: the handle is a generational id, so a released id resolves
+            // to no request rather than to a later one, and the trampoline reads
+            // only the token passed as user_data.
+            unsafe {
+                sys::mln_resource_request_set_cancel_callback(
+                    handle,
+                    native_callback,
+                    token as *mut c_void,
+                )
+            }
+        });
+        let result = maplibre_core::check(status).map_err(map_error);
+        if result.is_err() {
+            self.cancel.clear();
+        }
+        result
+    }
+
+    fn close(&self, py: Python<'_>) {
+        let state = &*self.state;
+        // Release waits for a cancel callback running on a MapLibre thread, and
+        // that callback needs the GIL. From inside the callback it returns
+        // without waiting.
+        py.detach(|| state.close());
+        // Release has retired the request, so no callback can start now.
+        self.cancel.clear();
     }
 }
 
@@ -5051,7 +5193,9 @@ impl PyResourceProviderState {
             let py_handle = Py::new(
                 py,
                 ResourceRequestHandle {
-                    state: Arc::clone(&handle_state),
+                    state: ManuallyDrop::new(Arc::clone(&handle_state)),
+                    handle: handle.0,
+                    cancel: CancelCallbackSlot::new(),
                 },
             )?;
             let decision = self

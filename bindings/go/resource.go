@@ -170,6 +170,13 @@ type HttpHeaderTransformCallback func(HttpHeaderTransformRequest) []HttpHeader
 // handle was already completed.
 type ResourceProviderCallback func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision
 
+// ResourceRequestCancelCallback reports that MapLibre cancelled a handled
+// resource request. Native code invokes it on the thread that retires the
+// request: the runtime owner thread inside a map or runtime call, and a MapLibre
+// thread otherwise. The callback must not call MapLibre map or runtime APIs. It may
+// complete or close the cancelled request. Panics are contained and discarded.
+type ResourceRequestCancelCallback func()
+
 // ResourceRequestHandle owns a provider-selected native request handle.
 type ResourceRequestHandle struct {
 	state *callback.ResourceRequestHandle
@@ -263,6 +270,28 @@ func (handle *ResourceRequestHandle) Cancelled() (bool, error) {
 		return false, bindingErr
 	}
 	return cancelled, nil
+}
+
+// SetCancelCallback registers the callback that runs when MapLibre cancels the
+// request, and replaces any previous registration. A nil callback clears the
+// registration. Registering on an already cancelled request runs the callback
+// before this method returns.
+func (handle *ResourceRequestHandle) SetCancelCallback(callback ResourceRequestCancelCallback) error {
+	if handle == nil || handle.state == nil {
+		return newBindingError(ErrInvalidArgument, "ResourceRequestHandle is nil")
+	}
+	var bindingErr error
+	if err := checkNative(func() int32 {
+		status, err := handle.state.SetCancelCallbackChecked(callback)
+		if err != nil {
+			bindingErr = resourceRequestStateError(err)
+			return int32(C.MLN_STATUS_OK)
+		}
+		return int32(status)
+	}); err != nil {
+		return err
+	}
+	return bindingErr
 }
 
 // Close releases the provider-owned request handle without completing it.

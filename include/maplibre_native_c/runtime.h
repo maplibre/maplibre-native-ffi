@@ -830,6 +830,20 @@ typedef uint32_t (*mln_resource_provider_callback)(
   mln_resource_request_handle handle
 );
 
+/**
+ * Reports that MapLibre cancelled a C API resource provider request.
+ *
+ * The callback runs at most once per request, on the thread that retires the
+ * request, and only while the request is still open: a request the provider
+ * already completed is not reported. That thread is the runtime owner thread
+ * when a map or runtime call discards the request, such as a style change or
+ * map destruction, and a MapLibre worker thread otherwise. The callback must
+ * be thread-safe, return quickly, and must not call map or runtime C API
+ * functions. It may call resource request handle functions for the cancelled
+ * handle, including mln_resource_request_release().
+ */
+typedef void (*mln_resource_request_cancel_callback)(void* user_data);
+
 typedef struct mln_resource_provider {
   uint32_t size;
   mln_resource_provider_callback callback;
@@ -944,6 +958,32 @@ MLN_API mln_status mln_resource_request_complete(
  */
 MLN_API mln_status mln_resource_request_cancelled(
   mln_resource_request_handle handle, bool* out_cancelled
+) MLN_NOEXCEPT;
+
+/**
+ * Registers a callback that runs when MapLibre cancels a C API resource
+ * provider request.
+ *
+ * This function may be called from any thread while the provider still owns the
+ * handle. Each call replaces the previous callback and user_data. Passing a
+ * null callback clears the registration. A request that is already cancelled
+ * and not completed invokes the callback synchronously before this function
+ * returns.
+ *
+ * The callback and user_data are stored by reference and stay reachable until
+ * the request is released, replaced by another registration, or invoked. This
+ * function and mln_resource_request_release() wait for a cancel callback
+ * running on another thread to return, so the previous user_data may be freed
+ * once either call returns. Called from inside the callback, both return
+ * without waiting.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when handle is stale or released.
+ */
+MLN_API mln_status mln_resource_request_set_cancel_callback(
+  mln_resource_request_handle handle,
+  mln_resource_request_cancel_callback callback, void* user_data
 ) MLN_NOEXCEPT;
 
 /**

@@ -352,6 +352,37 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
     }
   }
 
+  // BND-198.
+  @Test
+  fun closedHandleRejectsCancelCallbackRegistrationBeforeReachingNative() {
+    memScoped {
+      var registrations = 0
+      val fakeHandle = SyntheticHandles.resourceRequest()
+      val handle =
+        ResourceRequestHandle(
+          fakeHandle,
+          cancelCallbackSetter = { _, _, _ ->
+            registrations++
+            MaplibreStatus.OK.nativeCode
+          },
+          releaser = {},
+        )
+
+      assertEquals(
+        ResourceProviderDecision.HANDLE.nativeValue.toUInt(),
+        handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
+      )
+      handle.setCancelCallback {}
+      handle.setCancelCallback(null)
+      assertEquals(2, registrations)
+
+      handle.close()
+
+      assertFailsWith<InvalidStateException> { handle.setCancelCallback {} }
+      assertEquals(2, registrations)
+    }
+  }
+
   @Test
   fun closeDuringCancellationCheckWaitsForCheckBeforeNativeRelease() {
     memScoped {
