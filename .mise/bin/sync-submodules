@@ -59,6 +59,7 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0003-run-loop-process-gate.patch"
   "$repo_root/patches/maplibre-native/0004-opengl-valid-api-calls.patch"
   "$repo_root/patches/maplibre-native/0005-unwrapped-unprojection.patch"
+  "$repo_root/patches/maplibre-native/0006-process-lifetime-logging.patch"
 )
 
 # A patch counts as applied when it reverses cleanly, which is also what makes
