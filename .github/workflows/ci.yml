@@ -163,6 +163,7 @@ jobs:
           name: native-package-linux-gnu-x64-egl-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-linux-gnu-x64-egl.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-linux-gnu-x64-vulkan:
     name: target / linux-gnu-x64-vulkan
@@ -255,6 +256,7 @@ jobs:
           name: native-package-linux-gnu-x64-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-linux-gnu-arm64-egl:
     name: target / linux-gnu-arm64-egl
@@ -345,6 +347,7 @@ jobs:
           name: native-package-linux-gnu-arm64-egl-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-linux-gnu-arm64-egl.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-linux-gnu-arm64-vulkan:
     name: target / linux-gnu-arm64-vulkan
@@ -431,6 +434,7 @@ jobs:
           name: native-package-linux-gnu-arm64-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-linux-gnu-arm64-vulkan.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-linux-musl-x64-egl:
     name: target / linux-musl-x64-egl
@@ -472,6 +476,7 @@ jobs:
           name: native-package-linux-musl-x64-egl-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-linux-musl-x64-egl.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-linux-musl-x64-vulkan:
     name: target / linux-musl-x64-vulkan
@@ -513,6 +518,7 @@ jobs:
           name: native-package-linux-musl-x64-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-linux-musl-x64-vulkan.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-linux-musl-arm64-egl:
     name: target / linux-musl-arm64-egl
@@ -554,6 +560,7 @@ jobs:
           name: native-package-linux-musl-arm64-egl-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-linux-musl-arm64-egl.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-linux-musl-arm64-vulkan:
     name: target / linux-musl-arm64-vulkan
@@ -595,6 +602,7 @@ jobs:
           name: native-package-linux-musl-arm64-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-linux-musl-arm64-vulkan.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-emscripten-wasm32-webgl:
     name: target / emscripten-wasm32-webgl
@@ -633,6 +641,7 @@ jobs:
           name: native-package-emscripten-wasm32-webgl-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-emscripten-wasm32-webgl.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-emscripten-wasm32-webgpu:
     name: target / emscripten-wasm32-webgpu
@@ -670,6 +679,7 @@ jobs:
           name: native-package-emscripten-wasm32-webgpu-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-emscripten-wasm32-webgpu.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-macos-arm64-metal:
     name: target / macos-arm64-metal
@@ -756,6 +766,7 @@ jobs:
           name: native-package-macos-arm64-metal-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-macos-arm64-metal.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-macos-arm64-vulkan:
     name: target / macos-arm64-vulkan
@@ -838,6 +849,7 @@ jobs:
           name: native-package-macos-arm64-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-macos-arm64-vulkan.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-macos-arm64-egl:
     name: target / macos-arm64-egl
@@ -917,6 +929,7 @@ jobs:
           name: native-package-macos-arm64-egl-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-macos-arm64-egl.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-ios-arm64-metal:
     name: target / ios-arm64-metal
@@ -965,6 +978,7 @@ jobs:
           name: native-package-ios-arm64-metal-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-ios-arm64-metal.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-ios-simulator-arm64-metal:
     name: target / ios-simulator-arm64-metal
@@ -1013,6 +1027,7 @@ jobs:
           name: native-package-ios-simulator-arm64-metal-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-ios-simulator-arm64-metal.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-tvos-arm64-metal:
     name: target / tvos-arm64-metal
@@ -1055,6 +1070,7 @@ jobs:
           name: native-package-tvos-arm64-metal-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-tvos-arm64-metal.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-tvos-simulator-arm64-metal:
     name: target / tvos-simulator-arm64-metal
@@ -1097,6 +1113,7 @@ jobs:
           name: native-package-tvos-simulator-arm64-metal-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-tvos-simulator-arm64-metal.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-android-arm-egl:
     name: target / android-arm-egl
@@ -1151,6 +1168,7 @@ jobs:
           name: native-package-android-arm-egl-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-android-arm-egl.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-android-arm-vulkan:
     name: target / android-arm-vulkan
@@ -1205,6 +1223,7 @@ jobs:
           name: native-package-android-arm-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-android-arm-vulkan.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-android-arm64-egl:
     name: target / android-arm64-egl
@@ -1259,6 +1278,7 @@ jobs:
           name: native-package-android-arm64-egl-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-android-arm64-egl.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-android-arm64-vulkan:
     name: target / android-arm64-vulkan
@@ -1313,6 +1333,7 @@ jobs:
           name: native-package-android-arm64-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-android-arm64-vulkan.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-android-x64-egl:
     name: target / android-x64-egl
@@ -1370,6 +1391,7 @@ jobs:
           name: native-package-android-x64-egl-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-android-x64-egl.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-android-x64-vulkan:
     name: target / android-x64-vulkan
@@ -1427,6 +1449,7 @@ jobs:
           name: native-package-android-x64-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-android-x64-vulkan.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-ohos-arm64-egl:
     name: target / ohos-arm64-egl
@@ -1467,6 +1490,7 @@ jobs:
           name: native-package-ohos-arm64-egl-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-ohos-arm64-egl.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-ohos-arm64-vulkan:
     name: target / ohos-arm64-vulkan
@@ -1507,6 +1531,7 @@ jobs:
           name: native-package-ohos-arm64-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-ohos-arm64-vulkan.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-ohos-x64-egl:
     name: target / ohos-x64-egl
@@ -1547,6 +1572,7 @@ jobs:
           name: native-package-ohos-x64-egl-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-ohos-x64-egl.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-ohos-x64-vulkan:
     name: target / ohos-x64-vulkan
@@ -1587,6 +1613,7 @@ jobs:
           name: native-package-ohos-x64-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-ohos-x64-vulkan.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-windows-x64-wgl:
     name: target / windows-x64-wgl
@@ -1664,6 +1691,7 @@ jobs:
           name: native-package-windows-x64-wgl-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-windows-x64-wgl.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-windows-x64-vulkan:
     name: target / windows-x64-vulkan
@@ -1740,6 +1768,7 @@ jobs:
           name: native-package-windows-x64-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-windows-x64-vulkan.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-windows-arm64-wgl:
     name: target / windows-arm64-wgl
@@ -1798,6 +1827,7 @@ jobs:
           name: native-package-windows-arm64-wgl-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-windows-arm64-wgl.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   target-windows-arm64-vulkan:
     name: target / windows-arm64-vulkan
@@ -1855,6 +1885,7 @@ jobs:
           name: native-package-windows-arm64-vulkan-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-windows-arm64-vulkan.tar.gz
           if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
 
   android-multi:
     name: Android multi-ABI packaging
@@ -1926,6 +1957,7 @@ jobs:
       publish: false
       run_id: ${{ github.run_id }}
       sha: ${{ github.sha }}
+      verified_retention_days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       version: 0.1.0-SNAPSHOT
 
   required:

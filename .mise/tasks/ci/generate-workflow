@@ -193,6 +193,7 @@ def target_job(row: dict[str, object]) -> list[str]:
                 f"          name: native-package-{preset}-${{{{ github.sha }}}}",
                 f"          path: build/packages/native/dist/maplibre-native-c-{preset}.tar.gz",
                 "          if-no-files-found: error",
+                "          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}",
             ]
         )
     lines.append("")
@@ -328,6 +329,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
             "      publish: false",
             "      run_id: ${{ github.run_id }}",
             "      sha: ${{ github.sha }}",
+            "      verified_retention_days: ${{ github.event_name == 'pull_request' && 1 || 30 }}",
             f"      version: {KOTLIN_SNAPSHOT_VERSION}",
             "",
         ]
