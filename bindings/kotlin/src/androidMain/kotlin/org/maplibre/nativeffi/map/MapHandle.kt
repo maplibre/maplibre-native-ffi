@@ -22,6 +22,7 @@ import org.maplibre.nativeffi.geo.Quaternion
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.geo.Vec3
 import org.maplibre.nativeffi.internal.callback.CallbackGate
+import org.maplibre.nativeffi.internal.javacpp.AndroidNativeBridge
 import org.maplibre.nativeffi.internal.javacpp.ByteArrayViewScope
 import org.maplibre.nativeffi.internal.javacpp.GeoJsonSourceOptionsScope
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
@@ -605,10 +606,11 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
       PremultipliedImageScope(image).use { nativeImage ->
         StyleImageOptionsScope(options).use { nativeOptions ->
           Status.check(
-            MaplibreNativeC.mln_map_set_style_image(
+            AndroidNativeBridge.setStyleImage(
               requireLiveHandle(),
               nativeImageId.view,
               nativeImage.image,
+              image.pixelsTransit,
               nativeOptions.options,
             )
           )
@@ -722,12 +724,13 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
       LatLngArrayScope(coordinates).use { nativeCoordinates ->
         PremultipliedImageScope(image).use { nativeImage ->
           Status.check(
-            MaplibreNativeC.mln_map_add_image_source_image(
+            AndroidNativeBridge.addImageSourceImage(
               requireLiveHandle(),
               nativeSourceId.view,
               nativeCoordinates.coordinates,
               nativeCoordinates.count,
               nativeImage.image,
+              image.pixelsTransit,
             )
           )
         }
@@ -755,10 +758,11 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     StringViewScope(sourceId).use { nativeSourceId ->
       PremultipliedImageScope(image).use { nativeImage ->
         Status.check(
-          MaplibreNativeC.mln_map_set_image_source_image(
+          AndroidNativeBridge.setImageSourceImage(
             requireLiveHandle(),
             nativeSourceId.view,
             nativeImage.image,
+            image.pixelsTransit,
           )
         )
       }
@@ -3060,24 +3064,18 @@ private class ProjectionModeOptionsScope(value: ProjectionModeOptions) : AutoClo
 }
 
 private class PremultipliedImageScope(value: PremultipliedRgba8Image) : AutoCloseable {
-  private val pixels: BytePointer
   val image: MaplibreNativeC.mln_premultiplied_rgba8_image =
     MaplibreNativeC.mln_premultiplied_rgba8_image_default()
 
   init {
-    val bytes = value.pixelsTransit
-    pixels = BytePointer(bytes.size.toLong())
-    pixels.put(bytes, 0, bytes.size)
     image.width(value.width)
     image.height(value.height)
     image.stride(value.stride)
-    image.pixels(pixels)
-    image.byte_length(bytes.size.toLong())
+    image.byte_length(value.pixelsTransit.size.toLong())
   }
 
   override fun close() {
     image.close()
-    pixels.close()
   }
 }
 
