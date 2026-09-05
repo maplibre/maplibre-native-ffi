@@ -279,8 +279,14 @@ tasks.configureEach {
 
 val hostNativeInstallConfigured = providers.gradleProperty("maplibreNativeCInstallDir").isPresent
 
+class TestClasspathArguments(@get:Classpath val classpath: FileCollection) :
+  CommandLineArgumentProvider {
+  override fun asArguments() = listOf("-Dorg.maplibre.nativeffi.test.classpath=${classpath.asPath}")
+}
+
 tasks.named<Test>("jvmTest") {
   jvmArgs("--enable-native-access=ALL-UNNAMED")
+  jvmArgumentProviders.add(TestClasspathArguments(classpath))
   systemProperty("org.maplibre.nativeffi.library.path", maplibreNativeC.libraryPath.absolutePath)
   systemProperty(
     "org.maplibre.nativeffi.library.dirs",

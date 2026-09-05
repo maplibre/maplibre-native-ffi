@@ -25,6 +25,12 @@ failures.
 standalone projection coordinate conversion. The C API uses them to expose
 continuous longitudes while the existing overloads keep wrapped behavior.
 
+`0006-process-lifetime-logging.patch` gives the global logger, its observer,
+mutex, severity settings, and scheduler process lifetime. This prevents static
+destruction from joining a logging worker whose thread-local cleanup must detach
+from an already shut down host VM. Explicit observer replacement and removal
+still release the previous observer.
+
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
 before applying the list again. A pin bump, an edit to a patch, and a dropped
