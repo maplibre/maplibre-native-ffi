@@ -11,6 +11,10 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+      - converted_to_draft
+      - labeled
+      - unlabeled
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -20,15 +24,25 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  plan:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    outputs:
+      tier: ${{ steps.plan.outputs.tier }}
+      expected: ${{ steps.plan.outputs.expected }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: plan
+        run: python3 .mise/tasks/ci/plan
+
   hygiene:
     name: hygiene
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,10 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -79,10 +90,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-linux-gnu-x64-egl'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -169,10 +178,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-linux-gnu-x64-vulkan'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -261,10 +268,8 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-linux-gnu-arm64-egl'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -351,10 +356,8 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-linux-gnu-arm64-vulkan'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -437,10 +440,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-linux-musl-x64-egl'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -478,10 +479,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-linux-musl-x64-vulkan'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -519,10 +518,8 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-linux-musl-arm64-egl'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -560,10 +557,8 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-linux-musl-arm64-vulkan'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -601,10 +596,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-emscripten-wasm32-webgl'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -639,10 +632,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-emscripten-wasm32-webgpu'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -676,10 +667,8 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-macos-arm64-metal'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -762,10 +751,8 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-macos-arm64-vulkan'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -844,10 +831,8 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-macos-arm64-egl'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -923,10 +908,8 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-ios-arm64-metal'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -971,10 +954,8 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-ios-simulator-arm64-metal'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1019,10 +1000,8 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-tvos-arm64-metal'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1061,10 +1040,8 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-tvos-simulator-arm64-metal'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1103,10 +1080,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-android-arm-egl'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1157,10 +1132,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-android-arm-vulkan'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1211,10 +1184,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-android-arm64-egl'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1265,10 +1236,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-android-arm64-vulkan'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1319,10 +1288,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-android-x64-egl'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1376,10 +1343,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-android-x64-vulkan'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1433,10 +1398,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-ohos-arm64-egl'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1473,10 +1436,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-ohos-arm64-vulkan'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1513,10 +1474,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-ohos-x64-egl'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1553,10 +1512,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-ohos-x64-vulkan'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1593,10 +1550,8 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-windows-x64-wgl'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1670,10 +1625,8 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-windows-x64-vulkan'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1746,10 +1699,8 @@ jobs:
     runs-on: windows-11-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-windows-arm64-wgl'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1804,10 +1755,8 @@ jobs:
     runs-on: windows-11-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    needs: plan
+    if: fromJSON(needs.plan.outputs.expected)['target-windows-arm64-vulkan'] == 'success'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1861,11 +1810,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    if: fromJSON(needs.plan.outputs.expected)['android-multi'] == 'success'
     needs:
+      - plan
       - target-android-arm-egl
       - target-android-arm-vulkan
       - target-android-arm64-egl
@@ -1895,11 +1842,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-    if: >-
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
+    if: fromJSON(needs.plan.outputs.expected)['kotlin-maven'] == 'success'
     needs:
+      - plan
       - target-linux-gnu-x64-egl
       - target-linux-gnu-x64-vulkan
       - target-linux-gnu-arm64-egl
@@ -1932,13 +1877,9 @@ jobs:
     name: ci-required
     runs-on: ubuntu-slim
     timeout-minutes: 5
-    if: >-
-      always() && (
-      github.event_name != 'pull_request'
-      || github.base_ref == 'main'
-      || github.event.pull_request.draft == false
-      )
+    if: always()
     needs:
+      - plan
       - hygiene
       - docs
       - target-linux-gnu-x64-egl
@@ -1975,9 +1916,18 @@ jobs:
       - android-multi
       - kotlin-maven
     steps:
-      - name: Fail if required jobs failed
-        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
+      - name: Check selected job results
+        env:
+          EXPECTED: ${{ needs.plan.outputs.expected }}
+          RESULTS: ${{ toJSON(needs) }}
         run: |
-          echo '${{ toJSON(needs) }}'
-          exit 1
-      - run: "true"
+          echo "Needed job results: $RESULTS"
+          jq --exit-status --null-input \
+            --argjson expected "$EXPECTED" \
+            --argjson results "$RESULTS" '
+              ($expected.plan == "success")
+              and all($expected[]; . == "success" or . == "skipped")
+              and all($results[]; .result == "success" or .result == "skipped")
+              and (($expected | keys) == ($results | keys))
+              and all($expected | keys[]; $results[.].result == $expected[.])
+            '
