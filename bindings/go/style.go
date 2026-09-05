@@ -782,26 +782,26 @@ type StyleImageInfo struct {
 }
 
 type cPremultipliedRGBA8Image struct {
-	raw        C.mln_premultiplied_rgba8_image
-	allocation unsafe.Pointer
+	raw    C.mln_premultiplied_rgba8_image
+	pinner runtime.Pinner
 }
 
-func newCPremultipliedRGBA8Image(image PremultipliedRGBA8Image) cPremultipliedRGBA8Image {
-	raw := C.mln_premultiplied_rgba8_image_default()
-	raw.width = C.uint32_t(image.Width)
-	raw.height = C.uint32_t(image.Height)
-	raw.stride = C.uint32_t(image.Stride)
-	var allocation unsafe.Pointer
+func newCPremultipliedRGBA8Image(image PremultipliedRGBA8Image) *cPremultipliedRGBA8Image {
+	result := &cPremultipliedRGBA8Image{raw: C.mln_premultiplied_rgba8_image_default()}
+	result.raw.width = C.uint32_t(image.Width)
+	result.raw.height = C.uint32_t(image.Height)
+	result.raw.stride = C.uint32_t(image.Stride)
 	if len(image.Pixels) > 0 {
-		allocation = C.CBytes(image.Pixels)
-		raw.pixels = (*C.uint8_t)(allocation)
+		// The descriptor contains a Go pointer, so pin its backing array until C returns.
+		result.pinner.Pin(&image.Pixels[0])
+		result.raw.pixels = (*C.uint8_t)(unsafe.Pointer(&image.Pixels[0]))
 	}
-	raw.byte_length = C.size_t(len(image.Pixels))
-	return cPremultipliedRGBA8Image{raw: raw, allocation: allocation}
+	result.raw.byte_length = C.size_t(len(image.Pixels))
+	return result
 }
 
-func (image cPremultipliedRGBA8Image) free() {
-	C.free(image.allocation)
+func (image *cPremultipliedRGBA8Image) free() {
+	image.pinner.Unpin()
 }
 
 func styleImageInfoFromC(info C.mln_style_image_info) StyleImageInfo {

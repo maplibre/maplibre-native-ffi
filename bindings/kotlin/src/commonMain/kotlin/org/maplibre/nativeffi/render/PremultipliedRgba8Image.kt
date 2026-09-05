@@ -14,6 +14,9 @@ public class PremultipliedRgba8Image(
   public val pixels: ByteArray
     get() = pixelBytes.copyOf()
 
+  internal val pixelsTransit: ByteArray
+    get() = pixelBytes
+
   init {
     Status.requireArgument(width > 0 && height > 0) { "width and height must be positive" }
     Status.requireArgument(stride >= 0) { "stride must be non-negative" }

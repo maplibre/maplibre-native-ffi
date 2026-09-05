@@ -9,6 +9,7 @@ use maplibre_native_ffi_sys as sys;
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
+use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::ffi::{c_char, c_void};
 use std::mem::ManuallyDrop;
@@ -3452,7 +3453,7 @@ impl MapHandle {
         width: u32,
         height: u32,
         stride: u32,
-        pixels: Vec<u8>,
+        pixels: Cow<'_, [u8]>,
         pixel_ratio: Option<f32>,
         sdf: Option<bool>,
         stretch_x: Option<Vec<(f32, f32)>>,
@@ -3641,7 +3642,7 @@ impl MapHandle {
         width: u32,
         height: u32,
         stride: u32,
-        pixels: Vec<u8>,
+        pixels: Cow<'_, [u8]>,
     ) -> PyResult<()> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);
@@ -3678,7 +3679,7 @@ impl MapHandle {
         width: u32,
         height: u32,
         stride: u32,
-        pixels: Vec<u8>,
+        pixels: Cow<'_, [u8]>,
     ) -> PyResult<()> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);

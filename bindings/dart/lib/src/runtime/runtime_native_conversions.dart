@@ -12,9 +12,7 @@ raw.mln_premultiplied_rgba8_image _premultipliedRgba8ImageToNative(
   result.byte_length = bytes.length;
   if (bytes.isNotEmpty) {
     final nativeBytes = allocator<Uint8>(bytes.length);
-    for (var index = 0; index < bytes.length; index += 1) {
-      nativeBytes[index] = bytes[index];
-    }
+    nativeBytes.asTypedList(bytes.length).setAll(0, bytes);
     result.pixels = nativeBytes;
   }
   return result;
