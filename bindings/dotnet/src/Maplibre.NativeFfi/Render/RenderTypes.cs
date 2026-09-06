@@ -122,9 +122,20 @@ public enum GpuSyncKind : uint
     WebGpuToken = 4,
 }
 
-public readonly record struct GpuSync(GpuSyncKind Kind, NativePointer Object, ulong Value)
+/// <summary>
+/// Backend synchronization copied by frame access and release calls.
+/// </summary>
+/// <param name="Kind">Which backend primitive <paramref name="ObjectBits"/> names.</param>
+/// <param name="ObjectBits">
+/// Bit pattern of the backend object that <paramref name="Kind"/> names: the
+/// <c>id&lt;MTLSharedEvent&gt;</c> pointer, the <c>VkSemaphore</c> handle, the <c>GLsync</c>
+/// pointer, or the WebGPU token. A Vulkan handle stays 64 bits wide even where a pointer is not.
+/// Zero when <paramref name="Kind"/> is <see cref="GpuSyncKind.CpuComplete"/>.
+/// </param>
+/// <param name="Value">The signal or timeline value the backend primitive waits on.</param>
+public readonly record struct GpuSync(GpuSyncKind Kind, ulong ObjectBits, ulong Value)
 {
-    public static GpuSync CpuComplete => new(GpuSyncKind.CpuComplete, default, 0);
+    public static GpuSync CpuComplete => new(GpuSyncKind.CpuComplete, 0, 0);
 }
 
 public enum RenderAbandonDisposition : uint

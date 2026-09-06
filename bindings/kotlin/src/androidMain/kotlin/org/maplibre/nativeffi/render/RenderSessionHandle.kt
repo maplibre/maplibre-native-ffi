@@ -569,7 +569,7 @@ internal constructor(
       Status.check(MaplibreNativeC.mln_acquired_frame_get_producer_sync(frame, value))
       GpuSync(
         GpuSyncKind.fromNative(value.kind()),
-        address(value.`object`()).toULong(),
+        value.`object`().toULong(),
         value.value().toULong(),
       )
     }
@@ -604,7 +604,7 @@ internal constructor(
     MaplibreNativeC.mln_gpu_sync_default().use { nativeSync ->
       nativeSync
         .kind(consumerCompletion.kind.nativeValue)
-        .`object`(pointerOrNull(consumerCompletion.objectHandle))
+        .`object`(consumerCompletion.objectHandle.toLong())
         .value(consumerCompletion.value.toLong())
       LongPointer(1).use { frame ->
         frame.put(0, frameId)

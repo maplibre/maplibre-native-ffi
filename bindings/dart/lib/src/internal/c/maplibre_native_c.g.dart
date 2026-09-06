@@ -4249,7 +4249,8 @@ final class mln_gpu_sync extends ffi.Struct {
   @ffi.Uint32()
   external int kind;
 
-  external ffi.Pointer<ffi.Void> object;
+  @ffi.Uint64()
+  external int object;
 
   @ffi.Uint64()
   external int value;
@@ -4258,7 +4259,7 @@ final class mln_gpu_sync extends ffi.Struct {
     ffi.Allocator $allocator, {
     required int size,
     required int kind,
-    required ffi.Pointer<ffi.Void> object,
+    required int object,
     required int value,
   }) => $allocator<mln_gpu_sync>()
     ..ref.size = size

@@ -13,7 +13,7 @@ pub use opengl_target::RenderTarget;
 pub use vulkan_target::RenderTarget;
 
 use maplibre_native_ffi::{
-    AcquiredFrameHandle, Error, ErrorKind, FrameDemand, FrameDisposition, GpuSyncKind,
+    AcquiredFrameHandle, Error, ErrorKind, FrameDemand, FrameDisposition, FrameGpuSync,
     RenderSessionHandle, RenderTargetExtent,
 };
 
@@ -84,15 +84,12 @@ fn request_render_frame(
 
 fn require_cpu_complete_producer(frame: &AcquiredFrameHandle) -> maplibre_native_ffi::Result<()> {
     let producer = frame.producer_sync()?;
-    if producer.kind == GpuSyncKind::CpuComplete {
+    if matches!(producer, FrameGpuSync::CpuComplete) {
         return Ok(());
     }
     Err(Error::new(
         ErrorKind::InvalidState,
         None,
-        format!(
-            "rust-map cannot consume a {:?} producer synchronization payload",
-            producer.kind
-        ),
+        format!("rust-map cannot consume a {producer:?} producer synchronization payload"),
     ))
 }

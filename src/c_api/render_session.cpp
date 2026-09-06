@@ -29,7 +29,7 @@ auto mln_gpu_sync_default() noexcept -> mln_gpu_sync {
   return mln_gpu_sync{
     .size = sizeof(mln_gpu_sync),
     .kind = MLN_GPU_SYNC_CPU_COMPLETE,
-    .object = nullptr,
+    .object = 0,
     .value = 0,
   };
 }

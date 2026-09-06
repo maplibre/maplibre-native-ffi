@@ -165,10 +165,13 @@ pub const RenderSessionSnapshot = struct {
     pending_changes: bool,
 };
 
+/// Backend synchronization for an acquired texture frame. Each payload carries
+/// the backend object in the type that names it: a `NativePointer` for the
+/// pointer-typed backends and a `VulkanHandle` for the Vulkan semaphore.
 pub const GpuSync = union(enum) {
     cpu_complete,
     metal_shared_event: struct { object: NativePointer, value: u64 },
-    vulkan_timeline_semaphore: struct { object: NativePointer, value: u64 },
+    vulkan_timeline_semaphore: struct { semaphore: VulkanHandle, value: u64 },
     opengl_fence: NativePointer,
     webgpu_token: struct { object: NativePointer, value: u64 },
 };
@@ -1126,34 +1129,45 @@ fn gpuSyncToNative(sync: GpuSync) c.mln_gpu_sync {
         .cpu_complete => {},
         .metal_shared_event => |value| {
             raw.kind = c.MLN_GPU_SYNC_METAL_SHARED_EVENT;
-            raw.object = value.object.toPtr();
+            raw.object = nativePointerBits(value.object);
             raw.value = value.value;
         },
         .vulkan_timeline_semaphore => |value| {
             raw.kind = c.MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE;
-            raw.object = value.object.toPtr();
+            raw.object = value.semaphore.bits();
             raw.value = value.value;
         },
         .opengl_fence => |value| {
             raw.kind = c.MLN_GPU_SYNC_OPENGL_FENCE;
-            raw.object = value.toPtr();
+            raw.object = nativePointerBits(value);
         },
         .webgpu_token => |value| {
             raw.kind = c.MLN_GPU_SYNC_WEBGPU_TOKEN;
-            raw.object = value.object.toPtr();
+            raw.object = nativePointerBits(value.object);
             raw.value = value.value;
         },
     }
     return raw;
 }
 
+fn nativePointerBits(pointer: NativePointer) u64 {
+    return @intFromEnum(pointer);
+}
+
+/// Reads a pointer-typed synchronization object out of the C carrier, which is
+/// wider than a pointer on 32-bit targets.
+fn nativePointerFromBits(bits: u64) status.Error!NativePointer {
+    if (bits == 0 or bits > std.math.maxInt(usize)) return error.NativeError;
+    return @enumFromInt(@as(usize, @intCast(bits)));
+}
+
 fn gpuSyncFromNative(raw: c.mln_gpu_sync) status.Error!GpuSync {
     return switch (raw.kind) {
         c.MLN_GPU_SYNC_CPU_COMPLETE => .cpu_complete,
-        c.MLN_GPU_SYNC_METAL_SHARED_EVENT => .{ .metal_shared_event = .{ .object = NativePointer.fromPtr(raw.object orelse return error.NativeError), .value = raw.value } },
-        c.MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE => .{ .vulkan_timeline_semaphore = .{ .object = NativePointer.fromPtr(raw.object orelse return error.NativeError), .value = raw.value } },
-        c.MLN_GPU_SYNC_OPENGL_FENCE => .{ .opengl_fence = NativePointer.fromPtr(raw.object orelse return error.NativeError) },
-        c.MLN_GPU_SYNC_WEBGPU_TOKEN => .{ .webgpu_token = .{ .object = NativePointer.fromPtr(raw.object orelse return error.NativeError), .value = raw.value } },
+        c.MLN_GPU_SYNC_METAL_SHARED_EVENT => .{ .metal_shared_event = .{ .object = try nativePointerFromBits(raw.object), .value = raw.value } },
+        c.MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE => .{ .vulkan_timeline_semaphore = .{ .semaphore = VulkanHandle.fromBits(raw.object), .value = raw.value } },
+        c.MLN_GPU_SYNC_OPENGL_FENCE => .{ .opengl_fence = try nativePointerFromBits(raw.object) },
+        c.MLN_GPU_SYNC_WEBGPU_TOKEN => .{ .webgpu_token = .{ .object = try nativePointerFromBits(raw.object), .value = raw.value } },
         else => error.NativeError,
     };
 }

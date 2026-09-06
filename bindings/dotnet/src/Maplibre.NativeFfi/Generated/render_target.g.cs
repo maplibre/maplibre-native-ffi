@@ -76,7 +76,7 @@ namespace Maplibre.NativeFfi.Internal.C
         MLN_GPU_SYNC_WEBGPU_TOKEN = 4U,
     }
 
-    internal unsafe partial struct mln_gpu_sync
+    internal partial struct mln_gpu_sync
     {
         [NativeTypeName("uint32_t")]
         public uint size;
@@ -84,7 +84,8 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("uint32_t")]
         public uint kind;
 
-        public void* @object;
+        [NativeTypeName("uint64_t")]
+        public ulong @object;
 
         [NativeTypeName("uint64_t")]
         public ulong value;
@@ -221,7 +222,7 @@ namespace Maplibre.NativeFfi.Internal.C
 
         public mln_opengl_context_ownership ownership;
 
-        [NativeTypeName("__AnonymousRecord_render_target_L299_C3")]
+        [NativeTypeName("__AnonymousRecord_render_target_L307_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]

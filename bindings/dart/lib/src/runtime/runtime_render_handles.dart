@@ -435,31 +435,60 @@ final class RenderAbandonResult {
 final class GpuSync {
   /// Creates synchronization for work that completed before the call that
   /// carries it.
-  const GpuSync.cpuComplete() : kind = 0, object = null, value = 0;
+  const GpuSync.cpuComplete()
+    : kind = 0,
+      object = null,
+      semaphore = null,
+      value = 0;
 
-  /// Creates synchronization from a backend object and its signal value.
+  /// Creates synchronization from a pointer-typed backend object and its
+  /// signal value: a Metal shared event, an OpenGL fence, or a WebGPU token.
   ///
   /// The backend object stays caller-owned. Metal is the exception: the
-  /// session retains a shared event. A Vulkan, OpenGL, or WebGPU object stays
-  /// borrowed until a later [RenderSessionHandle.barrier] or
+  /// session retains a shared event. An OpenGL or WebGPU object stays borrowed
+  /// until a later [RenderSessionHandle.barrier] or
   /// [RenderSessionHandle.detach] completes.
   const GpuSync.native({
     required this.kind,
     required this.object,
     required this.value,
-  });
+  }) : semaphore = null;
+
+  /// Creates synchronization from a Vulkan timeline semaphore and the timeline
+  /// value it signals.
+  ///
+  /// The semaphore stays borrowed until a later [RenderSessionHandle.barrier]
+  /// or [RenderSessionHandle.detach] completes.
+  const GpuSync.vulkanTimelineSemaphore(
+    VulkanHandle this.semaphore, {
+    required this.value,
+  }) : kind = 2,
+       object = null;
 
   /// Payload kind: 0 CPU-complete, 1 Metal shared event, 2 Vulkan timeline
   /// semaphore, 3 OpenGL fence, and 4 WebGPU token.
   final int kind;
 
-  /// Backend synchronization object, and null for CPU-complete
-  /// synchronization.
+  /// Pointer-typed backend synchronization object, and null for CPU-complete
+  /// and Vulkan synchronization.
   final NativePointer? object;
+
+  /// Vulkan timeline semaphore, and null for every other kind. Its handle is
+  /// 64 bits wide even where a pointer is not.
+  final VulkanHandle? semaphore;
 
   /// Signal value for a timeline object, such as a Metal shared event or a
   /// Vulkan timeline semaphore.
   final int value;
+
+  /// Bit pattern the C API carries for the backend object.
+  int get _objectBits {
+    final handle = semaphore;
+    if (handle != null) {
+      return uint64ToNative(handle.bits, 'Vulkan timeline semaphore');
+    }
+    return object?.address ?? 0;
+  }
 }
 
 /// An attachment that exposes the session while graphics initialization runs.
@@ -1188,11 +1217,15 @@ final class AcquiredFrame {
     final out = arena<raw.mln_gpu_sync>()
       ..ref.size = sizeOf<raw.mln_gpu_sync>();
     _check(raw.mln_acquired_frame_get_producer_sync(_handle, out));
+    if (out.ref.kind == 2) {
+      return GpuSync.vulkanTimelineSemaphore(
+        VulkanHandle(uint64FromNative(out.ref.object)),
+        value: out.ref.value,
+      );
+    }
     return GpuSync.native(
       kind: out.ref.kind,
-      object: out.ref.object == nullptr
-          ? null
-          : NativePointer(out.ref.object.address),
+      object: out.ref.object == 0 ? null : NativePointer(out.ref.object),
       value: out.ref.value,
     );
   });
@@ -1257,7 +1290,7 @@ final class AcquiredFrame {
       final nativeSync = arena<raw.mln_gpu_sync>()
         ..ref = raw.mln_gpu_sync_default()
         ..ref.kind = sync.kind
-        ..ref.object = Pointer<Void>.fromAddress(sync.object?.address ?? 0)
+        ..ref.object = sync._objectBits
         ..ref.value = sync.value;
       _check(raw.mln_acquired_frame_release(frame, nativeSync));
       _handle = 0;

@@ -119,7 +119,15 @@ typedef struct mln_gpu_sync {
   uint32_t size;
   /** One mln_gpu_sync_kind value. */
   uint32_t kind;
-  void* object;
+  /**
+   * Bit pattern of the backend object that kind names: the id<MTLSharedEvent>
+   * pointer, the VkSemaphore handle, the GLsync pointer, or the WebGPU token.
+   *
+   * A fixed-width carrier keeps a Vulkan non-dispatchable handle intact on
+   * 32-bit targets, where it is wider than a pointer. Zero when kind is
+   * MLN_GPU_SYNC_CPU_COMPLETE.
+   */
+  uint64_t object;
   uint64_t value;
 } mln_gpu_sync;
 

@@ -847,10 +847,13 @@ public struct RenderSessionSnapshot: Sendable, Hashable {
   public let pendingChanges: Bool
 }
 
+/// Backend synchronization for an acquired texture frame. Each case carries the
+/// backend object in the type that names it: a `VulkanHandle` for the Vulkan
+/// timeline semaphore and a `NativePointer` for the pointer-typed backends.
 public enum GPUSynchronization: Sendable, Hashable {
   case cpuComplete
   case metalSharedEvent(NativePointer, value: UInt64)
-  case vulkanTimelineSemaphore(NativePointer, value: UInt64)
+  case vulkanTimelineSemaphore(VulkanHandle, value: UInt64)
   case openGLFence(NativePointer)
   case webGPUToken(NativePointer, value: UInt64)
 
@@ -861,18 +864,18 @@ public enum GPUSynchronization: Sendable, Hashable {
       break
     case let .metalSharedEvent(object, signal):
       value.kind = MLN_GPU_SYNC_METAL_SHARED_EVENT.rawValue
-      value.object = object.unsafeMutableRawPointer
+      value.object = UInt64(object.addressBitPattern)
       value.value = signal
-    case let .vulkanTimelineSemaphore(object, signal):
+    case let .vulkanTimelineSemaphore(semaphore, signal):
       value.kind = MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE.rawValue
-      value.object = object.unsafeMutableRawPointer
+      value.object = semaphore.bitPattern
       value.value = signal
     case let .openGLFence(object):
       value.kind = MLN_GPU_SYNC_OPENGL_FENCE.rawValue
-      value.object = object.unsafeMutableRawPointer
+      value.object = UInt64(object.addressBitPattern)
     case let .webGPUToken(object, signal):
       value.kind = MLN_GPU_SYNC_WEBGPU_TOKEN.rawValue
-      value.object = object.unsafeMutableRawPointer
+      value.object = UInt64(object.addressBitPattern)
       value.value = signal
     }
     return value
@@ -982,14 +985,20 @@ public final class AcquiredFrameHandle: @unchecked Sendable {
         try checkStatus(mln_acquired_frame_get_producer_sync(
           requireLiveLocked(), &value
         ))
-        let object = NativePointer(bitPattern: UInt(bitPattern: value.object))
+        // The C carrier is wider than a pointer on 32-bit targets, so bits it
+        // cannot address read as null for the pointer-typed kinds.
+        let object = NativePointer(
+          bitPattern: UInt(truncatingIfNeeded: value.object)
+        )
         switch value.kind {
         case MLN_GPU_SYNC_CPU_COMPLETE.rawValue:
           return .cpuComplete
         case MLN_GPU_SYNC_METAL_SHARED_EVENT.rawValue:
           return .metalSharedEvent(object, value: value.value)
         case MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE.rawValue:
-          return .vulkanTimelineSemaphore(object, value: value.value)
+          return .vulkanTimelineSemaphore(
+            VulkanHandle(bitPattern: value.object), value: value.value
+          )
         case MLN_GPU_SYNC_OPENGL_FENCE.rawValue:
           return .openGLFence(object)
         case MLN_GPU_SYNC_WEBGPU_TOKEN.rawValue:

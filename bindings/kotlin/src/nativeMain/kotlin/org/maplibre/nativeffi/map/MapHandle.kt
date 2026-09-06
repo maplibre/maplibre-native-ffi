@@ -22,6 +22,7 @@ import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.async.mapDeferred
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_LAYER_INFO_SOURCE_ID
@@ -73,12 +74,18 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_region
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_tile
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_mvt_vector_source_tile
+import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_for_pixel
+import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_for_pixel_unwrapped
+import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels
+import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_layer_ids
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids
 import org.maplibre.nativeffi.internal.c.mln_map_loaded_style_json
 import org.maplibre.nativeffi.internal.c.mln_map_move_style_layer
 import org.maplibre.nativeffi.internal.c.mln_map_options
 import org.maplibre.nativeffi.internal.c.mln_map_options_default
+import org.maplibre.nativeffi.internal.c.mln_map_pixel_for_lat_lng
+import org.maplibre.nativeffi.internal.c.mln_map_pixels_for_lat_lngs
 import org.maplibre.nativeffi.internal.c.mln_map_projection_create
 import org.maplibre.nativeffi.internal.c.mln_map_release
 import org.maplibre.nativeffi.internal.c.mln_map_remove_feature_state
@@ -127,6 +134,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_snapshot
 import org.maplibre.nativeffi.internal.c.mln_map_snapshot_get
 import org.maplibre.nativeffi.internal.c.mln_map_style_url
 import org.maplibre.nativeffi.internal.c.mln_map_update_camera
+import org.maplibre.nativeffi.internal.c.mln_screen_point
 import org.maplibre.nativeffi.internal.c.mln_style_image_result
 import org.maplibre.nativeffi.internal.c.mln_style_image_stretches_result
 import org.maplibre.nativeffi.internal.c.mln_style_layer_result
@@ -1594,6 +1602,93 @@ private constructor(
       },
       { completion -> mln_map_camera_query(state.requireLive().rawHandleValue, completion) },
     )
+
+  public actual fun pixelForLatLng(coordinate: LatLng): Deferred<ScreenPoint> =
+    CompletionBridge.submit(
+      { result ->
+        CoreStructs.screenPoint(result.pointed.value!!.reinterpret<mln_screen_point>().pointed)
+      },
+      { completion ->
+        mln_map_pixel_for_lat_lng(
+          state.requireLive().rawHandleValue,
+          CoreStructs.latLng(coordinate),
+          completion,
+        )
+      },
+    )
+
+  public actual fun latLngForPixel(point: ScreenPoint): Deferred<LatLng> =
+    latLngForPixel(point, unwrapped = false)
+
+  public actual fun latLngForPixelUnwrapped(point: ScreenPoint): Deferred<LatLng> =
+    latLngForPixel(point, unwrapped = true)
+
+  public actual fun pixelsForLatLngs(coordinates: List<LatLng>): Deferred<List<ScreenPoint>> {
+    val coordinateSnapshot = coordinates.toList()
+    return memScoped {
+      val nativeCoordinates = CoreStructs.latLngArray(coordinateSnapshot, this)
+      CompletionBridge.submit(
+        { result ->
+          val count = result.pointed.value_count.toInt()
+          if (count == 0) emptyList()
+          else
+            CoreStructs.screenPointArray(
+              result.pointed.value!!.reinterpret<mln_screen_point>(),
+              count,
+            )
+        },
+        { completion ->
+          mln_map_pixels_for_lat_lngs(
+            state.requireLive().rawHandleValue,
+            nativeCoordinates,
+            coordinateSnapshot.size.toCSize(),
+            completion,
+          )
+        },
+      )
+    }
+  }
+
+  public actual fun latLngsForPixels(points: List<ScreenPoint>): Deferred<List<LatLng>> =
+    latLngsForPixels(points, unwrapped = false)
+
+  public actual fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): Deferred<List<LatLng>> =
+    latLngsForPixels(points, unwrapped = true)
+
+  private fun latLngForPixel(point: ScreenPoint, unwrapped: Boolean): Deferred<LatLng> =
+    CompletionBridge.submit(
+      { result -> CoreStructs.latLng(result.pointed.value!!.reinterpret<mln_lat_lng>().pointed) },
+      { completion ->
+        val map = state.requireLive().rawHandleValue
+        val nativePoint = CoreStructs.screenPoint(point)
+        if (unwrapped) mln_map_lat_lng_for_pixel_unwrapped(map, nativePoint, completion)
+        else mln_map_lat_lng_for_pixel(map, nativePoint, completion)
+      },
+    )
+
+  private fun latLngsForPixels(
+    points: List<ScreenPoint>,
+    unwrapped: Boolean,
+  ): Deferred<List<LatLng>> {
+    val pointSnapshot = points.toList()
+    return memScoped {
+      val nativePoints = CoreStructs.screenPointArray(pointSnapshot, this)
+      val pointCount = pointSnapshot.size.toCSize()
+      CompletionBridge.submit(
+        { result ->
+          val count = result.pointed.value_count.toInt()
+          if (count == 0) emptyList()
+          else CoreStructs.latLngArray(result.pointed.value!!.reinterpret<mln_lat_lng>(), count)
+        },
+        { completion ->
+          val map = state.requireLive().rawHandleValue
+          if (unwrapped)
+            mln_map_lat_lngs_for_pixels_unwrapped(map, nativePoints, pointCount, completion)
+          else mln_map_lat_lngs_for_pixels(map, nativePoints, pointCount, completion)
+        },
+      )
+    }
+  }
 
   public actual fun attachMetalOwnedTexture(
     descriptor: MetalOwnedTextureDescriptor,

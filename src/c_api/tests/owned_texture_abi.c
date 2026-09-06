@@ -8,7 +8,7 @@ static void gpu_sync_default_is_cpu_complete(void) {
   const mln_gpu_sync sync = mln_gpu_sync_default();
   TEST_ASSERT_EQUAL_UINT32(sizeof(mln_gpu_sync), sync.size);
   TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_CPU_COMPLETE, sync.kind);
-  TEST_ASSERT_NULL(sync.object);
+  TEST_ASSERT_EQUAL_UINT64(0, sync.object);
   TEST_ASSERT_EQUAL_UINT64(0, sync.value);
 }
 

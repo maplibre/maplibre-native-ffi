@@ -315,7 +315,7 @@ struct RenderTextureSlot {
   mln_gpu_sync producer_sync{
     .size = sizeof(mln_gpu_sync),
     .kind = MLN_GPU_SYNC_CPU_COMPLETE,
-    .object = nullptr,
+    .object = 0,
     .value = 0
   };
   bool available = false;

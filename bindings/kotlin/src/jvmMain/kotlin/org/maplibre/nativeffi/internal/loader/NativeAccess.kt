@@ -1885,6 +1885,96 @@ internal object NativeAccess {
       { completion -> MapLibreNativeC.mln_map_camera_query(map.raw, completion) },
     )
 
+  internal fun pixelForLatLng(map: NativeMap, coordinate: LatLng): Deferred<ScreenPoint> =
+    Arena.ofConfined().use { arena ->
+      CompletionBridge.submit(
+        { result -> screenPoint(completionValue(result, mln_screen_point.sizeof())) },
+        { completion ->
+          MapLibreNativeC.mln_map_pixel_for_lat_lng(map.raw, latLng(coordinate, arena), completion)
+        },
+      )
+    }
+
+  internal fun latLngForPixel(
+    map: NativeMap,
+    point: ScreenPoint,
+    unwrapped: Boolean,
+  ): Deferred<LatLng> =
+    Arena.ofConfined().use { arena ->
+      val nativePoint = screenPoint(point, arena)
+      CompletionBridge.submit(
+        { result -> latLng(completionValue(result, mln_lat_lng.sizeof())) },
+        { completion ->
+          if (unwrapped)
+            MapLibreNativeC.mln_map_lat_lng_for_pixel_unwrapped(map.raw, nativePoint, completion)
+          else MapLibreNativeC.mln_map_lat_lng_for_pixel(map.raw, nativePoint, completion)
+        },
+      )
+    }
+
+  internal fun pixelsForLatLngs(
+    map: NativeMap,
+    coordinates: List<LatLng>,
+  ): Deferred<List<ScreenPoint>> {
+    val coordinateSnapshot = coordinates.toList()
+    return Arena.ofConfined().use { arena ->
+      CompletionBridge.submit(
+        { result ->
+          val count = checkedInt(mln_completion_result.value_count(result))
+          if (count == 0) emptyList()
+          else
+            screenPointArray(
+              completionValue(result, mln_screen_point.sizeof() * count.toLong()),
+              count,
+            )
+        },
+        { completion ->
+          MapLibreNativeC.mln_map_pixels_for_lat_lngs(
+            map.raw,
+            latLngArray(arena, coordinateSnapshot),
+            coordinateSnapshot.size.toLong(),
+            completion,
+          )
+        },
+      )
+    }
+  }
+
+  internal fun latLngsForPixels(
+    map: NativeMap,
+    points: List<ScreenPoint>,
+    unwrapped: Boolean,
+  ): Deferred<List<LatLng>> {
+    val pointSnapshot = points.toList()
+    return Arena.ofConfined().use { arena ->
+      val nativePoints = screenPointArray(arena, pointSnapshot)
+      val pointCount = pointSnapshot.size.toLong()
+      CompletionBridge.submit(
+        { result ->
+          val count = checkedInt(mln_completion_result.value_count(result))
+          if (count == 0) emptyList()
+          else latLngArray(completionValue(result, mln_lat_lng.sizeof() * count.toLong()), count)
+        },
+        { completion ->
+          if (unwrapped)
+            MapLibreNativeC.mln_map_lat_lngs_for_pixels_unwrapped(
+              map.raw,
+              nativePoints,
+              pointCount,
+              completion,
+            )
+          else
+            MapLibreNativeC.mln_map_lat_lngs_for_pixels(
+              map.raw,
+              nativePoints,
+              pointCount,
+              completion,
+            )
+        },
+      )
+    }
+  }
+
   internal fun attachMetalOwnedTexture(
     map: NativeMap,
     descriptor: MetalOwnedTextureDescriptor,
@@ -5154,19 +5244,14 @@ internal object NativeAccess {
     arena.allocate(GPU_SYNC_SIZE).also { segment ->
       segment.set(ValueLayout.JAVA_INT, 0, GPU_SYNC_SIZE.toInt())
       segment.set(ValueLayout.JAVA_INT, 4, sync.kind.nativeValue)
-      segment.set(
-        ValueLayout.ADDRESS,
-        8,
-        if (sync.objectHandle == 0uL) MemorySegment.NULL
-        else MemorySegment.ofAddress(sync.objectHandle.toLong()),
-      )
+      segment.set(ValueLayout.JAVA_LONG, 8, sync.objectHandle.toLong())
       segment.set(ValueLayout.JAVA_LONG, 16, sync.value.toLong())
     }
 
   private fun readGpuSync(segment: MemorySegment): GpuSync =
     GpuSync(
       kind = GpuSyncKind.fromNative(segment.get(ValueLayout.JAVA_INT, 4)),
-      objectHandle = segment.get(ValueLayout.ADDRESS, 8).address().toULong(),
+      objectHandle = segment.get(ValueLayout.JAVA_LONG, 8).toULong(),
       value = segment.get(ValueLayout.JAVA_LONG, 16).toULong(),
     )
 

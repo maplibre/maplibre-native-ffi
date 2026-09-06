@@ -1133,6 +1133,98 @@ class MapHandleTest {
       }
     }
 
+  @Test
+  fun mapCoordinateConversionsRoundTrip(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val runtime = RuntimeHandle.create(RuntimeOptions())
+      val map =
+        MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 128
+              height = 128
+              scaleFactor = 1.0
+              mapMode = MapMode.STATIC
+            },
+          )
+          .await()
+
+      try {
+        val coordinate = LatLng(0.0, 0.0)
+        val point = map.pixelForLatLng(coordinate).await()
+        val roundTrip = map.latLngForPixel(point).await()
+        assertEquals(coordinate.latitude, roundTrip.latitude, 1e-6)
+        assertEquals(coordinate.longitude, roundTrip.longitude, 1e-6)
+
+        val coordinates = listOf(LatLng(0.0, 0.0), LatLng(10.0, 20.0))
+        val points = map.pixelsForLatLngs(coordinates).await()
+        assertEquals(coordinates.size, points.size)
+        val batchRoundTrips = map.latLngsForPixels(points).await()
+        assertEquals(coordinates.size, batchRoundTrips.size)
+        coordinates.zip(batchRoundTrips).forEach { (expected, actual) ->
+          assertEquals(expected.latitude, actual.latitude, 1e-6)
+          assertEquals(expected.longitude, actual.longitude, 1e-6)
+        }
+
+        // An empty batch still queues one query and answers with an empty list.
+        assertEquals(emptyList(), map.pixelsForLatLngs(emptyList()).await())
+        assertEquals(emptyList(), map.latLngsForPixels(emptyList()).await())
+        assertEquals(emptyList(), map.latLngsForPixelsUnwrapped(emptyList()).await())
+      } finally {
+        map.close()
+        runtime.close()
+      }
+    }
+
+  @Test
+  fun mapUnwrappedConversionsPreserveVisibleWorldCopies(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val runtime = RuntimeHandle.create(RuntimeOptions())
+      val map =
+        MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 1024
+              height = 512
+              scaleFactor = 1.0
+              mapMode = MapMode.STATIC
+            },
+          )
+          .await()
+
+      try {
+        map
+          .updateCamera(
+            CameraUpdate(
+              camera =
+                CameraOptions().apply {
+                  center = LatLng(0.0, 180.0)
+                  zoom = 0.0
+                }
+            )
+          )
+          .await()
+
+        // The viewport is two world copies wide, so its edges name the same wrapped longitude
+        // in different copies.
+        val points = listOf(ScreenPoint(0.0, 256.0), ScreenPoint(1024.0, 256.0))
+        val wrapped = map.latLngsForPixels(points).await()
+        val unwrapped = map.latLngsForPixelsUnwrapped(points).await()
+
+        assertTrue(wrapped.all { it.longitude in -180.0..180.0 })
+        assertTrue(unwrapped[1].longitude - unwrapped[0].longitude > 360.0)
+        assertTrue(map.latLngForPixel(points[1]).await().longitude in -180.0..180.0)
+        assertEquals(
+          unwrapped[1].longitude,
+          map.latLngForPixelUnwrapped(points[1]).await().longitude,
+          1e-10,
+        )
+      } finally {
+        map.close()
+        runtime.close()
+      }
+    }
+
   private fun imageCoordinates(): List<LatLng> =
     listOf(LatLng(0.0, 0.0), LatLng(0.0, 1.0), LatLng(1.0, 1.0), LatLng(1.0, 0.0))
 

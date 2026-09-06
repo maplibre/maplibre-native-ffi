@@ -2779,9 +2779,7 @@ auto acquired_frame_release(
   if (!handle || *handle == MLN_HANDLE_NULL) return MLN_STATUS_INVALID_ARGUMENT;
   const auto copied =
     sync ? *sync
-         : mln_gpu_sync{
-             sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, nullptr, 0
-           };
+         : mln_gpu_sync{sizeof(mln_gpu_sync), MLN_GPU_SYNC_CPU_COMPLETE, 0, 0};
   if (copied.size < sizeof(mln_gpu_sync)) return MLN_STATUS_INVALID_ARGUMENT;
   const auto frame = handle_table<mln_acquired_frame_object>().lease(*handle);
   if (!frame) return MLN_STATUS_INVALID_ARGUMENT;

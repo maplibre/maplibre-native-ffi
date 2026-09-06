@@ -85,9 +85,12 @@ import Testing
   #expect(GPUSynchronization.metalSharedEvent(
     NativePointer(bitPattern: 0x1234), value: 9
   ).native.kind == MLN_GPU_SYNC_METAL_SHARED_EVENT.rawValue)
-  #expect(GPUSynchronization.vulkanTimelineSemaphore(
-    NativePointer(bitPattern: 0x5678), value: 11
-  ).native.kind == MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE.rawValue)
+  let semaphore = GPUSynchronization.vulkanTimelineSemaphore(
+    VulkanHandle(bitPattern: 0xFEED_FACE_0000_0007), value: 11
+  ).native
+  #expect(semaphore.kind == MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE.rawValue)
+  // A Vulkan handle stays 64 bits wide even where a pointer is not.
+  #expect(semaphore.object == 0xFEED_FACE_0000_0007)
 }
 
 @Test func transferredWebGLCanvasMaterializesWorkerDescriptor() throws {

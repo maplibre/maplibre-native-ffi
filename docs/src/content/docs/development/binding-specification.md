@@ -472,9 +472,10 @@ checks before exposing the pointer.
 
 `VulkanHandle` represents the 64-bit bit pattern of a borrowed Vulkan
 non-dispatchable handle. It transfers no ownership and grants no memory access.
-Public APIs use it for `VkSurfaceKHR`, `VkImage`, and `VkImageView`, because
-Vulkan defines these handle types as pointers on 64-bit targets and as
-`uint64_t` values on 32-bit targets. Zero represents `VK_NULL_HANDLE`.
+Public APIs use it for `VkSurfaceKHR`, `VkImage`, `VkImageView`, and the
+`VkSemaphore` a frame's synchronization payload carries, because Vulkan defines
+these handle types as pointers on 64-bit targets and as `uint64_t` values on
+32-bit targets. Zero represents `VK_NULL_HANDLE`.
 
 Vulkan handles returned from acquired texture frames perform active-frame checks
 before exposing the value.
@@ -976,13 +977,20 @@ binding copies common metadata and exposes backend handles only through
 active-handle accessors.
 
 The binding MUST expose producer-completion synchronization and accept optional
-consumer-completion synchronization on release. CPU-complete synchronization is
-valid when the relevant GPU producer or consumer completed before publication.
-Release consumes the frame handle synchronously. The session retires the slot
-through its selected driver and does not reuse it until consumer GPU completion.
-A binding MUST NOT release a slot merely because the CPU wrapper closed while
-host GPU reads remain pending. A borrowed non-CPU synchronization object remains
-valid until a later session barrier or detach completes.
+consumer-completion synchronization on release. The C API carries the
+synchronization object as a fixed-width 64-bit bit pattern, which keeps a Vulkan
+handle intact on a target whose pointers are narrower. A binding that names the
+payload kind in its type system MUST carry the Vulkan timeline semaphore as a
+`VulkanHandle` and the pointer-typed objects as `NativePointer`. A binding that
+models the payload as one flat record MUST carry the unsigned 64-bit bit pattern
+and document which backend object each kind names. CPU-complete synchronization
+is valid when the relevant GPU producer or consumer completed before
+publication. Release consumes the frame handle synchronously. The session
+retires the slot through its selected driver and does not reuse it until
+consumer GPU completion. A binding MUST NOT release a slot merely because the
+CPU wrapper closed while host GPU reads remain pending. A borrowed non-CPU
+synchronization object remains valid until a later session barrier or detach
+completes.
 
 After abandonment, releasing an acquired frame still consumes its handle
 CPU-only. The binding MUST NOT call a backend accessor after abandonment.

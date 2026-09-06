@@ -17,7 +17,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  * struct mln_gpu_sync {
  *     uint32_t size;
  *     uint32_t kind;
- *     void *object;
+ *     uint64_t object;
  *     uint64_t value;
  * }
  * }
@@ -31,7 +31,7 @@ public class mln_gpu_sync {
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
         MapLibreNativeC.C_INT.withName("size"),
         MapLibreNativeC.C_INT.withName("kind"),
-        MapLibreNativeC.C_POINTER.withName("object"),
+        MapLibreNativeC.C_LONG.withName("object"),
         MapLibreNativeC.C_LONG.withName("value")
     ).withName("mln_gpu_sync");
 
@@ -130,15 +130,15 @@ public class mln_gpu_sync {
         struct.set(kind$LAYOUT, kind$OFFSET, fieldValue);
     }
 
-    private static final AddressLayout object$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("object"));
+    private static final OfLong object$LAYOUT = (OfLong)$LAYOUT.select(groupElement("object"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * void *object
+     * uint64_t object
      * }
      */
-    public static final AddressLayout object$layout() {
+    public static final OfLong object$layout() {
         return object$LAYOUT;
     }
 
@@ -147,7 +147,7 @@ public class mln_gpu_sync {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * void *object
+     * uint64_t object
      * }
      */
     public static final long object$offset() {
@@ -157,20 +157,20 @@ public class mln_gpu_sync {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * void *object
+     * uint64_t object
      * }
      */
-    public static MemorySegment object(MemorySegment struct) {
+    public static long object(MemorySegment struct) {
         return struct.get(object$LAYOUT, object$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * void *object
+     * uint64_t object
      * }
      */
-    public static void object(MemorySegment struct, MemorySegment fieldValue) {
+    public static void object(MemorySegment struct, long fieldValue) {
         struct.set(object$LAYOUT, object$OFFSET, fieldValue);
     }
 

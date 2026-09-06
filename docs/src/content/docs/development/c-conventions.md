@@ -55,9 +55,10 @@ Backend-native pointer handles are opaque `void*`; document the backend type and
 field-level requirements on the struct field, and ownership and lifetime on the
 function that accepts or returns the struct. Vulkan non-dispatchable handles use
 `mln_vulkan_non_dispatchable_handle`, because Vulkan represents them as pointers
-on 64-bit targets and `uint64_t` values on 32-bit targets. A backend-native
-handle remains a value that the host already owns and never becomes a MapLibre
-handle id.
+on 64-bit targets and `uint64_t` values on 32-bit targets. A field that carries
+the object of more than one backend, such as `mln_gpu_sync.object`, is a
+`uint64_t` bit pattern for the same reason. A backend-native handle remains a
+value that the host already owns and never becomes a MapLibre handle id.
 
 A copy-out entry point takes a caller buffer, its capacity, and an out-parameter
 for the required length. It writes the required length before it checks the

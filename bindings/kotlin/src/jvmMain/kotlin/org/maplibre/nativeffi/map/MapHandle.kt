@@ -9,6 +9,7 @@ import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.async.mapDeferred
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
@@ -690,6 +691,36 @@ private constructor(
   public actual fun queryCamera(): Deferred<CameraSnapshot> {
     NativeAccess.ensureLoaded()
     return NativeAccess.queryCamera(requireLiveHandle())
+  }
+
+  public actual fun pixelForLatLng(coordinate: LatLng): Deferred<ScreenPoint> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.pixelForLatLng(requireLiveHandle(), coordinate)
+  }
+
+  public actual fun latLngForPixel(point: ScreenPoint): Deferred<LatLng> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.latLngForPixel(requireLiveHandle(), point, unwrapped = false)
+  }
+
+  public actual fun latLngForPixelUnwrapped(point: ScreenPoint): Deferred<LatLng> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.latLngForPixel(requireLiveHandle(), point, unwrapped = true)
+  }
+
+  public actual fun pixelsForLatLngs(coordinates: List<LatLng>): Deferred<List<ScreenPoint>> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.pixelsForLatLngs(requireLiveHandle(), coordinates)
+  }
+
+  public actual fun latLngsForPixels(points: List<ScreenPoint>): Deferred<List<LatLng>> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.latLngsForPixels(requireLiveHandle(), points, unwrapped = false)
+  }
+
+  public actual fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): Deferred<List<LatLng>> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.latLngsForPixels(requireLiveHandle(), points, unwrapped = true)
   }
 
   public actual fun attachMetalOwnedTexture(

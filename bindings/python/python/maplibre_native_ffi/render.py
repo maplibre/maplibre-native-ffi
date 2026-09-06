@@ -418,17 +418,35 @@ class RenderSessionSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class GpuSync:
-    """Backend synchronization copied across a frame lease boundary."""
+    """Backend synchronization copied across a frame lease boundary.
+
+    ``object`` holds the backend object that ``kind`` names: a
+    :class:`VulkanHandle` for a Vulkan timeline semaphore, whose handle is 64
+    bits wide even where a pointer is not, and a :class:`NativePointer` for the
+    pointer-typed backends.
+    """
 
     kind: GpuSyncKind = GpuSyncKind.CPU_COMPLETE
-    object: NativePointer = field(default_factory=NativePointer.null)
+    object: NativePointer | VulkanHandle = field(default_factory=NativePointer.null)
     value: int = 0
+
+    @property
+    def _object_bits(self) -> int:
+        if isinstance(self.object, VulkanHandle):
+            return self.object.bits
+        return self.object.address
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> GpuSync:
+        kind = GpuSyncKind(raw["kind"])
+        bits = raw["object_bits"]
         return cls(
-            kind=GpuSyncKind(raw["kind"]),
-            object=NativePointer(raw["object_address"]),
+            kind=kind,
+            object=(
+                VulkanHandle(bits)
+                if kind == GpuSyncKind.VULKAN_TIMELINE_SEMAPHORE
+                else NativePointer(bits)
+            ),
             value=raw["value"],
         )
 
@@ -1144,7 +1162,7 @@ class _AcquiredFrameHandle:
         """Release this lease after optional consumer GPU work."""
         self._native.release(
             consumer_completion.kind.native_code,
-            consumer_completion.object.address,
+            consumer_completion._object_bits,
             consumer_completion.value,
         )
 

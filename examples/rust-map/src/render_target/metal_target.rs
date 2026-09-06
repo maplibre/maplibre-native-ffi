@@ -134,7 +134,7 @@ impl RenderTarget {
                 require_cpu_complete_producer(&frame)?;
                 let presented = compositor.draw(&frame)?;
                 frame
-                    .release(GpuSync::CPU_COMPLETE)
+                    .release(GpuSync::CpuComplete)
                     .map_err(|error| error.into_error())?;
                 Ok(presented)
             }

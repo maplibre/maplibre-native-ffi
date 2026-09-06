@@ -452,7 +452,7 @@ type RenderFrameResult struct {
 func (sync GPUSync) toC() C.mln_gpu_sync {
 	raw := C.mln_gpu_sync_default()
 	raw.kind = C.uint32_t(sync.Kind)
-	raw.object = cPointer(sync.Object)
+	raw.object = C.uint64_t(sync.Object)
 	raw.value = C.uint64_t(sync.Value)
 	return raw
 }
@@ -479,10 +479,15 @@ const (
 	GPUSyncWebGPUToken             GPUSyncKind = GPUSyncKind(C.MLN_GPU_SYNC_WEBGPU_TOKEN)
 )
 
-// GPUSync is a copied backend synchronization payload.
+// GPUSync is a copied backend synchronization payload. Object is the bit
+// pattern of the backend object that Kind names: the id<MTLSharedEvent>
+// pointer, the VkSemaphore handle, the GLsync pointer, or the WebGPU token. A
+// Vulkan handle stays 64 bits wide even where a pointer is not, so the field is
+// uint64 rather than a pointer-width value; convert a NativePointer or a
+// VulkanHandle into it. Object is zero when Kind is GPUSyncCPUComplete.
 type GPUSync struct {
 	Kind   GPUSyncKind
-	Object NativePointer
+	Object uint64
 	Value  uint64
 }
 

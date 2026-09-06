@@ -9,6 +9,7 @@ import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
@@ -501,6 +502,44 @@ public expect class MapHandle {
 
   /** Suspends for an ordered camera observation behind commands accepted before this call. */
   public fun queryCamera(): Deferred<CameraSnapshot>
+
+  /**
+   * Converts one coordinate to a screen point.
+   *
+   * Each conversion queues one ordered map query. A hot path such as a per-pointer-move conversion
+   * uses [MapProjectionHandle], whose conversions are synchronous.
+   */
+  public fun pixelForLatLng(coordinate: LatLng): Deferred<ScreenPoint>
+
+  /**
+   * Converts one screen point to a coordinate, with the longitude wrapped to -180 through 180.
+   *
+   * Each conversion queues one ordered map query.
+   */
+  public fun latLngForPixel(point: ScreenPoint): Deferred<LatLng>
+
+  /**
+   * Converts one screen point to a coordinate whose longitude preserves the visible world copy and
+   * may fall outside -180 through 180.
+   *
+   * Each conversion queues one ordered map query.
+   */
+  public fun latLngForPixelUnwrapped(point: ScreenPoint): Deferred<LatLng>
+
+  /** Converts coordinates to screen points. The batch queues one ordered map query. */
+  public fun pixelsForLatLngs(coordinates: List<LatLng>): Deferred<List<ScreenPoint>>
+
+  /**
+   * Converts screen points to coordinates, with each longitude wrapped to -180 through 180. The
+   * batch queues one ordered map query.
+   */
+  public fun latLngsForPixels(points: List<ScreenPoint>): Deferred<List<LatLng>>
+
+  /**
+   * Converts screen points to coordinates whose longitudes preserve their visible world copies and
+   * may fall outside -180 through 180. The batch queues one ordered map query.
+   */
+  public fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): Deferred<List<LatLng>>
 
   /**
    * Starts attaching a render target and returns its immediately usable session plus completion

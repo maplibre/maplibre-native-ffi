@@ -121,7 +121,13 @@ public value class GpuSyncKind public constructor(public val nativeValue: Int) {
   }
 }
 
-/** Native synchronization payload. The object value follows the backend's C ownership rules. */
+/**
+ * Native synchronization payload. The object value follows the backend's C ownership rules.
+ *
+ * @property objectHandle Bit pattern of the backend object that [kind] names: the
+ *   `id<MTLSharedEvent>` pointer, the `VkSemaphore` handle, the `GLsync` pointer, or the WebGPU
+ *   token. Zero when [kind] is [GpuSyncKind.CPU_COMPLETE].
+ */
 public data class GpuSync(
   public val kind: GpuSyncKind = GpuSyncKind.CPU_COMPLETE,
   public val objectHandle: ULong = 0u,

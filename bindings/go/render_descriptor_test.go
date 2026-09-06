@@ -58,3 +58,22 @@ func TestVulkanDescriptorsKeepHighHandleBits(t *testing.T) {
 		t.Errorf("surface = %#x, want %#x", got, surface)
 	}
 }
+
+// The GPU synchronization object shares that 64-bit carrier: a Vulkan timeline
+// semaphore with a bit set above the low 32 bits must reach the C struct whole.
+func TestGPUSyncKeepsHighSemaphoreBits(t *testing.T) {
+	const semaphore = VulkanHandle(0xFEED_FACE_0000_0007)
+
+	raw := GPUSync{
+		Kind:   GPUSyncVulkanTimelineSemaphore,
+		Object: uint64(semaphore),
+		Value:  9,
+	}.toC()
+
+	if got := VulkanHandle(raw.object); got != semaphore {
+		t.Errorf("object = %#x, want %#x", got, semaphore)
+	}
+	if got := uint64(raw.value); got != 9 {
+		t.Errorf("value = %d, want 9", got)
+	}
+}

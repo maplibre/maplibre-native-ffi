@@ -197,6 +197,17 @@ impl<'frame> FrameNativePointer<'frame> {
         }
     }
 
+    /// Reads a pointer-typed value out of a fixed-width C carrier, which is
+    /// wider than a pointer on 32-bit targets. Bits above the pointer width
+    /// cannot name a host pointer, so they read as null.
+    fn from_bits(bits: u64) -> Self {
+        Self {
+            address: usize::try_from(bits).unwrap_or(0),
+            _frame: PhantomData,
+            _thread_affine: PhantomData,
+        }
+    }
+
     /// Returns this opaque value as an integer address.
     ///
     /// # Safety
@@ -1633,60 +1644,79 @@ impl Drop for RenderFrameBatch {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GpuSyncKind {
-    CpuComplete,
-    MetalSharedEvent,
-    VulkanTimelineSemaphore,
-    OpenGlFence,
-    WebGpuToken,
-    Unknown(u32),
-}
-
 /// Consumer completion passed when releasing an acquired frame.
 ///
 /// A non-CPU backend object remains caller-owned and must stay valid until the
-/// next render-session barrier or detach completes. Constructing its
-/// [`NativePointer`] is unsafe because Rust cannot verify that lifetime.
+/// next render-session barrier or detach completes. Constructing the
+/// [`NativePointer`] or [`VulkanHandle`] it carries is unsafe because Rust
+/// cannot verify that lifetime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct GpuSync {
-    pub kind: GpuSyncKind,
-    pub object: NativePointer,
-    pub value: u64,
-}
-
-impl GpuSync {
-    pub const CPU_COMPLETE: Self = Self {
-        kind: GpuSyncKind::CpuComplete,
-        object: NativePointer::NULL,
-        value: 0,
-    };
+pub enum GpuSync {
+    /// The consumer completed before the release call.
+    CpuComplete,
+    /// `id<MTLSharedEvent>` plus the value it signals.
+    MetalSharedEvent { event: NativePointer, value: u64 },
+    /// `VkSemaphore` plus its timeline value.
+    VulkanTimelineSemaphore { semaphore: VulkanHandle, value: u64 },
+    /// `GLsync`, valid only for a caller-graphics-thread driver.
+    OpenGlFence { fence: NativePointer },
+    /// A backend-defined WebGPU completion token plus its value.
+    WebGpuToken { token: NativePointer, value: u64 },
 }
 
 /// Producer synchronization borrowed from an acquired frame.
 ///
 /// Backend objects remain valid only while the frame lease is live.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct FrameGpuSync<'frame> {
-    pub kind: GpuSyncKind,
-    pub object: FrameNativePointer<'frame>,
-    pub value: u64,
+pub enum FrameGpuSync<'frame> {
+    /// The producer completed before the frame was published.
+    CpuComplete,
+    /// `id<MTLSharedEvent>` plus the value it signals.
+    MetalSharedEvent {
+        event: FrameNativePointer<'frame>,
+        value: u64,
+    },
+    /// `VkSemaphore` plus its timeline value.
+    VulkanTimelineSemaphore {
+        semaphore: FrameVulkanHandle<'frame>,
+        value: u64,
+    },
+    /// `GLsync`, valid only for a caller-graphics-thread driver.
+    OpenGlFence { fence: FrameNativePointer<'frame> },
+    /// A backend-defined WebGPU completion token plus its value.
+    WebGpuToken {
+        token: FrameNativePointer<'frame>,
+        value: u64,
+    },
+    /// A synchronization kind this binding version does not name. `object` is
+    /// the bit pattern the C API carries for that kind.
+    Unknown { kind: u32, object: u64, value: u64 },
 }
 
 impl FrameGpuSync<'_> {
     fn from_native(raw: sys::mln_gpu_sync) -> Self {
-        let kind = match raw.kind {
-            sys::MLN_GPU_SYNC_CPU_COMPLETE => GpuSyncKind::CpuComplete,
-            sys::MLN_GPU_SYNC_METAL_SHARED_EVENT => GpuSyncKind::MetalSharedEvent,
-            sys::MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE => GpuSyncKind::VulkanTimelineSemaphore,
-            sys::MLN_GPU_SYNC_OPENGL_FENCE => GpuSyncKind::OpenGlFence,
-            sys::MLN_GPU_SYNC_WEBGPU_TOKEN => GpuSyncKind::WebGpuToken,
-            value => GpuSyncKind::Unknown(value),
-        };
-        Self {
-            kind,
-            object: unsafe { FrameNativePointer::from_ptr(raw.object) },
-            value: raw.value,
+        match raw.kind {
+            sys::MLN_GPU_SYNC_CPU_COMPLETE => Self::CpuComplete,
+            sys::MLN_GPU_SYNC_METAL_SHARED_EVENT => Self::MetalSharedEvent {
+                event: FrameNativePointer::from_bits(raw.object),
+                value: raw.value,
+            },
+            sys::MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE => Self::VulkanTimelineSemaphore {
+                semaphore: FrameVulkanHandle::new(raw.object),
+                value: raw.value,
+            },
+            sys::MLN_GPU_SYNC_OPENGL_FENCE => Self::OpenGlFence {
+                fence: FrameNativePointer::from_bits(raw.object),
+            },
+            sys::MLN_GPU_SYNC_WEBGPU_TOKEN => Self::WebGpuToken {
+                token: FrameNativePointer::from_bits(raw.object),
+                value: raw.value,
+            },
+            kind => Self::Unknown {
+                kind,
+                object: raw.object,
+                value: raw.value,
+            },
         }
     }
 }
@@ -1694,16 +1724,30 @@ impl FrameGpuSync<'_> {
 impl GpuSync {
     fn to_native(self) -> sys::mln_gpu_sync {
         let mut raw = unsafe { sys::mln_gpu_sync_default() };
-        raw.kind = match self.kind {
-            GpuSyncKind::CpuComplete => sys::MLN_GPU_SYNC_CPU_COMPLETE,
-            GpuSyncKind::MetalSharedEvent => sys::MLN_GPU_SYNC_METAL_SHARED_EVENT,
-            GpuSyncKind::VulkanTimelineSemaphore => sys::MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE,
-            GpuSyncKind::OpenGlFence => sys::MLN_GPU_SYNC_OPENGL_FENCE,
-            GpuSyncKind::WebGpuToken => sys::MLN_GPU_SYNC_WEBGPU_TOKEN,
-            GpuSyncKind::Unknown(value) => value,
+        let (kind, object, value) = match self {
+            Self::CpuComplete => (sys::MLN_GPU_SYNC_CPU_COMPLETE, 0, 0),
+            Self::MetalSharedEvent { event, value } => (
+                sys::MLN_GPU_SYNC_METAL_SHARED_EVENT,
+                event.address() as u64,
+                value,
+            ),
+            Self::VulkanTimelineSemaphore { semaphore, value } => (
+                sys::MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE,
+                semaphore.bits(),
+                value,
+            ),
+            Self::OpenGlFence { fence } => {
+                (sys::MLN_GPU_SYNC_OPENGL_FENCE, fence.address() as u64, 0)
+            }
+            Self::WebGpuToken { token, value } => (
+                sys::MLN_GPU_SYNC_WEBGPU_TOKEN,
+                token.address() as u64,
+                value,
+            ),
         };
-        raw.object = self.object.as_void_ptr();
-        raw.value = self.value;
+        raw.kind = kind;
+        raw.object = object;
+        raw.value = value;
         raw
     }
 }
@@ -1843,7 +1887,7 @@ impl Drop for AcquiredFrameHandle {
             });
             return;
         }
-        let sync = GpuSync::CPU_COMPLETE.to_native();
+        let sync = GpuSync::CpuComplete.to_native();
         unsafe { sys::mln_acquired_frame_release(&mut frame, &sync) };
     }
 }

@@ -148,7 +148,7 @@ impl RenderTarget {
                     compositor_error(format!("Vulkan consumer wait failed: {error:?}"))
                 })?;
                 frame
-                    .release(GpuSync::CPU_COMPLETE)
+                    .release(GpuSync::CpuComplete)
                     .map_err(|error| error.into_error())?;
                 Ok(presented)
             }

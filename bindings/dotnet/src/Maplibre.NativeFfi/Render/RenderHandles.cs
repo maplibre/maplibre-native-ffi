@@ -895,11 +895,7 @@ public sealed unsafe class AcquiredFrameHandle : IDisposable
                         &value
                     )
                 );
-                return new(
-                    (GpuSyncKind)value.kind,
-                    NativePointer.FromNativeAddress((nint)value.@object),
-                    value.value
-                );
+                return new((GpuSyncKind)value.kind, value.@object, value.value);
             }
         }
     }
@@ -974,7 +970,7 @@ public sealed unsafe class AcquiredFrameHandle : IDisposable
             if (consumerCompletion is { } completion)
             {
                 sync.kind = (uint)completion.Kind;
-                sync.@object = (void*)completion.Object.Address;
+                sync.@object = completion.ObjectBits;
                 sync.value = completion.Value;
             }
             var frame = handle;

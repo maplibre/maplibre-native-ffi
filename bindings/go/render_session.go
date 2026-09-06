@@ -450,7 +450,7 @@ func (f *AcquiredFrame) ProducerSync() (GPUSync, error) {
 		}
 		sync = GPUSync{
 			Kind:   GPUSyncKind(raw.kind),
-			Object: NativePointer(uintptr(raw.object)),
+			Object: uint64(raw.object),
 			Value:  uint64(raw.value),
 		}
 		return nil

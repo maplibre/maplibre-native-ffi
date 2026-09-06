@@ -527,11 +527,7 @@ internal constructor(
     val v = alloc<mln_gpu_sync>()
     mln_gpu_sync_default().place(v.ptr)
     Status.check(mln_acquired_frame_get_producer_sync(requireFrame(), v.ptr))
-    GpuSync(
-      GpuSyncKind.fromNative(v.kind.toInt()),
-      v.`object`?.rawValue?.toLong()?.toULong() ?: 0u,
-      v.value,
-    )
+    GpuSync(GpuSyncKind.fromNative(v.kind.toInt()), v.`object`, v.value)
   }
 
   public actual fun metalTexture(): MetalOwnedTextureFrame = memScoped {
@@ -594,7 +590,7 @@ internal constructor(
     val native = alloc<mln_gpu_sync>()
     mln_gpu_sync_default().place(native.ptr)
     native.kind = consumerCompletion.kind.nativeValue.toUInt()
-    native.`object` = consumerCompletion.objectHandle.toLong().toCPointer()
+    native.`object` = consumerCompletion.objectHandle
     native.value = consumerCompletion.value
     val holder = alloc<ULongVar>()
     holder.value = frame

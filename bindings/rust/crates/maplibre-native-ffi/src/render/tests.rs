@@ -264,7 +264,7 @@ fn finish_unit(session: &RenderSessionHandle, operation: NativeFuture<()>) {
 }
 
 fn release_frame(frame: AcquiredFrameHandle) {
-    match frame.release(GpuSync::CPU_COMPLETE) {
+    match frame.release(GpuSync::CpuComplete) {
         Ok(()) => {}
         Err(error) => panic!("failed to release acquired frame: {}", error.error()),
     }
@@ -2642,6 +2642,30 @@ fn native_pointer_round_trips_address() {
     assert_eq!(pointer.address(), 0x1234);
     assert_eq!(unsafe { pointer.as_ptr::<u8>() } as usize, 0x1234);
     assert!(NativePointer::NULL.is_null());
+}
+
+#[test]
+fn vulkan_timeline_semaphore_keeps_its_full_64_bit_handle() {
+    // A Vulkan non-dispatchable handle is 64 bits wide even where a pointer is
+    // not, so the high half must survive the trip through the C carrier.
+    let bits = 0xfeed_face_0000_0007_u64;
+    // SAFETY: The test only copies this bit pattern; no Vulkan call receives it.
+    let semaphore = unsafe { VulkanHandle::from_bits(bits) };
+    let raw = GpuSync::VulkanTimelineSemaphore {
+        semaphore,
+        value: 9,
+    }
+    .to_native();
+    assert_eq!(raw.kind, sys::MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE);
+    assert_eq!(raw.object, bits);
+
+    match FrameGpuSync::from_native(raw) {
+        FrameGpuSync::VulkanTimelineSemaphore { semaphore, value } => {
+            assert_eq!(unsafe { semaphore.bits() }, bits);
+            assert_eq!(value, 9);
+        }
+        other => panic!("unexpected producer synchronization: {other:?}"),
+    }
 }
 
 #[test]

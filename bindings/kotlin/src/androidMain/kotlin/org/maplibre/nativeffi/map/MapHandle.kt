@@ -1587,6 +1587,104 @@ private constructor(
       { completion -> MaplibreNativeC.mln_map_camera_query(requireLiveHandle(), completion) },
     )
 
+  public actual fun pixelForLatLng(coordinate: LatLng): Deferred<ScreenPoint> =
+    latLng(coordinate).use { nativeCoordinate ->
+      CompletionBridge.submit(
+        { result -> screenPoint(MaplibreNativeC.mln_screen_point(result.value())) },
+        { completion ->
+          MaplibreNativeC.mln_map_pixel_for_lat_lng(
+            requireLiveHandle(),
+            nativeCoordinate,
+            completion,
+          )
+        },
+      )
+    }
+
+  public actual fun latLngForPixel(point: ScreenPoint): Deferred<LatLng> =
+    latLngForPixel(point, unwrapped = false)
+
+  public actual fun latLngForPixelUnwrapped(point: ScreenPoint): Deferred<LatLng> =
+    latLngForPixel(point, unwrapped = true)
+
+  public actual fun pixelsForLatLngs(coordinates: List<LatLng>): Deferred<List<ScreenPoint>> =
+    LatLngArrayScope(coordinates).use { nativeCoordinates ->
+      CompletionBridge.submit(
+        { result ->
+          val count = Math.toIntExact(result.value_count())
+          if (count == 0) emptyList()
+          else {
+            val values = MaplibreNativeC.mln_screen_point(result.value())
+            List(count) { index -> screenPoint(values.position(index.toLong())) }
+          }
+        },
+        { completion ->
+          MaplibreNativeC.mln_map_pixels_for_lat_lngs(
+            requireLiveHandle(),
+            nativeCoordinates.coordinates,
+            nativeCoordinates.count,
+            completion,
+          )
+        },
+      )
+    }
+
+  public actual fun latLngsForPixels(points: List<ScreenPoint>): Deferred<List<LatLng>> =
+    latLngsForPixels(points, unwrapped = false)
+
+  public actual fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): Deferred<List<LatLng>> =
+    latLngsForPixels(points, unwrapped = true)
+
+  private fun latLngForPixel(point: ScreenPoint, unwrapped: Boolean): Deferred<LatLng> =
+    screenPoint(point).use { nativePoint ->
+      CompletionBridge.submit(
+        { result -> latLng(MaplibreNativeC.mln_lat_lng(result.value())) },
+        { completion ->
+          if (unwrapped)
+            MaplibreNativeC.mln_map_lat_lng_for_pixel_unwrapped(
+              requireLiveHandle(),
+              nativePoint,
+              completion,
+            )
+          else
+            MaplibreNativeC.mln_map_lat_lng_for_pixel(requireLiveHandle(), nativePoint, completion)
+        },
+      )
+    }
+
+  private fun latLngsForPixels(
+    points: List<ScreenPoint>,
+    unwrapped: Boolean,
+  ): Deferred<List<LatLng>> =
+    ScreenPointArrayScope(points).use { nativePoints ->
+      CompletionBridge.submit(
+        { result ->
+          val count = Math.toIntExact(result.value_count())
+          if (count == 0) emptyList()
+          else {
+            val values = MaplibreNativeC.mln_lat_lng(result.value())
+            List(count) { index -> latLng(values.position(index.toLong())) }
+          }
+        },
+        { completion ->
+          if (unwrapped)
+            MaplibreNativeC.mln_map_lat_lngs_for_pixels_unwrapped(
+              requireLiveHandle(),
+              nativePoints.points,
+              nativePoints.count,
+              completion,
+            )
+          else
+            MaplibreNativeC.mln_map_lat_lngs_for_pixels(
+              requireLiveHandle(),
+              nativePoints.points,
+              nativePoints.count,
+              completion,
+            )
+        },
+      )
+    }
+
   public actual fun attachMetalOwnedTexture(
     descriptor: MetalOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
@@ -2077,6 +2175,20 @@ private class StringViewArrayScope(values: List<String>) : AutoCloseable {
   override fun close() {
     views?.close()
     strings.asReversed().forEach(StringViewScope::close)
+  }
+}
+
+private class ScreenPointArrayScope(values: List<ScreenPoint>) : AutoCloseable {
+  val count: Long = values.size.toLong()
+  val points: MaplibreNativeC.mln_screen_point = MaplibreNativeC.mln_screen_point(count)
+
+  init {
+    values.forEachIndexed { index, point -> points.position(index.toLong()).x(point.x).y(point.y) }
+    points.position(0)
+  }
+
+  override fun close() {
+    points.close()
   }
 }
 
