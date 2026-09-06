@@ -166,14 +166,21 @@ def smoke_musl(args: argparse.Namespace) -> None:
         shutil.rmtree(work)
     packages.mkdir(parents=True)
 
+    # The mise tasks keep every dotnet output under build/, so the smoke's
+    # pack and publish steps do the same rather than writing bin/ trees into
+    # the source projects.
+    base_output = ROOT / "build" / "dotnet" / args.preset
     copy_runtime_assets(install, assets / rid / "native", args.preset)
-    pack(MANAGED_PROJECT, packages, MUSL_SMOKE_VERSION)
+    pack(
+        MANAGED_PROJECT, packages, MUSL_SMOKE_VERSION, BaseOutputPath=f"{base_output}/"
+    )
     pack(
         RUNTIME_PROJECT,
         packages,
         MUSL_SMOKE_VERSION,
         RenderBackend=backend,
         NativeAssetsDir=assets,
+        BaseOutputPath=f"{base_output}/",
     )
     run(
         "dotnet",
@@ -192,6 +199,7 @@ def smoke_musl(args: argparse.Namespace) -> None:
         "https://api.nuget.org/v3/index.json",
         f"-p:MaplibreNativeFfiPackageVersion={MUSL_SMOKE_VERSION}",
         f"-p:MaplibreNativeFfiRenderBackend={backend}",
+        f"-p:BaseOutputPath={base_output}/",
     )
 
     environment = os.environ.copy()

@@ -1353,7 +1353,7 @@ auto start_attach_render_session(
         }
       } else {
         session->worker =
-          std::thread{[session]() { run_core_worker(session); }};
+          mln::core::WorkerThread{[session]() { run_core_worker(session); }};
       }
     }
     enqueue_work(

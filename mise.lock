@@ -861,6 +861,13 @@ conda_deps = [
     "vcomp14-14.51.36231-h1b9f54f_39",
 ]
 
+[[tools."conda:doxygen"]]
+version = "1.18.0"
+backend = "conda:doxygen"
+
+[tools."conda:doxygen".options]
+channel = "conda-forge"
+
 [[tools."conda:libxml2"]]
 version = "2.13.9"
 backend = "conda:libxml2"

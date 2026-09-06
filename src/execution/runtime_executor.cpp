@@ -17,7 +17,7 @@ auto RuntimeExecutor::start(std::function<void()> initialize) -> void {
     startup_error_ = nullptr;
   }
 
-  worker_ = std::thread(
+  worker_ = WorkerThread(
     [this, initialize = std::move(initialize)]() mutable noexcept -> void {
       try {
         auto loop = mln::util::RunLoop{mln::util::RunLoop::Type::New};
@@ -75,7 +75,7 @@ auto RuntimeExecutor::stop() noexcept -> void {
     loop->invoke([loop]() noexcept -> void { loop->stop(); });
   }
   if (worker_.joinable()) {
-    if (worker_.get_id() == std::this_thread::get_id()) {
+    if (worker_.is_current()) {
       worker_.detach();
     } else {
       worker_.join();

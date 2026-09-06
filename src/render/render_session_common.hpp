@@ -27,6 +27,7 @@
 #include <mln/util/size.hpp>
 
 #include "diagnostics/diagnostics.hpp"
+#include "execution/worker_thread.hpp"
 #include "handles/handle_table.hpp"
 #include "map/feature_state.hpp"
 #include "maplibre_native_c.h"
@@ -537,9 +538,9 @@ struct mln_render_session_object
   std::deque<mln::core::RenderDriverWork> waiting_update_work;
   std::deque<mln::core::RenderDriverWork> driver_work;
   std::condition_variable worker_condition;
-  std::thread worker;
+  mln::core::WorkerThread worker;
   // Backends with transfer-time thread attributes may replace the default
-  // std::thread worker before attachment.
+  // worker thread before attachment.
   std::function<mln_status(std::function<void()>)> start_worker;
   std::function<void()> join_worker;
   // Attachment descriptors are copied into this closure. It creates every

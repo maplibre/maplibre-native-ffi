@@ -33,6 +33,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("cargo:rustc-link-search=native={}", aliases.display());
     }
     println!("cargo:rustc-link-search=native={}", link_dir.display());
+    if target_os == "macos" {
+        // ld64 resolves a library name to the shared library when both forms
+        // sit in one directory, so this crate's own test binary needs that
+        // directory on its run-time search path. The argument reaches only
+        // this package's own targets, not the crates that depend on it.
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{}", link_dir.display());
+    }
     print_rerun_if_changed(&link_dir);
     let descriptor_path = install_dir.join("share/maplibre-native-c/artifact.json");
     println!("cargo:rerun-if-changed={}", descriptor_path.display());

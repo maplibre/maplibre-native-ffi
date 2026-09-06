@@ -111,6 +111,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/geojson/geojson_source_data.cpp
       ${PROJECT_SOURCE_DIR}/src/handles/handle_table.cpp
       ${PROJECT_SOURCE_DIR}/src/execution/runtime_executor.cpp
+      ${PROJECT_SOURCE_DIR}/src/execution/worker_thread.cpp
       ${PROJECT_SOURCE_DIR}/src/logging/logging.cpp
       ${PROJECT_SOURCE_DIR}/src/operation/operation.cpp
       ${PROJECT_SOURCE_DIR}/src/map/feature_state.cpp

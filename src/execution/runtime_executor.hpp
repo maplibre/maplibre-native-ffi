@@ -13,6 +13,7 @@
 #include <mln/util/run_loop.hpp>
 
 #include "c_api/autorelease_pool.hpp"
+#include "execution/worker_thread.hpp"
 
 namespace mln::core {
 
@@ -89,7 +90,7 @@ class RuntimeExecutor {
  private:
   mutable std::mutex mutex_;
   std::condition_variable started_;
-  std::thread worker_;
+  WorkerThread worker_;
   std::thread::id worker_id_;
   mln::util::RunLoop* run_loop_ = nullptr;
   std::exception_ptr startup_error_;
