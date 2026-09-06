@@ -207,16 +207,39 @@ within the PR's coverage tier using mise's affected project graph. Cargo
 supplies crate dependencies; `[monorepo.projects]` in `mise.toml` connects
 native code, bindings, examples, and generated references across languages. Add
 those relationships when adding a project. `mise run ci:check-project-graph`
-verifies CI task ownership. Full runs and explicit platform labels retain their
-requested coverage. An unavailable selection retains the complete tier, and the
-plan summary reports the cause. Docs and hygiene always run. `ci/snapshots.toml`
-declares the input scope of each component the daily snapshot workflow
-publishes, so a component republishes only when the paths it consumes changed;
-`mise run ci:check-snapshot-scopes` keeps every tracked path classified.
+verifies CI task ownership. `ci/snapshots.toml` declares the input scope of each
+component the daily snapshot workflow publishes, so a component republishes only
+when the paths it consumes changed; `mise run ci:check-snapshot-scopes` keeps
+every tracked path classified.
 
 [Astro](https://astro.build/) and [Starlight](https://starlight.astro.build/)
 build the documentation site. Generated API reference HTML is installed into
 `docs/public/reference/` before each docs build.
+
+## CI coverage
+
+Draft PRs use Linux x64 EGL/Vulkan coverage. Ready PRs add macOS Metal, Windows
+x64 WGL/Vulkan, Android x64 EGL/Vulkan, and browser WebGL/WebGPU. Mise's
+affected project graph selects complete target jobs within that tier; native
+changes and shared root files retain the complete tier. Docs and hygiene always
+run. Main, manual runs, and Dependabot-authored PRs use full coverage.
+
+Persistent PR labels expand coverage and combine across platforms:
+
+| Label        | Coverage                                                          |
+| ------------ | ----------------------------------------------------------------- |
+| `ci:apple`   | All macOS backends and iOS/tvOS device and simulator targets      |
+| `ci:android` | All Android ABIs/backends and multi-ABI packaging                 |
+| `ci:linux`   | All Linux GNU and musl targets                                    |
+| `ci:windows` | All Windows targets                                               |
+| `ci:ohos`    | OpenHarmony targets and emulator tests                            |
+| `ci:full`    | Every target and complete packaging verification, including Maven |
+
+Readiness and label changes start a new run. Explicit labels retain their
+requested coverage even when the affected graph would omit it. If affected
+selection is unavailable, the planner retains the complete tier and reports the
+reason in the run summary. `ci-required` requires every selected job to succeed
+and accepts skips only for jobs omitted by the plan.
 
 ## Tests And Examples
 
