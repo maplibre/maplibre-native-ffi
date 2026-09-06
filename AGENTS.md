@@ -96,6 +96,28 @@ When you open a pull request, follow the repository PR template and write
 the PR description if more detail is needed. More context:
 [AI_POLICY.md](./AI_POLICY.md).
 
+Draft PRs run hygiene, docs, and the Linux x64 EGL/Vulkan targets with their
+binding suites. Ready PRs also run macOS Metal, Windows x64 WGL/Vulkan, Android
+x64 EGL/Vulkan, and browser WebGL/WebGPU. Main, manual runs, and
+Dependabot-authored PRs run every target and complete packaging verification.
+
+Use persistent PR labels to add coverage to either PR tier:
+
+| Label        | Additional coverage                                               |
+| ------------ | ----------------------------------------------------------------- |
+| `ci:apple`   | All macOS backends and iOS/tvOS device and simulator targets      |
+| `ci:android` | All Android ABIs/backends and multi-ABI packaging                 |
+| `ci:linux`   | Linux ARM64 and musl variants                                     |
+| `ci:windows` | Windows ARM64 variants                                            |
+| `ci:ohos`    | OpenHarmony targets and emulator tests                            |
+| `ci:full`    | Every target and complete packaging verification, including Maven |
+
+Labels combine and persist across pushes. Readiness and label changes start a
+new run. Every job selected by the planner must succeed for `ci-required` to
+pass; only jobs omitted by the plan may be skipped. For CI, ABI, shared
+toolchain, dependency, or publishing changes, request full coverage with
+`gh pr edit <number> --add-label 'ci:full'`.
+
 ## Project Invariants
 
 ### General
