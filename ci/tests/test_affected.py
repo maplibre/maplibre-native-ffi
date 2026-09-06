@@ -7,6 +7,7 @@ import os
 import pathlib
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -16,7 +17,7 @@ from ci.pr_matrix import plan, select
 from ci.tests.test_pr_matrix import pr
 from ci.workflow import consumer_roots
 
-ROOT = pathlib.Path(__file__).resolve().parents[2]
+ROOT = pathlib.Path.cwd()
 RUST = "bindings/rust/crates/maplibre-native-ffi"
 
 
@@ -31,7 +32,6 @@ class AffectedGraphTest(unittest.TestCase):
         tracked = subprocess.check_output(
             ["git", "ls-files", "-z"], cwd=ROOT, text=True
         ).split("\0")
-        tracked.extend(str(p.relative_to(ROOT)) for p in (ROOT / "ci").glob("*.py"))
         for name in filter(None, tracked):
             source = ROOT / name
             if source.is_file():
@@ -261,8 +261,8 @@ class AffectedGraphTest(unittest.TestCase):
             output = pathlib.Path(directory)
             (output / "event.json").write_text(json.dumps(event))
             subprocess.run(
-                ["bash", str(self.root / ".mise/tasks/ci/plan")],
-                cwd=output,
+                [sys.executable, "-m", "ci.pr_matrix"],
+                cwd=self.root,
                 check=True,
                 env={
                     "PATH": os.environ["PATH"],

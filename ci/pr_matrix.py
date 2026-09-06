@@ -16,7 +16,7 @@ from ci.workflow import (
     runner,
 )
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path.cwd()
 DRAFT_TARGETS = {"linux-gnu-x64-egl", "linux-gnu-x64-vulkan"}
 READY_TARGETS = DRAFT_TARGETS | {
     "macos-arm64-metal",

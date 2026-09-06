@@ -14,7 +14,7 @@ import tarfile
 import tempfile
 from collections.abc import Iterable
 
-from release_version import parse_version
+from ci.release_version import parse_version
 
 ARCHIVE_PREFIX = "maplibre-native-c-"
 ARCHIVE_SUFFIX = ".tar.gz"

@@ -15,7 +15,7 @@ import unittest
 from ci.pr_matrix import PLATFORM_GROUPS, plan
 from ci.workflow import runner
 
-ROOT = pathlib.Path(__file__).resolve().parents[2]
+ROOT = pathlib.Path.cwd()
 WORKFLOW = ROOT / ".github/workflows/ci.yml"
 
 
@@ -203,17 +203,19 @@ class CoverageTest(unittest.TestCase):
             expected = plan("pull_request", pr(True, (label,)))["expected"]
             self.assertEqual(expected[f"target-{representative}"], "success")
 
-    def test_entrypoint_runs_outside_checkout_and_emits_the_plan(self):
+    def test_mise_entrypoint_uses_root_cwd_from_a_subproject(self):
         event = pr(True, ("ci:apple", "ci:android"))
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             (root / "event").write_text(json.dumps(event))
             subprocess.run(
-                ["bash", str(ROOT / ".mise/tasks/ci/plan")],
-                cwd=root,
+                ["mise", "run", "--no-deps", "--skip-tools", "//:ci:plan"],
+                cwd=ROOT / "bindings/rust",
                 check=True,
                 env={
                     "PATH": os.environ["PATH"],
+                    "MISE_TRUSTED_CONFIG_PATHS": str(ROOT),
+                    "MISE_NO_HOOKS": "1",
                     "GITHUB_EVENT_NAME": "pull_request",
                     "GITHUB_EVENT_PATH": str(root / "event"),
                     "GITHUB_OUTPUT": str(root / "output"),

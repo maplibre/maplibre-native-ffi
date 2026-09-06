@@ -32,7 +32,7 @@ local lintSteps = new Mapping<String, Step> {
     check = "mise run ci:check-snapshot-scopes"
   }
   ["project-graph"] {
-    check = "mise exec --no-deps -- python3 .mise/tasks/ci/check-project-graph"
+    check = "mise exec --no-deps -- python3 -m ci.check_project_graph"
   }
   ["jvl"] {
     glob = List("**/*.json", "**/*.jsonc")

@@ -48,7 +48,7 @@ jobs:
       - id: plan
         env:
           MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
-        run: bash .mise/tasks/ci/plan
+        run: python3 -m ci.pr_matrix
 
   hygiene:
     name: hygiene

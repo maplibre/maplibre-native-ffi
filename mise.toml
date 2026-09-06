@@ -536,20 +536,56 @@ run = "pnpm dlx actions-up"
 
 [tasks."ci:prepare-native-package"]
 description = "Prepare native package snapshot or tagged release assets."
-run = 'python3 ci/native_package_release.py "$@"'
+run = "python3 -m ci.native_package_release"
 
 [tasks."ci:prepare-python-snapshot"]
 description = "Relabel a backend wheel or generate the Python snapshot index."
-run = 'python3 ci/python_snapshot.py "$@"'
+run = "python3 -m ci.python_snapshot"
 
 [tasks."ci:release-version"]
 description = "Validate calendar release versions and source tags."
-run = 'python3 ci/release_version.py "$@"'
+run = "python3 -m ci.release_version"
 
 [tasks."ci:test-release-tools"]
 description = "Test release version and native package tooling."
-run = 'PYTHONPATH="$MISE_MONOREPO_ROOT/ci${PYTHONPATH:+:$PYTHONPATH}" python3 -m unittest discover -s ci/tests -p "test_*.py"'
+run = 'python3 -m unittest discover -s ci/tests -p "test_*.py"'
 
 [tasks."kotlin:prepare-release"]
 description = "Merge, sign, and publish Kotlin Maven repositories."
-run = 'python3 ci/kotlin_release.py "$@"'
+run = "python3 -m ci.kotlin_release"
+
+[tasks."ci:generate-workflow"]
+description = "Generate the GitHub Actions CI workflow."
+run = "python3 -m ci.generate_workflow"
+
+[tasks."ci:generate-devcontainer-tools"]
+description = "Generate the devcontainer's aggregate tool list."
+run = "python3 -m ci.generate_devcontainer_tools"
+
+[tasks."ci:check-action-pins"]
+description = "Verify GitHub Actions pins match the pins catalog."
+run = "python3 -m ci.check_action_pins"
+
+[tasks."ci:check-snapshot-scopes"]
+description = "Verify snapshot component scopes classify every tracked path."
+run = "python3 -m ci.check_snapshot_scopes"
+
+[tasks."ci:check-project-graph"]
+description = "Verify CI consumer tasks have mise project ownership."
+run = "python3 -m ci.check_project_graph"
+
+[tasks."ci:snapshot-state"]
+description = "Hash snapshot component inputs and track what was published."
+run = "python3 -m ci.snapshot_state"
+
+[tasks."kotlin:verify-staging"]
+description = "Verify staged Kotlin Maven payloads."
+run = "python3 -m ci.kotlin_verify_staging"
+
+[tasks."kotlin:check-android-api-floor"]
+description = "Verify compiled androidMain bytecode stays on the android-minSdk floor."
+run = "python3 -m ci.kotlin_check_android_api_floor"
+
+[tasks."ci:plan"]
+description = "Select CI coverage from the GitHub event."
+run = "python3 -m ci.pr_matrix"

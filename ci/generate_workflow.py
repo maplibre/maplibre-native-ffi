@@ -1,19 +1,15 @@
-#!/usr/bin/env python3
-# [MISE] description="Generate the GitHub Actions CI workflow."
-# [MISE] shell="python"
-
 import argparse
 import difflib
 import pathlib
 import re
 import sys
 
-ROOT = pathlib.Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / ".github" / "workflows" / "ci.yml"
-sys.path.insert(0, str(ROOT))
-
 from ci.action_pins import load_pins
 from ci.workflow import load_configuration, platform, target_rows
+
+ROOT = pathlib.Path.cwd()
+OUTPUT = ROOT / ".github" / "workflows" / "ci.yml"
+
 
 # Pins come from `.github/workflows/action-pins.yml` so Dependabot updates them.
 PINS = load_pins(ROOT)
@@ -250,7 +246,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "      - id: plan",
         "        env:",
         "          MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}",
-        "        run: bash .mise/tasks/ci/plan",
+        "        run: python3 -m ci.pr_matrix",
         "",
         "  hygiene:",
         "    name: hygiene",

@@ -1,7 +1,3 @@
-#!/usr/bin/env python3
-# [MISE] description="Hash snapshot component inputs and track what was published."
-# [MISE] shell="python"
-
 """Gate snapshot publishing on the inputs each component actually consumes.
 
 `hash` digests one component's inputs at a commit. `plan` digests every
@@ -26,11 +22,7 @@ import sys
 import urllib.error
 import urllib.request
 
-
-ROOT = pathlib.Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(ROOT))
-
-from ci.snapshots import (  # noqa: E402
+from ci.snapshots import (
     Component,
     UncoveredPaths,
     component_hash,
@@ -38,6 +30,8 @@ from ci.snapshots import (  # noqa: E402
     load,
     state_tag,
 )
+
+ROOT = pathlib.Path.cwd()
 
 
 def _token() -> str:
@@ -139,8 +133,10 @@ def _emit_outputs(report: dict[str, dict]) -> None:
     if not output:
         return
     with open(output, "a", encoding="utf-8") as file:
-        for name, entry in sorted(report.items()):
-            file.write(f"publish_{name}={str(entry['publish']).lower()}\n")
+        file.writelines(
+            f"publish_{name}={str(entry['publish']).lower()}\n"
+            for name, entry in sorted(report.items())
+        )
 
 
 def command_hash(arguments: argparse.Namespace) -> int:
@@ -222,7 +218,7 @@ def command_record(arguments: argparse.Namespace) -> int:
         raise SystemExit("error: SNAPSHOT_SHA is required to record a publish")
 
     published_at = (
-        datetime.datetime.now(datetime.timezone.utc)
+        datetime.datetime.now(datetime.UTC)
         .isoformat(timespec="seconds")
         .replace("+00:00", "Z")
     )
