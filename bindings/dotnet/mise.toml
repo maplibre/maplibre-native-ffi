@@ -13,7 +13,8 @@ sources = [
 run = "dotnet tool restore --tool-manifest .config/dotnet-tools.json --verbosity quiet && dotnet tool restore --tool-manifest bindings/dotnet/.config/dotnet-tools.json --verbosity quiet"
 
 [tasks.generate]
-run = "python scripts/generate-clangsharp.py"
+dir = "../.."
+run = "python -m bindings.dotnet.scripts.generate_clangsharp"
 
 [tasks.api]
 description = "Generate DocFX HTML API reference for the .NET binding."
@@ -49,7 +50,7 @@ extends = "ffi:preset"
 dir = "../.."
 run = '''
 if [[ "$usage_preset" == linux-musl-* ]]; then
-  exec python3 ci/dotnet_snapshot.py smoke-musl "$usage_preset"
+  exec python3 -m ci.dotnet_snapshot smoke-musl "$usage_preset"
 fi
 
 MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \

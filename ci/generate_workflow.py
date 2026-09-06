@@ -1,19 +1,15 @@
-#!/usr/bin/env python3
-# [MISE] description="Generate the GitHub Actions CI workflow."
-# [MISE] shell="python"
-
 import argparse
 import difflib
 import pathlib
 import re
 import sys
 
-ROOT = pathlib.Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / ".github" / "workflows" / "ci.yml"
-sys.path.insert(0, str(ROOT))
-
 from ci.action_pins import load_pins
 from ci.workflow import load_configuration, platform, target_rows
+
+ROOT = pathlib.Path.cwd()
+OUTPUT = ROOT / ".github" / "workflows" / "ci.yml"
+
 
 # Pins come from `.github/workflows/action-pins.yml` so Dependabot updates them.
 PINS = load_pins(ROOT)
@@ -22,6 +18,7 @@ CACHE_SAVE = PINS["actions/cache/save"]
 DOWNLOAD = PINS["actions/download-artifact"]
 UPLOAD = PINS["actions/upload-artifact"]
 SETUP_ANDROID = PINS["android-actions/setup-android"]
+MISE = PINS["jdx/mise-action"]
 
 
 def android_compile_sdk() -> str:
@@ -51,7 +48,7 @@ def setup(
     target: str | None = None,
     zig: bool = False,
     gradle: bool = True,
-    save_toolchains: bool = False,
+    save_toolchains: str | None = None,
 ) -> list[str]:
     lines = [
         f"      - uses: {CHECKOUT}",
@@ -69,7 +66,7 @@ def setup(
     if not gradle:
         lines.append("          gradle: false")
     if save_toolchains:
-        lines.append("          save-toolchains: true")
+        lines.append(f"          save-toolchains: {save_toolchains}")
     lines.extend(
         [
             "          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}",
@@ -131,7 +128,10 @@ def target_job(row: dict[str, object]) -> list[str]:
             preset,
             zig=zig,
             gradle=bool(row["gradle"]),
-            save_toolchains=bool(row["save_toolchains"]),
+            save_toolchains=(
+                "${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), "
+                f"'{job_id(preset)}') }}}}"
+            ),
         ),
     ]
     for command in native:
@@ -228,12 +228,25 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "    outputs:",
         "      tier: ${{ steps.plan.outputs.tier }}",
         "      expected: ${{ steps.plan.outputs.expected }}",
+        "      toolchain_writers: ${{ steps.plan.outputs.toolchain_writers }}",
         "    steps:",
         f"      - uses: {CHECKOUT}",
         "        with:",
         "          persist-credentials: false",
+        "          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}",
+        "      - name: Install mise for affected selection",
+        "        if: github.event_name == 'pull_request'",
+        "        continue-on-error: true",
+        f"        uses: {MISE}",
+        "        with:",
+        "          version: 2026.8.2",
+        "          install: false",
+        "          cache: false",
+        "          env: false",
         "      - id: plan",
-        "        run: bash .mise/tasks/ci/plan",
+        "        env:",
+        "          MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}",
+        "        run: python3 -m ci.pr_matrix",
         "",
         "  hygiene:",
         "    name: hygiene",

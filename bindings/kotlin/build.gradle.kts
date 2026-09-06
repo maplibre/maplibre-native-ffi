@@ -321,9 +321,7 @@ val checkAndroidApiFloor =
     description = "Verifies androidMain bytecode stays on the android-minSdk floor."
     dependsOn("compileAndroidMain", "compileAndroidMainJavaWithJavac")
     workingDir = rootProject.layout.projectDirectory.asFile
-    commandLine(
-      rootProject.layout.projectDirectory.file(".mise/tasks/kotlin/check-android-api-floor").asFile
-    )
+    commandLine("python3", "-m", "ci.kotlin_check_android_api_floor")
   }
 
 tasks.register("androidBuild") {

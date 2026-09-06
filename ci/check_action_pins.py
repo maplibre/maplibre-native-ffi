@@ -1,15 +1,9 @@
-#!/usr/bin/env python3
-# [MISE] description="Verify GitHub Actions pins match the pins catalog."
-# [MISE] shell="python"
-
 import pathlib
 import sys
 
+from ci.action_pins import CATALOG, check_pins
 
-ROOT = pathlib.Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(ROOT))
-
-from ci.action_pins import CATALOG, check_pins  # noqa: E402
+ROOT = pathlib.Path.cwd()
 
 
 def main() -> int:

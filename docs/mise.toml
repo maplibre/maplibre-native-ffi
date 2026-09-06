@@ -136,4 +136,5 @@ run = "pnpm run preview"
 run = "pnpm exec astro"
 
 [tasks.generate-support-matrix]
-run = "pnpm run generate-support-matrix"
+dir = ".."
+run = "python3 -m docs.scripts.generate_support_matrix"

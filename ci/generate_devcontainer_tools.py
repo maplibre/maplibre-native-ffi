@@ -1,18 +1,12 @@
-#!/usr/bin/env python3
-# [MISE] description="Generate the devcontainer's aggregate tool list."
-# [MISE] shell="python"
-
 import argparse
 import difflib
 import pathlib
 import sys
 
+from ci.devcontainer_tools import render
 
-ROOT = pathlib.Path(__file__).resolve().parents[3]
+ROOT = pathlib.Path.cwd()
 OUTPUT = ROOT / ".devcontainer" / "mise.toml"
-sys.path.insert(0, str(ROOT))
-
-from ci.devcontainer_tools import render  # noqa: E402
 
 
 def main() -> int:

@@ -3,7 +3,7 @@
 # repository tasks.
 
 monorepo_root = true
-min_version = "2026.7.15"
+min_version = "2026.8.2"
 
 [settings]
 lockfile = true
@@ -38,6 +38,124 @@ dotnet.isolated = true
 [monorepo]
 config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 lockfile = true
+
+# Project impact is separate from task prerequisites. Cargo infers its local
+# crate dependencies; these declarations connect native code, bindings,
+# examples, and generated references across language boundaries.
+# The native root owns shared files and unclassified paths conservatively.
+[monorepo.projects."node:maplibre-native-ffi"]
+remove = true
+
+[monorepo.projects."uv:maplibre-native-ffi-workspace"]
+remove = true
+
+[monorepo.projects."uv:maplibre-native-ffi"]
+remove = true
+
+[monorepo.projects."ffi:native"]
+root = "."
+depends = ["cargo:mln-ffi-platform"]
+
+[monorepo.projects."cargo:maplibre-native-ffi-sys"]
+depends_add = ["ffi:native"]
+
+[monorepo.projects."ffi:rust"]
+root = "bindings/rust"
+depends = [
+  "cargo:maplibre-native-ffi",
+  "cargo:maplibre-native-ffi-core",
+  "cargo:maplibre-native-ffi-sys",
+]
+
+[monorepo.projects."ffi:kotlin"]
+root = "bindings/kotlin"
+depends = ["ffi:native", "ffi:verifier-android", "ffi:gradle", "ffi:buildSrc"]
+
+[monorepo.projects."ffi:dotnet"]
+root = "bindings/dotnet"
+depends = ["ffi:native"]
+
+[monorepo.projects."ffi:go"]
+root = "bindings/go"
+depends = ["ffi:native"]
+
+[monorepo.projects."ffi:swift"]
+root = "bindings/swift"
+depends = ["ffi:native"]
+
+[monorepo.projects."ffi:zig"]
+root = "bindings/zig"
+depends = ["ffi:native"]
+
+[monorepo.projects."ffi:dart"]
+root = "bindings/dart"
+depends = ["ffi:native"]
+
+[monorepo.projects."ffi:verifier-android"]
+root = "bindings/rustls-platform-verifier-android"
+depends = ["ffi:native"]
+
+[monorepo.projects."ffi:gradle"]
+root = "gradle"
+depends = []
+
+[monorepo.projects."ffi:buildSrc"]
+root = "buildSrc"
+depends = []
+
+[monorepo.projects."example:android-map"]
+root = "examples/android-map"
+depends = ["ffi:kotlin"]
+
+[monorepo.projects."example:compose-map"]
+root = "examples/compose-map"
+depends = ["ffi:kotlin"]
+
+[monorepo.projects."example:lwjgl-map"]
+root = "examples/lwjgl-map"
+depends = ["ffi:kotlin"]
+
+[monorepo.projects."example:swift-map"]
+root = "examples/swift-map"
+depends = ["ffi:swift"]
+
+[monorepo.projects."example:zig-map"]
+root = "examples/zig-map"
+depends = ["ffi:zig"]
+
+[monorepo.projects."example:zig-readback"]
+root = "examples/zig-readback"
+depends = ["ffi:zig"]
+
+[monorepo.projects."example:dotnet-map"]
+root = "examples/dotnet-map"
+depends = ["ffi:dotnet"]
+
+[monorepo.projects."example:go-map"]
+root = "examples/go-map"
+depends = ["ffi:go"]
+
+[monorepo.projects."example:c-map"]
+root = "examples/c-map"
+depends = ["ffi:native"]
+
+[monorepo.projects."ffi:snippets"]
+root = "docs/snippets"
+depends = ["ffi:native"]
+
+[monorepo.projects."node:docs"]
+depends_add = [
+  "ffi:native",
+  "ffi:rust",
+  "cargo:maplibre-native-ffi-python",
+  "ffi:snippets",
+  "ffi:kotlin",
+  "ffi:dotnet",
+  "ffi:go",
+  "ffi:swift",
+  "ffi:zig",
+  "ffi:dart",
+]
 
 # Inline task scripts across the workspace are Bash. Cascading the shell gives
 # every monorepo config root the same contract without repeating it, and keeps
@@ -418,20 +536,56 @@ run = "pnpm dlx actions-up"
 
 [tasks."ci:prepare-native-package"]
 description = "Prepare native package snapshot or tagged release assets."
-run = 'python3 ci/native_package_release.py "$@"'
+run = "python3 -m ci.native_package_release"
 
 [tasks."ci:prepare-python-snapshot"]
 description = "Relabel a backend wheel or generate the Python snapshot index."
-run = 'python3 ci/python_snapshot.py "$@"'
+run = "python3 -m ci.python_snapshot"
 
 [tasks."ci:release-version"]
 description = "Validate calendar release versions and source tags."
-run = 'python3 ci/release_version.py "$@"'
+run = "python3 -m ci.release_version"
 
 [tasks."ci:test-release-tools"]
 description = "Test release version and native package tooling."
-run = 'PYTHONPATH="$MISE_MONOREPO_ROOT/ci${PYTHONPATH:+:$PYTHONPATH}" python3 -m unittest discover -s ci/tests -p "test_*.py"'
+run = 'python3 -m unittest discover -s ci/tests -p "test_*.py"'
 
 [tasks."kotlin:prepare-release"]
 description = "Merge, sign, and publish Kotlin Maven repositories."
-run = 'python3 ci/kotlin_release.py "$@"'
+run = "python3 -m ci.kotlin_release"
+
+[tasks."ci:generate-workflow"]
+description = "Generate the GitHub Actions CI workflow."
+run = "python3 -m ci.generate_workflow"
+
+[tasks."ci:generate-devcontainer-tools"]
+description = "Generate the devcontainer's aggregate tool list."
+run = "python3 -m ci.generate_devcontainer_tools"
+
+[tasks."ci:check-action-pins"]
+description = "Verify GitHub Actions pins match the pins catalog."
+run = "python3 -m ci.check_action_pins"
+
+[tasks."ci:check-snapshot-scopes"]
+description = "Verify snapshot component scopes classify every tracked path."
+run = "python3 -m ci.check_snapshot_scopes"
+
+[tasks."ci:check-project-graph"]
+description = "Verify CI consumer tasks have mise project ownership."
+run = "python3 -m ci.check_project_graph"
+
+[tasks."ci:snapshot-state"]
+description = "Hash snapshot component inputs and track what was published."
+run = "python3 -m ci.snapshot_state"
+
+[tasks."kotlin:verify-staging"]
+description = "Verify staged Kotlin Maven payloads."
+run = "python3 -m ci.kotlin_verify_staging"
+
+[tasks."kotlin:check-android-api-floor"]
+description = "Verify compiled androidMain bytecode stays on the android-minSdk floor."
+run = "python3 -m ci.kotlin_check_android_api_floor"
+
+[tasks."ci:plan"]
+description = "Select CI coverage from the GitHub event."
+run = "python3 -m ci.pr_matrix"

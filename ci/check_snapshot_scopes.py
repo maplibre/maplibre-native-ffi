@@ -1,15 +1,9 @@
-#!/usr/bin/env python3
-# [MISE] description="Verify snapshot component scopes classify every tracked path."
-# [MISE] shell="python"
-
 import pathlib
 import sys
 
+from ci.snapshots import CONFIG, check_scopes
 
-ROOT = pathlib.Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(ROOT))
-
-from ci.snapshots import CONFIG, check_scopes  # noqa: E402
+ROOT = pathlib.Path.cwd()
 
 
 def main() -> int:
