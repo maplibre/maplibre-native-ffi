@@ -232,14 +232,13 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "        with:",
         "          persist-credentials: false",
         "      - id: plan",
-        "        run: python3 .mise/tasks/ci/plan",
+        "        run: bash .mise/tasks/ci/plan",
         "",
         "  hygiene:",
         "    name: hygiene",
         "    runs-on: ubuntu-latest",
         "    timeout-minutes: 30",
         SCCACHE_ENVIRONMENT,
-        "    needs: plan",
         "    steps:",
         *setup(gradle=False),
         "      - run: mise run ci:generate-workflow --check",
@@ -263,7 +262,6 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "    runs-on: ubuntu-latest",
         "    timeout-minutes: 60",
         SCCACHE_ENVIRONMENT,
-        "    needs: plan",
         "    steps:",
         # Dokka configures the Kotlin Multiplatform project, including the
         # Android target, so docs generation needs Gradle and an SDK platform.

@@ -1,36 +1,5 @@
-#!/usr/bin/env python3
+#!/usr/bin/env bash
 # [MISE] description="Select CI coverage from the GitHub event."
-# [MISE] shell="python"
-
-import json
-import os
-import pathlib
-import sys
-
-ROOT = pathlib.Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(ROOT))
-
-from ci.pr_matrix import plan
-
-selection = plan(
-    os.environ["GITHUB_EVENT_NAME"],
-    json.loads(pathlib.Path(os.environ["GITHUB_EVENT_PATH"]).read_text()),
-)
-with pathlib.Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
-    for key, value in selection.items():
-        encoded = (
-            value
-            if isinstance(value, str)
-            else json.dumps(value, separators=(",", ":"))
-        )
-        print(f"{key}={encoded}", file=output)
-with pathlib.Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as summary:
-    print(f"CI tier: **{selection['tier']}**\n", file=summary)
-    print("Selected jobs (all required):\n", file=summary)
-    for job, result in selection["expected"].items():
-        if result == "success":
-            print(f"- `{job}`", file=summary)
-    print(
-        "\nPlatform labels expand coverage; `ci:full` includes all targets and packaging.",
-        file=summary,
-    )
+set -euo pipefail
+cd "${MISE_PROJECT_ROOT:-$(cd "$(dirname "$0")/../../.." && pwd)}"
+exec python3 -m ci.pr_matrix

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 import pathlib
 
 from ci.workflow import load_configuration, platform, preset_sets
@@ -62,3 +64,32 @@ def plan(event_name: str, event: dict) -> dict:
     )
     expected["kotlin-maven"] = "success" if tier == "full" else "skipped"
     return {"tier": tier, "expected": expected}
+
+
+def main() -> None:
+    selection = plan(
+        os.environ["GITHUB_EVENT_NAME"],
+        json.loads(pathlib.Path(os.environ["GITHUB_EVENT_PATH"]).read_text()),
+    )
+    with pathlib.Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
+        for key, value in selection.items():
+            encoded = (
+                value
+                if isinstance(value, str)
+                else json.dumps(value, separators=(",", ":"))
+            )
+            print(f"{key}={encoded}", file=output)
+    with pathlib.Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as summary:
+        print(f"CI tier: **{selection['tier']}**\n", file=summary)
+        print("Selected jobs (all required):\n", file=summary)
+        for job, result in selection["expected"].items():
+            if result == "success":
+                print(f"- `{job}`", file=summary)
+        print(
+            "\nPlatform labels expand coverage; `ci:full` includes all targets and packaging.",
+            file=summary,
+        )
+
+
+if __name__ == "__main__":
+    main()

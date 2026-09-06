@@ -8,7 +8,6 @@ import os
 import pathlib
 import re
 import subprocess
-import sys
 import tempfile
 import textwrap
 import unittest
@@ -105,6 +104,8 @@ class CoverageTest(unittest.TestCase):
             re.findall(r"^      - ([\w-]+)$", blocks["required"], re.MULTILINE)
         )
         self.assertEqual(required_needs, set(full))
+        for job in ("hygiene", "docs"):
+            self.assertNotIn("needs:", blocks[job])
         for count in range(len(PLATFORM_GROUPS) + 1):
             for labels in itertools.combinations(PLATFORM_GROUPS, count):
                 expected = plan("pull_request", pr(True, labels))["expected"]
@@ -142,16 +143,17 @@ class CoverageTest(unittest.TestCase):
             expected = plan("pull_request", pr(True, (label,)))["expected"]
             self.assertEqual(expected[f"target-{representative}"], "success")
 
-    def test_event_entrypoint_emits_the_plan_and_workflow_handles_tier_changes(self):
+    def test_entrypoint_runs_outside_checkout_and_emits_the_plan(self):
         event = pr(True, ("ci:apple", "ci:android"))
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             (root / "event").write_text(json.dumps(event))
             subprocess.run(
-                [sys.executable, str(ROOT / ".mise/tasks/ci/plan")],
+                ["bash", str(ROOT / ".mise/tasks/ci/plan")],
+                cwd=root,
                 check=True,
                 env={
-                    **os.environ,
+                    "PATH": os.environ["PATH"],
                     "GITHUB_EVENT_NAME": "pull_request",
                     "GITHUB_EVENT_PATH": str(root / "event"),
                     "GITHUB_OUTPUT": str(root / "output"),
