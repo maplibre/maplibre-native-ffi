@@ -3,7 +3,7 @@
 # repository tasks.
 
 monorepo_root = true
-min_version = "2026.7.15"
+min_version = "2026.8.2"
 
 [settings]
 lockfile = true
@@ -38,6 +38,124 @@ dotnet.isolated = true
 [monorepo]
 config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 lockfile = true
+
+# Project impact is separate from task prerequisites. Cargo infers its local
+# crate dependencies; these declarations connect native code, bindings,
+# examples, and generated references across language boundaries.
+# The native root owns shared files and unclassified paths conservatively.
+[monorepo.projects."node:maplibre-native-ffi"]
+remove = true
+
+[monorepo.projects."uv:maplibre-native-ffi-workspace"]
+remove = true
+
+[monorepo.projects."uv:maplibre-native-ffi"]
+remove = true
+
+[monorepo.projects."ffi:native"]
+root = "."
+depends = ["cargo:mln-ffi-platform"]
+
+[monorepo.projects."cargo:maplibre-native-ffi-sys"]
+depends_add = ["ffi:native"]
+
+[monorepo.projects."ffi:rust"]
+root = "bindings/rust"
+depends = [
+  "cargo:maplibre-native-ffi",
+  "cargo:maplibre-native-ffi-core",
+  "cargo:maplibre-native-ffi-sys",
+]
+
+[monorepo.projects."ffi:kotlin"]
+root = "bindings/kotlin"
+depends = ["ffi:native", "ffi:verifier-android", "ffi:gradle", "ffi:buildSrc"]
+
+[monorepo.projects."ffi:dotnet"]
+root = "bindings/dotnet"
+depends = ["ffi:native"]
+
+[monorepo.projects."ffi:go"]
+root = "bindings/go"
+depends = ["ffi:native"]
+
+[monorepo.projects."ffi:swift"]
+root = "bindings/swift"
+depends = ["ffi:native"]
+
+[monorepo.projects."ffi:zig"]
+root = "bindings/zig"
+depends = ["ffi:native"]
+
+[monorepo.projects."ffi:dart"]
+root = "bindings/dart"
+depends = ["ffi:native"]
+
+[monorepo.projects."ffi:verifier-android"]
+root = "bindings/rustls-platform-verifier-android"
+depends = ["ffi:native"]
+
+[monorepo.projects."ffi:gradle"]
+root = "gradle"
+depends = []
+
+[monorepo.projects."ffi:buildSrc"]
+root = "buildSrc"
+depends = []
+
+[monorepo.projects."example:android-map"]
+root = "examples/android-map"
+depends = ["ffi:kotlin"]
+
+[monorepo.projects."example:compose-map"]
+root = "examples/compose-map"
+depends = ["ffi:kotlin"]
+
+[monorepo.projects."example:lwjgl-map"]
+root = "examples/lwjgl-map"
+depends = ["ffi:kotlin"]
+
+[monorepo.projects."example:swift-map"]
+root = "examples/swift-map"
+depends = ["ffi:swift"]
+
+[monorepo.projects."example:zig-map"]
+root = "examples/zig-map"
+depends = ["ffi:zig"]
+
+[monorepo.projects."example:zig-readback"]
+root = "examples/zig-readback"
+depends = ["ffi:zig"]
+
+[monorepo.projects."example:dotnet-map"]
+root = "examples/dotnet-map"
+depends = ["ffi:dotnet"]
+
+[monorepo.projects."example:go-map"]
+root = "examples/go-map"
+depends = ["ffi:go"]
+
+[monorepo.projects."example:c-map"]
+root = "examples/c-map"
+depends = ["ffi:native"]
+
+[monorepo.projects."ffi:snippets"]
+root = "docs/snippets"
+depends = ["ffi:native"]
+
+[monorepo.projects."node:docs"]
+depends_add = [
+  "ffi:native",
+  "ffi:rust",
+  "cargo:maplibre-native-ffi-python",
+  "ffi:snippets",
+  "ffi:kotlin",
+  "ffi:dotnet",
+  "ffi:go",
+  "ffi:swift",
+  "ffi:zig",
+  "ffi:dart",
+]
 
 # Inline task scripts across the workspace are Bash. Cascading the shell gives
 # every monorepo config root the same contract without repeating it, and keeps

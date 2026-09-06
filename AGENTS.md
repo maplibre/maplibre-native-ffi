@@ -98,7 +98,10 @@ the PR description if more detail is needed. More context:
 
 Draft PRs run hygiene, docs, and the Linux x64 EGL/Vulkan targets with their
 binding suites. Ready PRs also run macOS Metal, Windows x64 WGL/Vulkan, Android
-x64 EGL/Vulkan, and browser WebGL/WebGPU. Main, manual runs, and
+x64 EGL/Vulkan, and browser WebGL/WebGPU. Within either PR tier, mise's project
+graph selects target jobs whose native code or consumer suites are affected.
+Each selected job runs all of its suites. Shared root files and native changes
+select the complete tier; docs and hygiene always run. Main, manual runs, and
 Dependabot-authored PRs run every target and complete packaging verification.
 
 Use persistent PR labels to add coverage to either PR tier:
@@ -113,10 +116,17 @@ Use persistent PR labels to add coverage to either PR tier:
 | `ci:full`    | Every target and complete packaging verification, including Maven |
 
 Labels combine and persist across pushes. Readiness and label changes start a
-new run. Every job selected by the planner must succeed for `ci-required` to
-pass; only jobs omitted by the plan may be skipped. For CI, ABI, shared
-toolchain, dependency, or publishing changes, request full coverage with
-`gh pr edit <number> --add-label 'ci:full'`.
+new run. Explicit platform labels retain all coverage on those platforms even
+when the affected graph would omit it. If selection is unavailable, the planner
+retains the complete tier and reports the reason. Every job selected by the
+planner must succeed for `ci-required` to pass; only jobs omitted by the plan
+may be skipped. For CI, ABI, shared toolchain, dependency, or publishing
+changes, request full coverage with `gh pr edit <number> --add-label 'ci:full'`.
+
+Keep cross-language dependencies in `[monorepo.projects]` in `mise.toml` when
+adding bindings, examples, or generated reference inputs. Cargo path
+dependencies are inferred from manifests. `mise run ci:check-project-graph`
+verifies that every CI consumer task has project ownership.
 
 ## Project Invariants
 

@@ -13,6 +13,7 @@ import textwrap
 import unittest
 
 from ci.pr_matrix import PLATFORM_GROUPS, plan
+from ci.workflow import runner
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github/workflows/ci.yml"
@@ -31,6 +32,65 @@ def pr(draft=False, labels=(), author="contributor", action="synchronize"):
 
 
 class CoverageTest(unittest.TestCase):
+    def test_affected_selection_preserves_full_and_explicit_platform_coverage(self):
+        for name, event in (
+            ("push", {}),
+            ("workflow_dispatch", {}),
+            ("pull_request", pr(True, ("ci:full",))),
+            ("pull_request", pr(author="dependabot[bot]")),
+        ):
+            self.assertEqual(plan(name, event, set()), plan(name, event))
+        for labels in (
+            ("ci:android",),
+            ("ci:apple", "ci:windows"),
+            tuple(PLATFORM_GROUPS),
+        ):
+            event = pr(True, labels)
+            expected = plan("pull_request", event, {"docs"})["expected"]
+            baseline = plan("pull_request", event)["expected"]
+            requested = set().union(*(PLATFORM_GROUPS[label] for label in labels))
+            from ci.workflow import platform
+
+            for job, result in expected.items():
+                if job.startswith("target-"):
+                    self.assertEqual(
+                        result,
+                        baseline[job] if platform(job[7:]) in requested else "skipped",
+                    )
+            self.assertEqual(expected["android-multi"], baseline["android-multi"])
+            self.assertEqual(expected["kotlin-maven"], baseline["kotlin-maven"])
+        for draft in (True, False):
+            event = pr(draft)
+            self.assertEqual(
+                plan("pull_request", event, {"."}), plan("pull_request", event)
+            )
+
+    def test_cache_writers_are_selected_from_retained_jobs(self):
+        # The static ubuntu-latest writer was the browser WebGL job, which an
+        # Android-example-only change omits. The retained Android job must save.
+        selection = plan("pull_request", pr(), {"examples/android-map"})
+        self.assertEqual(selection["toolchain_writers"], ["target-android-x64-egl"])
+        for roots in (set(), {"docs"}, {"bindings/python"}, {"bindings/swift"}, {"."}):
+            for labels in ((), ("ci:android",), ("ci:full",)):
+                selection = plan("pull_request", pr(labels=labels), roots)
+                selected = {
+                    job
+                    for job, result in selection["expected"].items()
+                    if job.startswith("target-") and result == "success"
+                }
+                writers = selection["toolchain_writers"]
+                self.assertTrue(set(writers) <= selected)
+                self.assertEqual(
+                    len(writers), len({runner(job[7:]) for job in selected})
+                )
+                self.assertEqual(
+                    {runner(job[7:]) for job in writers},
+                    {runner(job[7:]) for job in selected},
+                )
+        workflow = WORKFLOW.read_text()
+        self.assertIn("fromJSON(needs.plan.outputs.toolchain_writers)", workflow)
+        self.assertNotIn("save-toolchains: true", workflow)
+
     def test_readiness_and_labels_expand_and_restore_coverage(self):
         draft = plan("pull_request", pr(True))["expected"]
         ready = plan("pull_request", pr(action="ready_for_review"))["expected"]
@@ -168,6 +228,7 @@ class CoverageTest(unittest.TestCase):
                 json.loads(outputs["expected"]), plan("pull_request", event)["expected"]
             )
             self.assertIn("target-ios-arm64-metal", (root / "summary").read_text())
+            self.assertIn("retaining the complete tier", (root / "summary").read_text())
         events = (
             WORKFLOW.read_text()
             .split("  pull_request:\n", 1)[1]
@@ -240,3 +301,18 @@ class RequiredCheckTest(unittest.TestCase):
         self.assertFalse(
             self.accepts({"plan": "skipped"}, {"plan": {"result": "skipped"}})
         )
+
+    def test_affected_job_skips_are_checked_against_the_narrowed_plan(self):
+        for roots in ({"docs"}, {"bindings/dart"}, {"examples/android-map"}):
+            expected = plan("pull_request", pr(), roots)["expected"]
+            results = {job: {"result": wanted} for job, wanted in expected.items()}
+            self.assertTrue(self.accepts(expected, results))
+            for job in ("docs", "hygiene"):
+                self.assertFalse(
+                    self.accepts(expected, {**results, job: {"result": "skipped"}})
+                )
+            for job, wanted in expected.items():
+                if job.startswith("target-") and wanted == "success":
+                    self.assertFalse(
+                        self.accepts(expected, {**results, job: {"result": "skipped"}})
+                    )
