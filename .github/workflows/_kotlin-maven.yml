@@ -21,6 +21,11 @@ on:
         description: Source commit and artifact suffix
         required: true
         type: string
+      verified_retention_days:
+        description: Days to retain the verified Maven repository
+        default: 30
+        required: false
+        type: number
       verified_run_id:
         description: >-
           Run that already staged and verified this commit at this version.
@@ -130,14 +135,14 @@ jobs:
       - run: >-
           mise run //:kotlin:publish verify
           build/packages/kotlin/maven-staging "$KOTLIN_VERSION"
-      # Publishing runs reuse this artifact through `verified_run_id`, so it
-      # outlives the run long enough for a delayed or retried publish.
+      # Main CI retains this repository for delayed or retried publishing;
+      # pull requests retain it for one day.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: kotlin-maven-verified-${{ env.PACKAGE_SHA }}
           path: build/packages/kotlin/maven-staging
           if-no-files-found: error
-          retention-days: 30
+          retention-days: ${{ inputs.verified_retention_days }}
 
   publish:
     name: Kotlin Maven publish
