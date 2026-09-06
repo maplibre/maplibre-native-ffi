@@ -238,10 +238,22 @@ MLN_API mln_status mln_map_pixel_for_lat_lng(
 /**
  * Starts an ordered conversion from a screen point to a geographic coordinate.
  *
- * Each conversion queues one map query. Hot paths such as per-pointer-move
- * conversion use a standalone projection, whose conversions are synchronous.
+ * The output longitude is wrapped to -180 to 180. Each conversion queues one
+ * map query. Hot paths such as per-pointer-move conversion use a standalone
+ * projection, whose conversions are synchronous.
  */
 MLN_API mln_status mln_map_lat_lng_for_pixel(
+  mln_map map, mln_screen_point point, const mln_completion* completion
+) MLN_NOEXCEPT;
+
+/**
+ * Starts an ordered conversion from a screen point to an unwrapped geographic
+ * coordinate.
+ *
+ * The longitude preserves the visible world copy and may fall outside -180 to
+ * 180. The completion borrows one mln_lat_lng.
+ */
+MLN_API mln_status mln_map_lat_lng_for_pixel_unwrapped(
   mln_map map, mln_screen_point point, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
@@ -255,8 +267,22 @@ MLN_API mln_status mln_map_pixels_for_lat_lngs(
 
 /**
  * Starts an ordered conversion of copied screen points to coordinates.
+ *
+ * The output longitudes are wrapped to -180 to 180.
  */
 MLN_API mln_status mln_map_lat_lngs_for_pixels(
+  mln_map map, const mln_screen_point* points, size_t point_count,
+  const mln_completion* completion
+) MLN_NOEXCEPT;
+
+/**
+ * Starts an ordered conversion of copied screen points to unwrapped
+ * coordinates.
+ *
+ * Each longitude preserves the visible world copy and may fall outside -180 to
+ * 180. The completion borrows mln_lat_lng[value_count].
+ */
+MLN_API mln_status mln_map_lat_lngs_for_pixels_unwrapped(
   mln_map map, const mln_screen_point* points, size_t point_count,
   const mln_completion* completion
 ) MLN_NOEXCEPT;

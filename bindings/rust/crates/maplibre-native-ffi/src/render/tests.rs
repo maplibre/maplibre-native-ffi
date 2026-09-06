@@ -228,6 +228,8 @@ use crate::{
 
 assert_not_impl_any!(NativePointer: Send, Sync);
 assert_not_impl_any!(FrameNativePointer<'static>: Send, Sync);
+assert_not_impl_any!(VulkanHandle: Send, Sync);
+assert_not_impl_any!(FrameVulkanHandle<'static>: Send, Sync);
 assert_not_impl_any!(FrameOpenGLTextureName<'static>: Send, Sync);
 assert_impl_all!(RenderSessionHandle: Send, Sync);
 assert_impl_all!(AcquiredFrameHandle: Send, Sync);
@@ -513,13 +515,16 @@ impl OwnedTextureTestContext {
             }
             #[cfg(not(target_os = "emscripten"))]
             Self::Vulkan(context) => {
+                // SAFETY: The rejected setter never reaches Vulkan with these
+                // non-null placeholder handle values.
+                let placeholder_handle = unsafe { VulkanHandle::from_bits(1) };
                 session.set_vulkan_borrowed_texture_target(&VulkanBorrowedTextureDescriptor::new(
                     extent.clone(),
                     64,
                     64,
                     context.descriptor(),
-                    placeholder,
-                    placeholder,
+                    placeholder_handle,
+                    placeholder_handle,
                     1,
                     0,
                     1,
@@ -2171,6 +2176,10 @@ impl OpenGLTestContext {
         }
     }
 
+    fn clear_gl_errors(&self) {
+        while unsafe { self.gl.get_error() } != gl_api::NO_ERROR {}
+    }
+
     /// Reads the surface this context presents to.
     ///
     /// The browser reads the context's own drawing buffer, which is what its
@@ -2228,6 +2237,7 @@ impl OpenGLBorrowedTexture {
         height: u32,
     ) -> std::result::Result<gl_api::NativeTexture, Box<dyn StdError>> {
         context.make_current()?;
+        context.clear_gl_errors();
         let texture = unsafe {
             let texture = context.gl.create_texture()?;
             context.gl.bind_texture(gl_api::TEXTURE_2D, Some(texture));
@@ -2303,6 +2313,7 @@ impl OpenGLBorrowedTexture {
 
     fn read_rgba(&self) -> std::result::Result<Vec<u8>, Box<dyn StdError>> {
         self.context.make_current()?;
+        self.context.clear_gl_errors();
         let mut pixels = vec![0_u8; self.width as usize * self.height as usize * 4];
         let texture = self.texture.ok_or("borrowed texture has been deleted")?;
         unsafe {

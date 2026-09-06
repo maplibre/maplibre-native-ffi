@@ -55,6 +55,39 @@ test "style source removal reports state and copies missing results" {
     try testing.expect((try support.styleSourceUrl(&map, "remove-me")) == null);
 }
 
+test "style source volatility round trips through the public API" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createLoadedMap(&runtime);
+    defer map.close() catch @panic("map close failed");
+
+    const tiles = [_][]const u8{"https://example.com/{z}/{x}/{y}.mvt"};
+    _ = try map.addVectorSourceTiles(testing.allocator, "volatile-source", tiles[0..], null);
+
+    {
+        var info = (try support.styleSourceInfo(&map, "volatile-source")).?;
+        defer info.deinit();
+        try testing.expect(!info.is_volatile);
+    }
+
+    try testing.expectEqual(.committed, try support.waitForCommandDisposition(&runtime, try map.setStyleSourceVolatile(testing.allocator, "volatile-source", true)));
+    {
+        var info = (try support.styleSourceInfo(&map, "volatile-source")).?;
+        defer info.deinit();
+        try testing.expect(info.is_volatile);
+    }
+
+    try testing.expectEqual(.committed, try support.waitForCommandDisposition(&runtime, try map.setStyleSourceVolatile(testing.allocator, "volatile-source", false)));
+    {
+        var info = (try support.styleSourceInfo(&map, "volatile-source")).?;
+        defer info.deinit();
+        try testing.expect(!info.is_volatile);
+    }
+
+    // Setting volatility on a missing ID is accepted, then fails with NOT_FOUND.
+    try support.expectCommandError(&runtime, try map.setStyleSourceVolatile(testing.allocator, "missing-source", true), error.NotFound);
+}
+
 test "tile source helpers expose copied reconstructible source information" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");

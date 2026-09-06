@@ -111,6 +111,66 @@ func TestStyleSourceMetadataForMissingSources(t *testing.T) {
 	if _, _, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("")); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("StyleSourceInfo(empty) error = %v, want ErrInvalidArgument", err)
 	}
+	volatileCompletion, err := m.SetStyleSourceVolatile("missing", true)
+	requireCommandFailedWith(t, runtime, volatileCompletion, err, ErrNotFound)
+}
+
+func TestStyleSourceVolatilityRoundTripsThroughPublicAPI(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := awaitForTest(runtime.NewMap())
+	if err != nil {
+		_ = closeRuntimeForTest(runtime)
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := closeRuntimeForTest(runtime); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	}
+	if _, err := m.AddVectorSourceURL("volatile-source", "https://example.invalid/tiles.json", nil); err != nil {
+		t.Fatalf("AddVectorSourceURL(): %v", err)
+	}
+
+	info, found, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("volatile-source"))
+	if err != nil {
+		t.Fatalf("StyleSourceInfo(initial): %v", err)
+	}
+	if !found {
+		t.Fatal("StyleSourceInfo(initial) found = false, want true")
+	}
+	if info.IsVolatile {
+		t.Fatal("StyleSourceInfo(initial).IsVolatile = true, want false")
+	}
+
+	enabled, err := m.SetStyleSourceVolatile("volatile-source", true)
+	requireCommandCommitted(t, runtime, enabled, err)
+	info, found, err = takeOptionalStyleOperationForTest(m.StyleSourceInfo("volatile-source"))
+	if err != nil {
+		t.Fatalf("StyleSourceInfo(true): %v", err)
+	}
+	if !found || !info.IsVolatile {
+		t.Fatalf("StyleSourceInfo(true) = (%#v, %v), want found and volatile", info, found)
+	}
+
+	disabled, err := m.SetStyleSourceVolatile("volatile-source", false)
+	requireCommandCommitted(t, runtime, disabled, err)
+	info, found, err = takeOptionalStyleOperationForTest(m.StyleSourceInfo("volatile-source"))
+	if err != nil {
+		t.Fatalf("StyleSourceInfo(false): %v", err)
+	}
+	if !found || info.IsVolatile {
+		t.Fatalf("StyleSourceInfo(false) = (%#v, %v), want found and non-volatile", info, found)
+	}
 }
 
 func TestStyleSourceURLAndTileBindings(t *testing.T) {

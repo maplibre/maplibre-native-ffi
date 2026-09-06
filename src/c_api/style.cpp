@@ -798,6 +798,27 @@ auto mln_map_set_geojson_source_synchronous_tiling(
   });
 }
 
+auto mln_map_set_style_source_volatile(
+  mln_map map, mln_buffer_view source_id, bool is_volatile,
+  const mln_completion* completion
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    if (!valid_view(source_id, "source_id is invalid")) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto id = OwnedView{source_id};
+    return command(
+      map,
+      [map, id = std::move(id), is_volatile]() -> mln_status {
+        return mln::core::map_set_style_source_volatile(
+          map, id.view(), is_volatile
+        );
+      },
+      completion
+    );
+  });
+}
+
 MLN_TILE_URL_COMMAND(
   mln_map_add_vector_source_url, map_add_vector_source_url, 0
 )

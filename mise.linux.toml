@@ -5,7 +5,7 @@
 swift.platform = "ubuntu24.04"
 
 [vars]
-host_native_preset = "linux-{{ arch() }}-vulkan"
+host_native_preset = "linux-gnu-{{ arch() }}-vulkan"
 # Highest glibc release our published Linux natives may require. The zig
 # toolchain sets this from MLN_FFI_ZIG_GLIBC rather than from the build host,
 # so change it together with cmake/toolchains/zig-linux.cmake.
@@ -67,4 +67,27 @@ if [[ "$highest" != "GLIBC_$floor" ]]; then
 fi
 
 echo "$usage_preset requires $required (floor GLIBC_$floor)"
+'''
+
+[tasks.check-musl-abi]
+description = "Verify that a built Linux musl native requires the musl libc ABI."
+usage = 'arg "<preset>"'
+run = '''
+library="$MISE_MONOREPO_ROOT/build/$usage_preset/install/lib/libmaplibre-native-c.so"
+
+if [[ ! -f "$library" ]]; then
+  echo "error: $library not found; build $usage_preset first" >&2
+  exit 1
+fi
+
+if ! readelf --dynamic "$library" | grep -Fq 'Shared library: [libc.so]'; then
+  echo "error: $usage_preset does not require musl's libc.so" >&2
+  exit 1
+fi
+if readelf --version-info "$library" | grep -q 'GLIBC_'; then
+  echo "error: $usage_preset contains glibc symbol versions" >&2
+  exit 1
+fi
+
+echo "$usage_preset requires musl libc and contains no glibc symbol versions"
 '''

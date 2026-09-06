@@ -82,7 +82,7 @@ pub struct MetalSurfaceDescriptorFields {
 pub struct VulkanSurfaceDescriptorFields {
     pub extent: RenderTargetExtentFields,
     pub context: VulkanContextDescriptorFields,
-    pub surface: *mut c_void,
+    pub surface: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -126,8 +126,8 @@ pub struct VulkanBorrowedTextureDescriptorFields {
     pub physical_width: u32,
     pub physical_height: u32,
     pub context: VulkanContextDescriptorFields,
-    pub image: *mut c_void,
-    pub image_view: *mut c_void,
+    pub image: u64,
+    pub image_view: u64,
     pub format: u32,
     pub initial_layout: u32,
     pub final_layout: u32,
@@ -543,11 +543,11 @@ mod tests {
     }
 
     #[test]
-    fn vulkan_descriptors_fill_sizes_fields_and_pointers() {
+    fn vulkan_descriptors_fill_sizes_fields_and_handles() {
         let surface = vulkan_surface_descriptor_to_native(VulkanSurfaceDescriptorFields {
             extent: extent(),
             context: vulkan_context(1),
-            surface: ptr(6),
+            surface: 6,
         });
         assert_eq!(
             surface.size,
@@ -557,7 +557,7 @@ mod tests {
         assert_eq!(surface.context.graphics_queue_family_index, 5);
         assert_eq!(surface.context.get_instance_proc_addr, ptr(21));
         assert_eq!(surface.context.get_device_proc_addr, ptr(22));
-        assert_eq!(surface.surface, ptr(6));
+        assert_eq!(surface.surface, 6);
 
         let owned = vulkan_owned_texture_descriptor_to_native(VulkanOwnedTextureDescriptorFields {
             extent: extent(),
@@ -578,8 +578,8 @@ mod tests {
                 physical_width: 65,
                 physical_height: 33,
                 context: vulkan_context(12),
-                image: ptr(17),
-                image_view: ptr(18),
+                image: 17,
+                image_view: 18,
                 format: 19,
                 initial_layout: 20,
                 final_layout: 21,
@@ -588,8 +588,8 @@ mod tests {
             borrowed.size,
             std::mem::size_of::<sys::mln_vulkan_borrowed_texture_descriptor>() as u32
         );
-        assert_eq!(borrowed.image, ptr(17));
-        assert_eq!(borrowed.image_view, ptr(18));
+        assert_eq!(borrowed.image, 17);
+        assert_eq!(borrowed.image_view, 18);
         assert_eq!(borrowed.format, 19);
         assert_eq!(borrowed.initial_layout, 20);
         assert_eq!(borrowed.final_layout, 21);

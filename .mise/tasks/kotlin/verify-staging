@@ -23,6 +23,7 @@ MODULES = set(
 API_BEARING_MODULES = {
     "maplibre-native-ffi",
     "maplibre-native-ffi-android",
+    "maplibre-native-ffi-androidnativearm32",
     "maplibre-native-ffi-androidnativearm64",
     "maplibre-native-ffi-androidnativex64",
     "maplibre-native-ffi-iosarm64",
@@ -38,6 +39,7 @@ API_BEARING_MODULES = {
 ROOT_TARGET_MODULES = {
     "maplibre-native-ffi": {
         "android": "maplibre-native-ffi-android",
+        "androidNativeArm32": "maplibre-native-ffi-androidnativearm32",
         "androidNativeArm64": "maplibre-native-ffi-androidnativearm64",
         "androidNativeX64": "maplibre-native-ffi-androidnativex64",
         "iosArm64": "maplibre-native-ffi-iosarm64",
@@ -51,6 +53,7 @@ ROOT_TARGET_MODULES = {
     },
     "maplibre-native-ffi-runtime-opengl": {
         "android": "maplibre-native-ffi-runtime-opengl-android",
+        "androidNativeArm32": "maplibre-native-ffi-runtime-opengl-androidnativearm32",
         "androidNativeArm64": "maplibre-native-ffi-runtime-opengl-androidnativearm64",
         "androidNativeX64": "maplibre-native-ffi-runtime-opengl-androidnativex64",
         "jvm": "maplibre-native-ffi-runtime-opengl-jvm",
@@ -60,6 +63,7 @@ ROOT_TARGET_MODULES = {
     },
     "maplibre-native-ffi-runtime-vulkan": {
         "android": "maplibre-native-ffi-runtime-vulkan-android",
+        "androidNativeArm32": "maplibre-native-ffi-runtime-vulkan-androidnativearm32",
         "androidNativeArm64": "maplibre-native-ffi-runtime-vulkan-androidnativearm64",
         "androidNativeX64": "maplibre-native-ffi-runtime-vulkan-androidnativex64",
         "jvm": "maplibre-native-ffi-runtime-vulkan-jvm",
@@ -285,7 +289,7 @@ def verify_android(root: pathlib.Path) -> None:
     )
     with zipfile.ZipFile(core) as aar:
         names = set(aar.namelist())
-        for abi in ("arm64-v8a", "x86_64"):
+        for abi in ("armeabi-v7a", "arm64-v8a", "x86_64"):
             expected = f"jni/{abi}/libjniMaplibreNativeC.so"
             if expected not in names:
                 raise SystemExit(f"the core Android AAR is missing {expected}")
@@ -344,7 +348,8 @@ def verify_android(root: pathlib.Path) -> None:
                 )
                 if expected not in names:
                     raise SystemExit(f"{runtime} is missing {expected}")
-            for abi in ("arm64-v8a", "x86_64"):
+            abis = ("armeabi-v7a", "arm64-v8a", "x86_64")
+            for abi in abis:
                 expected = f"jni/{abi}/libmaplibre-native-c.so"
                 if expected not in names:
                     raise SystemExit(f"{runtime} is missing {expected}")
@@ -430,6 +435,10 @@ def verify_jvm(root: pathlib.Path) -> None:
 
 def verify_native(root: pathlib.Path) -> None:
     modules = {
+        "maplibre-native-ffi-runtime-opengl-androidnativearm32": (
+            "opengl",
+            "android-arm",
+        ),
         "maplibre-native-ffi-runtime-opengl-androidnativearm64": (
             "opengl",
             "android-arm64",
@@ -441,6 +450,10 @@ def verify_native(root: pathlib.Path) -> None:
         "maplibre-native-ffi-runtime-opengl-linuxarm64": ("opengl", "linux-arm64"),
         "maplibre-native-ffi-runtime-opengl-linuxx64": ("opengl", "linux-x64"),
         "maplibre-native-ffi-runtime-opengl-macosarm64": ("opengl", "macos-arm64"),
+        "maplibre-native-ffi-runtime-vulkan-androidnativearm32": (
+            "vulkan",
+            "android-arm",
+        ),
         "maplibre-native-ffi-runtime-vulkan-androidnativearm64": (
             "vulkan",
             "android-arm64",

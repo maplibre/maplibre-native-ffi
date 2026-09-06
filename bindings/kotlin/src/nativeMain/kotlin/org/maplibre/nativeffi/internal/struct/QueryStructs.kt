@@ -4,7 +4,6 @@ import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CValue
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
-import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.cValue
@@ -40,6 +39,9 @@ import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options_default
 import org.maplibre.nativeffi.internal.lifecycle.NativeQueriedFeatureList
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
+import org.maplibre.nativeffi.internal.memory.CSize
+import org.maplibre.nativeffi.internal.memory.CSizeVar
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.QueriedFeature
@@ -63,7 +65,7 @@ internal object QueryStructs {
       is RenderedQueryGeometry.LineString ->
         mln_rendered_query_geometry_line_string(
             CoreStructs.screenPointArray(value.points, scope),
-            value.points.size.toULong(),
+            value.points.size.toCSize(),
           )
           .place(native.ptr)
     }
@@ -81,7 +83,7 @@ internal object QueryStructs {
       val layerIdSnapshot = layerIds.toList()
       native.fields = native.fields or MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
       native.layer_ids = stringViewArray(layerIdSnapshot, scope)
-      native.layer_id_count = layerIdSnapshot.size.toULong()
+      native.layer_id_count = layerIdSnapshot.size.toCSize()
     }
     value.filterTransit?.let { filter ->
       native.filter = ByteStructs.bufferViewPointer(filter, scope)
@@ -100,7 +102,7 @@ internal object QueryStructs {
       val sourceLayerIdSnapshot = sourceLayerIds.toList()
       native.fields = native.fields or MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
       native.source_layer_ids = stringViewArray(sourceLayerIdSnapshot, scope)
-      native.source_layer_id_count = sourceLayerIdSnapshot.size.toULong()
+      native.source_layer_id_count = sourceLayerIdSnapshot.size.toCSize()
     }
     value.filterTransit?.let { filter ->
       native.filter = ByteStructs.bufferViewPointer(filter, scope)
@@ -118,18 +120,18 @@ internal object QueryStructs {
 
   fun queriedFeatureList(
     list: ULong,
-    counter: (ULong, CPointer<ULongVar>) -> Int,
-    getter: (ULong, ULong, CPointer<mln_queried_feature>) -> Int,
+    counter: (ULong, CPointer<CSizeVar>) -> Int,
+    getter: (ULong, CSize, CPointer<mln_queried_feature>) -> Int,
     destroyer: (ULong) -> Unit,
   ): List<QueriedFeature> =
     try {
       memScoped {
-        val outCount = alloc<ULongVar>()
+        val outCount = alloc<CSizeVar>()
         Status.check(counter(list, outCount.ptr))
-        List(checkedInt(outCount.value, "queried feature count")) { index ->
+        List(checkedInt(outCount.value.toULong(), "queried feature count")) { index ->
           val outFeature = alloc<mln_queried_feature>()
           mln_queried_feature_default().place(outFeature.ptr)
-          Status.check(getter(list, index.toULong(), outFeature.ptr))
+          Status.check(getter(list, index.toCSize(), outFeature.ptr))
           queriedFeature(outFeature)
         }
       }
@@ -137,8 +139,8 @@ internal object QueryStructs {
       destroyer(list)
     }
 
-  fun queriedFeatures(values: CPointer<mln_queried_feature>?, count: ULong): List<QueriedFeature> {
-    val size = checkedInt(count, "queried feature count")
+  fun queriedFeatures(values: CPointer<mln_queried_feature>?, count: CSize): List<QueriedFeature> {
+    val size = checkedInt(count.toULong(), "queried feature count")
     if (size == 0) return emptyList()
     requireNotNull(values) { "native completion omitted its queried features" }
     return List(size) { index -> queriedFeature(values[index]) }

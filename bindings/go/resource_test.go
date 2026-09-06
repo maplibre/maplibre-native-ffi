@@ -251,3 +251,236 @@ func TestRuntimeResourceTransformRejectsNilCallback(t *testing.T) {
 		t.Fatalf("SetResourceTransform(nil) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
+// BND-198: a request the provider handled but never completed reports one
+// cancellation when the map that asked for it goes away, the callback can
+// close that request from inside itself, and a second registration on the same
+// request reports invalid state.
+func TestResourceRequestCancelCallbackReportsDiscardedRequest(t *testing.T) {
+	const styleURL = "jar:file:/packaged/cancelled-style.json"
+	requested := make(chan struct{}, 1)
+	cancelled := make(chan struct{}, 4)
+	var cancelCalls atomic.Int64
+	var registerErr, secondRegisterErr atomic.Value
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	defer func() {
+		if err := closeRuntimeForTest(runtime); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+	if _, err := runtime.SetResourceProvider(func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+		if request.RequestedURL != styleURL {
+			return ResourceProviderDecisionPassThrough
+		}
+		if err := handle.SetCancelCallback(func() {
+			cancelCalls.Add(1)
+			handle.Close()
+			cancelled <- struct{}{}
+		}); err != nil {
+			registerErr.Store(err)
+		}
+		if err := handle.SetCancelCallback(func() { cancelCalls.Add(1) }); err != nil {
+			secondRegisterErr.Store(err)
+		}
+		select {
+		case requested <- struct{}{}:
+		default:
+		}
+		// The request stays open, so only cancellation retires it.
+		return ResourceProviderDecisionHandle
+	}); err != nil {
+		_ = closeRuntimeForTest(runtime)
+		t.Fatalf("SetResourceProvider(): %v", err)
+	}
+
+	m, err := awaitForTest(runtime.NewMap())
+	if err != nil {
+		t.Fatalf("NewMap(): %v", err)
+	}
+	if _, err := m.SetStyleURL(styleURL); err != nil {
+		t.Fatalf("SetStyleURL(): %v", err)
+	}
+	waitForResourceSignal(t, requested, "the provider to receive the style request")
+	// Map teardown discards the request the provider never completed, and the
+	// cancel callback runs on the thread that discards it.
+	teardown, err := m.CloseAsync()
+	if err != nil {
+		t.Fatalf("Map CloseAsync(): %v", err)
+	}
+	waitForResourceSignal(t, cancelled, "the cancel callback to run")
+	if _, err := awaitForTest(teardown, nil); err != nil {
+		t.Fatalf("map teardown: %v", err)
+	}
+
+	if err, ok := registerErr.Load().(error); ok {
+		t.Fatalf("SetCancelCallback(): %v", err)
+	}
+	if err, ok := secondRegisterErr.Load().(error); !ok || !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("second SetCancelCallback() error = %v, want ErrInvalidState", err)
+	}
+	if _, err := awaitForTest(runtime.Barrier()); err != nil {
+		t.Fatalf("Barrier(): %v", err)
+	}
+	if got := cancelCalls.Load(); got != 1 {
+		t.Fatalf("cancel callback calls = %d, want 1", got)
+	}
+}
+
+// BND-198: registering on a request MapLibre already cancelled runs the
+// callback before SetCancelCallback returns, and a closed request rejects
+// registration as closed.
+func TestResourceRequestCancelCallbackRunsForAlreadyCancelledRequest(t *testing.T) {
+	const styleURL = "jar:file:/packaged/late-cancel-style.json"
+	handles := make(chan *ResourceRequestHandle, 1)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	defer func() {
+		if err := closeRuntimeForTest(runtime); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+	if _, err := runtime.SetResourceProvider(func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+		if request.RequestedURL != styleURL {
+			return ResourceProviderDecisionPassThrough
+		}
+		select {
+		case handles <- handle:
+		default:
+		}
+		return ResourceProviderDecisionHandle
+	}); err != nil {
+		_ = closeRuntimeForTest(runtime)
+		t.Fatalf("SetResourceProvider(): %v", err)
+	}
+
+	m, err := awaitForTest(runtime.NewMap())
+	if err != nil {
+		t.Fatalf("NewMap(): %v", err)
+	}
+	if _, err := m.SetStyleURL(styleURL); err != nil {
+		t.Fatalf("SetStyleURL(): %v", err)
+	}
+	handle := waitForResourceSignalValue(t, handles, "the provider to receive the style request")
+	if err := m.Close(); err != nil {
+		t.Fatalf("Map Close(): %v", err)
+	}
+	waitForResourceRequestCancelled(t, handle)
+
+	var calls int
+	if err := handle.SetCancelCallback(func() { calls++ }); err != nil {
+		t.Fatalf("SetCancelCallback() on a cancelled request: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("cancel callback calls = %d, want 1 before SetCancelCallback returned", calls)
+	}
+
+	handle.Close()
+	if err := handle.SetCancelCallback(func() { calls++ }); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetCancelCallback() after Close error = %v, want ErrInvalidArgument", err)
+	}
+	if calls != 1 {
+		t.Fatalf("cancel callback calls after Close = %d, want 1", calls)
+	}
+}
+
+// BND-198: a request the provider completed is not reported as cancelled, even
+// once the map that asked for it goes away.
+func TestResourceRequestCancelCallbackSkipsCompletedRequest(t *testing.T) {
+	const styleURL = "jar:file:/packaged/completed-style.json"
+	var cancelCalls atomic.Int64
+	var providerErr atomic.Value
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	defer func() {
+		if err := closeRuntimeForTest(runtime); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+	if _, err := runtime.SetResourceProvider(func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+		if request.RequestedURL != styleURL {
+			return ResourceProviderDecisionPassThrough
+		}
+		if err := handle.SetCancelCallback(func() { cancelCalls.Add(1) }); err != nil {
+			providerErr.Store(err)
+		}
+		if err := handle.Complete(ResourceResponse{
+			Status: ResourceResponseStatusOK,
+			Bytes:  []byte(minimalStyleJSON),
+		}); err != nil {
+			providerErr.Store(err)
+		}
+		return ResourceProviderDecisionHandle
+	}); err != nil {
+		_ = closeRuntimeForTest(runtime)
+		t.Fatalf("SetResourceProvider(): %v", err)
+	}
+
+	m, err := awaitForTest(runtime.NewMap())
+	if err != nil {
+		t.Fatalf("NewMap(): %v", err)
+	}
+	if _, err := m.SetStyleURL(styleURL); err != nil {
+		t.Fatalf("SetStyleURL(): %v", err)
+	}
+	waitForRuntimeEvent(t, runtime, RuntimeEventMapStyleLoaded)
+	teardown, err := m.CloseAsync()
+	if err != nil {
+		t.Fatalf("Map CloseAsync(): %v", err)
+	}
+	if _, err := awaitForTest(teardown, nil); err != nil {
+		t.Fatalf("map teardown: %v", err)
+	}
+
+	if err, ok := providerErr.Load().(error); ok {
+		t.Fatalf("provider error: %v", err)
+	}
+	if got := cancelCalls.Load(); got != 0 {
+		t.Fatalf("cancel callback calls for a completed request = %d, want 0", got)
+	}
+}
+
+// waitForResourceSignal waits for a signal that native code raises from a
+// MapLibre thread.
+func waitForResourceSignal(t *testing.T, signal <-chan struct{}, what string) {
+	t.Helper()
+	waitForResourceSignalValue(t, signal, what)
+}
+
+func waitForResourceSignalValue[T any](t *testing.T, signal <-chan T, what string) T {
+	t.Helper()
+	select {
+	case value := <-signal:
+		return value
+	case <-time.After(30 * time.Second):
+		t.Fatalf("timed out waiting for %s", what)
+	}
+	var zero T
+	return zero
+}
+
+// waitForResourceRequestCancelled polls until native code reports the request
+// as cancelled.
+func waitForResourceRequestCancelled(t *testing.T, handle *ResourceRequestHandle) {
+	t.Helper()
+	for range make([]struct{}, 30000) {
+		cancelled, err := handle.Cancelled()
+		if err != nil {
+			t.Fatalf("Cancelled(): %v", err)
+		}
+		if cancelled {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("timed out waiting for the request to be cancelled")
+}

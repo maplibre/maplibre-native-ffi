@@ -1,0 +1,84 @@
+diff --git a/src/mln/util/logging.cpp b/src/mln/util/logging.cpp
+--- a/src/mln/util/logging.cpp
++++ b/src/mln/util/logging.cpp
+@@ -5,6 +5,7 @@
+ #include <mln/util/platform.hpp>
+ #include <mln/util/traits.hpp>
+ 
++#include <atomic>
+ #include <cstdio>
+ #include <cstdarg>
+ #include <exception>
+@@ -15,15 +16,16 @@
+ 
+ namespace {
+ 
+-std::unique_ptr<Log::Observer> currentObserver;
+ constexpr auto SeverityCount = underlying_type(EventSeverity::SeverityCount);
+-std::atomic<bool> useThread[SeverityCount] = {true, true, true, false};
+-std::mutex mutex;
+ 
+ } // namespace
+ 
+ class Log::Impl {
+ public:
++    std::unique_ptr<Observer> observer;
++    std::atomic<bool> useThread[SeverityCount] = {true, true, true, false};
++    std::mutex mutex;
++
+     Impl()
+         : scheduler(Scheduler::GetSequenced()) {}
+ 
+@@ -53,13 +55,16 @@
+ Log::~Log() = default;
+ 
+ Log* Log::get() noexcept {
+-    static Log instance;
+-    return &instance;
++    // Keep the worker and the state it accesses alive until process termination.
++    // Joining it during static destruction can deadlock after a host VM shuts down
++    // because native thread-local cleanup may need to detach from that VM.
++    static auto* const instance = new Log();
++    return instance;
+ }
+ 
+ void Log::useLogThread(bool enable, std::optional<EventSeverity> severity) {
+     if (severity) {
+-        useThread[underlying_type(*severity)] = enable;
++        get()->impl->useThread[underlying_type(*severity)] = enable;
+     } else {
+         useLogThread(enable, EventSeverity::Debug);
+         useLogThread(enable, EventSeverity::Info);
+@@ -69,14 +74,16 @@
+ }
+ 
+ void Log::setObserver(std::unique_ptr<Observer> observer) {
+-    std::scoped_lock lock(mutex);
+-    currentObserver = std::move(observer);
++    auto& state = *get()->impl;
++    std::scoped_lock lock(state.mutex);
++    state.observer = std::move(observer);
+ }
+ 
+ std::unique_ptr<Log::Observer> Log::removeObserver() {
+-    std::scoped_lock lock(mutex);
++    auto& state = *get()->impl;
++    std::scoped_lock lock(state.mutex);
+     std::unique_ptr<Observer> observer;
+-    std::swap(observer, currentObserver);
++    std::swap(observer, state.observer);
+     return observer;
+ }
+ 
+@@ -93,8 +100,9 @@
+                  int64_t code,
+                  const std::string& msg,
+                  const std::optional<std::string>& threadName) {
+-    std::scoped_lock lock(mutex);
+-    if (currentObserver && severity != EventSeverity::Debug && currentObserver->onRecord(severity, event, code, msg)) {
++    auto& state = *get()->impl;
++    std::scoped_lock lock(state.mutex);
++    if (state.observer && severity != EventSeverity::Debug && state.observer->onRecord(severity, event, code, msg)) {
+         return;
+     }
+ 

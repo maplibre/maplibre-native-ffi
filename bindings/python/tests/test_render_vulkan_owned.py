@@ -162,8 +162,8 @@ def test_core_worker_renders_and_releases_owned_vulkan_frame(
     assert result == render.RenderResult.RENDERED
     frame = vulkan_owned_session.session.acquire_vulkan_owned_texture_frame()
     assert frame.result.disposition == result
-    assert frame.image.address != 0
-    assert frame.image_view.address != 0
+    assert frame.image.bits != 0
+    assert frame.image_view.bits != 0
     assert (
         frame.device.address == vulkan_owned_session.context.descriptor().device.address
     )
@@ -318,11 +318,11 @@ def test_vulkan_frame_exposes_backend_handles_only_while_the_lease_is_live(
     image = frame.image
     image_view = frame.image_view
     device = frame.device
-    assert isinstance(image, render.NativePointer)
-    assert isinstance(image_view, render.NativePointer)
+    assert isinstance(image, render.VulkanHandle)
+    assert isinstance(image_view, render.VulkanHandle)
     assert isinstance(device, render.NativePointer)
-    assert image.address != 0
-    assert image_view.address != 0
+    assert image.bits != 0
+    assert image_view.bits != 0
     assert device.address == vulkan_owned_session.context.descriptor().device.address
 
     release_frame(frame)
@@ -341,16 +341,18 @@ def test_stale_vulkan_frame_handles_cannot_expose_backend_handles_after_reuse(
     stale_device = stale_frame.device
     release_frame(stale_frame)
 
-    for pointer in (stale_image, stale_image_view, stale_device):
-        assert_invalid_state(lambda pointer=pointer: pointer.address)
+    for handle in (stale_image, stale_image_view):
+        assert_invalid_state(lambda handle=handle: handle.bits)
+    assert_invalid_state(lambda: stale_device.address)
 
     # The ring may hand the same backend object to the next lease, so the
-    # retired pointers must stay unreadable rather than alias it.
+    # retired handles must stay unreadable rather than alias it.
     next_frame = wait_for_vulkan_frame(vulkan_owned_session, lambda _: True)
     try:
-        assert next_frame.image.address != 0
-        for pointer in (stale_image, stale_image_view, stale_device):
-            assert_invalid_state(lambda pointer=pointer: pointer.address)
+        assert next_frame.image.bits != 0
+        for handle in (stale_image, stale_image_view):
+            assert_invalid_state(lambda handle=handle: handle.bits)
+        assert_invalid_state(lambda: stale_device.address)
     finally:
         release_frame(next_frame)
 
@@ -378,7 +380,7 @@ def test_vulkan_frame_release_failure_leaves_the_lease_live_for_a_later_release(
         closed = False
         release_calls = 0
 
-        def image_address(self) -> int:
+        def image_bits(self) -> int:
             if self.closed:
                 raise mln.InvalidStateError(
                     None, "VulkanOwnedTextureFrameHandle is closed"
@@ -394,14 +396,14 @@ def test_vulkan_frame_release_failure_leaves_the_lease_live_for_a_later_release(
     native = FakeNativeFrame()
     frame = render.VulkanOwnedTextureFrameHandle._from_native(native)
 
-    assert frame.image.address == 0x1000
+    assert frame.image.bits == 0x1000
     with pytest.raises(mln.InvalidStateError, match="frame release failed"):
         release_frame(frame)
 
-    # A rejected release keeps the host's claim on the slot, so the address
+    # A rejected release keeps the host's claim on the slot, so the handle
     # stays readable and a later release still retires it.
     assert not frame.closed
-    assert frame.image.address == 0x1000
+    assert frame.image.bits == 0x1000
     assert native.release_calls == 1
 
     release_frame(frame)

@@ -824,6 +824,35 @@ impl super::MapHandle {
         )
     }
 
+    /// Sets whether a style source stores fetched tiles in persistent storage.
+    ///
+    /// When `is_volatile` is true, source implementations that fetch tiles do
+    /// not store fetched tiles in persistent storage. Other source types retain
+    /// the value for inspection without changing their loading behavior.
+    ///
+    /// The command's finished event reports `Failed` with a not-found status
+    /// code when no source has the ID.
+    pub fn set_style_source_volatile(
+        &self,
+        source_id: &str,
+        is_volatile: bool,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let map = self.inner.native()?;
+        let source_id = maplibre_core::string::string_view(source_id);
+        // SAFETY: map is live and source_id is valid for this call.
+        crate::completion::submit(
+            move |completion| unsafe {
+                sys::mln_map_set_style_source_volatile(
+                    map,
+                    source_id.raw(),
+                    is_volatile,
+                    completion,
+                )
+            },
+            crate::completion::command,
+        )
+    }
+
     /// Adds a GeoJSON source that loads data from a URL.
     /// `options` are fixed at creation; later data or URL updates keep them.
     pub fn add_geojson_source_url(

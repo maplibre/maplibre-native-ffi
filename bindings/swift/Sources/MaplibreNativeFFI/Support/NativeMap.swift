@@ -148,10 +148,21 @@ enum NativeMap {
 
   static func latLngForPixel(
     _ map: NativeMapHandle,
-    point: NativeScreenPoint
+    point: NativeScreenPoint,
+    unwrapped: Bool
   ) throws -> NativeFuture<LatLng> {
     try NativeCompletion.start(
-      { mln_map_lat_lng_for_pixel(map.raw, point.native, $0) }
+      { completion in
+        if unwrapped {
+          mln_map_lat_lng_for_pixel_unwrapped(
+            map.raw,
+            point.native,
+            completion
+          )
+        } else {
+          mln_map_lat_lng_for_pixel(map.raw, point.native, completion)
+        }
+      }
     ) { result in
       let value: mln_lat_lng = try NativeCompletion.value(result)
       return LatLng(native: NativeLatLng(value))
@@ -183,18 +194,28 @@ enum NativeMap {
 
   static func latLngsForPixels(
     _ map: NativeMapHandle,
-    points: [NativeScreenPoint]
+    points: [NativeScreenPoint],
+    unwrapped: Bool
   ) throws -> NativeFuture<[LatLng]> {
     let raw = points.map(\.native)
     return try raw.withUnsafeBufferPointer { points in
       try NativeCompletion.start(
-        {
-          mln_map_lat_lngs_for_pixels(
-            map.raw,
-            points.baseAddress,
-            points.count,
-            $0
-          )
+        { completion in
+          if unwrapped {
+            mln_map_lat_lngs_for_pixels_unwrapped(
+              map.raw,
+              points.baseAddress,
+              points.count,
+              completion
+            )
+          } else {
+            mln_map_lat_lngs_for_pixels(
+              map.raw,
+              points.baseAddress,
+              points.count,
+              completion
+            )
+          }
         }
       ) { result in
         try NativeCompletion.values(result, as: mln_lat_lng.self).map {

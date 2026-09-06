@@ -92,9 +92,15 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_map_lat_lng_for_pixel([NativeTypeName("mln_map")] MlnMap map, mln_screen_point point, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_lat_lng_for_pixel_unwrapped([NativeTypeName("mln_map")] MlnMap map, mln_screen_point point, [NativeTypeName("const mln_completion *")] mln_completion* completion);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_pixels_for_lat_lngs([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_lat_lng *")] mln_lat_lng* coordinates, [NativeTypeName("size_t")] nuint coordinate_count, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_lat_lngs_for_pixels([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_screen_point *")] mln_screen_point* points, [NativeTypeName("size_t")] nuint point_count, [NativeTypeName("const mln_completion *")] mln_completion* completion);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_lat_lngs_for_pixels_unwrapped([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_screen_point *")] mln_screen_point* points, [NativeTypeName("size_t")] nuint point_count, [NativeTypeName("const mln_completion *")] mln_completion* completion);
     }
 }

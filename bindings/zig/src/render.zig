@@ -72,6 +72,22 @@ pub const RenderSessionAttachOptions = struct {
     requested_texture_ring_depth: u32 = 1,
 };
 
+/// Borrowed Vulkan non-dispatchable handle represented with Vulkan's stable
+/// 64-bit ABI width on every target.
+pub const VulkanHandle = enum(u64) {
+    null_handle = 0,
+    _,
+
+    pub fn fromBits(raw_bits: u64) VulkanHandle {
+        return @enumFromInt(raw_bits);
+    }
+
+    pub fn bits(self: VulkanHandle) u64 {
+        return @intFromEnum(self);
+    }
+};
+
+/// Which outcome a successful `RenderSessionHandle.renderUpdate` call reached.
 pub const RenderResult = union(enum) {
     rendered,
     no_update,
@@ -352,8 +368,8 @@ pub const VulkanBorrowedTextureDescriptor = struct {
     physical_width: u32,
     physical_height: u32,
     context: VulkanContextDescriptor,
-    image: NativePointer,
-    image_view: NativePointer,
+    image: VulkanHandle,
+    image_view: VulkanHandle,
     format: u32,
     initial_layout: u32,
     final_layout: u32,
@@ -398,7 +414,7 @@ pub const MetalSurfaceDescriptor = struct {
 pub const VulkanSurfaceDescriptor = struct {
     extent: RenderTargetExtent = .{},
     context: VulkanContextDescriptor,
-    surface: NativePointer,
+    surface: VulkanHandle,
 };
 
 pub const OpenGLSurfaceDescriptor = struct {
@@ -513,8 +529,8 @@ pub const VulkanOwnedTextureFrameInfo = struct {
     width: u32,
     height: u32,
     scale_factor: f64,
-    image: NativePointer,
-    image_view: NativePointer,
+    image: VulkanHandle,
+    image_view: VulkanHandle,
     device: NativePointer,
     format: u32,
     layout: u32,
@@ -602,7 +618,7 @@ pub const AcquiredFrame = struct {
         var raw: c.mln_vulkan_owned_texture_frame = undefined;
         raw.size = @sizeOf(c.mln_vulkan_owned_texture_frame);
         try status.checkStatus(c.mln_acquired_frame_get_vulkan_texture(self.native, &raw), lease.diagnostic_store);
-        return .{ .generation = raw.generation, .width = raw.width, .height = raw.height, .scale_factor = raw.scale_factor, .image = NativePointer.fromPtr(raw.image orelse return error.ClosedHandle), .image_view = NativePointer.fromPtr(raw.image_view orelse return error.ClosedHandle), .device = NativePointer.fromPtr(raw.device orelse return error.ClosedHandle), .format = raw.format, .layout = raw.layout };
+        return .{ .generation = raw.generation, .width = raw.width, .height = raw.height, .scale_factor = raw.scale_factor, .image = VulkanHandle.fromBits(raw.image), .image_view = VulkanHandle.fromBits(raw.image_view), .device = NativePointer.fromPtr(raw.device orelse return error.ClosedHandle), .format = raw.format, .layout = raw.layout };
     }
 
     pub fn openGLTexture(self: AcquiredFrame) status.Error!OpenGLOwnedTextureFrameInfo {
@@ -1320,7 +1336,7 @@ fn vulkanSurfaceDescriptorToNative(descriptor: VulkanSurfaceDescriptor) c.mln_vu
     var raw = c.mln_vulkan_surface_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.context = vulkanContextToNative(descriptor.context);
-    raw.surface = descriptor.surface.toPtr();
+    raw.surface = descriptor.surface.bits();
     return raw;
 }
 
@@ -1355,8 +1371,8 @@ fn vulkanBorrowedTextureDescriptorToNative(descriptor: VulkanBorrowedTextureDesc
     raw.physical_width = descriptor.physical_width;
     raw.physical_height = descriptor.physical_height;
     raw.context = vulkanContextToNative(descriptor.context);
-    raw.image = descriptor.image.toPtr();
-    raw.image_view = descriptor.image_view.toPtr();
+    raw.image = descriptor.image.bits();
+    raw.image_view = descriptor.image_view.bits();
     raw.format = descriptor.format;
     raw.initial_layout = descriptor.initial_layout;
     raw.final_layout = descriptor.final_layout;

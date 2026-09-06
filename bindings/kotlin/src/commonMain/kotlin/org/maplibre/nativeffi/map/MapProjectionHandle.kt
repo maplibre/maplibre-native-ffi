@@ -31,6 +31,9 @@ public expect class MapProjectionHandle {
   /** Converts a logical-pixel screen point to a geographic coordinate. */
   public fun latLngForPixel(point: ScreenPoint): LatLng
 
+  /** Converts a screen point to an unwrapped coordinate that preserves its visible world copy. */
+  public fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng
+
   public val isClosed: Boolean
 
   /** Closes the projection after waiting for projection calls already running on other threads. */

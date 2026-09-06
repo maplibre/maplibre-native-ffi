@@ -167,6 +167,8 @@ impl MapProjectionHandle {
     }
 
     /// Converts a screen point to a geographic coordinate synchronously.
+    ///
+    /// The longitude is wrapped to the range from -180 to 180 degrees.
     pub fn lat_lng_for_pixel(&self, point: ScreenPoint) -> Result<LatLng> {
         let mut raw = sys::mln_lat_lng {
             latitude: 0.0,
@@ -175,6 +177,27 @@ impl MapProjectionHandle {
         // SAFETY: projection is live and raw is writable storage.
         maplibre_core::check(unsafe {
             sys::mln_map_projection_lat_lng_for_pixel(
+                self.inner.native()?,
+                point.to_native(),
+                &mut raw,
+            )
+        })?;
+        Ok(LatLng::from_native(raw))
+    }
+
+    /// Converts a screen point to an unwrapped geographic coordinate
+    /// synchronously.
+    ///
+    /// The longitude preserves the visible world copy and may fall outside
+    /// -180 to 180.
+    pub fn lat_lng_for_pixel_unwrapped(&self, point: ScreenPoint) -> Result<LatLng> {
+        let mut raw = sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        };
+        // SAFETY: projection is live and raw is writable storage.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_lat_lng_for_pixel_unwrapped(
                 self.inner.native()?,
                 point.to_native(),
                 &mut raw,

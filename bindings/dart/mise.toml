@@ -26,7 +26,7 @@ dir = "../.."
 run = "dart format"
 
 [tasks.ffigen]
-run = "dart run tool/ffigen.dart"
+run = "dart --packages=.dart_tool/package_config.json tool/ffigen.dart"
 sources = [
   "tool/ffigen.dart",
   "hook/build.dart",
@@ -60,6 +60,8 @@ description = "Build the Dart binding in a Flutter mobile application."
 usage = '''
 arg "[preset]" {
   choices \
+    "android-arm-egl" \
+    "android-arm-vulkan" \
     "android-arm64-egl" \
     "android-arm64-vulkan" \
     "android-x64-egl" \
@@ -87,6 +89,9 @@ cd "$app"
 flutter pub get
 
 case "$usage_preset" in
+  android-arm-*)
+    flutter build apk --release --target-platform android-arm
+    ;;
   android-arm64-*)
     flutter build apk --release --target-platform android-arm64
     ;;
@@ -129,4 +134,23 @@ run_windows = '''
 # The DLL loads its own dependencies from the prefix it was installed into.
 export PATH="$(cygpath -u "$MISE_MONOREPO_ROOT/build/$usage_preset/install/bin")${PATH:+:${PATH}}"
 dart test
+'''
+
+[tasks."test:download"]
+description = "Test the build hook against a downloaded native snapshot archive."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+# Runs one file rather than the suite, because what this task checks is the
+# acquisition path rather than binding behavior. Removing the pointer forces the
+# download; it goes back afterwards so a local prefix survives this task.
+run = '''
+pointer=.dart_tool/maplibre_native_install_dir
+saved="$(mktemp)"
+trap 'if [[ -s "$saved" ]]; then mv "$saved" "$pointer"; else rm -f "$saved"; fi' EXIT
+if [[ -f "$pointer" ]]; then
+  mv "$pointer" "$saved"
+fi
+python3 "$MISE_MONOREPO_ROOT/ci/native_download_fixture.py" \
+  --dart-pointer .dart_tool/maplibre_native_test_snapshot_base_url \
+  "$MISE_MONOREPO_ROOT/build/packages/native/dist/maplibre-native-c-$usage_preset.tar.gz" \
+  -- dart test test/isolate_migration_test.dart
 '''

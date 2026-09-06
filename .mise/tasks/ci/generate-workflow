@@ -8,13 +8,12 @@ import pathlib
 import re
 import sys
 
-
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 OUTPUT = ROOT / ".github" / "workflows" / "ci.yml"
 sys.path.insert(0, str(ROOT))
 
-from ci.action_pins import load_pins  # noqa: E402
-from ci.workflow import load_configuration, platform, target_rows  # noqa: E402
+from ci.action_pins import load_pins
+from ci.workflow import load_configuration, platform, target_rows
 
 # Pins come from `.github/workflows/action-pins.yml` so Dependabot updates them.
 PINS = load_pins(ROOT)
@@ -39,24 +38,9 @@ SCCACHE_ENVIRONMENT = (
     "    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}"
 )
 
-# Tall stacks put many pull requests in flight at once, so CI runs for pushes,
-# for pull requests that target `main`, and for pull requests that are ready for
-# review. A draft deeper in a stack waits until it retargets `main` or leaves
-# draft. Every event that reaches a gated-off job publishes a skipped
-# `ci-required` check, which counts as a satisfied required check, so the
-# trigger lists only events that create a pull request or move its head commit.
-GATE_CLAUSES = [
-    "github.event_name != 'pull_request'",
-    "|| github.base_ref == 'main'",
-    "|| github.event.pull_request.draft == false",
-]
 
-
-def gate(always: bool = False) -> list[str]:
-    clauses = [f"      {clause}" for clause in GATE_CLAUSES]
-    if always:
-        return ["    if: >-", "      always() && (", *clauses, "      )"]
-    return ["    if: >-", *clauses]
+def selected(job: str) -> str:
+    return f"    if: fromJSON(needs.plan.outputs.expected)['{job}'] == 'success'"
 
 
 def job_id(preset: str) -> str:
@@ -112,7 +96,7 @@ CONSUMER_ENV = {"MISE_TASK_SKIP": '"//:build"'}
 # the absent native package.
 KOTLIN_MAVEN_PLATFORMS = {
     "android",
-    "linux",
+    "linux-gnu",
     "macos",
     "ios",
     "ios-simulator",
@@ -140,7 +124,8 @@ def target_job(row: dict[str, object]) -> list[str]:
         f"    runs-on: {row['runner']}",
         "    timeout-minutes: 120",
         SCCACHE_ENVIRONMENT,
-        *gate(),
+        "    needs: plan",
+        selected(job_id(preset)),
         "    steps:",
         *setup(
             preset,
@@ -193,6 +178,7 @@ def target_job(row: dict[str, object]) -> list[str]:
                 f"          name: native-package-{preset}-${{{{ github.sha }}}}",
                 f"          path: build/packages/native/dist/maplibre-native-c-{preset}.tar.gz",
                 "          if-no-files-found: error",
+                "          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}",
             ]
         )
     lines.append("")
@@ -216,17 +202,17 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "  push:",
         "    branches:",
         "      - main",
-        # No branch filter: a pull request stacked on another one bases on that
-        # branch rather than main, and a stack cannot be verified if only its
-        # first link runs CI. The job-level gate decides which of those links
-        # actually build, and `ready_for_review` lets a gated-off link start
-        # once it qualifies.
+        # Stacked PRs use the same readiness and label policy.
         "  pull_request:",
         "    types:",
         "      - opened",
         "      - synchronize",
         "      - reopened",
         "      - ready_for_review",
+        "      - converted_to_draft",
+        "      - labeled",
+        "      - unlabeled",
+        "  workflow_dispatch:",
         "",
         "permissions:",
         "  contents: read",
@@ -236,12 +222,24 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "  cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
         "",
         "jobs:",
+        "  plan:",
+        "    runs-on: ubuntu-slim",
+        "    timeout-minutes: 5",
+        "    outputs:",
+        "      tier: ${{ steps.plan.outputs.tier }}",
+        "      expected: ${{ steps.plan.outputs.expected }}",
+        "    steps:",
+        f"      - uses: {CHECKOUT}",
+        "        with:",
+        "          persist-credentials: false",
+        "      - id: plan",
+        "        run: bash .mise/tasks/ci/plan",
+        "",
         "  hygiene:",
         "    name: hygiene",
         "    runs-on: ubuntu-latest",
         "    timeout-minutes: 30",
         SCCACHE_ENVIRONMENT,
-        *gate(),
         "    steps:",
         *setup(gradle=False),
         "      - run: mise run ci:generate-workflow --check",
@@ -265,7 +263,6 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "    runs-on: ubuntu-latest",
         "    timeout-minutes: 60",
         SCCACHE_ENVIRONMENT,
-        *gate(),
         "    steps:",
         # Dokka configures the Kotlin Multiplatform project, including the
         # Android target, so docs generation needs Gradle and an SDK platform.
@@ -286,8 +283,9 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
             "    runs-on: ubuntu-latest",
             "    timeout-minutes: 30",
             SCCACHE_ENVIRONMENT,
-            *gate(),
+            selected("android-multi"),
             "    needs:",
+            "      - plan",
             *[f"      - {job}" for job in android_package_ids],
             "    steps:",
             *setup("android-multi"),
@@ -320,14 +318,16 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
             "    permissions:",
             "      actions: read",
             "      contents: read",
-            *gate(),
+            selected("kotlin-maven"),
             "    needs:",
+            "      - plan",
             *[f"      - {job}" for job in kotlin_maven_needs],
             "    uses: ./.github/workflows/_kotlin-maven.yml",
             "    with:",
             "      publish: false",
             "      run_id: ${{ github.run_id }}",
             "      sha: ${{ github.sha }}",
+            "      verified_retention_days: ${{ github.event_name == 'pull_request' && 1 || 30 }}",
             f"      version: {KOTLIN_SNAPSHOT_VERSION}",
             "",
         ]
@@ -339,20 +339,30 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
             "    name: ci-required",
             "    runs-on: ubuntu-slim",
             "    timeout-minutes: 5",
-            *gate(always=True),
+            "    if: always()",
             "    needs:",
+            "      - plan",
             "      - hygiene",
             "      - docs",
             *[f"      - {job}" for job in target_ids],
             "      - android-multi",
             "      - kotlin-maven",
             "    steps:",
-            "      - name: Fail if required jobs failed",
-            "        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}",
+            "      - name: Check selected job results",
+            "        env:",
+            "          EXPECTED: ${{ needs.plan.outputs.expected }}",
+            "          RESULTS: ${{ toJSON(needs) }}",
             "        run: |",
-            "          echo '${{ toJSON(needs) }}'",
-            "          exit 1",
-            '      - run: "true"',
+            '          echo "Needed job results: $RESULTS"',
+            "          jq --exit-status --null-input \\",
+            '            --argjson expected "$EXPECTED" \\',
+            '            --argjson results "$RESULTS" \'',
+            '              ($expected.plan == "success")',
+            '              and all($expected[]; . == "success" or . == "skipped")',
+            '              and all($results[]; .result == "success" or .result == "skipped")',
+            "              and (($expected | keys) == ($results | keys))",
+            "              and all($expected | keys[]; $results[.].result == $expected[.])",
+            "            '",
             "",
         ]
     )

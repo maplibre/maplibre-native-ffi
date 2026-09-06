@@ -44,6 +44,7 @@ from .render import (
     RenderSessionCapability,
     RenderSessionSnapshot,
     RenderSessionState,
+    VulkanHandle,
 )
 from .runtime import (
     CameraChangeMode,
@@ -129,6 +130,7 @@ __all__ = [
     "UnknownRuntimeEventPayload",
     "UnknownStatusError",
     "UnsupportedFeatureError",
+    "VulkanHandle",
     "WrongThreadError",
     "c_version",
     "network_status",

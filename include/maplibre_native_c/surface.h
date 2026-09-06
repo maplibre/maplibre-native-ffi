@@ -38,8 +38,8 @@ typedef struct mln_vulkan_surface_descriptor {
    * presentation to this descriptor's surface.
    */
   mln_vulkan_context_descriptor context;
-  /** Borrowed VkSurfaceKHR. Required. */
-  void* surface;
+  /** Borrowed VkSurfaceKHR bit pattern. Required. */
+  mln_vulkan_non_dispatchable_handle surface;
 } mln_vulkan_surface_descriptor;
 
 /** WebGPU native surface session attachment options. */

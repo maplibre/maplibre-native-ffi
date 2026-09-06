@@ -2177,6 +2177,69 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
+    private static class mln_resource_request_set_cancel_callback {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_resource_request_set_cancel_callback");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data, bool *out_cancelled)
+     * }
+     */
+    public static FunctionDescriptor mln_resource_request_set_cancel_callback$descriptor() {
+        return mln_resource_request_set_cancel_callback.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data, bool *out_cancelled)
+     * }
+     */
+    public static MethodHandle mln_resource_request_set_cancel_callback$handle() {
+        return mln_resource_request_set_cancel_callback.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data, bool *out_cancelled)
+     * }
+     */
+    public static MemorySegment mln_resource_request_set_cancel_callback$address() {
+        return mln_resource_request_set_cancel_callback.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data, bool *out_cancelled)
+     * }
+     */
+    public static int mln_resource_request_set_cancel_callback(long handle, MemorySegment callback, MemorySegment user_data, MemorySegment out_cancelled) {
+        var mh$ = mln_resource_request_set_cancel_callback.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_resource_request_set_cancel_callback", handle, callback, user_data, out_cancelled);
+            }
+            return (int)mh$.invokeExact(handle, callback, user_data, out_cancelled);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mln_resource_request_release {
         public static final FunctionDescriptor DESC = FunctionDescriptor.ofVoid(
             MapLibreNativeC.C_LONG
@@ -7338,6 +7401,68 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
+    private static class mln_map_lat_lng_for_pixel_unwrapped {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_screen_point.layout(),
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_lat_lng_for_pixel_unwrapped");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_lat_lng_for_pixel_unwrapped(mln_map map, mln_screen_point point, const mln_completion *completion)
+     * }
+     */
+    public static FunctionDescriptor mln_map_lat_lng_for_pixel_unwrapped$descriptor() {
+        return mln_map_lat_lng_for_pixel_unwrapped.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_lat_lng_for_pixel_unwrapped(mln_map map, mln_screen_point point, const mln_completion *completion)
+     * }
+     */
+    public static MethodHandle mln_map_lat_lng_for_pixel_unwrapped$handle() {
+        return mln_map_lat_lng_for_pixel_unwrapped.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_lat_lng_for_pixel_unwrapped(mln_map map, mln_screen_point point, const mln_completion *completion)
+     * }
+     */
+    public static MemorySegment mln_map_lat_lng_for_pixel_unwrapped$address() {
+        return mln_map_lat_lng_for_pixel_unwrapped.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_lat_lng_for_pixel_unwrapped(mln_map map, mln_screen_point point, const mln_completion *completion)
+     * }
+     */
+    public static int mln_map_lat_lng_for_pixel_unwrapped(long map, MemorySegment point, MemorySegment completion) {
+        var mh$ = mln_map_lat_lng_for_pixel_unwrapped.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_lat_lng_for_pixel_unwrapped", map, point, completion);
+            }
+            return (int)mh$.invokeExact(map, point, completion);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mln_map_pixels_for_lat_lngs {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
@@ -7455,6 +7580,69 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         try {
             if (TRACE_DOWNCALLS) {
                 traceDowncall("mln_map_lat_lngs_for_pixels", map, points, point_count, completion);
+            }
+            return (int)mh$.invokeExact(map, points, point_count, completion);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_lat_lngs_for_pixels_unwrapped {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_lat_lngs_for_pixels_unwrapped");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_lat_lngs_for_pixels_unwrapped(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion)
+     * }
+     */
+    public static FunctionDescriptor mln_map_lat_lngs_for_pixels_unwrapped$descriptor() {
+        return mln_map_lat_lngs_for_pixels_unwrapped.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_lat_lngs_for_pixels_unwrapped(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion)
+     * }
+     */
+    public static MethodHandle mln_map_lat_lngs_for_pixels_unwrapped$handle() {
+        return mln_map_lat_lngs_for_pixels_unwrapped.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_lat_lngs_for_pixels_unwrapped(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion)
+     * }
+     */
+    public static MemorySegment mln_map_lat_lngs_for_pixels_unwrapped$address() {
+        return mln_map_lat_lngs_for_pixels_unwrapped.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_lat_lngs_for_pixels_unwrapped(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion)
+     * }
+     */
+    public static int mln_map_lat_lngs_for_pixels_unwrapped(long map, MemorySegment points, long point_count, MemorySegment completion) {
+        var mh$ = mln_map_lat_lngs_for_pixels_unwrapped.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_lat_lngs_for_pixels_unwrapped", map, points, point_count, completion);
             }
             return (int)mh$.invokeExact(map, points, point_count, completion);
         } catch (Error | RuntimeException ex) {
@@ -8410,6 +8598,68 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         try {
             if (TRACE_DOWNCALLS) {
                 traceDowncall("mln_map_projection_lat_lng_for_pixel", projection, point, out_coordinate);
+            }
+            return (int)mh$.invokeExact(projection, point, out_coordinate);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_projection_lat_lng_for_pixel_unwrapped {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_screen_point.layout(),
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_projection_lat_lng_for_pixel_unwrapped");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * }
+     */
+    public static FunctionDescriptor mln_map_projection_lat_lng_for_pixel_unwrapped$descriptor() {
+        return mln_map_projection_lat_lng_for_pixel_unwrapped.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * }
+     */
+    public static MethodHandle mln_map_projection_lat_lng_for_pixel_unwrapped$handle() {
+        return mln_map_projection_lat_lng_for_pixel_unwrapped.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * }
+     */
+    public static MemorySegment mln_map_projection_lat_lng_for_pixel_unwrapped$address() {
+        return mln_map_projection_lat_lng_for_pixel_unwrapped.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * }
+     */
+    public static int mln_map_projection_lat_lng_for_pixel_unwrapped(long projection, MemorySegment point, MemorySegment out_coordinate) {
+        var mh$ = mln_map_projection_lat_lng_for_pixel_unwrapped.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_projection_lat_lng_for_pixel_unwrapped", projection, point, out_coordinate);
             }
             return (int)mh$.invokeExact(projection, point, out_coordinate);
         } catch (Error | RuntimeException ex) {
@@ -12866,6 +13116,69 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
                 traceDowncall("mln_map_get_style_source_info", map, source_id, completion);
             }
             return (int)mh$.invokeExact(map, source_id, completion);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_set_style_source_volatile {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_buffer_view.layout(),
+            MapLibreNativeC.C_BOOL,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_set_style_source_volatile");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_style_source_volatile(mln_map map, mln_buffer_view source_id, bool is_volatile, const mln_completion *completion)
+     * }
+     */
+    public static FunctionDescriptor mln_map_set_style_source_volatile$descriptor() {
+        return mln_map_set_style_source_volatile.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_style_source_volatile(mln_map map, mln_buffer_view source_id, bool is_volatile, const mln_completion *completion)
+     * }
+     */
+    public static MethodHandle mln_map_set_style_source_volatile$handle() {
+        return mln_map_set_style_source_volatile.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_style_source_volatile(mln_map map, mln_buffer_view source_id, bool is_volatile, const mln_completion *completion)
+     * }
+     */
+    public static MemorySegment mln_map_set_style_source_volatile$address() {
+        return mln_map_set_style_source_volatile.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_set_style_source_volatile(mln_map map, mln_buffer_view source_id, bool is_volatile, const mln_completion *completion)
+     * }
+     */
+    public static int mln_map_set_style_source_volatile(long map, MemorySegment source_id, boolean is_volatile, MemorySegment completion) {
+        var mh$ = mln_map_set_style_source_volatile.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_set_style_source_volatile", map, source_id, is_volatile, completion);
+            }
+            return (int)mh$.invokeExact(map, source_id, is_volatile, completion);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <string>
 
-#include <mbgl/util/image.hpp>
+#include <mln/util/image.hpp>
 
 extern "C" {
 

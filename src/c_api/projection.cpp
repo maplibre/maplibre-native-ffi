@@ -92,6 +92,17 @@ auto mln_map_projection_lat_lng_for_pixel(
   });
 }
 
+auto mln_map_projection_lat_lng_for_pixel_unwrapped(
+  mln_map_projection projection, mln_screen_point point,
+  mln_lat_lng* out_coordinate
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_projection_lat_lng_for_pixel_unwrapped(
+      projection, point, out_coordinate
+    );
+  });
+}
+
 auto mln_projected_meters_for_lat_lng(
   mln_lat_lng coordinate, mln_projected_meters* out_meters
 ) noexcept -> mln_status {

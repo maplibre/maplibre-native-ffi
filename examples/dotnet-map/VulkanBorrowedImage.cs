@@ -28,9 +28,9 @@ internal sealed unsafe class VulkanBorrowedImage : IDisposable
         }
     }
 
-    public NativePointer ImagePointer => NativePointer.FromBorrowedAddress((nint)image.Handle);
+    public VulkanHandle ImageHandle => new(image.Handle);
 
-    public NativePointer ViewPointer => NativePointer.FromBorrowedAddress((nint)view.Handle);
+    public VulkanHandle ViewHandle => new(view.Handle);
 
     public ImageView View => view;
 

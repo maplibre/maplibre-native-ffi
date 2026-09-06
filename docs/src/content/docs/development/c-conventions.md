@@ -51,11 +51,13 @@ the default constructor sets every type the library reports.
 Prefer scalar fields, pointers with length fields, structs, unions, and opaque
 handles in public structs—these are friendly to binding generators. Expose
 borrowed ABI-owned text with a length or provide an explicit copy or drain API.
-Backend-native handles are opaque `void*`; document the backend type and
+Backend-native pointer handles are opaque `void*`; document the backend type and
 field-level requirements on the struct field, and ownership and lifetime on the
-function that accepts or returns the struct. A backend-native handle is an
-address the host already owns, so it stays a `void*` and never becomes a
-MapLibre handle id.
+function that accepts or returns the struct. Vulkan non-dispatchable handles use
+`mln_vulkan_non_dispatchable_handle`, because Vulkan represents them as pointers
+on 64-bit targets and `uint64_t` values on 32-bit targets. A backend-native
+handle remains a value that the host already owns and never becomes a MapLibre
+handle id.
 
 A copy-out entry point takes a caller buffer, its capacity, and an out-parameter
 for the required length. It writes the required length before it checks the

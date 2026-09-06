@@ -47,7 +47,7 @@ function(mln_ffi_configure_platform_dependencies target)
   set_target_properties(
     ${target}
     PROPERTIES
-      MLN_FFI_DEFAULT_LOGGING_STDERR TRUE MLN_FFI_DEFAULT_THREAD_LOCAL TRUE
+      MLN_FFI_DEFAULT_LOGGING_STDERR FALSE MLN_FFI_DEFAULT_THREAD_LOCAL TRUE
       MLN_FFI_SHARED_SUPPORTED TRUE)
 
   mln_ffi_apple_is_simulator(MLN_FFI_APPLE_SIMULATOR)
@@ -127,12 +127,13 @@ endfunction()
 
 function(mln_ffi_configure_platform target)
   set(MLN_FFI_VENDOR_APPLE_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/qt/src/mbgl/bidi.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/qt/src/mln/bidi.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/async_task.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/collator.mm
       ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../../src/platform/apple/http_file_source.mm
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/image.mm
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/local_glyph_rasterizer.mm
+      ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/logging_nslog.mm
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/native_apple_interface.m
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/number_format.mm
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/nsthread.mm

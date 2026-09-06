@@ -8,15 +8,23 @@
 goos=
 
 case "$1" in
-  android-arm64-* | android-x64-*)
+  android-arm-* | android-arm64-* | android-x64-*)
     goos=android
-    if [[ "$1" == android-arm64-* ]]; then
-      goarch=arm64
-      compiler_prefix=aarch64-linux-android
-    else
-      goarch=amd64
-      compiler_prefix=x86_64-linux-android
-    fi
+    case "$1" in
+      android-arm-*)
+        goarch=arm
+        compiler_prefix=armv7a-linux-androideabi
+        export GOARM=7
+        ;;
+      android-arm64-*)
+        goarch=arm64
+        compiler_prefix=aarch64-linux-android
+        ;;
+      android-x64-*)
+        goarch=amd64
+        compiler_prefix=x86_64-linux-android
+        ;;
+    esac
     ndk_prebuilt_root="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt"
     ndk_bin=
     for host_prebuilt in "$ndk_prebuilt_root"/*; do

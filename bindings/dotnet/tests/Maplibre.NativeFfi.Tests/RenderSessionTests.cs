@@ -68,6 +68,50 @@ public sealed unsafe class RenderSessionTests
     }
 
     [Fact]
+    public void VulkanDescriptorsCarryHandleBitsWithoutPointerConversion()
+    {
+        var surface = RenderStructs.ToNative(
+            new VulkanSurfaceDescriptor
+            {
+                Extent = new RenderTargetExtent(640, 480, 1),
+                Surface = new VulkanHandle(111),
+                Context = new VulkanContextDescriptor
+                {
+                    Instance = NativePointer.FromBorrowedAddress(222),
+                    PhysicalDevice = NativePointer.FromBorrowedAddress(333),
+                    Device = NativePointer.FromBorrowedAddress(444),
+                    Queue = NativePointer.FromBorrowedAddress(555),
+                    GraphicsQueueFamilyIndex = 7,
+                },
+            }
+        );
+
+        Assert.Equal(111ul, surface.surface);
+        Assert.Equal(222, (nint)surface.context.instance);
+        Assert.Equal(7u, surface.context.graphics_queue_family_index);
+
+        var borrowed = RenderStructs.ToNative(
+            new VulkanBorrowedTextureDescriptor
+            {
+                Extent = new RenderTargetExtent(256, 128, 1),
+                PhysicalWidth = 65,
+                PhysicalHeight = 33,
+                Image = new VulkanHandle(40),
+                ImageView = new VulkanHandle(45),
+                Format = 50,
+                InitialLayout = 55,
+                FinalLayout = 60,
+            }
+        );
+
+        Assert.Equal(40ul, borrowed.image);
+        Assert.Equal(45ul, borrowed.image_view);
+        Assert.Equal(50u, borrowed.format);
+        Assert.Equal(55u, borrowed.initial_layout);
+        Assert.Equal(60u, borrowed.final_layout);
+    }
+
+    [Fact]
     public void RawSurfaceAttachReturnsSessionAndAcceptsCompletion()
     {
         var method = typeof(NativeMethods).GetMethod(
@@ -116,9 +160,27 @@ public sealed unsafe class RenderSessionTests
     public void AcquiredFrameAccessIsScopedToItsLease()
     {
         var scope = new FrameScope();
+        var frame = new VulkanOwnedTextureFrame(
+            scope,
+            1,
+            2,
+            3,
+            4,
+            5,
+            new VulkanHandle(6),
+            new VulkanHandle(7),
+            NativePointer.FromBorrowedAddress(8),
+            9,
+            10
+        );
+
         scope.EnsureActive();
+        Assert.Equal(6ul, frame.Image.Bits);
+        Assert.Equal(7ul, frame.ImageView.Bits);
+
         scope.Dispose();
         Assert.Throws<ObjectDisposedException>(scope.EnsureActive);
+        Assert.Throws<ObjectDisposedException>(() => frame.ImageView);
     }
 
     [Fact]

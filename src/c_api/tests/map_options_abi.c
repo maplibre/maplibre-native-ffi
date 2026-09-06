@@ -453,13 +453,180 @@ static void map_coordinate_conversion_rejects_invalid_arguments(void) {
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_lat_lng_for_pixel_unwrapped(
+      fixture.map, (mln_screen_point){.x = 0.0, .y = 0.0}, NULL
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
     mln_map_pixels_for_lat_lngs(fixture.map, NULL, 1, &operation)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_lat_lngs_for_pixels(fixture.map, NULL, 1, &operation)
   );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_lat_lngs_for_pixels_unwrapped(fixture.map, NULL, 1, &operation)
+  );
   destroy_map_fixture(fixture);
+}
+
+static void unwrapped_coordinate_conversion_preserves_world_copies(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map_options options = mln_map_options_default();
+  options.initial_extent.width = 1024;
+  options.initial_extent.height = 512;
+  mln_map map = mln_test_create_map_with_options(runtime, &options);
+
+  mln_camera_update update = mln_camera_update_default();
+  update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
+  update.camera.latitude = 0.0;
+  update.camera.longitude = 179.0;
+  update.camera.zoom = 0.0;
+  mln_test_completion jump = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_update_camera(map, &update, &jump.descriptor)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&jump));
+  mln_test_completion_destroy(&jump);
+
+  const mln_screen_point points[] = {
+    {.x = 0.0, .y = 256.0},
+    {.x = 512.0, .y = 256.0},
+    {.x = 1024.0, .y = 256.0},
+  };
+  mln_lat_lng wrapped[3] = {0};
+  mln_lat_lng unwrapped[3] = {0};
+  mln_test_completion wrapped_batch =
+    mln_test_completion_default(3 * sizeof(mln_lat_lng));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_lat_lngs_for_pixels(map, points, 3, &wrapped_batch.descriptor)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_completion_finish(&wrapped_batch)
+  );
+  TEST_ASSERT_TRUE(
+    mln_test_completion_copy_value(&wrapped_batch, wrapped, sizeof(wrapped))
+  );
+  mln_test_completion_destroy(&wrapped_batch);
+
+  mln_test_completion unwrapped_batch =
+    mln_test_completion_default(3 * sizeof(mln_lat_lng));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_lat_lngs_for_pixels_unwrapped(
+                     map, points, 3, &unwrapped_batch.descriptor
+                   )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_completion_finish(&unwrapped_batch)
+  );
+  TEST_ASSERT_TRUE(mln_test_completion_copy_value(
+    &unwrapped_batch, unwrapped, sizeof(unwrapped)
+  ));
+  mln_test_completion_destroy(&unwrapped_batch);
+
+  for (size_t index = 0; index < 3; index++) {
+    TEST_ASSERT_TRUE(wrapped[index].longitude >= -180.0);
+    TEST_ASSERT_TRUE(wrapped[index].longitude <= 180.0);
+  }
+  TEST_ASSERT_DOUBLE_WITHIN(1e-10, 179.0, unwrapped[1].longitude);
+  TEST_ASSERT_TRUE(unwrapped[2].longitude - unwrapped[0].longitude > 360.0);
+
+  mln_lat_lng wrapped_right = {0};
+  mln_test_completion wrapped_single =
+    mln_test_completion_default(sizeof(mln_lat_lng));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_lat_lng_for_pixel(map, points[2], &wrapped_single.descriptor)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_completion_finish(&wrapped_single)
+  );
+  TEST_ASSERT_TRUE(mln_test_completion_copy_value(
+    &wrapped_single, &wrapped_right, sizeof(wrapped_right)
+  ));
+  mln_test_completion_destroy(&wrapped_single);
+  TEST_ASSERT_TRUE(wrapped_right.longitude >= -180.0);
+  TEST_ASSERT_TRUE(wrapped_right.longitude <= 180.0);
+
+  mln_lat_lng unwrapped_right = {0};
+  mln_test_completion unwrapped_single =
+    mln_test_completion_default(sizeof(mln_lat_lng));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_lat_lng_for_pixel_unwrapped(
+                     map, points[2], &unwrapped_single.descriptor
+                   )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_completion_finish(&unwrapped_single)
+  );
+  TEST_ASSERT_TRUE(mln_test_completion_copy_value(
+    &unwrapped_single, &unwrapped_right, sizeof(unwrapped_right)
+  ));
+  mln_test_completion_destroy(&unwrapped_single);
+  TEST_ASSERT_EQUAL_DOUBLE(unwrapped[2].longitude, unwrapped_right.longitude);
+
+  update.camera.zoom = 2.0;
+  mln_test_completion zoomed = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_update_camera(map, &update, &zoomed.descriptor)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&zoomed));
+  mln_test_completion_destroy(&zoomed);
+
+  const mln_screen_point antimeridian_points[] = {points[0], points[2]};
+  mln_lat_lng antimeridian_wrapped[2] = {0};
+  mln_lat_lng antimeridian_unwrapped[2] = {0};
+  mln_test_completion antimeridian_wrapped_batch =
+    mln_test_completion_default(2 * sizeof(mln_lat_lng));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_lat_lngs_for_pixels(
+      map, antimeridian_points, 2, &antimeridian_wrapped_batch.descriptor
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_completion_finish(&antimeridian_wrapped_batch)
+  );
+  TEST_ASSERT_TRUE(mln_test_completion_copy_value(
+    &antimeridian_wrapped_batch, antimeridian_wrapped,
+    sizeof(antimeridian_wrapped)
+  ));
+  mln_test_completion_destroy(&antimeridian_wrapped_batch);
+
+  mln_test_completion antimeridian_unwrapped_batch =
+    mln_test_completion_default(2 * sizeof(mln_lat_lng));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_lat_lngs_for_pixels_unwrapped(
+      map, antimeridian_points, 2, &antimeridian_unwrapped_batch.descriptor
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_completion_finish(&antimeridian_unwrapped_batch)
+  );
+  TEST_ASSERT_TRUE(mln_test_completion_copy_value(
+    &antimeridian_unwrapped_batch, antimeridian_unwrapped,
+    sizeof(antimeridian_unwrapped)
+  ));
+  mln_test_completion_destroy(&antimeridian_unwrapped_batch);
+
+  TEST_ASSERT_TRUE(
+    antimeridian_unwrapped[0].longitude < antimeridian_unwrapped[1].longitude
+  );
+  TEST_ASSERT_TRUE(antimeridian_unwrapped[0].longitude < 180.0);
+  TEST_ASSERT_TRUE(antimeridian_unwrapped[1].longitude > 180.0);
+  TEST_ASSERT_TRUE(
+    antimeridian_unwrapped[1].longitude - antimeridian_unwrapped[0].longitude <
+    360.0
+  );
+  TEST_ASSERT_TRUE(antimeridian_wrapped[0].longitude > 0.0);
+  TEST_ASSERT_TRUE(antimeridian_wrapped[1].longitude < 0.0);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
 }
 
 static void projected_meters_reject_invalid_arguments(void) {
@@ -723,6 +890,7 @@ void run_map_options_abi_tests(void) {
   RUN_TEST(free_camera_options_reject_raw_invalid_arguments);
   RUN_TEST(map_projection_mode_rejects_invalid_arguments);
   RUN_TEST(map_coordinate_conversion_rejects_invalid_arguments);
+  RUN_TEST(unwrapped_coordinate_conversion_preserves_world_copies);
   RUN_TEST(projected_meters_reject_invalid_arguments);
   RUN_TEST(map_debug_options_reject_raw_invalid_arguments);
   RUN_TEST(map_options_default_leaves_fast_pfor_decoding_off);

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import pathlib
+import shlex
 import tomllib
 
-DESKTOP = {"linux", "macos", "windows"}
+DESKTOP = {"linux-gnu", "linux-musl", "macos", "windows"}
 
 # Targets whose suite runs on an emulator instead of through ctest, so CMake
 # registers no test preset for them.
@@ -30,6 +31,10 @@ def load_configuration(
 
 
 def platform(preset: str) -> str:
+    if preset.startswith("linux-gnu-"):
+        return "linux-gnu"
+    if preset.startswith("linux-musl-"):
+        return "linux-musl"
     if preset.startswith("ios-simulator-"):
         return "ios-simulator"
     if preset.startswith("tvos-simulator-"):
@@ -39,7 +44,7 @@ def platform(preset: str) -> str:
 
 def architecture(preset: str) -> str:
     parts = preset.split("-")
-    for candidate in ("x64", "arm64", "wasm32"):
+    for candidate in ("x64", "arm64", "arm", "wasm32"):
         if candidate in parts:
             return candidate
     raise SystemExit(f"error: cannot determine architecture from preset {preset!r}")
@@ -55,9 +60,9 @@ def backend(preset: str) -> str:
 def runner(preset: str) -> str:
     target_platform = platform(preset)
     target_architecture = architecture(preset)
-    if target_platform == "linux":
-        # The zig toolchain sets the glibc floor. These images stay pinned so
-        # the graphics loaders and drivers the tests use stay reproducible.
+    if target_platform in {"linux-gnu", "linux-musl"}:
+        # The Zig toolchain selects the libc. These images stay pinned so the
+        # graphics headers and loaders used at build time stay reproducible.
         return "ubuntu-24.04-arm" if target_architecture == "arm64" else "ubuntu-24.04"
     if target_platform in {"macos", "ios", "ios-simulator", "tvos", "tvos-simulator"}:
         return "macos-26"
@@ -85,12 +90,13 @@ def suite_commands(source: dict[str, object], preset: str) -> list[str]:
                 continue
             if preset in command.get("exclude", []):
                 continue
+            arguments = [str(command["task"])]
             # A command with `preset = false` runs once for the job it lands in
             # rather than against the job's build tree.
             if command.get("preset", True):
-                commands.append(f"mise run {command['task']} {preset}")
-            else:
-                commands.append(f"mise run {command['task']}")
+                arguments.append(preset)
+            arguments.extend(str(argument) for argument in command.get("args", []))
+            commands.append(f"mise run {shlex.join(arguments)}")
     return commands
 
 
@@ -137,8 +143,10 @@ def native_commands(preset: str, tested: set[str]) -> list[str]:
     commands = [
         f"mise run {'test' if runtime_tested(preset, tested) else 'build'} {preset}"
     ]
-    if target_platform == "linux":
+    if target_platform == "linux-gnu":
         commands.append(f"mise run check-glibc-floor {preset}")
+    elif target_platform == "linux-musl":
+        commands.append(f"mise run check-musl-abi {preset}")
     return commands
 
 
@@ -146,8 +154,12 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
     target_platform = platform(preset)
     commands = []
     if target_platform == "android":
-        abi = "arm64-v8a" if architecture(preset) == "arm64" else "x86_64"
-        commands.extend(android_commands(preset, abi, backend(preset) == "egl"))
+        abi = {
+            "arm": "armeabi-v7a",
+            "arm64": "arm64-v8a",
+            "x64": "x86_64",
+        }[architecture(preset)]
+        commands.extend(android_commands(preset, abi, True))
     elif target_platform == "ohos":
         commands.extend(ohos_commands(preset))
     elif target_platform == "ios":

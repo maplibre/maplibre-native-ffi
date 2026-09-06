@@ -198,6 +198,9 @@ auto map_get_style_source_info(
   mln_map map, mln_buffer_view source_id, mln_style_source_info* out_info,
   bool* out_found
 ) -> mln_status;
+auto map_set_style_source_volatile(
+  mln_map map, mln_buffer_view source_id, bool is_volatile
+) -> mln_status;
 auto map_copy_style_source_attribution(
   mln_map map, mln_buffer_view source_id, char* out_attribution,
   size_t attribution_capacity, size_t* out_attribution_size, bool* out_found
@@ -445,11 +448,18 @@ auto map_pixel_for_lat_lng_start(
 auto map_lat_lng_for_pixel_start(
   mln_map map, mln_screen_point point, const mln_completion* completion
 ) -> mln_status;
+auto map_lat_lng_for_pixel_unwrapped_start(
+  mln_map map, mln_screen_point point, const mln_completion* completion
+) -> mln_status;
 auto map_pixels_for_lat_lngs_start(
   mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
   const mln_completion* completion
 ) -> mln_status;
 auto map_lat_lngs_for_pixels_start(
+  mln_map map, const mln_screen_point* points, size_t point_count,
+  const mln_completion* completion
+) -> mln_status;
+auto map_lat_lngs_for_pixels_unwrapped_start(
   mln_map map, const mln_screen_point* points, size_t point_count,
   const mln_completion* completion
 ) -> mln_status;
@@ -495,6 +505,10 @@ auto map_projection_pixel_for_lat_lng(
   mln_screen_point* out_point
 ) -> mln_status;
 auto map_projection_lat_lng_for_pixel(
+  mln_map_projection projection, mln_screen_point point,
+  mln_lat_lng* out_coordinate
+) -> mln_status;
+auto map_projection_lat_lng_for_pixel_unwrapped(
   mln_map_projection projection, mln_screen_point point,
   mln_lat_lng* out_coordinate
 ) -> mln_status;

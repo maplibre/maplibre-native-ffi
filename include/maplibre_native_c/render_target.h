@@ -15,6 +15,18 @@
 extern "C" {
 #endif
 
+/**
+ * Bit pattern of a Vulkan non-dispatchable handle.
+ *
+ * Vulkan defines these handles as pointers on 64-bit targets and as uint64_t
+ * values on 32-bit targets. This fixed-width carrier preserves either native
+ * representation across the C ABI. Zero represents VK_NULL_HANDLE.
+ */
+typedef uint64_t mln_vulkan_non_dispatchable_handle;
+
+/** Null Vulkan non-dispatchable handle. */
+#define MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL UINT64_C(0)
+
 /** Logical render target extent in UI pixels. */
 typedef struct mln_render_target_extent {
   uint32_t size;

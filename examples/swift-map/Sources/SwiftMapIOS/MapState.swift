@@ -102,9 +102,9 @@ final class MapState {
     guard !isClosed else { return }
     isClosed = true
     runtime.setEventReadyHandler(nil)
-    try map.close()
-    // Awaiting the release completion keeps process exit ordered after native
+    // Awaiting both release completions keeps process exit ordered after native
     // teardown.
+    try await map.close()
     try await runtime.close()
   }
 

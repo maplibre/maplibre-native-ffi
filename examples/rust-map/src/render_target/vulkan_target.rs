@@ -72,7 +72,7 @@ impl RenderTarget {
                 let descriptor = VulkanSurfaceDescriptor::new(
                     extent(viewport),
                     context_descriptor(vk),
-                    vk.surface_pointer(),
+                    vk.surface_handle(),
                 );
                 Ok(Self::Surface {
                     session: finish_attach(map.attach_vulkan_surface(&descriptor, options)?)?,
@@ -235,8 +235,8 @@ fn borrowed_descriptor(
         viewport.physical_width,
         viewport.physical_height,
         context_descriptor(vk),
-        image.image_pointer(),
-        image.view_pointer(),
+        image.image_handle(),
+        image.view_handle(),
         ash::vk::Format::R8G8B8A8_UNORM.as_raw() as u32,
         ash::vk::ImageLayout::UNDEFINED.as_raw() as u32,
         ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL.as_raw() as u32,

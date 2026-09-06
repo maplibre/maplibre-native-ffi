@@ -273,6 +273,53 @@ public sealed class MapCameraOptionsTests
 
     [BindingSpecTest("BND-103")]
     [Fact]
+    public async Task UnwrappedCoordinateConversionsPreserveVisibleWorldCopies()
+    {
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 1024, Height = 512 }
+        );
+        await map.UpdateCameraAsync(
+            new CameraUpdate
+            {
+                Mode = CameraUpdateMode.Jump,
+                Camera = new CameraOptions { Center = new LatLng(0, 180), Zoom = 0 },
+            }
+        );
+        ScreenPoint[] points = [new(0, 256), new(1024, 256)];
+
+        var wrapped = await map.LatLngsForPixelsAsync(
+            points,
+            TestContext.Current.CancellationToken
+        );
+        var unwrapped = await map.LatLngsForPixelsUnwrappedAsync(
+            points,
+            TestContext.Current.CancellationToken
+        );
+        Assert.All(wrapped, coordinate => Assert.InRange(coordinate.Longitude, -180, 180));
+        Assert.True(unwrapped[1].Longitude - unwrapped[0].Longitude > 360);
+        var wrappedRight = await map.LatLngForPixelAsync(
+            points[1],
+            TestContext.Current.CancellationToken
+        );
+        Assert.InRange(wrappedRight.Longitude, -180, 180);
+        var right = await map.LatLngForPixelUnwrappedAsync(
+            points[1],
+            TestContext.Current.CancellationToken
+        );
+        Assert.Equal(unwrapped[1].Longitude, right.Longitude, CoordinatePrecision);
+
+        using var projection = await map.CreateProjectionAsync(
+            TestContext.Current.CancellationToken
+        );
+        Assert.InRange(projection.LatLngForPixel(points[1]).Longitude, -180, 180);
+        var projectedRight = projection.LatLngForPixelUnwrapped(points[1]);
+        Assert.Equal(right.Longitude, projectedRight.Longitude, CoordinatePrecision);
+    }
+
+    [BindingSpecTest("BND-103")]
+    [Fact]
     public async Task ProjectionConvertsSynchronouslyAndObservesItsOwnSetters()
     {
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());

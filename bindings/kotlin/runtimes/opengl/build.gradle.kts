@@ -10,8 +10,11 @@ plugins {
 }
 
 val androidTargets =
-  AndroidTarget.parseAbis(
-    providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
+  AndroidTarget.compatibleAbis(
+    providers
+      .gradleProperty("maplibre.android.abis")
+      .getOrElse(AndroidTarget.defaultAbis("opengl")),
+    "opengl",
   )
 val packagedAndroidRuntimeLibs =
   project(":bindings:kotlin").layout.buildDirectory.dir("generated/jniLibs/runtime")
@@ -19,6 +22,7 @@ val packagedAndroidRuntimeLibs =
 kotlin {
   jvm { compilerOptions { jvmTarget.set(JvmTarget.fromTarget(libs.versions.java.release.get())) } }
 
+  androidNativeArm32()
   androidNativeArm64()
   androidNativeX64()
   linuxArm64()

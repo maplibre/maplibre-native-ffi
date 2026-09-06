@@ -191,6 +191,58 @@ static void setters_apply_before_return_and_conversions_round_trip(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static void unwrapped_conversion_preserves_world_copies(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map_options options = mln_map_options_default();
+  options.initial_extent.width = 1024;
+  options.initial_extent.height = 512;
+  mln_map map = mln_test_create_map_with_options(runtime, &options);
+  mln_map_projection projection = create_projection(map);
+
+  mln_camera_options camera = mln_camera_options_default();
+  camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
+  camera.latitude = 0.0;
+  camera.longitude = 179.0;
+  camera.zoom = 0.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_set_camera(projection, &camera)
+  );
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_projection_lat_lng_for_pixel_unwrapped(
+                                   projection, (mln_screen_point){0}, NULL
+                                 )
+  );
+
+  // The right viewport edge sits a full world east of the left edge, so the
+  // wrapped conversion folds it back across the antimeridian while the
+  // unwrapped one keeps the visible world copy.
+  const mln_screen_point right = {.x = 1024.0, .y = 256.0};
+  mln_lat_lng wrapped = {0};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_projection_lat_lng_for_pixel(projection, right, &wrapped)
+  );
+  TEST_ASSERT_TRUE(wrapped.longitude >= -180.0);
+  TEST_ASSERT_TRUE(wrapped.longitude <= 180.0);
+
+  mln_lat_lng unwrapped = {0};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_lat_lng_for_pixel_unwrapped(
+                     projection, right, &unwrapped
+                   )
+  );
+  TEST_ASSERT_TRUE(unwrapped.longitude > 180.0);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, wrapped.latitude, unwrapped.latitude);
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-9, wrapped.longitude, unwrapped.longitude - 360.0
+  );
+
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_close(projection));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 typedef struct projection_thread_probe {
   mln_map_projection projection;
   mln_status set_camera_status;
@@ -264,5 +316,6 @@ void run_projection_abi_tests(void) {
   RUN_TEST(projection_outlives_its_source_map_and_runtime);
   RUN_TEST(creation_observes_earlier_map_camera_commands);
   RUN_TEST(setters_apply_before_return_and_conversions_round_trip);
+  RUN_TEST(unwrapped_conversion_preserves_world_copies);
   RUN_TEST(projection_handles_are_callable_from_foreign_threads);
 }

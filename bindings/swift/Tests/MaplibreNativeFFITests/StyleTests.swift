@@ -159,6 +159,47 @@ import Testing
   #expect(remote.url == "https://example.com/source.json")
 }
 
+/// Volatility toggles commit and are visible through source info, and a
+/// missing source fails the command with `MLN_STATUS_NOT_FOUND`.
+@Test func styleSourceVolatilityTogglesAndMissingSourceFails() async throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(runtime: runtime,
+                                options: MapOptions(width: 1, height: 1))
+  defer { try? map.closeBlockingForTests() }
+
+  try await map
+    .setStyleJSON(jsonData(#"{"version":8,"sources":{},"layers":[]}"#))
+  try await map.addVectorSourceTiles(
+    sourceId: "tiles",
+    tiles: ["https://example.com/{z}/{x}/{y}.mvt"]
+  )
+
+  #expect(try await map.styleSourceInfo("tiles")?.isVolatile == false)
+  let enabled = try await map.setStyleSourceVolatile(
+    sourceId: "tiles",
+    isVolatile: true
+  )
+  #expect(try await commandDisposition(
+    enabled, runtime: runtime
+  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(try await map.styleSourceInfo("tiles")?.isVolatile == true)
+  let disabled = try await map.setStyleSourceVolatile(
+    sourceId: "tiles",
+    isVolatile: false
+  )
+  #expect(try await commandDisposition(
+    disabled, runtime: runtime
+  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(try await map.styleSourceInfo("tiles")?.isVolatile == false)
+
+  try expectCommandFailure(
+    await map.setStyleSourceVolatile(sourceId: "missing", isVolatile: true),
+    status: MLN_STATUS_NOT_FOUND
+  )
+}
+
 @Test func styleImageDescriptorsMaterializeScopedPixelsAndOptions() throws {
   let image = StyleRGBA8Image(
     width: 1,

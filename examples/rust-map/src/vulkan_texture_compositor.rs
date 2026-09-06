@@ -119,7 +119,7 @@ impl VulkanTextureCompositor {
                 metadata.layout
             )));
         }
-        let image_view = unsafe { vk::ImageView::from_raw(image_view.address() as u64) };
+        let image_view = vk::ImageView::from_raw(unsafe { image_view.bits() });
         if image_view == vk::ImageView::null() {
             return Err(compositor_error("owned Vulkan frame has a null image view"));
         }

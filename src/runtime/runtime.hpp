@@ -367,6 +367,8 @@ auto validate_runtime(mln_runtime runtime, RuntimeObject*& out_runtime)
   -> mln_status;
 [[nodiscard]] auto lease_runtime(mln_runtime runtime)
   -> std::shared_ptr<RuntimeObject>;
+auto validate_offline_side_database_path(const char* side_database_path)
+  -> mln_status;
 auto dispatch_runtime_sync(
   mln_runtime runtime, std::function<mln_status()> function
 ) -> mln_status;

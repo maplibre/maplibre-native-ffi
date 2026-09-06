@@ -65,7 +65,8 @@ Requirements:
   language cannot hide raw declarations, they MUST live under a generated
   interop namespace and be excluded from the supported safe API surface.
 - Host FFI carrier types and raw entrypoints MUST stay outside the safe public
-  API. Public APIs expose backend addresses only through `NativePointer`.
+  API. Public APIs expose backend addresses through `NativePointer` and Vulkan
+  non-dispatchable handle bit patterns through `VulkanHandle`.
 - Public examples and tests MUST use the public binding layer, not raw C calls,
   except bindability and layout tests.
 - Raw C declarations MUST be generated or tool-imported from public headers.
@@ -467,6 +468,17 @@ lifetime and synchronization requirements.
 Backend pointers returned from acquired texture frames perform active-frame
 checks before exposing the pointer.
 
+### Vulkan handles
+
+`VulkanHandle` represents the 64-bit bit pattern of a borrowed Vulkan
+non-dispatchable handle. It transfers no ownership and grants no memory access.
+Public APIs use it for `VkSurfaceKHR`, `VkImage`, and `VkImageView`, because
+Vulkan defines these handle types as pointers on 64-bit targets and as
+`uint64_t` values on 32-bit targets. Zero represents `VK_NULL_HANDLE`.
+
+Vulkan handles returned from acquired texture frames perform active-frame checks
+before exposing the value.
+
 ---
 
 ## Data Ownership
@@ -549,6 +561,15 @@ on success and on copy failure. They preserve unknown source, scheme, vector
 encoding, and raster encoding values through the binding's ordinary unknown-enum
 representation. A returned value remains valid after source removal, style
 replacement, and map release.
+
+A binding that exposes style source metadata MUST expose the source volatility
+setter as one ordered map command taking a source ID and a Boolean value. Its
+completion resolves with a committed disposition and the published generation,
+or with a failed disposition and a not-found status when the style has no source
+with that ID. The applied value is observable through the source metadata query.
+A volatile tile-backed source does not store fetched tiles in persistent
+storage. Other source types retain the value for inspection without changing
+their loading behavior.
 
 ## Callbacks And Requests
 
@@ -680,6 +701,27 @@ completion that reaches C consumes the completion path even when native returns
 non-OK. Release runs once, waits for in-flight completion or cancellation
 checks, and makes later completion or cancellation checks fail before crossing
 into C. Stale public request handles cannot affect later native requests.
+
+A handled request accepts one cancel callback, registered through the public
+request handle and mirroring the C API's set-cancel-callback operation. A second
+registration reports the binding's invalid-state error, and a released request
+rejects registration as closed. The binding invokes the host callback on the
+thread that cancels the request, which is always a MapLibre-owned thread: the
+runtime's native scheduler thread when a committed map or runtime command
+discards the request, or a MapLibre worker thread otherwise, never a host thread
+the caller controls. The binding contains host failures inside the callback. The
+callback may complete or release the same request. When the C API reports that
+the request was already cancelled, the binding runs the callback itself before
+registration returns, as part of that call: release from another thread does not
+wait for it, and a concurrent release cannot stop it from running. The binding
+holds no lock of its own while it runs the callback or while it calls native
+release, because native release waits for a cancel callback running on another
+thread and that callback may call back into the same request handle. A binding
+that blocks native threads on a host lock, such as an interpreter lock, releases
+that lock around the request calls that can block on a running cancel callback:
+completion, release or close, and wait until retired. Callback state does not
+keep the request handle reachable: the request handle owns the callback, and any
+registry the binding uses to resolve a native token holds a weak reference.
 
 A binding whose host runtime moves a handled request between execution contexts
 passes the request handle id itself, and exposes the C API's wait-until-retired
@@ -876,8 +918,9 @@ progress.
 
 Render-session attach APIs cover native surfaces, session-owned textures, and
 caller-owned borrowed textures. They materialize the backend descriptor, common
-attach options, and `NativePointer` fields without taking ownership of borrowed
-resources.
+attach options, `NativePointer` fields for pointer resources, and `VulkanHandle`
+fields for Vulkan non-dispatchable resources, without taking ownership of
+borrowed resources.
 
 The public handle exposes:
 
@@ -1071,17 +1114,17 @@ that a real native failure would expose.
 
 ### Map, camera, projection, style, and query
 
-| ID      | Test                                                                                                                                                                                                    |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-100 | Synchronous runtime creation and asynchronous map creation apply public options, transfer each handle once, enforce close preflight, and preserve parent relationships.                                 |
-| BND-101 | Style URL and style JSON commands complete successfully and later return copied style-loaded events through a drain.                                                                                    |
-| BND-102 | One atomic camera command applies every selected field; its completion, published snapshots, and ordered queries report the expected committed state and generation.                                    |
-| BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance.                                                                     |
-| BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.                                                                          |
-| BND-105 | Style source, layer, image, and feature-state workflows submit commands, await ordered query/list operations, and preserve copied IDs.                                                                  |
-| BND-106 | Query workflows return copied queried-feature values. Each value contains a GeoJSON Feature buffer, optional source and source-layer identifiers, and optional feature-state JSON.                      |
-| BND-108 | The loaded style document reads back byte-for-byte through public map APIs, the style URL reads back the last requested URL, and both report empty when absent.                                         |
-| BND-109 | Source inspection copies a URL-backed source URL and inline tile-source metadata, including multiple tile URLs and absent fields, and the result remains valid after the map no longer owns the source. |
+| ID      | Test                                                                                                                                                                                                          |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-100 | Synchronous runtime creation and asynchronous map creation apply public options, transfer each handle once, enforce close preflight, and preserve parent relationships.                                       |
+| BND-101 | Style URL and style JSON commands complete successfully and later return copied style-loaded events through a drain.                                                                                          |
+| BND-102 | One atomic camera command applies every selected field; its completion, published snapshots, and ordered queries report the expected committed state and generation.                                          |
+| BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance. Unwrapped screen-to-coordinate conversion preserves visible world copies. |
+| BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.                                                                                |
+| BND-105 | Style source, layer, image, and feature-state workflows submit commands, await ordered query/list operations, and preserve copied IDs.                                                                        |
+| BND-106 | Query workflows return copied queried-feature values. Each value contains a GeoJSON Feature buffer, optional source and source-layer identifiers, and optional feature-state JSON.                            |
+| BND-108 | The loaded style document reads back byte-for-byte through public map APIs, the style URL reads back the last requested URL, and both report empty when absent.                                               |
+| BND-109 | Source inspection copies a URL-backed source URL and inline tile-source metadata, including multiple tile URLs and absent fields, and the result remains valid after the map no longer owns the source.       |
 
 ### Logging and callbacks
 
@@ -1095,26 +1138,27 @@ that a real native failure would expose.
 
 ### Resources
 
-| ID      | Test                                                                                                                                                                                                  |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-140 | Resource transform can rewrite a URL and can be cleared after registration.                                                                                                                           |
-| BND-141 | Resource transform request data is copied into language-owned values before user code receives it.                                                                                                    |
-| BND-142 | Resource provider pass-through delegates to native loading without retaining a request handle.                                                                                                        |
-| BND-143 | Resource provider handled request can complete inline and load a style.                                                                                                                               |
-| BND-144 | Resource provider handled request can complete later and load a style.                                                                                                                                |
-| BND-145 | Handled request can complete from another thread.                                                                                                                                                     |
-| BND-146 | Completing a handled request twice reports the binding's already-completed error before crossing into C.                                                                                              |
-| BND-147 | Releasing a handled request makes later completion and cancellation checks fail as closed.                                                                                                            |
-| BND-148 | Request cancellation is observable before a late completion, and late completion maps native status.                                                                                                  |
-| BND-149 | Resource error responses become copied runtime loading-failure or offline-error events.                                                                                                               |
-| BND-150 | Inline completion during the provider callback finalizes handled ownership even when the callback's later return path would otherwise pass through.                                                   |
-| BND-151 | Stale request handles cannot complete, cancel, or release later native requests.                                                                                                                      |
-| BND-152 | Completion that reaches C is terminal even when native completion returns a non-OK status.                                                                                                            |
-| BND-153 | Releasing a request waits for in-flight completion or cancellation checks before native release.                                                                                                      |
-| BND-154 | Resource provider can be replaced while maps are live and can be cleared, and a cleared provider stops receiving requests.                                                                            |
-| BND-155 | A request for a configured URI-scheme alias exposes the alias as the requested URL and the tile-server-normalized URL as the resolved URL.                                                            |
-| BND-158 | HTTP header transform requests and returned headers cross the callback boundary as copied language-owned values, reject duplicate field names case-insensitively, and contain host-language failures. |
-| BND-159 | HTTP header transforms can be installed, replaced, and cleared while maps are live; transformed headers reach matching requests and no request after clear.                                           |
+| ID      | Test                                                                                                                                                                                                                                                                           |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| BND-140 | Resource transform can rewrite a URL and can be cleared after registration.                                                                                                                                                                                                    |
+| BND-141 | Resource transform request data is copied into language-owned values before user code receives it.                                                                                                                                                                             |
+| BND-142 | Resource provider pass-through delegates to native loading without retaining a request handle.                                                                                                                                                                                 |
+| BND-143 | Resource provider handled request can complete inline and load a style.                                                                                                                                                                                                        |
+| BND-144 | Resource provider handled request can complete later and load a style.                                                                                                                                                                                                         |
+| BND-145 | Handled request can complete from another thread.                                                                                                                                                                                                                              |
+| BND-146 | Completing a handled request twice reports the binding's already-completed error before crossing into C.                                                                                                                                                                       |
+| BND-147 | Releasing a handled request makes later completion and cancellation checks fail as closed.                                                                                                                                                                                     |
+| BND-148 | Request cancellation is observable before a late completion, and late completion maps native status.                                                                                                                                                                           |
+| BND-149 | Resource error responses become copied runtime loading-failure or offline-error events.                                                                                                                                                                                        |
+| BND-150 | Inline completion during the provider callback finalizes handled ownership even when the callback's later return path would otherwise pass through.                                                                                                                            |
+| BND-151 | Stale request handles cannot complete, cancel, or release later native requests.                                                                                                                                                                                               |
+| BND-152 | Completion that reaches C is terminal even when native completion returns a non-OK status.                                                                                                                                                                                     |
+| BND-153 | Releasing a request waits for in-flight completion or cancellation checks before native release.                                                                                                                                                                               |
+| BND-154 | Resource provider can be replaced while maps are live and can be cleared, and a cleared provider stops receiving requests.                                                                                                                                                     |
+| BND-155 | A request for a configured URI-scheme alias exposes the alias as the requested URL and the tile-server-normalized URL as the resolved URL.                                                                                                                                     |
+| BND-158 | HTTP header transform requests and returned headers cross the callback boundary as copied language-owned values, reject duplicate field names case-insensitively, and contain host-language failures.                                                                          |
+| BND-159 | HTTP header transforms can be installed, replaced, and cleared while maps are live; transformed headers reach matching requests and no request after clear.                                                                                                                    |
+| BND-198 | A cancel callback registered on a handled request runs once when MapLibre discards the request, may release that request from inside the callback, runs before registration returns for an already-cancelled request, and is not invoked for a request the provider completed. |
 
 #### Queued provider routes
 
@@ -1131,7 +1175,7 @@ When the binding routes provider requests through
 | ID      | Test                                                                                                                                                                                                                        |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | BND-160 | Backend and target capabilities gate driver and target combinations, including caller-driver WGL/shared-EGL/WebGL and browser WebGPU, and core-worker transferable Metal, Vulkan, private EGL, and `OffscreenCanvas` WebGL. |
-| BND-161 | Render-target descriptors copy extents and `NativePointer` backend handles without taking ownership.                                                                                                                        |
+| BND-161 | Render-target descriptors copy extents, `NativePointer` resources, and `VulkanHandle` non-dispatchable handles without taking ownership.                                                                                    |
 | BND-162 | Every supported target attach returns an attaching session and completion; caller-driver service can complete attachment without a deadlock.                                                                                |
 | BND-163 | Attaching a second session to one map reports invalid state and leaves the first session usable.                                                                                                                            |
 | BND-164 | Every accepted demand yields one result, preserving all dispositions, tokens, timestamps, and generation fields.                                                                                                            |

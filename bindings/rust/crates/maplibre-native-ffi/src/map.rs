@@ -594,14 +594,71 @@ impl MapHandle {
         )
     }
 
-    pub fn lat_lng_for_pixel(&self, point: ScreenPoint) -> Result<NativeFuture<LatLng>> {
+    fn coordinate_for_pixel(
+        &self,
+        point: ScreenPoint,
+        unwrapped: bool,
+    ) -> Result<NativeFuture<LatLng>> {
         let map = self.inner.native()?;
         crate::completion::submit(
             move |completion| unsafe {
-                sys::mln_map_lat_lng_for_pixel(map, point.to_native(), completion)
+                if unwrapped {
+                    sys::mln_map_lat_lng_for_pixel_unwrapped(map, point.to_native(), completion)
+                } else {
+                    sys::mln_map_lat_lng_for_pixel(map, point.to_native(), completion)
+                }
             },
             |result| Ok(LatLng::from_native(crate::completion::copy_value(result)?)),
         )
+    }
+
+    fn coordinates_for_pixels(
+        &self,
+        points: &[ScreenPoint],
+        unwrapped: bool,
+    ) -> Result<NativeFuture<Vec<LatLng>>> {
+        let map = self.inner.native()?;
+        let points = screen_points_to_native(points);
+        crate::completion::submit(
+            move |completion| unsafe {
+                if unwrapped {
+                    sys::mln_map_lat_lngs_for_pixels_unwrapped(
+                        map,
+                        const_ptr_or_null(&points),
+                        points.len(),
+                        completion,
+                    )
+                } else {
+                    sys::mln_map_lat_lngs_for_pixels(
+                        map,
+                        const_ptr_or_null(&points),
+                        points.len(),
+                        completion,
+                    )
+                }
+            },
+            |result| {
+                Ok(crate::completion::copy_slice::<sys::mln_lat_lng>(result)?
+                    .into_iter()
+                    .map(LatLng::from_native)
+                    .collect())
+            },
+        )
+    }
+
+    /// Converts a screen point to a geographic coordinate.
+    ///
+    /// The longitude is wrapped to the range from -180 to 180 degrees.
+    pub fn lat_lng_for_pixel(&self, point: ScreenPoint) -> Result<NativeFuture<LatLng>> {
+        self.coordinate_for_pixel(point, false)
+    }
+
+    /// Converts a screen point to an unwrapped geographic coordinate.
+    ///
+    /// The longitude preserves the visible world copy and may fall outside
+    /// -180 to 180.
+    pub fn lat_lng_for_pixel_unwrapped(&self, point: ScreenPoint) -> Result<NativeFuture<LatLng>> {
+        self.coordinate_for_pixel(point, true)
     }
 
     pub fn pixels_for_lat_lngs(
@@ -630,25 +687,22 @@ impl MapHandle {
         )
     }
 
+    /// Converts screen points to geographic coordinates.
+    ///
+    /// Each longitude is wrapped to the range from -180 to 180 degrees.
     pub fn lat_lngs_for_pixels(&self, points: &[ScreenPoint]) -> Result<NativeFuture<Vec<LatLng>>> {
-        let map = self.inner.native()?;
-        let points = screen_points_to_native(points);
-        crate::completion::submit(
-            move |completion| unsafe {
-                sys::mln_map_lat_lngs_for_pixels(
-                    map,
-                    const_ptr_or_null(&points),
-                    points.len(),
-                    completion,
-                )
-            },
-            |result| {
-                Ok(crate::completion::copy_slice::<sys::mln_lat_lng>(result)?
-                    .into_iter()
-                    .map(LatLng::from_native)
-                    .collect())
-            },
-        )
+        self.coordinates_for_pixels(points, false)
+    }
+
+    /// Converts screen points to unwrapped geographic coordinates.
+    ///
+    /// Each longitude preserves its visible world copy and may fall outside
+    /// -180 to 180.
+    pub fn lat_lngs_for_pixels_unwrapped(
+        &self,
+        points: &[ScreenPoint],
+    ) -> Result<NativeFuture<Vec<LatLng>>> {
+        self.coordinates_for_pixels(points, true)
     }
 
     /// Creates a standalone projection snapshot from the current map transform.

@@ -28,6 +28,7 @@ import org.maplibre.nativeffi.internal.c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_S
 import org.maplibre.nativeffi.internal.c.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
 import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
@@ -60,7 +61,7 @@ class QueryStructsTest : org.maplibre.nativeffi.NativeTestBase() {
             )
             .pointed
         assertEquals(MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING, line.type)
-        assertEquals(2UL, line.data.line_string.point_count)
+        assertEquals(2UL, line.data.line_string.point_count.toULong())
         assertEquals(7.0, line.data.line_string.points!![1].x)
       }
     }
@@ -79,7 +80,7 @@ class QueryStructsTest : org.maplibre.nativeffi.NativeTestBase() {
             )!!
             .pointed
         assertTrue((rendered.fields and MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS) != 0U)
-        assertEquals(2UL, rendered.layer_id_count)
+        assertEquals(2UL, rendered.layer_id_count.toULong())
         assertNotNull(rendered.filter)
 
         val source =
@@ -89,7 +90,7 @@ class QueryStructsTest : org.maplibre.nativeffi.NativeTestBase() {
             )!!
             .pointed
         assertTrue((source.fields and MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS) != 0U)
-        assertEquals(1UL, source.source_layer_id_count)
+        assertEquals(1UL, source.source_layer_id_count.toULong())
       }
     }
 
@@ -127,7 +128,7 @@ class QueryStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       QueryStructs.queriedFeatureList(
         SyntheticHandles.queriedFeatureList().rawHandleValue,
         counter = { _, outCount ->
-          outCount[0] = 1UL
+          outCount[0] = 1.toCSize()
           MaplibreStatus.OK.nativeCode
         },
         getter = { _, _, outFeature ->
@@ -158,7 +159,7 @@ class QueryStructsTest : org.maplibre.nativeffi.NativeTestBase() {
         QueryStructs.queriedFeatureList(
           SyntheticHandles.queriedFeatureList().rawHandleValue,
           counter = { _, outCount ->
-            outCount[0] = Int.MAX_VALUE.toULong() + 1UL
+            outCount[0] = (Int.MAX_VALUE.toULong() + 1UL).toCSize()
             MaplibreStatus.OK.nativeCode
           },
           getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },

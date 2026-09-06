@@ -92,6 +92,92 @@ impl fmt::Debug for NativePointer {
     }
 }
 
+/// Bit pattern of a borrowed Vulkan non-dispatchable handle. It transfers no
+/// ownership and grants no memory access. Zero represents `VK_NULL_HANDLE`.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct VulkanHandle {
+    bits: u64,
+    _thread_affine: PhantomData<Rc<()>>,
+}
+
+impl VulkanHandle {
+    /// Null Vulkan non-dispatchable handle.
+    pub const NULL: Self = Self {
+        bits: 0,
+        _thread_affine: PhantomData,
+    };
+
+    /// Creates a borrowed Vulkan handle from its native bit pattern.
+    ///
+    /// # Safety
+    ///
+    /// The bit pattern must have the Vulkan handle type required by every API
+    /// that receives it. The host must keep that object valid and synchronized
+    /// for the documented borrow window.
+    pub unsafe fn from_bits(bits: u64) -> Self {
+        Self {
+            bits,
+            _thread_affine: PhantomData,
+        }
+    }
+
+    /// Returns this Vulkan handle's native bit pattern.
+    pub fn bits(self) -> u64 {
+        self.bits
+    }
+
+    /// Returns whether this value represents `VK_NULL_HANDLE`.
+    pub fn is_null(self) -> bool {
+        self.bits == 0
+    }
+}
+
+impl fmt::Debug for VulkanHandle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "VulkanHandle(0x{:x})", self.bits)
+    }
+}
+
+/// Borrowed Vulkan non-dispatchable handle tied to an active texture frame.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FrameVulkanHandle<'frame> {
+    bits: u64,
+    _frame: PhantomData<&'frame ()>,
+    _thread_affine: PhantomData<Rc<()>>,
+}
+
+impl<'frame> FrameVulkanHandle<'frame> {
+    fn new(bits: u64) -> Self {
+        Self {
+            bits,
+            _frame: PhantomData,
+            _thread_affine: PhantomData,
+        }
+    }
+
+    /// Returns this Vulkan handle's native bit pattern.
+    ///
+    /// # Safety
+    ///
+    /// The returned integer no longer carries this value's frame lifetime. Use
+    /// it only while the borrowed frame remains open and satisfy the Vulkan
+    /// synchronization requirements for the image or image view.
+    pub unsafe fn bits(self) -> u64 {
+        self.bits
+    }
+
+    /// Returns whether this value represents `VK_NULL_HANDLE`.
+    pub fn is_null(self) -> bool {
+        self.bits == 0
+    }
+}
+
+impl fmt::Debug for FrameVulkanHandle<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "FrameVulkanHandle(0x{:x})", self.bits)
+    }
+}
+
 /// Borrowed opaque native address whose validity is tied to an active texture
 /// frame. It does not own, retain, dereference, or validate the pointed-to
 /// object.
@@ -562,14 +648,14 @@ impl MetalSurfaceDescriptor {
 pub struct VulkanSurfaceDescriptor {
     pub extent: RenderTargetExtent,
     pub context: VulkanContextDescriptor,
-    pub surface: NativePointer,
+    pub surface: VulkanHandle,
 }
 
 impl VulkanSurfaceDescriptor {
     pub fn new(
         extent: RenderTargetExtent,
         context: VulkanContextDescriptor,
-        surface: NativePointer,
+        surface: VulkanHandle,
     ) -> Self {
         Self {
             extent,
@@ -583,7 +669,7 @@ impl VulkanSurfaceDescriptor {
             maplibre_core::render::VulkanSurfaceDescriptorFields {
                 extent: self.extent.to_core(),
                 context: self.context.to_core(),
-                surface: self.surface.as_void_ptr(),
+                surface: self.surface.bits(),
             },
         )
     }
@@ -754,8 +840,8 @@ pub struct VulkanBorrowedTextureDescriptor {
     pub physical_width: u32,
     pub physical_height: u32,
     pub context: VulkanContextDescriptor,
-    pub image: NativePointer,
-    pub image_view: NativePointer,
+    pub image: VulkanHandle,
+    pub image_view: VulkanHandle,
     pub format: u32,
     pub initial_layout: u32,
     pub final_layout: u32,
@@ -768,8 +854,8 @@ impl VulkanBorrowedTextureDescriptor {
         physical_width: u32,
         physical_height: u32,
         context: VulkanContextDescriptor,
-        image: NativePointer,
-        image_view: NativePointer,
+        image: VulkanHandle,
+        image_view: VulkanHandle,
         format: u32,
         initial_layout: u32,
         final_layout: u32,
@@ -794,8 +880,8 @@ impl VulkanBorrowedTextureDescriptor {
                 physical_width: self.physical_width,
                 physical_height: self.physical_height,
                 context: self.context.to_core(),
-                image: self.image.as_void_ptr(),
-                image_view: self.image_view.as_void_ptr(),
+                image: self.image.bits(),
+                image_view: self.image_view.bits(),
                 format: self.format,
                 initial_layout: self.initial_layout,
                 final_layout: self.final_layout,
@@ -1794,8 +1880,8 @@ impl AcquiredFrameHandle {
         &self,
     ) -> Result<(
         VulkanOwnedTextureFrame,
-        FrameNativePointer<'_>,
-        FrameNativePointer<'_>,
+        FrameVulkanHandle<'_>,
+        FrameVulkanHandle<'_>,
         FrameNativePointer<'_>,
     )> {
         let mut raw: sys::mln_vulkan_owned_texture_frame = unsafe { mem::zeroed() };
@@ -1814,8 +1900,8 @@ impl AcquiredFrameHandle {
                 format: raw.format,
                 layout: raw.layout,
             },
-            unsafe { FrameNativePointer::from_ptr(raw.image) },
-            unsafe { FrameNativePointer::from_ptr(raw.image_view) },
+            FrameVulkanHandle::new(raw.image),
+            FrameVulkanHandle::new(raw.image_view),
             unsafe { FrameNativePointer::from_ptr(raw.device) },
         ))
     }

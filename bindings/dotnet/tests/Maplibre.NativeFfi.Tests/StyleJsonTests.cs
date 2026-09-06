@@ -63,6 +63,43 @@ public sealed class StyleJsonTests
         Assert.Equal((uint)RasterDemEncoding.Mapbox, demInfo?.RawRasterDemEncoding);
     }
 
+    [BindingSpecTest("BND-105")]
+    [Fact]
+    public async Task StyleSourceVolatilityReadsBackAndRejectsMissingSource()
+    {
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
+        map.SetStyleJsonAsync(EmptyStyle());
+        map.AddVectorSourceTilesAsync(
+            "volatile-source",
+            ["https://example.test/vector/{z}/{x}/{y}.pbf"],
+            new TileSourceOptions()
+        );
+
+        Assert.False((await map.StyleSourceInfoAsync("volatile-source"))!.IsVolatile);
+
+        RuntimeEventTestHelpers.WaitForCommand(
+            runtime,
+            map.SetStyleSourceVolatileAsync("volatile-source", true)
+        );
+        Assert.True((await map.StyleSourceInfoAsync("volatile-source"))!.IsVolatile);
+
+        RuntimeEventTestHelpers.WaitForCommand(
+            runtime,
+            map.SetStyleSourceVolatileAsync("volatile-source", false)
+        );
+        Assert.False((await map.StyleSourceInfoAsync("volatile-source"))!.IsVolatile);
+
+        RuntimeEventTestHelpers.AssertCommandFinishes(
+            runtime,
+            map.SetStyleSourceVolatileAsync("missing-source", true),
+            MaplibreStatus.NotFound
+        );
+    }
+
     [BindingSpecTest("BND-109")]
     [Fact]
     public async Task SourceInspectionCopiesUrlAndInlineTileJsonAfterSourceRelease()

@@ -14,7 +14,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public void* layer;
     }
 
-    internal unsafe partial struct mln_vulkan_surface_descriptor
+    internal partial struct mln_vulkan_surface_descriptor
     {
         [NativeTypeName("uint32_t")]
         public uint size;
@@ -23,7 +23,8 @@ namespace Maplibre.NativeFfi.Internal.C
 
         public mln_vulkan_context_descriptor context;
 
-        public void* surface;
+        [NativeTypeName("mln_vulkan_non_dispatchable_handle")]
+        public ulong surface;
     }
 
     internal unsafe partial struct mln_webgpu_surface_descriptor

@@ -9,19 +9,19 @@
 #include <string_view>
 #include <utility>
 
-#include <mbgl/storage/database_file_source.hpp>
-#include <mbgl/storage/file_source.hpp>
-#include <mbgl/storage/file_source_request.hpp>
-#include <mbgl/storage/main_resource_loader.hpp>
-#include <mbgl/storage/online_file_source.hpp>
-#include <mbgl/storage/resource.hpp>
-#include <mbgl/storage/resource_options.hpp>
-#include <mbgl/storage/resource_transform.hpp>
-#include <mbgl/storage/response.hpp>
-#include <mbgl/util/async_request.hpp>
-#include <mbgl/util/client_options.hpp>
-#include <mbgl/util/mapbox.hpp>
-#include <mbgl/util/tile_server_options.hpp>
+#include <mln/storage/database_file_source.hpp>
+#include <mln/storage/file_source.hpp>
+#include <mln/storage/file_source_request.hpp>
+#include <mln/storage/main_resource_loader.hpp>
+#include <mln/storage/online_file_source.hpp>
+#include <mln/storage/resource.hpp>
+#include <mln/storage/resource_options.hpp>
+#include <mln/storage/resource_transform.hpp>
+#include <mln/storage/response.hpp>
+#include <mln/util/async_request.hpp>
+#include <mln/util/client_options.hpp>
+#include <mln/util/mapbox.hpp>
+#include <mln/util/tile_server_options.hpp>
 
 #include "resources/resource_loader.hpp"
 

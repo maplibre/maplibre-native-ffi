@@ -489,11 +489,20 @@ public extension MapHandle {
     return try await mapNativeFailure { try await future.value() }
   }
 
-  func latLng(for point: ScreenPoint) async throws -> LatLng {
+  /// Converts a screen point to a geographic coordinate.
+  ///
+  /// The longitude is wrapped to the range from -180 to 180 degrees unless
+  /// `unwrapped` is `true`, in which case it preserves the visible world copy
+  /// and may fall outside that range.
+  func latLng(
+    for point: ScreenPoint,
+    unwrapped: Bool = false
+  ) async throws -> LatLng {
     let future = try mapNativeFailure {
       try NativeMap.latLngForPixel(
         requireLiveHandle(),
-        point: point.nativeInput
+        point: point.nativeInput,
+        unwrapped: unwrapped
       )
     }
     return try await mapNativeFailure { try await future.value() }
@@ -509,11 +518,20 @@ public extension MapHandle {
     return try await mapNativeFailure { try await future.value() }
   }
 
-  func latLngs(for points: [ScreenPoint]) async throws -> [LatLng] {
+  /// Converts screen points to geographic coordinates.
+  ///
+  /// Each longitude is wrapped to the range from -180 to 180 degrees unless
+  /// `unwrapped` is `true`, in which case it preserves its visible world copy
+  /// and may fall outside that range.
+  func latLngs(
+    for points: [ScreenPoint],
+    unwrapped: Bool = false
+  ) async throws -> [LatLng] {
     let future = try mapNativeFailure {
       try NativeMap.latLngsForPixels(
         requireLiveHandle(),
-        points: points.map(\.nativeInput)
+        points: points.map(\.nativeInput),
+        unwrapped: unwrapped
       )
     }
     return try await mapNativeFailure { try await future.value() }

@@ -369,3 +369,69 @@ ResourceRequest _copyResourceRequest(
     priorData: priorData,
   );
 }
+
+/// Dart callback run when MapLibre cancels a provider resource request.
+typedef ResourceRequestCancelCallback = void Function();
+
+/// Cancel registrations made on this isolate, keyed by request handle id.
+///
+/// An entry lives from registration until the request is retired on this
+/// isolate or its callback has run. Completion, release, and native cancellation
+/// all look the state up here, so a cancel message that arrives after the
+/// request was retired finds no entry and is dropped.
+final Map<int, _ResourceRequestCancelState> _resourceRequestCancelStates = {};
+
+final class _ResourceRequestCancelState {
+  _ResourceRequestCancelState(this.requestId, this._callback) {
+    listener =
+        NativeCallable<
+          raw.mln_resource_request_cancel_callbackFunction
+        >.listener((Pointer<Void> _) => _deliver());
+  }
+
+  final int requestId;
+  ResourceRequestCancelCallback? _callback;
+  late final NativeCallable<raw.mln_resource_request_cancel_callbackFunction>
+  listener;
+  var _closed = false;
+
+  /// Handles the queued native cancel message on the registering isolate.
+  void _deliver() {
+    if (!identical(_resourceRequestCancelStates[requestId], this)) {
+      return;
+    }
+    _resourceRequestCancelStates.remove(requestId);
+    runCallback();
+    // Native invokes the callback at most once, so the callable is unused from
+    // here on even while the host still owns the request.
+    close();
+  }
+
+  /// Runs the host callback once, containing any exception it throws.
+  void runCallback() {
+    final callback = _callback;
+    _callback = null;
+    if (callback == null) {
+      return;
+    }
+    try {
+      callback();
+    } catch (_) {
+      // An exception must not escape into native callback delivery.
+    }
+  }
+
+  void close() {
+    if (_closed) {
+      return;
+    }
+    _closed = true;
+    _callback = null;
+    listener.close();
+  }
+}
+
+/// Drops the cancel registration for [requestId] once native release returned.
+void _retireResourceRequestCancelState(int requestId) {
+  _resourceRequestCancelStates.remove(requestId)?.close();
+}

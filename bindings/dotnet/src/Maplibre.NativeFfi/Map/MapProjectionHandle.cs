@@ -132,6 +132,7 @@ public sealed unsafe class MapProjectionHandle : IDisposable
     }
 
     /// <summary>Converts a logical-pixel screen point to a geographic coordinate.</summary>
+    /// <remarks>The longitude is wrapped to the range from -180 to 180 degrees.</remarks>
     public LatLng LatLngForPixel(ScreenPoint point)
     {
         var nativePoint = MapStructs.ToNative(point);
@@ -140,6 +141,26 @@ public sealed unsafe class MapProjectionHandle : IDisposable
             mln_lat_lng native = default;
             NativeStatus.Check(
                 NativeMethods.mln_map_projection_lat_lng_for_pixel(live, nativePoint, &native)
+            );
+            return native;
+        });
+        return CoreStructs.FromNative(coordinate);
+    }
+
+    /// <summary>Converts a logical-pixel screen point to an unwrapped geographic coordinate.</summary>
+    /// <remarks>The longitude preserves the visible world copy and may fall outside -180 to 180.</remarks>
+    public LatLng LatLngForPixelUnwrapped(ScreenPoint point)
+    {
+        var nativePoint = MapStructs.ToNative(point);
+        var coordinate = state.WithLive(live =>
+        {
+            mln_lat_lng native = default;
+            NativeStatus.Check(
+                NativeMethods.mln_map_projection_lat_lng_for_pixel_unwrapped(
+                    live,
+                    nativePoint,
+                    &native
+                )
             );
             return native;
         });

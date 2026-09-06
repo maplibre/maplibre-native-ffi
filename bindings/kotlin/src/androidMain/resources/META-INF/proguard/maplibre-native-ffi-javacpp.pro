@@ -9,7 +9,7 @@
 # package because org.bytedeco.javacpp.tools is build-time only.
 -keep class org.bytedeco.javacpp.* { *; }
 -keep class org.bytedeco.javacpp.annotation.** { *; }
--keepattributes *Annotation*
+-keepattributes *Annotation*,InnerClasses,EnclosingMethod
 
 # JavaCPP carries JVM-only code paths Android does not ship and never reaches.
 -dontwarn java.lang.management.**

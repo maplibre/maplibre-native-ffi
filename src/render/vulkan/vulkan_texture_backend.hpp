@@ -2,12 +2,12 @@
 
 #include <vector>
 
-#include <mbgl/gfx/headless_backend.hpp>
-#include <mbgl/gfx/renderable.hpp>
-#include <mbgl/gfx/renderer_backend.hpp>
-#include <mbgl/util/image.hpp>
-#include <mbgl/util/size.hpp>
-#include <mbgl/vulkan/renderer_backend.hpp>
+#include <mln/gfx/headless_backend.hpp>
+#include <mln/gfx/renderable.hpp>
+#include <mln/gfx/renderer_backend.hpp>
+#include <mln/util/image.hpp>
+#include <mln/util/size.hpp>
+#include <mln/vulkan/renderer_backend.hpp>
 
 #include <vulkan/vulkan_core.h>
 
@@ -16,8 +16,8 @@
 namespace mln::core {
 
 struct VulkanTextureFrameResources {
-  VkImage image = nullptr;
-  VkImageView image_view = nullptr;
+  VkImage image = VK_NULL_HANDLE;
+  VkImageView image_view = VK_NULL_HANDLE;
   VkDevice device = nullptr;
   VkFormat format = VK_FORMAT_UNDEFINED;
 };

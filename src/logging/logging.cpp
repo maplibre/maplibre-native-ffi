@@ -2,8 +2,8 @@
 #include <memory>
 #include <string>
 
-#include <mbgl/util/event.hpp>
-#include <mbgl/util/logging.hpp>
+#include <mln/util/event.hpp>
+#include <mln/util/logging.hpp>
 
 #include "logging/logging.hpp"
 

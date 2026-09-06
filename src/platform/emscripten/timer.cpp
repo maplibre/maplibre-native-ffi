@@ -4,8 +4,8 @@
 #include <memory>
 #include <utility>
 
-#include <mbgl/util/run_loop.hpp>
-#include <mbgl/util/timer.hpp>
+#include <mln/util/run_loop.hpp>
+#include <mln/util/timer.hpp>
 
 #include "run_loop_wake.hpp"
 

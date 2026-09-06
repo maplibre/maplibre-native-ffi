@@ -765,6 +765,50 @@ fn style_source_info_reports_type_and_found_flag() {
 }
 
 #[test]
+// Spec coverage: BND-105.
+fn style_source_volatility_round_trips_through_public_api() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    map.add_vector_source_url("source", "https://example.com/source.json", None)
+        .unwrap();
+
+    assert!(
+        !operation_result!(map.style_source_info("source"))
+            .unwrap()
+            .unwrap()
+            .is_volatile
+    );
+
+    let volatile = map.set_style_source_volatile("source", true).unwrap();
+    assert_command_disposition(&runtime, volatile, CommandDisposition::Committed);
+    assert!(
+        operation_result!(map.style_source_info("source"))
+            .unwrap()
+            .unwrap()
+            .is_volatile
+    );
+
+    let persistent = map.set_style_source_volatile("source", false).unwrap();
+    assert_command_disposition(&runtime, persistent, CommandDisposition::Committed);
+    assert!(
+        !operation_result!(map.style_source_info("source"))
+            .unwrap()
+            .unwrap()
+            .is_volatile
+    );
+
+    // A missing source fails the command with the not-found status code.
+    let missing = map.set_style_source_volatile("missing", true).unwrap();
+    let (_, code, _) = assert_command_disposition(&runtime, missing, CommandDisposition::Failed);
+    assert_eq!(code, sys::MLN_STATUS_NOT_FOUND);
+
+    map.close_and_wait();
+    runtime.close_and_wait();
+}
+
+#[test]
 // Spec coverage: BND-066, BND-109.
 fn style_source_info_copies_reconstructible_source_state() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
@@ -1447,6 +1491,52 @@ fn snapshot_fields_round_trip_through_their_set_commands() {
     assert!((position.y - 0.25).abs() < 1e-6);
     assert!(position.z > 0.0);
     assert!(snapshot.rendering_stats_view_enabled);
+
+    map.close_and_wait();
+    runtime.close_and_wait();
+}
+
+#[test]
+// Spec coverage: BND-103.
+fn unwrapped_coordinate_conversions_preserve_visible_world_copies() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(1024, 512, 1.0),
+    ));
+    let mut update = CameraUpdate::default();
+    update.camera.center = Some(LatLng::new(0.0, 180.0));
+    update.camera.zoom = Some(0.0);
+    let command = map.update_camera(&update).unwrap();
+    assert_command_disposition(&runtime, command, CommandDisposition::Committed);
+    await_runtime_barrier(&runtime);
+
+    // The viewport is two world copies wide, so its edges name the same
+    // wrapped longitude in different copies.
+    let points = [
+        ScreenPoint::new(0.0, 256.0),
+        ScreenPoint::new(1024.0, 256.0),
+    ];
+    let wrapped = operation_result!(map.lat_lngs_for_pixels(&points)).unwrap();
+    let unwrapped = operation_result!(map.lat_lngs_for_pixels_unwrapped(&points)).unwrap();
+    assert!(
+        wrapped
+            .iter()
+            .all(|coordinate| (-180.0..=180.0).contains(&coordinate.longitude))
+    );
+    assert!(unwrapped[1].longitude - unwrapped[0].longitude > 360.0);
+
+    let right_wrapped = operation_result!(map.lat_lng_for_pixel(points[1])).unwrap();
+    assert!((-180.0..=180.0).contains(&right_wrapped.longitude));
+    let right = operation_result!(map.lat_lng_for_pixel_unwrapped(points[1])).unwrap();
+    assert!((right.longitude - unwrapped[1].longitude).abs() < 1e-10);
+
+    // A projection snapshot reports the same pair of readings.
+    let projection = crate::completion::blocking(map.create_projection());
+    assert!((-180.0..=180.0).contains(&projection.lat_lng_for_pixel(points[1]).unwrap().longitude));
+    let projected_right = projection.lat_lng_for_pixel_unwrapped(points[1]).unwrap();
+    assert!((projected_right.longitude - right.longitude).abs() < 1e-10);
+    projection.close().unwrap();
 
     map.close_and_wait();
     runtime.close_and_wait();

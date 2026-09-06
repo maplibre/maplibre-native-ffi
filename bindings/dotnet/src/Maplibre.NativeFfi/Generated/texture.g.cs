@@ -65,7 +65,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public mln_vulkan_context_descriptor context;
     }
 
-    internal unsafe partial struct mln_vulkan_borrowed_texture_descriptor
+    internal partial struct mln_vulkan_borrowed_texture_descriptor
     {
         [NativeTypeName("uint32_t")]
         public uint size;
@@ -80,9 +80,11 @@ namespace Maplibre.NativeFfi.Internal.C
 
         public mln_vulkan_context_descriptor context;
 
-        public void* image;
+        [NativeTypeName("mln_vulkan_non_dispatchable_handle")]
+        public ulong image;
 
-        public void* image_view;
+        [NativeTypeName("mln_vulkan_non_dispatchable_handle")]
+        public ulong image_view;
 
         [NativeTypeName("uint32_t")]
         public uint format;
@@ -113,9 +115,11 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("uint64_t")]
         public ulong frame_id;
 
-        public void* image;
+        [NativeTypeName("mln_vulkan_non_dispatchable_handle")]
+        public ulong image;
 
-        public void* image_view;
+        [NativeTypeName("mln_vulkan_non_dispatchable_handle")]
+        public ulong image_view;
 
         public void* device;
 

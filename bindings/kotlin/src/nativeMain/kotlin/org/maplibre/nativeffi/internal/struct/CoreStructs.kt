@@ -21,6 +21,7 @@ import org.maplibre.nativeffi.internal.c.mln_lat_lng_bounds
 import org.maplibre.nativeffi.internal.c.mln_projected_meters
 import org.maplibre.nativeffi.internal.c.mln_screen_point
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
+import org.maplibre.nativeffi.internal.memory.toCSize
 
 /** Materializes core copied values at the C boundary. */
 @OptIn(ExperimentalForeignApi::class)
@@ -97,14 +98,14 @@ internal object CoreStructs {
 
   fun stringView(value: String, scope: MemScope): CValue<mln_buffer_view> = cValue {
     data = MemoryUtil.utf8Bytes(scope, value)
-    size = value.encodeToByteArray().size.toULong()
+    size = value.encodeToByteArray().size.toCSize()
   }
 
   fun stringView(value: mln_buffer_view): String =
-    MemoryUtil.copyStringView(value.data?.reinterpret<ByteVar>(), value.size)
+    MemoryUtil.copyStringView(value.data?.reinterpret<ByteVar>(), value.size.toULong())
 
   fun setStringView(native: mln_buffer_view, value: String, scope: MemScope) {
     native.data = MemoryUtil.utf8Bytes(scope, value)
-    native.size = value.encodeToByteArray().size.toULong()
+    native.size = value.encodeToByteArray().size.toCSize()
   }
 }

@@ -94,7 +94,7 @@ function(mln_ffi_configure_renderer target)
   target_compile_definitions(${target} PRIVATE MLN_RENDER_BACKEND_OPENGL=1)
 
   set(MLN_FFI_VENDOR_OPENGL_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/gl/headless_backend.cpp)
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/gl/headless_backend.cpp)
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
     # A browser host owns its WebGL context and hands it to a session, so
     # upstream's EGL headless host has nothing to do here.

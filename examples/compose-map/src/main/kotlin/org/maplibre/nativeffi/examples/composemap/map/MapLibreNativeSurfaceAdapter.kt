@@ -27,6 +27,7 @@ import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
+import org.maplibre.nativeffi.render.VulkanHandle
 import org.maplibre.nativeffi.render.WglContextDescriptor
 
 internal object MapLibreNativeSurfaceAdapter {
@@ -66,8 +67,8 @@ internal object MapLibreNativeSurfaceAdapter {
           extent.physicalWidth,
           extent.physicalHeight,
           target.context.toDescriptor(),
-          target.image.toPointer(),
-          target.imageView.toPointer(),
+          target.image.toVulkanHandle(),
+          target.imageView.toVulkanHandle(),
           target.format,
           target.initialLayout,
         )
@@ -149,6 +150,8 @@ private fun SurfaceExtent.toRenderTargetExtent(): RenderTargetExtent =
   RenderTargetExtent(width, height, scaleFactor)
 
 private fun NativeHandle.toPointer(): NativePointer = NativePointer.ofAddress(address)
+
+private fun NativeHandle.toVulkanHandle(): VulkanHandle = VulkanHandle.ofBits(address)
 
 private fun RenderBackend.toProducerBackend(): ProducerBackend? =
   when (this) {

@@ -58,10 +58,15 @@ while IFS= read -r test_binary || [[ -n "$test_binary" ]]; do
   fi
 done <"$test_manifest"
 if [[ "$preset" == android-* ]]; then
+  emulator_args=()
+  if [[ "$preset" == android-x64-egl ]]; then
+    emulator_args+=(--api 26)
+  fi
   exec "$MISE_MONOREPO_ROOT/scripts/run-android-emulator-test.sh" \
     600 \
     "$abi" \
     "$native_install_dir/lib/libmaplibre-native-c.so" \
+    ${emulator_args[@]+"${emulator_args[@]}"} \
     --test-threads=1 -- ${test_binaries[@]+"${test_binaries[@]}"}
 fi
 exec "$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \

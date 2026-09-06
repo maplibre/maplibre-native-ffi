@@ -331,12 +331,12 @@ public struct MetalSurfaceDescriptor: Equatable, Sendable {
 public struct VulkanSurfaceDescriptor: Equatable, Sendable {
   public var extent: RenderTargetExtent
   public var context: VulkanContextDescriptor
-  public var surface: NativePointer
+  public var surface: VulkanHandle
 
   public init(
     extent: RenderTargetExtent,
     context: VulkanContextDescriptor,
-    surface: NativePointer
+    surface: VulkanHandle
   ) {
     self.extent = extent
     self.context = context
@@ -347,7 +347,7 @@ public struct VulkanSurfaceDescriptor: Equatable, Sendable {
     NativeVulkanSurfaceDescriptorInput(
       extent: extent.nativeInput,
       context: context.nativeInput,
-      surfaceAddress: surface.addressBitPattern
+      surfaceBits: surface.bitPattern
     )
   }
 }
@@ -466,8 +466,8 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Sendable {
   public var physicalWidth: UInt32
   public var physicalHeight: UInt32
   public var context: VulkanContextDescriptor
-  public var image: NativePointer
-  public var imageView: NativePointer
+  public var image: VulkanHandle
+  public var imageView: VulkanHandle
   public var format: UInt32
   public var initialLayout: UInt32
   public var finalLayout: UInt32
@@ -477,8 +477,8 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Sendable {
     physicalWidth: UInt32,
     physicalHeight: UInt32,
     context: VulkanContextDescriptor,
-    image: NativePointer,
-    imageView: NativePointer,
+    image: VulkanHandle,
+    imageView: VulkanHandle,
     format: UInt32,
     initialLayout: UInt32,
     finalLayout: UInt32
@@ -500,8 +500,8 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Sendable {
       physicalWidth: physicalWidth,
       physicalHeight: physicalHeight,
       context: context.nativeInput,
-      imageAddress: image.addressBitPattern,
-      imageViewAddress: imageView.addressBitPattern,
+      imageBits: image.bitPattern,
+      imageViewBits: imageView.bitPattern,
       format: format,
       initialLayout: initialLayout,
       finalLayout: finalLayout
@@ -906,8 +906,8 @@ public struct VulkanOwnedTextureFrame: Sendable, Hashable {
   public let height: UInt32
   public let scaleFactor: Double
   public let frameID: UInt64
-  public let image: NativePointer
-  public let imageView: NativePointer
+  public let image: VulkanHandle
+  public let imageView: VulkanHandle
   public let device: NativePointer
   public let format: UInt32
   public let layout: UInt32
@@ -1043,9 +1043,8 @@ public final class AcquiredFrameHandle: @unchecked Sendable {
           height: value.height,
           scaleFactor: value.scale_factor,
           frameID: value.frame_id,
-          image: NativePointer(bitPattern: UInt(bitPattern: value.image)),
-          imageView: NativePointer(bitPattern: UInt(bitPattern: value
-              .image_view)),
+          image: VulkanHandle(bitPattern: value.image),
+          imageView: VulkanHandle(bitPattern: value.image_view),
           device: NativePointer(bitPattern: UInt(bitPattern: value.device)),
           format: value.format,
           layout: value.layout

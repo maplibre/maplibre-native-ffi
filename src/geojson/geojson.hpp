@@ -4,11 +4,11 @@
 #include <string>
 #include <vector>
 
-#include <mbgl/util/feature.hpp>
-#include <mbgl/util/geo.hpp>
-#include <mbgl/util/geojson.hpp>
-#include <mbgl/util/geometry.hpp>
-#include <mbgl/util/rapidjson.hpp>
+#include <mln/util/feature.hpp>
+#include <mln/util/geo.hpp>
+#include <mln/util/geojson.hpp>
+#include <mln/util/geometry.hpp>
+#include <mln/util/rapidjson.hpp>
 
 #include "maplibre_native_c/base.h"
 

@@ -3,7 +3,7 @@ use std::ffi::{CStr, CString};
 
 use ash::vk;
 use ash::vk::Handle;
-use maplibre_native_ffi::NativePointer;
+use maplibre_native_ffi::{NativePointer, VulkanHandle};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::Window;
 
@@ -188,9 +188,9 @@ impl VulkanContext {
         }
     }
 
-    pub fn surface_pointer(&self) -> NativePointer {
+    pub fn surface_handle(&self) -> VulkanHandle {
         // SAFETY: The Vulkan surface is live for the render session lifetime.
-        unsafe { NativePointer::from_address(self.surface.as_raw() as usize) }
+        unsafe { VulkanHandle::from_bits(self.surface.as_raw()) }
     }
 
     pub fn graphics_queue_family_index(&self) -> u32 {
@@ -304,14 +304,14 @@ impl BorrowedImage {
         self.view
     }
 
-    pub fn image_pointer(&self) -> NativePointer {
+    pub fn image_handle(&self) -> VulkanHandle {
         // SAFETY: The Vulkan image is live while the borrowed texture session is live.
-        unsafe { NativePointer::from_address(self.image.as_raw() as usize) }
+        unsafe { VulkanHandle::from_bits(self.image.as_raw()) }
     }
 
-    pub fn view_pointer(&self) -> NativePointer {
+    pub fn view_handle(&self) -> VulkanHandle {
         // SAFETY: The Vulkan image view is live while the borrowed texture session is live.
-        unsafe { NativePointer::from_address(self.view.as_raw() as usize) }
+        unsafe { VulkanHandle::from_bits(self.view.as_raw()) }
     }
 }
 

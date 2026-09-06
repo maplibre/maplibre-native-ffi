@@ -14,6 +14,7 @@ import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.internal.c.mln_network_status_set
 import org.maplibre.nativeffi.internal.c.mln_resource_transform_response
 import org.maplibre.nativeffi.internal.c.mln_resource_transform_response_set_url
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.internal.status.Status
 
 @OptIn(ExperimentalForeignApi::class)
@@ -42,7 +43,7 @@ class NativeFrameAcquirePolicyTest : org.maplibre.nativeffi.NativeTestBase() {
                   mln_resource_transform_response_set_url(
                     response.ptr,
                     replacement,
-                    replacement.length.toULong(),
+                    replacement.length.toCSize(),
                   )
                 )
               },

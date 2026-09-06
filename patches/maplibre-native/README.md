@@ -10,6 +10,22 @@ canonical Windows drive paths and opens UTF-8 filenames through wide filesystem
 APIs. This lets the local file source load percent-encoded `file:///C:/...`
 resources whose paths contain spaces or non-ASCII characters.
 
+`0004-opengl-valid-api-calls.patch` uses indexed extension enumeration on OpenGL
+ES, allocates storage before copying a uniform buffer, and isolates allocation
+errors from earlier OpenGL calls. This prevents strict implementations and the
+API 26 Android emulator from turning stale errors into false allocation
+failures.
+
+`0005-unwrapped-unprojection.patch` adds wrap-mode overloads to map and
+standalone projection coordinate conversion. The C API uses them to expose
+continuous longitudes while the existing overloads keep wrapped behavior.
+
+`0006-process-lifetime-logging.patch` gives the global logger, its observer,
+mutex, severity settings, and scheduler process lifetime. This prevents static
+destruction from joining a logging worker whose thread-local cleanup must detach
+from an already shut down host VM. Explicit observer replacement and removal
+still release the previous observer.
+
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
 before applying the list again. A pin bump, an edit to a patch, and a dropped

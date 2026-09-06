@@ -19,7 +19,7 @@ import Testing
       runtime: runtime,
       options: MapOptions(width: 32, height: 32)
     )
-    defer { try? map.close() }
+    defer { try? map.closeBlockingForTests() }
     let device = try #require(MTLCreateSystemDefaultDevice())
     let devicePointer = NativePointer(bitPattern: UInt(bitPattern:
       Unmanaged.passUnretained(device as AnyObject).toOpaque()))
@@ -120,4 +120,49 @@ import Testing
       #expect(native.pointee.frame_wake.user_data == frameWake.user_data)
       #expect(native.pointee.driver_work_wake.user_data == driverWake.user_data)
     }
+}
+
+/// A Vulkan non-dispatchable handle is 64 bits wide on every platform, so a
+/// carrier sized like a pointer would drop the high half on a 32-bit host.
+/// Both halves of a handle that lives entirely above bit 32 have to survive
+/// the trip into the native descriptor.
+@Test func vulkanDescriptorsCarryFullWidthHandles() throws {
+  let context = VulkanContextDescriptor(
+    instance: NativePointer(bitPattern: 0x30),
+    physicalDevice: NativePointer(bitPattern: 0x40),
+    device: NativePointer(bitPattern: 0x50),
+    graphicsQueue: NativePointer(bitPattern: 0x60),
+    graphicsQueueFamilyIndex: 7,
+    getInstanceProcAddr: NativePointer(bitPattern: 0x90),
+    getDeviceProcAddr: NativePointer(bitPattern: 0xA0)
+  )
+  let extent = RenderTargetExtent(width: 64, height: 32, scaleFactor: 2)
+
+  let texture = VulkanBorrowedTextureDescriptor(
+    extent: extent,
+    physicalWidth: 128,
+    physicalHeight: 64,
+    context: context,
+    image: VulkanHandle(bitPattern: 0x8000_0000_0000_0001),
+    imageView: VulkanHandle(bitPattern: 0x0000_0001_0000_0000),
+    format: 44,
+    initialLayout: 1,
+    finalLayout: 2
+  )
+  try texture.nativeInput.withNativeDescriptor { descriptor in
+    #expect(descriptor.pointee.image == 0x8000_0000_0000_0001)
+    #expect(descriptor.pointee.image_view == 0x0000_0001_0000_0000)
+    #expect(descriptor.pointee.physical_width == 128)
+    #expect(descriptor.pointee.format == 44)
+  }
+
+  let surface = VulkanSurfaceDescriptor(
+    extent: extent,
+    context: context,
+    surface: VulkanHandle(bitPattern: 0xFEDC_BA98_7654_3210)
+  )
+  try surface.nativeInput.withNativeDescriptor { descriptor in
+    #expect(descriptor.pointee.surface == 0xFEDC_BA98_7654_3210)
+    #expect(UInt(bitPattern: descriptor.pointee.context.device) == 0x50)
+  }
 }

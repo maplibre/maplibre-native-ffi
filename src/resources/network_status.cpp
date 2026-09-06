@@ -1,6 +1,6 @@
 #include <cstdint>
 
-#include <mbgl/storage/network_status.hpp>
+#include <mln/storage/network_status.hpp>
 
 #include "resources/network_status.hpp"
 

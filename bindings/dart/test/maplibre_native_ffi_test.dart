@@ -806,6 +806,135 @@ void main() {
     await runtime.close();
   });
 
+  // BND-198: a cancel callback registered on a handled request runs once when
+  // MapLibre discards the request, may release the request from inside, and
+  // keeps an exception it throws inside the binding.
+  test(
+    'resource request cancel callbacks report a discarded request',
+    () async {
+      const styleUrl = 'custom://dart-provider-cancel-reported.json';
+      final runtime = RuntimeHandle.create();
+      ResourceRequestHandle? token;
+      var cancels = 0;
+      var cancelledInsideCallback = false;
+      Object? insideError;
+
+      runtime.setResourceProvider(
+        ResourceProvider(
+          routes: const [
+            ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+          ],
+          callback: (_, handle) {
+            token = handle;
+            handle.setCancelCallback(() {
+              cancels += 1;
+              try {
+                cancelledInsideCallback = handle.cancelled();
+              } catch (error) {
+                insideError = error;
+              }
+              handle.close();
+              throw StateError('cancel callback failed');
+            });
+          },
+        ),
+      );
+
+      final map = await runtime.createMap();
+      map.setStyleUrl(styleUrl);
+      await _waitUntilCondition(runtime, () => token != null);
+      final liveToken = token!;
+      expect(
+        () => liveToken.setCancelCallback(() {}),
+        throwsA(isA<InvalidStateException>()),
+      );
+
+      await map.close();
+      await runtime.close();
+      await _waitUntil(() => cancels > 0);
+
+      expect(insideError, isNull);
+      expect(cancelledInsideCallback, isTrue);
+      expect(cancels, 1);
+      expect(
+        () => liveToken.setCancelCallback(() {}),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+    },
+  );
+
+  // BND-198: a request the provider completed is never reported as cancelled.
+  test('resource request cancel callbacks end at completion', () async {
+    const styleUrl = 'custom://dart-provider-cancel-completed.json';
+    final runtime = RuntimeHandle.create();
+    var cancels = 0;
+
+    runtime.setResourceProvider(
+      ResourceProvider(
+        routes: const [
+          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+        ],
+        callback: (_, handle) {
+          handle.setCancelCallback(() => cancels += 1);
+          handle.complete(
+            ResourceResponse(
+              status: ResourceResponseStatus.ok,
+              bytes: Uint8List.fromList(_emptyStyleJson.codeUnits),
+            ),
+          );
+        },
+      ),
+    );
+
+    final map = await runtime.createMap();
+    map.setStyleUrl(styleUrl);
+    await _waitUntilEvent(
+      runtime,
+      (candidate) => candidate.eventType == RuntimeEventType.mapStyleLoaded,
+    );
+
+    await map.close();
+    await runtime.close();
+
+    expect(cancels, 0);
+  });
+
+  // BND-198: a registration on a request MapLibre already cancelled runs the
+  // callback before registration returns.
+  test('cancel callbacks registered after cancellation run inline', () async {
+    const styleUrl = 'custom://dart-provider-cancel-late.json';
+    final runtime = RuntimeHandle.create();
+    ResourceRequestHandle? token;
+    var cancels = 0;
+
+    runtime.setResourceProvider(
+      ResourceProvider(
+        routes: const [
+          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+        ],
+        callback: (_, handle) {
+          token = handle;
+        },
+      ),
+    );
+
+    final map = await runtime.createMap();
+    map.setStyleUrl(styleUrl);
+    await _waitUntilCondition(runtime, () => token != null);
+    final liveToken = token!;
+
+    await map.close();
+    await runtime.close();
+    await _waitUntil(liveToken.cancelled);
+
+    liveToken.setCancelCallback(() => cancels += 1);
+    expect(cancels, 1);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(cancels, 1);
+
+    liveToken.close();
+  });
+
   test(
     'projection is synchronous and observes only earlier commands',
     () async {
@@ -862,6 +991,52 @@ void main() {
         await map.close();
         await runtime.close();
       }
+    },
+  );
+
+  test(
+    'unwrapped coordinate conversions preserve visible world copies',
+    () async {
+      final runtime = RuntimeHandle.create();
+      final map = await runtime.createMap(
+        options: const MapOptions(width: 1024, height: 512),
+      );
+      await _expectCommandCommitted(
+        runtime,
+        map.updateCamera(const CameraOptions(center: LatLng(0, 180), zoom: 0)),
+      );
+      const points = [ScreenPoint(0, 256), ScreenPoint(1024, 256)];
+
+      final wrapped = await map.latLngsForPixels(points);
+      final unwrapped = await map.latLngsForPixelsUnwrapped(points);
+      expect(
+        wrapped.every(
+          (coordinate) =>
+              coordinate.longitude >= -180 && coordinate.longitude <= 180,
+        ),
+        isTrue,
+      );
+      expect(unwrapped[1].longitude - unwrapped[0].longitude, greaterThan(360));
+      expect(
+        (await map.latLngForPixel(points[1])).longitude,
+        inInclusiveRange(-180, 180),
+      );
+      final right = await map.latLngForPixelUnwrapped(points[1]);
+      expect(right.longitude, closeTo(unwrapped[1].longitude, 1e-10));
+
+      final projection = await map.createProjection();
+      expect(
+        projection.latLngForPixel(points[1]).longitude,
+        inInclusiveRange(-180, 180),
+      );
+      expect(
+        projection.latLngForPixelUnwrapped(points[1]).longitude,
+        closeTo(right.longitude, 1e-10),
+      );
+
+      projection.close();
+      await map.close();
+      await runtime.close();
     },
   );
 
@@ -2281,6 +2456,43 @@ void main() {
       expect(RasterDemEncoding.fromRaw(93).rawValue, 93);
     },
   );
+
+  test('style source volatility round-trips through the public API', () async {
+    final runtime = RuntimeHandle.create();
+    final map = await runtime.createMap();
+    map.setStyleJson(_jsonBytes(_emptyStyleJson));
+    map.addVectorSourceTiles('dart-volatile-source', const [
+      'https://example.com/{z}/{x}/{y}.mvt',
+    ]);
+
+    expect(
+      (await map.getStyleSourceInfo('dart-volatile-source'))!.isVolatile,
+      isFalse,
+    );
+    await _expectCommandCommitted(
+      runtime,
+      map.setStyleSourceVolatile('dart-volatile-source', true),
+    );
+    expect(
+      (await map.getStyleSourceInfo('dart-volatile-source'))!.isVolatile,
+      isTrue,
+    );
+    await _expectCommandCommitted(
+      runtime,
+      map.setStyleSourceVolatile('dart-volatile-source', false),
+    );
+    expect(
+      (await map.getStyleSourceInfo('dart-volatile-source'))!.isVolatile,
+      isFalse,
+    );
+    await _expectCommandFailure(
+      map.setStyleSourceVolatile('missing-source', true),
+      MaplibreStatus.notFound,
+    );
+
+    await map.close();
+    await runtime.close();
+  });
 
   test(
     'scoped native values validate before exposing borrowed values',

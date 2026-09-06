@@ -35,14 +35,16 @@ prepare_native_inputs() {
   case "$partition" in
     linux)
       presets=(
+        android-arm-egl
+        android-arm-vulkan
         android-arm64-egl
         android-arm64-vulkan
         android-x64-egl
         android-x64-vulkan
-        linux-arm64-egl
-        linux-arm64-vulkan
-        linux-x64-egl
-        linux-x64-vulkan
+        linux-gnu-arm64-egl
+        linux-gnu-arm64-vulkan
+        linux-gnu-x64-egl
+        linux-gnu-x64-vulkan
       )
       ;;
     apple)
@@ -50,14 +52,16 @@ prepare_native_inputs() {
       # schedule cinterop tasks for the Android and Linux targets even though
       # the Linux partition publishes them; their install dirs must exist here.
       presets=(
+        android-arm-egl
+        android-arm-vulkan
         android-arm64-egl
         android-arm64-vulkan
         android-x64-egl
         android-x64-vulkan
-        linux-x64-egl
-        linux-arm64-egl
-        linux-x64-vulkan
-        linux-arm64-vulkan
+        linux-gnu-x64-egl
+        linux-gnu-arm64-egl
+        linux-gnu-x64-vulkan
+        linux-gnu-arm64-vulkan
         macos-arm64-egl
         macos-arm64-vulkan
         macos-arm64-metal
@@ -103,48 +107,52 @@ publish_linux_leaves() {
   shift
   local common=(
     -Pmaplibre.android.prebuiltInstallRoot="$install_root"
-    "-Pmaplibre.android.abis=arm64-v8a,x86_64"
   )
   # Cinterop commonization can schedule cinterop tasks for every Kotlin/Native
   # target of a runtime module that the host supports, not just the
   # publications named on the command line, so each invocation configures
   # install dirs for all of them.
   local opengl=(
+    -Pmaplibre.runtime.opengl.androidNativeArm32.installDir="$install_root/android-arm-egl"
     -Pmaplibre.runtime.opengl.androidNativeArm64.installDir="$install_root/android-arm64-egl"
     -Pmaplibre.runtime.opengl.androidNativeX64.installDir="$install_root/android-x64-egl"
-    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"
-    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
+    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-gnu-arm64-egl"
+    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-gnu-x64-egl"
   )
   local vulkan=(
+    -Pmaplibre.runtime.vulkan.androidNativeArm32.installDir="$install_root/android-arm-vulkan"
     -Pmaplibre.runtime.vulkan.androidNativeArm64.installDir="$install_root/android-arm64-vulkan"
     -Pmaplibre.runtime.vulkan.androidNativeX64.installDir="$install_root/android-x64-vulkan"
-    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"
-    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-x64-vulkan"
+    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-gnu-arm64-vulkan"
+    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-gnu-x64-vulkan"
   )
 
   publish_tasks \
     :bindings:kotlin \
     "$repository" \
-    Android AndroidNativeArm64 AndroidNativeX64 -- \
+    Android AndroidNativeArm32 AndroidNativeArm64 AndroidNativeX64 -- \
     "$@" \
-    "${common[@]}"
+    "${common[@]}" \
+    -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86_64
 
   publish_tasks \
     :bindings:kotlin:runtimes:opengl \
     "$repository" \
-    Android AndroidNativeArm64 AndroidNativeX64 -- \
+    Android AndroidNativeArm32 AndroidNativeArm64 AndroidNativeX64 -- \
     "$@" \
     "${common[@]}" \
     "${opengl[@]}" \
+    -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86_64 \
     -Pmaplibre.android.backend=opengl
 
   publish_tasks \
     :bindings:kotlin:runtimes:vulkan \
     "$repository" \
-    Android AndroidNativeArm64 AndroidNativeX64 -- \
+    Android AndroidNativeArm32 AndroidNativeArm64 AndroidNativeX64 -- \
     "$@" \
     "${common[@]}" \
     "${vulkan[@]}" \
+    -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86_64 \
     -Pmaplibre.android.backend=vulkan
 
   publish_tasks \
@@ -159,7 +167,7 @@ publish_linux_leaves() {
     LinuxArm64 -- \
     "$@" \
     -Pkotlin.native.enableKlibsCrossCompilation=true \
-    -PmaplibreNativeCInstallDir="$install_root/linux-arm64-egl"
+    -PmaplibreNativeCInstallDir="$install_root/linux-gnu-arm64-egl"
 
   publish_tasks \
     :bindings:kotlin:runtimes:opengl \
@@ -197,7 +205,7 @@ publish_linux_leaves() {
   if [[ "$(uname -s)" == Linux && "$(uname -m)" == aarch64 ]]; then
     ./gradlew \
       -Pkotlin.native.enableKlibsCrossCompilation=true \
-      -PmaplibreNativeCInstallDir="$install_root/linux-arm64-egl" \
+      -PmaplibreNativeCInstallDir="$install_root/linux-gnu-arm64-egl" \
       :bindings:kotlin:linkDebugTestLinuxArm64
   fi
 }
@@ -209,25 +217,27 @@ publish_apple_leaves() {
   # target of a runtime module, not just the publications named on the command
   # line, so each invocation configures install dirs for all of them.
   local opengl=(
+    -Pmaplibre.runtime.opengl.androidNativeArm32.installDir="$install_root/android-arm-egl"
     -Pmaplibre.runtime.opengl.androidNativeArm64.installDir="$install_root/android-arm64-egl"
     -Pmaplibre.runtime.opengl.androidNativeX64.installDir="$install_root/android-x64-egl"
-    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"
-    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
+    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-gnu-arm64-egl"
+    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-gnu-x64-egl"
     -Pmaplibre.runtime.opengl.macosArm64.installDir="$install_root/macos-arm64-egl"
-    -Pmaplibre.runtime.opengl.jvm.natives-linux-x64.installDir="$install_root/linux-x64-egl"
-    -Pmaplibre.runtime.opengl.jvm.natives-linux-arm64.installDir="$install_root/linux-arm64-egl"
+    -Pmaplibre.runtime.opengl.jvm.natives-linux-x64.installDir="$install_root/linux-gnu-x64-egl"
+    -Pmaplibre.runtime.opengl.jvm.natives-linux-arm64.installDir="$install_root/linux-gnu-arm64-egl"
     -Pmaplibre.runtime.opengl.jvm.natives-macos-arm64.installDir="$install_root/macos-arm64-egl"
     -Pmaplibre.runtime.opengl.jvm.natives-windows-x64.installDir="$install_root/windows-x64-wgl"
     -Pmaplibre.runtime.opengl.jvm.natives-windows-arm64.installDir="$install_root/windows-arm64-wgl"
   )
   local vulkan=(
+    -Pmaplibre.runtime.vulkan.androidNativeArm32.installDir="$install_root/android-arm-vulkan"
     -Pmaplibre.runtime.vulkan.androidNativeArm64.installDir="$install_root/android-arm64-vulkan"
     -Pmaplibre.runtime.vulkan.androidNativeX64.installDir="$install_root/android-x64-vulkan"
-    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"
-    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-x64-vulkan"
+    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-gnu-arm64-vulkan"
+    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-gnu-x64-vulkan"
     -Pmaplibre.runtime.vulkan.macosArm64.installDir="$install_root/macos-arm64-vulkan"
-    -Pmaplibre.runtime.vulkan.jvm.natives-linux-x64.installDir="$install_root/linux-x64-vulkan"
-    -Pmaplibre.runtime.vulkan.jvm.natives-linux-arm64.installDir="$install_root/linux-arm64-vulkan"
+    -Pmaplibre.runtime.vulkan.jvm.natives-linux-x64.installDir="$install_root/linux-gnu-x64-vulkan"
+    -Pmaplibre.runtime.vulkan.jvm.natives-linux-arm64.installDir="$install_root/linux-gnu-arm64-vulkan"
     -Pmaplibre.runtime.vulkan.jvm.natives-macos-arm64.installDir="$install_root/macos-arm64-vulkan"
     -Pmaplibre.runtime.vulkan.jvm.natives-windows-x64.installDir="$install_root/windows-x64-vulkan"
     -Pmaplibre.runtime.vulkan.jvm.natives-windows-arm64.installDir="$install_root/windows-arm64-vulkan"
@@ -273,17 +283,19 @@ publish_apple_roots() {
   local repository="$1"
   shift
   local opengl=(
+    -Pmaplibre.runtime.opengl.androidNativeArm32.installDir="$install_root/android-arm-egl"
     -Pmaplibre.runtime.opengl.androidNativeArm64.installDir="$install_root/android-arm64-egl"
     -Pmaplibre.runtime.opengl.androidNativeX64.installDir="$install_root/android-x64-egl"
-    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"
-    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
+    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-gnu-arm64-egl"
+    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-gnu-x64-egl"
     -Pmaplibre.runtime.opengl.macosArm64.installDir="$install_root/macos-arm64-egl"
   )
   local vulkan=(
+    -Pmaplibre.runtime.vulkan.androidNativeArm32.installDir="$install_root/android-arm-vulkan"
     -Pmaplibre.runtime.vulkan.androidNativeArm64.installDir="$install_root/android-arm64-vulkan"
     -Pmaplibre.runtime.vulkan.androidNativeX64.installDir="$install_root/android-x64-vulkan"
-    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"
-    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-x64-vulkan"
+    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-gnu-arm64-vulkan"
+    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-gnu-x64-vulkan"
     -Pmaplibre.runtime.vulkan.macosArm64.installDir="$install_root/macos-arm64-vulkan"
   )
   local metal=(
@@ -409,7 +421,7 @@ case "$operation" in
       :examples:android-map:assembleDebug \
       -Pmaplibre.usePublishedKotlin=true \
       -Pmaplibre.android.backend=opengl \
-      -Pmaplibre.android.abis=arm64-v8a,x86_64 \
+      -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86_64 \
       "${release_version_args[@]}" \
       -Pmaplibre.maven.localRepository="$partition"
     ;;

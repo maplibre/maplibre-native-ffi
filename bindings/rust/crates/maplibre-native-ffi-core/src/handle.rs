@@ -135,10 +135,6 @@ impl<T: NativeHandle> NativeHandleState<T> {
         self.id.set(None);
     }
 
-    pub fn restore_handle_for_retry(&self, handle: T) {
-        self.id.set(NonZeroU64::new(handle.to_raw()));
-    }
-
     pub fn is_closed(&self) -> bool {
         self.id.get().is_none()
     }

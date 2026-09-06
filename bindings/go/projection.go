@@ -171,6 +171,29 @@ func (projection *MapProjectionHandle) LatLngForPixel(point ScreenPoint) (LatLng
 	return goLatLng(coordinate), nil
 }
 
+// LatLngForPixelUnwrapped converts a logical screen point to an unwrapped
+// geographic coordinate. The longitude preserves the visible world copy. The
+// result observes every earlier projection setter.
+func (projection *MapProjectionHandle) LatLngForPixelUnwrapped(point ScreenPoint) (LatLng, error) {
+	ptr, err := projection.ptr()
+	if err != nil {
+		return LatLng{}, err
+	}
+
+	defer projection.state.KeepAlive()
+	var coordinate C.mln_lat_lng
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_projection_lat_lng_for_pixel_unwrapped(
+			C.mln_map_projection(ptr),
+			cScreenPoint(point),
+			&coordinate,
+		))
+	}); err != nil {
+		return LatLng{}, err
+	}
+	return goLatLng(coordinate), nil
+}
+
 // ProjectedMetersForLatLng converts a geographic coordinate to Spherical Mercator projected meters.
 func ProjectedMetersForLatLng(coordinate LatLng) (ProjectedMeters, error) {
 	var meters C.mln_projected_meters

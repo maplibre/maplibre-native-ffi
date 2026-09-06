@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import org.maplibre.nativeffi.error.InvalidArgumentException
 
 class NativeBufferTest {
   // BND-166.
@@ -44,4 +45,9 @@ class NativeBufferTest {
       first[0] = 8
       assertContentEquals(byteArrayOf(1, 2, 3, 4), image.pixels)
     }
+
+  @Test
+  fun premultipliedImageRejectsEmptyPixels() {
+    assertFailsWith<InvalidArgumentException> { PremultipliedRgba8Image(1, 1, 4, byteArrayOf()) }
+  }
 }

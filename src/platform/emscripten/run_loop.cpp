@@ -8,8 +8,8 @@
 #include <mutex>
 #include <stdexcept>
 
-#include <mbgl/actor/scheduler.hpp>
-#include <mbgl/util/run_loop.hpp>
+#include <mln/actor/scheduler.hpp>
+#include <mln/util/run_loop.hpp>
 
 #include "run_loop_wake.hpp"
 

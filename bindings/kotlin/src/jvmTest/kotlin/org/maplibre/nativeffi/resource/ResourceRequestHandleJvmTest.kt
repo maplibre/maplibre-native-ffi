@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.resource
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,6 +14,8 @@ import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC
+import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelRegistry
+import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelSetResult
 import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 
@@ -88,6 +91,58 @@ class ResourceRequestHandleJvmTest {
       assertEquals(1, releases.get())
       assertFailsWith<InvalidStateException> { handle.isCancelled() }
     }
+
+  // BND-198.
+  @Test
+  fun unreachableHandleWithSelfCapturingCancelCallbackReleasesNativeRequest() {
+    val released = CountDownLatch(1)
+
+    registerUnreachableHandleWithSelfCapturingCancelCallback(released)
+
+    assertTrue(awaitRelease(released), "expected unreachable request cleanup to release native")
+  }
+
+  // BND-198.
+  @Test
+  fun providerFailureDropsCancelRouting() {
+    val releases = AtomicInteger(0)
+    val token = AtomicLong(0)
+    val handle =
+      ResourceRequestHandle(
+        SyntheticHandles.resourceRequest(),
+        cancelCallbackSetter = { _, registered ->
+          token.set(registered)
+          ResourceRequestCancelSetResult(MaplibreStatus.OK.nativeCode, false)
+        },
+        releaser = { releases.incrementAndGet() },
+      )
+
+    handle.setCancelCallback {}
+    assertTrue(ResourceRequestCancelRegistry.isRegisteredForTesting(token.get()))
+
+    assertEquals(-1, handle.finishProviderException())
+
+    assertFalse(ResourceRequestCancelRegistry.isRegisteredForTesting(token.get()))
+    assertEquals(0, releases.get())
+  }
+
+  private fun registerUnreachableHandleWithSelfCapturingCancelCallback(released: CountDownLatch) {
+    val handle =
+      ResourceRequestHandle(
+        SyntheticHandles.resourceRequest(),
+        cancelCallbackSetter = { _, _ ->
+          ResourceRequestCancelSetResult(MaplibreStatus.OK.nativeCode, false)
+        },
+        releaser = { released.countDown() },
+      )
+    // A callback that closes its own request is the documented shape, and it must not keep the
+    // handle reachable from the cancel registry.
+    handle.setCancelCallback { handle.close() }
+    assertEquals(
+      ResourceProviderDecision.HANDLE.nativeValue,
+      handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
+    )
+  }
 
   private fun registerUnreachableProviderOwnedHandle(released: CountDownLatch) {
     val handle =

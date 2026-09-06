@@ -27,60 +27,60 @@
 #include <variant>
 #include <vector>
 
-#include <mbgl/actor/actor_ref.hpp>
-#include <mbgl/actor/mailbox.hpp>
-#include <mbgl/actor/scheduler.hpp>
-#include <mbgl/gfx/rendering_stats.hpp>
-#include <mbgl/map/bound_options.hpp>
-#include <mbgl/map/camera.hpp>
-#include <mbgl/map/map.hpp>
-#include <mbgl/map/map_observer.hpp>
-#include <mbgl/map/map_options.hpp>
-#include <mbgl/map/map_projection.hpp>
-#include <mbgl/map/mode.hpp>
-#include <mbgl/map/projection_mode.hpp>
-#include <mbgl/renderer/renderer_frontend.hpp>
-#include <mbgl/renderer/renderer_observer.hpp>
-#include <mbgl/renderer/update_parameters.hpp>
-#include <mbgl/style/conversion.hpp>
-#include <mbgl/style/conversion/geojson_options.hpp>  // IWYU pragma: keep
-#include <mbgl/style/conversion/json.hpp>
-#include <mbgl/style/conversion/layer.hpp>   // IWYU pragma: keep
-#include <mbgl/style/conversion/light.hpp>   // IWYU pragma: keep
-#include <mbgl/style/conversion/source.hpp>  // IWYU pragma: keep
-#include <mbgl/style/conversion_impl.hpp>
-#include <mbgl/style/image.hpp>
-#include <mbgl/style/layer.hpp>
-#include <mbgl/style/layers/color_relief_layer.hpp>
-#include <mbgl/style/layers/hillshade_layer.hpp>
-#include <mbgl/style/layers/location_indicator_layer.hpp>
-#include <mbgl/style/light.hpp>
-#include <mbgl/style/rapidjson_conversion.hpp>
-#include <mbgl/style/source.hpp>
-#include <mbgl/style/sources/custom_geometry_source.hpp>
-#include <mbgl/style/sources/custom_vector_source.hpp>
-#include <mbgl/style/sources/geojson_source.hpp>
-#include <mbgl/style/sources/image_source.hpp>
-#include <mbgl/style/sources/raster_dem_source.hpp>
-#include <mbgl/style/sources/raster_source.hpp>
-#include <mbgl/style/sources/vector_source.hpp>
-#include <mbgl/style/style.hpp>
-#include <mbgl/style/style_property.hpp>
-#include <mbgl/style/transition_options.hpp>
-#include <mbgl/style/types.hpp>
-#include <mbgl/tile/tile_id.hpp>
-#include <mbgl/tile/tile_operation.hpp>
-#include <mbgl/util/chrono.hpp>
-#include <mbgl/util/constants.hpp>
-#include <mbgl/util/feature.hpp>
-#include <mbgl/util/geo.hpp>
-#include <mbgl/util/image.hpp>
-#include <mbgl/util/immutable.hpp>
-#include <mbgl/util/projection.hpp>
-#include <mbgl/util/range.hpp>
-#include <mbgl/util/size.hpp>
-#include <mbgl/util/tileset.hpp>
-#include <mbgl/util/vectors.hpp>
+#include <mln/actor/actor_ref.hpp>
+#include <mln/actor/mailbox.hpp>
+#include <mln/actor/scheduler.hpp>
+#include <mln/gfx/rendering_stats.hpp>
+#include <mln/map/bound_options.hpp>
+#include <mln/map/camera.hpp>
+#include <mln/map/map.hpp>
+#include <mln/map/map_observer.hpp>
+#include <mln/map/map_options.hpp>
+#include <mln/map/map_projection.hpp>
+#include <mln/map/mode.hpp>
+#include <mln/map/projection_mode.hpp>
+#include <mln/renderer/renderer_frontend.hpp>
+#include <mln/renderer/renderer_observer.hpp>
+#include <mln/renderer/update_parameters.hpp>
+#include <mln/style/conversion.hpp>
+#include <mln/style/conversion/geojson_options.hpp>  // IWYU pragma: keep
+#include <mln/style/conversion/json.hpp>
+#include <mln/style/conversion/layer.hpp>   // IWYU pragma: keep
+#include <mln/style/conversion/light.hpp>   // IWYU pragma: keep
+#include <mln/style/conversion/source.hpp>  // IWYU pragma: keep
+#include <mln/style/conversion_impl.hpp>
+#include <mln/style/image.hpp>
+#include <mln/style/layer.hpp>
+#include <mln/style/layers/color_relief_layer.hpp>
+#include <mln/style/layers/hillshade_layer.hpp>
+#include <mln/style/layers/location_indicator_layer.hpp>
+#include <mln/style/light.hpp>
+#include <mln/style/rapidjson_conversion.hpp>
+#include <mln/style/source.hpp>
+#include <mln/style/sources/custom_geometry_source.hpp>
+#include <mln/style/sources/custom_vector_source.hpp>
+#include <mln/style/sources/geojson_source.hpp>
+#include <mln/style/sources/image_source.hpp>
+#include <mln/style/sources/raster_dem_source.hpp>
+#include <mln/style/sources/raster_source.hpp>
+#include <mln/style/sources/vector_source.hpp>
+#include <mln/style/style.hpp>
+#include <mln/style/style_property.hpp>
+#include <mln/style/transition_options.hpp>
+#include <mln/style/types.hpp>
+#include <mln/tile/tile_id.hpp>
+#include <mln/tile/tile_operation.hpp>
+#include <mln/util/chrono.hpp>
+#include <mln/util/constants.hpp>
+#include <mln/util/feature.hpp>
+#include <mln/util/geo.hpp>
+#include <mln/util/image.hpp>
+#include <mln/util/immutable.hpp>
+#include <mln/util/projection.hpp>
+#include <mln/util/range.hpp>
+#include <mln/util/size.hpp>
+#include <mln/util/tileset.hpp>
+#include <mln/util/vectors.hpp>
 
 #include "map/map.hpp"
 
@@ -4103,7 +4103,8 @@ auto map_pixel_for_lat_lng(
 }
 
 auto map_lat_lng_for_pixel(
-  mln_map map, mln_screen_point point, mln_lat_lng* out_coordinate
+  mln_map map, mln_screen_point point, mln_lat_lng* out_coordinate,
+  mln::LatLng::WrapMode wrap_mode
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -4120,7 +4121,7 @@ auto map_lat_lng_for_pixel(
   }
 
   *out_coordinate = from_native_lat_lng(
-    live->map->latLngForPixel(to_native_screen_point(point))
+    live->map->latLngForPixel(to_native_screen_point(point), wrap_mode)
   );
   return MLN_STATUS_OK;
 }
@@ -4163,7 +4164,7 @@ auto map_pixels_for_lat_lngs(
 
 auto map_lat_lngs_for_pixels(
   mln_map map, const mln_screen_point* points, size_t point_count,
-  mln_lat_lng* out_coordinates
+  mln_lat_lng* out_coordinates, mln::LatLng::WrapMode wrap_mode
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -4185,7 +4186,8 @@ auto map_lat_lngs_for_pixels(
   }
 
   const auto native_points = to_native_screen_points(points, point_count);
-  const auto coordinates = live->map->latLngsForPixels(native_points);
+  const auto coordinates =
+    live->map->latLngsForPixels(native_points, wrap_mode);
   auto output = std::span<mln_lat_lng>{out_coordinates, coordinates.size()};
   auto output_position = output.begin();
   for (const auto& coordinate : coordinates) {
@@ -4210,19 +4212,34 @@ auto map_pixel_for_lat_lng_start(
   );
 }
 
-auto map_lat_lng_for_pixel_start(
-  mln_map map, mln_screen_point point, const mln_completion* completion
+auto start_coordinate_for_pixel(
+  mln_map map, mln_screen_point point, bool unwrapped,
+  const mln_completion* completion
 ) -> mln_status {
   if (validate_screen_point(point) != MLN_STATUS_OK) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  const auto wrap_mode =
+    unwrapped ? mln::LatLng::Unwrapped : mln::LatLng::Wrapped;
   return start_geometry_operation(
     map, GeometryOperationKind::CoordinateForPixel,
-    [map, point](GeometryOperationResult& result) {
-      return map_lat_lng_for_pixel(map, point, &result.coordinate);
+    [map, point, wrap_mode](GeometryOperationResult& result) {
+      return map_lat_lng_for_pixel(map, point, &result.coordinate, wrap_mode);
     },
     completion
   );
+}
+
+auto map_lat_lng_for_pixel_start(
+  mln_map map, mln_screen_point point, const mln_completion* completion
+) -> mln_status {
+  return start_coordinate_for_pixel(map, point, false, completion);
+}
+
+auto map_lat_lng_for_pixel_unwrapped_start(
+  mln_map map, mln_screen_point point, const mln_completion* completion
+) -> mln_status {
+  return start_coordinate_for_pixel(map, point, true, completion);
 }
 
 auto map_pixels_for_lat_lngs_start(
@@ -4250,9 +4267,9 @@ auto map_pixels_for_lat_lngs_start(
   );
 }
 
-auto map_lat_lngs_for_pixels_start(
+auto start_coordinates_for_pixels(
   mln_map map, const mln_screen_point* points, size_t point_count,
-  const mln_completion* completion
+  bool unwrapped, const mln_completion* completion
 ) -> mln_status {
   if (validate_screen_point_array(points, point_count) != MLN_STATUS_OK) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -4261,15 +4278,36 @@ auto map_lat_lngs_for_pixels_start(
   if (point_count != 0) {
     copied.assign(points, points + point_count);
   }
+  const auto wrap_mode =
+    unwrapped ? mln::LatLng::Unwrapped : mln::LatLng::Wrapped;
   return start_geometry_operation(
     map, GeometryOperationKind::CoordinatesForPixels,
-    [map, copied = std::move(copied)](GeometryOperationResult& result) {
+    [map, copied = std::move(copied),
+     wrap_mode](GeometryOperationResult& result) {
       result.coordinates.resize(copied.size());
       return map_lat_lngs_for_pixels(
-        map, copied.data(), copied.size(), result.coordinates.data()
+        map, copied.data(), copied.size(), result.coordinates.data(), wrap_mode
       );
     },
     completion
+  );
+}
+
+auto map_lat_lngs_for_pixels_start(
+  mln_map map, const mln_screen_point* points, size_t point_count,
+  const mln_completion* completion
+) -> mln_status {
+  return start_coordinates_for_pixels(
+    map, points, point_count, false, completion
+  );
+}
+
+auto map_lat_lngs_for_pixels_unwrapped_start(
+  mln_map map, const mln_screen_point* points, size_t point_count,
+  const mln_completion* completion
+) -> mln_status {
+  return start_coordinates_for_pixels(
+    map, points, point_count, true, completion
   );
 }
 
@@ -4450,9 +4488,11 @@ auto map_projection_pixel_for_lat_lng(
   );
 }
 
-auto map_projection_lat_lng_for_pixel(
+namespace {
+
+auto projection_lat_lng_for_pixel(
   mln_map_projection projection, mln_screen_point point,
-  mln_lat_lng* out_coordinate
+  mln_lat_lng* out_coordinate, mln::LatLng::WrapMode wrap_mode
 ) -> mln_status {
   if (out_coordinate == nullptr) {
     set_thread_error("out_coordinate must not be null");
@@ -4464,9 +4504,31 @@ auto map_projection_lat_lng_for_pixel(
   }
   const auto native_point = to_native_screen_point(point);
   return with_projection(
-    projection, [&native_point, out_coordinate](mln::MapProjection& value) {
-      *out_coordinate = from_native_lat_lng(value.latLngForPixel(native_point));
+    projection,
+    [&native_point, out_coordinate, wrap_mode](mln::MapProjection& value) {
+      *out_coordinate =
+        from_native_lat_lng(value.latLngForPixel(native_point, wrap_mode));
     }
+  );
+}
+
+}  // namespace
+
+auto map_projection_lat_lng_for_pixel(
+  mln_map_projection projection, mln_screen_point point,
+  mln_lat_lng* out_coordinate
+) -> mln_status {
+  return projection_lat_lng_for_pixel(
+    projection, point, out_coordinate, mln::LatLng::Wrapped
+  );
+}
+
+auto map_projection_lat_lng_for_pixel_unwrapped(
+  mln_map_projection projection, mln_screen_point point,
+  mln_lat_lng* out_coordinate
+) -> mln_status {
+  return projection_lat_lng_for_pixel(
+    projection, point, out_coordinate, mln::LatLng::Unwrapped
   );
 }
 

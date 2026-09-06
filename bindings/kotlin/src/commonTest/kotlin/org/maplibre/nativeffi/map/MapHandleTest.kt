@@ -10,6 +10,8 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.BoundsConstraint
+import org.maplibre.nativeffi.camera.CameraOptions
+import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
@@ -18,6 +20,7 @@ import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.Quaternion
+import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.geo.Vec3
 import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
@@ -290,6 +293,40 @@ class MapHandleTest {
         assertCommandCommitted(runtime, map.removeStyleSource("places").await())
         assertNull(map.styleSourceInfo("places").await())
         assertCommandFailed(map.removeStyleSource("places").await(), MaplibreStatus.NOT_FOUND)
+      } finally {
+        map.close()
+        runtime.close()
+      }
+    }
+
+  @Test
+  fun styleSourceVolatilityCanBeToggled(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val runtime = RuntimeHandle.create(RuntimeOptions())
+      val map =
+        MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+              mapMode = MapMode.STATIC
+            },
+          )
+          .await()
+
+      try {
+        map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
+        map.addStyleSourceJson("places", geoJsonSource()).await()
+
+        assertFalse(assertNotNull(map.styleSourceInfo("places").await()).volatileSource)
+        assertCommandCommitted(runtime, map.setStyleSourceVolatile("places", true).await())
+        assertTrue(assertNotNull(map.styleSourceInfo("places").await()).volatileSource)
+        assertCommandCommitted(runtime, map.setStyleSourceVolatile("places", false).await())
+        assertFalse(assertNotNull(map.styleSourceInfo("places").await()).volatileSource)
+        assertCommandFailed(
+          map.setStyleSourceVolatile("missing", true).await(),
+          MaplibreStatus.NOT_FOUND,
+        )
       } finally {
         map.close()
         runtime.close()
@@ -1043,6 +1080,58 @@ class MapHandleTest {
 
   private fun backgroundLayer(): ByteArray =
     "{\"id\":\"background\",\"type\":\"background\"}".encodeToByteArray()
+
+  // BND-103.
+
+  @Test
+  fun projectionUnwrappedConversionPreservesVisibleWorldCopy(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val runtime = RuntimeHandle.create(RuntimeOptions())
+      val map =
+        MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 1024
+              height = 512
+              scaleFactor = 1.0
+              mapMode = MapMode.STATIC
+            },
+          )
+          .await()
+
+      try {
+        map
+          .updateCamera(
+            CameraUpdate(
+              camera =
+                CameraOptions().apply {
+                  center = LatLng(0.0, 179.0)
+                  zoom = 0.0
+                }
+            )
+          )
+          .await()
+
+        val projection = map.createProjection().await()
+        try {
+          // The right edge of the viewport sits in the next world copy at this camera.
+          val rightEdge = ScreenPoint(1023.0, 256.0)
+          val wrapped = projection.latLngForPixel(rightEdge)
+          val unwrapped = projection.latLngForPixelUnwrapped(rightEdge)
+
+          assertTrue(wrapped.longitude in -180.0..180.0)
+          assertTrue(unwrapped.longitude > 180.0, "the right edge sits in a later world copy")
+          val worldCopies = (unwrapped.longitude - wrapped.longitude) / 360.0
+          assertEquals(kotlin.math.round(worldCopies), worldCopies, 1e-9)
+          assertEquals(wrapped.latitude, unwrapped.latitude, 1e-9)
+        } finally {
+          projection.close()
+        }
+      } finally {
+        map.close()
+        runtime.close()
+      }
+    }
 
   private fun imageCoordinates(): List<LatLng> =
     listOf(LatLng(0.0, 0.0), LatLng(0.0, 1.0), LatLng(1.0, 1.0), LatLng(1.0, 0.0))

@@ -29,6 +29,9 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_map_projection_lat_lng_for_pixel([NativeTypeName("mln_map_projection")] MlnMapProjection projection, mln_screen_point point, mln_lat_lng* out_coordinate);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_projection_lat_lng_for_pixel_unwrapped([NativeTypeName("mln_map_projection")] MlnMapProjection projection, mln_screen_point point, mln_lat_lng* out_coordinate);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_projected_meters_for_lat_lng(mln_lat_lng coordinate, mln_projected_meters* out_meters);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

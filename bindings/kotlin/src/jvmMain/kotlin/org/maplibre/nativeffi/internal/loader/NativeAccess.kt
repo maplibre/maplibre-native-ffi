@@ -131,6 +131,7 @@ import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_frame
 import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_descriptor
 import org.maplibre.nativeffi.internal.c.mln_wake
 import org.maplibre.nativeffi.internal.c.mln_wgl_context_descriptor
+import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelSetResult
 import org.maplibre.nativeffi.internal.lifecycle.NativeGeoJsonSourceData
 import org.maplibre.nativeffi.internal.lifecycle.NativeHandle
 import org.maplibre.nativeffi.internal.lifecycle.NativeMap
@@ -199,6 +200,7 @@ import org.maplibre.nativeffi.render.TextureImageInfo
 import org.maplibre.nativeffi.render.TextureReadback
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
+import org.maplibre.nativeffi.render.VulkanHandle
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureFrame
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
@@ -430,6 +432,19 @@ internal object NativeAccess {
     CompletionBridge.unit { completion ->
       runtimeSetMaximumAmbientCacheSizeStartFunction().invokeNative(runtime, size, completion)
         as Int
+    }
+
+  internal fun setResourceRequestCancelCallback(
+    handle: NativeResourceRequest,
+    callback: MemorySegment,
+    userData: MemorySegment,
+  ): ResourceRequestCancelSetResult =
+    Arena.ofConfined().use { arena ->
+      val outCancelled = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      val status =
+        resourceRequestSetCancelCallbackFunction()
+          .invokeNative(handle, callback, userData, outCancelled) as Int
+      ResourceRequestCancelSetResult(status, outCancelled.get(ValueLayout.JAVA_BOOLEAN, 0))
     }
 
   internal fun createOfflineRegion(
@@ -701,6 +716,19 @@ internal object NativeAccess {
         },
       )
     }
+
+  internal fun setStyleSourceVolatile(
+    map: NativeMap,
+    sourceId: String,
+    isVolatile: Boolean,
+  ): Deferred<CommandCompletion> = command { completion ->
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewBooleanStatusFunction("mln_map_set_style_source_volatile")
+          .invokeNative(map, stringView(arena, sourceId), isVolatile, completion) as Int
+      )
+    }
+  }
 
   internal fun styleSourceIds(map: NativeMap): Deferred<List<String>> =
     CompletionBridge.submit(
@@ -2441,8 +2469,8 @@ internal object NativeAccess {
       mln_vulkan_owned_texture_frame.height(segment),
       mln_vulkan_owned_texture_frame.scale_factor(segment),
       mln_vulkan_owned_texture_frame.frame_id(segment),
-      scopedPointer(mln_vulkan_owned_texture_frame.image(segment), scope),
-      scopedPointer(mln_vulkan_owned_texture_frame.image_view(segment), scope),
+      VulkanHandle.scoped(mln_vulkan_owned_texture_frame.image(segment), scope),
+      VulkanHandle.scoped(mln_vulkan_owned_texture_frame.image_view(segment), scope),
       scopedPointer(mln_vulkan_owned_texture_frame.device(segment), scope),
       mln_vulkan_owned_texture_frame.format(segment),
       mln_vulkan_owned_texture_frame.layout(segment),
@@ -2556,6 +2584,22 @@ internal object NativeAccess {
       val outCoordinate = arena.allocate(latLngLayout)
       Status.check(
         MapLibreNativeC.mln_map_projection_lat_lng_for_pixel(
+          projection.raw,
+          screenPoint(point, arena),
+          outCoordinate,
+        )
+      )
+      latLng(outCoordinate)
+    }
+
+  internal fun projectionLatLngForPixelUnwrapped(
+    projection: NativeMapProjection,
+    point: ScreenPoint,
+  ): LatLng =
+    Arena.ofConfined().use { arena ->
+      val outCoordinate = arena.allocate(latLngLayout)
+      Status.check(
+        MapLibreNativeC.mln_map_projection_lat_lng_for_pixel_unwrapped(
           projection.raw,
           screenPoint(point, arena),
           outCoordinate,
@@ -2823,11 +2867,8 @@ internal object NativeAccess {
       mln_vulkan_borrowed_texture_descriptor.physical_width(segment, descriptor.physicalWidth)
       mln_vulkan_borrowed_texture_descriptor.physical_height(segment, descriptor.physicalHeight)
       fillVulkanContext(mln_vulkan_borrowed_texture_descriptor.context(segment), descriptor.context)
-      mln_vulkan_borrowed_texture_descriptor.image(segment, nativePointer(descriptor.image))
-      mln_vulkan_borrowed_texture_descriptor.image_view(
-        segment,
-        nativePointer(descriptor.imageView),
-      )
+      mln_vulkan_borrowed_texture_descriptor.image(segment, descriptor.image.bits)
+      mln_vulkan_borrowed_texture_descriptor.image_view(segment, descriptor.imageView.bits)
       mln_vulkan_borrowed_texture_descriptor.format(segment, descriptor.format)
       mln_vulkan_borrowed_texture_descriptor.initial_layout(segment, descriptor.initialLayout)
       descriptor.finalLayout?.let {
@@ -2876,7 +2917,7 @@ internal object NativeAccess {
     MapLibreNativeC.mln_vulkan_surface_descriptor_default(arena).also { segment ->
       fillRenderTargetExtent(mln_vulkan_surface_descriptor.extent(segment), descriptor.extent)
       fillVulkanContext(mln_vulkan_surface_descriptor.context(segment), descriptor.context)
-      mln_vulkan_surface_descriptor.surface(segment, nativePointer(descriptor.surface))
+      mln_vulkan_surface_descriptor.surface(segment, descriptor.surface.bits)
     }
   }
 
@@ -3271,6 +3312,9 @@ internal object NativeAccess {
 
   private fun resourceRequestCancelledFunction(): MethodHandle =
     downcall("mln_resource_request_cancelled")
+
+  private fun resourceRequestSetCancelCallbackFunction(): MethodHandle =
+    downcall("mln_resource_request_set_cancel_callback")
 
   private fun resourceRequestReleaseFunction(): MethodHandle =
     downcall("mln_resource_request_release")
@@ -3978,7 +4022,7 @@ internal object NativeAccess {
   }
 
   private fun premultipliedRgba8Image(arena: Arena, value: PremultipliedRgba8Image): MemorySegment {
-    val pixels = value.pixels
+    val pixels = value.pixelsTransit
     val segment = MapLibreNativeC.mln_premultiplied_rgba8_image_default(arena)
     mln_premultiplied_rgba8_image.width(segment, value.width)
     mln_premultiplied_rgba8_image.height(segment, value.height)
@@ -6009,8 +6053,8 @@ internal object NativeAccess {
           mln_render_target_extent.width(extent),
           mln_render_target_extent.height(extent),
           mln_render_target_extent.scale_factor(extent),
-          mln_vulkan_borrowed_texture_descriptor.image(native).address(),
-          mln_vulkan_borrowed_texture_descriptor.image_view(native).address(),
+          mln_vulkan_borrowed_texture_descriptor.image(native),
+          mln_vulkan_borrowed_texture_descriptor.image_view(native),
           mln_vulkan_borrowed_texture_descriptor.final_layout(native),
         )
       }

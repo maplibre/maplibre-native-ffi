@@ -12,9 +12,7 @@ raw.mln_premultiplied_rgba8_image _premultipliedRgba8ImageToNative(
   result.byte_length = bytes.length;
   if (bytes.isNotEmpty) {
     final nativeBytes = allocator<Uint8>(bytes.length);
-    for (var index = 0; index < bytes.length; index += 1) {
-      nativeBytes[index] = bytes[index];
-    }
+    nativeBytes.asTypedList(bytes.length).setAll(0, bytes);
     result.pixels = nativeBytes;
   }
   return result;
@@ -988,7 +986,7 @@ raw.mln_vulkan_surface_descriptor _vulkanSurfaceDescriptorToNative(
   final result = raw.mln_vulkan_surface_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
   result.context = _vulkanContextDescriptorToNative(value.context);
-  result.surface = Pointer<Void>.fromAddress(value.surface.address);
+  result.surface = uint64ToNative(value.surface.bits, 'Vulkan surface');
   return result;
 }
 
@@ -1052,8 +1050,8 @@ _vulkanBorrowedTextureDescriptorToNative(
     'physical image height',
   );
   result.context = _vulkanContextDescriptorToNative(value.context);
-  result.image = Pointer<Void>.fromAddress(value.image.address);
-  result.image_view = Pointer<Void>.fromAddress(value.imageView.address);
+  result.image = uint64ToNative(value.image.bits, 'Vulkan image');
+  result.image_view = uint64ToNative(value.imageView.bits, 'Vulkan image view');
   result.format = value.format;
   result.initial_layout = value.initialLayout;
   result.final_layout = value.finalLayout;

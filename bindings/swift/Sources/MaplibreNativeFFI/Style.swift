@@ -654,6 +654,17 @@ public extension MapHandle {
     )
   }
 
+  /// Sets whether a style source stores fetched tiles in persistent storage.
+  @discardableResult
+  func setStyleSourceVolatile(
+    sourceId: String,
+    isVolatile: Bool
+  ) async throws -> CommandCompletion {
+    try await styleCommand {
+      mln_map_set_style_source_volatile($0, $1.view(sourceId), isVolatile, $2)
+    }
+  }
+
   func styleSourceTileURLs(_ sourceId: String) async throws -> [String]? {
     guard let info = try await styleSourceInfo(sourceId) else { return nil }
     return info.tileJSON?.tileURLs

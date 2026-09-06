@@ -3,9 +3,9 @@
 #include <memory>
 #include <optional>
 
-#include <mbgl/style/sources/geojson_source.hpp>
-#include <mbgl/util/geojson.hpp>
-#include <mbgl/util/immutable.hpp>
+#include <mln/style/sources/geojson_source.hpp>
+#include <mln/util/geojson.hpp>
+#include <mln/util/immutable.hpp>
 
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c/base.h"

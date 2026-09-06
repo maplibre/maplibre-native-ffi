@@ -48,51 +48,51 @@ endfunction()
 
 function(mln_ffi_configure_platform_support target)
   set(MLN_FFI_VENDOR_PLATFORM_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/monotonic_timer.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/gfx/headless_backend.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/layermanager/layer_manager.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/database_file_source.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/file_source_request.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/local_file_request.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/local_file_source.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/main_resource_loader.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/mbtiles_file_source.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/offline.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/offline_database.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/offline_download.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/online_file_source.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/sqlite3.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/platform/time.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/compression.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/filesystem.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/utf.cpp)
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/monotonic_timer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/gfx/headless_backend.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/layermanager/layer_manager.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/database_file_source.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/file_source_request.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/local_file_request.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/local_file_source.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/main_resource_loader.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/mbtiles_file_source.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/offline.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/offline_database.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/offline_download.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/online_file_source.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/sqlite3.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/platform/time.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/compression.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/filesystem.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/utf.cpp)
 
   get_target_property(
     MLN_FFI_DEFAULT_LOGGING_STDERR mln_ffi_platform_dependencies
     MLN_FFI_DEFAULT_LOGGING_STDERR)
   if(MLN_FFI_DEFAULT_LOGGING_STDERR)
     list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
-         ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/logging_stderr.cpp)
+         ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/logging_stderr.cpp)
   endif()
 
   get_target_property(MLN_FFI_DEFAULT_THREAD_LOCAL mln_ffi_platform_dependencies
                       MLN_FFI_DEFAULT_THREAD_LOCAL)
   if(MLN_FFI_DEFAULT_THREAD_LOCAL)
     list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
-         ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/thread_local.cpp)
+         ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/thread_local.cpp)
   endif()
 
   if(NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
     list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
-         ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/asset_file_source.cpp)
+         ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/asset_file_source.cpp)
   endif()
 
   if(MLN_WITH_PMTILES)
     list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
-         ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/pmtiles_file_source.cpp)
+         ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/pmtiles_file_source.cpp)
   else()
     list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
-         ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/pmtiles_file_source_stub.cpp)
+         ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/pmtiles_file_source_stub.cpp)
   endif()
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_PLATFORM_SOURCES})

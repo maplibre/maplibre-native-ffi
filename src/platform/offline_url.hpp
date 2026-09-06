@@ -6,8 +6,8 @@
 
 #include <string>
 
-#include <mbgl/storage/resource.hpp>
-#include <mbgl/util/url.hpp>
+#include <mln/storage/resource.hpp>
+#include <mln/util/url.hpp>
 
 namespace mln::platform {
 

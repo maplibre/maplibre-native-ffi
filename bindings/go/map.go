@@ -606,10 +606,22 @@ func (m *MapHandle) PixelForLatLng(coordinate LatLng) (*Future[ScreenPoint], err
 }
 
 // LatLngForPixel converts a logical screen point to a geographic coordinate for
-// the current map.
+// the current map. The longitude is wrapped to the range from -180 to 180
+// degrees.
 func (m *MapHandle) LatLngForPixel(point ScreenPoint) (*Future[LatLng], error) {
 	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
 		return int32(C.mln_map_lat_lng_for_pixel(raw, cScreenPoint(point), completion))
+	}, func(result *C.mln_completion_result) (LatLng, error) {
+		value, err := completionValue[C.mln_lat_lng](result)
+		return goLatLng(value), err
+	})
+}
+
+// LatLngForPixelUnwrapped converts a logical screen point to an unwrapped
+// geographic coordinate. The longitude preserves the visible world copy.
+func (m *MapHandle) LatLngForPixelUnwrapped(point ScreenPoint) (*Future[LatLng], error) {
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_lat_lng_for_pixel_unwrapped(raw, cScreenPoint(point), completion))
 	}, func(result *C.mln_completion_result) (LatLng, error) {
 		value, err := completionValue[C.mln_lat_lng](result)
 		return goLatLng(value), err
@@ -635,7 +647,8 @@ func (m *MapHandle) PixelsForLatLngs(coordinates []LatLng) (*Future[[]ScreenPoin
 }
 
 // LatLngsForPixels converts logical screen points to geographic coordinates for
-// the current map.
+// the current map. Each longitude is wrapped to the range from -180 to 180
+// degrees.
 func (m *MapHandle) LatLngsForPixels(points []ScreenPoint) (*Future[[]LatLng], error) {
 	rawPoints := cScreenPointSlice(points)
 	var rawPointsPtr *C.mln_screen_point
@@ -644,6 +657,24 @@ func (m *MapHandle) LatLngsForPixels(points []ScreenPoint) (*Future[[]LatLng], e
 	}
 	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
 		return int32(C.mln_map_lat_lngs_for_pixels(
+			raw, rawPointsPtr, C.size_t(len(points)), completion,
+		))
+	}, func(result *C.mln_completion_result) ([]LatLng, error) {
+		values, err := completionSlice[C.mln_lat_lng](result)
+		return goLatLngSlice(values), err
+	})
+}
+
+// LatLngsForPixelsUnwrapped converts logical screen points to unwrapped
+// geographic coordinates. Each longitude preserves its visible world copy.
+func (m *MapHandle) LatLngsForPixelsUnwrapped(points []ScreenPoint) (*Future[[]LatLng], error) {
+	rawPoints := cScreenPointSlice(points)
+	var rawPointsPtr *C.mln_screen_point
+	if len(points) > 0 {
+		rawPointsPtr = &rawPoints[0]
+	}
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_lat_lngs_for_pixels_unwrapped(
 			raw, rawPointsPtr, C.size_t(len(points)), completion,
 		))
 	}, func(result *C.mln_completion_result) ([]LatLng, error) {

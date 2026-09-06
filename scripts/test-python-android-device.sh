@@ -41,6 +41,13 @@ if [[ ! -d "$native_install_dir" ]]; then
 fi
 
 mise run //:android-sdk-packages
+if [[ "$preset" == android-x64-egl ]]; then
+  # CPython 3.14's x86_64 Android runtime uses the legacy open syscall during
+  # mimalloc initialization. API 26 rejects that syscall before Python can
+  # load the wheel, so replace the Goldfish regression device with the default
+  # emulator used by this binding's suite.
+  mise run //:android-emulator:stop
+fi
 mise run //:android-emulator:boot "$abi"
 
 # cibuildwheel pins its own NDK and removes other NDK versions from the SDK it
@@ -78,7 +85,14 @@ export CIBW_TEST_RUNTIME='args: --connected emulator-5554'
 export CIBW_TEST_SOURCES_ANDROID=tests
 
 cd "$MISE_MONOREPO_ROOT/bindings/python"
-exec uv run --project . --group android --no-sync \
+python_test_status=0
+uv run --project . --group android --no-sync \
   cibuildwheel --platform android \
   --output-dir "$MISE_MONOREPO_ROOT/build/android-emulator/$preset/python/wheelhouse" \
-  .
+  . || python_test_status=$?
+if ((python_test_status == 0)); then
+  exit 0
+fi
+
+"$shared_android_home/platform-tools/adb" -s emulator-5554 logcat -d -b crash >&2 || true
+exit "$python_test_status"

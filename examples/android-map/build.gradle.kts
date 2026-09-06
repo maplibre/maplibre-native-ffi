@@ -10,7 +10,10 @@ val androidBackend =
   )
 val androidTargets =
   AndroidTarget.parseAbis(
-    providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
+    providers
+      .gradleProperty("maplibre.android.abis")
+      .getOrElse(AndroidTarget.defaultAbis(androidBackend)),
+    androidBackend,
   )
 val androidCmakeVersion = requiredEnvironmentVariable("MLN_FFI_ANDROID_CMAKE_VERSION")
 val androidNdkVersion = requiredEnvironmentVariable("MLN_FFI_ANDROID_NDK_VERSION")
@@ -43,6 +46,18 @@ android {
     }
 
     buildConfigField("String", "RENDER_BACKEND", "\"$androidBackend\"")
+  }
+
+  // CI assembles this variant so R8 runs over the binding and its consumer keep
+  // rules on every change. Signing with the debug key keeps the APK installable
+  // without carrying a release keystore.
+  buildTypes {
+    release {
+      isMinifyEnabled = true
+      isShrinkResources = true
+      signingConfig = signingConfigs.getByName("debug")
+      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+    }
   }
 
   buildFeatures { buildConfig = true }

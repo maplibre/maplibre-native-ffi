@@ -103,8 +103,8 @@ def _descriptor_snapshot(
         context.graphics_queue_family_index,
         context.get_instance_proc_addr.address,
         context.get_device_proc_addr.address,
-        descriptor.image.address,
-        descriptor.image_view.address,
+        descriptor.image.bits,
+        descriptor.image_view.bits,
         descriptor.format,
         descriptor.initial_layout,
         descriptor.final_layout,
@@ -256,7 +256,7 @@ def test_vulkan_borrowed_texture_set_target_hands_over_a_replacement() -> None:
                                 render.VulkanSurfaceDescriptor(
                                     extent=replacement_descriptor.extent,
                                     context=context.descriptor(),
-                                    surface=render.NativePointer(0x1),
+                                    surface=render.VulkanHandle(0x1),
                                 )
                             ),
                         )

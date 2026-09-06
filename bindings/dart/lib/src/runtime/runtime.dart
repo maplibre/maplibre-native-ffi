@@ -2281,15 +2281,35 @@ final class MapHandle {
   );
 
   /// Converts a screen point after prior commands.
-  Future<LatLng> latLngForPixel(ScreenPoint point) => _startMapValue(
+  ///
+  /// The longitude wraps to the range from -180 to 180 degrees.
+  Future<LatLng> latLngForPixel(ScreenPoint point) =>
+      _latLngForPixel(point, unwrapped: false);
+
+  /// Converts a screen point after prior commands without wrapping longitude.
+  ///
+  /// The longitude preserves the visible world copy and may fall outside
+  /// -180 to 180.
+  Future<LatLng> latLngForPixelUnwrapped(ScreenPoint point) =>
+      _latLngForPixel(point, unwrapped: true);
+
+  Future<LatLng> _latLngForPixel(
+    ScreenPoint point, {
+    required bool unwrapped,
+  }) => _startMapValue(
     copyKind:
         raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
     elementSize: sizeOf<raw.mln_lat_lng>(),
-    start: (completion) => raw.mln_map_lat_lng_for_pixel(
-      _handle.raw,
-      native_struct.screenPointToNative(point),
-      completion,
-    ),
+    start: (completion) {
+      final nativePoint = native_struct.screenPointToNative(point);
+      return unwrapped
+          ? raw.mln_map_lat_lng_for_pixel_unwrapped(
+              _handle.raw,
+              nativePoint,
+              completion,
+            )
+          : raw.mln_map_lat_lng_for_pixel(_handle.raw, nativePoint, completion);
+    },
     decode: (result) => native_struct.latLngFromNative(
       result.value.cast<raw.mln_lat_lng>().ref,
     ),
@@ -2311,9 +2331,22 @@ final class MapHandle {
       );
 
   /// Converts screen points after prior commands.
-  Future<List<LatLng>> latLngsForPixels(
-    List<ScreenPoint> points,
-  ) => _coordinateListQuery<LatLng>(
+  ///
+  /// Longitudes wrap to the range from -180 to 180 degrees.
+  Future<List<LatLng>> latLngsForPixels(List<ScreenPoint> points) =>
+      _latLngsForPixels(points, unwrapped: false);
+
+  /// Converts screen points after prior commands without wrapping longitudes.
+  ///
+  /// Each longitude preserves its visible world copy and may fall outside
+  /// -180 to 180.
+  Future<List<LatLng>> latLngsForPixelsUnwrapped(List<ScreenPoint> points) =>
+      _latLngsForPixels(points, unwrapped: true);
+
+  Future<List<LatLng>> _latLngsForPixels(
+    List<ScreenPoint> points, {
+    required bool unwrapped,
+  }) => _coordinateListQuery<LatLng>(
     sizeOf<raw.mln_lat_lng>(),
     (arena, completion) {
       // Keep argument storage alive until native copies it below.
@@ -2323,12 +2356,19 @@ final class MapHandle {
       for (var index = 0; index < points.length; index += 1) {
         nativePoints[index] = native_struct.screenPointToNative(points[index]);
       }
-      return raw.mln_map_lat_lngs_for_pixels(
-        _handle.raw,
-        nativePoints,
-        points.length,
-        completion,
-      );
+      return unwrapped
+          ? raw.mln_map_lat_lngs_for_pixels_unwrapped(
+              _handle.raw,
+              nativePoints,
+              points.length,
+              completion,
+            )
+          : raw.mln_map_lat_lngs_for_pixels(
+              _handle.raw,
+              nativePoints,
+              points.length,
+              completion,
+            );
     },
     (values, index) =>
         native_struct.latLngFromNative(values.cast<raw.mln_lat_lng>()[index]),
@@ -3062,6 +3102,31 @@ final class MapHandle {
           _handle.raw,
           nativeId.value,
           _canonicalTileIdToNative(tileId),
+          completion,
+        ),
+      );
+    });
+  }
+
+  /// Sets whether one style source stores fetched tiles in the persistent
+  /// cache.
+  ///
+  /// When [isVolatile] is true, source implementations that fetch tiles stop
+  /// storing them in persistent storage, and other source types keep the value
+  /// for inspection. [getStyleSourceInfo] reports the committed value as
+  /// [SourceInfo.isVolatile]. The command fails with
+  /// [MaplibreStatus.notFound] when no style source has [sourceId].
+  Future<CommandCompletion> setStyleSourceVolatile(
+    String sourceId,
+    bool isVolatile,
+  ) {
+    return _startCommandInArena((arena, completion) {
+      final nativeId = nativeStringView(sourceId, arena);
+      _check(
+        raw.mln_map_set_style_source_volatile(
+          _handle.raw,
+          nativeId.value,
+          isVolatile,
           completion,
         ),
       );

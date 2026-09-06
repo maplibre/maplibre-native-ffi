@@ -2,8 +2,23 @@ package maplibre
 
 import (
 	"errors"
+	stdruntime "runtime"
 	"testing"
+	"unsafe"
 )
+
+func TestStyleImageBorrowsPixelsAcrossGC(t *testing.T) {
+	pixels := []byte{1, 2, 3, 4}
+	image := newCPremultipliedRGBA8Image(PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4, Pixels: pixels})
+	defer image.free()
+	stdruntime.GC()
+	if unsafe.Pointer(image.raw.pixels) != unsafe.Pointer(&pixels[0]) {
+		t.Fatal("native image does not borrow the backing pixels")
+	}
+	if got := unsafe.Slice((*byte)(unsafe.Pointer(image.raw.pixels)), 4); got[0] != 1 || got[3] != 4 {
+		t.Fatalf("borrowed pixels after GC = %v", got)
+	}
+}
 
 func TestNinePatchStyleImageRoundTripsStretchContentAndTextFit(t *testing.T) {
 	runtime, err := NewRuntime()

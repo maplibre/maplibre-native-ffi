@@ -66,6 +66,18 @@ auto mln_resource_request_cancelled(
   });
 }
 
+auto mln_resource_request_set_cancel_callback(
+  mln_resource_request_handle handle,
+  mln_resource_request_cancel_callback callback, void* user_data,
+  bool* out_cancelled
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::set_resource_request_cancel_callback(
+      handle, callback, user_data, out_cancelled
+    );
+  });
+}
+
 auto mln_resource_request_wait_until_retired(
   mln_resource_request_handle handle
 ) noexcept -> mln_status {
@@ -200,6 +212,18 @@ auto mln_runtime_offline_regions_merge_database(
   const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
+    // Opening the side database blocks, so it happens here rather than on the
+    // executor, which also keeps the diagnostic on the calling thread.
+    mln::core::RuntimeObject* live = nullptr;
+    const auto runtime_status = mln::core::validate_runtime(runtime, live);
+    if (runtime_status != MLN_STATUS_OK) {
+      return runtime_status;
+    }
+    const auto path_status =
+      mln::core::validate_offline_side_database_path(side_database_path);
+    if (path_status != MLN_STATUS_OK) {
+      return path_status;
+    }
     return mln::core::dispatch_runtime_sync(runtime, [&]() -> mln_status {
       return mln::core::offline_regions_merge_database_start(
         runtime, side_database_path, completion

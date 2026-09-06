@@ -7,6 +7,7 @@ package maplibre
 import "C"
 
 import (
+	"runtime"
 	"unsafe"
 
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
@@ -812,26 +813,26 @@ type StyleImage struct {
 }
 
 type cPremultipliedRGBA8Image struct {
-	raw        C.mln_premultiplied_rgba8_image
-	allocation unsafe.Pointer
+	raw    C.mln_premultiplied_rgba8_image
+	pinner runtime.Pinner
 }
 
-func newCPremultipliedRGBA8Image(image PremultipliedRGBA8Image) cPremultipliedRGBA8Image {
-	raw := C.mln_premultiplied_rgba8_image_default()
-	raw.width = C.uint32_t(image.Width)
-	raw.height = C.uint32_t(image.Height)
-	raw.stride = C.uint32_t(image.Stride)
-	var allocation unsafe.Pointer
+func newCPremultipliedRGBA8Image(image PremultipliedRGBA8Image) *cPremultipliedRGBA8Image {
+	result := &cPremultipliedRGBA8Image{raw: C.mln_premultiplied_rgba8_image_default()}
+	result.raw.width = C.uint32_t(image.Width)
+	result.raw.height = C.uint32_t(image.Height)
+	result.raw.stride = C.uint32_t(image.Stride)
 	if len(image.Pixels) > 0 {
-		allocation = C.CBytes(image.Pixels)
-		raw.pixels = (*C.uint8_t)(allocation)
+		// The descriptor contains a Go pointer, so pin its backing array until C returns.
+		result.pinner.Pin(&image.Pixels[0])
+		result.raw.pixels = (*C.uint8_t)(unsafe.Pointer(&image.Pixels[0]))
 	}
-	raw.byte_length = C.size_t(len(image.Pixels))
-	return cPremultipliedRGBA8Image{raw: raw, allocation: allocation}
+	result.raw.byte_length = C.size_t(len(image.Pixels))
+	return result
 }
 
-func (image cPremultipliedRGBA8Image) free() {
-	C.free(image.allocation)
+func (image *cPremultipliedRGBA8Image) free() {
+	image.pinner.Unpin()
 }
 
 func styleImageInfoFromC(info C.mln_style_image_info) StyleImageInfo {
@@ -1035,6 +1036,25 @@ func (m *MapHandle) SetGeoJSONSourceSynchronousTiling(sourceID string, enabled b
 	defer sourceView.free()
 	return startCompletion(func(completion *C.mln_completion) int32 {
 		return int32(C.mln_map_set_geojson_source_synchronous_tiling(C.mln_map(ptr), sourceView.raw(), C.bool(enabled), completion))
+	}, completionCommand)
+}
+
+// SetStyleSourceVolatile submits a command that sets whether one style source
+// stores fetched tiles in persistent cache. The change is visible through
+// StyleSourceInfo's IsVolatile field. The command fails with ErrNotFound
+// reported through its terminal event's Err payload field when no source with
+// the ID exists.
+func (m *MapHandle) SetStyleSourceVolatile(sourceID string, isVolatile bool) (*Future[CommandCompletion], error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+
+	defer m.state.KeepAlive()
+	sourceView := newCStringView(sourceID)
+	defer sourceView.free()
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_style_source_volatile(C.mln_map(ptr), sourceView.raw(), C.bool(isVolatile), completion))
 	}, completionCommand)
 }
 
@@ -1487,13 +1507,6 @@ func (m *MapHandle) RemoveStyleSource(sourceID string) (*Future[CommandCompletio
 		return int32(C.mln_map_remove_style_source(C.mln_map(ptr), sourceView.raw(), completion))
 	}, completionCommand)
 }
-
-// StyleSourceInfo returns copied source metadata and whether the source exists.
-
-// StyleSourceAttribution returns copied source attribution and whether the
-// source exists.
-
-// StyleSourceIDs returns copied source IDs in style order.
 
 func styleIDListStrings(list C.mln_style_id_list) ([]string, error) {
 	defer C.mln_style_id_list_destroy(list)

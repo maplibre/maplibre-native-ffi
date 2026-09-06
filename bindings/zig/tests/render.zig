@@ -129,6 +129,26 @@ fn fakeVulkanContext() maplibre.VulkanContextDescriptor {
     };
 }
 
+fn vulkanHandleToBinding(handle: anytype) maplibre.VulkanHandle {
+    const Handle = @TypeOf(handle);
+    const bits: u64 = switch (@typeInfo(Handle)) {
+        .optional => if (handle) |value| @intFromPtr(value) else 0,
+        .pointer => @intFromPtr(handle),
+        .int => @intCast(handle),
+        .@"enum" => @intCast(@intFromEnum(handle)),
+        else => @compileError("unsupported Vulkan handle representation"),
+    };
+    return maplibre.VulkanHandle.fromBits(bits);
+}
+
+fn nullVulkanHandle(comptime Handle: type) Handle {
+    return std.mem.zeroes(Handle);
+}
+
+fn isNullVulkanHandle(handle: anytype) bool {
+    return std.meta.eql(handle, nullVulkanHandle(@TypeOf(handle)));
+}
+
 const supports_test_owned_texture = build_options.supports_metal or build_options.supports_vulkan or build_options.supports_opengl;
 
 const TestOwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachContext else if (supports_wgl) WglAttachContext else if (supports_egl) EglAttachContext else if (build_options.supports_metal) struct {
@@ -884,13 +904,13 @@ const VulkanBorrowedImage = if (build_options.supports_vulkan) struct {
     }
 
     fn allocate(context: *const VulkanAttachContext, width: u32, height: u32) !Allocation {
-        var image: vk.VkImage = null;
-        var memory: vk.VkDeviceMemory = null;
-        var image_view: vk.VkImageView = null;
+        var image = nullVulkanHandle(vk.VkImage);
+        var memory = nullVulkanHandle(vk.VkDeviceMemory);
+        var image_view = nullVulkanHandle(vk.VkImageView);
         errdefer {
-            if (image_view != null) context.dispatch.destroy_image_view.?(context.device, image_view, null);
-            if (image != null) context.dispatch.destroy_image.?(context.device, image, null);
-            if (memory != null) context.dispatch.free_memory.?(context.device, memory, null);
+            if (!isNullVulkanHandle(image_view)) context.dispatch.destroy_image_view.?(context.device, image_view, null);
+            if (!isNullVulkanHandle(image)) context.dispatch.destroy_image.?(context.device, image, null);
+            if (!isNullVulkanHandle(memory)) context.dispatch.free_memory.?(context.device, memory, null);
         }
 
         var image_info = std.mem.zeroes(vk.VkImageCreateInfo);
@@ -973,8 +993,8 @@ const VulkanBorrowedImage = if (build_options.supports_vulkan) struct {
             .physical_width = width,
             .physical_height = height,
             .context = self.context.descriptor(),
-            .image = maplibre.NativePointer.fromPtr(@ptrCast(allocation.image.?)),
-            .image_view = maplibre.NativePointer.fromPtr(@ptrCast(allocation.image_view.?)),
+            .image = vulkanHandleToBinding(allocation.image),
+            .image_view = vulkanHandleToBinding(allocation.image_view),
             .format = @as(u32, vk.VK_FORMAT_R8G8B8A8_UNORM),
             .initial_layout = @as(u32, vk.VK_IMAGE_LAYOUT_UNDEFINED),
             .final_layout = @as(u32, vk.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
@@ -1065,7 +1085,9 @@ fn expectOwnedFrameExtent(
         try testing.expectEqual(extent.width, info.width);
         try testing.expectEqual(extent.height, info.height);
         try testing.expectEqual(extent.scale_factor, info.scale_factor);
-        try testing.expect(@intFromEnum(info.image) != 0);
+        try testing.expect(info.image.bits() != 0);
+        // The image is a Vulkan non-dispatchable handle, not the device pointer.
+        try testing.expect(info.image.bits() != @intFromPtr(info.device.toPtr()));
     } else if (build_options.supports_opengl) {
         const info = try frame.openGLTexture();
         try testing.expectEqual(extent.width, info.width);

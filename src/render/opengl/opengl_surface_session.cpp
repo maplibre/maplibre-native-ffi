@@ -5,12 +5,12 @@
 #include <string>
 #include <utility>
 
-#include <mbgl/gfx/backend_scope.hpp>
-#include <mbgl/gfx/renderable.hpp>
-#include <mbgl/gl/context.hpp>
-#include <mbgl/gl/renderable_resource.hpp>
-#include <mbgl/gl/renderer_backend.hpp>
-#include <mbgl/util/size.hpp>
+#include <mln/gfx/backend_scope.hpp>
+#include <mln/gfx/renderable.hpp>
+#include <mln/gl/context.hpp>
+#include <mln/gl/renderable_resource.hpp>
+#include <mln/gl/renderer_backend.hpp>
+#include <mln/util/size.hpp>
 
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
 #ifndef WIN32_LEAN_AND_MEAN

@@ -15,16 +15,23 @@ const LIBRARY_NAME: &str = "maplibre-native-c";
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-env-changed=MAPLIBRE_NATIVE_C_INSTALL_DIR");
+    println!("cargo:rerun-if-env-changed=MAPLIBRE_NATIVE_C_TEST_SNAPSHOT_BASE_URL");
     println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_OS");
     let install_dir = native_install_dir()?;
     let include_dir = install_dir.join("include");
     let link_dir = native_library_dir(&install_dir);
     let target_os = env::var("CARGO_CFG_TARGET_OS")?;
+    let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    let out_path = PathBuf::from(env::var("OUT_DIR")?);
     let header = include_dir.join("maplibre_native_c.h");
 
     require_dir(&include_dir, "native include directory")?;
     require_dir(&link_dir, "native link directory")?;
 
+    if target_env == "musl" {
+        let aliases = musl_aliases(&out_path)?;
+        println!("cargo:rustc-link-search=native={}", aliases.display());
+    }
     println!("cargo:rustc-link-search=native={}", link_dir.display());
     print_rerun_if_changed(&link_dir);
     let descriptor_path = install_dir.join("share/maplibre-native-c/artifact.json");
@@ -39,6 +46,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         // The archive merges in every dependency it can. What is left is the
         // platform and render backend's system libraries, which CMake records.
         for library in descriptor.static_link_libraries() {
+            // Rust's self-contained musl sysroot includes these interfaces in
+            // libc and provides no separate alias archives for them.
+            if target_env == "musl" && matches!(library.as_str(), "m" | "dl" | "pthread" | "rt") {
+                continue;
+            }
             println!("cargo:rustc-link-lib={library}");
         }
         for framework in descriptor.static_link_frameworks() {
@@ -111,10 +123,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .generate()?;
 
-    let out_path = PathBuf::from(env::var("OUT_DIR")?);
     bindings.write_to_file(out_path.join("bindings.rs"))?;
 
     Ok(())
+}
+
+/// Supplies musl's traditional library names without a second implementation.
+/// The complete native archive provides the unified libc interfaces and the
+/// process-wide unwinder that its C++ frames and Rust frames share.
+fn musl_aliases(out_path: &Path) -> Result<PathBuf, io::Error> {
+    let directory = out_path.join("musl-aliases");
+    fs::create_dir_all(&directory)?;
+    for library in ["dl", "m", "pthread", "rt", "unwind"] {
+        fs::write(directory.join(format!("lib{library}.a")), b"!<arch>\n")?;
+    }
+    Ok(directory)
 }
 
 /// Locates the native install prefix, downloading a published snapshot archive
@@ -260,6 +283,7 @@ mod download {
 
     const RELEASE_BASE_URL: &str =
         "https://github.com/maplibre/maplibre-native-ffi/releases/download";
+    const TEST_RELEASE_BASE_URL_ENV: &str = "MAPLIBRE_NATIVE_C_TEST_SNAPSHOT_BASE_URL";
     const SNAPSHOT_TAG: &str = "unstable-native-snapshot";
     const BACKENDS: [&str; 4] = ["metal", "opengl", "vulkan", "webgpu"];
 
@@ -298,15 +322,15 @@ mod download {
     const APPLE_MOBILE: &[(&str, &str)] = &[("metal", "metal")];
 
     /// The presets `.github/workflows/publish-snapshots.yml` publishes a shared
-    /// library for. musl and windows-gnu ship no archive. Device iOS ships only
-    /// a static archive, which needs Apple framework link metadata this does
-    /// not emit.
+    /// library for. windows-gnu ships no archive. Device iOS ships only a
+    /// static archive, which needs Apple framework link metadata this does not
+    /// emit.
     const PLATFORM_TARGETS: &[PlatformTarget] = &[
         PlatformTarget {
             os: "linux",
             arch: "x86_64",
             env: "gnu",
-            platform: "linux-x64",
+            platform: "linux-gnu-x64",
             default_backend: "vulkan",
             backends: OPENGL_EGL,
         },
@@ -314,7 +338,23 @@ mod download {
             os: "linux",
             arch: "aarch64",
             env: "gnu",
-            platform: "linux-arm64",
+            platform: "linux-gnu-arm64",
+            default_backend: "vulkan",
+            backends: OPENGL_EGL,
+        },
+        PlatformTarget {
+            os: "linux",
+            arch: "x86_64",
+            env: "musl",
+            platform: "linux-musl-x64",
+            default_backend: "vulkan",
+            backends: OPENGL_EGL,
+        },
+        PlatformTarget {
+            os: "linux",
+            arch: "aarch64",
+            env: "musl",
+            platform: "linux-musl-arm64",
             default_backend: "vulkan",
             backends: OPENGL_EGL,
         },
@@ -341,6 +381,14 @@ mod download {
             platform: "windows-arm64",
             default_backend: "vulkan",
             backends: OPENGL_WGL,
+        },
+        PlatformTarget {
+            os: "android",
+            arch: "arm",
+            env: "",
+            platform: "android-arm",
+            default_backend: "opengl",
+            backends: OPENGL_EGL,
         },
         PlatformTarget {
             os: "android",
@@ -402,6 +450,8 @@ mod download {
     pub(super) fn install_prefix(backend: Option<&'static str>) -> Result<PathBuf, Box<dyn Error>> {
         let preset = resolve_preset(backend)?;
         let cache_dir = cache_dir()?.join(&preset.name);
+        let release_base_url =
+            env::var(TEST_RELEASE_BASE_URL_ENV).unwrap_or_else(|_| RELEASE_BASE_URL.to_owned());
 
         // Only an unreachable release falls back to the cache; a checksum or
         // extraction failure stays fatal. A publish replaces `SHA256SUMS` and
@@ -410,9 +460,15 @@ mod download {
         // fresh checksum file, with every cached answer suppressed.
         let mut after_mismatch = false;
         let prefix = loop {
-            match fetch_checksums()
-                .and_then(|checksums| acquire(&preset, &cache_dir, &checksums, after_mismatch))
-            {
+            match fetch_checksums(&release_base_url).and_then(|checksums| {
+                acquire(
+                    &preset,
+                    &cache_dir,
+                    &checksums,
+                    &release_base_url,
+                    after_mismatch,
+                )
+            }) {
                 Ok(prefix) => break prefix,
                 Err(Unreachable(error)) if after_mismatch => return Err(error),
                 Err(Unreachable(error)) => {
@@ -457,6 +513,7 @@ mod download {
         preset: &Preset,
         cache_dir: &Path,
         checksums: &str,
+        release_base_url: &str,
         after_mismatch: bool,
     ) -> Result<PathBuf, Failure> {
         let prefix = cache_dir.join(hex(&Sha256::digest(checksums.as_bytes())));
@@ -466,7 +523,7 @@ mod download {
 
         let archive_name = format!("{LIBRARY_NAME}-{}.tar.gz", preset.name);
         let expected = checksum_for(checksums, &archive_name).map_err(Fatal)?;
-        let url = format!("{RELEASE_BASE_URL}/{SNAPSHOT_TAG}/{archive_name}");
+        let url = format!("{release_base_url}/{SNAPSHOT_TAG}/{archive_name}");
         println!("cargo:warning=downloading {url}");
         let response = agent()
             .get(&url)
@@ -566,8 +623,8 @@ mod download {
         }
     }
 
-    fn fetch_checksums() -> Result<String, Failure> {
-        let url = format!("{RELEASE_BASE_URL}/{SNAPSHOT_TAG}/SHA256SUMS");
+    fn fetch_checksums(release_base_url: &str) -> Result<String, Failure> {
+        let url = format!("{release_base_url}/{SNAPSHOT_TAG}/SHA256SUMS");
         let mut response = agent()
             .get(&url)
             .call()

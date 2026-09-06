@@ -30,7 +30,10 @@ val androidBackend =
   )
 val androidTargets =
   AndroidTarget.parseAbis(
-    providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
+    providers
+      .gradleProperty("maplibre.android.abis")
+      .getOrElse(AndroidTarget.defaultAbis(androidBackend)),
+    androidBackend,
   )
 val checkedInJextractSources = layout.projectDirectory.dir("src/jvmMain/generated")
 val packagedAndroidBindingLibs = layout.buildDirectory.dir("generated/jniLibs/androidMain")
@@ -39,8 +42,13 @@ val generatedJavaCppSources =
 val mavenGroup = providers.gradleProperty("maplibre.maven.group").get()
 val mavenVersion = providers.gradleProperty("maplibre.maven.version").get()
 val mavenArtifact = "maplibre-native-ffi"
+val minifyAndroidDeviceTests =
+  providers.gradleProperty("maplibre.android.testMinify").map(String::toBoolean).getOrElse(false)
+val androidConsumerKeepRules =
+  file("src/androidMain/resources/META-INF/proguard/maplibre-native-ffi-javacpp.pro")
 
 kotlin {
+  androidNativeArm32()
   androidNativeArm64()
   androidNativeX64()
   iosArm64()
@@ -76,9 +84,14 @@ kotlin {
       }
 
     optimization {
-      consumerKeepRules.file(
-        "src/androidMain/resources/META-INF/proguard/maplibre-native-ffi-javacpp.pro"
-      )
+      // CI enables minification while building the device-test artifact. Reuse
+      // the published consumer rules so JavaCPP is optimized exactly as it is
+      // in a shrinking Android application.
+      minify = minifyAndroidDeviceTests
+      keepRules.file(androidConsumerKeepRules)
+      testKeepRules.file(androidConsumerKeepRules)
+      testKeepRules.file("src/androidDeviceTest/resources/proguard-rules.pro")
+      consumerKeepRules.file(androidConsumerKeepRules)
       consumerKeepRules.publish = true
     }
 
@@ -163,6 +176,23 @@ kotlin {
     }
 
     commonTest.dependencies { implementation(kotlin("test")) }
+
+    configureEach {
+      if (
+        name.startsWith("native") ||
+          name.startsWith("androidNative") ||
+          name.startsWith("apple") ||
+          name.startsWith("ios") ||
+          name.startsWith("tvos") ||
+          name.startsWith("linux") ||
+          name.startsWith("macos")
+      ) {
+        // C interop commonizes size_t as an unsafe number because it is UInt on
+        // Android ARM32 and ULong on the other native targets. These declarations
+        // remain internal and are used only at the target-local C boundary.
+        languageSettings.optIn("kotlinx.cinterop.UnsafeNumber")
+      }
+    }
   }
 }
 
@@ -183,6 +213,7 @@ canonicalizeKmpRootMetadata(
   targetModules =
     mapOf(
       "android" to "$mavenArtifact-android",
+      "androidNativeArm32" to "$mavenArtifact-androidnativearm32",
       "androidNativeArm64" to "$mavenArtifact-androidnativearm64",
       "androidNativeX64" to "$mavenArtifact-androidnativex64",
       "iosArm64" to "$mavenArtifact-iosarm64",
@@ -251,8 +282,14 @@ tasks.configureEach {
 
 val hostNativeInstallConfigured = providers.gradleProperty("maplibreNativeCInstallDir").isPresent
 
+class TestClasspathArguments(@get:Classpath val classpath: FileCollection) :
+  CommandLineArgumentProvider {
+  override fun asArguments() = listOf("-Dorg.maplibre.nativeffi.test.classpath=${classpath.asPath}")
+}
+
 tasks.named<Test>("jvmTest") {
   jvmArgs("--enable-native-access=ALL-UNNAMED")
+  jvmArgumentProviders.add(TestClasspathArguments(classpath))
   systemProperty("org.maplibre.nativeffi.library.path", maplibreNativeC.libraryPath.absolutePath)
   systemProperty(
     "org.maplibre.nativeffi.library.dirs",

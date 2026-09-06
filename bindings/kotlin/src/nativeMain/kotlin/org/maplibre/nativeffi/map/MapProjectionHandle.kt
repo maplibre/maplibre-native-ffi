@@ -14,6 +14,7 @@ import org.maplibre.nativeffi.internal.c.mln_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_map_projection_close
 import org.maplibre.nativeffi.internal.c.mln_map_projection_get_camera
 import org.maplibre.nativeffi.internal.c.mln_map_projection_lat_lng_for_pixel
+import org.maplibre.nativeffi.internal.c.mln_map_projection_lat_lng_for_pixel_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_projection_pixel_for_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_map_projection_set_camera
 import org.maplibre.nativeffi.internal.c.mln_map_projection_set_visible_coordinates
@@ -22,6 +23,7 @@ import org.maplibre.nativeffi.internal.c.mln_screen_point
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.lifecycle.NativeMapProjection
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.ByteStructs
 import org.maplibre.nativeffi.internal.struct.CoreStructs
@@ -61,7 +63,7 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
           mln_map_projection_set_visible_coordinates(
             handle.rawHandleValue,
             CoreStructs.latLngArray(coordinateSnapshot, this),
-            coordinateSnapshot.size.toULong(),
+            coordinateSnapshot.size.toCSize(),
             CoreStructs.edgeInsets(padding),
           )
         )
@@ -98,6 +100,20 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
     state.withLive { handle ->
       Status.check(
         mln_map_projection_lat_lng_for_pixel(
+          handle.rawHandleValue,
+          CoreStructs.screenPoint(point),
+          outCoordinate.ptr,
+        )
+      )
+    }
+    CoreStructs.latLng(outCoordinate)
+  }
+
+  public actual fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng = memScoped {
+    val outCoordinate = alloc<mln_lat_lng>()
+    state.withLive { handle ->
+      Status.check(
+        mln_map_projection_lat_lng_for_pixel_unwrapped(
           handle.rawHandleValue,
           CoreStructs.screenPoint(point),
           outCoordinate.ptr,

@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstring>
 #include <exception>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -22,17 +23,18 @@
 #include <variant>
 #include <vector>
 
-#include <mbgl/actor/scheduler.hpp>
-#include <mbgl/storage/database_file_source.hpp>
-#include <mbgl/storage/file_source.hpp>
-#include <mbgl/storage/file_source_manager.hpp>
-#include <mbgl/storage/offline.hpp>
-#include <mbgl/storage/resource_options.hpp>
-#include <mbgl/storage/response.hpp>
-#include <mbgl/util/client_options.hpp>
-#include <mbgl/util/expected.hpp>
-#include <mbgl/util/geo.hpp>
-#include <mbgl/util/run_loop.hpp>
+#include <mln/actor/scheduler.hpp>
+#include <mln/storage/database_file_source.hpp>
+#include <mln/storage/file_source.hpp>
+#include <mln/storage/file_source_manager.hpp>
+#include <mln/storage/offline.hpp>
+#include <mln/storage/resource_options.hpp>
+#include <mln/storage/response.hpp>
+#include <mln/storage/sqlite3.hpp>
+#include <mln/util/client_options.hpp>
+#include <mln/util/expected.hpp>
+#include <mln/util/geo.hpp>
+#include <mln/util/run_loop.hpp>
 
 #include "runtime/runtime.hpp"
 
@@ -2072,6 +2074,34 @@ auto offline_regions_list_start(
   );
 }
 
+auto validate_offline_side_database_path(const char* side_database_path)
+  -> mln_status {
+  if (side_database_path == nullptr) {
+    set_thread_error("side_database_path must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto path = std::string{side_database_path};
+  std::error_code filesystem_error;
+  if (
+    path.empty() || path.front() == ':' || path.compare(0, 5, "file:") == 0 ||
+    !std::filesystem::is_regular_file(path, filesystem_error)
+  ) {
+    set_thread_error(
+      "side database path must identify an existing readable database file"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto side_database =
+    mapbox::sqlite::Database::tryOpen(path, mapbox::sqlite::ReadOnly);
+  if (std::holds_alternative<mapbox::sqlite::Exception>(side_database)) {
+    set_thread_error(
+      "side database path must identify an existing readable database file"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
 auto offline_regions_merge_database_start(
   mln_runtime runtime, const char* side_database_path,
   const mln_completion* completion
@@ -2090,13 +2120,17 @@ auto offline_regions_merge_database_start(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
+  // The path was validated on the calling thread by
+  // validate_offline_side_database_path, so the executor never blocks on a
+  // filesystem or SQLite open here.
+  const auto path = std::string{side_database_path};
+
   auto database = database_source_for_runtime(live);
   if (database == nullptr) {
     set_thread_error("database file source is unavailable");
     return MLN_STATUS_NATIVE_ERROR;
   }
 
-  const auto path = std::string{side_database_path};
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE, completion,
     [&](auto state) -> void {

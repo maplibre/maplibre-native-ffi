@@ -129,6 +129,16 @@ public expect class MapHandle {
   /** Returns one source's copied metadata, or null when no source carries [sourceId]. */
   public fun styleSourceInfo(sourceId: String): Deferred<SourceInfo?>
 
+  /**
+   * Sets whether [sourceId] stores fetched tiles in persistent storage. Source types that do not
+   * fetch tiles retain the value only for [styleSourceInfo]. The returned deferred fails with
+   * [org.maplibre.nativeffi.error.MaplibreStatus.NOT_FOUND] when no source has [sourceId].
+   */
+  public fun setStyleSourceVolatile(
+    sourceId: String,
+    isVolatile: Boolean,
+  ): Deferred<CommandCompletion>
+
   public fun styleSourceIds(): Deferred<List<String>>
 
   public fun addGeoJsonSourceUrl(

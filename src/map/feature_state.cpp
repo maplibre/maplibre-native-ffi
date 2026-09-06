@@ -2,10 +2,10 @@
 #include <ranges>
 #include <utility>
 
-#include <mbgl/renderer/renderer.hpp>
-#include <mbgl/renderer/update_parameters.hpp>
-#include <mbgl/style/source_impl.hpp>
-#include <mbgl/util/feature.hpp>
+#include <mln/renderer/renderer.hpp>
+#include <mln/renderer/update_parameters.hpp>
+#include <mln/style/source_impl.hpp>
+#include <mln/util/feature.hpp>
 
 #include "map/feature_state.hpp"
 

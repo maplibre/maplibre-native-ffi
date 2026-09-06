@@ -8,8 +8,10 @@ use maplibre_native_ffi_core::{
 use maplibre_native_ffi_sys as sys;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
+use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::ffi::{c_char, c_void};
+use std::mem::ManuallyDrop;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -68,7 +70,20 @@ struct PyHttpHeaderTransformState {
 
 #[pyclass(name = "_ResourceRequestHandle")]
 struct ResourceRequestHandle {
-    state: Arc<maplibre_core::resource::ResourceRequestHandleState>,
+    // Dropped by hand, with the GIL released; see the Drop impl below.
+    state: ManuallyDrop<Arc<maplibre_core::resource::ResourceRequestHandleState>>,
+}
+
+impl Drop for ResourceRequestHandle {
+    fn drop(&mut self) {
+        // SAFETY: drop runs once, and nothing reads the field after this take.
+        let state = unsafe { ManuallyDrop::take(&mut self.state) };
+        // The last reference releases the native request, and release waits for
+        // a cancel callback running on a MapLibre thread. That callback needs
+        // the GIL this thread holds while collecting the Python handle, so the
+        // release runs detached.
+        Python::attach(|py| py.detach(move || drop(state)));
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -2190,16 +2205,25 @@ impl MapHandle {
         )
     }
 
-    fn lat_lng_for_pixel(&self, py: Python<'_>, x: f64, y: f64) -> PyResult<Py<PyAny>> {
+    fn lat_lng_for_pixel(
+        &self,
+        py: Python<'_>,
+        x: f64,
+        y: f64,
+        unwrapped: bool,
+    ) -> PyResult<Py<PyAny>> {
         let state = self.state();
         submit_python_future(
             py,
-            |completion| unsafe {
-                sys::mln_map_lat_lng_for_pixel(
-                    state.handle(),
-                    sys::mln_screen_point { x, y },
-                    completion,
-                )
+            |completion| {
+                let point = sys::mln_screen_point { x, y };
+                if unwrapped {
+                    unsafe {
+                        sys::mln_map_lat_lng_for_pixel_unwrapped(state.handle(), point, completion)
+                    }
+                } else {
+                    unsafe { sys::mln_map_lat_lng_for_pixel(state.handle(), point, completion) }
+                }
             },
             |py, result| lat_lng_to_py(py, completion_value::<sys::mln_lat_lng>(result)?),
         )
@@ -2226,18 +2250,36 @@ impl MapHandle {
         )
     }
 
-    fn lat_lngs_for_pixels(&self, py: Python<'_>, points: Vec<(f64, f64)>) -> PyResult<Py<PyAny>> {
+    fn lat_lngs_for_pixels(
+        &self,
+        py: Python<'_>,
+        points: Vec<(f64, f64)>,
+        unwrapped: bool,
+    ) -> PyResult<Py<PyAny>> {
         let state = self.state();
         let points: Vec<_> = points.into_iter().map(screen_point_from_tuple).collect();
         submit_python_future(
             py,
-            |completion| unsafe {
-                sys::mln_map_lat_lngs_for_pixels(
-                    state.handle(),
-                    points.as_ptr(),
-                    points.len(),
-                    completion,
-                )
+            |completion| {
+                if unwrapped {
+                    unsafe {
+                        sys::mln_map_lat_lngs_for_pixels_unwrapped(
+                            state.handle(),
+                            points.as_ptr(),
+                            points.len(),
+                            completion,
+                        )
+                    }
+                } else {
+                    unsafe {
+                        sys::mln_map_lat_lngs_for_pixels(
+                            state.handle(),
+                            points.as_ptr(),
+                            points.len(),
+                            completion,
+                        )
+                    }
+                }
             },
             |py, result| lat_lng_list_to_py(py, &completion_slice(result)?),
         )
@@ -2550,6 +2592,17 @@ impl MapHandle {
             },
             py_source_info,
         )
+    }
+
+    fn set_style_source_volatile(
+        &self,
+        source_id: String,
+        is_volatile: bool,
+    ) -> PyResult<Py<PyAny>> {
+        let source_id = maplibre_core::string::string_view(&source_id);
+        self.run_style_command(|map, out| unsafe {
+            sys::mln_map_set_style_source_volatile(map, source_id.raw(), is_volatile, out)
+        })
     }
 
     fn list_style_source_ids(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -2956,7 +3009,7 @@ impl MapHandle {
         width: u32,
         height: u32,
         stride: u32,
-        pixels: Vec<u8>,
+        pixels: Cow<'_, [u8]>,
         pixel_ratio: Option<f32>,
         sdf: Option<bool>,
         stretch_x: Option<Vec<(f32, f32)>>,
@@ -3063,7 +3116,7 @@ impl MapHandle {
         width: u32,
         height: u32,
         stride: u32,
-        pixels: Vec<u8>,
+        pixels: Cow<'_, [u8]>,
     ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let coordinates = lat_lngs_from_tuples(coordinates);
@@ -3097,7 +3150,7 @@ impl MapHandle {
         width: u32,
         height: u32,
         stride: u32,
-        pixels: Vec<u8>,
+        pixels: Cow<'_, [u8]>,
     ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let image = premultiplied_rgba8_image_from_parts(width, height, stride, &pixels);
@@ -3524,6 +3577,23 @@ impl MapProjectionHandle {
         lat_lng_to_py(py, coordinate)
     }
 
+    fn lat_lng_for_pixel_unwrapped(&self, py: Python<'_>, x: f64, y: f64) -> PyResult<Py<PyAny>> {
+        let handle = self.native_handle();
+        let mut coordinate = sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        };
+        let status = py.detach(|| unsafe {
+            sys::mln_map_projection_lat_lng_for_pixel_unwrapped(
+                handle,
+                sys::mln_screen_point { x, y },
+                &mut coordinate,
+            )
+        });
+        maplibre_core::check(status).map_err(map_error)?;
+        lat_lng_to_py(py, coordinate)
+    }
+
     #[getter]
     fn closed(&self) -> bool {
         self.state().is_closed()
@@ -3759,7 +3829,7 @@ impl RenderSessionHandle {
         graphics_queue_family_index: u32,
         get_instance_proc_addr: usize,
         get_device_proc_addr: usize,
-        surface_address: usize,
+        surface_bits: u64,
     ) -> PyResult<Py<PyAny>> {
         let descriptor = maplibre_core::render::vulkan_surface_descriptor_to_native(
             maplibre_core::render::VulkanSurfaceDescriptorFields {
@@ -3777,7 +3847,7 @@ impl RenderSessionHandle {
                     get_instance_proc_addr,
                     get_device_proc_addr,
                 ),
-                surface: surface_address as *mut c_void,
+                surface: surface_bits,
             },
         );
         self.start_target(py, descriptor, |session, raw, completion| {
@@ -3901,8 +3971,8 @@ impl RenderSessionHandle {
         graphics_queue_family_index: u32,
         get_instance_proc_addr: usize,
         get_device_proc_addr: usize,
-        image_address: usize,
-        image_view_address: usize,
+        image_bits: u64,
+        image_view_bits: u64,
         format: u32,
         initial_layout: u32,
         final_layout: u32,
@@ -3925,8 +3995,8 @@ impl RenderSessionHandle {
                     get_instance_proc_addr,
                     get_device_proc_addr,
                 ),
-                image: image_address as *mut c_void,
-                image_view: image_view_address as *mut c_void,
+                image: image_bits,
+                image_view: image_view_bits,
                 format,
                 initial_layout,
                 final_layout,
@@ -4322,17 +4392,39 @@ impl ResourceRequestHandle {
         Ok(())
     }
 
-    fn complete(&self, response: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn complete(&self, py: Python<'_>, response: &Bound<'_, PyAny>) -> PyResult<()> {
         let response = resource_response_from_py(response)?;
-        self.state.complete(&response).map_err(map_error)
+        let state = &*self.state;
+        // Completion retires the request, which waits for a cancel callback
+        // running on a MapLibre thread, and that callback needs the GIL.
+        py.detach(|| state.complete(&response)).map_err(map_error)
     }
 
     fn is_cancelled(&self) -> PyResult<bool> {
         self.state.is_cancelled().map_err(map_error)
     }
 
-    fn close(&self) {
-        self.state.close();
+    /// Registers the request's one cancel callback. The core state owns the
+    /// callable and hands the C API a weak reference to itself, so nothing
+    /// outside this handle keeps the callable or the handle alive.
+    fn set_cancel_callback(&self, callback: Py<PyAny>) -> PyResult<()> {
+        self.state
+            .set_cancel_callback(Box::new(move || {
+                // The cancel path reports no status, so a host exception is
+                // discarded here like other void callbacks in this binding.
+                Python::attach(|py| {
+                    let _ = callback.bind(py).call0();
+                });
+            }))
+            .map_err(map_error)
+    }
+
+    fn close(&self, py: Python<'_>) {
+        let state = &*self.state;
+        // Release waits for a cancel callback running on a MapLibre thread, and
+        // that callback needs the GIL. From inside the callback it returns
+        // without waiting.
+        py.detach(|| state.close());
     }
 }
 
@@ -4421,7 +4513,7 @@ impl PyResourceProviderState {
             let py_handle = Py::new(
                 py,
                 ResourceRequestHandle {
-                    state: Arc::clone(&handle_state),
+                    state: ManuallyDrop::new(Arc::clone(&handle_state)),
                 },
             )?;
             let decision = self
@@ -6184,7 +6276,7 @@ impl VulkanOwnedTextureFrameHandle {
         Ok(dict.into_any().unbind())
     }
 
-    fn image_address(&self) -> PyResult<usize> {
+    fn image_bits(&self) -> PyResult<u64> {
         let frame = live_acquired_frame(&self.frame)?;
         let mut raw: sys::mln_vulkan_owned_texture_frame = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_vulkan_owned_texture_frame>() as u32;
@@ -6192,10 +6284,10 @@ impl VulkanOwnedTextureFrameHandle {
             sys::mln_acquired_frame_get_vulkan_texture(frame, &mut raw)
         })
         .map_err(map_error)?;
-        Ok(raw.image as usize)
+        Ok(raw.image)
     }
 
-    fn image_view_address(&self) -> PyResult<usize> {
+    fn image_view_bits(&self) -> PyResult<u64> {
         let frame = live_acquired_frame(&self.frame)?;
         let mut raw: sys::mln_vulkan_owned_texture_frame = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_vulkan_owned_texture_frame>() as u32;
@@ -6203,7 +6295,7 @@ impl VulkanOwnedTextureFrameHandle {
             sys::mln_acquired_frame_get_vulkan_texture(frame, &mut raw)
         })
         .map_err(map_error)?;
-        Ok(raw.image_view as usize)
+        Ok(raw.image_view)
     }
 
     fn device_address(&self) -> PyResult<usize> {
@@ -7123,7 +7215,7 @@ fn attach_vulkan_surface(
     graphics_queue_family_index: u32,
     get_instance_proc_addr: usize,
     get_device_proc_addr: usize,
-    surface_address: usize,
+    surface_bits: u64,
     driver: u32,
     texture_ring_depth: u32,
 ) -> PyResult<(RenderSessionHandle, Py<PyAny>)> {
@@ -7143,7 +7235,7 @@ fn attach_vulkan_surface(
                 get_instance_proc_addr,
                 get_device_proc_addr,
             ),
-            surface: surface_address as *mut c_void,
+            surface: surface_bits,
         },
     );
     attach_render_session(
@@ -7290,8 +7382,8 @@ fn attach_vulkan_borrowed_texture(
     graphics_queue_family_index: u32,
     get_instance_proc_addr: usize,
     get_device_proc_addr: usize,
-    image_address: usize,
-    image_view_address: usize,
+    image_bits: u64,
+    image_view_bits: u64,
     format: u32,
     initial_layout: u32,
     final_layout: u32,
@@ -7316,8 +7408,8 @@ fn attach_vulkan_borrowed_texture(
                 get_instance_proc_addr,
                 get_device_proc_addr,
             ),
-            image: image_address as *mut c_void,
-            image_view: image_view_address as *mut c_void,
+            image: image_bits,
+            image_view: image_view_bits,
             format,
             initial_layout,
             final_layout,

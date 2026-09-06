@@ -136,7 +136,7 @@ internal static unsafe class RenderStructs
         var native = NativeMethods.mln_vulkan_surface_descriptor_default();
         native.extent = ToNative(descriptor.Extent);
         native.context = ToNative(descriptor.Context);
-        native.surface = (void*)descriptor.Surface.Address;
+        native.surface = descriptor.Surface.Bits;
         return native;
     }
 
@@ -203,8 +203,8 @@ internal static unsafe class RenderStructs
         native.physical_width = descriptor.PhysicalWidth;
         native.physical_height = descriptor.PhysicalHeight;
         native.context = ToNative(descriptor.Context);
-        native.image = (void*)descriptor.Image.Address;
-        native.image_view = (void*)descriptor.ImageView.Address;
+        native.image = descriptor.Image.Bits;
+        native.image_view = descriptor.ImageView.Bits;
         native.format = descriptor.Format;
         native.initial_layout = descriptor.InitialLayout;
         if (descriptor.FinalLayout != 0)
@@ -333,8 +333,8 @@ internal static unsafe class RenderStructs
             frame.height,
             frame.scale_factor,
             frame.frame_id,
-            NativePointer.FromNativeAddress((nint)frame.image),
-            NativePointer.FromNativeAddress((nint)frame.image_view),
+            new VulkanHandle(frame.image),
+            new VulkanHandle(frame.image_view),
             NativePointer.FromNativeAddress((nint)frame.device),
             frame.format,
             frame.layout

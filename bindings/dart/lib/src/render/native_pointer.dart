@@ -27,6 +27,38 @@ final class NativePointer {
   String toString() => 'NativePointer[address=0x${address.toRadixString(16)}]';
 }
 
+/// Opaque borrowed Vulkan non-dispatchable handle with a stable 64-bit width.
+final class VulkanHandle {
+  /// Creates a Vulkan handle from its unsigned 64-bit representation.
+  VulkanHandle(this.bits) {
+    if (bits.isNegative || bits.bitLength > 64) {
+      throw ArgumentError.value(
+        bits,
+        'bits',
+        'must fit in an unsigned 64-bit value',
+      );
+    }
+  }
+
+  /// Null Vulkan handle.
+  static final nullHandle = VulkanHandle(BigInt.zero);
+
+  /// Unsigned 64-bit Vulkan handle representation.
+  final BigInt bits;
+
+  /// Returns true when this is a null Vulkan handle.
+  bool get isNull => bits == BigInt.zero;
+
+  @override
+  bool operator ==(Object other) => other is VulkanHandle && other.bits == bits;
+
+  @override
+  int get hashCode => bits.hashCode;
+
+  @override
+  String toString() => 'VulkanHandle[bits=0x${bits.toRadixString(16)}]';
+}
+
 /// Native pointer value that is valid only while an owner-defined scope is live.
 final class ScopedNativePointer {
   /// Creates a scoped native pointer.
@@ -56,6 +88,37 @@ final class ScopedNativePointer {
   @override
   String toString() =>
       'ScopedNativePointer[$_debugName,address=0x${address.toRadixString(16)}]';
+}
+
+/// Vulkan handle value that is valid only while an owner-defined scope is live.
+final class ScopedVulkanHandle {
+  /// Creates a scoped Vulkan handle.
+  ScopedVulkanHandle(
+    this._bits, {
+    required void Function() checkValid,
+    required String debugName,
+  }) : _checkValid = checkValid,
+       _debugName = debugName;
+
+  final BigInt _bits;
+  final void Function() _checkValid;
+  final String _debugName;
+
+  /// Unsigned 64-bit handle representation after validating the scope.
+  BigInt get bits {
+    _checkValid();
+    return _bits;
+  }
+
+  /// Returns true when this is a null Vulkan handle.
+  bool get isNull => bits == BigInt.zero;
+
+  /// Copies the current bits into an unscoped [VulkanHandle].
+  VulkanHandle toVulkanHandle() => VulkanHandle(bits);
+
+  @override
+  String toString() =>
+      'ScopedVulkanHandle[$_debugName,bits=0x${bits.toRadixString(16)}]';
 }
 
 /// Native integer value that is valid only while an owner-defined scope is live.

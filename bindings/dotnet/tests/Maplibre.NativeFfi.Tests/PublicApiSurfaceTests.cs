@@ -193,6 +193,7 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Style.TileScheme",
             "Maplibre.NativeFfi.Style.TileSourceOptions",
             "Maplibre.NativeFfi.Style.VectorTileEncoding",
+            "Maplibre.NativeFfi.VulkanHandle",
         };
         var actual = assembly.GetExportedTypes().Select(type => type.FullName).Order().ToArray();
 

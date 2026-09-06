@@ -1,7 +1,7 @@
-# The toolchain builds against a glibc older than any the project supports and
-# links its own static C++ runtime, rather than taking either from the build
-# host. That keeps the artifacts loadable on older distributions, and it is what
-# lets the distributed archive stand on its own.
+# The toolchain builds against its selected libc and links its own static C++
+# runtime, rather than taking either from the build host. The glibc target uses
+# an old ABI floor, and the musl target stays independent of a host sysroot.
+# That is what lets each distributed archive stand on its own.
 #
 # See cmake/toolchains/zig-linux.cmake and the Kotlin publishing doc.
 function(mln_ffi_configure_linux_archive_contents target)
@@ -21,6 +21,7 @@ function(mln_ffi_configure_linux_archive_contents target)
     COMMAND
       "${CMAKE_CXX_COMPILER}"
       ${probe_flags}
+      -fPIC
       "${probe_source}"
       -o
       "${CMAKE_CURRENT_BINARY_DIR}/mln-cxx-runtime-probe"
@@ -62,24 +63,38 @@ function(mln_ffi_configure_linux_archive_contents target)
       "llvm-${component}.txt")
   endforeach()
 
-  # A consumer links this archive next to a C++ runtime of its own. Everything
-  # but the C API entry points becomes internal to the archive, and the one
-  # support symbol that has to keep a standard name is renamed, so the two
-  # cannot collide. The second rename is the compiler-generated reference to the
-  # first and has to move with it.
+  # A consumer links this archive next to a C++ runtime of its own. The C++ ABI
+  # stays internal, including its renamed personality function. A musl archive
+  # carries the complete unwinder and leaves its ABI global so mixed-language
+  # executables use one implementation for every frame. The second rename is
+  # the compiler-generated reference to the first and has to move with it.
+  set(archive_keep_global "mln_*;__mln_personality_v0")
+  set(bundle_complete_runtime FALSE)
+  if(MLN_FFI_ZIG_LIBC STREQUAL "musl")
+    list(
+      APPEND
+      archive_keep_global
+      "_Unwind_*"
+      __register_frame
+      __deregister_frame
+      "__unw_*"
+      "unw_*")
+    set(bundle_complete_runtime TRUE)
+  endif()
   set_target_properties(
     ${target}
     PROPERTIES
       MLN_FFI_ARCHIVE_BUNDLED_RUNTIME
       "${runtime_archives}"
       MLN_FFI_ARCHIVE_KEEP_GLOBAL
-      "mln_*;__mln_personality_v0"
+      "${archive_keep_global}"
+      MLN_FFI_ARCHIVE_BUNDLED_RUNTIME_WHOLE
+      "${bundle_complete_runtime}"
       MLN_FFI_ARCHIVE_RENAME_SYMBOLS
       "__gxx_personality_v0=__mln_personality_v0;DW.ref.__gxx_personality_v0=DW.ref.__mln_personality_v0"
-      # The graphics loaders the test harness links come from the machine
-      # running the tests, so they are built against a newer glibc than this
-      # toolchain targets. The loader resolves their libc references at run
-      # time.
+      # The graphics loaders the test harness links come from the build host.
+      # The glibc test runs there, and the musl test resolves matching loaders
+      # inside its Alpine container.
       MLN_FFI_TEST_LINK_OPTIONS
       "LINKER:--allow-shlib-undefined")
 endfunction()
@@ -138,16 +153,24 @@ function(mln_ffi_configure_platform_dependencies target)
       TRUE)
   mln_ffi_configure_linux_archive_contents(${target})
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
-    set_target_properties(
-      ${target}
-      PROPERTIES
-        MLN_FFI_TARGET_PLATFORM linux-arm64 MLN_FFI_ZIG_TARGET aarch64-linux-gnu)
+    set(target_architecture arm64)
+    set(zig_architecture aarch64)
   else()
-    set_target_properties(
-      ${target}
-      PROPERTIES
-        MLN_FFI_TARGET_PLATFORM linux-x64 MLN_FFI_ZIG_TARGET x86_64-linux-gnu)
+    set(target_architecture x64)
+    set(zig_architecture x86_64)
   endif()
+  if(MLN_FFI_ZIG_LIBC STREQUAL "musl")
+    set(target_platform "linux-musl-${target_architecture}")
+    set(zig_target "${zig_architecture}-linux-musl")
+  else()
+    set(target_platform "linux-gnu-${target_architecture}")
+    set(zig_target "${zig_architecture}-linux-gnu")
+  endif()
+  set_target_properties(
+    ${target}
+    PROPERTIES
+      MLN_FFI_TARGET_PLATFORM "${target_platform}" MLN_FFI_ZIG_TARGET
+      "${zig_target}")
 endfunction()
 
 function(mln_ffi_configure_platform target)
@@ -156,16 +179,16 @@ function(mln_ffi_configure_platform target)
   include("${MLN_FFI_SOURCE_DIR}/vendor/icu.cmake")
 
   set(MLN_FFI_VENDOR_LINUX_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/collator.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/text/bidi.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/text/local_glyph_rasterizer.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/async_task.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/png_writer.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/run_loop.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/string_stdlib.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/thread.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp)
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/collator.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/bidi.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/local_glyph_rasterizer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/async_task.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/png_writer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/run_loop.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/string_stdlib.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/thread.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/timer.cpp)
 
   set(MLN_FFI_LINUX_SOURCES
       ${PROJECT_SOURCE_DIR}/src/platform/rust/http_file_source.cpp
@@ -175,7 +198,7 @@ function(mln_ffi_configure_platform target)
   mln_ffi_target_project_sources(${target} ${MLN_FFI_LINUX_SOURCES})
 
   set_source_files_properties(
-    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
+    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
     PROPERTIES COMPILE_DEFINITIONS MBGL_USE_BUILTIN_ICU)
 
   target_include_directories(

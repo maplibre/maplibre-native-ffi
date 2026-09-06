@@ -552,8 +552,13 @@ class MapProjectionHandle(NativeHandleMixin):
         return ScreenPoint(x=raw["x"], y=raw["y"])
 
     def lat_lng_for_pixel(self, point: ScreenPoint) -> LatLng:
-        """Convert a screen-space point to a geographic coordinate."""
+        """Convert a screen point to a coordinate with longitude wrapped to [-180, 180]."""
         raw = self._native.lat_lng_for_pixel(point.x, point.y)
+        return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
+
+    def lat_lng_for_pixel_unwrapped(self, point: ScreenPoint) -> LatLng:
+        """Convert a screen point to a coordinate that preserves its visible world copy."""
+        raw = self._native.lat_lng_for_pixel_unwrapped(point.x, point.y)
         return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
 
 
@@ -975,6 +980,17 @@ class MapHandle(NativeHandleMixin):
             self._native.get_style_source_info(source_id),
             lambda raw: StyleSourceInfo._from_native(raw) if raw is not None else None,
         )
+
+    def set_style_source_volatile(
+        self, source_id: str, is_volatile: bool
+    ) -> Future[CommandCompletion]:
+        """Submit a style source volatility change and return its completion future.
+
+        Volatile sources keep fetched tiles out of persistent storage. The
+        command's terminal event reports ``FAILED`` with
+        :attr:`MaplibreStatus.NOT_FOUND` when no style source has the ID.
+        """
+        return self._native.set_style_source_volatile(source_id, is_volatile)
 
     def list_style_source_ids(self) -> Future[tuple[str, ...]]:
         """Return style source IDs in style order."""
@@ -1546,12 +1562,18 @@ class MapHandle(NativeHandleMixin):
             lambda raw: ScreenPoint(x=raw["x"], y=raw["y"]),
         )
 
-    def lat_lng_for_pixel(self, point: ScreenPoint) -> Future[LatLng]:
-        """Convert a screen point to a geographic world coordinate for this map."""
+    def lat_lng_for_pixel(
+        self, point: ScreenPoint, *, unwrapped: bool = False
+    ) -> Future[LatLng]:
+        """Convert a screen point to a geographic world coordinate for this map.
+
+        The longitude is wrapped to [-180, 180] unless ``unwrapped`` is set, in
+        which case the result preserves the point's visible world copy.
+        """
         from .geo import LatLng
 
         return map_future(
-            self._native.lat_lng_for_pixel(point.x, point.y),
+            self._native.lat_lng_for_pixel(point.x, point.y, unwrapped),
             lambda raw: LatLng(latitude=raw["latitude"], longitude=raw["longitude"]),
         )
 
@@ -1570,12 +1592,20 @@ class MapHandle(NativeHandleMixin):
     def lat_lngs_for_pixels(
         self,
         points: list[ScreenPoint] | tuple[ScreenPoint, ...],
+        *,
+        unwrapped: bool = False,
     ) -> Future[tuple[LatLng, ...]]:
-        """Convert screen points to geographic world coordinates for this map."""
+        """Convert screen points to geographic world coordinates for this map.
+
+        Longitudes are wrapped to [-180, 180] unless ``unwrapped`` is set, in
+        which case each result preserves its point's visible world copy.
+        """
         from .geo import LatLng
 
         return map_future(
-            self._native.lat_lngs_for_pixels([(point.x, point.y) for point in points]),
+            self._native.lat_lngs_for_pixels(
+                [(point.x, point.y) for point in points], unwrapped
+            ),
             lambda raw: tuple(LatLng(**coordinate) for coordinate in raw),
         )
 
@@ -1762,7 +1792,7 @@ class MapHandle(NativeHandleMixin):
             descriptor.context.graphics_queue_family_index,
             descriptor.context.get_instance_proc_addr.address,
             descriptor.context.get_device_proc_addr.address,
-            descriptor.surface.address,
+            descriptor.surface.bits,
         )
 
     def attach_webgpu_surface(
@@ -1886,8 +1916,8 @@ class MapHandle(NativeHandleMixin):
             descriptor.context.graphics_queue_family_index,
             descriptor.context.get_instance_proc_addr.address,
             descriptor.context.get_device_proc_addr.address,
-            descriptor.image.address,
-            descriptor.image_view.address,
+            descriptor.image.bits,
+            descriptor.image_view.bits,
             descriptor.format,
             descriptor.initial_layout,
             descriptor.final_layout,

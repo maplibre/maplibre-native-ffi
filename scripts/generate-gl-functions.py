@@ -54,7 +54,7 @@ def rewrite(source: str, origin: str) -> tuple[str, int]:
 
     # The prototypes only existed to give the initializers something to bind to.
     rewritten = rewritten.replace("#define GL_GLEXT_PROTOTYPES\n", "")
-    marker = "#include <mbgl/platform/gl_functions.hpp>\n"
+    marker = "#include <mln/platform/gl_functions.hpp>\n"
     if marker not in rewritten:
         raise SystemExit(f"error: unexpected header layout in {origin}")
     declarations = "".join(

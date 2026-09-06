@@ -9,8 +9,8 @@ internal constructor(
   private val heightValue: Int,
   private val scaleFactorValue: Double,
   private val frameIdValue: Long,
-  private val imageValue: NativePointer,
-  private val imageViewValue: NativePointer,
+  private val imageValue: VulkanHandle,
+  private val imageViewValue: VulkanHandle,
   private val deviceValue: NativePointer,
   private val formatValue: Int,
   private val layoutValue: Int,
@@ -27,9 +27,9 @@ internal constructor(
   /** Opaque frame identity preserved as a native `uint64_t` bit pattern in [Long]. */
   public fun frameId(): Long = checked { frameIdValue }
 
-  public fun image(): NativePointer = checked { imageValue }
+  public fun image(): VulkanHandle = checked { imageValue }
 
-  public fun imageView(): NativePointer = checked { imageViewValue }
+  public fun imageView(): VulkanHandle = checked { imageViewValue }
 
   public fun device(): NativePointer = checked { deviceValue }
 

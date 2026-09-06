@@ -185,6 +185,8 @@ class RenderSessionHandleTest {
 
 private fun dummyPointer(): NativePointer = NativePointer.ofAddress(1)
 
+private fun dummyVulkanHandle(): VulkanHandle = VulkanHandle.ofBits(1)
+
 private fun metalBorrowedTexture(): MetalBorrowedTextureDescriptor =
   MetalBorrowedTextureDescriptor(RenderTargetExtent(16, 8, 1.0), 16, 8, dummyPointer())
 
@@ -212,15 +214,15 @@ private fun vulkanBorrowedTexture(): VulkanBorrowedTextureDescriptor =
     16,
     8,
     vulkanContext(),
-    dummyPointer(),
-    dummyPointer(),
+    dummyVulkanHandle(),
+    dummyVulkanHandle(),
     // VK_FORMAT_R8G8B8A8_UNORM and VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
     37,
     5,
   )
 
 private fun vulkanSurface(): VulkanSurfaceDescriptor =
-  VulkanSurfaceDescriptor(RenderTargetExtent(16, 8, 1.0), vulkanContext(), dummyPointer())
+  VulkanSurfaceDescriptor(RenderTargetExtent(16, 8, 1.0), vulkanContext(), dummyVulkanHandle())
 
 private fun eglContext(): EglContextDescriptor =
   EglContextDescriptor(dummyPointer(), dummyPointer(), dummyPointer(), NativePointer.NULL_POINTER)

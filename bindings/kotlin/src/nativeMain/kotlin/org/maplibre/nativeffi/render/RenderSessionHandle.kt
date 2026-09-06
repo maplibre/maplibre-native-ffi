@@ -8,6 +8,8 @@ import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.lifecycle.*
+import org.maplibre.nativeffi.internal.memory.CSizeVar
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.ByteStructs
 import org.maplibre.nativeffi.internal.struct.QueryStructs
@@ -85,12 +87,12 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     Status.check(mln_render_session_drain_frame_results(id(), outBatch.ptr))
     val batch = outBatch.value
     try {
-      val outCount = alloc<ULongVar>()
+      val outCount = alloc<CSizeVar>()
       Status.check(mln_render_frame_batch_count(batch, outCount.ptr))
       List(outCount.value.toInt()) { index ->
         val value = alloc<mln_render_frame_result>()
         value.size = sizeOf<mln_render_frame_result>().toUInt()
-        Status.check(mln_render_frame_batch_get(batch, index.toULong(), value.ptr))
+        Status.check(mln_render_frame_batch_get(batch, index.toCSize(), value.ptr))
         frameResult(value)
       }
     } finally {
@@ -100,8 +102,8 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
 
   public actual fun serviceDriverWork(maxWork: Int): Int = memScoped {
     Status.requireArgument(maxWork >= 0) { "maxWork must be non-negative" }
-    val serviced = alloc<ULongVar>()
-    Status.check(mln_render_session_service_driver_work(id(), maxWork.toULong(), serviced.ptr))
+    val serviced = alloc<CSizeVar>()
+    Status.check(mln_render_session_service_driver_work(id(), maxWork.toCSize(), serviced.ptr))
     serviced.value.toInt()
   }
 
@@ -319,7 +321,9 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     CompletionBridge.unit(start)
 
   private fun requiredBuffer(result: CPointer<mln_completion_result>): ByteArray {
-    require(result.pointed.value_count == 1uL) { "native completion omitted its byte result" }
+    require(result.pointed.value_count.toULong() == 1uL) {
+      "native completion omitted its byte result"
+    }
     return ByteStructs.copyBufferView(result.pointed.value!!.reinterpret<mln_buffer_view>().pointed)
   }
 
@@ -558,8 +562,8 @@ internal constructor(
       v.height.toInt(),
       v.scale_factor,
       v.frame_id.toLong(),
-      scoped(v.image),
-      scoped(v.image_view),
+      VulkanHandle.scoped(v.image.toLong(), scope),
+      VulkanHandle.scoped(v.image_view.toLong(), scope),
       scoped(v.device),
       v.format.toInt(),
       v.layout.toInt(),

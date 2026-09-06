@@ -1,7 +1,7 @@
 #include <string>
 
-#include <mbgl/platform/thread.hpp>
-#include <mbgl/util/platform.hpp>
+#include <mln/platform/thread.hpp>
+#include <mln/util/platform.hpp>
 
 namespace mln {
 namespace platform {

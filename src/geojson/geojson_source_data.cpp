@@ -10,14 +10,14 @@
 #include <utility>
 #include <vector>
 
-#include <mbgl/actor/scheduler.hpp>
-#include <mbgl/style/conversion/geojson_options.hpp>  // IWYU pragma: keep
-#include <mbgl/style/conversion/json.hpp>
-#include <mbgl/style/conversion_impl.hpp>
-#include <mbgl/tile/tile_id.hpp>
-#include <mbgl/util/geometry.hpp>
-#include <mbgl/util/identity.hpp>
-#include <mbgl/util/rapidjson.hpp>
+#include <mln/actor/scheduler.hpp>
+#include <mln/style/conversion/geojson_options.hpp>  // IWYU pragma: keep
+#include <mln/style/conversion/json.hpp>
+#include <mln/style/conversion_impl.hpp>
+#include <mln/tile/tile_id.hpp>
+#include <mln/util/geometry.hpp>
+#include <mln/util/identity.hpp>
+#include <mln/util/rapidjson.hpp>
 
 #include "geojson/geojson_source_data.hpp"
 

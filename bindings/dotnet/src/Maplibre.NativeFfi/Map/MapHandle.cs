@@ -445,6 +445,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
     }
 
+    /// <summary>Converts a screen pixel to a geographic coordinate using the current map projection.</summary>
+    /// <remarks>The longitude is wrapped to the range from -180 to 180 degrees.</remarks>
     public Task<LatLng> LatLngForPixelAsync(
         ScreenPoint point,
         CancellationToken cancellationToken = default
@@ -453,6 +455,25 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         return RunMapOperationAsync(
             completion =>
                 NativeMethods.mln_map_lat_lng_for_pixel(
+                    Handle,
+                    MapStructs.ToNative(point),
+                    completion
+                ),
+            result => CoreStructs.FromNative(NativeCompletion.Value<mln_lat_lng>(result)),
+            cancellationToken
+        );
+    }
+
+    /// <summary>Converts a screen pixel to an unwrapped geographic coordinate.</summary>
+    /// <remarks>The longitude preserves the visible world copy and may fall outside -180 to 180.</remarks>
+    public Task<LatLng> LatLngForPixelUnwrappedAsync(
+        ScreenPoint point,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return RunMapOperationAsync(
+            completion =>
+                NativeMethods.mln_map_lat_lng_for_pixel_unwrapped(
                     Handle,
                     MapStructs.ToNative(point),
                     completion
@@ -487,6 +508,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
     }
 
+    /// <summary>Converts screen pixels to geographic coordinates using the current map projection.</summary>
+    /// <remarks>Each longitude is wrapped to the range from -180 to 180 degrees.</remarks>
     public Task<LatLng[]> LatLngsForPixelsAsync(
         IReadOnlyList<ScreenPoint> points,
         CancellationToken cancellationToken = default
@@ -500,6 +523,33 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
                 fixed (mln_screen_point* pointer = native)
                 {
                     return NativeMethods.mln_map_lat_lngs_for_pixels(
+                        Handle,
+                        native.Length == 0 ? null : pointer,
+                        (nuint)native.Length,
+                        completion
+                    );
+                }
+            },
+            ReadCoordinates,
+            cancellationToken
+        );
+    }
+
+    /// <summary>Converts screen pixels to unwrapped geographic coordinates.</summary>
+    /// <remarks>Each longitude preserves its visible world copy and may fall outside -180 to 180.</remarks>
+    public Task<LatLng[]> LatLngsForPixelsUnwrappedAsync(
+        IReadOnlyList<ScreenPoint> points,
+        CancellationToken cancellationToken = default
+    )
+    {
+        ArgumentNullException.ThrowIfNull(points);
+        var native = points.Select(value => MapStructs.ToNative(value)).ToArray();
+        return RunMapOperationAsync(
+            completion =>
+            {
+                fixed (mln_screen_point* pointer = native)
+                {
+                    return NativeMethods.mln_map_lat_lngs_for_pixels_unwrapped(
                         Handle,
                         native.Length == 0 ? null : pointer,
                         (nuint)native.Length,
@@ -663,6 +713,24 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
             NativeStatus.Check(
                 NativeMethods.mln_map_remove_style_source(Handle, nativeSourceId.Value, completion)
+            );
+        });
+    }
+
+    /// <summary>Sets whether a style source stores fetched tiles in persistent storage.</summary>
+    /// <remarks>The command fails with a not-found status when the source does not exist.</remarks>
+    public Task<CommandCompletion> SetStyleSourceVolatileAsync(string sourceId, bool isVolatile)
+    {
+        return NativeCompletion.SubmitCommandChecked(completion =>
+        {
+            using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+            NativeStatus.Check(
+                NativeMethods.mln_map_set_style_source_volatile(
+                    Handle,
+                    nativeSourceId.Value,
+                    isVolatile ? (byte)1 : (byte)0,
+                    completion
+                )
             );
         });
     }

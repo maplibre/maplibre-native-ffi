@@ -6,12 +6,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.rawValue
 import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
+import kotlinx.cinterop.usePinned
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
@@ -32,6 +35,9 @@ import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options
 import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
+import org.maplibre.nativeffi.internal.memory.CSizeVar
+import org.maplibre.nativeffi.internal.memory.toCSize
+import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
@@ -40,6 +46,20 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 @OptIn(ExperimentalForeignApi::class)
 class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-060, BND-061, BND-062, BND-066.
+
+  @Test
+  fun premultipliedImageBorrowsBackingPixelsForBlock() {
+    val image = PremultipliedRgba8Image(1, 1, 4, byteArrayOf(1, 2, 3, 4))
+
+    image.pixelsTransit.usePinned { expectedPixels ->
+      memScoped {
+        StyleStructs.withPremultipliedRgba8Image(image, this) { nativeImage ->
+          assertEquals(expectedPixels.addressOf(0).rawValue, nativeImage.pointed.pixels?.rawValue)
+          assertEquals(4.toCSize(), nativeImage.pointed.byte_length)
+        }
+      }
+    }
+  }
 
   @Test
   fun styleOptionsInitializeDefaultsAndPresentZeroMasks(): Unit =
@@ -141,7 +161,7 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
         StyleStructs.styleIdList(
           list.rawHandleValue,
           counter = { _, outCount ->
-            outCount[0] = 1UL
+            outCount[0] = 1.toCSize()
             MaplibreStatus.OK.nativeCode
           },
           getter = { _, _, outId ->
@@ -167,7 +187,7 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
           StyleStructs.styleIdList(
             list.rawHandleValue,
             counter = { _, outCount ->
-              outCount[0] = Int.MAX_VALUE.toULong() + 1UL
+              outCount[0] = (Int.MAX_VALUE.toULong() + 1UL).toCSize()
               MaplibreStatus.OK.nativeCode
             },
             getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
@@ -188,7 +208,7 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
           StyleStructs.styleStringList(
             123UL,
             counter = { _, outCount ->
-              outCount[0] = 1UL
+              outCount[0] = 1.toCSize()
               MaplibreStatus.OK.nativeCode
             },
             getter = { _, _, outValue ->
@@ -204,7 +224,7 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
           StyleStructs.styleStringList(
             456UL,
             counter = { _, outCount ->
-              outCount[0] = Int.MAX_VALUE.toULong() + 1UL
+              outCount[0] = (Int.MAX_VALUE.toULong() + 1UL).toCSize()
               MaplibreStatus.OK.nativeCode
             },
             getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
@@ -240,7 +260,7 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
         native.width = 1U
         native.height = 2U
         native.stride = 8U
-        native.byte_length = 16UL
+        native.byte_length = 16.toCSize()
         native.pixel_ratio = 2.0f
         native.sdf = true
 
@@ -253,8 +273,10 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
         assertEquals(2.0f, info.pixelRatio)
         assertEquals(true, info.sdf)
 
-        native.byte_length = Long.MAX_VALUE.toULong() + 1UL
-        assertFailsWith<IllegalArgumentException> { StyleStructs.styleImageInfo(native) }
+        if (sizeOf<CSizeVar>() == 8L) {
+          native.byte_length = (Long.MAX_VALUE.toULong() + 1UL).toCSize()
+          assertFailsWith<IllegalArgumentException> { StyleStructs.styleImageInfo(native) }
+        }
       }
     }
 }

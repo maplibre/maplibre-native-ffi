@@ -8,6 +8,8 @@
 #include "unity.h"
 
 static void* const fake_handle = (void*)(uintptr_t)1;
+static const mln_vulkan_non_dispatchable_handle fake_vulkan_handle =
+  UINT64_C(1);
 
 static void discard_completion_result(
   void* user_data, const mln_completion_result* result
@@ -904,11 +906,11 @@ static mln_vulkan_context_descriptor fake_vulkan_context(void) {
 static mln_vulkan_surface_descriptor vulkan_surface_descriptor(void) {
   mln_vulkan_surface_descriptor value = mln_vulkan_surface_descriptor_default();
   value.context = fake_vulkan_context();
-  value.surface = fake_handle;
+  value.surface = fake_vulkan_handle;
   return value;
 }
 static void clear_vulkan_surface(mln_vulkan_surface_descriptor* descriptor) {
-  descriptor->surface = NULL;
+  descriptor->surface = MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
 }
 static void shrink_vulkan_surface(mln_vulkan_surface_descriptor* descriptor) {
   descriptor->context.size = sizeof(mln_vulkan_context_descriptor) - 1;
@@ -952,8 +954,8 @@ static void vulkan_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   mln_vulkan_borrowed_texture_descriptor descriptor =
     mln_vulkan_borrowed_texture_descriptor_default();
   descriptor.context = fake_vulkan_context();
-  descriptor.image = fake_handle;
-  descriptor.image_view = fake_handle;
+  descriptor.image = fake_vulkan_handle;
+  descriptor.image_view = fake_vulkan_handle;
   descriptor.format = 37;
   descriptor.initial_layout = 0;
   descriptor.final_layout = 5;
@@ -987,7 +989,7 @@ static void vulkan_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   invalid = descriptor;
-  invalid.image = NULL;
+  invalid.image = MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_vulkan_borrowed_texture_attach(
@@ -1003,6 +1005,57 @@ static void vulkan_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
+
+// A Vulkan non-dispatchable handle is 64 bits wide on every ABI, including
+// 32-bit ones where a pointer carrier would truncate it. A handle whose value
+// lives entirely in the high 32 bits reads as null once truncated, so the
+// descriptor validation would reject it. A Vulkan build accepts the attach and
+// defers backend initialization to driver work, so the rejection this test
+// observes exists only on the other backends.
+#if !defined(MLN_FFI_TEST_BACKEND_VULKAN)
+static void vulkan_handles_keep_their_high_bits(void) {
+  const mln_vulkan_non_dispatchable_handle high_handle =
+    UINT64_C(0x8000000000000001);
+  const mln_vulkan_non_dispatchable_handle high_view_handle =
+    UINT64_C(0x0000000100000000);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_vulkan_borrowed_texture_descriptor descriptor =
+    mln_vulkan_borrowed_texture_descriptor_default();
+  descriptor.extent = (mln_render_target_extent){
+    .size = sizeof(mln_render_target_extent),
+    .width = 64,
+    .height = 64,
+    .scale_factor = 1.0,
+  };
+  descriptor.context = fake_vulkan_context();
+  descriptor.image = high_handle;
+  descriptor.image_view = high_view_handle;
+  descriptor.format = 37;
+  descriptor.initial_layout = 0;
+  descriptor.final_layout = 5;
+  TEST_ASSERT_EQUAL_UINT64(high_handle, descriptor.image);
+  TEST_ASSERT_EQUAL_UINT64(high_view_handle, descriptor.image_view);
+
+  mln_render_session session = MLN_HANDLE_NULL;
+  const mln_status status = mln_vulkan_borrowed_texture_attach(
+    map, &descriptor,
+    &(mln_render_session_attach_options){
+      .size = sizeof(mln_render_session_attach_options),
+      .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+    },
+    &session, MLN_TEST_DISCARD_COMPLETION
+  );
+  // The descriptor is well formed, so the only remaining rejection is the
+  // backend one; a truncated handle would instead be reported as null.
+  TEST_ASSERT_EQUAL_INT_MESSAGE(
+    MLN_STATUS_UNSUPPORTED, status, mln_thread_last_error_message()
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+#endif
 
 void run_render_backend_abi_tests(void) {
   UnitySetTestFile(__FILE__);
@@ -1028,6 +1081,9 @@ void run_render_backend_abi_tests(void) {
   RUN_TEST(vulkan_surface_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(vulkan_owned_texture_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(vulkan_borrowed_texture_rejects_unsafe_raw_descriptors);
+#if !defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  RUN_TEST(vulkan_handles_keep_their_high_bits);
+#endif
   RUN_TEST(webgpu_owned_texture_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(webgpu_surface_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(webgpu_surface_attach_rejects_an_unspecified_format);

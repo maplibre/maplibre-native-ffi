@@ -1,19 +1,14 @@
 package org.maplibre.nativeffi.map
 
-import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
-import kotlinx.cinterop.CValue
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
-import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
-import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.readValue
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
@@ -123,6 +118,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_style_image
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_json
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_light_json
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_light_property
+import org.maplibre.nativeffi.internal.c.mln_map_set_style_source_volatile
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_url
 import org.maplibre.nativeffi.internal.c.mln_map_set_tile_options
@@ -142,6 +138,7 @@ import org.maplibre.nativeffi.internal.lifecycle.mapHandle
 import org.maplibre.nativeffi.internal.lifecycle.mapProjectionHandle
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.ByteStructs
 import org.maplibre.nativeffi.internal.struct.CoreStructs
@@ -321,7 +318,7 @@ private constructor(
   public actual fun styleSourceInfo(sourceId: String): Deferred<SourceInfo?> = memScoped {
     CompletionBridge.submit(
       { result ->
-        if (result.pointed.value_count == 0uL) null
+        if (result.pointed.value_count.toULong() == 0uL) null
         else {
           val value = result.pointed.value!!.reinterpret<mln_style_source_result>().pointed
           val tileUrls =
@@ -344,6 +341,22 @@ private constructor(
         )
       },
     )
+  }
+
+  public actual fun setStyleSourceVolatile(
+    sourceId: String,
+    isVolatile: Boolean,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_set_style_source_volatile(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          isVolatile,
+          completion,
+        )
+      )
+    }
   }
 
   public actual fun styleSourceIds(): Deferred<List<String>> =
@@ -617,7 +630,7 @@ private constructor(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.stringViewArray(tileSnapshot, this),
-          tileSnapshot.size.toULong(),
+          tileSnapshot.size.toCSize(),
           StyleStructs.tileSourceOptions(options, this),
           completion,
         )
@@ -655,7 +668,7 @@ private constructor(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.stringViewArray(tileSnapshot, this),
-          tileSnapshot.size.toULong(),
+          tileSnapshot.size.toCSize(),
           StyleStructs.tileSourceOptions(options, this),
           completion,
         )
@@ -693,7 +706,7 @@ private constructor(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.stringViewArray(tileSnapshot, this),
-          tileSnapshot.size.toULong(),
+          tileSnapshot.size.toCSize(),
           StyleStructs.tileSourceOptions(options, this),
           completion,
         )
@@ -707,15 +720,17 @@ private constructor(
     options: StyleImageOptions,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_style_image(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(imageId, this),
-          StyleStructs.premultipliedRgba8Image(image, this),
-          StyleStructs.styleImageOptions(options, this),
-          completion,
+      StyleStructs.withPremultipliedRgba8Image(image, this) { nativeImage ->
+        Status.check(
+          mln_map_set_style_image(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(imageId, this),
+            nativeImage,
+            StyleStructs.styleImageOptions(options, this),
+            completion,
+          )
         )
-      )
+      }
     }
   }
 
@@ -735,7 +750,7 @@ private constructor(
   public actual fun styleImageInfo(imageId: String): Deferred<StyleImageInfo?> = memScoped {
     CompletionBridge.submit(
       { result ->
-        if (result.pointed.value_count == 0uL) null
+        if (result.pointed.value_count.toULong() == 0uL) null
         else
           StyleStructs.styleImageInfo(
             result.pointed.value!!.reinterpret<mln_style_image_result>().pointed.info
@@ -756,14 +771,14 @@ private constructor(
   ): Deferred<Pair<List<ImageStretch>, List<ImageStretch>>?> = memScoped {
     CompletionBridge.submit(
       { result ->
-        if (result.pointed.value_count == 0uL) null
+        if (result.pointed.value_count.toULong() == 0uL) null
         else {
           val value = result.pointed.value!!.reinterpret<mln_style_image_stretches_result>().pointed
           val copy = { values: CPointer<mln_image_stretch>?, count: ULong ->
             List(count.toInt()) { index -> ImageStretch(values!![index].from, values[index].to) }
           }
-          copy(value.stretch_x, value.stretch_x_count) to
-            copy(value.stretch_y, value.stretch_y_count)
+          copy(value.stretch_x, value.stretch_x_count.toULong()) to
+            copy(value.stretch_y, value.stretch_y_count.toULong())
         }
       },
       { completion ->
@@ -780,7 +795,7 @@ private constructor(
     memScoped {
       CompletionBridge.submit(
         { result ->
-          if (result.pointed.value_count == 0uL) null
+          if (result.pointed.value_count.toULong() == 0uL) null
           else {
             val value = result.pointed.value!!.reinterpret<mln_style_image_result>().pointed
             val info = StyleStructs.styleImageInfo(value.info)
@@ -818,7 +833,7 @@ private constructor(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.latLngArray(coordinateSnapshot, this),
-          coordinateSnapshot.size.toULong(),
+          coordinateSnapshot.size.toCSize(),
           CoreStructs.stringView(url, this),
           completion,
         )
@@ -833,16 +848,18 @@ private constructor(
   ): Deferred<CommandCompletion> = command { completion ->
     val coordinateSnapshot = coordinates.toList()
     memScoped {
-      Status.check(
-        mln_map_add_image_source_image(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          CoreStructs.latLngArray(coordinateSnapshot, this),
-          coordinateSnapshot.size.toULong(),
-          StyleStructs.premultipliedRgba8Image(image, this),
-          completion,
+      StyleStructs.withPremultipliedRgba8Image(image, this) { nativeImage ->
+        Status.check(
+          mln_map_add_image_source_image(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            CoreStructs.latLngArray(coordinateSnapshot, this),
+            coordinateSnapshot.size.toCSize(),
+            nativeImage,
+            completion,
+          )
         )
-      )
+      }
     }
   }
 
@@ -865,14 +882,16 @@ private constructor(
     image: PremultipliedRgba8Image,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_image_source_image(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          StyleStructs.premultipliedRgba8Image(image, this),
-          completion,
+      StyleStructs.withPremultipliedRgba8Image(image, this) { nativeImage ->
+        Status.check(
+          mln_map_set_image_source_image(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            nativeImage,
+            completion,
+          )
         )
-      )
+      }
     }
   }
 
@@ -887,7 +906,7 @@ private constructor(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.latLngArray(coordinateSnapshot, this),
-          coordinateSnapshot.size.toULong(),
+          coordinateSnapshot.size.toCSize(),
           completion,
         )
       )
@@ -897,7 +916,7 @@ private constructor(
   public actual fun imageSourceCoordinates(sourceId: String): Deferred<List<LatLng>?> = memScoped {
     CompletionBridge.submit(
       { result ->
-        val count = result.pointed.value_count
+        val count = result.pointed.value_count.toULong()
         if (count == 0uL) null
         else
           CoreStructs.latLngArray(result.pointed.value!!.reinterpret<mln_lat_lng>(), count.toInt())
@@ -1064,7 +1083,7 @@ private constructor(
   public actual fun styleLayerInfo(layerId: String): Deferred<LayerInfo?> = memScoped {
     CompletionBridge.submit(
       { result ->
-        if (result.pointed.value_count == 0uL) null
+        if (result.pointed.value_count.toULong() == 0uL) null
         else {
           val raw = result.pointed.value!!.reinterpret<mln_style_layer_result>().pointed
           val info = raw.info
@@ -1330,39 +1349,6 @@ private constructor(
         )
       },
     )
-  }
-
-  private fun copyMapBytes(
-    copy: (ULong, CPointer<UByteVar>?, ULong, CPointer<ULongVar>) -> Int
-  ): ByteArray = memScoped {
-    val handle = state.requireLive().rawHandleValue
-    val outSize = alloc<ULongVar>()
-    Status.check(copy(handle, null, 0UL, outSize.ptr))
-    val required = checkedInt(outSize.value, "map byte size")
-    if (required == 0) return@memScoped ByteArray(0)
-
-    val buffer = allocArray<UByteVar>(required)
-    val outCopied = alloc<ULongVar>()
-    Status.check(copy(handle, buffer, required.toULong(), outCopied.ptr))
-    buffer.reinterpret<ByteVar>().readBytes(checkedInt(outCopied.value, "map copied byte size"))
-  }
-
-  private fun copyLayerText(
-    layerId: String,
-    copy: (ULong, CValue<mln_buffer_view>, CPointer<ByteVar>?, ULong, CPointer<ULongVar>) -> Int,
-  ): String = memScoped {
-    val handle = state.requireLive().rawHandleValue
-    val outSize = alloc<ULongVar>()
-    Status.check(copy(handle, CoreStructs.stringView(layerId, this), null, 0UL, outSize.ptr))
-    val required = checkedInt(outSize.value, "layer text size")
-    if (required == 0) return@memScoped ""
-
-    val buffer = allocArray<ByteVar>(required)
-    val outCopied = alloc<ULongVar>()
-    Status.check(
-      copy(handle, CoreStructs.stringView(layerId, this), buffer, required.toULong(), outCopied.ptr)
-    )
-    buffer.readBytes(checkedInt(outCopied.value, "layer copied text size")).decodeToString()
   }
 
   public actual fun setLayerMinZoom(layerId: String, minZoom: Double): Deferred<CommandCompletion> =
@@ -1698,11 +1684,6 @@ private constructor(
 
   internal fun nativeHandleId(): Long = state.handleId()
 
-  private fun checkedInt(value: ULong, name: String): Int {
-    require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }
-    return value.toInt()
-  }
-
   public actual companion object {
     public actual fun create(runtime: RuntimeHandle, options: MapOptions): Deferred<MapHandle> =
       memScoped {
@@ -1760,13 +1741,13 @@ private constructor(
 
 @OptIn(ExperimentalForeignApi::class)
 private fun bufferCompletion(result: CPointer<mln_completion_result>): ByteArray? {
-  if (result.pointed.value_count == 0uL) return null
+  if (result.pointed.value_count.toULong() == 0uL) return null
   return ByteStructs.copyBufferView(result.pointed.value!!.reinterpret<mln_buffer_view>().pointed)
 }
 
 @OptIn(ExperimentalForeignApi::class)
 private fun stringViewsCompletion(result: CPointer<mln_completion_result>): List<String> {
-  val count = result.pointed.value_count
+  val count = result.pointed.value_count.toULong()
   if (count == 0uL) return emptyList()
   require(count <= Int.MAX_VALUE.toULong()) { "string count exceeds Int.MAX_VALUE" }
   val values = result.pointed.value!!.reinterpret<mln_buffer_view>()

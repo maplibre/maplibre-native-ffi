@@ -36,7 +36,7 @@ function(mln_ffi_configure_platform_dependencies target)
     ${target}
     PROPERTIES
       MLN_FFI_DEFAULT_LOGGING_STDERR
-      TRUE
+      FALSE
       MLN_FFI_DEFAULT_THREAD_LOCAL
       FALSE
       MLN_FFI_SHARED_SUPPORTED
@@ -74,27 +74,28 @@ function(mln_ffi_configure_platform target)
   include("${MLN_FFI_SOURCE_DIR}/vendor/icu.cmake")
 
   set(MLN_FFI_VENDOR_WINDOWS_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/collator.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/text/bidi.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/text/local_glyph_rasterizer.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/async_task.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/png_writer.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/run_loop.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/string_stdlib.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/collator.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/bidi.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/local_glyph_rasterizer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/async_task.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/png_writer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/run_loop.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/string_stdlib.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/timer.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/windows/src/thread.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/windows/src/thread_local.cpp)
 
   set(MLN_FFI_WINDOWS_SOURCES
       ${PROJECT_SOURCE_DIR}/src/platform/rust/http_file_source.cpp
-      ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp)
+      ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/windows/logging_debugger.cpp)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_WINDOWS_SOURCES})
   mln_ffi_target_project_sources(${target} ${MLN_FFI_WINDOWS_SOURCES})
 
   set_source_files_properties(
-    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
+    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
     PROPERTIES COMPILE_DEFINITIONS MBGL_USE_BUILTIN_ICU)
 
   target_include_directories(

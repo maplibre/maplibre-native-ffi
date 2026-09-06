@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <memory>
 
-#include <mbgl/util/size.hpp>
+#include <mln/util/size.hpp>
 
 #include <Metal/MTLDevice.hpp>
 #include <Metal/MTLPixelFormat.hpp>

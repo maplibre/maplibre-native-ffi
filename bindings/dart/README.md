@@ -12,7 +12,7 @@ toolchain. From the repository root:
 
 ```bash
 mise run //bindings/dart:test
-mise run //bindings/dart:test linux-x64-vulkan
+mise run //bindings/dart:test linux-gnu-x64-vulkan
 mise run //bindings/dart:build:mobile android-arm64-egl
 mise run //bindings/dart:build:mobile ios-arm64-metal
 mise run //bindings/dart:build:mobile ios-simulator-arm64-metal
@@ -101,6 +101,13 @@ Resource-request completion is one-shot. Calling `complete()` or `close()`
 releases the provider reference even when completion reports a native error.
 Callback exceptions are contained at the native boundary and reported through
 the native diagnostic path.
+
+`ResourceRequestHandle.setCancelCallback()` registers one callback per request
+that runs when MapLibre discards a request the provider left open. The binding
+queues the callback to the isolate that registered it, and a request that is
+already cancelled runs the callback before registration returns. Register,
+complete, and release such a request on that isolate. An exception the callback
+throws is contained inside the binding.
 
 Unsigned C `uint64_t` JSON values, feature identifiers, and camera transition
 IDs use Dart `BigInt` so the complete native range is preserved. Native buffers

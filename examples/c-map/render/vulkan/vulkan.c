@@ -426,8 +426,9 @@ static mln_vulkan_borrowed_texture_descriptor borrowed_image_descriptor(
   descriptor.physical_height = current_viewport.physical_height;
   descriptor.context =
     vulkan_context_descriptor(&target->as.borrowed.compositor.context);
-  descriptor.image = target->as.borrowed.image.image;
-  descriptor.image_view = target->as.borrowed.image.view;
+  descriptor.image = vulkan_image_to_abi(target->as.borrowed.image.image);
+  descriptor.image_view =
+    vulkan_image_view_to_abi(target->as.borrowed.image.view);
   descriptor.format = borrowed_image_format;
   descriptor.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
   descriptor.final_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -471,7 +472,8 @@ app_error render_target_attach(
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         vulkan_context_descriptor(&target->as.surface.context);
-      descriptor.surface = target->as.surface.context.surface;
+      descriptor.surface =
+        vulkan_surface_to_abi(target->as.surface.context.surface);
       kind = RENDER_SESSION_SURFACE;
       error = APP_ERROR_SURFACE_ATTACH_FAILED;
       status = mln_vulkan_surface_attach(
@@ -627,7 +629,8 @@ static app_error render_update_owned(
   }
   bool presented = false;
   const app_error error = vulkan_compositor_present_image_view(
-    &target->as.owned.compositor, frame.image_view, &presented
+    &target->as.owned.compositor, vulkan_image_view_from_abi(frame.image_view),
+    &presented
   );
   if (error != APP_OK || !presented) {
     mln_gpu_sync sync = mln_gpu_sync_default();

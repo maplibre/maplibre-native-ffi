@@ -505,8 +505,8 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
             PhysicalWidth = viewport.PhysicalWidth,
             PhysicalHeight = viewport.PhysicalHeight,
             Context = context.Descriptor(),
-            Image = image.ImagePointer,
-            ImageView = image.ViewPointer,
+            Image = image.ImageHandle,
+            ImageView = image.ViewHandle,
             Format = (uint)VulkanBorrowedImage.ImageFormat,
             InitialLayout = (uint)VulkanBorrowedImage.InitialLayout,
             FinalLayout = (uint)VulkanBorrowedImage.FinalLayout,
@@ -561,7 +561,7 @@ internal sealed class NativeSurfaceRenderTarget : IRenderTarget
                     new VulkanSurfaceDescriptor
                     {
                         Extent = viewport.RenderTargetExtent,
-                        Surface = vulkan.SurfacePointer(),
+                        Surface = vulkan.SurfaceHandle(),
                         Context = vulkan.Descriptor(),
                     },
                     null

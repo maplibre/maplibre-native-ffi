@@ -18,13 +18,13 @@
 #include <unordered_set>
 #include <vector>
 
-#include <mbgl/actor/scheduler.hpp>
-#include <mbgl/gfx/headless_backend.hpp>
-#include <mbgl/gfx/renderer_backend.hpp>
-#include <mbgl/renderer/renderer.hpp>
-#include <mbgl/renderer/renderer_observer.hpp>
-#include <mbgl/util/feature.hpp>
-#include <mbgl/util/size.hpp>
+#include <mln/actor/scheduler.hpp>
+#include <mln/gfx/headless_backend.hpp>
+#include <mln/gfx/renderer_backend.hpp>
+#include <mln/renderer/renderer.hpp>
+#include <mln/renderer/renderer_observer.hpp>
+#include <mln/util/feature.hpp>
+#include <mln/util/size.hpp>
 
 #include "diagnostics/diagnostics.hpp"
 #include "handles/handle_table.hpp"

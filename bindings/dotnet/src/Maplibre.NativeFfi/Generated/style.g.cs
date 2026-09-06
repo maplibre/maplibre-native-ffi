@@ -634,6 +634,9 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_map_get_style_source_info([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_set_style_source_volatile([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("bool")] byte is_volatile, [NativeTypeName("const mln_completion *")] mln_completion* completion);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_copy_style_source_attribution([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

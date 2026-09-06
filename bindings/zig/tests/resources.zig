@@ -610,8 +610,9 @@ const PmtilesRangeProviderState = struct {
     saw_style_absent_range: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     recorded_pmtiles_request: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     saw_source_kind: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
-    range_start: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
-    range_end: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
+    range_lock: std.atomic.Mutex = .unlocked,
+    range_start: u64 = 0,
+    range_end: u64 = 0,
 
     fn markStyle(self: *PmtilesRangeProviderState, request: maplibre.ResourceRequest) void {
         self.saw_style_absent_range.store(request.range == null, .seq_cst);
@@ -620,15 +621,23 @@ const PmtilesRangeProviderState = struct {
     fn markPmtilesRequest(self: *PmtilesRangeProviderState, request: maplibre.ResourceRequest) void {
         self.saw_source_kind.store(std.meta.eql(request.kind, maplibre.ResourceKind.source), .seq_cst);
         if (request.range) |range| {
-            self.range_start.store(range.start, .seq_cst);
-            self.range_end.store(range.end, .seq_cst);
+            while (!self.range_lock.tryLock()) {
+                std.Thread.yield() catch {};
+            }
+            defer self.range_lock.unlock();
+            self.range_start = range.start;
+            self.range_end = range.end;
         }
         self.recorded_pmtiles_request.store(true, .seq_cst);
     }
 
     fn expectObservedRequest(self: *PmtilesRangeProviderState) !void {
-        const start = self.range_start.load(.seq_cst);
-        const end = self.range_end.load(.seq_cst);
+        while (!self.range_lock.tryLock()) {
+            std.Thread.yield() catch {};
+        }
+        defer self.range_lock.unlock();
+        const start = self.range_start;
+        const end = self.range_end;
         try testing.expect(self.saw_style_absent_range.load(.seq_cst));
         try testing.expect(self.recorded_pmtiles_request.load(.seq_cst));
         try testing.expect(self.saw_source_kind.load(.seq_cst));
@@ -1405,6 +1414,208 @@ test "resource provider observes cancellation before late completion" {
     const diagnostic = diagnostics.get().?;
     try testing.expectEqual(@as(?i32, -2), diagnostic.raw_status);
     try testing.expect(diagnostic.message.len > 0);
+}
+
+// BND-198 covers the cancel callback a provider registers on a handled request.
+const CancelProbeState = struct {
+    handle_lock: std.atomic.Mutex = .unlocked,
+    handle: ?maplibre.ResourceRequestHandle = null,
+    registered: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+    cancels: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
+    register_when_handled: bool = false,
+    complete_when_handled: bool = false,
+    release_inside_callback: bool = false,
+
+    fn storeHandle(self: *CancelProbeState, handle: maplibre.ResourceRequestHandle) void {
+        self.lockHandle();
+        defer self.unlockHandle();
+        self.handle = handle;
+    }
+
+    fn readHandle(self: *CancelProbeState) ?maplibre.ResourceRequestHandle {
+        self.lockHandle();
+        defer self.unlockHandle();
+        return self.handle;
+    }
+
+    fn lockHandle(self: *CancelProbeState) void {
+        while (!self.handle_lock.tryLock()) {
+            std.Thread.yield() catch {};
+        }
+    }
+
+    fn unlockHandle(self: *CancelProbeState) void {
+        self.handle_lock.unlock();
+    }
+};
+
+fn recordCancel(context: ?*anyopaque) void {
+    const state: *CancelProbeState = @ptrCast(@alignCast(context.?));
+    // The release runs before the count, so a test that waits on the count
+    // observes a handle the callback has already retired.
+    if (state.release_inside_callback) {
+        if (state.readHandle()) |handle| handle.release();
+    }
+    _ = state.cancels.fetchAdd(1, .seq_cst);
+}
+
+fn cancelProbeProvider(
+    context: ?*anyopaque,
+    request: maplibre.ResourceRequest,
+    maybe_handle: ?maplibre.ResourceRequestHandle,
+) maplibre.ResourceProviderDecision {
+    if (!std.mem.eql(u8, request.requested_url, "custom://cancel-style.json")) return .pass_through;
+    const handle = maybe_handle orelse return .pass_through;
+    const state: *CancelProbeState = @ptrCast(@alignCast(context.?));
+    state.storeHandle(handle);
+    if (state.register_when_handled) {
+        handle.setCancelCallback(.{ .handler = recordCancel, .context = state }) catch {
+            handle.release();
+            return .pass_through;
+        };
+    }
+    if (state.complete_when_handled) {
+        handle.complete(.{ .bytes = support.style_json }) catch {
+            handle.release();
+            return .pass_through;
+        };
+    }
+    state.registered.store(true, .seq_cst);
+    return .handle;
+}
+
+/// Reports whether the cancel callback ran at least `expected` times within
+/// `attempts` milliseconds.
+fn cancelCountReaches(
+    counter: *std.atomic.Value(usize),
+    expected: usize,
+    attempts: usize,
+) !bool {
+    for (0..attempts) |_| {
+        if (counter.load(.seq_cst) >= expected) return true;
+        try sleepOneMillisecond();
+    }
+    return false;
+}
+
+const CancelProbeRequest = struct {
+    map: maplibre.MapHandle,
+    handle: maplibre.ResourceRequestHandle,
+};
+
+/// Installs `state` as the runtime's resource provider and drives a map style
+/// load through it, returning the map and the request the provider handled.
+fn startCancelProbeRequest(
+    runtime: *maplibre.RuntimeHandle,
+    state: *CancelProbeState,
+) !CancelProbeRequest {
+    _ = try runtime.setResourceProvider(.{ .handler = cancelProbeProvider, .context = state });
+
+    var map_future = try maplibre.MapHandle.create(runtime, .{});
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
+    errdefer map.close() catch {};
+    _ = try map.setStyleUrl(testing.allocator, "custom://cancel-style.json");
+
+    for (0..5000) |_| {
+        if (state.registered.load(.seq_cst)) {
+            return .{ .map = map, .handle = state.readHandle().? };
+        }
+        try sleepOneMillisecond();
+    }
+    return error.ProviderNotCalled;
+}
+
+test "cancel callback runs once when the map discards a handled request (BND-198)" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+
+    var state = CancelProbeState{ .register_when_handled = true };
+    var probe = try startCancelProbeRequest(&runtime, &state);
+    defer probe.handle.release();
+
+    try testing.expectError(error.InvalidState, probe.handle.setCancelCallback(.{ .handler = recordCancel, .context = &state }));
+    try testing.expectEqual(@as(usize, 0), state.cancels.load(.seq_cst));
+
+    try probe.map.close();
+    try testing.expect(try cancelCountReaches(&state.cancels, 1, 5000));
+    try testing.expect(try probe.handle.cancelled());
+    try testing.expectError(error.InvalidState, probe.handle.complete(.{ .bytes = support.style_json }));
+
+    // The registration stays in place after it ran, so the request still
+    // rejects another one and nothing runs a second time.
+    try testing.expectError(error.InvalidState, probe.handle.setCancelCallback(.{ .handler = recordCancel, .context = &state }));
+    try testing.expectEqual(@as(usize, 1), state.cancels.load(.seq_cst));
+
+    probe.handle.release();
+    try testing.expectError(error.ClosedHandle, probe.handle.setCancelCallback(.{ .handler = recordCancel, .context = &state }));
+    try testing.expectEqual(@as(usize, 1), state.cancels.load(.seq_cst));
+}
+
+test "cancel callback can release its own resource request (BND-198)" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+
+    var state = CancelProbeState{ .register_when_handled = true, .release_inside_callback = true };
+    var probe = try startCancelProbeRequest(&runtime, &state);
+
+    try probe.map.close();
+    // The callback releases before it counts, so the count proves the handle
+    // is already retired.
+    try testing.expect(try cancelCountReaches(&state.cancels, 1, 5000));
+    try testing.expectError(error.ClosedHandle, probe.handle.cancelled());
+    try testing.expectError(error.ClosedHandle, probe.handle.setCancelCallback(.{ .handler = recordCancel, .context = &state }));
+    try testing.expectEqual(@as(usize, 1), state.cancels.load(.seq_cst));
+    // A second release of the handle the callback already released is a no-op.
+    probe.handle.release();
+}
+
+test "cancel callback registered after cancellation runs before registration returns (BND-198)" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+
+    var state = CancelProbeState{};
+    var probe = try startCancelProbeRequest(&runtime, &state);
+    defer probe.handle.release();
+
+    try probe.map.close();
+    try waitForRequestCancellation(&runtime, probe.handle);
+    try testing.expectEqual(@as(usize, 0), state.cancels.load(.seq_cst));
+
+    try probe.handle.setCancelCallback(.{ .handler = recordCancel, .context = &state });
+    try testing.expectEqual(@as(usize, 1), state.cancels.load(.seq_cst));
+    try testing.expectError(error.InvalidState, probe.handle.setCancelCallback(.{ .handler = recordCancel, .context = &state }));
+    try testing.expectEqual(@as(usize, 1), state.cancels.load(.seq_cst));
+}
+
+test "cancel callback registered after cancellation can release its own request (BND-198)" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+
+    var state = CancelProbeState{ .release_inside_callback = true };
+    var probe = try startCancelProbeRequest(&runtime, &state);
+
+    try probe.map.close();
+    try waitForRequestCancellation(&runtime, probe.handle);
+    try probe.handle.setCancelCallback(.{ .handler = recordCancel, .context = &state });
+    try testing.expectEqual(@as(usize, 1), state.cancels.load(.seq_cst));
+    try testing.expectError(error.ClosedHandle, probe.handle.cancelled());
+}
+
+test "cancel callback stays silent for a completed resource request (BND-198)" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+
+    var state = CancelProbeState{ .register_when_handled = true, .complete_when_handled = true };
+    var probe = try startCancelProbeRequest(&runtime, &state);
+    defer probe.handle.release();
+
+    // Let the response reach the style before the map goes away.
+    try waitForStyleLoaded(&runtime);
+    try probe.map.close();
+    try support.waitForBarrier(&runtime);
+    try testing.expect(!(try cancelCountReaches(&state.cancels, 1, 200)));
+    try testing.expectEqual(@as(usize, 0), state.cancels.load(.seq_cst));
 }
 
 test "offline region download control emits copied status events" {

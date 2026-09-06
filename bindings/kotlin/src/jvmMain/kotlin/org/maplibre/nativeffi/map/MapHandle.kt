@@ -141,6 +141,14 @@ private constructor(
     return NativeAccess.styleSourceInfo(requireLiveHandle(), sourceId)
   }
 
+  public actual fun setStyleSourceVolatile(
+    sourceId: String,
+    isVolatile: Boolean,
+  ): Deferred<CommandCompletion> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.setStyleSourceVolatile(requireLiveHandle(), sourceId, isVolatile)
+  }
+
   public actual fun styleSourceIds(): Deferred<List<String>> {
     NativeAccess.ensureLoaded()
     return NativeAccess.styleSourceIds(requireLiveHandle())

@@ -671,8 +671,8 @@ private fun vulkanBorrowedTextureDescriptor(
     physical_width(descriptor.physicalWidth)
     physical_height(descriptor.physicalHeight)
     setVulkanContext(context(), descriptor.context)
-    image(pointerOrNull(descriptor.image))
-    image_view(pointerOrNull(descriptor.imageView))
+    image(descriptor.image.bits)
+    image_view(descriptor.imageView.bits)
     format(descriptor.format)
     initial_layout(descriptor.initialLayout)
     descriptor.finalLayout?.let { final_layout(it) }
@@ -684,7 +684,7 @@ private fun vulkanSurfaceDescriptor(
   MaplibreNativeC.mln_vulkan_surface_descriptor_default().apply {
     setExtent(extent(), descriptor.extent)
     setVulkanContext(context(), descriptor.context)
-    surface(pointerOrNull(descriptor.surface))
+    surface(descriptor.surface.bits)
   }
 
 private fun openglOwnedTextureDescriptor(
@@ -805,8 +805,8 @@ private fun vulkanOwnedTextureFrame(
     frame.height(),
     frame.scale_factor(),
     frame.frame_id(),
-    NativePointer.scoped(address(frame.image()), scope),
-    NativePointer.scoped(address(frame.image_view()), scope),
+    VulkanHandle.scoped(frame.image(), scope),
+    VulkanHandle.scoped(frame.image_view(), scope),
     NativePointer.scoped(address(frame.device()), scope),
     frame.format(),
     frame.layout(),
@@ -1115,8 +1115,8 @@ internal object JavaCppRenderStructs {
         it.extent().width(),
         it.extent().height(),
         it.extent().scale_factor(),
-        address(it.image()),
-        address(it.image_view()),
+        it.image(),
+        it.image_view(),
         it.final_layout(),
       )
     }

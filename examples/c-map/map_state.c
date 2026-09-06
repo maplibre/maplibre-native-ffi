@@ -1,9 +1,29 @@
+#if !defined(_WIN32)
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <stdatomic.h>
-#include <threads.h>
 
 #include "map_state.h"
 
 #include "diagnostics.h"
+
+#if defined(_WIN32)
+#include <windows.h>
+#else
+#include <sched.h>
+#endif
+
+/// Hands the processor to the runtime threads that complete the operations
+/// this file waits on. The Apple SDK ships no C11 <threads.h>, so the wait
+/// yields through the platform primitive rather than thrd_yield.
+static void yield_to_runtime(void) {
+#if defined(_WIN32)
+  Sleep(0);
+#else
+  sched_yield();
+#endif
+}
 
 typedef struct map_create_completion {
   atomic_bool completed;
@@ -77,7 +97,7 @@ static app_error create_map(map_state* state, viewport initial_viewport) {
     return APP_ERROR_MAP_CREATE_FAILED;
   }
   while (!atomic_load_explicit(&result.completed, memory_order_acquire)) {
-    thrd_yield();
+    yield_to_runtime();
   }
   if (result.status != MLN_STATUS_OK || result.map == MLN_HANDLE_NULL) {
     diagnostics_log_status("map create failed", result.status);
@@ -164,7 +184,7 @@ void map_state_deinit(map_state* state) {
       diagnostics_log_status("map release failed", status);
     else
       while (!atomic_load_explicit(&teardown.completed, memory_order_acquire))
-        thrd_yield();
+        yield_to_runtime();
     state->map = MLN_HANDLE_NULL;
   }
   if (state->runtime != MLN_HANDLE_NULL) {
@@ -176,7 +196,7 @@ void map_state_deinit(map_state* state) {
       // Waiting for the completion keeps process exit ordered after native
       // teardown.
       while (!atomic_load_explicit(&teardown.completed, memory_order_acquire)) {
-        thrd_yield();
+        yield_to_runtime();
       }
     }
     state->runtime = MLN_HANDLE_NULL;

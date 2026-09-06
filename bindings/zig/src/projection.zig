@@ -136,6 +136,20 @@ pub const MapProjectionHandle = enum(c.mln_map_projection) {
         return values.latLngFromNative(coordinate);
     }
 
+    /// Converts a screen point to an unwrapped geographic coordinate. The
+    /// longitude preserves the visible world copy. Synchronous, callable from
+    /// any thread, like `latLngForPixel`.
+    pub fn latLngForPixelUnwrapped(self: *MapProjectionHandle, point: values.ScreenPoint) status.Error!values.LatLng {
+        const lease = try projectionLease(self.*);
+        defer lease.release();
+        var coordinate: c.mln_lat_lng = undefined;
+        try status.checkStatus(
+            c.mln_map_projection_lat_lng_for_pixel_unwrapped(lease.native, values.screenPointToNative(point), &coordinate),
+            lease.diagnostic_store,
+        );
+        return values.latLngFromNative(coordinate);
+    }
+
     /// Closes the projection before returning. Synchronous, callable from any
     /// thread.
     pub fn close(self: *MapProjectionHandle) status.Error!void {

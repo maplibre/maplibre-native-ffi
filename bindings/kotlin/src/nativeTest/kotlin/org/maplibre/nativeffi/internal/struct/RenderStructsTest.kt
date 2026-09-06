@@ -10,6 +10,8 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import org.maplibre.nativeffi.internal.c.mln_texture_image_info
+import org.maplibre.nativeffi.internal.memory.CSizeVar
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.render.EglContextDescriptor
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalContextDescriptor
@@ -25,6 +27,7 @@ import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.render.TextureImageInfo
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
+import org.maplibre.nativeffi.render.VulkanHandle
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 
 @OptIn(ExperimentalForeignApi::class)
@@ -37,12 +40,14 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
         info.width = 2U
         info.height = 3U
         info.stride = 8U
-        info.byte_length = 24UL
+        info.byte_length = 24.toCSize()
 
         assertEquals(TextureImageInfo(2, 3, 8, 24), RenderStructs.textureImageInfo(info))
 
-        info.byte_length = Long.MAX_VALUE.toULong() + 1UL
-        assertFailsWith<IllegalArgumentException> { RenderStructs.textureImageInfo(info) }
+        if (kotlinx.cinterop.sizeOf<CSizeVar>() == 8L) {
+          info.byte_length = (Long.MAX_VALUE.toULong() + 1UL).toCSize()
+          assertFailsWith<IllegalArgumentException> { RenderStructs.textureImageInfo(info) }
+        }
       }
     }
 
@@ -114,8 +119,8 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
                   65,
                   33,
                   context,
-                  NativePointer.ofAddress(0x50L),
-                  NativePointer.ofAddress(0x60L),
+                  VulkanHandle.ofBits(Long.MIN_VALUE),
+                  VulkanHandle.ofBits(-1L),
                   44,
                   1,
                 )
@@ -127,6 +132,8 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
         assertEquals(7U, borrowed.context.graphics_queue_family_index)
         assertFalse(borrowed.context.get_instance_proc_addr == null)
         assertFalse(borrowed.context.get_device_proc_addr == null)
+        assertEquals(Long.MIN_VALUE.toULong(), borrowed.image)
+        assertEquals(ULong.MAX_VALUE, borrowed.image_view)
         assertEquals(44U, borrowed.format)
         assertEquals(2U, borrowed.final_layout)
 
@@ -135,12 +142,12 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
               VulkanSurfaceDescriptor(
                 RenderTargetExtent(256, 256, 1.0),
                 context,
-                NativePointer.ofAddress(0x70L),
+                VulkanHandle.ofBits(0x70L),
               ),
               this,
             )
             .pointed
-        assertFalse(surface.surface == null)
+        assertEquals(0x70UL, surface.surface)
       }
     }
 

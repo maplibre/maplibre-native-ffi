@@ -638,6 +638,7 @@ fn addAndroidTestRunStep(
     target: std.Build.ResolvedTarget,
     native_install_dir: std.Build.LazyPath,
     android_runner: std.Build.LazyPath,
+    emulator_api: ?[]const u8,
 ) *std.Build.Step.Run {
     const abi = switch (target.result.cpu.arch) {
         .aarch64 => "arm64-v8a",
@@ -650,8 +651,11 @@ fn addAndroidTestRunStep(
         "180",
         abi,
         installPath(b, native_install_dir, "lib/libmaplibre-native-c.so").getPath(b),
-        "--",
     });
+    if (emulator_api) |api| {
+        run_tests.addArgs(&.{ "--api", api });
+    }
+    run_tests.addArg("--");
     for (tests) |test_executable| {
         run_tests.addArtifactArg(test_executable);
     }
@@ -726,6 +730,7 @@ pub fn build(b: *std.Build) void {
             options.target,
             options.native_install_dir,
             b.path("scripts/run-android-emulator-test.sh"),
+            if (options.target.result.cpu.arch == .x86_64 and options.render_backend == .opengl) "26" else null,
         );
         test_step.dependOn(&run_tests.step);
     } else {

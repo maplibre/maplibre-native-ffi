@@ -8,7 +8,7 @@ function(mln_ffi_configure_renderer target)
   target_compile_definitions(${target} PRIVATE MLN_RENDER_BACKEND_METAL=1)
 
   set(MLN_FFI_VENDOR_METAL_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/mtl/headless_backend.cpp)
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/mtl/headless_backend.cpp)
   set(MLN_FFI_METAL_SOURCES
       ${PROJECT_SOURCE_DIR}/src/render/metal/metal_texture_session.mm
       ${PROJECT_SOURCE_DIR}/src/render/metal/metal_texture_backend.mm

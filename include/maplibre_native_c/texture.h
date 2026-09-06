@@ -107,13 +107,13 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
    * physical size: the session builds a framebuffer at that size, and Vulkan
    * leaves a framebuffer larger than its attachment undefined.
    */
-  void* image;
+  mln_vulkan_non_dispatchable_handle image;
   /**
    * Borrowed VkImageView for image. Required.
    *
    * The view must be a 2D color view that matches image and format.
    */
-  void* image_view;
+  mln_vulkan_non_dispatchable_handle image_view;
   /** Backend-native VkFormat value for image. VK_FORMAT_UNDEFINED is invalid.
    */
   uint32_t format;
@@ -141,10 +141,10 @@ typedef struct mln_vulkan_owned_texture_frame {
   double scale_factor;
   /** Opaque frame identity used to reject stale releases. */
   uint64_t frame_id;
-  /** Borrowed VkImage. Valid until frame release. */
-  void* image;
-  /** Borrowed VkImageView. Valid until frame release. */
-  void* image_view;
+  /** Borrowed VkImage bit pattern. Valid until frame release. */
+  mln_vulkan_non_dispatchable_handle image;
+  /** Borrowed VkImageView bit pattern. Valid until frame release. */
+  mln_vulkan_non_dispatchable_handle image_view;
   /** Borrowed VkDevice. Valid until frame release. */
   void* device;
   /** Backend-native VkFormat value. */
@@ -477,7 +477,12 @@ MLN_API mln_status mln_acquired_frame_get_metal_texture(
   mln_acquired_frame frame, mln_metal_owned_texture_frame* out_frame
 ) MLN_NOEXCEPT;
 
-/** Copies Vulkan-native metadata from an acquired frame. */
+/**
+ * Copies Vulkan-native metadata from an acquired frame.
+ *
+ * The image and image view handles and the device pointer are borrowed and
+ * remain valid only until mln_acquired_frame_release().
+ */
 MLN_API mln_status mln_acquired_frame_get_vulkan_texture(
   mln_acquired_frame frame, mln_vulkan_owned_texture_frame* out_frame
 ) MLN_NOEXCEPT;

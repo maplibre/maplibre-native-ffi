@@ -114,6 +114,61 @@ test "map converts between lat lngs and screen points" {
     try testing.expectEqual(@as(usize, 0), empty_coordinates.items.len);
 }
 
+test "unwrapped coordinate conversions preserve visible world copies" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 1024, .height = 512 });
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
+    defer map.close() catch @panic("map close failed");
+
+    var camera_future = try map.updateCamera(.{ .camera = .{ .center = .{ .latitude = 0.0, .longitude = 180.0 }, .zoom = 0.0 } });
+    defer camera_future.deinit();
+    _ = try camera_future.wait(null);
+
+    const points = [_]maplibre.ScreenPoint{
+        .{ .x = 0.0, .y = 256.0 },
+        .{ .x = 1024.0, .y = 256.0 },
+    };
+
+    var wrapped_future = try map.latLngsForPixels(testing.allocator, points[0..]);
+    defer wrapped_future.deinit();
+    var wrapped = try wrapped_future.wait(null);
+    defer wrapped.deinit();
+    for (wrapped.items) |coordinate| {
+        try testing.expect(coordinate.longitude >= -180.0);
+        try testing.expect(coordinate.longitude <= 180.0);
+    }
+
+    var unwrapped_future = try map.latLngsForPixelsUnwrapped(testing.allocator, points[0..]);
+    defer unwrapped_future.deinit();
+    var unwrapped = try unwrapped_future.wait(null);
+    defer unwrapped.deinit();
+    try testing.expect(unwrapped.items[1].longitude - unwrapped.items[0].longitude > 360.0);
+
+    var wrapped_right_future = try map.latLngForPixel(points[1]);
+    defer wrapped_right_future.deinit();
+    const wrapped_right = try wrapped_right_future.wait(null);
+    try testing.expect(wrapped_right.longitude >= -180.0);
+    try testing.expect(wrapped_right.longitude <= 180.0);
+
+    var right_future = try map.latLngForPixelUnwrapped(points[1]);
+    defer right_future.deinit();
+    const right = try right_future.wait(null);
+    try expectLatLngApprox(unwrapped.items[1], right);
+
+    var projection_future = try maplibre.MapProjectionHandle.create(&map);
+    defer projection_future.deinit();
+    var projection = try projection_future.wait(null);
+    defer projection.close() catch @panic("projection close failed");
+
+    const projected_wrapped_right = try projection.latLngForPixel(points[1]);
+    try testing.expect(projected_wrapped_right.longitude >= -180.0);
+    try testing.expect(projected_wrapped_right.longitude <= 180.0);
+    const projected_right = try projection.latLngForPixelUnwrapped(points[1]);
+    try expectLatLngApprox(right, projected_right);
+}
+
 // Creation is ordered after every earlier map command, so a projection created
 // right after a camera command observes that command without an explicit wait.
 test "standalone projection converts and updates camera" {

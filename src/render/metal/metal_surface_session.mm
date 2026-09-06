@@ -1,12 +1,12 @@
 #include <memory>
 #include <stdexcept>
 
-#include <mbgl/gfx/backend_scope.hpp>
-#include <mbgl/mtl/context.hpp>
-#include <mbgl/mtl/renderable_resource.hpp>
-#include <mbgl/mtl/renderer_backend.hpp>
-#include <mbgl/mtl/texture2d.hpp>
-#include <mbgl/util/size.hpp>
+#include <mln/gfx/backend_scope.hpp>
+#include <mln/mtl/context.hpp>
+#include <mln/mtl/renderable_resource.hpp>
+#include <mln/mtl/renderer_backend.hpp>
+#include <mln/mtl/texture2d.hpp>
+#include <mln/util/size.hpp>
 
 #include <Foundation/NSSharedPtr.hpp>
 #include <Metal/MTLBlitPass.hpp>

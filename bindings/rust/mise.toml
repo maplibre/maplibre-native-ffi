@@ -9,11 +9,12 @@ export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
 # the target and point every tool that compiles or links at the platform SDK.
 source "$MISE_MONOREPO_ROOT/scripts/rust-cross-env.sh" "$usage_preset"
 if [[ -n "$cargo_target" ]]; then
-  exec cargo build \
+  cargo build \
     -p maplibre-native-ffi-sys \
     -p maplibre-native-ffi-core \
     -p maplibre-native-ffi \
     --target "$cargo_target"
+  exit 0
 fi
 exec cargo build \
   -p maplibre-native-ffi-sys \
@@ -22,7 +23,13 @@ exec cargo build \
 '''
 
 [tasks.test]
-extends = "ffi:preset"
+usage = '''
+arg "[preset]" default="{{vars.host_native_preset}}"
+arg "[profile]" default="dev" {
+  choices "dev" "release"
+}
+'''
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 # The preset selects the runner: Android presets and OpenHarmony x64 presets
 # push to an emulator, Emscripten presets run as a page in headless Chromium,
@@ -42,6 +49,20 @@ case "$usage_preset" in
 esac
 
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+if [[ "$usage_preset" == linux-musl-* ]]; then
+  # Rendering loads Alpine's graphics implementation, so the test process uses
+  # musl's dynamic loader while the packaged native archive remains static.
+  export MLN_FFI_RUST_MUSL_DYNAMIC=1
+fi
+source "$MISE_MONOREPO_ROOT/scripts/rust-cross-env.sh" "$usage_preset"
+cargo_args=()
+if [[ -n "$cargo_target" ]]; then
+  cargo_args+=(--target "$cargo_target")
+fi
+if [[ "$usage_profile" == "release" ]]; then
+  cargo_args+=(--release)
+fi
 # The sys crate's rpath covers only its own link targets, so the core and
 # umbrella test binaries need the library located at run time. Resolving it here
 # rather than through RUSTFLAGS keeps the preset out of the compiler command
@@ -52,38 +73,56 @@ if [[ -n "${MLN_FFI_VULKAN_LOADER_DIR:-}" ]]; then
 fi
 export LD_LIBRARY_PATH="$lib_dirs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export DYLD_LIBRARY_PATH="$lib_dirs${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
-export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
-cargo test \
+cargo test "${cargo_args[@]}" \
   -p maplibre-native-ffi-sys \
   -p maplibre-native-ffi-core \
   -p maplibre-native-ffi \
   -- --test-threads=1
-cargo clippy \
-  -p maplibre-native-ffi-sys \
-  -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  --all-targets -- -D warnings
+# Clippy is profile-independent. Every other host preset runs it against the
+# dev graph, so the release variant avoids compiling that graph a second time.
+if [[ "$usage_profile" == "dev" ]]; then
+  clippy_args=()
+  if [[ -n "$cargo_target" ]]; then
+    clippy_args+=(--target "$cargo_target")
+  fi
+  cargo clippy \
+    -p maplibre-native-ffi-sys \
+    -p maplibre-native-ffi-core \
+    -p maplibre-native-ffi \
+    "${clippy_args[@]}" --all-targets -- -D warnings
+fi
 '''
 run_windows = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
-cargo test \
+cargo_args=()
+if [[ "$usage_profile" == "release" ]]; then
+  cargo_args+=(--release)
+fi
+cargo test "${cargo_args[@]}" \
   -p maplibre-native-ffi-sys \
   -p maplibre-native-ffi-core \
   -p maplibre-native-ffi \
   -- --test-threads=1
-cargo clippy \
-  -p maplibre-native-ffi-sys \
-  -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  --all-targets -- -D warnings
+if [[ "$usage_profile" == "dev" ]]; then
+  cargo clippy \
+    -p maplibre-native-ffi-sys \
+    -p maplibre-native-ffi-core \
+    -p maplibre-native-ffi \
+    --all-targets -- -D warnings
+fi
 '''
 
 [tasks."test:download"]
 description = "Test the sys crate against a downloaded native snapshot archive."
 dir = "../.."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 # Stops at maplibre-native-ffi-sys: only the build script's acquisition path is
 # under test, and the crates above it stop compiling whenever the snapshot
 # release lags a header change in this commit.
-run = 'env -u MAPLIBRE_NATIVE_C_INSTALL_DIR cargo test -p maplibre-native-ffi-sys'
+run = '''
+python3 ci/native_download_fixture.py \
+  "build/packages/native/dist/maplibre-native-c-$usage_preset.tar.gz" \
+  -- env -u MAPLIBRE_NATIVE_C_INSTALL_DIR cargo test -p maplibre-native-ffi-sys
+'''

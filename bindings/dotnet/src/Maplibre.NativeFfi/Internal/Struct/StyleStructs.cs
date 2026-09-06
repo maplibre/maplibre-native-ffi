@@ -210,9 +210,9 @@ internal sealed unsafe class NativeGeoJsonSourceOptions : IDisposable
 
 internal sealed unsafe class NativeStyleImage : IDisposable
 {
-    private readonly nint pixels;
+    private GCHandle pixels;
 
-    private NativeStyleImage(mln_premultiplied_rgba8_image value, nint pixels)
+    private NativeStyleImage(mln_premultiplied_rgba8_image value, GCHandle pixels)
     {
         Value = value;
         this.pixels = pixels;
@@ -223,40 +223,35 @@ internal sealed unsafe class NativeStyleImage : IDisposable
     internal static NativeStyleImage From(PremultipliedRgba8Image image)
     {
         ArgumentNullException.ThrowIfNull(image);
-        var bytes = image.Bytes ?? [];
-        var pixels = bytes.Length == 0 ? 0 : (nint)NativeMemory.Alloc((nuint)bytes.Length);
+        var bytes = image.BytesTransit;
+        var pixels = bytes.Length == 0 ? default : GCHandle.Alloc(bytes, GCHandleType.Pinned);
         try
         {
-            if (pixels != 0)
-            {
-                Marshal.Copy(bytes, 0, pixels, bytes.Length);
-            }
-
             var info = image.Info;
             var native = NativeMethods.mln_premultiplied_rgba8_image_default();
             native.width = info.Width;
             native.height = info.Height;
             native.stride = info.Stride;
             native.byte_length = (nuint)bytes.Length;
-            native.pixels = (byte*)pixels;
+            native.pixels = pixels.IsAllocated ? (byte*)pixels.AddrOfPinnedObject() : null;
             var result = new NativeStyleImage(native, pixels);
-            pixels = 0;
+            pixels = default;
             return result;
         }
         finally
         {
-            if (pixels != 0)
+            if (pixels.IsAllocated)
             {
-                NativeMemory.Free((void*)pixels);
+                pixels.Free();
             }
         }
     }
 
     public void Dispose()
     {
-        if (pixels != 0)
+        if (pixels.IsAllocated)
         {
-            NativeMemory.Free((void*)pixels);
+            pixels.Free();
         }
     }
 }

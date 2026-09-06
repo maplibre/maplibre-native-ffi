@@ -63,19 +63,20 @@ pub use maplibre_native_ffi_core::handle::{NativeHandleLeak, set_leak_reporter};
 pub use projection::MapProjectionHandle;
 pub use render::{
     AcquiredFrameHandle, EglContextDescriptor, FeatureStateSelector, FrameDemand, FrameDisposition,
-    FrameGpuSync, FrameNativePointer, FrameOpenGLTextureName, GpuSync, GpuSyncKind,
-    MetalBorrowedTextureDescriptor, MetalContextDescriptor, MetalOwnedTextureDescriptor,
-    MetalOwnedTextureFrame, MetalSurfaceDescriptor, NativePointer, OpenGLBorrowedTextureDescriptor,
-    OpenGLContextDescriptor, OpenGLOwnedTextureDescriptor, OpenGLOwnedTextureFrame,
-    OpenGLSurfaceDescriptor, PremultipliedRgba8Image, QueriedFeature, RenderAbandonResult,
-    RenderDriverKind, RenderFrameBatch, RenderFrameResult, RenderSessionAttachOptions,
-    RenderSessionAttachment, RenderSessionCapabilities, RenderSessionHandle,
-    RenderSessionLifecycle, RenderSessionSnapshot, RenderTargetExtent, RenderedFeatureQueryOptions,
-    RenderedQueryGeometry, SourceFeatureQueryOptions, TextureImageInfo,
-    VulkanBorrowedTextureDescriptor, VulkanContextDescriptor, VulkanOwnedTextureDescriptor,
-    VulkanOwnedTextureFrame, VulkanSurfaceDescriptor, WebGlContextDescriptor,
-    WebGpuBorrowedTextureDescriptor, WebGpuContextDescriptor, WebGpuOwnedTextureDescriptor,
-    WebGpuOwnedTextureFrame, WebGpuSurfaceDescriptor, WglContextDescriptor,
+    FrameGpuSync, FrameNativePointer, FrameOpenGLTextureName, FrameVulkanHandle, GpuSync,
+    GpuSyncKind, MetalBorrowedTextureDescriptor, MetalContextDescriptor,
+    MetalOwnedTextureDescriptor, MetalOwnedTextureFrame, MetalSurfaceDescriptor, NativePointer,
+    OpenGLBorrowedTextureDescriptor, OpenGLContextDescriptor, OpenGLOwnedTextureDescriptor,
+    OpenGLOwnedTextureFrame, OpenGLSurfaceDescriptor, PremultipliedRgba8Image, QueriedFeature,
+    RenderAbandonResult, RenderDriverKind, RenderFrameBatch, RenderFrameResult,
+    RenderSessionAttachOptions, RenderSessionAttachment, RenderSessionCapabilities,
+    RenderSessionHandle, RenderSessionLifecycle, RenderSessionSnapshot, RenderTargetExtent,
+    RenderedFeatureQueryOptions, RenderedQueryGeometry, SourceFeatureQueryOptions,
+    TextureImageInfo, VulkanBorrowedTextureDescriptor, VulkanContextDescriptor, VulkanHandle,
+    VulkanOwnedTextureDescriptor, VulkanOwnedTextureFrame, VulkanSurfaceDescriptor,
+    WebGlContextDescriptor, WebGpuBorrowedTextureDescriptor, WebGpuContextDescriptor,
+    WebGpuOwnedTextureDescriptor, WebGpuOwnedTextureFrame, WebGpuSurfaceDescriptor,
+    WglContextDescriptor,
 };
 pub use resource::{
     ByteRange, HttpHeader, HttpHeaderTransformRequest, ResourceProviderDecision, ResourceRequest,
@@ -226,6 +227,8 @@ mod tests {
     assert_not_impl_any!(FrameOpenGLTextureName<'static>: Send, Sync);
     assert_not_impl_any!(GpuSync: Send, Sync);
     assert_not_impl_any!(FrameGpuSync<'static>: Send, Sync);
+    assert_not_impl_any!(VulkanHandle: Send, Sync);
+    assert_not_impl_any!(FrameVulkanHandle<'static>: Send, Sync);
 
     #[test]
     // Spec coverage: BND-103.

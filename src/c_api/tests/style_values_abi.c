@@ -423,6 +423,68 @@ static void layer_info_reports_scalars_and_sizes_the_source_id_copy(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static bool read_style_source_volatility(mln_map map, mln_buffer_view id) {
+  mln_test_completion info =
+    mln_test_completion_default(sizeof(mln_style_source_result));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_source_info(map, id, &info.descriptor)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&info));
+  mln_style_source_result result = {0};
+  TEST_ASSERT_TRUE(
+    mln_test_completion_copy_value(&info, &result, sizeof(result))
+  );
+  mln_test_completion_destroy(&info);
+  return result.info.is_volatile;
+}
+
+static void style_source_volatility_round_trips(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  const mln_buffer_view source_id = VIEW("volatile-vector");
+  const mln_buffer_view tiles[] = {
+    VIEW("https://example.com/{z}/{x}/{y}.mvt"),
+  };
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK, mln_map_add_vector_source_tiles(
+                     map, source_id, tiles, 1, NULL, &completion.descriptor
+                   )
+  );
+  TEST_ASSERT_FALSE(read_style_source_volatility(map, source_id));
+
+  // The committed toggle publishes a snapshot generation, so volatility is an
+  // ordered command rather than a synchronous write.
+  mln_test_completion enable = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_style_source_volatile(map, source_id, true, &enable.descriptor)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&enable));
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&enable)
+  );
+  TEST_ASSERT_NOT_EQUAL_UINT64(0, mln_test_completion_generation(&enable));
+  mln_test_completion_destroy(&enable);
+  TEST_ASSERT_TRUE(read_style_source_volatility(map, source_id));
+
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK, mln_map_set_style_source_volatile(
+                     map, source_id, false, &completion.descriptor
+                   )
+  );
+  TEST_ASSERT_FALSE(read_style_source_volatility(map, source_id));
+
+  EXPECT_STYLE_COMMAND_FAILED(
+    MLN_STATUS_NOT_FOUND, "missing",
+    mln_map_set_style_source_volatile(
+      map, VIEW("missing"), true, &completion.descriptor
+    )
+  );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -779,6 +841,7 @@ void run_style_values_abi_tests(void) {
   RUN_TEST(duplicate_id_is_an_async_failed_terminal_event);
   RUN_TEST(remove_commands_commit_and_report_missing_ids);
   RUN_TEST(an_in_use_source_removal_fails_and_leaves_the_source);
+  RUN_TEST(style_source_volatility_round_trips);
   RUN_TEST(geojson_source_data_create_rejects_unsafe_raw_values);
   RUN_TEST(clustered_geojson_data_reports_non_point_geometry);
   RUN_TEST(clustered_geojson_data_requires_a_feature_collection);

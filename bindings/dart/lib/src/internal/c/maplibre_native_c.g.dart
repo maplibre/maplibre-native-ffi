@@ -1044,6 +1044,15 @@ external int mln_map_lat_lng_for_pixel(
 );
 
 @ffi.Native<
+  ffi.Int32 Function(mln_map, mln_screen_point, ffi.Pointer<mln_completion>)
+>()
+external int mln_map_lat_lng_for_pixel_unwrapped(
+  int map,
+  mln_screen_point point,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_screen_point>,
@@ -1052,6 +1061,21 @@ external int mln_map_lat_lng_for_pixel(
   )
 >()
 external int mln_map_lat_lngs_for_pixels(
+  int map,
+  ffi.Pointer<mln_screen_point> points,
+  int point_count,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_screen_point>,
+    ffi.Size,
+    ffi.Pointer<mln_completion>,
+  )
+>()
+external int mln_map_lat_lngs_for_pixels_unwrapped(
   int map,
   ffi.Pointer<mln_screen_point> points,
   int point_count,
@@ -1143,6 +1167,19 @@ external int mln_map_projection_get_camera(
   )
 >()
 external int mln_map_projection_lat_lng_for_pixel(
+  int projection,
+  mln_screen_point point,
+  ffi.Pointer<mln_lat_lng> out_coordinate,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map_projection,
+    mln_screen_point,
+    ffi.Pointer<mln_lat_lng>,
+  )
+>()
+external int mln_map_projection_lat_lng_for_pixel_unwrapped(
   int projection,
   mln_screen_point point,
   ffi.Pointer<mln_lat_lng> out_coordinate,
@@ -1699,6 +1736,21 @@ external int mln_map_set_style_light_property(
   int map,
   mln_buffer_view property_name,
   mln_buffer_view value,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Bool,
+    ffi.Pointer<mln_completion>,
+  )
+>()
+external int mln_map_set_style_source_volatile(
+  int map,
+  mln_buffer_view source_id,
+  bool is_volatile,
   ffi.Pointer<mln_completion> completion,
 );
 
@@ -2299,6 +2351,21 @@ external int mln_resource_request_complete(
 @ffi.Native<ffi.Void Function(mln_resource_request_handle)>()
 external void mln_resource_request_release(int handle);
 
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_resource_request_handle,
+    mln_resource_request_cancel_callback,
+    ffi.Pointer<ffi.Void>,
+    ffi.Pointer<ffi.Bool>,
+  )
+>()
+external int mln_resource_request_set_cancel_callback(
+  int handle,
+  mln_resource_request_cancel_callback callback,
+  ffi.Pointer<ffi.Void> user_data,
+  ffi.Pointer<ffi.Bool> out_cancelled,
+);
+
 @ffi.Native<ffi.Int32 Function(mln_resource_request_handle)>()
 external int mln_resource_request_wait_until_retired(int handle);
 
@@ -2812,6 +2879,8 @@ external int mln_webgpu_surface_set_target(
 const int MLN_ADAPTER_RESOURCE_KIND_ANY = 4294967295;
 
 const int MLN_HANDLE_NULL = 0;
+
+const int MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL = 0;
 
 final class UnnamedUnion extends ffi.Union {
   external mln_offline_tile_pyramid_region_definition tile_pyramid;
@@ -6006,6 +6075,14 @@ final class mln_resource_request extends ffi.Struct {
     ..ref.prior_data_size = prior_data_size;
 }
 
+typedef mln_resource_request_cancel_callback =
+    ffi.Pointer<
+      ffi.NativeFunction<mln_resource_request_cancel_callbackFunction>
+    >;
+typedef mln_resource_request_cancel_callbackFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
+typedef Dartmln_resource_request_cancel_callbackFunction =
+    void Function(ffi.Pointer<ffi.Void> user_data);
 typedef mln_resource_request_handle = ffi.Uint64;
 typedef Dartmln_resource_request_handle = int;
 
@@ -7360,9 +7437,11 @@ final class mln_vulkan_borrowed_texture_descriptor extends ffi.Struct {
 
   external mln_vulkan_context_descriptor context;
 
-  external ffi.Pointer<ffi.Void> image;
+  @mln_vulkan_non_dispatchable_handle()
+  external int image;
 
-  external ffi.Pointer<ffi.Void> image_view;
+  @mln_vulkan_non_dispatchable_handle()
+  external int image_view;
 
   @ffi.Uint32()
   external int format;
@@ -7414,6 +7493,9 @@ final class mln_vulkan_context_descriptor extends ffi.Struct {
     ..ref.get_device_proc_addr = get_device_proc_addr;
 }
 
+typedef mln_vulkan_non_dispatchable_handle = ffi.Uint64;
+typedef Dartmln_vulkan_non_dispatchable_handle = int;
+
 final class mln_vulkan_owned_texture_descriptor extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -7442,9 +7524,11 @@ final class mln_vulkan_owned_texture_frame extends ffi.Struct {
   @ffi.Uint64()
   external int frame_id;
 
-  external ffi.Pointer<ffi.Void> image;
+  @mln_vulkan_non_dispatchable_handle()
+  external int image;
 
-  external ffi.Pointer<ffi.Void> image_view;
+  @mln_vulkan_non_dispatchable_handle()
+  external int image_view;
 
   external ffi.Pointer<ffi.Void> device;
 
@@ -7462,8 +7546,8 @@ final class mln_vulkan_owned_texture_frame extends ffi.Struct {
     required int height,
     required double scale_factor,
     required int frame_id,
-    required ffi.Pointer<ffi.Void> image,
-    required ffi.Pointer<ffi.Void> image_view,
+    required int image,
+    required int image_view,
     required ffi.Pointer<ffi.Void> device,
     required int format,
     required int layout,
@@ -7489,7 +7573,8 @@ final class mln_vulkan_surface_descriptor extends ffi.Struct {
 
   external mln_vulkan_context_descriptor context;
 
-  external ffi.Pointer<ffi.Void> surface;
+  @mln_vulkan_non_dispatchable_handle()
+  external int surface;
 }
 
 final class mln_wake extends ffi.Struct {

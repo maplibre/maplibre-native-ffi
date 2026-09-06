@@ -583,7 +583,7 @@ impl RuntimeHandle {
         #[cfg(not(target_os = "emscripten"))]
         completion::blocking(Ok(completion));
         // Each browser integration test has a dedicated process, so returning
-        // keeps the runtime owner thread available until process teardown.
+        // keeps the runtime's scheduler thread available until process teardown.
         #[cfg(target_os = "emscripten")]
         drop(completion);
     }
@@ -992,7 +992,7 @@ mod tests {
 
     #[test]
     // Spec coverage: BND-084.
-    fn offline_region_merge_database_uses_real_c_abi() {
+    fn offline_region_merge_database_accepts_read_only_source_through_real_c_abi() {
         let base = TempDir::new("maplibre-rust-offline-merge");
         let main_cache = base.path().join("main.db");
         let side_cache = base.path().join("side.db");
@@ -1010,6 +1010,16 @@ mod tests {
             create.release();
             side_runtime.close_and_wait();
         }
+        let side_database_before = std::fs::read(&side_cache).unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            let mut permissions = std::fs::metadata(&side_cache).unwrap().permissions();
+            permissions.set_mode(0o444);
+            std::fs::set_permissions(&side_cache, permissions).unwrap();
+        }
 
         let mut main_options = RuntimeOptions::default();
         main_options.cache_path = Some(main_cache.to_string_lossy().into_owned());
@@ -1023,6 +1033,7 @@ mod tests {
         assert_eq!(merged.len(), 1);
         assert_eq!(merged[0].definition, definition);
         assert_eq!(merged[0].metadata, b"merge");
+        assert_eq!(std::fs::read(&side_cache).unwrap(), side_database_before);
         main_runtime.close_and_wait();
     }
 
@@ -1504,6 +1515,201 @@ mod tests {
             RuntimeEventType::MapStyleLoaded
         ));
         map.close_and_wait();
+        runtime.close_and_wait();
+    }
+
+    /// Waits for the condition to hold, returning whether it did.
+    fn wait_for_condition(condition: impl Fn() -> bool) -> bool {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !condition() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        condition()
+    }
+
+    /// Installs a resource provider and waits for the runtime to commit it, so
+    /// the map created afterward sees it.
+    fn commit_resource_provider<F>(runtime: &RuntimeHandle, callback: F)
+    where
+        F: Fn(crate::ResourceRequest, crate::ResourceRequestHandle) -> ResourceProviderDecision
+            + Send
+            + Sync
+            + 'static,
+    {
+        let completion = crate::completion::blocking(runtime.set_resource_provider(callback));
+        assert_eq!(completion.disposition, crate::CommandDisposition::Committed);
+    }
+
+    #[test]
+    // Spec coverage: BND-198.
+    fn cancel_callback_runs_once_when_the_map_discards_the_request() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let cancels = Arc::new(AtomicUsize::new(0));
+        let callback_cancels = Arc::clone(&cancels);
+        let (sender, receiver) = std::sync::mpsc::channel();
+        commit_resource_provider(&runtime, move |request, handle| {
+            if request.requested_url != "custom://cancel-style.json" {
+                return ResourceProviderDecision::PassThrough;
+            }
+            let cancels = Arc::clone(&callback_cancels);
+            handle
+                .set_cancel_callback(move || {
+                    cancels.fetch_add(1, Ordering::SeqCst);
+                })
+                .unwrap();
+            sender.send(handle).unwrap();
+            ResourceProviderDecision::Handle
+        });
+
+        let map =
+            crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
+        map.set_style_url("custom://cancel-style.json").unwrap();
+        let handle = receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("provider should send handled request");
+        assert_eq!(cancels.load(Ordering::SeqCst), 0);
+
+        map.close_and_wait();
+
+        assert!(wait_for_condition(|| cancels.load(Ordering::SeqCst) == 1));
+        assert!(handle.is_cancelled().unwrap());
+        // The cancelled request rejects a late completion and stays at one call.
+        assert_eq!(
+            handle
+                .complete(ResourceResponse::no_content())
+                .unwrap_err()
+                .kind(),
+            ErrorKind::InvalidState
+        );
+        assert_eq!(cancels.load(Ordering::SeqCst), 1);
+        handle.close();
+        runtime.close_and_wait();
+    }
+
+    #[test]
+    // Spec coverage: BND-198.
+    fn cancel_callback_may_close_its_own_request() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let cancelled_request: Arc<Mutex<Option<crate::ResourceRequestHandle>>> =
+            Arc::new(Mutex::new(None));
+        let provider_request = Arc::clone(&cancelled_request);
+        let closed = Arc::new(AtomicUsize::new(0));
+        let callback_closed = Arc::clone(&closed);
+        let (sender, receiver) = std::sync::mpsc::channel();
+        commit_resource_provider(&runtime, move |request, handle| {
+            if request.requested_url != "custom://cancel-style.json" {
+                return ResourceProviderDecision::PassThrough;
+            }
+            let callback_request = Arc::clone(&provider_request);
+            let closed = Arc::clone(&callback_closed);
+            handle
+                .set_cancel_callback(move || {
+                    let request = callback_request.lock().unwrap().take();
+                    request.expect("the cancelled request").close();
+                    closed.fetch_add(1, Ordering::SeqCst);
+                })
+                .unwrap();
+            *provider_request.lock().unwrap() = Some(handle);
+            sender.send(()).unwrap();
+            ResourceProviderDecision::Handle
+        });
+
+        let map =
+            crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
+        map.set_style_url("custom://cancel-style.json").unwrap();
+        receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("provider should handle the style request");
+
+        map.close_and_wait();
+
+        assert!(wait_for_condition(|| closed.load(Ordering::SeqCst) == 1));
+        assert!(cancelled_request.lock().unwrap().is_none());
+        runtime.close_and_wait();
+    }
+
+    #[test]
+    // Spec coverage: BND-198.
+    fn cancel_callback_skips_a_completed_request() {
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let cancels = Arc::new(AtomicUsize::new(0));
+        let callback_cancels = Arc::clone(&cancels);
+        commit_resource_provider(&runtime, move |request, handle| {
+            if request.requested_url != "custom://cancel-style.json" {
+                return ResourceProviderDecision::PassThrough;
+            }
+            let cancels = Arc::clone(&callback_cancels);
+            handle
+                .set_cancel_callback(move || {
+                    cancels.fetch_add(1, Ordering::SeqCst);
+                })
+                .unwrap();
+            // Completing releases the handle, so no Rust view of the request
+            // survives to query its cancellation afterwards; the cancel count
+            // carries the negative instead.
+            handle
+                .complete(ResourceResponse::ok(
+                    PROVIDER_STYLE_JSON.as_bytes().to_vec(),
+                ))
+                .unwrap();
+            ResourceProviderDecision::Handle
+        });
+
+        let map =
+            crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
+        map.set_style_url("custom://cancel-style.json").unwrap();
+        // The response reaches the style before the map goes away.
+        assert!(wait_for_runtime_event(
+            &mut runtime,
+            RuntimeEventType::MapStyleLoaded
+        ));
+
+        map.close_and_wait();
+
+        // MapLibre runs its cancel hook on every request teardown, so the
+        // retired map proves the completed request reported no cancellation.
+        crate::completion::blocking(runtime.barrier());
+        assert_eq!(cancels.load(Ordering::SeqCst), 0);
+        runtime.close_and_wait();
+    }
+
+    #[test]
+    // Spec coverage: BND-198.
+    fn cancel_registration_on_a_cancelled_request_runs_before_returning() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        commit_resource_provider(&runtime, move |request, handle| {
+            if request.requested_url != "custom://cancel-style.json" {
+                return ResourceProviderDecision::PassThrough;
+            }
+            sender.send(handle).unwrap();
+            ResourceProviderDecision::Handle
+        });
+
+        let map =
+            crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
+        map.set_style_url("custom://cancel-style.json").unwrap();
+        let handle = receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("provider should send handled request");
+        map.close_and_wait();
+        assert!(wait_for_condition(|| handle.is_cancelled().unwrap()));
+
+        let cancels = Arc::new(AtomicUsize::new(0));
+        let callback_cancels = Arc::clone(&cancels);
+        handle
+            .set_cancel_callback(move || {
+                callback_cancels.fetch_add(1, Ordering::SeqCst);
+            })
+            .unwrap();
+        assert_eq!(cancels.load(Ordering::SeqCst), 1);
+
+        // The request keeps its one registration after the callback ran.
+        assert_eq!(
+            handle.set_cancel_callback(|| {}).unwrap_err().kind(),
+            ErrorKind::InvalidState
+        );
+        handle.close();
         runtime.close_and_wait();
     }
 

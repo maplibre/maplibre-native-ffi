@@ -17,7 +17,7 @@ pub const Context = struct {
         var self = Context{
             .allocator = allocator,
             .instance = null,
-            .surface = null,
+            .surface = util.nullHandle(c.VkSurfaceKHR),
             .physical_device = null,
             .device = null,
             .queue = null,
@@ -39,7 +39,7 @@ pub const Context = struct {
 
     pub fn deinit(self: *Context) void {
         if (self.device != null) c.vkDestroyDevice(self.device, null);
-        if (self.surface != null) {
+        if (!util.isNullHandle(self.surface)) {
             c.SDL_Vulkan_DestroySurface(self.instance, self.surface, null);
         }
         if (self.instance != null) c.vkDestroyInstance(self.instance, null);

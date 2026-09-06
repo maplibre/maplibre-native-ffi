@@ -123,6 +123,22 @@ public actual class MapProjectionHandle internal constructor(private val handleI
     }
   }
 
+  public actual fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng {
+    NativeAccess.ensureLoaded()
+    MaplibreNativeC.mln_lat_lng().use { outCoordinate ->
+      withLiveHandle { handle ->
+        Status.check(
+          MaplibreNativeC.mln_map_projection_lat_lng_for_pixel_unwrapped(
+            handle,
+            MaplibreNativeC.mln_screen_point().x(point.x).y(point.y),
+            outCoordinate,
+          )
+        )
+      }
+      return LatLng(outCoordinate.latitude(), outCoordinate.longitude())
+    }
+  }
+
   public actual val isClosed: Boolean
     get() = core.isReleased()
 

@@ -17,6 +17,7 @@ import org.maplibre.nativeffi.internal.c.mln_http_header_transform
 import org.maplibre.nativeffi.internal.c.mln_http_header_transform_response
 import org.maplibre.nativeffi.internal.c.mln_http_header_transform_response_set
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.resource.HttpHeaderTransformCallback
 import org.maplibre.nativeffi.resource.HttpHeaderTransformRequest
 import org.maplibre.nativeffi.resource.ResourceKind
@@ -60,9 +61,9 @@ internal class HttpHeaderTransformState(private val callback: HttpHeaderTransfor
           mln_http_header_transform_response_set(
             response,
             header.name,
-            header.name.encodeToByteArray().size.toULong(),
+            header.name.encodeToByteArray().size.toCSize(),
             header.value,
-            header.value.encodeToByteArray().size.toULong(),
+            header.value.encodeToByteArray().size.toCSize(),
           )
         if (status != MaplibreStatus.OK.nativeCode) return status
       }

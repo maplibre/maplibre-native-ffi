@@ -65,6 +65,7 @@ import org.maplibre.nativeffi.internal.lifecycle.asHandle
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.lifecycle.runtimeHandle
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.RuntimeStructs
 import org.maplibre.nativeffi.map.MapHandle
@@ -120,7 +121,7 @@ public actual class RuntimeHandle internal constructor(handle: NativeRuntime) {
           state.requireLive().rawHandleValue,
           RuntimeStructs.offlineRegionDefinition(definition, this),
           RuntimeStructs.metadata(metadata, this),
-          metadata.size.toULong(),
+          metadata.size.toCSize(),
           completion,
         )
       },
@@ -169,7 +170,7 @@ public actual class RuntimeHandle internal constructor(handle: NativeRuntime) {
           state.requireLive().rawHandleValue,
           id,
           RuntimeStructs.metadata(metadata, this),
-          metadata.size.toULong(),
+          metadata.size.toCSize(),
           completion,
         )
       },
@@ -226,14 +227,14 @@ public actual class RuntimeHandle internal constructor(handle: NativeRuntime) {
     }
 
   private fun offlineRegionInfo(result: CPointer<mln_completion_result>): OfflineRegionInfo? {
-    if (result.pointed.value_count == 0uL) return null
+    if (result.pointed.value_count.toULong() == 0uL) return null
     return RuntimeStructs.offlineRegionInfo(
       result.pointed.value!!.reinterpret<mln_offline_region_info>().pointed
     )
   }
 
   private fun offlineRegionList(result: CPointer<mln_completion_result>): List<OfflineRegionInfo> {
-    val count = result.pointed.value_count
+    val count = result.pointed.value_count.toULong()
     if (count == 0uL) return emptyList()
     require(count <= Int.MAX_VALUE.toULong()) { "offline region count exceeds Int.MAX_VALUE" }
     val regions = result.pointed.value!!.reinterpret<mln_offline_region_info>()
@@ -300,7 +301,7 @@ public actual class RuntimeHandle internal constructor(handle: NativeRuntime) {
       val view = alloc<mln_runtime_event_batch_view>()
       view.size = sizeOf<mln_runtime_event_batch_view>().toUInt()
       Status.check(mln_event_batch_get(outBatch.value, view.ptr))
-      val eventCount = view.event_count
+      val eventCount = view.event_count.toULong()
       require(eventCount <= Int.MAX_VALUE.toULong()) { "event count exceeds Int.MAX_VALUE" }
       val copied =
         if (eventCount == 0uL) {

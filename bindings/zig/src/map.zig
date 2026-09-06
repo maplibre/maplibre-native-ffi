@@ -267,7 +267,7 @@ pub const CustomMvtVectorSourceOptions = struct {
     cancel_tile: ?CustomMvtVectorSourceTileCallback = null,
     /// Invoked once with `context` after the map stops referencing this source:
     /// on an explicit removal, on a style load that leaves a style without the
-    /// source, and on the map's own destruction. It runs on the map owner thread,
+    /// source, and on the map's own destruction. It runs on the runtime worker
     /// after the last tile callback returns, and never runs for an add that
     /// failed. A host frees `context` here instead of tracking style loads.
     release_context: ?CustomMvtVectorSourceReleaseCallback = null,
@@ -674,6 +674,19 @@ pub const MapHandle = enum(c.mln_map) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         return submitAllocatedQuery(?values.OwnedString, self, allocator, copyOptionalOwnedStringResult, c.mln_map_copy_style_source_url, .{ try native(self), try temp.stringView(source_id) });
+    }
+
+    /// Sets whether one style source stores fetched tiles in persistent
+    /// storage. A missing source completes with `error.NotFound`.
+    pub fn setStyleSourceVolatile(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        is_volatile: bool,
+    ) status.Error!completion.Future(completion.CommandCompletion) {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        return submitCommand(self, c.mln_map_set_style_source_volatile, .{ try native(self), try temp.stringView(source_id), is_volatile });
     }
 
     pub fn getStyleSourceTileUrls(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!completion.Future(values.StringList) {
@@ -1438,6 +1451,16 @@ pub const MapHandle = enum(c.mln_map) {
         }.copyResult, c.mln_map_lat_lng_for_pixel, .{ try native(self), values.screenPointToNative(point) });
     }
 
+    /// Converts a screen point to an unwrapped geographic coordinate.
+    /// The longitude preserves the visible world copy.
+    pub fn latLngForPixelUnwrapped(self: *MapHandle, point: values.ScreenPoint) status.Error!completion.Future(values.LatLng) {
+        return submitQuery(values.LatLng, self, struct {
+            fn copyResult(result: *const c.mln_completion_result) status.Error!values.LatLng {
+                return values.latLngFromNative(try completion.value(c.mln_lat_lng)(result));
+            }
+        }.copyResult, c.mln_map_lat_lng_for_pixel_unwrapped, .{ try native(self), values.screenPointToNative(point) });
+    }
+
     pub fn pixelsForLatLngs(self: *MapHandle, allocator: std.mem.Allocator, coordinates: []const values.LatLng) status.Error!completion.Future(ScreenPointList) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
@@ -1470,6 +1493,25 @@ pub const MapHandle = enum(c.mln_map) {
                 return .{ .allocator = target.*, .items = items };
             }
         }.copyResult, c.mln_map_lat_lngs_for_pixels, .{ try native(self), if (raw_points.len == 0) null else raw_points.ptr, raw_points.len });
+    }
+
+    /// Converts screen points to unwrapped geographic coordinates.
+    /// Each longitude preserves its visible world copy.
+    pub fn latLngsForPixelsUnwrapped(self: *MapHandle, allocator: std.mem.Allocator, points: []const values.ScreenPoint) status.Error!completion.Future(LatLngList) {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        const raw_points = try temp.screenPoints(points);
+        return submitAllocatedQuery(LatLngList, self, allocator, struct {
+            fn copyResult(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!LatLngList {
+                const items = try target.alloc(values.LatLng, result.value_count);
+                errdefer target.free(items);
+                if (result.value_count != 0) {
+                    const raw = @as([*]align(1) const c.mln_lat_lng, @ptrCast(result.value orelse return error.NativeError))[0..result.value_count];
+                    for (raw, items) |coordinate, *item| item.* = values.latLngFromNative(coordinate);
+                }
+                return .{ .allocator = target.*, .items = items };
+            }
+        }.copyResult, c.mln_map_lat_lngs_for_pixels_unwrapped, .{ try native(self), if (raw_points.len == 0) null else raw_points.ptr, raw_points.len });
     }
 
     pub fn cameraForLatLngBounds(self: *MapHandle, bounds: values.LatLngBounds, fit_options: ?values.CameraFitOptions) status.Error!completion.Future(values.CameraOptions) {
