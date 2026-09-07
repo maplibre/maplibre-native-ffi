@@ -274,12 +274,12 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 	if _, found, err := takeOptionalStyleOperationForTest(m.StyleSourceAttribution("missing")); err != nil || found {
 		t.Fatalf("StyleSourceAttribution(missing) = (%v, %v), want (false, nil)", found, err)
 	}
-	copiedTileURLs, err := awaitForTest(m.StyleSourceTileURLs("inline-vector"))
-	if err != nil || !slices.Equal(copiedTileURLs, tileURLs) {
-		t.Fatalf("StyleSourceTileURLs(inline-vector) = (%q, %v), want %q", copiedTileURLs, err, tileURLs)
+	copiedTileURLs, found, err := takeOptionalStyleOperationForTest(m.StyleSourceTileURLs("inline-vector"))
+	if err != nil || !found || !slices.Equal(copiedTileURLs, tileURLs) {
+		t.Fatalf("StyleSourceTileURLs(inline-vector) = (%q, %v, %v), want %q and true", copiedTileURLs, found, err, tileURLs)
 	}
-	if missingTileURLs, err := awaitForTest(m.StyleSourceTileURLs("missing")); err != nil || len(missingTileURLs) != 0 {
-		t.Fatalf("StyleSourceTileURLs(missing) = (%q, %v), want an empty list", missingTileURLs, err)
+	if missingTileURLs, found, err := takeOptionalStyleOperationForTest(m.StyleSourceTileURLs("missing")); err != nil || found {
+		t.Fatalf("StyleSourceTileURLs(missing) = (%q, %v, %v), want (false, nil)", missingTileURLs, found, err)
 	}
 
 	layerJSON := []byte(`{"id":"inline-vector-layer","type":"line","source":"inline-vector","source-layer":"lines"}`)
@@ -322,8 +322,8 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 	if _, found, err := takeOptionalStyleOperationForTest(m.StyleSourceURL("missing")); err != nil || found {
 		t.Fatalf("StyleSourceURL(missing) = (%v, %v), want (false, nil)", found, err)
 	}
-	if urlTileURLs, err := awaitForTest(m.StyleSourceTileURLs("url-vector")); err != nil || len(urlTileURLs) != 0 {
-		t.Fatalf("StyleSourceTileURLs(url-vector) = (%q, %v), want an empty list for a URL-backed source", urlTileURLs, err)
+	if urlTileURLs, found, err := takeOptionalStyleOperationForTest(m.StyleSourceTileURLs("url-vector")); err != nil || !found || len(urlTileURLs) != 0 {
+		t.Fatalf("StyleSourceTileURLs(url-vector) = (%q, %v, %v), want an empty list and true for a URL-backed source", urlTileURLs, found, err)
 	}
 
 	data, err := NewGeoJSONSourceData([]byte(`{"type":"FeatureCollection","features":[]}`), nil)

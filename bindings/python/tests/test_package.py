@@ -1169,7 +1169,7 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
         )
         assert _await(map_handle.get_style_source_url("missing")) is None
         assert _await(map_handle.get_style_source_attribution("missing")) is None
-        assert _await(map_handle.get_style_source_tile_urls("missing")) == []
+        assert _await(map_handle.get_style_source_tile_urls("missing")) is None
 
         removed_id = map_handle.remove_style_source("points")
         removed = _await_command_completion(removed_id)

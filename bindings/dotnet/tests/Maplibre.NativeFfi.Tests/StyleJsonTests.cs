@@ -303,7 +303,11 @@ public sealed class StyleJsonTests
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 64, Height = 64 });
-        var tileUrls = new[] { "https://example.test/tiles/{z}/{x}/{y}.pbf" };
+        var tileUrls = new[]
+        {
+            "https://example.test/tiles/{z}/{x}/{y}.pbf",
+            "https://example.test/mirror/{z}/{x}/{y}.pbf",
+        };
 
         _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
         _ = map.AddVectorSourceUrlAsync(
@@ -348,18 +352,18 @@ public sealed class StyleJsonTests
                 TestContext.Current.CancellationToken
             )
         );
-        Assert.Empty(
-            await map.GetStyleSourceTileUrlsAsync(
-                "url-vector",
-                TestContext.Current.CancellationToken
-            )
+        var urlBackedTileUrls = await map.GetStyleSourceTileUrlsAsync(
+            "url-vector",
+            TestContext.Current.CancellationToken
         );
+        Assert.NotNull(urlBackedTileUrls);
+        Assert.Empty(urlBackedTileUrls);
 
         // A missing source is not an error for these queries.
         Assert.Null(
             await map.GetStyleSourceUrlAsync("missing", TestContext.Current.CancellationToken)
         );
-        Assert.Empty(
+        Assert.Null(
             await map.GetStyleSourceTileUrlsAsync("missing", TestContext.Current.CancellationToken)
         );
     }

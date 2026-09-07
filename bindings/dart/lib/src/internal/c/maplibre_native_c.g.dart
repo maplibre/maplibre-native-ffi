@@ -2820,7 +2820,8 @@ enum mln_adapter_completion_copy_kind {
   MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE(5),
   MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES(6),
   MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURES(7),
-  MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK(8);
+  MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK(8),
+  MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS(9);
 
   final int value;
   const mln_adapter_completion_copy_kind(this.value);
@@ -2836,6 +2837,7 @@ enum mln_adapter_completion_copy_kind {
         6 => MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES,
         7 => MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURES,
         8 => MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK,
+        9 => MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS,
         _ => throw ArgumentError(
           'Unknown value for mln_adapter_completion_copy_kind: $value',
         ),
@@ -6947,6 +6949,31 @@ final class mln_style_source_result extends ffi.Struct {
 
   @ffi.Size()
   external int tile_url_count;
+}
+
+final class mln_style_source_tile_urls_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  external ffi.Pointer<mln_buffer_view> tile_urls;
+
+  @ffi.Size()
+  external int tile_url_count;
+
+  static ffi.Pointer<mln_style_source_tile_urls_result> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int reserved,
+    required ffi.Pointer<mln_buffer_view> tile_urls,
+    required int tile_url_count,
+  }) => $allocator<mln_style_source_tile_urls_result>()
+    ..ref.size = size
+    ..ref.reserved = reserved
+    ..ref.tile_urls = tile_urls
+    ..ref.tile_url_count = tile_url_count;
 }
 
 enum mln_style_source_type {

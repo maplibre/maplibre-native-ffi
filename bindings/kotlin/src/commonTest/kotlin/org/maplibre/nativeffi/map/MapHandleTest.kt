@@ -426,7 +426,7 @@ class MapHandleTest {
           // No source carries this ID.
           assertNull(map.styleSourceAttribution("missing").await())
           assertNull(map.styleSourceUrl("missing").await())
-          assertEquals(emptyList(), map.styleSourceTileUrls("missing").await())
+          assertNull(map.styleSourceTileUrls("missing").await())
         }
     }
   }

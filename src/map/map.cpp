@@ -2437,6 +2437,7 @@ auto start_style_operation(
         auto view = mln_buffer_view{};
         auto views = std::vector<mln_buffer_view>{};
         auto stretches = mln_style_image_stretches_result{};
+        auto tile_urls = mln_style_source_tile_urls_result{};
         auto source = mln_style_source_result{};
         auto layer = mln_style_layer_result{};
         auto image = mln_style_image_result{};
@@ -2516,8 +2517,14 @@ auto start_style_operation(
           case StyleOperationKind::SourceTileUrls:
             if (result->found) {
               fill_views();
-              value = views.data();
-              count = views.size();
+              tile_urls = mln_style_source_tile_urls_result{
+                .size = sizeof(mln_style_source_tile_urls_result),
+                .reserved = 0,
+                .tile_urls = views.data(),
+                .tile_url_count = views.size(),
+              };
+              value = &tile_urls;
+              count = 1;
             }
             break;
           case StyleOperationKind::ImageStretches:

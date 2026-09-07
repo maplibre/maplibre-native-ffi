@@ -153,7 +153,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     return NativeAccess.styleSourceUrl(requireLiveHandle(), sourceId)
   }
 
-  public actual fun styleSourceTileUrls(sourceId: String): Deferred<List<String>> {
+  public actual fun styleSourceTileUrls(sourceId: String): Deferred<List<String>?> {
     NativeAccess.ensureLoaded()
     return NativeAccess.styleSourceTileUrls(requireLiveHandle(), sourceId)
   }

@@ -291,10 +291,18 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
       )
     }
 
-  public actual fun styleSourceTileUrls(sourceId: String): Deferred<List<String>> =
+  public actual fun styleSourceTileUrls(sourceId: String): Deferred<List<String>?> =
     StringViewScope(sourceId).use { nativeSourceId ->
       CompletionBridge.submit(
-        ::stringList,
+        { result ->
+          if (result.value_count() == 0L) null
+          else {
+            val raw = MaplibreNativeC.mln_style_source_tile_urls_result(result.value())
+            List(Math.toIntExact(raw.tile_url_count())) { index ->
+              stringView(raw.tile_urls().position(index.toLong()))
+            }
+          }
+        },
         { completion ->
           MaplibreNativeC.mln_map_get_style_source_tile_urls(
             requireLiveHandle(),

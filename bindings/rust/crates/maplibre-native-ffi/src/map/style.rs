@@ -798,11 +798,14 @@ impl super::MapHandle {
 
     /// Copies one style source's inline TileJSON tile URLs.
     ///
-    /// The completion carries an empty sequence when no source has the ID, and
-    /// when the source loads its TileJSON from a URL.
-    /// [`MapHandle::style_source_info`] reads the tile URLs together with the
-    /// rest of a source's metadata, and reports whether the source exists.
-    pub fn style_source_tile_urls(&self, source_id: &str) -> Result<NativeFuture<Vec<String>>> {
+    /// The completion carries no value when no source has the ID, and an empty
+    /// sequence when the source loads its TileJSON from a URL or carries no
+    /// inline TileJSON. [`MapHandle::style_source_info`] reads the tile URLs
+    /// together with the rest of a source's metadata.
+    pub fn style_source_tile_urls(
+        &self,
+        source_id: &str,
+    ) -> Result<NativeFuture<Option<Vec<String>>>> {
         let source_id = maplibre_core::string::string_view(source_id);
         // SAFETY: map is live and source_id stays valid for this synchronous
         // submission.
@@ -810,7 +813,7 @@ impl super::MapHandle {
             move |map, completion| unsafe {
                 sys::mln_map_get_style_source_tile_urls(map, source_id.raw(), completion)
             },
-            copy_string_views,
+            copy_optional_tile_urls,
         )
     }
 
@@ -1418,6 +1421,46 @@ impl super::MapHandle {
     }
 }
 
+/// Copies a borrowed array of tile URL views.
+///
+/// # Safety
+///
+/// `tile_urls` must be null, or point to `count` views that stay valid for the
+/// current completion callback.
+unsafe fn copy_tile_url_views(
+    tile_urls: *const sys::mln_buffer_view,
+    count: usize,
+) -> Result<Vec<String>> {
+    if count == 0 {
+        return Ok(Vec::new());
+    }
+    if tile_urls.is_null() {
+        return Err(crate::Error::new(
+            crate::ErrorKind::NativeError,
+            None,
+            "source completion returned a null tile URL array",
+        ));
+    }
+    // SAFETY: the caller guarantees the array is borrowed for this callback.
+    unsafe { std::slice::from_raw_parts(tile_urls, count) }
+        .iter()
+        .map(|view| {
+            // SAFETY: each view is borrowed for this completion callback.
+            unsafe { maplibre_core::string::copy_string_view(*view) }
+        })
+        .collect()
+}
+
+fn copy_optional_tile_urls(result: &sys::mln_completion_result) -> Result<Option<Vec<String>>> {
+    let Some(raw) =
+        crate::completion::optional_value::<sys::mln_style_source_tile_urls_result>(result)?
+    else {
+        return Ok(None);
+    };
+    // SAFETY: the array and its views are borrowed for this completion callback.
+    unsafe { copy_tile_url_views(raw.tile_urls, raw.tile_url_count) }.map(Some)
+}
+
 fn copy_string_views(result: &sys::mln_completion_result) -> Result<Vec<String>> {
     crate::completion::copy_slice::<sys::mln_buffer_view>(result)?
         .into_iter()
@@ -1447,25 +1490,8 @@ fn copy_source_info(result: &sys::mln_completion_result) -> Result<Option<Source
             unsafe { maplibre_core::string::copy_string_view(raw.url) }
         })
         .transpose()?;
-    let tiles = if raw.tile_url_count == 0 {
-        Vec::new()
-    } else {
-        if raw.tile_urls.is_null() {
-            return Err(crate::Error::new(
-                crate::ErrorKind::NativeError,
-                None,
-                "source completion returned a null tile URL array",
-            ));
-        }
-        // SAFETY: the array is borrowed for this completion callback.
-        unsafe { std::slice::from_raw_parts(raw.tile_urls, raw.tile_url_count) }
-            .iter()
-            .map(|view| {
-                // SAFETY: each view is borrowed for this completion callback.
-                unsafe { maplibre_core::string::copy_string_view(*view) }
-            })
-            .collect::<Result<Vec<_>>>()?
-    };
+    // SAFETY: the array and its views are borrowed for this completion callback.
+    let tiles = unsafe { copy_tile_url_views(raw.tile_urls, raw.tile_url_count) }?;
     Ok(Some(maplibre_core::style::style_source_info_from_native(
         &raw.info,
         attribution,

@@ -894,9 +894,11 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
     }
 
-    /// <summary>Copies one style source's inline TileJSON tile URLs.</summary>
+    /// <summary>
+    /// Copies one style source's inline TileJSON tile URLs, or null when no source carries the ID.
+    /// </summary>
     /// <remarks>A URL-backed source, or one without inline TileJSON, reports an empty array.</remarks>
-    public Task<string[]> GetStyleSourceTileUrlsAsync(
+    public Task<string[]?> GetStyleSourceTileUrlsAsync(
         string sourceId,
         CancellationToken cancellationToken = default
     )
@@ -909,7 +911,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
                     nativeSourceId.Value,
                     completion
                 ),
-            ReadStrings,
+            ReadTileUrls,
             cancellationToken
         );
     }
@@ -2367,6 +2369,23 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             CopyStretches(value.stretch_x, value.stretch_x_count) ?? [],
             CopyStretches(value.stretch_y, value.stretch_y_count) ?? []
         );
+    }
+
+    /// <summary>Copies borrowed tile URLs, reading no value as a missing source.</summary>
+    private static string[]? ReadTileUrls(mln_completion_result* result)
+    {
+        if (result->value_count == 0)
+        {
+            return null;
+        }
+        var value = NativeCompletion.Value<mln_style_source_tile_urls_result>(result);
+        var urls = new string[checked((int)value.tile_url_count)];
+        for (nuint index = 0; index < value.tile_url_count; index++)
+        {
+            var view = value.tile_urls[index];
+            urls[(int)index] = RuntimeStructs.CopyUtf8((sbyte*)view.data, view.size);
+        }
+        return urls;
     }
 
     private static string[] ReadStrings(mln_completion_result* result)

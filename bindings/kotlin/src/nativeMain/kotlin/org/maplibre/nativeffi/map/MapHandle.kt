@@ -154,6 +154,7 @@ import org.maplibre.nativeffi.internal.c.mln_style_image_result
 import org.maplibre.nativeffi.internal.c.mln_style_image_stretches_result
 import org.maplibre.nativeffi.internal.c.mln_style_layer_result
 import org.maplibre.nativeffi.internal.c.mln_style_source_result
+import org.maplibre.nativeffi.internal.c.mln_style_source_tile_urls_result
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.lifecycle.NativeMap
 import org.maplibre.nativeffi.internal.lifecycle.asHandle
@@ -379,9 +380,18 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) {
     )
   }
 
-  public actual fun styleSourceTileUrls(sourceId: String): Deferred<List<String>> = memScoped {
+  public actual fun styleSourceTileUrls(sourceId: String): Deferred<List<String>?> = memScoped {
     CompletionBridge.submit(
-      ::stringViewsCompletion,
+      { result ->
+        if (result.pointed.value_count.toULong() == 0uL) null
+        else {
+          val value =
+            result.pointed.value!!.reinterpret<mln_style_source_tile_urls_result>().pointed
+          List(value.tile_url_count.toInt()) { index ->
+            CoreStructs.stringView(value.tile_urls!![index])
+          }
+        }
+      },
       { completion ->
         mln_map_get_style_source_tile_urls(
           state.requireLive().rawHandleValue,

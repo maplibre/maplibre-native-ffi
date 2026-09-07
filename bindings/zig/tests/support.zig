@@ -229,6 +229,10 @@ pub fn styleSourceUrl(map: *maplibre.MapHandle, source_id: []const u8) !?maplibr
     return resolve(?maplibre.OwnedString, try map.copyStyleSourceUrl(testing.allocator, source_id));
 }
 
+pub fn styleSourceTileUrls(map: *maplibre.MapHandle, source_id: []const u8) !?maplibre.StringList {
+    return resolve(?maplibre.StringList, try map.getStyleSourceTileUrls(testing.allocator, source_id));
+}
+
 /// The layer's style-spec type name, a static string the process owns.
 pub fn styleLayerType(map: *maplibre.MapHandle, layer_id: []const u8) !?[]const u8 {
     var info = (try styleLayerInfo(map, layer_id)) orelse return null;

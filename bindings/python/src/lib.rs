@@ -628,6 +628,35 @@ fn py_optional_string(py: Python<'_>, result: &sys::mln_completion_result) -> Py
     py_string(py, result)
 }
 
+fn copy_tile_urls(values: *const sys::mln_buffer_view, count: usize) -> PyResult<Vec<String>> {
+    if count == 0 {
+        return Ok(Vec::new());
+    }
+    if values.is_null() {
+        return Err(native_error(
+            "source completion returned a null tile URL array",
+        ));
+    }
+    // SAFETY: the completion keeps the tile URL views alive while this callback
+    // copies them into Python-owned strings.
+    unsafe { std::slice::from_raw_parts(values, count) }
+        .iter()
+        .map(|view| copied_string_view(*view))
+        .collect()
+}
+
+fn py_optional_tile_urls(
+    py: Python<'_>,
+    result: &sys::mln_completion_result,
+) -> PyResult<Py<PyAny>> {
+    if result.value_count == 0 {
+        return Ok(py.None());
+    }
+    let raw = completion_value::<sys::mln_style_source_tile_urls_result>(result)?;
+    let urls = copy_tile_urls(raw.tile_urls, raw.tile_url_count)?;
+    Ok(PyList::new(py, urls)?.into_any().unbind())
+}
+
 fn py_source_info(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
     if result.value_count == 0 {
         return Ok(py.None());
@@ -641,17 +670,7 @@ fn py_source_info(py: Python<'_>, result: &sys::mln_completion_result) -> PyResu
     let url = (raw.info.fields & sys::MLN_STYLE_SOURCE_INFO_URL != 0)
         .then(|| copied_string_view(raw.url))
         .transpose()?;
-    let mut tiles = Vec::with_capacity(raw.tile_url_count);
-    if raw.tile_url_count != 0 {
-        if raw.tile_urls.is_null() {
-            return Err(native_error(
-                "source completion returned a null tile URL array",
-            ));
-        }
-        for view in unsafe { std::slice::from_raw_parts(raw.tile_urls, raw.tile_url_count) } {
-            tiles.push(copied_string_view(*view)?);
-        }
-    }
+    let tiles = copy_tile_urls(raw.tile_urls, raw.tile_url_count)?;
     source_info_to_py(
         py,
         maplibre_core::style::style_source_info_from_native(&raw.info, attribution, url, tiles),
@@ -2634,7 +2653,7 @@ impl MapHandle {
             |map, completion| unsafe {
                 sys::mln_map_get_style_source_tile_urls(map, source_id_view.raw(), completion)
             },
-            py_string_list,
+            py_optional_tile_urls,
         )
     }
 

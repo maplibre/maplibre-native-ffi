@@ -662,10 +662,13 @@ pub const MapHandle = enum(c.mln_map) {
         return submitCommand(self, c.mln_map_set_style_source_volatile, .{ try native(self), try temp.stringView(source_id), is_volatile });
     }
 
-    pub fn getStyleSourceTileUrls(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!completion.Future(values.StringList) {
+    /// Copies one source's inline TileJSON tile URLs, completing with null when
+    /// no source has the ID and with an empty list when the source is
+    /// URL-backed or carries no inline TileJSON.
+    pub fn getStyleSourceTileUrls(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!completion.Future(?values.StringList) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        return submitAllocatedQuery(values.StringList, self, allocator, copyStringListResult, c.mln_map_get_style_source_tile_urls, .{ try native(self), try temp.stringView(source_id) });
+        return submitAllocatedQuery(?values.StringList, self, allocator, copyStyleSourceTileUrlsResult, c.mln_map_get_style_source_tile_urls, .{ try native(self), try temp.stringView(source_id) });
     }
 
     pub fn addStyleLayerJson(
@@ -2138,6 +2141,23 @@ fn copyOwnedStringResult(result: *const c.mln_completion_result, allocator: *std
 fn copyOptionalOwnedStringResult(result: *const c.mln_completion_result, allocator: *std.mem.Allocator) status.Error!?values.OwnedString {
     const view = (try optionalCompletionValue(c.mln_buffer_view, result)) orelse return null;
     return .{ .allocator = allocator.*, .value = try copyView(allocator.*, view) };
+}
+
+fn copyStyleSourceTileUrlsResult(result: *const c.mln_completion_result, allocator: *std.mem.Allocator) status.Error!?values.StringList {
+    const raw = (try optionalCompletionValue(c.mln_style_source_tile_urls_result, result)) orelse return null;
+    const items = try allocator.alloc([]const u8, raw.tile_url_count);
+    errdefer allocator.free(items);
+    var initialized: usize = 0;
+    errdefer for (items[0..initialized]) |item| allocator.free(item);
+    if (raw.tile_url_count != 0) {
+        if (raw.tile_urls == null) return error.NativeError;
+        const views = raw.tile_urls[0..raw.tile_url_count];
+        for (views, items) |view, *item| {
+            item.* = try copyView(allocator.*, view);
+            initialized += 1;
+        }
+    }
+    return .{ .allocator = allocator.*, .items = items };
 }
 
 fn copyStringListResult(result: *const c.mln_completion_result, allocator: *std.mem.Allocator) status.Error!values.StringList {

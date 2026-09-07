@@ -3311,11 +3311,16 @@ final class MapHandle {
 
   /// Copies one style source's inline TileJSON tile URLs after prior commands.
   ///
-  /// The list is empty when no style source has [sourceId], and when the
-  /// source loads its TileJSON from a URL.
-  Future<List<String>> getStyleSourceTileUrls(String sourceId) =>
-      _startStringList(
-        (completion) => withNativeArena((arena) {
+  /// The value is null when no style source has [sourceId]. The list is empty
+  /// when the source loads its TileJSON from a URL, or carries no inline
+  /// TileJSON.
+  Future<List<String>?> getStyleSourceTileUrls(String sourceId) =>
+      _startMapValue(
+        copyKind: raw
+            .mln_adapter_completion_copy_kind
+            .MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS,
+        elementSize: sizeOf<raw.mln_style_source_tile_urls_result>(),
+        start: (completion) => withNativeArena((arena) {
           final nativeId = nativeStringView(sourceId, arena);
           return raw.mln_map_get_style_source_tile_urls(
             _handle.raw,
@@ -3323,6 +3328,16 @@ final class MapHandle {
             completion,
           );
         }),
+        decode: (result) {
+          if (result.value_count == 0) return null;
+          final value = result.value
+              .cast<raw.mln_style_source_tile_urls_result>()
+              .ref;
+          return [
+            for (var index = 0; index < value.tile_url_count; index += 1)
+              utf8.decode(_copyBufferView(value.tile_urls[index])),
+          ];
+        },
       );
 
   Future<List<String>> _startStringList(NativeCompletionStart start) =>

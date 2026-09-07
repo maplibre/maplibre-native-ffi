@@ -177,6 +177,32 @@ test "tile source helpers expose copied reconstructible source information" {
     try testing.expectEqualStrings("https://example.com/vector.json", vector_url_info.url.?);
 }
 
+test "style source tile URLs separate an empty list from a missing source" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createLoadedMap(&runtime);
+    defer support.closeMap(&map) catch @panic("map close failed");
+
+    const tiles = [_][]const u8{
+        "https://a.example.com/tiles/{z}/{x}/{y}.mvt",
+        "https://b.example.com/tiles/{z}/{x}/{y}.mvt",
+    };
+    try support.expectCommitted(try map.addVectorSourceTiles(testing.allocator, "inline-vector", tiles[0..], null));
+    try support.expectCommitted(try map.addVectorSourceUrl(testing.allocator, "url-vector", "https://example.com/vector.json", null));
+
+    var inline_urls = (try support.styleSourceTileUrls(&map, "inline-vector")).?;
+    defer inline_urls.deinit();
+    try testing.expectEqual(@as(usize, 2), inline_urls.items.len);
+    try testing.expectEqualStrings(tiles[0], inline_urls.items[0]);
+    try testing.expectEqualStrings(tiles[1], inline_urls.items[1]);
+
+    var url_backed = (try support.styleSourceTileUrls(&map, "url-vector")).?;
+    defer url_backed.deinit();
+    try testing.expectEqual(@as(usize, 0), url_backed.items.len);
+
+    try testing.expect((try support.styleSourceTileUrls(&map, "missing-source")) == null);
+}
+
 test "image source helpers add update and copy coordinates" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");

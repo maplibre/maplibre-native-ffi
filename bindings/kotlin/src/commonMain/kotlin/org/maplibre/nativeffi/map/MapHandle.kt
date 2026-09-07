@@ -155,10 +155,11 @@ public expect class MapHandle {
   public fun styleSourceUrl(sourceId: String): Deferred<String?>
 
   /**
-   * Returns one source's copied inline TileJSON tile URLs. The list is empty when no source carries
-   * [sourceId] and when the source loads its TileJSON from a URL.
+   * Returns one source's copied inline TileJSON tile URLs, or null when no source carries
+   * [sourceId]. The list is empty when the source loads its TileJSON from a URL or carries no
+   * inline TileJSON.
    */
-  public fun styleSourceTileUrls(sourceId: String): Deferred<List<String>>
+  public fun styleSourceTileUrls(sourceId: String): Deferred<List<String>?>
 
   public fun styleSourceIds(): Deferred<List<String>>
 

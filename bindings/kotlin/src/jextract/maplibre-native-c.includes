@@ -619,6 +619,7 @@
 --include-struct mln_style_layer_result
 --include-struct mln_style_source_info
 --include-struct mln_style_source_result
+--include-struct mln_style_source_tile_urls_result
 --include-struct mln_style_tile_source_options
 --include-struct mln_style_transition_options
 --include-function mln_custom_geometry_source_options_default

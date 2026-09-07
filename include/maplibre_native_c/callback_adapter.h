@@ -63,6 +63,8 @@ typedef enum mln_adapter_completion_copy_kind : uint32_t {
   MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURES = 7,
   /** Copy one mln_texture_readback_result and its pixel bytes. */
   MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK = 8,
+  /** Copy one mln_style_source_tile_urls_result and its URL bytes. */
+  MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS = 9,
 } mln_adapter_completion_copy_kind;
 
 /** Native-owned completion copy delivered to an asynchronous host listener. */

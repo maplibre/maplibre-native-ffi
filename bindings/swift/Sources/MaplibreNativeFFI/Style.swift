@@ -665,13 +665,18 @@ public extension MapHandle {
     }
   }
 
-  /// Reads one style source's inline TileJSON tile URLs. A missing source and
-  /// a URL-backed source both read as an empty list.
-  func styleSourceTileURLs(_ sourceId: String) async throws -> [String] {
+  /// Reads one style source's inline TileJSON tile URLs, or nil when no source
+  /// carries `sourceId`. A URL-backed source, or one without inline TileJSON,
+  /// reads as an empty list.
+  func styleSourceTileURLs(_ sourceId: String) async throws -> [String]? {
     try await styleQuery(
-      { mln_map_get_style_source_tile_urls($0, $1.view(sourceId), $2) },
-      convert: Self.copyStrings
-    )
+      { mln_map_get_style_source_tile_urls($0, $1.view(sourceId), $2) }
+    ) { result in
+      guard result.pointee.value_count > 0 else { return nil }
+      let raw: mln_style_source_tile_urls_result = try NativeCompletion
+        .value(result)
+      return try Self.copyTileURLs(raw.tile_urls, count: raw.tile_url_count)
+    }
   }
 
   func styleSourceIds() async throws -> [String] {
@@ -1600,6 +1605,20 @@ public extension MapHandle {
     }
   }
 
+  private static func copyTileURLs(
+    _ values: UnsafePointer<mln_buffer_view>?,
+    count: Int
+  ) throws -> [String] {
+    guard count > 0 else { return [] }
+    guard let values else {
+      throw NativeStatusFailure.swiftNativeError(
+        "source completion returned a null tile URL array"
+      )
+    }
+    return try UnsafeBufferPointer(start: values, count: count)
+      .map { try NativeString.copyUTF8(data: $0.data, size: $0.size) }
+  }
+
   private static func copyStyleSourceInfo(
     _ result: UnsafePointer<mln_completion_result>
   ) throws -> StyleSourceInfo? {
@@ -1612,19 +1631,9 @@ public extension MapHandle {
       ) : nil
     let url = has(MLN_STYLE_SOURCE_INFO_URL.rawValue)
       ? try NativeString.copyUTF8(data: raw.url.data, size: raw.url.size) : nil
-    let tileURLs: [String]
-    if raw.tile_url_count == 0 {
-      tileURLs = []
-    } else {
-      guard let values = raw.tile_urls else {
-        throw NativeStatusFailure.swiftNativeError(
-          "source completion returned a null tile URL array"
-        )
-      }
-      tileURLs = try UnsafeBufferPointer(
-        start: values, count: raw.tile_url_count
-      ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) }
-    }
+    let tileURLs = try copyTileURLs(
+      raw.tile_urls, count: raw.tile_url_count
+    )
     return StyleSourceInfo(native: NativeStyle.sourceInfo(
       fixed: raw.info,
       attribution: attribution,

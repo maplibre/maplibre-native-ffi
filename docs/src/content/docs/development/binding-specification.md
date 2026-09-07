@@ -533,8 +533,11 @@ only copied source metadata.
 
 Style source inspection returns one copied, language-owned source information
 value. It combines the fixed fields from `mln_style_source_info` with copied
-attribution, source URL, and inline TileJSON tile URLs. The native string-list
-handle is an internal copy mechanism and MUST NOT appear in the public API.
+attribution, source URL, and inline TileJSON tile URLs. The narrow
+`mln_map_get_style_source_tile_urls` read completes with one
+`mln_style_source_tile_urls_result` for a found source, so a binding
+distinguishes a missing source from a found source with no inline tile URLs and
+copies the views before its callback returns.
 
 The public value represents these concepts:
 

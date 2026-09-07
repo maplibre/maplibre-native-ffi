@@ -542,6 +542,105 @@ static bool read_style_source_volatility(mln_map map, mln_buffer_view id) {
   return result.info.is_volatile;
 }
 
+typedef struct tile_urls_probe {
+  atomic_bool done;
+  mln_status status;
+  size_t value_count;
+  size_t tile_url_count;
+  char first[64];
+  char second[64];
+} tile_urls_probe;
+
+static void copy_tile_urls(
+  void* user_data, const mln_completion_result* result
+) {
+  tile_urls_probe* probe = user_data;
+  probe->status = result->status;
+  probe->value_count = result->value_count;
+  if (result->value_count == 1) {
+    const mln_style_source_tile_urls_result* urls = result->value;
+    probe->tile_url_count = urls->tile_url_count;
+    if (urls->tile_url_count > 0) {
+      snprintf(
+        probe->first, sizeof(probe->first), "%.*s",
+        (int)urls->tile_urls[0].size, (const char*)urls->tile_urls[0].data
+      );
+    }
+    if (urls->tile_url_count > 1) {
+      snprintf(
+        probe->second, sizeof(probe->second), "%.*s",
+        (int)urls->tile_urls[1].size, (const char*)urls->tile_urls[1].data
+      );
+    }
+  }
+  atomic_store(&probe->done, true);
+}
+
+static void read_tile_urls(
+  mln_runtime runtime, mln_map map, mln_buffer_view source_id,
+  tile_urls_probe* probe
+) {
+  *probe = (tile_urls_probe){.status = MLN_STATUS_INVALID_STATE};
+  atomic_init(&probe->done, false);
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = copy_tile_urls,
+    .user_data = probe,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_get_style_source_tile_urls(map, source_id, &completion)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  TEST_ASSERT_TRUE(atomic_load(&probe->done));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe->status);
+}
+
+// A found source completes with one result even when it holds no inline tile
+// URLs, so a host can tell a URL-backed source from a missing one.
+static void style_source_tile_urls_distinguish_empty_from_missing(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  const mln_buffer_view tiles[] = {
+    MLN_BUFFER_LITERAL("https://example.com/a/{z}/{x}/{y}.mvt"),
+    MLN_BUFFER_LITERAL("https://example.com/b/{z}/{x}/{y}.mvt"),
+  };
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_add_vector_source_tiles(
+      map, MLN_BUFFER_LITERAL("inline"), tiles, 2, NULL, &completion.descriptor
+    )
+  );
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK, mln_map_add_vector_source_url(
+                     map, MLN_BUFFER_LITERAL("remote"),
+                     MLN_BUFFER_LITERAL("https://example.com/tiles.json"), NULL,
+                     &completion.descriptor
+                   )
+  );
+
+  tile_urls_probe probe;
+  read_tile_urls(runtime, map, MLN_BUFFER_LITERAL("inline"), &probe);
+  TEST_ASSERT_EQUAL_size_t(1, probe.value_count);
+  TEST_ASSERT_EQUAL_size_t(2, probe.tile_url_count);
+  TEST_ASSERT_EQUAL_STRING(
+    "https://example.com/a/{z}/{x}/{y}.mvt", probe.first
+  );
+  TEST_ASSERT_EQUAL_STRING(
+    "https://example.com/b/{z}/{x}/{y}.mvt", probe.second
+  );
+
+  read_tile_urls(runtime, map, MLN_BUFFER_LITERAL("remote"), &probe);
+  TEST_ASSERT_EQUAL_size_t(1, probe.value_count);
+  TEST_ASSERT_EQUAL_size_t(0, probe.tile_url_count);
+
+  read_tile_urls(runtime, map, MLN_BUFFER_LITERAL("missing"), &probe);
+  TEST_ASSERT_EQUAL_size_t(0, probe.value_count);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void style_source_volatility_round_trips(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -1043,6 +1142,7 @@ void run_style_values_abi_tests(void) {
   RUN_TEST(duplicate_id_is_an_async_failed_terminal_event);
   RUN_TEST(remove_commands_commit_and_report_missing_ids);
   RUN_TEST(an_in_use_source_removal_fails_and_leaves_the_source);
+  RUN_TEST(style_source_tile_urls_distinguish_empty_from_missing);
   RUN_TEST(style_source_volatility_round_trips);
   RUN_TEST(geojson_source_data_create_rejects_unsafe_raw_values);
   RUN_TEST(clustered_geojson_data_reports_non_point_geometry);

@@ -839,10 +839,9 @@ fn style_source_url_attribution_and_tile_urls_round_trip_through_public_api() {
         crate::completion::blocking(map.style_source_attribution("inline")).as_deref(),
         Some("Example attribution")
     );
-    assert_eq!(
-        crate::completion::blocking(map.style_source_tile_urls("inline")),
-        tiles
-    );
+    let inline_tile_urls = crate::completion::blocking(map.style_source_tile_urls("inline"))
+        .expect("the inline source exists");
+    assert_eq!(inline_tile_urls, tiles);
     assert_eq!(
         crate::completion::blocking(map.style_source_url("inline")),
         None
@@ -853,14 +852,16 @@ fn style_source_url_attribution_and_tile_urls_round_trip_through_public_api() {
         crate::completion::blocking(map.style_source_url("remote")).as_deref(),
         Some("https://example.com/source.json")
     );
-    assert!(crate::completion::blocking(map.style_source_tile_urls("remote")).is_empty());
+    assert_eq!(
+        crate::completion::blocking(map.style_source_tile_urls("remote")),
+        Some(Vec::new())
+    );
     assert_eq!(
         crate::completion::blocking(map.style_source_attribution("remote")),
         None
     );
 
-    // A missing source resolves rather than failing: no value for the strings,
-    // and an empty sequence for the tile URLs.
+    // A missing source resolves rather than failing, carrying no value.
     assert_eq!(
         crate::completion::blocking(map.style_source_url("missing-source")),
         None
@@ -869,9 +870,10 @@ fn style_source_url_attribution_and_tile_urls_round_trip_through_public_api() {
         crate::completion::blocking(map.style_source_attribution("missing-source")),
         None
     );
-    assert!(
-        crate::completion::blocking(map.style_source_tile_urls("missing-source")).is_empty(),
-        "the C completion reports a missing source the same way it reports a source with no inline TileJSON"
+    assert_eq!(
+        crate::completion::blocking(map.style_source_tile_urls("missing-source")),
+        None,
+        "a missing source reads as no value, unlike a source with no inline TileJSON"
     );
 
     map.close_and_wait();

@@ -157,8 +157,8 @@ import Testing
   #expect(remote.url == "https://example.com/source.json")
 }
 
-/// An inline tile source reads back the tile URLs it was added with, and a
-/// missing source reads as an empty list.
+/// An inline tile source reads back the tile URLs it was added with, a
+/// URL-backed source reads as an empty list, and a missing source reads as nil.
 @Test func styleSourceTileURLsReadBackInlineTilesAndMissingSources()
   async throws
 {
@@ -177,8 +177,13 @@ import Testing
   ]
   try await map.addVectorSourceTiles(sourceId: "inline", tiles: tiles)
 
+  try await map.addVectorSourceURL(
+    sourceId: "remote", url: "https://example.com/source.json"
+  )
+
   #expect(try await map.styleSourceTileURLs("inline") == tiles)
-  #expect(try await map.styleSourceTileURLs("missing").isEmpty)
+  #expect(try await map.styleSourceTileURLs("remote") == [])
+  #expect(try await map.styleSourceTileURLs("missing") == nil)
 }
 
 /// Volatility toggles commit and are visible through source info, and a

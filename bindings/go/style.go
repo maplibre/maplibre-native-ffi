@@ -1847,15 +1847,31 @@ func (m *MapHandle) StyleSourceURL(sourceID string) (*Future[StyleOptional[strin
 }
 
 // StyleSourceTileURLs returns one style source's copied inline TileJSON tile
-// URLs. A missing source and a URL-backed source both read as an empty list.
+// URLs. The query yields no value when the source is missing, and an empty
+// list for a URL-backed source or a source without inline TileJSON.
 // StyleSourceInfo reads the tile URLs together with the rest of a source's
-// metadata, and reports whether the source exists.
-func (m *MapHandle) StyleSourceTileURLs(sourceID string) (*Future[[]string], error) {
+// metadata.
+func (m *MapHandle) StyleSourceTileURLs(sourceID string) (*Future[StyleOptional[[]string]], error) {
 	view := newCStringView(sourceID)
 	defer view.free()
 	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
 		return int32(C.mln_map_get_style_source_tile_urls(raw, view.raw(), completion))
-	}, completionStyleIDs)
+	}, completionStyleSourceTileURLs)
+}
+
+func completionStyleSourceTileURLs(result *C.mln_completion_result) (StyleOptional[[]string], error) {
+	if result.value_count == 0 {
+		return StyleOptional[[]string]{}, nil
+	}
+	raw, err := completionValue[C.mln_style_source_tile_urls_result](result)
+	if err != nil {
+		return StyleOptional[[]string]{}, err
+	}
+	values, err := copyStyleViews(raw.tile_urls, raw.tile_url_count)
+	if err != nil {
+		return StyleOptional[[]string]{}, err
+	}
+	return StyleOptional[[]string]{Value: values, Found: true}, nil
 }
 
 // StyleImagePremultipliedRGBA8 returns one runtime style image's copied tightly

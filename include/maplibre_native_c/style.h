@@ -122,6 +122,15 @@ typedef struct mln_style_image_stretches_result {
   size_t stretch_y_count;
 } mln_style_image_stretches_result;
 
+/** Borrowed inline TileJSON tile URLs available during a completion callback.
+ */
+typedef struct mln_style_source_tile_urls_result {
+  uint32_t size;
+  uint32_t reserved;
+  const mln_buffer_view* tile_urls;
+  size_t tile_url_count;
+} mln_style_source_tile_urls_result;
+
 /**
  * Content-box insets in image pixels, measured from the image's top-left.
  *
@@ -730,8 +739,10 @@ MLN_API mln_status mln_map_copy_style_source_url(
 /**
  * Copies one style source's inline TileJSON tile URLs.
  *
- * A found source completes with a borrowed array of mln_buffer_view values. A
- * URL-backed source or source without inline TileJSON returns an empty array.
+ * A found source completes with one borrowed mln_style_source_tile_urls_result
+ * whose tile_urls array is empty for a URL-backed source or a source without
+ * inline TileJSON. A missing source completes successfully with no value. The
+ * binding must copy the views before the callback returns.
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.

@@ -117,6 +117,7 @@ import org.maplibre.nativeffi.internal.c.mln_style_layer_info
 import org.maplibre.nativeffi.internal.c.mln_style_layer_result
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_style_source_result
+import org.maplibre.nativeffi.internal.c.mln_style_source_tile_urls_result
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options
 import org.maplibre.nativeffi.internal.c.mln_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_texture_image_info
@@ -706,11 +707,20 @@ internal object NativeAccess {
   internal fun styleSourceUrl(map: NativeMap, sourceId: String): Deferred<String?> =
     optionalSourceText(map, sourceId, MapLibreNativeC::mln_map_copy_style_source_url)
 
-  internal fun styleSourceTileUrls(map: NativeMap, sourceId: String): Deferred<List<String>> =
+  internal fun styleSourceTileUrls(map: NativeMap, sourceId: String): Deferred<List<String>?> =
     Arena.ofConfined().use { arena ->
       val sourceIdView = stringView(arena, sourceId)
       CompletionBridge.submit(
-        ::stringViewsCompletion,
+        { result ->
+          if (mln_completion_result.value_count(result) == 0L) null
+          else {
+            val value = completionValue(result, mln_style_source_tile_urls_result.sizeof())
+            stringViews(
+              mln_style_source_tile_urls_result.tile_urls(value),
+              mln_style_source_tile_urls_result.tile_url_count(value),
+            )
+          }
+        },
         { completion ->
           MapLibreNativeC.mln_map_get_style_source_tile_urls(map.raw, sourceIdView, completion)
         },
@@ -4464,6 +4474,15 @@ internal object NativeAccess {
     }
   }
 
+  private fun stringViews(array: MemorySegment, rawCount: Long): List<String> {
+    val count = checkedInt(rawCount)
+    if (count == 0) return emptyList()
+    val views = array.reinterpret(mln_buffer_view.sizeof() * count.toLong())
+    return List(count) { index ->
+      stringView(views.asSlice(index * mln_buffer_view.sizeof(), mln_buffer_view.sizeof()))
+    }
+  }
+
   private fun optionalBufferCompletion(result: MemorySegment): ByteArray? {
     if (mln_completion_result.value_count(result) == 0L) return null
     val view = completionValue(result, mln_buffer_view.sizeof())
@@ -4498,17 +4517,10 @@ internal object NativeAccess {
     val info = mln_style_source_result.info(raw)
     val fields = mln_style_source_info.fields(info)
     val tileUrls =
-      if (mln_style_source_result.tile_url_count(raw) == 0L) emptyList()
-      else {
-        val count = checkedInt(mln_style_source_result.tile_url_count(raw))
-        val views =
-          mln_style_source_result
-            .tile_urls(raw)
-            .reinterpret(mln_buffer_view.sizeof() * count.toLong())
-        List(count) { index ->
-          stringView(views.asSlice(index * mln_buffer_view.sizeof(), mln_buffer_view.sizeof()))
-        }
-      }
+      stringViews(
+        mln_style_source_result.tile_urls(raw),
+        mln_style_source_result.tile_url_count(raw),
+      )
     return SourceInfo(
       SourceType.fromNative(mln_style_source_info.type(info)),
       mln_style_source_info.is_volatile(info),

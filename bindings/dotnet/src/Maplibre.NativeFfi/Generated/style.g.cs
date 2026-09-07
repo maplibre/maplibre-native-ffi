@@ -90,6 +90,21 @@ namespace Maplibre.NativeFfi.Internal.C
         public nuint stretch_y_count;
     }
 
+    internal unsafe partial struct mln_style_source_tile_urls_result
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("uint32_t")]
+        public uint reserved;
+
+        [NativeTypeName("const mln_buffer_view *")]
+        public mln_buffer_view* tile_urls;
+
+        [NativeTypeName("size_t")]
+        public nuint tile_url_count;
+    }
+
     internal partial struct mln_image_content
     {
         public float left;

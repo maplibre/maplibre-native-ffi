@@ -2630,7 +2630,7 @@ void main() {
       expect(await map.getStyleSourceTileUrls('url-vector'), isEmpty);
       expect(await map.getStyleSourceAttribution('missing-source'), isNull);
       expect(await map.getStyleSourceUrl('missing-source'), isNull);
-      expect(await map.getStyleSourceTileUrls('missing-source'), isEmpty);
+      expect(await map.getStyleSourceTileUrls('missing-source'), isNull);
 
       map.addRasterDemSourceTiles(
         'inline-dem',

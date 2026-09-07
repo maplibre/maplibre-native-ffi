@@ -995,11 +995,11 @@ class MapHandle(NativeHandleMixin):
         """
         return self._native.copy_style_source_attribution(source_id)
 
-    def get_style_source_tile_urls(self, source_id: str) -> Future[list[str]]:
+    def get_style_source_tile_urls(self, source_id: str) -> Future[list[str] | None]:
         """Return one style source's inline TileJSON tile URLs.
 
-        The result is empty for a missing source, for a URL-backed source, and
-        for a source without inline TileJSON.
+        The result is None when the source does not exist, and empty for a
+        URL-backed source or a source without inline TileJSON.
         """
         return self._native.get_style_source_tile_urls(source_id)
 
