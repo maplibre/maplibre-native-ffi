@@ -7,10 +7,12 @@
 #include "c_api/boundary.hpp"
 #include "maplibre_native_c.h"
 
-auto mln_log_set_callback(mln_log_callback callback, void* user_data) noexcept
-  -> mln_status {
+auto mln_log_set_callback(
+  mln_log_callback callback, void* user_data,
+  mln_log_callback_release release_user_data
+) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::set_log_callback(callback, user_data);
+    return mln::core::set_log_callback(callback, user_data, release_user_data);
   });
 }
 

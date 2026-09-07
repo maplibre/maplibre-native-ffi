@@ -10,11 +10,6 @@ canonical Windows drive paths and opens UTF-8 filenames through wide filesystem
 APIs. This lets the local file source load percent-encoded `file:///C:/...`
 resources whose paths contain spaces or non-ASCII characters.
 
-`0003-run-loop-process-gate.patch` adds an optional gate callback to
-`RunLoop::process()`, consulted before each queued task is dequeued. The C API
-uses it to bound one pump's drain; the budget logic stays on the C API side, and
-an unset gate keeps upstream behavior.
-
 `0004-opengl-valid-api-calls.patch` uses indexed extension enumeration on OpenGL
 ES, allocates storage before copying a uniform buffer, and isolates allocation
 errors from earlier OpenGL calls. This prevents strict implementations and the

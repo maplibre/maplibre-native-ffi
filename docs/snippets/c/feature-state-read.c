@@ -8,21 +8,26 @@
 extern bool host_json_selected(mln_buffer_view json);
 // #endregion member
 
-bool read_selected(mln_map map, const mln_feature_state_selector* selector) {
-  // #region get
-  mln_buffer result = MLN_HANDLE_NULL;
-  const mln_status got = mln_map_get_feature_state(map, selector, &result);
-  if (got != MLN_STATUS_OK) return false;
-  // #endregion get
-
+static void read_selected(
+  void* user_data, const mln_completion_result* result
+) {
+  bool* selected = user_data;
   // #region read
-  mln_buffer_view json = {0};
-  bool selected = false;
-  if (mln_buffer_get(result, &json) == MLN_STATUS_OK) {
-    selected = host_json_selected(json);
-  }
-
-  mln_buffer_destroy(result);
+  if (result->status != MLN_STATUS_OK || result->value_count != 1) return;
+  const mln_buffer_view json = *(const mln_buffer_view*)result->value;
+  *selected = host_json_selected(json);
   // #endregion read
-  return selected;
+}
+
+mln_status start_read_selected(
+  mln_map map, const mln_feature_state_selector* selector, bool* selected
+) {
+  // #region get
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = read_selected,
+    .user_data = selected,
+  };
+  return mln_map_get_feature_state(map, selector, &completion);
+  // #endregion get
 }

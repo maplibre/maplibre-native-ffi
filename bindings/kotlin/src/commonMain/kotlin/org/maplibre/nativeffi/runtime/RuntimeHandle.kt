@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.runtime
 
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
@@ -9,126 +10,69 @@ import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
 /** Owned runtime handle. Platform actuals own the native runtime carrier. */
-public expect class RuntimeHandle : AutoCloseable {
+public expect class RuntimeHandle {
   public val isClosed: Boolean
 
-  /**
-   * Advances this runtime: parks the owner thread when [timeoutMillis] allows it, then drains the
-   * owner-thread task queues. Drain the queued runtime events with [drainEvents] afterwards.
-   *
-   * [timeoutMillis] bounds the park. Zero drains and returns, a positive value parks for up to that
-   * many milliseconds, and a negative value parks until a wake arrives. A parking call returns as
-   * soon as the runtime's wake flag is set, and returns without parking while unread runtime events
-   * are queued. Timers and ready I/O set the flag only when they queue owner-thread work, so pass a
-   * bounded timeout to cap how long a call waits.
-   *
-   * [budgetMillis] bounds the drain. A negative value drains without a bound, and zero or a
-   * positive value stops the drain at the first task boundary after that many milliseconds. The
-   * first queued task always runs, so a bounded pump always makes progress, and tasks left behind
-   * set the wake flag so the next pump returns without parking and continues them.
-   *
-   * A non-zero timeout blocks the calling thread and ignores interruption. Call it outside any lock
-   * that a thread signalling a [WakeSource] takes.
-   */
-  public fun pump(timeoutMillis: Long, budgetMillis: Long = -1)
+  /** Completes after every command accepted before this call reaches a terminal disposition. */
+  public fun barrier(): Deferred<Unit>
 
-  /**
-   * Acquires a [WakeSource] that releases this runtime's parked owner thread. The returned source
-   * is usable from any thread, and the caller closes it.
-   */
-  public fun acquireWakeSource(): WakeSource
-
-  public fun startAmbientCacheOperation(
-    operation: AmbientCacheOperation
-  ): OfflineOperationHandle<Unit>
+  public fun runAmbientCacheOperation(operation: AmbientCacheOperation): Deferred<Unit>
 
   /**
    * Starts a change to this runtime's maximum ambient cache size. Lowering it evicts cached ambient
    * resources; offline regions are unaffected.
    */
-  public fun startSetMaximumAmbientCacheSize(size: Long): OfflineOperationHandle<Unit>
+  public fun setMaximumAmbientCacheSize(size: Long): Deferred<Unit>
 
-  public fun startCreateOfflineRegion(
+  public fun createOfflineRegion(
     definition: OfflineRegionDefinition,
     metadata: ByteArray,
-  ): OfflineOperationHandle<OfflineRegionInfo>
+  ): Deferred<OfflineRegionInfo>
 
-  public fun startOfflineRegion(id: Long): OfflineOperationHandle<OfflineRegionInfo?>
+  public fun offlineRegion(id: Long): Deferred<OfflineRegionInfo?>
 
-  public fun startOfflineRegions(): OfflineOperationHandle<List<OfflineRegionInfo>>
+  public fun offlineRegions(): Deferred<List<OfflineRegionInfo>>
 
-  public fun startMergeOfflineRegionsDatabase(
-    path: String
-  ): OfflineOperationHandle<List<OfflineRegionInfo>>
+  public fun mergeOfflineRegionsDatabase(path: String): Deferred<List<OfflineRegionInfo>>
 
-  public fun startUpdateOfflineRegionMetadata(
-    id: Long,
-    metadata: ByteArray,
-  ): OfflineOperationHandle<OfflineRegionInfo>
+  public fun updateOfflineRegionMetadata(id: Long, metadata: ByteArray): Deferred<OfflineRegionInfo>
 
-  public fun startOfflineRegionStatus(id: Long): OfflineOperationHandle<OfflineRegionStatus>
+  public fun offlineRegionStatus(id: Long): Deferred<OfflineRegionStatus>
 
-  public fun startSetOfflineRegionObserved(
-    id: Long,
-    observed: Boolean,
-  ): OfflineOperationHandle<Unit>
+  public fun setOfflineRegionObserved(id: Long, observed: Boolean): Deferred<Unit>
 
-  public fun startSetOfflineRegionDownloadState(
+  public fun setOfflineRegionDownloadState(
     id: Long,
     downloadState: OfflineRegionDownloadState,
-  ): OfflineOperationHandle<Unit>
+  ): Deferred<Unit>
 
-  public fun startInvalidateOfflineRegion(id: Long): OfflineOperationHandle<Unit>
+  public fun invalidateOfflineRegion(id: Long): Deferred<Unit>
 
-  public fun startDeleteOfflineRegion(id: Long): OfflineOperationHandle<Unit>
+  public fun deleteOfflineRegion(id: Long): Deferred<Unit>
 
-  public fun takeCreateOfflineRegionResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo>
-  ): OfflineRegionInfo
+  public fun setResourceProvider(callback: ResourceProviderCallback): Deferred<CommandCompletion>
 
-  public fun takeOfflineRegionResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo?>
-  ): OfflineRegionInfo?
+  public fun clearResourceProvider(): Deferred<CommandCompletion>
 
-  public fun takeOfflineRegionsResult(
-    operation: OfflineOperationHandle<List<OfflineRegionInfo>>
-  ): List<OfflineRegionInfo>
+  public fun setResourceTransform(callback: ResourceTransformCallback): Deferred<CommandCompletion>
 
-  public fun takeMergeOfflineRegionsDatabaseResult(
-    operation: OfflineOperationHandle<List<OfflineRegionInfo>>
-  ): List<OfflineRegionInfo>
+  public fun clearResourceTransform(): Deferred<CommandCompletion>
 
-  public fun takeUpdateOfflineRegionMetadataResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo>
-  ): OfflineRegionInfo
+  public fun setHttpHeaderTransform(
+    callback: HttpHeaderTransformCallback
+  ): Deferred<CommandCompletion>
 
-  public fun takeOfflineRegionStatusResult(
-    operation: OfflineOperationHandle<OfflineRegionStatus>
-  ): OfflineRegionStatus
-
-  public fun setResourceProvider(callback: ResourceProviderCallback)
-
-  public fun clearResourceProvider()
-
-  public fun setResourceTransform(callback: ResourceTransformCallback)
-
-  public fun clearResourceTransform()
-
-  public fun setHttpHeaderTransform(callback: HttpHeaderTransformCallback)
-
-  public fun clearHttpHeaderTransform()
+  public fun clearHttpHeaderTransform(): Deferred<CommandCompletion>
 
   /**
-   * Drains this runtime's queued events into one batch, in queue order.
+   * Drains this runtime's queued events, in queue order, and returns an empty list when none are
+   * queued.
    *
-   * [maxEvents] bounds the drain. Zero drains every queued event; a positive value drains at most
-   * that many events and reports the rest in [RuntimeEventBatch.remainingCount]. A negative value
-   * throws [org.maplibre.nativeffi.error.InvalidArgumentException].
-   *
-   * The two subscription masks decide which events reach the queue. Draining is a queue operation
-   * that runs no owner-thread work, so call [pump] first and drain what the pump produced.
+   * The two subscription masks decide which events reach the queue. Draining copies events the
+   * runtime worker has already published, so the returned events stay readable after later drains
+   * and after the source map or runtime closes.
    */
-  public fun drainEvents(maxEvents: Int = 0): RuntimeEventBatch
+  public fun drainEvents(): List<RuntimeEvent>
 
   /**
    * Runtime-originated event types that this runtime queues, [RuntimeEventMask.ALL] until a host
@@ -140,9 +84,19 @@ public expect class RuntimeHandle : AutoCloseable {
    */
   public var eventMask: RuntimeEventMask
 
-  override fun close()
+  /**
+   * Releases this runtime and its callback state, and reports the end of native teardown.
+   *
+   * The call consumes the handle before it returns, and it throws when this runtime still has a
+   * live or pending child. The returned [Deferred] completes after every earlier accepted
+   * submission, including released maps' teardown, has finished and the runtime's threads and
+   * resources are gone, so a host that awaits it may exit the process without racing native
+   * teardown. Closing an already closed runtime returns that same [Deferred].
+   */
+  public fun close(): Deferred<Unit>
 
   public companion object {
+    /** Creates a runtime. */
     public fun create(options: RuntimeOptions): RuntimeHandle
   }
 }

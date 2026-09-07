@@ -3,23 +3,29 @@ import MaplibreNativeFFI
 import QuartzCore
 
 /// The display-paced render loop. This view runs on the main thread and owns
-/// the window, input decoding, the Metal objects, and the render session. The
-/// runtime and the map live on the runtime loop thread it starts, reached
-/// through ``Channels``.
+/// the window, input decoding, the runtime, the map, the Metal objects, and the
+/// render session.
 @MainActor
 final class MetalMapView: NSView {
   private let metalLayer = CAMetalLayer()
   private let input = InputController()
+
   private let mode: RenderTargetMode
-  private let channels = Channels()
   private var graphics: MetalGraphicsContext?
+  private var mapState: MapState?
   private var renderTarget: MetalRenderTarget?
-  private var runtimeLoop: RuntimeLoopThread?
+  private var setupTask: Task<Void, Never>?
   private var timer: Timer?
+  private var frameTask: Task<Void, Never>?
+  private var shutdownTask: Task<Void, Never>?
+  private var pendingUpdates: Task<Void, Never>?
   private var currentViewport: Viewport?
+  private var renderRequested = true
+  private var pendingResize = false
   private var consecutiveRenderFailures = 0
   private var didLogStartupStatus = false
   private var isShutDown = false
+  private var terminateAfterShutdown = false
   private var setupError: Error?
   private var errorLabel: NSTextField?
 
@@ -39,12 +45,6 @@ final class MetalMapView: NSView {
       setupError = error
     }
     postsFrameChangedNotifications = true
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(shutdown),
-      name: AppDelegate.willTerminateMapViews,
-      object: nil
-    )
     if let setupError {
       showError(String(describing: setupError))
     }
@@ -64,31 +64,53 @@ final class MetalMapView: NSView {
   override func viewWillMove(toWindow newWindow: NSWindow?) {
     super.viewWillMove(toWindow: newWindow)
     if newWindow == nil {
-      shutdown()
+      Task { @MainActor in await shutdown() }
     }
   }
 
-  /// Closes the session before the runtime loop closes the map; a map with an
-  /// attached session cannot be destroyed.
-  @objc private func shutdown() {
+  /// Stops the host loop, then releases the render session, the map, and the
+  /// runtime in that order; a map with an attached session cannot be destroyed.
+  /// The caller may await the same teardown from more than one place.
+  func shutdown() async {
+    beginShutdown()
+    await frameTask?.value
+    finishShutdown()
+    await shutdownTask?.value
+  }
+
+  private func beginShutdown(terminate: Bool = false) {
+    terminateAfterShutdown = terminateAfterShutdown || terminate
     guard !isShutDown else { return }
     isShutDown = true
     timer?.invalidate()
     timer = nil
-    do {
-      try renderTarget?.close()
-    } catch {
-      print(error)
+    if frameTask == nil {
+      finishShutdown()
     }
+  }
+
+  private func finishShutdown() {
+    guard shutdownTask == nil else { return }
+    let target = renderTarget
     renderTarget = nil
-    if runtimeLoop != nil {
-      channels.requestShutdown()
-      if !channels.waitForRuntimeLoopExit(timeout: 5.0) {
-        print("runtime loop did not finish before the shutdown deadline")
+    let setup = setupTask
+    // A failing update reaches here from inside the update chain, so the chain
+    // is dropped rather than awaited; `isShutDown` stops every queued update
+    // before it touches the map.
+    pendingUpdates = nil
+    shutdownTask = Task { @MainActor in
+      await setup?.value
+      do {
+        try await target?.close()
+        try await self.mapState?.close()
+      } catch {
+        print(error)
       }
-      runtimeLoop = nil
+      self.mapState = nil
+      if self.terminateAfterShutdown {
+        NSApp.terminate(nil)
+      }
     }
-    NotificationCenter.default.removeObserver(self)
   }
 
   override func layout() {
@@ -102,70 +124,117 @@ final class MetalMapView: NSView {
   }
 
   override func mouseDown(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseDown(event, commands: channels))
+    updateMap { try await self.input.mouseDown(event, mapState: $0) }
   }
 
   override func rightMouseDown(with event: NSEvent) {
-    requestRenderIfCameraChanged(
-      input.rightMouseDown(event, commands: channels)
-    )
+    updateMap { try await self.input.rightMouseDown(event, mapState: $0) }
   }
 
   override func mouseUp(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseUp(event, commands: channels))
+    updateMap { try await self.input.mouseUp(event, mapState: $0) }
   }
 
   override func rightMouseUp(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.rightMouseUp(event, commands: channels))
+    updateMap { try await self.input.rightMouseUp(event, mapState: $0) }
   }
 
   override func mouseDragged(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseDragged(event, commands: channels))
+    updateMap { try await self.input.mouseDragged(event, mapState: $0) }
   }
 
   override func rightMouseDragged(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseDragged(event, commands: channels))
+    updateMap { try await self.input.mouseDragged(event, mapState: $0) }
   }
 
   override func scrollWheel(with event: NSEvent) {
-    requestRenderIfCameraChanged(
-      input.scrollWheel(event, commands: channels, in: self)
-    )
+    updateMap {
+      try await self.input.scrollWheel(event, in: self, mapState: $0)
+    }
   }
 
   override func keyDown(with event: NSEvent) {
     guard let viewport = currentViewport else { return }
-    requestRenderIfCameraChanged(
-      input.keyDown(event, commands: channels, viewport: viewport)
-    )
+    updateMap {
+      try await self.input.keyDown(event, viewport: viewport, mapState: $0)
+    }
   }
 
-  private func requestRenderIfCameraChanged(_ cameraChanged: Bool) {
-    if cameraChanged {
-      channels.setRenderRequest()
+  /// Submits one camera command. Each task awaits the one before it, so a
+  /// gesture-begin submission always reaches the map ahead of the deltas the
+  /// same gesture produces; main-actor isolation alone gives exclusion, not
+  /// order.
+  private func updateMap(
+    _ update: @escaping @MainActor (MapState) async throws -> Bool
+  ) {
+    guard !isShutDown, mapState != nil else { return }
+    let previous = pendingUpdates
+    pendingUpdates = Task { @MainActor in
+      await previous?.value
+      guard !self.isShutDown, let state = self.mapState else { return }
+      do {
+        if try await update(state) {
+          self.renderRequested = true
+        }
+      } catch {
+        self.fail(String(describing: error))
+      }
     }
   }
 
   private func startTimerIfNeeded() {
     guard timer == nil else { return }
-    // TODO(map-example-spec): Replace fixed NSTimer with a display-paced host
-    // loop.
+    // TODO(map-example-spec): Replace the fixed interval with a display-paced
+    // host loop. See Frame loop.
     timer = Timer
       .scheduledTimer(withTimeInterval: 1.0 / 60.0,
                       repeats: true)
       { [weak self] _ in
-        Task { @MainActor in self?.tick() }
+        Task { @MainActor in self?.scheduleFrame() }
       }
     RunLoop.main.add(timer!, forMode: .common)
   }
 
-  /// Starts the runtime loop once a non-empty viewport is known, because the
-  /// map takes its initial extent from it.
-  private func startRuntimeLoopIfNeeded(viewport: Viewport) {
-    guard runtimeLoop == nil, !isShutDown else { return }
-    let loop = RuntimeLoopThread(channels: channels, viewport: viewport)
-    runtimeLoop = loop
-    loop.start()
+  /// Creates the map once a non-empty viewport is known, because the map takes
+  /// its initial extent from it.
+  private func startMapStateIfNeeded(viewport: Viewport) {
+    guard mapState == nil, setupTask == nil, !isShutDown else { return }
+    setupTask = Task { @MainActor [weak self] in
+      guard let self else { return }
+      var setupFailure: Error?
+      do {
+        let state = try await MapState(viewport: viewport)
+        if self.isShutDown {
+          try await state.close()
+        } else {
+          if let latest = self.currentViewport, !latest.isEmpty,
+             latest != viewport
+          {
+            try await state.resize(MapLogicalExtent(
+              width: latest.logicalWidth,
+              height: latest.logicalHeight,
+              scaleFactor: latest.scaleFactor
+            ))
+          }
+          self.mapState = state
+          state.scheduleEventDrains(
+            onRenderRequested: { [weak self] in
+              self?.renderRequested = true
+            },
+            onFailure: { [weak self] error in
+              self?.fail(String(describing: error))
+            }
+          )
+          self.renderRequested = true
+        }
+      } catch {
+        setupFailure = error
+      }
+      self.setupTask = nil
+      if let setupFailure {
+        self.fail(String(describing: setupFailure))
+      }
+    }
   }
 
   private func updateViewport() {
@@ -181,70 +250,90 @@ final class MetalMapView: NSView {
       return
     }
 
-    do {
-      graphics.resize(viewport)
-      try renderTarget?.resize(graphics: graphics, viewport: viewport)
-      currentViewport = viewport
-      channels.setRenderRequest()
-      startRuntimeLoopIfNeeded(viewport: viewport)
-    } catch {
-      // A failed resize leaves the render target detached, so stop the timer
-      // rather than render through a detached session.
-      print(error)
-      timer?.invalidate()
-      timer = nil
-      showError(String(describing: error))
+    graphics.resize(viewport)
+    currentViewport = viewport
+    if renderTarget == nil {
+      // With no session attached the map is the only extent authority; a live
+      // session carries the extent through its own resize on the next tick.
+      updateMap { state in
+        try await state.resize(MapLogicalExtent(
+          width: viewport.logicalWidth,
+          height: viewport.logicalHeight,
+          scaleFactor: viewport.scaleFactor
+        ))
+        return true
+      }
+    } else {
+      pendingResize = true
     }
+    renderRequested = true
+    startMapStateIfNeeded(viewport: viewport)
   }
 
-  /// Attaches the render session on this thread. Attach records the calling
-  /// thread as the session's owner, and every later session call runs here.
-  private func attachIfNeeded() {
+  /// Attaches the render session on the graphics thread that services it.
+  private func attachIfNeeded() async {
     guard renderTarget == nil,
           let graphics,
           let viewport = currentViewport,
           !viewport.isEmpty,
-          let attachRef = channels.attachRef()
+          let renderMap = mapState?.mapHandle
     else { return }
 
     do {
-      renderTarget = try MetalRenderTarget.attach(
+      renderTarget = try await MetalRenderTarget.attach(
         mode: mode,
-        attachRef: attachRef,
+        map: renderMap,
         graphics: graphics,
         viewport: viewport
       )
+      // The viewport can change while the attach is in flight; the session
+      // was attached at the captured extent, so carry any later change into
+      // the next tick's session resize.
+      pendingResize = currentViewport != viewport
       if !didLogStartupStatus {
         logStartupStatus(mode: mode)
         didLogStartupStatus = true
       }
-      channels.setRenderRequest()
+      renderRequested = true
     } catch {
       fail(String(describing: error))
     }
   }
 
-  private func tick() {
-    guard !isShutDown else { return }
-    if let failureMessage = channels.failureMessage {
-      fail(failureMessage)
-      return
+  private func scheduleFrame() {
+    guard frameTask == nil, !isShutDown else { return }
+    frameTask = Task { @MainActor in
+      await tick()
+      frameTask = nil
+      if isShutDown {
+        finishShutdown()
+      }
     }
-    attachIfNeeded()
-    guard let renderTarget,
+  }
+
+  private func tick() async {
+    guard !isShutDown else { return }
+    await attachIfNeeded()
+    guard !isShutDown,
+          var renderTarget,
+          let graphics,
           let viewport = currentViewport,
           !viewport.isEmpty
     else { return }
 
     do {
-      // Consume first, so a request published during the render survives.
-      if channels.consumeRenderRequest() {
-        let rendered = try renderTarget.renderUpdate()
+      if pendingResize {
+        try await renderTarget.resize(graphics: graphics, viewport: viewport)
+        self.renderTarget = renderTarget
+        pendingResize = false
+      }
+      if renderRequested {
+        renderRequested = false
+        let rendered = try await renderTarget.renderFrame()
         if !rendered {
-          channels.setRenderRequest()
+          renderRequested = true
         }
       }
-      try renderTarget.finishFrame()
       consecutiveRenderFailures = 0
     } catch {
       print(error)
@@ -258,8 +347,7 @@ final class MetalMapView: NSView {
   private func fail(_ message: String) {
     print(message)
     showError(message)
-    shutdown()
-    NSApp.terminate(nil)
+    beginShutdown(terminate: true)
   }
 
   private func readViewport() -> Viewport {

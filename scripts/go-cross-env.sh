@@ -25,7 +25,10 @@ case "$1" in
         compiler_prefix=x86_64-linux-android
         ;;
     esac
-    ndk_bin="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
+    if ! ndk_prebuilt="$("$(dirname "${BASH_SOURCE[0]}")/android-ndk-prebuilt.sh")"; then
+      return 2
+    fi
+    ndk_bin="$ndk_prebuilt/bin"
     export GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=1
     export CC="$ndk_bin/${compiler_prefix}24-clang"
     export CXX="$ndk_bin/${compiler_prefix}24-clang++"
@@ -44,5 +47,8 @@ case "$1" in
     export GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=1
     export CC="$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
     export CXX="$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
+    # The OHOS loader leaves Go's internal function-pointer relocations
+    # unresolved in PIE executables. Link device binaries as ET_EXEC instead.
+    export CGO_LDFLAGS="${CGO_LDFLAGS:-} -no-pie"
     ;;
 esac

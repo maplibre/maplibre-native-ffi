@@ -12,11 +12,12 @@ import org.maplibre.nativeffi.internal.struct.StyleStructs
 import org.maplibre.nativeffi.resource.ResourceErrorReason
 import org.maplibre.nativeffi.resource.ResourceResponse
 import org.maplibre.nativeffi.resource.ResourceResponseStatus
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 @OptIn(ExperimentalForeignApi::class)
 class NativeDescriptorValidationTest : org.maplibre.nativeffi.NativeTestBase() {
   @Test
-  fun enumInputsRejectUnknownSentinelsBeforeNativeCalls() {
+  fun enumInputsRejectUnknownSentinelsBeforeNativeCalls(): Unit = runSuspendTest {
     assertFailsWith<InvalidArgumentException> {
       MapHandle.mapOptionsForTesting(MapOptions().apply { mapMode = MapMode(900) }) {}
     }
@@ -55,7 +56,7 @@ class NativeDescriptorValidationTest : org.maplibre.nativeffi.NativeTestBase() {
   }
 
   @Test
-  fun canonicalTileMaterializationRejectsOverflow() {
+  fun canonicalTileMaterializationRejectsOverflow(): Unit = runSuspendTest {
     assertFailsWith<InvalidArgumentException> {
       StyleStructs.canonicalTileId(CanonicalTileId(0, UInt.MAX_VALUE.toLong() + 1, 0))
     }

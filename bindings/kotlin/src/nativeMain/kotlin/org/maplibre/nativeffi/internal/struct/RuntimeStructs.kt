@@ -5,7 +5,6 @@ import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.plus
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.readBytes
@@ -19,7 +18,6 @@ import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_NONE
-import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT
@@ -28,28 +26,16 @@ import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION
 import org.maplibre.nativeffi.internal.c.mln_offline_region_definition
 import org.maplibre.nativeffi.internal.c.mln_offline_region_info
-import org.maplibre.nativeffi.internal.c.mln_offline_region_list_count
-import org.maplibre.nativeffi.internal.c.mln_offline_region_list_destroy
-import org.maplibre.nativeffi.internal.c.mln_offline_region_list_get
-import org.maplibre.nativeffi.internal.c.mln_offline_region_snapshot_destroy
-import org.maplibre.nativeffi.internal.c.mln_offline_region_snapshot_get
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_camera_transition_finished
-import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_operation_completed
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_response_error
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_tile_count_limit
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_render_frame
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_render_map
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_tile_action
-import org.maplibre.nativeffi.internal.lifecycle.NativeOfflineRegionList
-import org.maplibre.nativeffi.internal.lifecycle.NativeOfflineRegionSnapshot
-import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
-import org.maplibre.nativeffi.internal.memory.CSize
-import org.maplibre.nativeffi.internal.memory.CSizeVar
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
-import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.map.RenderingStats
 import org.maplibre.nativeffi.map.TileOperation
@@ -59,8 +45,6 @@ import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
 import org.maplibre.nativeffi.render.RenderMode
 import org.maplibre.nativeffi.resource.ResourceErrorReason
-import org.maplibre.nativeffi.runtime.OfflineOperationKind
-import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 
 /** Copies runtime event payloads out of native event storage. */
@@ -91,8 +75,6 @@ internal object RuntimeStructs {
         offlineRegionResponseError(event.payload.offline_region_response_error)
       MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT ->
         offlineRegionTileCountLimit(event.payload.offline_region_tile_count_limit)
-      MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED ->
-        offlineOperationCompleted(event.payload.offline_operation_completed)
       MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED ->
         cameraTransitionFinished(event.payload.camera_transition_finished)
       else -> unknownPayload(event, eventSize)
@@ -169,17 +151,6 @@ internal object RuntimeStructs {
       checkedLong(value.limit, "offline tile count limit"),
     )
 
-  private fun offlineOperationCompleted(
-    value: mln_runtime_event_offline_operation_completed
-  ): RuntimeEventPayload.OfflineOperationCompleted =
-    RuntimeEventPayload.OfflineOperationCompleted(
-      uint64BitsToLong(value.operation_id),
-      OfflineOperationKind.fromNative(value.operation_kind),
-      OfflineOperationResultKind.fromNative(value.result_kind),
-      value.result_status,
-      value.found,
-    )
-
   private fun cameraTransitionFinished(
     value: mln_runtime_event_camera_transition_finished
   ): RuntimeEventPayload.CameraTransitionFinished =
@@ -242,44 +213,6 @@ internal object RuntimeStructs {
     }
     return native.ptr
   }
-
-  fun offlineRegionSnapshot(
-    snapshot: NativeOfflineRegionSnapshot,
-    getter: (ULong, CPointer<mln_offline_region_info>) -> Int = ::mln_offline_region_snapshot_get,
-    destroyer: (ULong) -> Unit = ::mln_offline_region_snapshot_destroy,
-  ): OfflineRegionInfo =
-    try {
-      memScoped {
-        val info = alloc<mln_offline_region_info>()
-        info.size = sizeOf<mln_offline_region_info>().toUInt()
-        Status.check(getter(snapshot.rawHandleValue, info.ptr))
-        offlineRegionInfo(info)
-      }
-    } finally {
-      destroyer(snapshot.rawHandleValue)
-    }
-
-  fun offlineRegionList(
-    list: NativeOfflineRegionList,
-    counter: (ULong, CPointer<CSizeVar>) -> Int = ::mln_offline_region_list_count,
-    getter: (ULong, CSize, CPointer<mln_offline_region_info>) -> Int =
-      ::mln_offline_region_list_get,
-    destroyer: (ULong) -> Unit = ::mln_offline_region_list_destroy,
-  ): List<OfflineRegionInfo> =
-    try {
-      memScoped {
-        val outCount = alloc<CSizeVar>()
-        Status.check(counter(list.rawHandleValue, outCount.ptr))
-        List(checkedInt(outCount.value.toULong(), "offline region count")) { index ->
-          val info = alloc<mln_offline_region_info>()
-          info.size = sizeOf<mln_offline_region_info>().toUInt()
-          Status.check(getter(list.rawHandleValue, index.toCSize(), info.ptr))
-          offlineRegionInfo(info)
-        }
-      }
-    } finally {
-      destroyer(list.rawHandleValue)
-    }
 
   fun offlineRegionInfo(value: mln_offline_region_info): OfflineRegionInfo =
     OfflineRegionInfo(

@@ -16,6 +16,7 @@ import (
 	"runtime/cgo"
 	"sync"
 	"sync/atomic"
+	"unsafe"
 )
 
 // liveCustomGeometrySources counts the callback states this package holds a cgo
@@ -76,7 +77,7 @@ func newCustomGeometrySourceState(options CustomGeometrySourceOptions) *CustomGe
 // AddCustomGeometrySource installs a custom geometry source callback descriptor.
 // The C API owns the state from a successful add onwards and releases it through
 // the release callback, so a caller keeps nothing.
-func AddCustomGeometrySource(m uint64, sourceID string, options CustomGeometrySourceOptions) int32 {
+func AddCustomGeometrySource(m uint64, sourceID string, options CustomGeometrySourceOptions, completion unsafe.Pointer) int32 {
 	if options.FetchTile == nil {
 		return int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
@@ -102,7 +103,9 @@ func AddCustomGeometrySource(m uint64, sourceID string, options CustomGeometrySo
 	raw.clip = C.bool(options.Clip)
 	raw.wrap = C.bool(options.Wrap)
 
-	status := int32(C.mln_map_add_custom_geometry_source(C.mln_map(m), sourceView, &raw))
+	status := int32(C.mln_map_add_custom_geometry_source(
+		C.mln_map(m), sourceView, &raw, (*C.mln_completion)(completion),
+	))
 	if status != int32(C.MLN_STATUS_OK) {
 		// A failed add owes no release callback, so this call frees the state.
 		state.release()

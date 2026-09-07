@@ -1,5 +1,5 @@
 --include-directory
-../../include/maplibre_native_c
+../../include
 --language
 c
 -std
@@ -21,12 +21,11 @@ mln_map=MlnMap
 mln_map_projection=MlnMapProjection
 mln_geojson_source_data=MlnGeoJsonSourceData
 mln_render_session=MlnRenderSession
-mln_wake_source=MlnWakeSource
+mln_render_frame_batch=MlnRenderFrameBatch
+mln_acquired_frame=MlnAcquiredFrame
+mln_event_batch=MlnEventBatch
 mln_resource_request_handle=MlnResourceRequest
-mln_offline_region_snapshot=MlnOfflineRegionSnapshot
 mln_offline_region_list=MlnOfflineRegionList
-mln_style_id_list=MlnStyleIdList
-mln_style_string_list=MlnStyleStringList
 mln_queried_feature_list=MlnQueriedFeatureList
 --config
 latest-codegen

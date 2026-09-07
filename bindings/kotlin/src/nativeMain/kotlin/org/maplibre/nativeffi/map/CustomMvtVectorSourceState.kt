@@ -23,8 +23,8 @@ import org.maplibre.nativeffi.style.CustomMvtVectorSourceOptions
 /**
  * Owns map/style-scoped custom MVT vector source callback state.
  *
- * [onReleased] runs on the map owner thread when native stops referencing this state, which is what
- * drops it from its map's registry and closes it.
+ * Native invokes [onReleased] after it stops referencing this state, which drops it from its map's
+ * registry and closes it.
  */
 @OptIn(ExperimentalForeignApi::class)
 internal class CustomMvtVectorSourceState(
@@ -57,7 +57,7 @@ internal class CustomMvtVectorSourceState(
     }
   }
 
-  /** Runs when native stops referencing this state, on the map owner thread. */
+  /** Runs after native stops referencing this state. */
   internal fun released() {
     onReleased()
   }

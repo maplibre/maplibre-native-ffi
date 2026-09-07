@@ -22,14 +22,12 @@ contains every resource that a defined area needs and remains outside the
 ambient budget. Download a region when the host must draw a known area without
 a network.
 
-Database operations are asynchronous. A start call validates its arguments,
-returns an operation ID, and queues the work. The runtime later queues one
-operation-completed event with the ID and result status while its subscription
-selects that type, as
-[Handle events](/maplibre-native-ffi/guides/handle-events/) describes. This
-result is separate from the start call's status. Take the result value when an
-operation produces one. Take or discard every operation to release its runtime
-state.
+Database operations are asynchronous. A submission validates its arguments on
+the calling thread and queues the work, so no host thread waits on the database.
+Each accepted submission invokes its one-shot completion with the terminal
+status, diagnostic, and any borrowed result. A command that names a region the
+database does not hold completes with a not-found status. Copy values that must
+outlive the callback.
 
 ## Download a region
 
@@ -51,9 +49,8 @@ call returns.
 
 <Code code={region(offlineRegion, "create")} lang="c" title="offline-region.c" />
 
-Taking the result produces a snapshot handle that contains the region record. A
-failed take leaves the operation live. Discard the operation after the host
-stops retrying.
+The completion receives the region record directly. Its definition and metadata
+are borrowed for the callback, while the numeric region ID remains valid.
 
 <Code code={region(offlineRegion, "result")} lang="c" title="offline-region.c" />
 
@@ -61,9 +58,9 @@ The region ID is the part of the record that the remaining calls need.
 
 <Code code={region(offlineRegion, "region-id")} lang="c" title="offline-region.c" />
 
-Mark the region as observed to receive progress and error events. Then set its
-download state to active. MapLibre fetches the resources while the host pumps
-the runtime.
+Mark the region as observed to receive progress and error events. Then submit
+the active download-state command. MapLibre fetches the region's resources on
+the native scheduler thread.
 
 <Code code={region(offlineRegion, "download")} lang="c" title="offline-region.c" />
 
@@ -87,11 +84,12 @@ The databases must use the same MapLibre offline schema version. MBTiles uses a
 different schema, so load an MBTiles file through an `mbtiles://` source
 instead.
 
-The start call opens the downloaded database read-only. A missing or unreadable
-file fails immediately. The merge then copies the tiles and resources assigned
-to each region, combines duplicate region definitions, and leaves the downloaded
-file unchanged. Format, schema, and later filesystem errors arrive in the
-operation-completed event.
+The call opens the downloaded database read-only before it accepts the work, and
+rejects a path that names no readable database file. The merge then copies the
+tiles and resources assigned to each region, combines duplicate region
+definitions, and leaves the downloaded file unchanged. Format, schema, and later
+filesystem errors reach the completion, which borrows the merged region records
+when the merge succeeds.
 
 ## Read what the database holds
 
@@ -101,8 +99,8 @@ operation covers the whole database.
 
 <Code code={region(offlineStorage, "list")} lang="c" title="offline-storage.c" />
 
-Taking the result produces a list handle that the host owns. Destroy that handle
-after reading the entries.
+The list completion borrows a contiguous array of region records. Copy the
+records and nested definition or metadata values that the host keeps.
 
 <Code code={region(offlineStorage, "result")} lang="c" title="offline-storage.c" />
 

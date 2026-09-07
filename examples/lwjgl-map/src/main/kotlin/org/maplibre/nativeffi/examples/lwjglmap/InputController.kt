@@ -28,14 +28,10 @@ import org.lwjgl.glfw.GLFW.glfwSetMouseButtonCallback
 import org.lwjgl.glfw.GLFW.glfwSetScrollCallback
 import org.maplibre.nativeffi.geo.ScreenPoint
 
-/**
- * Decodes GLFW input into camera commands. GLFW delivers these callbacks on the render loop thread,
- * which does not own the map, so this only produces commands; the runtime loop applies them on the
- * map's thread.
- */
+/** Decodes GLFW input into camera updates on the GLFW thread. */
 internal class InputController(
   private val window: Long,
-  private val commands: CommandQueue,
+  private val mapState: MapState,
   private val renderRequest: RenderRequest,
   private val viewport: () -> Viewport,
 ) : AutoCloseable {
@@ -65,10 +61,10 @@ internal class InputController(
       return
     }
     if (rightDown || (leftDown && ctrlDown)) {
-      commands.push(CameraCommand.AdjustBearing(dx * DRAG_ROTATE_FACTOR))
-      commands.push(CameraCommand.PitchBy(dy * DRAG_PITCH_FACTOR))
+      mapState.adjustBearing(dx * DRAG_ROTATE_FACTOR)
+      mapState.adjustPitch(dy * DRAG_PITCH_FACTOR)
     } else if (leftDown) {
-      commands.push(CameraCommand.MoveBy(dx, dy))
+      mapState.moveBy(dx, dy)
     } else {
       return
     }
@@ -88,11 +84,10 @@ internal class InputController(
           if (action == GLFW_PRESS) true else if (action == GLFW_RELEASE) false else rightDown
     }
     if (action == GLFW_PRESS) {
-      // Queued ahead of the drag's own commands, so the transition stops before the first delta.
-      commands.push(CameraCommand.CancelTransitions)
+      mapState.cancelTransitions()
     }
     if (dragging != wasDragging) {
-      commands.push(CameraCommand.SetGestureInProgress(dragging))
+      mapState.setGestureInProgress(dragging)
     }
   }
 
@@ -102,7 +97,7 @@ internal class InputController(
   private fun onScroll(yOffset: Double) {
     // GLFW reports OS-adjusted scroll deltas, so natural scrolling needs no correction here.
     val scale = 2.0.pow(yOffset * 0.25)
-    commands.push(CameraCommand.ScaleBy(scale, ScreenPoint(cursorX, cursorY)))
+    mapState.scaleBy(scale, ScreenPoint(cursorX, cursorY))
     renderRequest.set()
   }
 
@@ -111,46 +106,32 @@ internal class InputController(
     if (action != GLFW_PRESS && action != GLFW_REPEAT) {
       return
     }
-    val command =
-      when (key) {
-        GLFW_KEY_LEFT,
-        GLFW_KEY_A -> CameraCommand.MoveByAnimated(KEYBOARD_PAN, 0.0, KEYBOARD_ANIMATION_MS)
+    when (key) {
+      GLFW_KEY_LEFT,
+      GLFW_KEY_A -> mapState.moveBy(KEYBOARD_PAN, 0.0, KEYBOARD_ANIMATION_MS)
 
-        GLFW_KEY_RIGHT,
-        GLFW_KEY_D -> CameraCommand.MoveByAnimated(-KEYBOARD_PAN, 0.0, KEYBOARD_ANIMATION_MS)
+      GLFW_KEY_RIGHT,
+      GLFW_KEY_D -> mapState.moveBy(-KEYBOARD_PAN, 0.0, KEYBOARD_ANIMATION_MS)
 
-        GLFW_KEY_UP,
-        GLFW_KEY_W -> CameraCommand.MoveByAnimated(0.0, KEYBOARD_PAN, KEYBOARD_ANIMATION_MS)
+      GLFW_KEY_UP,
+      GLFW_KEY_W -> mapState.moveBy(0.0, KEYBOARD_PAN, KEYBOARD_ANIMATION_MS)
 
-        GLFW_KEY_DOWN,
-        GLFW_KEY_S -> CameraCommand.MoveByAnimated(0.0, -KEYBOARD_PAN, KEYBOARD_ANIMATION_MS)
+      GLFW_KEY_DOWN,
+      GLFW_KEY_S -> mapState.moveBy(0.0, -KEYBOARD_PAN, KEYBOARD_ANIMATION_MS)
 
-        GLFW_KEY_EQUAL ->
-          CameraCommand.ScaleByAnimated(KEYBOARD_ZOOM, viewportCenter(), KEYBOARD_ANIMATION_MS)
+      GLFW_KEY_EQUAL -> mapState.scaleBy(KEYBOARD_ZOOM, viewportCenter(), KEYBOARD_ANIMATION_MS)
 
-        GLFW_KEY_MINUS ->
-          CameraCommand.ScaleByAnimated(
-            1.0 / KEYBOARD_ZOOM,
-            viewportCenter(),
-            KEYBOARD_ANIMATION_MS,
-          )
+      GLFW_KEY_MINUS ->
+        mapState.scaleBy(1.0 / KEYBOARD_ZOOM, viewportCenter(), KEYBOARD_ANIMATION_MS)
 
-        GLFW_KEY_Q -> CameraCommand.AdjustBearingAnimated(-KEYBOARD_BEARING, KEYBOARD_ANIMATION_MS)
-
-        GLFW_KEY_E -> CameraCommand.AdjustBearingAnimated(KEYBOARD_BEARING, KEYBOARD_ANIMATION_MS)
-        GLFW_KEY_RIGHT_BRACKET ->
-          CameraCommand.AdjustPitchAnimated(KEYBOARD_PITCH, KEYBOARD_ANIMATION_MS)
-
-        GLFW_KEY_LEFT_BRACKET ->
-          CameraCommand.AdjustPitchAnimated(-KEYBOARD_PITCH, KEYBOARD_ANIMATION_MS)
-
-        GLFW_KEY_0 -> CameraCommand.ResetOrientation(RESET_ANIMATION_MS)
-        else -> null
-      }
-    if (command != null) {
-      commands.push(command)
-      renderRequest.set()
+      GLFW_KEY_Q -> mapState.adjustBearing(-KEYBOARD_BEARING, KEYBOARD_ANIMATION_MS)
+      GLFW_KEY_E -> mapState.adjustBearing(KEYBOARD_BEARING, KEYBOARD_ANIMATION_MS)
+      GLFW_KEY_RIGHT_BRACKET -> mapState.adjustPitch(KEYBOARD_PITCH, KEYBOARD_ANIMATION_MS)
+      GLFW_KEY_LEFT_BRACKET -> mapState.adjustPitch(-KEYBOARD_PITCH, KEYBOARD_ANIMATION_MS)
+      GLFW_KEY_0 -> mapState.resetOrientation(RESET_ANIMATION_MS)
+      else -> return
     }
+    renderRequest.set()
   }
 
   private fun viewportCenter(): ScreenPoint {

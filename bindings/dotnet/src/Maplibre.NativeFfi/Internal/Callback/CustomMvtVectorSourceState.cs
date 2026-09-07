@@ -76,9 +76,9 @@ internal sealed unsafe class CustomMvtVectorSourceState : IDisposable
         state?.InvokeCancel(FromNative(tileId));
     }
 
-    // The C API invokes this once, on the map owner thread, after MapLibre stops referencing this
-    // state, so the stubs go with the source whether it was removed, dropped by a style load, or
-    // retired with the map.
+    // The C API invokes this once, on the runtime's native scheduler thread, after MapLibre stops
+    // referencing this state, so the stubs go with the source whether it was removed, dropped by a
+    // style load, or retired with the map.
     [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     private static void ReleaseUserData(void* userData)
     {

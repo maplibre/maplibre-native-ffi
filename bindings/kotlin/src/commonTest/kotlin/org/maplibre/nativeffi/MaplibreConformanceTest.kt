@@ -3,17 +3,27 @@ package org.maplibre.nativeffi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.geo.LatLng
+import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.runtime.NetworkStatus
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class MaplibreConformanceTest {
   @Test
-  fun globalOperationsReachTheNativeLibrary() {
+  fun globalOperationsReachTheNativeLibrary(): Unit = runSuspendTest {
     Maplibre.loadNativeLibrary()
     assertEquals(Maplibre.EXPECTED_C_ABI_VERSION, Maplibre.cVersion())
-    Maplibre.supportedRenderBackends()
-    Maplibre.supportedOpenGLContextProviders()
+    assertTrue(
+      Maplibre.supportedRenderBackends().isNotEmpty(),
+      "a loaded library builds at least one render backend",
+    )
+    assertTrue(
+      Maplibre.supportedOpenGLContextProviders().isNotEmpty() ||
+        RenderBackend.OPENGL !in Maplibre.supportedRenderBackends(),
+      "an OpenGL build exposes at least one context provider",
+    )
 
     val original = Maplibre.networkStatus
     try {
@@ -30,7 +40,7 @@ class MaplibreConformanceTest {
   }
 
   @Test
-  fun networkStatusRejectsAnUnknownInputBeforeNativeCall() {
+  fun networkStatusRejectsAnUnknownInputBeforeNativeCall(): Unit = runSuspendTest {
     assertFailsWith<InvalidArgumentException> { Maplibre.setNetworkStatus(NetworkStatus(999)) }
   }
 }

@@ -1,40 +1,49 @@
-using System.Runtime.InteropServices;
+using System.Diagnostics;
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Internal.Pointer;
 using Maplibre.NativeFfi.Internal.Struct;
 using Maplibre.NativeFfi.Map;
-using Maplibre.NativeFfi.Query;
 using Maplibre.NativeFfi.Render;
 using Maplibre.NativeFfi.Runtime;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
 
-public sealed unsafe class RenderSessionTests
+public sealed class RenderSessionTests
 {
-    [BindingSpecTest("BND-161")]
     [Fact]
-    public void SurfaceDescriptorsMaterializeOpaquePointersAndExtent()
+    public unsafe void WebGLDescriptorsRepresentExistingAndTransferredContexts()
     {
-        var metal = RenderStructs.ToNative(
-            new MetalSurfaceDescriptor
+        var existing = RenderStructs.ToNative(
+            new WebGLContextDescriptor
             {
-                Extent = new RenderTargetExtent(320, 240, 2),
-                Layer = NativePointer.FromBorrowedAddress(123),
-                Context = new MetalContextDescriptor
-                {
-                    Device = NativePointer.FromBorrowedAddress(456),
-                },
+                Kind = WebGLContextKind.Existing,
+                Context = 27,
+                Ownership = OpenGLContextOwnership.Shared,
             }
         );
-        Assert.Equal(320u, metal.extent.width);
-        Assert.Equal(240u, metal.extent.height);
-        Assert.Equal(2, metal.extent.scale_factor);
-        Assert.Equal(123, (nint)metal.layer);
-        Assert.Equal(456, (nint)metal.context.device);
+        var transferred = RenderStructs.ToNative(
+            new WebGLContextDescriptor
+            {
+                Kind = WebGLContextKind.TransferredCanvas,
+                CanvasSelector = "#map",
+                Ownership = OpenGLContextOwnership.Dedicated,
+            }
+        );
 
-        var vulkan = RenderStructs.ToNative(
+        Assert.Equal(
+            mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL,
+            existing.platform
+        );
+        Assert.Equal(27, existing.data.webgl.context);
+        Assert.Equal((uint)WebGLContextKind.TransferredCanvas, transferred.data.webgl.kind);
+    }
+
+    [BindingSpecTest("BND-161")]
+    [Fact]
+    public unsafe void VulkanDescriptorsCarryHandleBitsWithoutPointerConversion()
+    {
+        var surface = RenderStructs.ToNative(
             new VulkanSurfaceDescriptor
             {
                 Extent = new RenderTargetExtent(640, 480, 1),
@@ -46,125 +55,15 @@ public sealed unsafe class RenderSessionTests
                     Device = NativePointer.FromBorrowedAddress(444),
                     Queue = NativePointer.FromBorrowedAddress(555),
                     GraphicsQueueFamilyIndex = 7,
-                    GetInstanceProcAddr = NativePointer.FromBorrowedAddress(666),
-                    GetDeviceProcAddr = NativePointer.FromBorrowedAddress(777),
                 },
             }
         );
-        Assert.Equal(640u, vulkan.extent.width);
-        Assert.Equal(480u, vulkan.extent.height);
-        Assert.Equal(111ul, vulkan.surface);
-        Assert.Equal(222, (nint)vulkan.context.instance);
-        Assert.Equal(333, (nint)vulkan.context.physical_device);
-        Assert.Equal(444, (nint)vulkan.context.device);
-        Assert.Equal(555, (nint)vulkan.context.graphics_queue);
-        Assert.Equal(7u, vulkan.context.graphics_queue_family_index);
-        Assert.Equal(666, (nint)vulkan.context.get_instance_proc_addr);
-        Assert.Equal(777, (nint)vulkan.context.get_device_proc_addr);
 
-        var opengl = RenderStructs.ToNative(
-            new OpenGLSurfaceDescriptor
-            {
-                Extent = new RenderTargetExtent(800, 600, 2),
-                Surface = NativePointer.FromBorrowedAddress(888),
-                Context = new WglContextDescriptor
-                {
-                    DeviceContext = NativePointer.FromBorrowedAddress(999),
-                    ShareContext = NativePointer.FromBorrowedAddress(1000),
-                    GetProcAddress = NativePointer.FromBorrowedAddress(1001),
-                },
-            }
-        );
-        Assert.Equal(800u, opengl.extent.width);
-        Assert.Equal(600u, opengl.extent.height);
-        Assert.Equal(888, (nint)opengl.surface);
-        Assert.Equal(
-            mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WGL,
-            opengl.context.platform
-        );
-        Assert.Equal(999, (nint)opengl.context.data.wgl.device_context);
-        Assert.Equal(1000, (nint)opengl.context.data.wgl.share_context);
-        Assert.Equal(1001, (nint)opengl.context.data.wgl.get_proc_address);
-        Assert.Equal(
-            mln_opengl_context_ownership.MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
-            opengl.context.ownership
-        );
+        Assert.Equal(111ul, surface.surface);
+        Assert.Equal(222, (nint)surface.context.instance);
+        Assert.Equal(7u, surface.context.graphics_queue_family_index);
 
-        var dedicated = RenderStructs.ToNative(
-            new OpenGLSurfaceDescriptor
-            {
-                Extent = new RenderTargetExtent(800, 600, 2),
-                Surface = NativePointer.FromBorrowedAddress(1100),
-                Context = new EglContextDescriptor
-                {
-                    Display = NativePointer.FromBorrowedAddress(1101),
-                    Config = NativePointer.FromBorrowedAddress(1102),
-                    Ownership = OpenGLContextOwnership.Dedicated,
-                    ClientApi = OpenGLClientApi.Gles,
-                },
-            }
-        );
-        Assert.Equal(
-            mln_opengl_context_ownership.MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED,
-            dedicated.context.ownership
-        );
-        Assert.Equal(
-            mln_opengl_client_api.MLN_OPENGL_CLIENT_API_GLES,
-            dedicated.context.data.egl.client_api
-        );
-        Assert.Equal(0, (nint)dedicated.context.data.egl.share_context);
-    }
-
-    [BindingSpecTest("BND-161")]
-    [Fact]
-    public void TextureDescriptorsMaterializeOpaquePointersAndExtent()
-    {
-        var metalOwned = RenderStructs.ToNative(
-            new MetalOwnedTextureDescriptor
-            {
-                Extent = new RenderTargetExtent(128, 64, 2),
-                Context = new MetalContextDescriptor
-                {
-                    Device = NativePointer.FromBorrowedAddress(10),
-                },
-            }
-        );
-        Assert.Equal(128u, metalOwned.extent.width);
-        Assert.Equal(64u, metalOwned.extent.height);
-        Assert.Equal(10, (nint)metalOwned.context.device);
-
-        var metalBorrowed = RenderStructs.ToNative(
-            new MetalBorrowedTextureDescriptor
-            {
-                Extent = new RenderTargetExtent(128, 64, 2),
-                PhysicalWidth = 65,
-                PhysicalHeight = 33,
-                Texture = NativePointer.FromBorrowedAddress(20),
-            }
-        );
-        Assert.Equal(20, (nint)metalBorrowed.texture);
-        // Odd sizes no logical extent maps onto, so these must survive as stated.
-        Assert.Equal(65u, metalBorrowed.physical_width);
-        Assert.Equal(33u, metalBorrowed.physical_height);
-
-        var vulkanOwned = RenderStructs.ToNative(
-            new VulkanOwnedTextureDescriptor
-            {
-                Extent = new RenderTargetExtent(256, 128, 1),
-                Context = new VulkanContextDescriptor
-                {
-                    Device = NativePointer.FromBorrowedAddress(30),
-                    GetInstanceProcAddr = NativePointer.FromBorrowedAddress(31),
-                    GetDeviceProcAddr = NativePointer.FromBorrowedAddress(32),
-                },
-            }
-        );
-        Assert.Equal(256u, vulkanOwned.extent.width);
-        Assert.Equal(30, (nint)vulkanOwned.context.device);
-        Assert.Equal(31, (nint)vulkanOwned.context.get_instance_proc_addr);
-        Assert.Equal(32, (nint)vulkanOwned.context.get_device_proc_addr);
-
-        var vulkanBorrowed = RenderStructs.ToNative(
+        var borrowed = RenderStructs.ToNative(
             new VulkanBorrowedTextureDescriptor
             {
                 Extent = new RenderTargetExtent(256, 128, 1),
@@ -177,155 +76,21 @@ public sealed unsafe class RenderSessionTests
                 FinalLayout = 60,
             }
         );
-        Assert.Equal(40ul, vulkanBorrowed.image);
-        Assert.Equal(45ul, vulkanBorrowed.image_view);
-        Assert.Equal(50u, vulkanBorrowed.format);
-        Assert.Equal(55u, vulkanBorrowed.initial_layout);
-        Assert.Equal(60u, vulkanBorrowed.final_layout);
 
-        var openglOwned = RenderStructs.ToNative(
-            new OpenGLOwnedTextureDescriptor
-            {
-                Extent = new RenderTargetExtent(512, 256, 1),
-                Context = new EglContextDescriptor
-                {
-                    Display = NativePointer.FromBorrowedAddress(60),
-                    Config = NativePointer.FromBorrowedAddress(61),
-                    ShareContext = NativePointer.FromBorrowedAddress(62),
-                    GetProcAddress = NativePointer.FromBorrowedAddress(63),
-                },
-            }
-        );
-        Assert.Equal(512u, openglOwned.extent.width);
-        Assert.Equal(
-            mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_EGL,
-            openglOwned.context.platform
-        );
-        Assert.Equal(60, (nint)openglOwned.context.data.egl.display);
-        Assert.Equal(61, (nint)openglOwned.context.data.egl.config);
-        Assert.Equal(62, (nint)openglOwned.context.data.egl.share_context);
-        Assert.Equal(63, (nint)openglOwned.context.data.egl.get_proc_address);
-        Assert.Equal(
-            mln_opengl_client_api.MLN_OPENGL_CLIENT_API_UNSPECIFIED,
-            openglOwned.context.data.egl.client_api
-        );
-
-        var openglBorrowed = RenderStructs.ToNative(
-            new OpenGLBorrowedTextureDescriptor
-            {
-                Extent = new RenderTargetExtent(512, 256, 1),
-                PhysicalWidth = 65,
-                PhysicalHeight = 33,
-                Context = new WglContextDescriptor
-                {
-                    DeviceContext = NativePointer.FromBorrowedAddress(70),
-                    ShareContext = NativePointer.FromBorrowedAddress(71),
-                },
-                Texture = 72,
-                Target = 0x0de1,
-            }
-        );
-        Assert.Equal(72u, openglBorrowed.texture);
-        Assert.Equal(0x0de1u, openglBorrowed.target);
-        Assert.Equal(70, (nint)openglBorrowed.context.data.wgl.device_context);
+        Assert.Equal(40ul, borrowed.image);
+        Assert.Equal(45ul, borrowed.image_view);
+        Assert.Equal(50u, borrowed.format);
+        Assert.Equal(55u, borrowed.initial_layout);
+        Assert.Equal(60u, borrowed.final_layout);
     }
 
-    [BindingSpecTest("BND-060")]
+    [BindingSpecTest("BND-173")]
     [Fact]
-    public void RenderDescriptorsInitializeSizeAndPreserveCallerExtent()
+    public void AcquiredFrameAccessIsScopedToItsLease()
     {
-        var metal = RenderStructs.ToNative(
-            new MetalSurfaceDescriptor
-            {
-                Extent = new RenderTargetExtent(256, 256, 1.0),
-                Layer = NativePointer.FromBorrowedAddress(1),
-            }
-        );
-        Assert.Equal((uint)sizeof(mln_render_target_extent), metal.extent.size);
-        Assert.Equal(256u, metal.extent.width);
-        Assert.Equal(256u, metal.extent.height);
-        Assert.Equal(1, metal.extent.scale_factor);
-
-        var vulkanBorrowed = RenderStructs.ToNative(
-            new VulkanBorrowedTextureDescriptor
-            {
-                Extent = new RenderTargetExtent(256, 256, 1.0),
-                PhysicalWidth = 65,
-                PhysicalHeight = 33,
-                Image = new VulkanHandle(2),
-                ImageView = new VulkanHandle(3),
-            }
-        );
-        Assert.Equal((uint)sizeof(mln_render_target_extent), vulkanBorrowed.extent.size);
-        Assert.Equal(256u, vulkanBorrowed.extent.width);
-        Assert.Equal(256u, vulkanBorrowed.extent.height);
-        Assert.Equal(1, vulkanBorrowed.extent.scale_factor);
-        Assert.Equal(5u, vulkanBorrowed.final_layout);
-
-        var openglOwned = RenderStructs.ToNative(
-            new OpenGLOwnedTextureDescriptor { Extent = new RenderTargetExtent(256, 256, 1.0) }
-        );
-        var openglOwnedDefault = NativeMethods.mln_opengl_owned_texture_descriptor_default();
-        Assert.Equal((uint)sizeof(mln_opengl_owned_texture_descriptor), openglOwned.size);
-        Assert.Equal(openglOwnedDefault.context.platform, openglOwned.context.platform);
-    }
-
-    [BindingSpecTest("BND-166", "BND-167")]
-    [Fact]
-    public void TextureImageInfoCopiesNativeFields()
-    {
-        var info = RenderStructs.FromNative(
-            new mln_texture_image_info
-            {
-                width = 1,
-                height = 2,
-                stride = 4,
-                byte_length = 8,
-            }
-        );
-
-        Assert.Equal(new TextureImageInfo(1, 2, 4, 8), info);
-    }
-
-    [BindingSpecTest("BND-023")]
-    [Fact]
-    public void NativeBufferRejectsUseAfterDispose()
-    {
-        using var buffer = new NativeBuffer(4);
-        Assert.Equal(4, buffer.Span.Length);
-
-        buffer.Dispose();
-
-        Assert.Throws<ObjectDisposedException>(() =>
-        {
-            var span = buffer.Span;
-            _ = span.Length;
-        });
-    }
-
-    [BindingSpecTest("BND-168", "BND-173")]
-    [Fact]
-    public void TextureFramePropertiesRejectUseAfterScopeClose()
-    {
-        var metalScope = new FrameScope(nameof(MetalOwnedTextureFrame));
-        var metal = new MetalOwnedTextureFrame(
-            metalScope,
-            1,
-            2,
-            3,
-            4,
-            5,
-            NativePointer.FromBorrowedAddress(6),
-            NativePointer.FromBorrowedAddress(7),
-            8
-        );
-        Assert.Equal(6, metal.Texture.Address);
-        metalScope.Dispose();
-        Assert.Throws<InvalidStateException>(() => metal.Texture);
-
-        var vulkanScope = new FrameScope(nameof(VulkanOwnedTextureFrame));
-        var vulkan = new VulkanOwnedTextureFrame(
-            vulkanScope,
+        var scope = new FrameScope();
+        var frame = new VulkanOwnedTextureFrame(
+            scope,
             1,
             2,
             3,
@@ -337,563 +102,144 @@ public sealed unsafe class RenderSessionTests
             9,
             10
         );
-        Assert.Equal(7ul, vulkan.ImageView.Bits);
-        vulkanScope.Dispose();
-        Assert.Throws<InvalidStateException>(() => vulkan.ImageView);
 
-        var openglScope = new FrameScope(nameof(OpenGLOwnedTextureFrame));
-        var opengl = new OpenGLOwnedTextureFrame(
-            openglScope,
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-            0x0de1,
-            0x8058,
-            0x1908,
-            0x1401
-        );
-        Assert.Equal(6u, opengl.Texture);
-        openglScope.Dispose();
-        Assert.Throws<InvalidStateException>(() => opengl.Texture);
+        scope.EnsureActive();
+        Assert.Equal(6ul, frame.Image.Bits);
+        Assert.Equal(7ul, frame.ImageView.Bits);
+
+        scope.Dispose();
+        Assert.Throws<ObjectDisposedException>(scope.EnsureActive);
+        Assert.Throws<ObjectDisposedException>(() => frame.ImageView);
     }
 
-    [BindingSpecTest("BND-169")]
+    [BindingSpecTest("BND-162", "BND-163", "BND-164", "BND-167", "BND-168", "BND-169", "BND-178")]
     [Fact]
-    public void FailedTextureFrameReleaseLeavesFrameLiveForRetry()
+    public async Task OwnedTextureSessionRendersAcquiresAndDetaches()
     {
-        var pointer = (mln_metal_owned_texture_frame*)
-            NativeMemory.AllocZeroed((nuint)sizeof(mln_metal_owned_texture_frame));
-        pointer->size = (uint)sizeof(mln_metal_owned_texture_frame);
-        var session = RenderSessionHandle.CreateForTest(SyntheticHandles.RenderSession(1234));
-        var scope = new FrameScope(nameof(MetalOwnedTextureFrameHandle));
-        var releaseCalls = 0;
-        var state = new TextureFrameState<mln_metal_owned_texture_frame>(
-            session,
-            pointer,
-            scope,
-            (_, _) =>
-                releaseCalls++ == 0
-                    ? mln_status.MLN_STATUS_INVALID_STATE
-                    : mln_status.MLN_STATUS_OK,
-            nameof(MetalOwnedTextureFrameHandle)
+        Assert.SkipUnless(
+            OwnedTextureFixture.IsAvailable,
+            "The loaded native library compiles no backend this suite can attach offscreen."
         );
 
-        try
-        {
-            var error = Assert.Throws<InvalidStateException>(state.Close);
-
-            Assert.Equal(MaplibreStatus.InvalidState, error.Status);
-            Assert.False(state.IsClosed);
-            scope.EnsureActive();
-            Assert.Equal(1, releaseCalls);
-
-            state.Close();
-
-            Assert.True(state.IsClosed);
-            Assert.Throws<InvalidStateException>(scope.EnsureActive);
-            Assert.Equal(2, releaseCalls);
-            session.Close();
-        }
-        finally
-        {
-            if (!state.IsClosed)
-            {
-                scope.Dispose();
-                NativeMemory.Free(pointer);
-            }
-        }
-    }
-
-    [BindingSpecTest("BND-170")]
-    [Fact]
-    public void SessionOperationsForbiddenDuringActiveTextureFrameFailBeforeNativeCall()
-    {
-        var reports = new List<NativeLeakReport>();
-        using var capture = NativeLeakReporter.CaptureForTest(reports.Add);
-        var resizeCalls = 0;
-        var renderUpdateCalls = 0;
-        var textureReadCalls = 0;
-        var destroyCalls = 0;
-        var metalAcquireCalls = 0;
-        var vulkanAcquireCalls = 0;
-        var openGLAcquireCalls = 0;
-        using var sessionMethods = RenderSessionHandle.UseSessionMethodsForTest(
-            (_, _, _, _) =>
-            {
-                resizeCalls++;
-                return mln_status.MLN_STATUS_OK;
-            },
-            (_, _, _) =>
-            {
-                renderUpdateCalls++;
-                return mln_status.MLN_STATUS_OK;
-            },
-            (_, _, _, _) =>
-            {
-                textureReadCalls++;
-                return mln_status.MLN_STATUS_OK;
-            },
-            _ =>
-            {
-                destroyCalls++;
-                return mln_status.MLN_STATUS_OK;
-            }
-        );
-        using var metalMethods = RenderSessionHandle.UseMetalFrameMethodsForTest(
-            (_, _) =>
-            {
-                metalAcquireCalls++;
-                return mln_status.MLN_STATUS_OK;
-            },
-            (_, _) => mln_status.MLN_STATUS_OK,
-            (_, _) => throw new InvalidOperationException("unexpected frame read")
-        );
-        using var textureFrameMethods = RenderSessionHandle.UseTextureFrameAcquireMethodsForTest(
-            (_, _) =>
-            {
-                vulkanAcquireCalls++;
-                return mln_status.MLN_STATUS_OK;
-            },
-            (_, _) =>
-            {
-                openGLAcquireCalls++;
-                return mln_status.MLN_STATUS_OK;
-            }
-        );
-        var session = RenderSessionHandle.CreateForTest(SyntheticHandles.RenderSession(1234));
-        var pointer = (mln_metal_owned_texture_frame*)
-            NativeMemory.AllocZeroed((nuint)sizeof(mln_metal_owned_texture_frame));
-        pointer->size = (uint)sizeof(mln_metal_owned_texture_frame);
-        var scope = new FrameScope(nameof(MetalOwnedTextureFrameHandle));
-        var state = new TextureFrameState<mln_metal_owned_texture_frame>(
-            session,
-            pointer,
-            scope,
-            (_, _) => mln_status.MLN_STATUS_OK,
-            nameof(MetalOwnedTextureFrameHandle)
-        );
-
-        try
-        {
-            AssertActiveFrameError(() => session.Resize(64, 64, 1));
-            var extent = new RenderTargetExtent(64, 64, 1);
-            var handle = NativePointer.FromBorrowedAddress(1);
-            var vulkanHandle = new VulkanHandle(1);
-            AssertActiveFrameError(() =>
-                session.SetMetalSurfaceTarget(
-                    new MetalSurfaceDescriptor { Extent = extent, Layer = handle }
-                )
-            );
-            AssertActiveFrameError(() =>
-                session.SetVulkanSurfaceTarget(
-                    new VulkanSurfaceDescriptor { Extent = extent, Surface = vulkanHandle }
-                )
-            );
-            AssertActiveFrameError(() =>
-                session.SetOpenGLSurfaceTarget(
-                    new OpenGLSurfaceDescriptor { Extent = extent, Surface = handle }
-                )
-            );
-            AssertActiveFrameError(() =>
-                session.SetMetalBorrowedTextureTarget(
-                    new MetalBorrowedTextureDescriptor
-                    {
-                        Extent = extent,
-                        PhysicalWidth = 64,
-                        PhysicalHeight = 64,
-                        Texture = handle,
-                    }
-                )
-            );
-            AssertActiveFrameError(() =>
-                session.SetVulkanBorrowedTextureTarget(
-                    new VulkanBorrowedTextureDescriptor
-                    {
-                        Extent = extent,
-                        PhysicalWidth = 64,
-                        PhysicalHeight = 64,
-                        Image = vulkanHandle,
-                        ImageView = vulkanHandle,
-                    }
-                )
-            );
-            AssertActiveFrameError(() =>
-                session.SetOpenGLBorrowedTextureTarget(
-                    new OpenGLBorrowedTextureDescriptor
-                    {
-                        Extent = extent,
-                        PhysicalWidth = 64,
-                        PhysicalHeight = 64,
-                        Texture = 1,
-                        Target = 0x0de1,
-                    }
-                )
-            );
-            AssertActiveFrameError(() => _ = session.RenderUpdate());
-            AssertActiveFrameError(session.Detach);
-            AssertActiveFrameError(() => _ = session.TextureImageInfo());
-            using var buffer = new NativeBuffer(4);
-            AssertActiveFrameError(() => session.ReadPremultipliedRgba8(buffer));
-            AssertActiveFrameError(() => _ = session.AcquireMetalOwnedTextureFrame());
-            AssertActiveFrameError(() => _ = session.AcquireVulkanOwnedTextureFrame());
-            AssertActiveFrameError(() => _ = session.AcquireOpenGLOwnedTextureFrame());
-            AssertActiveFrameError(session.Close);
-            session.Dispose();
-
-            Assert.Equal(0, resizeCalls);
-            Assert.Equal(0, renderUpdateCalls);
-            Assert.Equal(0, textureReadCalls);
-            Assert.Equal(0, destroyCalls);
-            Assert.Equal(0, metalAcquireCalls);
-            Assert.Equal(0, vulkanAcquireCalls);
-            Assert.Equal(0, openGLAcquireCalls);
-            var report = Assert.Single(reports);
-            Assert.Equal(NativeLeakReportKind.DisposeFailed, report.Kind);
-            Assert.Equal(nameof(RenderSessionHandle), report.TypeName);
-            Assert.Equal(SyntheticHandles.RenderSession(1234).Value, report.Handle);
-            Assert.Null(report.Status);
-            Assert.Contains("texture frame is active", report.Message, StringComparison.Ordinal);
-        }
-        finally
-        {
-            if (!state.IsClosed)
-            {
-                state.Close();
-            }
-            session.Close();
-        }
-
-        static void AssertActiveFrameError(Action action)
-        {
-            var error = Assert.Throws<InvalidStateException>(action);
-
-            Assert.Equal(MaplibreStatus.InvalidState, error.Status);
-            Assert.Null(error.RawStatus);
-            Assert.Contains("texture frame is active", error.Diagnostic, StringComparison.Ordinal);
-        }
-    }
-
-    [BindingSpecTest("BND-162", "BND-171")]
-    [Fact]
-    public void OpenGLAttachFamiliesReturnPublicSessionHandlesAndKeepBorrowedHandlesOwnedByCaller()
-    {
-        // Deterministic attach hooks record which native family each public path reaches.
-        var attachCalls = new List<string>();
-        var destroyed = new List<ulong>();
-        using var methods = RenderSessionHandle.UseOpenGLAttachMethodsForTest(
-            (_, _, outSession) =>
-            {
-                attachCalls.Add("surface");
-                *outSession = SyntheticHandles.RenderSession(101);
-                return mln_status.MLN_STATUS_OK;
-            },
-            (_, _, outSession) =>
-            {
-                attachCalls.Add("owned");
-                *outSession = SyntheticHandles.RenderSession(102);
-                return mln_status.MLN_STATUS_OK;
-            },
-            (_, _, outSession) =>
-            {
-                attachCalls.Add("borrowed");
-                *outSession = SyntheticHandles.RenderSession(103);
-                return mln_status.MLN_STATUS_OK;
-            }
-        );
-        using var sessionMethods = RenderSessionHandle.UseSessionMethodsForTest(
-            (_, _, _, _) => mln_status.MLN_STATUS_OK,
-            (_, _, _) => mln_status.MLN_STATUS_OK,
-            (_, _, _, _) => mln_status.MLN_STATUS_OK,
-            session =>
-            {
-                destroyed.Add(session.Value);
-                return mln_status.MLN_STATUS_OK;
-            }
-        );
+        using var fixture = OwnedTextureFixture.Create();
+        var extent = new RenderTargetExtent(32, 16, 1.0);
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 64, Height = 64 });
-        var context = new WglContextDescriptor
-        {
-            DeviceContext = NativePointer.FromBorrowedAddress(1),
-            ShareContext = NativePointer.FromBorrowedAddress(2),
-        };
-        var borrowed = new OpenGLBorrowedTextureDescriptor
-        {
-            Extent = new RenderTargetExtent(32, 16, 1),
-            PhysicalWidth = 65,
-            PhysicalHeight = 33,
-            Context = context,
-            Texture = 77,
-            Target = 0x0de1,
-        };
-
-        using var surface = RenderSessionHandle.AttachOpenGLSurface(
-            map,
-            new OpenGLSurfaceDescriptor
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions
             {
-                Extent = new RenderTargetExtent(32, 16, 1),
-                Context = context,
-                Surface = NativePointer.FromBorrowedAddress(3),
+                Width = 32,
+                Height = 16,
+                ScaleFactor = 1.0,
             }
         );
-        using var owned = RenderSessionHandle.AttachOpenGLOwnedTexture(
-            map,
-            new OpenGLOwnedTextureDescriptor
-            {
-                Extent = new RenderTargetExtent(32, 16, 1),
-                Context = context,
-            }
+
+        using var session = fixture.Attach(map, extent);
+        Assert.Empty(session.DrainFrameResults());
+        await session.Attachment.WaitAsync(
+            TimeSpan.FromSeconds(30),
+            TestContext.Current.CancellationToken
         );
-        using var callerOwned = RenderSessionHandle.AttachOpenGLBorrowedTexture(map, borrowed);
-
-        Assert.False(surface.IsClosed);
-        Assert.False(owned.IsClosed);
-        Assert.False(callerOwned.IsClosed);
-        Assert.Equal(["surface", "owned", "borrowed"], attachCalls);
-
-        surface.Close();
-        owned.Close();
-        callerOwned.Close();
-
-        Assert.Equal(
-            [
-                SyntheticHandles.RenderSession(101).Value,
-                SyntheticHandles.RenderSession(102).Value,
-                SyntheticHandles.RenderSession(103).Value,
-            ],
-            destroyed
+        Assert.Equal(RenderSessionState.Attached, session.GetSnapshot().State);
+        Assert.Equal(RenderDriverKind.CoreWorker, session.GetCapabilities().Driver);
+        Assert.True(
+            session.GetCapabilities().Flags.HasFlag(RenderSessionCapabilities.FrameAcquisition)
         );
-        Assert.Equal(77u, borrowed.Texture);
-        Assert.Equal(0x0de1u, borrowed.Target);
-        var borrowedContext = Assert.IsType<WglContextDescriptor>(borrowed.Context);
-        Assert.Equal(1, borrowedContext.DeviceContext.Address);
-        Assert.Equal(2, borrowedContext.ShareContext.Address);
+
+        var second = Assert.Throws<InvalidStateException>(() => fixture.Attach(map, extent));
+        Assert.Contains("render session", second.Message, StringComparison.OrdinalIgnoreCase);
+
+        session.RequestFrame(new FrameDemand(FrameDemandFlags.None, 7, 0, 0));
+        var result = Assert.Single(
+            PollFor(() => session.DrainFrameResults(), results => results.Count > 0)
+        );
+        Assert.Equal(7ul, result.Token);
+        Assert.Equal(RenderResult.Rendered, result.Disposition);
+
+        Assert.True(session.TryAcquireFrame(out var frame));
+        Assert.Equal(result.FrameGeneration, frame.Result.FrameGeneration);
+        frame.Release(null);
+        Assert.Throws<ObjectDisposedException>(() => frame.Result);
+
+        var closeWhileAttached = Assert.Throws<InvalidStateException>(session.Close);
+        Assert.NotEmpty(closeWhileAttached.Message);
+
+        await session.DetachAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(RenderSessionState.Detached, session.GetSnapshot().State);
+        session.Close();
+        Assert.True(session.IsClosed);
     }
 
-    [BindingSpecTest("BND-163")]
+    [BindingSpecTest("BND-165", "BND-176", "BND-183")]
     [Fact]
-    public void SecondRenderSessionAttachInvalidStateLeavesFirstSessionOpen()
+    public async Task OwnedTextureSessionRejectsRetargetAndScaleFactorChange()
     {
-        // The invalid-state branch depends on native state that is not deterministic here.
-        var attachCalls = 0;
-        using var methods = RenderSessionHandle.UseOpenGLAttachMethodsForTest(
-            (_, _, outSession) =>
-            {
-                attachCalls++;
-                if (attachCalls == 1)
-                {
-                    *outSession = SyntheticHandles.RenderSession(101);
-                    return mln_status.MLN_STATUS_OK;
-                }
+        Assert.SkipUnless(
+            OwnedTextureFixture.IsAvailable,
+            "The loaded native library compiles no backend this suite can attach offscreen."
+        );
 
-                *outSession = default;
-                return mln_status.MLN_STATUS_INVALID_STATE;
-            },
-            (_, _, _) => mln_status.MLN_STATUS_UNSUPPORTED,
-            (_, _, _) => mln_status.MLN_STATUS_UNSUPPORTED
-        );
-        using var sessionMethods = RenderSessionHandle.UseSessionMethodsForTest(
-            (_, _, _, _) => mln_status.MLN_STATUS_OK,
-            (_, _, _) => mln_status.MLN_STATUS_OK,
-            (_, _, _, _) => mln_status.MLN_STATUS_OK,
-            _ => mln_status.MLN_STATUS_OK
-        );
+        using var fixture = OwnedTextureFixture.Create();
+        var extent = new RenderTargetExtent(32, 16, 1.0);
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 64, Height = 64 });
-        var descriptor = new OpenGLSurfaceDescriptor
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions
+            {
+                Width = 32,
+                Height = 16,
+                ScaleFactor = 1.0,
+            }
+        );
+
+        using var session = fixture.Attach(map, extent);
+        await session.Attachment.WaitAsync(
+            TimeSpan.FromSeconds(30),
+            TestContext.Current.CancellationToken
+        );
+
+        await Assert.ThrowsAsync<UnsupportedFeatureException>(async () =>
+            await fixture.SetTargetAsync(session, extent)
+        );
+
+        Assert.Throws<InvalidArgumentException>(() =>
         {
-            Extent = new RenderTargetExtent(32, 16, 1),
-            Context = new WglContextDescriptor
-            {
-                DeviceContext = NativePointer.FromBorrowedAddress(1),
-                ShareContext = NativePointer.FromBorrowedAddress(2),
-            },
-            Surface = NativePointer.FromBorrowedAddress(3),
-        };
+            _ = session.ResizeAsync(
+                new RenderTargetExtent(64, 32, 2.0),
+                TestContext.Current.CancellationToken
+            );
+        });
 
-        using var first = RenderSessionHandle.AttachOpenGLSurface(map, descriptor);
-        var error = Assert.Throws<InvalidStateException>(() =>
-            RenderSessionHandle.AttachOpenGLSurface(map, descriptor)
+        Assert.Throws<InvalidArgumentException>(() =>
+            session.RequestFrame(new FrameDemand((FrameDemandFlags)0x8000u, 0, 0, 0))
         );
 
-        Assert.Equal(MaplibreStatus.InvalidState, error.Status);
-        Assert.False(first.IsClosed);
-        Assert.Equal(2, attachCalls);
-    }
-
-    [BindingSpecTest("BND-164", "BND-165")]
-    [Fact]
-    public void RenderUpdateAfterResizeReportsSizePendingAndResizePassesExtent()
-    {
-        uint resizedWidth = 0;
-        uint resizedHeight = 0;
-        double resizedScale = 0;
-        var renderUpdateCalls = 0;
-        using var methods = RenderSessionHandle.UseSessionMethodsForTest(
-            (_, width, height, scale) =>
-            {
-                resizedWidth = width;
-                resizedHeight = height;
-                resizedScale = scale;
-                return mln_status.MLN_STATUS_OK;
-            },
-            (_, outResult, outNeedsRepaint) =>
-            {
-                renderUpdateCalls++;
-                if (renderUpdateCalls == 1)
-                {
-                    *outResult = mln_render_result.MLN_RENDER_RESULT_SIZE_PENDING;
-                    *outNeedsRepaint = false;
-                }
-                else
-                {
-                    *outResult = mln_render_result.MLN_RENDER_RESULT_RENDERED;
-                    *outNeedsRepaint = true;
-                }
-                return mln_status.MLN_STATUS_OK;
-            },
-            (_, _, _, _) => mln_status.MLN_STATUS_OK,
-            _ => mln_status.MLN_STATUS_OK
+        await session.ResizeAsync(
+            new RenderTargetExtent(64, 32, 1.0),
+            TestContext.Current.CancellationToken
         );
-        var session = RenderSessionHandle.CreateForTest(SyntheticHandles.RenderSession(1234));
+        var resized = session.GetSnapshot();
+        Assert.Equal(64u, resized.Extent.Width);
+        Assert.Equal(32u, resized.Extent.Height);
 
-        session.Resize(320, 240, 2);
-        var sizePending = session.RenderUpdate();
-        var rendered = session.RenderUpdate();
-
-        Assert.Equal(RenderResult.SizePending, sizePending.Result);
-        Assert.False(sizePending.NeedsRepaint);
-        Assert.Equal(RenderResult.Rendered, rendered.Result);
-        Assert.True(rendered.NeedsRepaint);
-        Assert.Equal(320u, resizedWidth);
-        Assert.Equal(240u, resizedHeight);
-        Assert.Equal(2, resizedScale);
-        Assert.False(session.IsClosed);
+        await session.DetachAsync(TestContext.Current.CancellationToken);
         session.Close();
     }
 
-    [BindingSpecTest("BND-172")]
-    [Fact]
-    public void MetalFrameConstructionFailureAfterNativeAcquireReleasesFrame()
+    /// <summary>Polls a nonblocking read until it satisfies the predicate or the deadline passes.</summary>
+    private static T PollFor<T>(Func<T> read, Func<T, bool> isSatisfied)
     {
-        var acquireCalls = 0;
-        var releaseCalls = 0;
-        using var methods = RenderSessionHandle.UseMetalFrameMethodsForTest(
-            (_, frame) =>
-            {
-                acquireCalls++;
-                frame->generation = 1;
-                return mln_status.MLN_STATUS_OK;
-            },
-            (_, _) =>
-            {
-                releaseCalls++;
-                return mln_status.MLN_STATUS_OK;
-            },
-            (_, _) => throw new InvalidOperationException("copy failed")
-        );
-        var session = RenderSessionHandle.CreateForTest(SyntheticHandles.RenderSession(1234));
-
-        var error = Assert.Throws<InvalidOperationException>(() =>
-            session.AcquireMetalOwnedTextureFrame()
-        );
-
-        Assert.Equal("copy failed", error.Message);
-        Assert.Equal(1, acquireCalls);
-        Assert.Equal(1, releaseCalls);
-        Assert.False(session.IsClosed);
-        session.Close();
-    }
-
-    [BindingSpecTest("BND-160")]
-    [Fact]
-    public void OpenGLAttachMethodsReportUnsupportedWhenBackendUnavailable()
-    {
-        if ((Maplibre.SupportedRenderBackends() & RenderBackend.OpenGL) != 0)
+        var deadline = Stopwatch.StartNew();
+        while (deadline.Elapsed < TimeSpan.FromSeconds(30))
         {
-            Assert.Skip("OpenGL native build exercises positive attach paths");
+            var value = read();
+            if (isSatisfied(value))
+            {
+                return value;
+            }
+            Thread.Sleep(1);
         }
 
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 64, Height = 64 });
-        var context = new WglContextDescriptor
-        {
-            DeviceContext = NativePointer.FromBorrowedAddress(1),
-            ShareContext = NativePointer.FromBorrowedAddress(1),
-        };
-
-        Assert.Throws<UnsupportedFeatureException>(() =>
-            RenderSessionHandle.AttachOpenGLOwnedTexture(
-                map,
-                new OpenGLOwnedTextureDescriptor
-                {
-                    Extent = new RenderTargetExtent(32, 16, 1),
-                    Context = context,
-                }
-            )
-        );
-        Assert.Throws<UnsupportedFeatureException>(() =>
-            RenderSessionHandle.AttachOpenGLBorrowedTexture(
-                map,
-                new OpenGLBorrowedTextureDescriptor
-                {
-                    Extent = new RenderTargetExtent(32, 16, 1),
-                    PhysicalWidth = 65,
-                    PhysicalHeight = 33,
-                    Context = context,
-                    Texture = 1,
-                    Target = 0x0de1,
-                }
-            )
-        );
-        Assert.Throws<UnsupportedFeatureException>(() =>
-            RenderSessionHandle.AttachOpenGLSurface(
-                map,
-                new OpenGLSurfaceDescriptor
-                {
-                    Extent = new RenderTargetExtent(32, 16, 1),
-                    Context = context,
-                    Surface = NativePointer.FromBorrowedAddress(1),
-                }
-            )
-        );
-    }
-
-    [BindingSpecTest("BND-061")]
-    [Fact]
-    public void FeatureStateSelectorMaterializesOptionalFields()
-    {
-        using var selector = NativeFeatureStateSelector.From(
-            new FeatureStateSelector
-            {
-                SourceId = "source",
-                SourceLayerId = "layer",
-                FeatureId = "feature",
-                StateKey = "hover",
-            }
-        );
-
-        var value = selector.Value;
-        Assert.Equal(
-            (uint)(
-                mln_feature_state_selector_field.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
-                | mln_feature_state_selector_field.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
-                | mln_feature_state_selector_field.MLN_FEATURE_STATE_SELECTOR_STATE_KEY
-            ),
-            value.fields
-        );
-        Assert.Equal("source", RuntimeStructs.CopyUtf8(value.source_id.data, value.source_id.size));
-        Assert.Equal(
-            "layer",
-            RuntimeStructs.CopyUtf8(value.source_layer_id.data, value.source_layer_id.size)
-        );
-        Assert.Equal(
-            "feature",
-            RuntimeStructs.CopyUtf8(value.feature_id.data, value.feature_id.size)
-        );
-        Assert.Equal("hover", RuntimeStructs.CopyUtf8(value.state_key.data, value.state_key.size));
+        throw new TimeoutException("The render session never produced the expected result.");
     }
 }

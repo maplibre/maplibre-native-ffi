@@ -60,6 +60,8 @@ internal class OpenGLTextureCompositor(
     useProgram(0)
     checkError("draw OpenGL texture")
     context.swapBuffers()
+    // CPU_COMPLETE is supplied when the acquired frame is released, so finish every texture read.
+    finish()
   }
 
   override fun close() {
@@ -367,6 +369,10 @@ internal class OpenGLTextureCompositor(
     } else {
       GL11.glDrawArrays(mode, first, count)
     }
+  }
+
+  private fun finish() {
+    if (gles) GLES20.glFinish() else GL11.glFinish()
   }
 
   internal companion object {

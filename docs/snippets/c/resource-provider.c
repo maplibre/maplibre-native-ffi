@@ -73,12 +73,14 @@ void watch_for_cancellation(
 // #endregion cancel
 
 // #region install
-void install_provider(mln_runtime runtime, asset_store* store) {
+mln_status install_provider(
+  mln_runtime runtime, asset_store* store, const mln_completion* completion
+) {
   const mln_resource_provider provider = {
     .size = sizeof(provider),
     .callback = serve_bundled_asset,
     .user_data = store,
   };
-  mln_runtime_set_resource_provider(runtime, &provider);
+  return mln_runtime_set_resource_provider(runtime, &provider, completion);
 }
 // #endregion install

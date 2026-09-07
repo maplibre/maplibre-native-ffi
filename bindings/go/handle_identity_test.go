@@ -9,36 +9,37 @@ import (
 // BND-045: a released map id, replayed after a new map exists, is reported
 // stale rather than naming the new map.
 func TestReleasedMapIDReplayedAfterANewMapReportsItStale(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	defer runtime.Close()
+	defer func() {
+		if err := closeRuntimeForTest(runtime); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
 
-	first, err := runtime.NewMap()
+	first, err := awaitForTest(runtime.NewMap())
 	if err != nil {
 		t.Fatalf("NewMap(): %v", err)
 	}
-	released, release, err := first.ptr()
+	released, err := first.ptr()
 	if err != nil {
 		t.Fatalf("ptr(): %v", err)
 	}
-	release()
-	if err := first.Close(); err != nil {
+	if err := closeMapForTest(first); err != nil {
 		t.Fatalf("first.Close(): %v", err)
 	}
 
 	// The released slot is the one the next map takes, so the replayed id
 	// names a retired generation of a slot that is live again.
-	second, err := runtime.NewMap()
+	second, err := awaitForTest(runtime.NewMap())
 	if err != nil {
 		t.Fatalf("second NewMap(): %v", err)
 	}
-	defer second.Close()
+	defer func() { _ = closeMapForTest(second) }()
 
-	err = mapSizeByIDForTest(released)
+	err = mapSnapshotByIDForTest(released)
 	if !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("replaying a released id: err = %v, want invalid argument", err)
 	}
@@ -46,75 +47,26 @@ func TestReleasedMapIDReplayedAfterANewMapReportsItStale(t *testing.T) {
 		t.Fatalf("diagnostic = %v, want it to name the id stale", err)
 	}
 
-	if _, _, _, err := second.Size(); err != nil {
-		t.Fatalf("second.Size(): %v", err)
+	if _, err := second.Snapshot(); err != nil {
+		t.Fatalf("second.Snapshot(): %v", err)
 	}
 }
 
-// BND-047: a map id passed to a runtime operation is rejected on its kind.
-func TestMapIDPassedToARuntimeOperationReportsInvalidArgument(t *testing.T) {
-	lockOSThreadForTest(t)
+// BND-047: a handle of one kind passed to another kind's entry point is
+// rejected, and the diagnostic names both kinds.
+func TestHandleOfAnotherKindIsRejectedByKind(t *testing.T) {
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	defer runtime.Close()
-
-	m, err := runtime.NewMap()
-	if err != nil {
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer m.Close()
-
-	mapID, release, err := m.ptr()
+	raw, err := m.ptr()
 	if err != nil {
 		t.Fatalf("ptr(): %v", err)
 	}
-	defer release()
-
-	err = pumpRuntimeWithMapIDForTest(mapID)
+	err = runtimeEventMaskByIDForTest(nativeRuntime(raw))
 	if !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("wrong-kind id: err = %v, want invalid argument", err)
+		t.Fatalf("passing a map id to a runtime entry point: err = %v, want invalid argument", err)
 	}
-	if message := err.Error(); !strings.Contains(message, "map") ||
-		!strings.Contains(message, "runtime") {
-		t.Fatalf("diagnostic = %q, want it to name both kinds", message)
-	}
-}
-
-// BND-049: a live id called from another thread reports wrong-thread rather
-// than stale.
-func TestLiveMapIDCalledFromAnotherThreadReportsWrongThread(t *testing.T) {
-	lockOSThreadForTest(t)
-
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	defer runtime.Close()
-
-	m, err := runtime.NewMap()
-	if err != nil {
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer m.Close()
-
-	live, release, err := m.ptr()
-	if err != nil {
-		t.Fatalf("ptr(): %v", err)
-	}
-	defer release()
-
-	done := make(chan error, 1)
-	go func() { done <- mapSizeByIDForTest(live) }()
-	got := <-done
-
-	// The id is live, so the owner-thread rule decides rather than identity.
-	if !errors.Is(got, ErrWrongThread) {
-		t.Fatalf("cross-thread call: err = %v, want wrong thread", got)
-	}
-	if strings.Contains(got.Error(), "stale") {
-		t.Fatalf("diagnostic = %v, want a wrong-thread message", got)
+	diagnostic := err.Error()
+	if !strings.Contains(diagnostic, "mln_map") || !strings.Contains(diagnostic, "mln_runtime") {
+		t.Fatalf("diagnostic = %q, want it to name both handle kinds", diagnostic)
 	}
 }

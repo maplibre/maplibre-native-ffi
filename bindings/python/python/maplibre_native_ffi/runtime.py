@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import weakref
 from collections.abc import Callable
+from concurrent.futures import Future
 from dataclasses import dataclass, field
 from enum import IntFlag
 from typing import Any
 
 from . import _native
 from ._enum import UnknownIntEnum
+from ._future import map_future
 from ._lifecycle import NativeHandleMixin
 from .errors import InvalidArgumentError
 from .resource import (
@@ -54,8 +56,7 @@ class RuntimeEventType(UnknownIntEnum):
     OFFLINE_REGION_STATUS_CHANGED = 19
     OFFLINE_REGION_RESPONSE_ERROR = 20
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21
-    OFFLINE_OPERATION_COMPLETED = 22
-    MAP_CAMERA_TRANSITION_FINISHED = 23
+    MAP_CAMERA_TRANSITION_FINISHED = 22
 
 
 class RuntimeEventMask(IntFlag):
@@ -63,8 +64,7 @@ class RuntimeEventMask(IntFlag):
 
     Each bit is ``1 << RuntimeEventType``, so a host derives a bit from a type
     it read from an event. A map or a runtime builds and queues only the types
-    its mask selects, so narrowing a mask also removes those events' wake
-    signals.
+    that its mask selects.
 
     :attr:`ALL_MAP_EVENTS` covers every map-originated type and
     :attr:`ALL_RUNTIME_EVENTS` every runtime-originated one.
@@ -100,7 +100,6 @@ class RuntimeEventMask(IntFlag):
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = (
         1 << RuntimeEventType.OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
     )
-    OFFLINE_OPERATION_COMPLETED = 1 << RuntimeEventType.OFFLINE_OPERATION_COMPLETED
     ALL_MAP_EVENTS = (
         MAP_CAMERA_WILL_CHANGE
         | MAP_CAMERA_IS_CHANGING
@@ -126,7 +125,6 @@ class RuntimeEventMask(IntFlag):
         OFFLINE_REGION_STATUS_CHANGED
         | OFFLINE_REGION_RESPONSE_ERROR
         | OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
-        | OFFLINE_OPERATION_COMPLETED
     )
     ALL = ALL_MAP_EVENTS | ALL_RUNTIME_EVENTS
 
@@ -148,6 +146,28 @@ class CameraChangeMode(UnknownIntEnum):
 
     IMMEDIATE = 0
     ANIMATED = 1
+
+
+class CommandDisposition(UnknownIntEnum):
+    """Terminal disposition of an accepted command."""
+
+    COMMITTED = 0
+    SUPERSEDED = 1
+    FAILED = 2
+    CANCELLED = 3
+
+
+@dataclass(frozen=True, slots=True)
+class CommandCompletion:
+    """Terminal result of an accepted map command."""
+
+    disposition: CommandDisposition
+    generation: int
+    native_status_code: int
+    diagnostic: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "disposition", CommandDisposition(self.disposition))
 
 
 class RuntimeEventSourceType(UnknownIntEnum):
@@ -270,11 +290,7 @@ class TileActionPayload:
 
 @dataclass(frozen=True, slots=True)
 class CameraTransitionFinishedPayload:
-    """Runtime camera transition-finished event payload.
-
-    A transition carrying a ``transition_id`` reports its end once for every
-    terminal outcome, without naming which outcome occurred.
-    """
+    """Runtime camera transition-finished event payload."""
 
     transition_id: int
 
@@ -383,14 +399,6 @@ class RuntimeEventBatch:
     events: list[RuntimeEvent]
     """Drained events in queue order."""
 
-    remaining_count: int
-    """Events still queued after this batch.
-
-    An unbounded drain leaves this at zero. A nonzero value means the
-    ``max_events`` bound ended the batch early, so another drain reports more
-    events.
-    """
-
     @classmethod
     def _from_native(
         cls,
@@ -401,7 +409,6 @@ class RuntimeEventBatch:
             events=[
                 RuntimeEvent._from_native(event, runtime) for event in raw["events"]
             ],
-            remaining_count=raw["remaining_count"],
         )
 
 
@@ -422,39 +429,8 @@ class RuntimeOptions:
     """
 
 
-class WakeSource(NativeHandleMixin):
-    """Releases a runtime owner thread parked in :meth:`RuntimeHandle.pump`.
-
-    Usable from any thread. It stays usable after its runtime closes, and
-    signalling it then does nothing.
-    """
-
-    _handle_name = "WakeSource"
-
-    def __init__(self, native: Any, *, _create_key: object | None = None) -> None:
-        if _create_key is not _WAKE_SOURCE_CREATE_KEY:
-            msg = "WakeSource instances are created by RuntimeHandle.wake_source()"
-            raise TypeError(msg)
-        self._native = native
-
-    @classmethod
-    def _from_native(cls, native: Any) -> WakeSource:
-        return cls(native, _create_key=_WAKE_SOURCE_CREATE_KEY)
-
-    def signal(self) -> None:
-        """Set the runtime's wake flag and release the parked owner thread.
-
-        A signal raised while the owner thread runs makes the next
-        :meth:`RuntimeHandle.pump` return without parking.
-        """
-        self._native.signal()
-
-
-_WAKE_SOURCE_CREATE_KEY = object()
-
-
 class RuntimeHandle(NativeHandleMixin):
-    """Owner-thread runtime handle."""
+    """Any-thread runtime handle with autonomous native execution."""
 
     _handle_name = "RuntimeHandle"
 
@@ -465,24 +441,35 @@ class RuntimeHandle(NativeHandleMixin):
             options.cache_path,
             int(options.event_mask),
         )
-        self._offline_operations: weakref.WeakSet[OfflineOperationHandle] = (
-            weakref.WeakSet()
-        )
         self._maps: dict[int, weakref.ReferenceType[MapHandle]] = {}
 
-    def close(self) -> None:
-        """Release this runtime handle exactly once."""
-        if self._offline_operations:
-            from .errors import InvalidStateError
+    def close(self) -> Future[None]:
+        """Release this runtime handle exactly once and report native teardown.
 
-            raise InvalidStateError(None, "runtime has live offline operation handles")
-        self._native.close()
+        The returned future resolves after every earlier accepted submission,
+        including released maps' teardown, has finished and the runtime's
+        threads and resources are gone. No library thread touches library state
+        afterward, so a host that waits for it may exit the process without
+        racing native teardown. Discarding the future starts the same teardown
+        and drops its completion.
+        """
+        return self._native.close()
 
-    def _register_offline_operation(self, operation: OfflineOperationHandle) -> None:
-        self._offline_operations.add(operation)
+    def barrier(self) -> Future[None]:
+        """Return a future for all previously accepted runtime commands."""
+        return self._native.barrier()
 
-    def _unregister_offline_operation(self, operation: OfflineOperationHandle) -> None:
-        self._offline_operations.discard(operation)
+    def set_event_wake_callback(self, callback: Callable[[], None]) -> None:
+        """Install the callback that schedules a later :meth:`drain_events`.
+
+        Native code may invoke the callback from any thread. The callback must
+        only arrange receiver work and must not call this binding directly.
+        """
+        self._native.set_event_wake_callback(callback)
+
+    def clear_event_wake_callback(self) -> None:
+        """Clear the scheduling callback after in-flight entries return."""
+        self._native.clear_event_wake_callback()
 
     def _register_map(self, map_handle: MapHandle) -> None:
         self._maps[map_handle._native_id()] = weakref.ref(map_handle)
@@ -500,62 +487,15 @@ class RuntimeHandle(NativeHandleMixin):
             return None
         return map_handle
 
-    def pump(self, timeout: float | None = 0.0, budget: float | None = None) -> None:
-        """Advance this runtime.
-
-        The call parks the owner thread when ``timeout`` allows it, then drains
-        the owner-thread task queues. Take the queued runtime events with
-        :meth:`drain_events` afterwards.
-
-        ``timeout`` is in seconds and bounds the park: zero drains and returns,
-        a positive value parks for up to that long, and ``None`` parks until a
-        wake arrives. Timers and ready file descriptors set the wake flag only
-        when they queue owner-thread work, so pass a bounded timeout to cap how
-        long a call waits.
-
-        ``budget`` is in seconds and bounds the drain: ``None`` drains without
-        a bound, and a value stops the drain at the first task boundary after
-        that long, measured from the start of the drain. The first queued task
-        always runs, so a bounded pump always makes progress, and tasks left
-        behind set the wake flag so the next pump returns without parking and
-        continues them. The budget bounds the task queues alone: expired
-        timers and ready file descriptors are serviced regardless, and a
-        single task runs to completion once started, so one long task can
-        overrun the budget.
-
-        A non-zero timeout releases the GIL while it parks. Call it outside any
-        lock that a signalling thread takes.
-        """
-        # A negative timeout collapses to no wait; ``None`` spells an unbounded
-        # park.
-        timeout_ms = -1 if timeout is None else max(0, int(timeout * 1000))
-        # ``None`` spells an unbounded drain.
-        budget_ms = -1 if budget is None else max(0, int(budget * 1000))
-        self._native.pump(timeout_ms, budget_ms)
-
-    def wake_source(self) -> WakeSource:
-        """Acquire a wake source for this runtime, usable from any thread."""
-        return WakeSource._from_native(self._native.wake_source())
-
-    def _offline_operation(
-        self, start: Callable[..., int], *args: object
-    ) -> OfflineOperationHandle:
-        from .offline import OfflineOperationHandle
-
-        return OfflineOperationHandle._from_native(self, start(*args))
-
     def run_ambient_cache_operation(
         self, operation: AmbientCacheOperation
-    ) -> OfflineOperationHandle:
+    ) -> Future[None]:
         """Start an ambient cache maintenance operation."""
-        from .offline import AmbientCacheOperation
-
-        return self._offline_operation(
-            self._native.run_ambient_cache_operation_start,
-            AmbientCacheOperation(operation).native_code,
+        return self._native.run_ambient_cache_operation(
+            AmbientCacheOperation(operation).native_code
         )
 
-    def set_maximum_ambient_cache_size(self, size: int) -> OfflineOperationHandle:
+    def set_maximum_ambient_cache_size(self, size: int) -> Future[None]:
         """Start a change to this runtime's maximum ambient cache size.
 
         MapLibre evicts ambient resources to fit the new budget, so lowering it
@@ -567,134 +507,121 @@ class RuntimeHandle(NativeHandleMixin):
             raise InvalidArgumentError(
                 f"maximum ambient cache size must fit in 64 unsigned bits, not {size}"
             )
-        return self._offline_operation(
-            self._native.set_maximum_ambient_cache_size_start,
-            size,
-        )
+        return self._native.set_maximum_ambient_cache_size(size)
 
     def create_offline_region(
         self, definition: OfflineRegionDefinition, metadata: bytes = b""
-    ) -> OfflineOperationHandle:
+    ) -> Future[OfflineRegionInfo]:
         """Start creating an offline region."""
-        return self._offline_operation(
-            self._native.offline_region_create_start,
-            definition,
-            metadata,
+        return map_future(
+            self._native.create_offline_region(definition, metadata),
+            OfflineRegionInfo._from_native,
         )
 
-    def get_offline_region(self, region_id: int) -> OfflineOperationHandle:
+    def get_offline_region(self, region_id: int) -> Future[OfflineRegionInfo | None]:
         """Start getting an offline region snapshot by ID."""
-        return self._offline_operation(self._native.offline_region_get_start, region_id)
+        return map_future(
+            self._native.get_offline_region(region_id), _adapt_optional_region_result
+        )
 
-    def list_offline_regions(self) -> OfflineOperationHandle:
+    def list_offline_regions(self) -> Future[tuple[OfflineRegionInfo, ...]]:
         """Start listing offline region snapshots."""
-        return self._offline_operation(self._native.offline_regions_list_start)
+        return map_future(
+            self._native.list_offline_regions(), _adapt_region_list_result
+        )
 
     def merge_offline_regions_database(
         self, side_database_path: str
-    ) -> OfflineOperationHandle:
+    ) -> Future[tuple[OfflineRegionInfo, ...]]:
         """Start merging offline regions from another database path."""
-        return self._offline_operation(
-            self._native.offline_regions_merge_database_start,
-            side_database_path,
+        return map_future(
+            self._native.merge_offline_regions_database(side_database_path),
+            _adapt_region_list_result,
         )
 
     def update_offline_region_metadata(
         self,
         region_id: int,
         metadata: bytes,
-    ) -> OfflineOperationHandle:
+    ) -> Future[OfflineRegionInfo]:
         """Start updating opaque binary metadata for an offline region."""
-        return self._offline_operation(
-            self._native.offline_region_update_metadata_start,
-            region_id,
-            metadata,
+        return map_future(
+            self._native.update_offline_region_metadata(region_id, metadata),
+            OfflineRegionInfo._from_native,
         )
 
-    def get_offline_region_status(self, region_id: int) -> OfflineOperationHandle:
+    def get_offline_region_status(self, region_id: int) -> Future[OfflineRegionStatus]:
         """Start getting completed/download status for an offline region."""
-        return self._offline_operation(
-            self._native.offline_region_get_status_start, region_id
+        return map_future(
+            self._native.get_offline_region_status(region_id),
+            OfflineRegionStatus._from_native,
         )
 
     def set_offline_region_observed(
         self, region_id: int, observed: bool
-    ) -> OfflineOperationHandle:
+    ) -> Future[None]:
         """Start enabling or disabling runtime events for an offline region."""
-        return self._offline_operation(
-            self._native.offline_region_set_observed_start,
-            region_id,
-            observed,
-        )
+        return self._native.set_offline_region_observed(region_id, observed)
 
     def set_offline_region_download_state(
         self,
         region_id: int,
         state: OfflineRegionDownloadState,
-    ) -> OfflineOperationHandle:
+    ) -> Future[None]:
         """Start setting an offline region's native download state."""
-        from .offline import OfflineRegionDownloadState
+        native_state = OfflineRegionDownloadState(state).native_code_for_set()
+        return self._native.set_offline_region_download_state(region_id, native_state)
 
-        return self._offline_operation(
-            self._native.offline_region_set_download_state_start,
-            region_id,
-            OfflineRegionDownloadState(state).native_code_for_set(),
-        )
-
-    def invalidate_offline_region(self, region_id: int) -> OfflineOperationHandle:
+    def invalidate_offline_region(self, region_id: int) -> Future[None]:
         """Start invalidating cached resources for an offline region."""
-        return self._offline_operation(
-            self._native.offline_region_invalidate_start, region_id
-        )
+        return self._native.invalidate_offline_region(region_id)
 
-    def delete_offline_region(self, region_id: int) -> OfflineOperationHandle:
+    def delete_offline_region(self, region_id: int) -> Future[None]:
         """Start deleting an offline region."""
-        return self._offline_operation(
-            self._native.offline_region_delete_start, region_id
-        )
+        return self._native.delete_offline_region(region_id)
 
     def set_resource_transform(
         self,
         callback: ResourceTransformCallback,
         *,
         max_pending_callbacks: int = 64,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Install or replace the runtime-scoped network URL transform."""
         from .resource import _adapt_resource_transform_callback
 
-        self._native.set_resource_transform(
+        return self._native.set_resource_transform(
             _adapt_resource_transform_callback(callback),
             max_pending_callbacks,
         )
 
-    def clear_resource_transform(self) -> None:
+    def clear_resource_transform(self) -> Future[CommandCompletion]:
         """Clear the runtime-scoped network URL transform."""
-        self._native.clear_resource_transform()
+        return self._native.clear_resource_transform()
 
     def set_http_header_transform(
         self,
         callback: HttpHeaderTransformCallback,
         *,
         max_pending_callbacks: int = 64,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Install or replace the outgoing HTTP header transform."""
         from .resource import _adapt_http_header_transform_callback
 
-        self._native.set_http_header_transform(
+        return self._native.set_http_header_transform(
             _adapt_http_header_transform_callback(callback),
             max_pending_callbacks,
         )
 
-    def clear_http_header_transform(self) -> None:
+    def clear_http_header_transform(self) -> Future[CommandCompletion]:
         """Clear the outgoing HTTP header transform."""
-        self._native.clear_http_header_transform()
+        return self._native.clear_http_header_transform()
 
     def set_resource_provider(
         self,
         callback: ResourceProviderCallback,
         *,
         max_pending_callbacks: int = 64,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Install or replace the runtime-scoped network resource provider.
 
         Replacement is allowed while maps are live. When this call returns, the
@@ -703,43 +630,29 @@ class RuntimeHandle(NativeHandleMixin):
         """
         from .resource import _adapt_resource_provider_callback
 
-        self._native.set_resource_provider(
+        return self._native.set_resource_provider(
             _adapt_resource_provider_callback(callback),
             max_pending_callbacks,
         )
 
-    def clear_resource_provider(self) -> None:
+    def clear_resource_provider(self) -> Future[CommandCompletion]:
         """Clear the runtime-scoped network resource provider.
 
         Later requests go to MapLibre's online file source. Requests the
         previous callback already took a handle for keep that handle and are
         completed and released as usual.
         """
-        self._native.clear_resource_provider()
+        return self._native.clear_resource_provider()
 
-    def drain_events(self, max_events: int = 0) -> RuntimeEventBatch:
+    def drain_events(self) -> RuntimeEventBatch:
         """Drain and copy this runtime's queued runtime events into one batch.
 
-        ``max_events`` bounds the drain: zero drains every queued event, and a
-        positive value takes at most that many and reports the rest as
-        :attr:`RuntimeEventBatch.remaining_count`.
-
-        A drain is a queue operation: it never parks and runs no owner-thread
-        work. Call :meth:`pump` to advance the runtime, then drain what the pump
-        produced.
+        Draining never waits for worker progress; native execution is autonomous.
 
         `RuntimeEvent.source.map_handle` is None once the caller drops its last
         reference to the source map.
         """
-        if not 0 <= max_events < 2**64:
-            # PyO3 raises a bare OverflowError extracting `usize` before the
-            # binding's error conversion runs.
-            raise InvalidArgumentError(
-                f"max_events must fit in 64 unsigned bits, not {max_events}"
-            )
-        return RuntimeEventBatch._from_native(
-            self._native.drain_events(max_events), runtime=self
-        )
+        return RuntimeEventBatch._from_native(self._native.drain_events(), runtime=self)
 
     def set_event_mask(self, mask: RuntimeEventMask) -> None:
         """Select which runtime-originated event types this runtime queues.
@@ -749,11 +662,8 @@ class RuntimeHandle(NativeHandleMixin):
         runtime-originated type. Narrowing gates later events and keeps queued
         ones, so a host drains what it already caused.
 
-        Region status, response error, and tile count limit events also need an
-        observed region, so this mask narrows that subscription rather than
-        replacing it. An offline operation records its result before the mask is
-        read, so an :class:`offline.OfflineOperationHandle` still reports its
-        result with the completion type unselected.
+        Region status, response error, and tile count limit events also require
+        an observed region. This mask narrows that subscription.
         """
         self._native.set_event_mask(int(mask))
 
@@ -766,10 +676,8 @@ class RuntimeHandle(NativeHandleMixin):
         """
         return RuntimeEventMask(self._native.get_event_mask())
 
-    def create_map(self, options: MapOptions | None = None) -> MapHandle:
-        """Create a map owned by this runtime."""
-        from .map import MapHandle
-
+    def create_map(self, options: MapOptions | None = None) -> Future[MapHandle]:
+        """Return an eager future for a map owned by this runtime."""
         return MapHandle._create(self, options)
 
 
@@ -789,8 +697,6 @@ def _runtime_payload_from_native(payload: dict[str, object]) -> RuntimeEventPayl
         return OfflineRegionResponseError._from_runtime_payload(payload)
     if kind == "offline_region_tile_count_limit":
         return OfflineRegionTileCountLimitExceeded._from_runtime_payload(payload)
-    if kind == "offline_operation_completed":
-        return OfflineOperationCompleted._from_runtime_payload(payload)
     if kind == "camera_transition_finished":
         return CameraTransitionFinishedPayload._from_runtime_payload(payload)
     return UnknownRuntimeEventPayload._from_runtime_payload(payload)
@@ -799,6 +705,8 @@ def _runtime_payload_from_native(payload: dict[str, object]) -> RuntimeEventPayl
 __all__ = [
     "CameraChangeMode",
     "CameraTransitionFinishedPayload",
+    "CommandCompletion",
+    "CommandDisposition",
     "NetworkStatus",
     "RenderFramePayload",
     "RenderMapPayload",
@@ -822,13 +730,15 @@ __all__ = [
 from .map import MapHandle, MapOptions
 from .offline import (
     AmbientCacheOperation,
-    OfflineOperationCompleted,
-    OfflineOperationHandle,
     OfflineRegionDefinition,
     OfflineRegionDownloadState,
+    OfflineRegionInfo,
     OfflineRegionResponseError,
+    OfflineRegionStatus,
     OfflineRegionStatusChanged,
     OfflineRegionTileCountLimitExceeded,
+    _adapt_optional_region_result,
+    _adapt_region_list_result,
 )
 
 RuntimeEventPayload = (
@@ -839,7 +749,6 @@ RuntimeEventPayload = (
     | OfflineRegionStatusChanged
     | OfflineRegionResponseError
     | OfflineRegionTileCountLimitExceeded
-    | OfflineOperationCompleted
     | CameraTransitionFinishedPayload
     | UnknownRuntimeEventPayload
 )

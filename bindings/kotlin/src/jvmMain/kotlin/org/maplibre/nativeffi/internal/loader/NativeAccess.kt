@@ -1,17 +1,26 @@
 package org.maplibre.nativeffi.internal.loader
 
 import java.lang.foreign.Arena
+import java.lang.foreign.FunctionDescriptor
+import java.lang.foreign.Linker
+import java.lang.foreign.MemoryLayout
 import java.lang.foreign.MemorySegment
+import java.lang.foreign.SymbolLookup
 import java.lang.foreign.ValueLayout
 import java.lang.invoke.MethodHandle
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.NoSuchElementException
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.BoundsConstraint
+import org.maplibre.nativeffi.camera.CameraDelta
 import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
+import org.maplibre.nativeffi.camera.CameraSnapshot
+import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.camera.UnitBezier
@@ -30,21 +39,29 @@ import org.maplibre.nativeffi.internal.c.MapLibreNativeC
 import org.maplibre.nativeffi.internal.c.mln_animation_options
 import org.maplibre.nativeffi.internal.c.mln_bound_options
 import org.maplibre.nativeffi.internal.c.mln_buffer_view
+import org.maplibre.nativeffi.internal.c.mln_camera_delta
 import org.maplibre.nativeffi.internal.c.mln_camera_fit_options
 import org.maplibre.nativeffi.internal.c.mln_camera_options
+import org.maplibre.nativeffi.internal.c.mln_camera_query_result
+import org.maplibre.nativeffi.internal.c.mln_camera_update
 import org.maplibre.nativeffi.internal.c.mln_canonical_tile_id
+import org.maplibre.nativeffi.internal.c.mln_completion_result
 import org.maplibre.nativeffi.internal.c.mln_custom_geometry_source_options
 import org.maplibre.nativeffi.internal.c.mln_custom_mvt_vector_source_options
 import org.maplibre.nativeffi.internal.c.mln_edge_insets
 import org.maplibre.nativeffi.internal.c.mln_egl_context_descriptor
 import org.maplibre.nativeffi.internal.c.mln_feature_state_selector
+import org.maplibre.nativeffi.internal.c.mln_frame_demand
 import org.maplibre.nativeffi.internal.c.mln_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_geojson_source_options
+import org.maplibre.nativeffi.internal.c.mln_gpu_sync
 import org.maplibre.nativeffi.internal.c.mln_image_content
 import org.maplibre.nativeffi.internal.c.mln_image_stretch
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_lat_lng_bounds
+import org.maplibre.nativeffi.internal.c.mln_logical_extent
 import org.maplibre.nativeffi.internal.c.mln_map_options
+import org.maplibre.nativeffi.internal.c.mln_map_snapshot
 import org.maplibre.nativeffi.internal.c.mln_map_tile_options
 import org.maplibre.nativeffi.internal.c.mln_map_viewport_options
 import org.maplibre.nativeffi.internal.c.mln_metal_borrowed_texture_descriptor
@@ -67,6 +84,11 @@ import org.maplibre.nativeffi.internal.c.mln_projected_meters
 import org.maplibre.nativeffi.internal.c.mln_projection_mode
 import org.maplibre.nativeffi.internal.c.mln_quaternion
 import org.maplibre.nativeffi.internal.c.mln_queried_feature
+import org.maplibre.nativeffi.internal.c.mln_render_abandon_result
+import org.maplibre.nativeffi.internal.c.mln_render_frame_result
+import org.maplibre.nativeffi.internal.c.mln_render_session_attach_options
+import org.maplibre.nativeffi.internal.c.mln_render_session_capabilities
+import org.maplibre.nativeffi.internal.c.mln_render_session_snapshot
 import org.maplibre.nativeffi.internal.c.mln_render_target_extent
 import org.maplibre.nativeffi.internal.c.mln_rendered_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_rendered_query_geometry
@@ -74,9 +96,8 @@ import org.maplibre.nativeffi.internal.c.mln_rendering_stats
 import org.maplibre.nativeffi.internal.c.mln_resource_request
 import org.maplibre.nativeffi.internal.c.mln_resource_response
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
-import org.maplibre.nativeffi.internal.c.mln_runtime_event_batch
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_batch_view
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_camera_transition_finished
-import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_operation_completed
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_response_error
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_tile_count_limit
@@ -90,10 +111,17 @@ import org.maplibre.nativeffi.internal.c.mln_screen_point
 import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_style_image_info
 import org.maplibre.nativeffi.internal.c.mln_style_image_options
+import org.maplibre.nativeffi.internal.c.mln_style_image_result
+import org.maplibre.nativeffi.internal.c.mln_style_image_stretches_result
+import org.maplibre.nativeffi.internal.c.mln_style_layer_info
+import org.maplibre.nativeffi.internal.c.mln_style_layer_result
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
+import org.maplibre.nativeffi.internal.c.mln_style_source_result
+import org.maplibre.nativeffi.internal.c.mln_style_source_tile_urls_result
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options
 import org.maplibre.nativeffi.internal.c.mln_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_texture_image_info
+import org.maplibre.nativeffi.internal.c.mln_texture_readback_result
 import org.maplibre.nativeffi.internal.c.mln_tile_id
 import org.maplibre.nativeffi.internal.c.mln_unit_bezier
 import org.maplibre.nativeffi.internal.c.mln_vec3
@@ -108,21 +136,15 @@ import org.maplibre.nativeffi.internal.lifecycle.NativeGeoJsonSourceData
 import org.maplibre.nativeffi.internal.lifecycle.NativeHandle
 import org.maplibre.nativeffi.internal.lifecycle.NativeMap
 import org.maplibre.nativeffi.internal.lifecycle.NativeMapProjection
-import org.maplibre.nativeffi.internal.lifecycle.NativeOfflineRegionList
-import org.maplibre.nativeffi.internal.lifecycle.NativeOfflineRegionSnapshot
-import org.maplibre.nativeffi.internal.lifecycle.NativeOwnedBuffer
-import org.maplibre.nativeffi.internal.lifecycle.NativeQueriedFeatureList
 import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
 import org.maplibre.nativeffi.internal.lifecycle.NativeResourceRequest
 import org.maplibre.nativeffi.internal.lifecycle.NativeRuntime
-import org.maplibre.nativeffi.internal.lifecycle.NativeStyleIdList
-import org.maplibre.nativeffi.internal.lifecycle.NativeStyleStringList
-import org.maplibre.nativeffi.internal.lifecycle.NativeWakeSource
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.map.ConstrainMode
 import org.maplibre.nativeffi.map.DebugOption
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.map.MapSize
+import org.maplibre.nativeffi.map.MapSnapshot
 import org.maplibre.nativeffi.map.NorthOrientation
 import org.maplibre.nativeffi.map.ProjectionModeOptions
 import org.maplibre.nativeffi.map.RenderingStats
@@ -141,13 +163,15 @@ import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 import org.maplibre.nativeffi.render.EglContextDescriptor
+import org.maplibre.nativeffi.render.FrameDemand
 import org.maplibre.nativeffi.render.FrameScope
+import org.maplibre.nativeffi.render.GpuSync
+import org.maplibre.nativeffi.render.GpuSyncKind
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalContextDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureFrame
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
-import org.maplibre.nativeffi.render.NativeBuffer
 import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLContextDescriptor
@@ -155,11 +179,19 @@ import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLOwnedTextureFrame
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
+import org.maplibre.nativeffi.render.RenderAbandonDisposition
+import org.maplibre.nativeffi.render.RenderAbandonResult
+import org.maplibre.nativeffi.render.RenderDriver
+import org.maplibre.nativeffi.render.RenderFrameResult
 import org.maplibre.nativeffi.render.RenderMode
 import org.maplibre.nativeffi.render.RenderResult
+import org.maplibre.nativeffi.render.RenderSessionAttachOptions
+import org.maplibre.nativeffi.render.RenderSessionCapabilities
+import org.maplibre.nativeffi.render.RenderSessionSnapshot
+import org.maplibre.nativeffi.render.RenderSessionState
 import org.maplibre.nativeffi.render.RenderTargetExtent
-import org.maplibre.nativeffi.render.RenderUpdate
 import org.maplibre.nativeffi.render.TextureImageInfo
+import org.maplibre.nativeffi.render.TextureReadback
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
 import org.maplibre.nativeffi.render.VulkanHandle
@@ -175,8 +207,8 @@ import org.maplibre.nativeffi.resource.ResourceRequest
 import org.maplibre.nativeffi.resource.ResourceResponse
 import org.maplibre.nativeffi.resource.ResourceStoragePolicy
 import org.maplibre.nativeffi.resource.ResourceUsage
-import org.maplibre.nativeffi.runtime.OfflineOperationKind
-import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
+import org.maplibre.nativeffi.runtime.CommandCompletion
+import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
@@ -184,14 +216,15 @@ import org.maplibre.nativeffi.style.CustomMvtVectorSourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageContent
 import org.maplibre.nativeffi.style.ImageStretch
+import org.maplibre.nativeffi.style.LayerInfo
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
-import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleImageTextFit
+import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileJson
 import org.maplibre.nativeffi.style.TileScheme
@@ -302,8 +335,8 @@ internal object NativeAccess {
     Status.check(statusInFunction("mln_log_set_async_severity_mask").invokeNative(mask) as Int)
   }
 
-  internal fun setLogCallback(callback: MemorySegment): Int =
-    logSetCallbackFunction().invokeNative(callback, MemorySegment.NULL) as Int
+  internal fun setLogCallback(callback: MemorySegment, release: MemorySegment): Int =
+    logSetCallbackFunction().invokeNative(callback, MemorySegment.NULL, release) as Int
 
   internal fun clearLogCallback(): Int = intFunction("mln_log_clear_callback").invokeNative() as Int
 
@@ -346,187 +379,44 @@ internal object NativeAccess {
       val nativeOptions = runtimeOptions(options, arena)
       val outRuntime = arena.allocate(ValueLayout.JAVA_LONG)
       outRuntime.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(runtimeCreateFunction().invokeNative(nativeOptions, outRuntime) as Int)
+      Status.check(MapLibreNativeC.mln_runtime_create(nativeOptions, outRuntime))
       NativeRuntime(outRuntime.get(ValueLayout.JAVA_LONG, 0)).also { runtime ->
         require(!runtime.isNull) { "mln_runtime_create returned the null handle" }
       }
     }
 
-  internal fun pumpRuntime(runtime: NativeRuntime, timeoutMillis: Long, budgetMillis: Long) {
-    Status.check(runtimePumpFunction().invokeNative(runtime, timeoutMillis, budgetMillis) as Int)
+  internal fun runtimeBarrier(runtime: NativeRuntime): Deferred<Unit> =
+    CompletionBridge.unit { completion ->
+      MapLibreNativeC.mln_runtime_barrier(runtime.raw, completion)
+    }
+
+  internal fun releaseRuntime(runtime: NativeRuntime): Deferred<Unit> =
+    CompletionBridge.unitChecked { completion ->
+      MapLibreNativeC.mln_runtime_release(runtime.raw, completion)
+    }
+
+  internal fun setResourceProvider(
+    runtime: NativeRuntime,
+    provider: MemorySegment,
+  ): Deferred<CommandCompletion> = CompletionBridge.commandChecked { completion ->
+    runtimeSetResourceProviderFunction().invokeNative(runtime.raw, provider, completion) as Int
   }
 
-  internal fun acquireWakeSource(runtime: NativeRuntime): NativeWakeSource =
-    Arena.ofConfined().use { arena ->
-      val outSource = arena.allocate(ValueLayout.JAVA_LONG)
-      outSource.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(runtimeWakeSourceAcquireFunction().invokeNative(runtime, outSource) as Int)
-      NativeWakeSource(outSource.get(ValueLayout.JAVA_LONG, 0)).also { source ->
-        require(!source.isNull) { "mln_runtime_wake_source_acquire returned the null handle" }
-      }
+  internal fun clearResourceProvider(runtime: NativeRuntime): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      runtimeClearResourceProviderFunction().invokeNative(runtime.raw, completion) as Int
     }
 
-  internal fun signalWakeSource(source: NativeWakeSource) {
-    Status.check(wakeSourceSignalFunction().invokeNative(source) as Int)
-  }
-
-  internal fun destroyWakeSource(source: NativeWakeSource) {
-    wakeSourceDestroyFunction().invokeNative(source)
-  }
-
-  internal fun destroyRuntime(runtime: NativeRuntime): Int =
-    runtimeStatusFunction("mln_runtime_destroy").invokeNative(runtime) as Int
-
-  internal fun setResourceProvider(runtime: NativeRuntime, provider: MemorySegment): Int =
-    runtimeSetResourceProviderFunction().invokeNative(runtime, provider) as Int
-
-  internal fun clearResourceProvider(runtime: NativeRuntime): Int =
-    runtimeClearResourceProviderFunction().invokeNative(runtime) as Int
-
-  internal fun startAmbientCacheOperation(runtime: NativeRuntime, operation: Int): Long =
-    Arena.ofConfined().use { arena ->
-      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
-      Status.check(
-        runtimeAmbientCacheOperationStartFunction().invokeNative(runtime, operation, outOperationId)
-          as Int
-      )
-      outOperationId.get(ValueLayout.JAVA_LONG, 0)
-    }
-
-  internal fun startSetMaximumAmbientCacheSize(runtime: NativeRuntime, size: Long): Long =
-    Arena.ofConfined().use { arena ->
-      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
-      Status.check(
-        runtimeSetMaximumAmbientCacheSizeStartFunction().invokeNative(runtime, size, outOperationId)
-          as Int
-      )
-      outOperationId.get(ValueLayout.JAVA_LONG, 0)
-    }
-
-  internal fun startCreateOfflineRegion(
-    runtime: NativeRuntime,
-    definition: OfflineRegionDefinition,
-    metadata: ByteArray,
-  ): Long =
-    Arena.ofConfined().use { arena ->
-      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
-      Status.check(
-        runtimeOfflineRegionCreateStartFunction()
-          .invokeNative(
-            runtime,
-            offlineRegionDefinition(definition, arena),
-            nativeBytes(arena, metadata),
-            metadata.size.toLong(),
-            outOperationId,
-          ) as Int
-      )
-      outOperationId.get(ValueLayout.JAVA_LONG, 0)
-    }
-
-  internal fun startOfflineRegion(runtime: NativeRuntime, regionId: Long): Long =
-    startRuntimeLongOperation("mln_runtime_offline_region_get_start", runtime, regionId)
-
-  internal fun startOfflineRegions(runtime: NativeRuntime): Long =
-    startRuntimeOperation("mln_runtime_offline_regions_list_start", runtime)
-
-  internal fun startMergeOfflineRegionsDatabase(runtime: NativeRuntime, path: String): Long =
-    Arena.ofConfined().use { arena ->
-      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
-      Status.check(
-        runtimeAddressOperationStartFunction("mln_runtime_offline_regions_merge_database_start")
-          .invokeNative(runtime, cString(arena, path), outOperationId) as Int
-      )
-      outOperationId.get(ValueLayout.JAVA_LONG, 0)
-    }
-
-  internal fun startUpdateOfflineRegionMetadata(
-    runtime: NativeRuntime,
-    regionId: Long,
-    metadata: ByteArray,
-  ): Long =
-    Arena.ofConfined().use { arena ->
-      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
-      Status.check(
-        runtimeLongAddressLongOperationStartFunction(
-            "mln_runtime_offline_region_update_metadata_start"
-          )
-          .invokeNative(
-            runtime,
-            regionId,
-            nativeBytes(arena, metadata),
-            metadata.size.toLong(),
-            outOperationId,
-          ) as Int
-      )
-      outOperationId.get(ValueLayout.JAVA_LONG, 0)
-    }
-
-  internal fun startOfflineRegionStatus(runtime: NativeRuntime, regionId: Long): Long =
-    startRuntimeLongOperation("mln_runtime_offline_region_get_status_start", runtime, regionId)
-
-  internal fun startSetOfflineRegionObserved(
-    runtime: NativeRuntime,
-    regionId: Long,
-    observed: Boolean,
-  ): Long =
-    Arena.ofConfined().use { arena ->
-      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
-      Status.check(
-        runtimeLongBooleanOperationStartFunction("mln_runtime_offline_region_set_observed_start")
-          .invokeNative(runtime, regionId, observed, outOperationId) as Int
-      )
-      outOperationId.get(ValueLayout.JAVA_LONG, 0)
-    }
-
-  internal fun startSetOfflineRegionDownloadState(
-    runtime: NativeRuntime,
-    regionId: Long,
-    downloadState: Int,
-  ): Long =
-    Arena.ofConfined().use { arena ->
-      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
-      Status.check(
-        runtimeLongIntOperationStartFunction("mln_runtime_offline_region_set_download_state_start")
-          .invokeNative(runtime, regionId, downloadState, outOperationId) as Int
-      )
-      outOperationId.get(ValueLayout.JAVA_LONG, 0)
-    }
-
-  internal fun startInvalidateOfflineRegion(runtime: NativeRuntime, regionId: Long): Long =
-    startRuntimeLongOperation("mln_runtime_offline_region_invalidate_start", runtime, regionId)
-
-  internal fun startDeleteOfflineRegion(runtime: NativeRuntime, regionId: Long): Long =
-    startRuntimeLongOperation("mln_runtime_offline_region_delete_start", runtime, regionId)
-
-  internal fun discardOfflineOperation(runtime: NativeRuntime, operationId: Long): Int =
-    runtimeOfflineOperationDiscardFunction().invokeNative(runtime, operationId) as Int
-
-  internal fun setResourceTransform(runtime: NativeRuntime, descriptor: MemorySegment): Int =
-    runtimeSetResourceTransformFunction().invokeNative(runtime, descriptor) as Int
-
-  internal fun clearResourceTransform(runtime: NativeRuntime): Int =
-    runtimeClearResourceTransformFunction().invokeNative(runtime) as Int
-
-  internal fun setHttpHeaderTransform(runtime: NativeRuntime, descriptor: MemorySegment): Int =
-    runtimeSetHttpHeaderTransformFunction().invokeNative(runtime, descriptor) as Int
-
-  internal fun clearHttpHeaderTransform(runtime: NativeRuntime): Int =
-    runtimeClearHttpHeaderTransformFunction().invokeNative(runtime) as Int
-
-  internal fun completeResourceRequest(
-    handle: NativeResourceRequest,
-    response: ResourceResponse,
-  ): Int =
-    Arena.ofConfined().use { arena ->
-      resourceRequestCompleteFunction().invokeNative(handle, resourceResponse(response, arena))
+  internal fun runAmbientCacheOperation(runtime: NativeRuntime, operation: Int): Deferred<Unit> =
+    CompletionBridge.unit { completion ->
+      runtimeAmbientCacheOperationStartFunction().invokeNative(runtime, operation, completion)
         as Int
     }
 
-  internal fun isResourceRequestCancelled(handle: NativeResourceRequest): Boolean =
-    Arena.ofConfined().use { arena ->
-      val outCancelled = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(resourceRequestCancelledFunction().invokeNative(handle, outCancelled) as Int)
-      outCancelled.get(ValueLayout.JAVA_BOOLEAN, 0)
+  internal fun setMaximumAmbientCacheSize(runtime: NativeRuntime, size: Long): Deferred<Unit> =
+    CompletionBridge.unit { completion ->
+      runtimeSetMaximumAmbientCacheSizeStartFunction().invokeNative(runtime, size, completion)
+        as Int
     }
 
   internal fun setResourceRequestCancelCallback(
@@ -542,228 +432,335 @@ internal object NativeAccess {
       ResourceRequestCancelSetResult(status, outCancelled.get(ValueLayout.JAVA_BOOLEAN, 0))
     }
 
-  internal fun releaseResourceRequest(handle: NativeResourceRequest) {
-    resourceRequestReleaseFunction().invokeNative(handle)
-  }
-
-  internal fun createMap(runtime: NativeRuntime, options: MapOptions): NativeMap =
+  internal fun createOfflineRegion(
+    runtime: NativeRuntime,
+    definition: OfflineRegionDefinition,
+    metadata: ByteArray,
+  ): Deferred<OfflineRegionInfo> =
     Arena.ofConfined().use { arena ->
-      val outMap = arena.allocate(ValueLayout.JAVA_LONG)
-      outMap.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(
-        mapCreateFunction().invokeNative(runtime, mapOptions(options, arena), outMap) as Int
+      CompletionBridge.submit(
+        { result -> offlineRegionInfo(completionValue(result, mln_offline_region_info.sizeof())) },
+        { completion ->
+          runtimeOfflineRegionCreateStartFunction()
+            .invokeNative(
+              runtime,
+              offlineRegionDefinition(definition, arena),
+              nativeBytes(arena, metadata),
+              metadata.size.toLong(),
+              completion,
+            ) as Int
+        },
       )
-      NativeMap(outMap.get(ValueLayout.JAVA_LONG, 0)).also { map ->
-        require(!map.isNull) { "mln_map_create returned the null handle" }
+    }
+
+  internal fun offlineRegion(runtime: NativeRuntime, regionId: Long): Deferred<OfflineRegionInfo?> =
+    CompletionBridge.submit(
+      { result ->
+        if (mln_completion_result.value_count(result) == 0L) null
+        else offlineRegionInfo(completionValue(result, mln_offline_region_info.sizeof()))
+      },
+      { completion ->
+        MapLibreNativeC.mln_runtime_offline_region_get(runtime.raw, regionId, completion)
+      },
+    )
+
+  internal fun offlineRegions(runtime: NativeRuntime): Deferred<List<OfflineRegionInfo>> =
+    offlineRegionList(runtime) { completion ->
+      MapLibreNativeC.mln_runtime_offline_regions_list(runtime.raw, completion)
+    }
+
+  internal fun mergeOfflineRegionsDatabase(
+    runtime: NativeRuntime,
+    path: String,
+  ): Deferred<List<OfflineRegionInfo>> =
+    Arena.ofConfined().use { arena ->
+      offlineRegionList(runtime) { completion ->
+        MapLibreNativeC.mln_runtime_offline_regions_merge_database(
+          runtime.raw,
+          cString(arena, path),
+          completion,
+        )
       }
     }
 
-  internal fun destroyMap(map: NativeMap): Int =
-    mapStatusFunction("mln_map_destroy").invokeNative(map) as Int
-
-  internal fun setMapStyleUrl(map: NativeMap, url: String) {
+  internal fun updateOfflineRegionMetadata(
+    runtime: NativeRuntime,
+    regionId: Long,
+    metadata: ByteArray,
+  ): Deferred<OfflineRegionInfo> =
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapAddressStatusFunction("mln_map_set_style_url").invokeNative(map, cString(arena, url))
-          as Int
+      CompletionBridge.submit(
+        { result -> offlineRegionInfo(completionValue(result, mln_offline_region_info.sizeof())) },
+        { completion ->
+          MapLibreNativeC.mln_runtime_offline_region_update_metadata(
+            runtime.raw,
+            regionId,
+            nativeBytes(arena, metadata),
+            metadata.size.toLong(),
+            completion,
+          )
+        },
       )
     }
+
+  internal fun offlineRegionStatus(
+    runtime: NativeRuntime,
+    regionId: Long,
+  ): Deferred<OfflineRegionStatus> =
+    CompletionBridge.submit(
+      { result ->
+        offlineRegionStatus(completionValue(result, mln_offline_region_status.sizeof()))
+      },
+      { completion ->
+        MapLibreNativeC.mln_runtime_offline_region_get_status(runtime.raw, regionId, completion)
+      },
+    )
+
+  internal fun setOfflineRegionObserved(
+    runtime: NativeRuntime,
+    regionId: Long,
+    observed: Boolean,
+  ): Deferred<Unit> = CompletionBridge.unit { completion ->
+    MapLibreNativeC.mln_runtime_offline_region_set_observed(
+      runtime.raw,
+      regionId,
+      observed,
+      completion,
+    )
   }
 
-  internal fun setMapStyleJson(map: NativeMap, json: ByteArray) {
+  internal fun setOfflineRegionDownloadState(
+    runtime: NativeRuntime,
+    regionId: Long,
+    downloadState: Int,
+  ): Deferred<Unit> = CompletionBridge.unit { completion ->
+    MapLibreNativeC.mln_runtime_offline_region_set_download_state(
+      runtime.raw,
+      regionId,
+      downloadState,
+      completion,
+    )
+  }
+
+  internal fun invalidateOfflineRegion(runtime: NativeRuntime, regionId: Long): Deferred<Unit> =
+    CompletionBridge.unit { completion ->
+      MapLibreNativeC.mln_runtime_offline_region_invalidate(runtime.raw, regionId, completion)
+    }
+
+  internal fun deleteOfflineRegion(runtime: NativeRuntime, regionId: Long): Deferred<Unit> =
+    CompletionBridge.unit { completion ->
+      MapLibreNativeC.mln_runtime_offline_region_delete(runtime.raw, regionId, completion)
+    }
+
+  internal fun setResourceTransform(
+    runtime: NativeRuntime,
+    descriptor: MemorySegment,
+  ): Deferred<CommandCompletion> = CompletionBridge.commandChecked { completion ->
+    runtimeSetResourceTransformFunction().invokeNative(runtime.raw, descriptor, completion) as Int
+  }
+
+  internal fun clearResourceTransform(runtime: NativeRuntime): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      runtimeClearResourceTransformFunction().invokeNative(runtime.raw, completion) as Int
+    }
+
+  internal fun setHttpHeaderTransform(
+    runtime: NativeRuntime,
+    descriptor: MemorySegment,
+  ): Deferred<CommandCompletion> = CompletionBridge.commandChecked { completion ->
+    runtimeSetHttpHeaderTransformFunction().invokeNative(runtime.raw, descriptor, completion) as Int
+  }
+
+  internal fun clearHttpHeaderTransform(runtime: NativeRuntime): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      runtimeClearHttpHeaderTransformFunction().invokeNative(runtime.raw, completion) as Int
+    }
+
+  internal fun createMap(runtime: NativeRuntime, options: MapOptions): Deferred<NativeMap> =
     Arena.ofConfined().use { arena ->
-      Status.check(
+      CompletionBridge.submit(
+        { result ->
+          val map =
+            NativeMap(
+              completionValue(result, ValueLayout.JAVA_LONG.byteSize())
+                .get(ValueLayout.JAVA_LONG, 0)
+            )
+          require(!map.isNull) { "mln_map_create completion returned the null handle" }
+          map
+        },
+        { completion ->
+          MapLibreNativeC.mln_map_create(runtime.raw, mapOptions(options, arena), completion)
+        },
+      )
+    }
+
+  internal fun releaseMap(map: NativeMap): Deferred<Unit> =
+    CompletionBridge.unitChecked { completion ->
+      MapLibreNativeC.mln_map_release(map.raw, completion)
+    }
+
+  internal fun setMapStyleUrl(map: NativeMap, url: String): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      Arena.ofConfined().use { arena ->
+        mapAddressStatusFunction("mln_map_set_style_url")
+          .invokeNative(map, cString(arena, url), completion) as Int
+      }
+    }
+
+  internal fun setMapStyleJson(map: NativeMap, json: ByteArray): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      Arena.ofConfined().use { arena ->
         mapAddressStatusFunction("mln_map_set_style_json")
-          .invokeNative(map, byteArrayView(arena, json)) as Int
-      )
+          .invokeNative(map, byteArrayView(arena, json), completion) as Int
+      }
     }
-  }
 
   internal fun setMapFeatureState(
     map: NativeMap,
     selector: FeatureStateSelector,
     value: ByteArray,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapTwoAddressStatusFunction("mln_map_set_feature_state")
-          .invokeNative(map, featureStateSelector(arena, selector), byteArrayView(arena, value))
-          as Int
-      )
+      mapTwoAddressStatusFunction("mln_map_set_feature_state")
+        .invokeNative(
+          map,
+          featureStateSelector(arena, selector),
+          byteArrayView(arena, value),
+          completion,
+        ) as Int
     }
   }
 
-  internal fun getMapFeatureState(map: NativeMap, selector: FeatureStateSelector): ByteArray =
+  internal fun getMapFeatureState(
+    map: NativeMap,
+    selector: FeatureStateSelector,
+  ): Deferred<ByteArray> =
     Arena.ofConfined().use { arena ->
-      val outSnapshot = arena.allocate(ValueLayout.JAVA_LONG)
-      outSnapshot.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(
-        mapTwoAddressStatusFunction("mln_map_get_feature_state")
-          .invokeNative(map, featureStateSelector(arena, selector), outSnapshot) as Int
-      )
-      ownedBuffer(NativeOwnedBuffer(outSnapshot.get(ValueLayout.JAVA_LONG, 0)))!!
-    }
-
-  internal fun removeMapFeatureState(map: NativeMap, selector: FeatureStateSelector) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapAddressStatusFunction("mln_map_remove_feature_state")
-          .invokeNative(map, featureStateSelector(arena, selector)) as Int
+      CompletionBridge.submit(
+        ::requiredBufferCompletion,
+        { completion ->
+          mapAddressStatusFunction("mln_map_get_feature_state")
+            .invokeNative(map, featureStateSelector(arena, selector), completion) as Int
+        },
       )
     }
-  }
 
-  internal fun addStyleSourceJson(map: NativeMap, sourceId: String, sourceJson: ByteArray) {
+  internal fun removeMapFeatureState(
+    map: NativeMap,
+    selector: FeatureStateSelector,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewAddressStatusFunction("mln_map_add_style_source_json")
-          .invokeNative(map, stringView(arena, sourceId), byteArrayView(arena, sourceJson)) as Int
-      )
+      mapAddressStatusFunction("mln_map_remove_feature_state")
+        .invokeNative(map, featureStateSelector(arena, selector), completion) as Int
     }
   }
 
-  internal fun removeStyleSource(map: NativeMap, sourceId: String): Boolean =
+  internal fun addStyleSourceJson(
+    map: NativeMap,
+    sourceId: String,
+    sourceJson: ByteArray,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      val outRemoved = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        mapStringViewAddressStatusFunction("mln_map_remove_style_source")
-          .invokeNative(map, stringView(arena, sourceId), outRemoved) as Int
-      )
-      outRemoved.get(ValueLayout.JAVA_BOOLEAN, 0)
+      mapStringViewAddressStatusFunction("mln_map_add_style_source_json")
+        .invokeNative(
+          map,
+          stringView(arena, sourceId),
+          byteArrayView(arena, sourceJson),
+          completion,
+        ) as Int
+    }
+  }
+
+  internal fun removeStyleSource(map: NativeMap, sourceId: String): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      Arena.ofConfined().use { arena ->
+        downcall("mln_map_remove_style_source")
+          .invokeNative(map, stringView(arena, sourceId), completion) as Int
+      }
     }
 
-  internal fun styleSourceExists(map: NativeMap, sourceId: String): Boolean =
-    Arena.ofConfined().use { arena ->
-      val outExists = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        mapStringViewAddressStatusFunction("mln_map_style_source_exists")
-          .invokeNative(map, stringView(arena, sourceId), outExists) as Int
-      )
-      outExists.get(ValueLayout.JAVA_BOOLEAN, 0)
-    }
-
-  internal fun styleSourceType(map: NativeMap, sourceId: String): SourceType? =
-    Arena.ofConfined().use { arena ->
-      val outType = arena.allocate(ValueLayout.JAVA_INT)
-      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        mapStringViewTwoAddressStatusFunction("mln_map_get_style_source_type")
-          .invokeNative(map, stringView(arena, sourceId), outType, outFound) as Int
-      )
-      if (outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
-        SourceType.fromNative(outType.get(ValueLayout.JAVA_INT, 0))
-      } else null
-    }
-
-  internal fun styleSourceInfo(map: NativeMap, sourceId: String): SourceInfo? =
+  internal fun styleSourceInfo(map: NativeMap, sourceId: String): Deferred<SourceInfo?> =
     Arena.ofConfined().use { arena ->
       val sourceIdView = stringView(arena, sourceId)
-      val outInfo = arena.allocate(STYLE_SOURCE_INFO_SIZE)
-      outInfo.set(
-        ValueLayout.JAVA_INT,
-        STYLE_SOURCE_INFO_SIZE_OFFSET,
-        STYLE_SOURCE_INFO_SIZE.toInt(),
-      )
-      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        mapStringViewTwoAddressStatusFunction("mln_map_get_style_source_info")
-          .invokeNative(map, sourceIdView, outInfo, outFound) as Int
-      )
-      if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
-        return@use null
-      }
-      val attribution =
-        if (outInfo.get(ValueLayout.JAVA_BOOLEAN, STYLE_SOURCE_INFO_HAS_ATTRIBUTION_OFFSET)) {
-          copyStyleSourceAttribution(
-            map,
-            sourceIdView,
-            outInfo.get(ValueLayout.JAVA_LONG, STYLE_SOURCE_INFO_ATTRIBUTION_SIZE_OFFSET),
-            arena,
-          ) ?: return@use null
-        } else null
-      val fields = outInfo.get(ValueLayout.JAVA_INT, STYLE_SOURCE_INFO_FIELDS_OFFSET)
-      val url =
-        if (fields and STYLE_SOURCE_INFO_URL != 0) {
-          copyStyleSourceUrl(
-            map,
-            sourceIdView,
-            outInfo.get(ValueLayout.JAVA_LONG, STYLE_SOURCE_INFO_URL_SIZE_OFFSET),
-            arena,
-          )
-        } else null
-      val tileJson =
-        if (fields and STYLE_SOURCE_INFO_TILEJSON != 0) {
-          TileJson(
-            styleSourceTileUrls(map, sourceIdView, arena),
-            outInfo.get(ValueLayout.JAVA_DOUBLE, STYLE_SOURCE_INFO_MIN_ZOOM_OFFSET),
-            outInfo.get(ValueLayout.JAVA_DOUBLE, STYLE_SOURCE_INFO_MAX_ZOOM_OFFSET),
-            TileScheme.fromNative(
-              outInfo.get(ValueLayout.JAVA_INT, STYLE_SOURCE_INFO_SCHEME_OFFSET)
-            ),
-            if (fields and STYLE_SOURCE_INFO_BOUNDS != 0)
-              latLngBounds(outInfo.asSlice(STYLE_SOURCE_INFO_BOUNDS_OFFSET, LAT_LNG_BOUNDS_SIZE))
-            else null,
-          )
-        } else null
-      SourceInfo(
-        SourceType.fromNative(outInfo.get(ValueLayout.JAVA_INT, STYLE_SOURCE_INFO_TYPE_OFFSET)),
-        outInfo.get(ValueLayout.JAVA_BOOLEAN, STYLE_SOURCE_INFO_IS_VOLATILE_OFFSET),
-        attribution,
-        url,
-        tileJson,
-        if (fields and STYLE_SOURCE_INFO_TILE_SIZE != 0)
-          Math.toIntExact(
-            Integer.toUnsignedLong(
-              outInfo.get(ValueLayout.JAVA_INT, STYLE_SOURCE_INFO_TILE_SIZE_OFFSET)
-            )
-          )
-        else null,
-        if (fields and STYLE_SOURCE_INFO_VECTOR_ENCODING != 0)
-          VectorTileEncoding.fromNative(
-            outInfo.get(ValueLayout.JAVA_INT, STYLE_SOURCE_INFO_VECTOR_ENCODING_OFFSET)
-          )
-        else null,
-        if (fields and STYLE_SOURCE_INFO_RASTER_ENCODING != 0)
-          RasterDemEncoding.fromNative(
-            outInfo.get(ValueLayout.JAVA_INT, STYLE_SOURCE_INFO_RASTER_ENCODING_OFFSET)
-          )
-        else null,
+      CompletionBridge.submit(
+        ::sourceInfoCompletion,
+        { completion ->
+          MapLibreNativeC.mln_map_get_style_source_info(map.raw, sourceIdView, completion)
+        },
       )
     }
 
-  internal fun setStyleSourceVolatile(map: NativeMap, sourceId: String, isVolatile: Boolean) {
+  internal fun setStyleSourceVolatile(
+    map: NativeMap,
+    sourceId: String,
+    isVolatile: Boolean,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewBooleanStatusFunction("mln_map_set_style_source_volatile")
-          .invokeNative(map, stringView(arena, sourceId), isVolatile) as Int
-      )
+      mapStringViewBooleanStatusFunction("mln_map_set_style_source_volatile")
+        .invokeNative(map, stringView(arena, sourceId), isVolatile, completion) as Int
     }
   }
 
-  internal fun styleSourceIds(map: NativeMap): List<String> =
+  internal fun styleSourceAttribution(map: NativeMap, sourceId: String): Deferred<String?> =
+    optionalSourceText(map, sourceId, MapLibreNativeC::mln_map_copy_style_source_attribution)
+
+  internal fun styleSourceUrl(map: NativeMap, sourceId: String): Deferred<String?> =
+    optionalSourceText(map, sourceId, MapLibreNativeC::mln_map_copy_style_source_url)
+
+  internal fun styleSourceTileUrls(map: NativeMap, sourceId: String): Deferred<List<String>?> =
     Arena.ofConfined().use { arena ->
-      val outList = arena.allocate(ValueLayout.JAVA_LONG)
-      outList.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(mapListStyleSourceIdsFunction().invokeNative(map, outList) as Int)
-      styleIdList(NativeStyleIdList(outList.get(ValueLayout.JAVA_LONG, 0)))
+      val sourceIdView = stringView(arena, sourceId)
+      CompletionBridge.submit(
+        { result ->
+          if (mln_completion_result.value_count(result) == 0L) null
+          else {
+            val value = completionValue(result, mln_style_source_tile_urls_result.sizeof())
+            stringViews(
+              mln_style_source_tile_urls_result.tile_urls(value),
+              mln_style_source_tile_urls_result.tile_url_count(value),
+            )
+          }
+        },
+        { completion ->
+          MapLibreNativeC.mln_map_get_style_source_tile_urls(map.raw, sourceIdView, completion)
+        },
+      )
     }
+
+  private fun optionalSourceText(
+    map: NativeMap,
+    sourceId: String,
+    submit: (Long, MemorySegment, MemorySegment) -> Int,
+  ): Deferred<String?> =
+    Arena.ofConfined().use { arena ->
+      val sourceIdView = stringView(arena, sourceId)
+      CompletionBridge.submit(
+        { result -> optionalBufferCompletion(result)?.let { String(it, StandardCharsets.UTF_8) } },
+        { completion -> submit(map.raw, sourceIdView, completion) },
+      )
+    }
+
+  internal fun styleSourceIds(map: NativeMap): Deferred<List<String>> =
+    CompletionBridge.submit(
+      ::stringViewsCompletion,
+      { completion -> MapLibreNativeC.mln_map_list_style_source_ids(map.raw, completion) },
+    )
 
   internal fun addGeoJsonSourceUrl(
     map: NativeMap,
     sourceId: String,
     url: String,
     options: GeoJsonSourceOptions?,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapTwoStringViewsAddressStatusFunction("mln_map_add_geojson_source_url")
-          .invokeNative(
-            map,
-            stringView(arena, sourceId),
-            stringView(arena, url),
-            geoJsonSourceOptions(arena, options),
-          ) as Int
-      )
+      mapTwoStringViewsAddressStatusFunction("mln_map_add_geojson_source_url")
+        .invokeNative(
+          map,
+          stringView(arena, sourceId),
+          stringView(arena, url),
+          geoJsonSourceOptions(arena, options),
+          completion,
+        ) as Int
     }
   }
 
@@ -792,21 +789,21 @@ internal object NativeAccess {
     map: NativeMap,
     sourceId: String,
     data: NativeGeoJsonSourceData,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewHandleStatusFunction("mln_map_add_geojson_source_data")
-          .invokeNative(map, stringView(arena, sourceId), data) as Int
-      )
+      mapStringViewHandleStatusFunction("mln_map_add_geojson_source_data")
+        .invokeNative(map, stringView(arena, sourceId), data, completion) as Int
     }
   }
 
-  internal fun setGeoJsonSourceUrl(map: NativeMap, sourceId: String, url: String) {
+  internal fun setGeoJsonSourceUrl(
+    map: NativeMap,
+    sourceId: String,
+    url: String,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapTwoStringViewsStatusFunction("mln_map_set_geojson_source_url")
-          .invokeNative(map, stringView(arena, sourceId), stringView(arena, url)) as Int
-      )
+      mapTwoStringViewsStatusFunction("mln_map_set_geojson_source_url")
+        .invokeNative(map, stringView(arena, sourceId), stringView(arena, url), completion) as Int
     }
   }
 
@@ -814,12 +811,10 @@ internal object NativeAccess {
     map: NativeMap,
     sourceId: String,
     data: NativeGeoJsonSourceData,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewHandleStatusFunction("mln_map_set_geojson_source_data")
-          .invokeNative(map, stringView(arena, sourceId), data) as Int
-      )
+      mapStringViewHandleStatusFunction("mln_map_set_geojson_source_data")
+        .invokeNative(map, stringView(arena, sourceId), data, completion) as Int
     }
   }
 
@@ -827,42 +822,41 @@ internal object NativeAccess {
     map: NativeMap,
     sourceId: String,
     enabled: Boolean,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewBooleanStatusFunction("mln_map_set_geojson_source_synchronous_tiling")
-          .invokeNative(map, stringView(arena, sourceId), enabled) as Int
-      )
+      mapStringViewBooleanStatusFunction("mln_map_set_geojson_source_synchronous_tiling")
+        .invokeNative(map, stringView(arena, sourceId), enabled, completion) as Int
     }
   }
 
-  internal fun addCustomGeometrySource(map: NativeMap, sourceId: String, options: MemorySegment) {
+  internal fun addCustomGeometrySource(
+    map: NativeMap,
+    sourceId: String,
+    options: MemorySegment,
+    completion: MemorySegment,
+  ): Int =
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewAddressStatusFunction("mln_map_add_custom_geometry_source")
-          .invokeNative(map, stringView(arena, sourceId), options) as Int
-      )
+      mapStringViewAddressStatusFunction("mln_map_add_custom_geometry_source")
+        .invokeNative(map, stringView(arena, sourceId), options, completion) as Int
     }
-  }
 
   internal fun setCustomGeometrySourceTileData(
     map: NativeMap,
     sourceId: String,
     tileId: CanonicalTileId,
     data: ByteArray,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewCanonicalTileIdAddressStatusFunction(
-            "mln_map_set_custom_geometry_source_tile_data"
-          )
-          .invokeNative(
-            map,
-            stringView(arena, sourceId),
-            canonicalTileId(arena, tileId),
-            byteArrayView(arena, data),
-          ) as Int
-      )
+      mapStringViewCanonicalTileIdAddressStatusFunction(
+          "mln_map_set_custom_geometry_source_tile_data"
+        )
+        .invokeNative(
+          map,
+          stringView(arena, sourceId),
+          canonicalTileId(arena, tileId),
+          byteArrayView(arena, data),
+          completion,
+        ) as Int
     }
   }
 
@@ -870,42 +864,42 @@ internal object NativeAccess {
     map: NativeMap,
     sourceId: String,
     tileId: CanonicalTileId,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewCanonicalTileIdStatusFunction("mln_map_invalidate_custom_geometry_source_tile")
-          .invokeNative(map, stringView(arena, sourceId), canonicalTileId(arena, tileId)) as Int
-      )
+      mapStringViewCanonicalTileIdStatusFunction("mln_map_invalidate_custom_geometry_source_tile")
+        .invokeNative(map, stringView(arena, sourceId), canonicalTileId(arena, tileId), completion)
+        as Int
     }
   }
 
-  internal fun addCustomMvtVectorSource(map: NativeMap, sourceId: String, options: MemorySegment) {
+  internal fun addCustomMvtVectorSource(
+    map: NativeMap,
+    sourceId: String,
+    options: MemorySegment,
+    completion: MemorySegment,
+  ): Int =
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewAddressStatusFunction("mln_map_add_custom_mvt_vector_source")
-          .invokeNative(map, stringView(arena, sourceId), options) as Int
-      )
+      mapStringViewAddressStatusFunction("mln_map_add_custom_mvt_vector_source")
+        .invokeNative(map, stringView(arena, sourceId), options, completion) as Int
     }
-  }
 
   internal fun setCustomMvtVectorSourceTileData(
     map: NativeMap,
     sourceId: String,
     tileId: CanonicalTileId,
     data: ByteArray,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewCanonicalTileIdAddressStatusFunction(
-            "mln_map_set_custom_mvt_vector_source_tile_data"
-          )
-          .invokeNative(
-            map,
-            stringView(arena, sourceId),
-            canonicalTileId(arena, tileId),
-            byteArrayView(arena, data),
-          ) as Int
-      )
+      mapStringViewCanonicalTileIdAddressStatusFunction(
+          "mln_map_set_custom_mvt_vector_source_tile_data"
+        )
+        .invokeNative(
+          map,
+          stringView(arena, sourceId),
+          canonicalTileId(arena, tileId),
+          byteArrayView(arena, data),
+          completion,
+        ) as Int
     }
   }
 
@@ -914,19 +908,18 @@ internal object NativeAccess {
     sourceId: String,
     tileId: CanonicalTileId,
     message: String,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewCanonicalTileIdAddressStatusFunction(
-            "mln_map_set_custom_mvt_vector_source_tile_error"
-          )
-          .invokeNative(
-            map,
-            stringView(arena, sourceId),
-            canonicalTileId(arena, tileId),
-            stringView(arena, message),
-          ) as Int
-      )
+      mapStringViewCanonicalTileIdAddressStatusFunction(
+          "mln_map_set_custom_mvt_vector_source_tile_error"
+        )
+        .invokeNative(
+          map,
+          stringView(arena, sourceId),
+          canonicalTileId(arena, tileId),
+          stringView(arena, message),
+          completion,
+        ) as Int
     }
   }
 
@@ -934,14 +927,11 @@ internal object NativeAccess {
     map: NativeMap,
     sourceId: String,
     tileId: CanonicalTileId,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewCanonicalTileIdStatusFunction(
-            "mln_map_invalidate_custom_mvt_vector_source_tile"
-          )
-          .invokeNative(map, stringView(arena, sourceId), canonicalTileId(arena, tileId)) as Int
-      )
+      mapStringViewCanonicalTileIdStatusFunction("mln_map_invalidate_custom_mvt_vector_source_tile")
+        .invokeNative(map, stringView(arena, sourceId), canonicalTileId(arena, tileId), completion)
+        as Int
     }
   }
 
@@ -949,12 +939,11 @@ internal object NativeAccess {
     map: NativeMap,
     sourceId: String,
     bounds: LatLngBounds,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewLatLngBoundsStatusFunction("mln_map_invalidate_custom_geometry_source_region")
-          .invokeNative(map, stringView(arena, sourceId), latLngBounds(arena, bounds)) as Int
-      )
+      mapStringViewLatLngBoundsStatusFunction("mln_map_invalidate_custom_geometry_source_region")
+        .invokeNative(map, stringView(arena, sourceId), latLngBounds(arena, bounds), completion)
+        as Int
     }
   }
 
@@ -963,8 +952,8 @@ internal object NativeAccess {
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ) {
-    addTileSourceUrl("mln_map_add_vector_source_url", map, sourceId, url, options)
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
+    addTileSourceUrl("mln_map_add_vector_source_url", map, sourceId, url, options, completion)
   }
 
   internal fun addVectorSourceTiles(
@@ -972,8 +961,8 @@ internal object NativeAccess {
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ) {
-    addTileSourceTiles("mln_map_add_vector_source_tiles", map, sourceId, tiles, options)
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
+    addTileSourceTiles("mln_map_add_vector_source_tiles", map, sourceId, tiles, options, completion)
   }
 
   internal fun addRasterSourceUrl(
@@ -981,8 +970,8 @@ internal object NativeAccess {
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ) {
-    addTileSourceUrl("mln_map_add_raster_source_url", map, sourceId, url, options)
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
+    addTileSourceUrl("mln_map_add_raster_source_url", map, sourceId, url, options, completion)
   }
 
   internal fun addRasterSourceTiles(
@@ -990,8 +979,8 @@ internal object NativeAccess {
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ) {
-    addTileSourceTiles("mln_map_add_raster_source_tiles", map, sourceId, tiles, options)
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
+    addTileSourceTiles("mln_map_add_raster_source_tiles", map, sourceId, tiles, options, completion)
   }
 
   internal fun addRasterDemSourceUrl(
@@ -999,8 +988,8 @@ internal object NativeAccess {
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ) {
-    addTileSourceUrl("mln_map_add_raster_dem_source_url", map, sourceId, url, options)
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
+    addTileSourceUrl("mln_map_add_raster_dem_source_url", map, sourceId, url, options, completion)
   }
 
   internal fun addRasterDemSourceTiles(
@@ -1008,8 +997,15 @@ internal object NativeAccess {
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ) {
-    addTileSourceTiles("mln_map_add_raster_dem_source_tiles", map, sourceId, tiles, options)
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
+    addTileSourceTiles(
+      "mln_map_add_raster_dem_source_tiles",
+      map,
+      sourceId,
+      tiles,
+      options,
+      completion,
+    )
   }
 
   internal fun setStyleImage(
@@ -1017,105 +1013,81 @@ internal object NativeAccess {
     imageId: String,
     image: PremultipliedRgba8Image,
     options: StyleImageOptions,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewTwoAddressStatusFunction("mln_map_set_style_image")
-          .invokeNative(
-            map,
-            stringView(arena, imageId),
-            premultipliedRgba8Image(arena, image),
-            styleImageOptions(arena, options),
-          ) as Int
-      )
+      mapStringViewTwoAddressStatusFunction("mln_map_set_style_image")
+        .invokeNative(
+          map,
+          stringView(arena, imageId),
+          premultipliedRgba8Image(arena, image),
+          styleImageOptions(arena, options),
+          completion,
+        ) as Int
     }
   }
 
-  internal fun removeStyleImage(map: NativeMap, imageId: String): Boolean =
-    Arena.ofConfined().use { arena ->
-      val outRemoved = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        mapStringViewAddressStatusFunction("mln_map_remove_style_image")
-          .invokeNative(map, stringView(arena, imageId), outRemoved) as Int
-      )
-      outRemoved.get(ValueLayout.JAVA_BOOLEAN, 0)
-    }
-
-  internal fun styleImageExists(map: NativeMap, imageId: String): Boolean =
-    Arena.ofConfined().use { arena ->
-      val outExists = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        mapStringViewAddressStatusFunction("mln_map_style_image_exists")
-          .invokeNative(map, stringView(arena, imageId), outExists) as Int
-      )
-      outExists.get(ValueLayout.JAVA_BOOLEAN, 0)
-    }
-
-  internal fun styleImageInfo(map: NativeMap, imageId: String): StyleImageInfo? =
-    Arena.ofConfined().use { arena ->
-      val outInfo = styleImageInfoDefault(arena)
-      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        mapStringViewTwoAddressStatusFunction("mln_map_get_style_image_info")
-          .invokeNative(map, stringView(arena, imageId), outInfo, outFound) as Int
-      )
-      if (outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) styleImageInfo(outInfo) else null
-    }
-
-  internal fun copyStyleImagePremultipliedRgba8(map: NativeMap, imageId: String): StyleImage? {
-    val info = styleImageInfo(map, imageId) ?: return null
-    return Arena.ofConfined().use { arena ->
-      val outPixels = arena.allocate(info.byteLength)
-      val outByteLength = arena.allocate(ValueLayout.JAVA_LONG)
-      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        mapStringViewAddressLongTwoAddressStatusFunction(
-            "mln_map_copy_style_image_premultiplied_rgba8"
-          )
-          .invokeNative(
-            map,
-            stringView(arena, imageId),
-            outPixels,
-            info.byteLength,
-            outByteLength,
-            outFound,
-          ) as Int
-      )
-      if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
-        return@use null
+  internal fun removeStyleImage(map: NativeMap, imageId: String): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      Arena.ofConfined().use { arena ->
+        downcall("mln_map_remove_style_image")
+          .invokeNative(map, stringView(arena, imageId), completion) as Int
       }
-      val byteLength = outByteLength.get(ValueLayout.JAVA_LONG, 0)
-      StyleImage(
-        PremultipliedRgba8Image(
-          info.width,
-          info.height,
-          info.stride,
-          copyBytes(outPixels, byteLength),
-        ),
-        info.pixelRatio,
-        info.sdf,
+    }
+
+  internal fun styleImageInfo(map: NativeMap, imageId: String): Deferred<StyleImageInfo?> =
+    Arena.ofConfined().use { arena ->
+      CompletionBridge.submit(
+        { result ->
+          if (mln_completion_result.value_count(result) == 0L) null
+          else
+            styleImageInfo(
+              mln_style_image_result.info(completionValue(result, mln_style_image_result.sizeof()))
+            )
+        },
+        { completion ->
+          MapLibreNativeC.mln_map_get_style_image_info(
+            map.raw,
+            stringView(arena, imageId),
+            completion,
+          )
+        },
       )
     }
-  }
+
+  internal fun copyStyleImagePremultipliedRgba8(
+    map: NativeMap,
+    imageId: String,
+  ): Deferred<ByteArray?> =
+    Arena.ofConfined().use { arena ->
+      CompletionBridge.submit(
+        ::optionalBufferCompletion,
+        { completion ->
+          MapLibreNativeC.mln_map_copy_style_image_premultiplied_rgba8(
+            map.raw,
+            stringView(arena, imageId),
+            completion,
+          )
+        },
+      )
+    }
 
   internal fun addImageSourceUrl(
     map: NativeMap,
     sourceId: String,
     coordinates: List<LatLng>,
     url: String,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     val coordinateSnapshot = coordinates.toList()
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewAddressLongStringViewStatusFunction("mln_map_add_image_source_url")
-          .invokeNative(
-            map,
-            stringView(arena, sourceId),
-            latLngArray(arena, coordinateSnapshot),
-            coordinateSnapshot.size.toLong(),
-            stringView(arena, url),
-          ) as Int
-      )
+      mapStringViewAddressLongStringViewStatusFunction("mln_map_add_image_source_url")
+        .invokeNative(
+          map,
+          stringView(arena, sourceId),
+          latLngArray(arena, coordinateSnapshot),
+          coordinateSnapshot.size.toLong(),
+          stringView(arena, url),
+          completion,
+        ) as Int
     }
   }
 
@@ -1124,28 +1096,29 @@ internal object NativeAccess {
     sourceId: String,
     coordinates: List<LatLng>,
     image: PremultipliedRgba8Image,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     val coordinateSnapshot = coordinates.toList()
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewAddressLongAddressStatusFunction("mln_map_add_image_source_image")
-          .invokeNative(
-            map,
-            stringView(arena, sourceId),
-            latLngArray(arena, coordinateSnapshot),
-            coordinateSnapshot.size.toLong(),
-            premultipliedRgba8Image(arena, image),
-          ) as Int
-      )
+      mapStringViewAddressLongAddressStatusFunction("mln_map_add_image_source_image")
+        .invokeNative(
+          map,
+          stringView(arena, sourceId),
+          latLngArray(arena, coordinateSnapshot),
+          coordinateSnapshot.size.toLong(),
+          premultipliedRgba8Image(arena, image),
+          completion,
+        ) as Int
     }
   }
 
-  internal fun setImageSourceUrl(map: NativeMap, sourceId: String, url: String) {
+  internal fun setImageSourceUrl(
+    map: NativeMap,
+    sourceId: String,
+    url: String,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapTwoStringViewsStatusFunction("mln_map_set_image_source_url")
-          .invokeNative(map, stringView(arena, sourceId), stringView(arena, url)) as Int
-      )
+      mapTwoStringViewsStatusFunction("mln_map_set_image_source_url")
+        .invokeNative(map, stringView(arena, sourceId), stringView(arena, url), completion) as Int
     }
   }
 
@@ -1153,13 +1126,15 @@ internal object NativeAccess {
     map: NativeMap,
     sourceId: String,
     image: PremultipliedRgba8Image,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewAddressStatusFunction("mln_map_set_image_source_image")
-          .invokeNative(map, stringView(arena, sourceId), premultipliedRgba8Image(arena, image))
-          as Int
-      )
+      mapStringViewAddressStatusFunction("mln_map_set_image_source_image")
+        .invokeNative(
+          map,
+          stringView(arena, sourceId),
+          premultipliedRgba8Image(arena, image),
+          completion,
+        ) as Int
     }
   }
 
@@ -1167,110 +1142,111 @@ internal object NativeAccess {
     map: NativeMap,
     sourceId: String,
     coordinates: List<LatLng>,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     val coordinateSnapshot = coordinates.toList()
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewAddressLongStatusFunction("mln_map_set_image_source_coordinates")
-          .invokeNative(
-            map,
-            stringView(arena, sourceId),
-            latLngArray(arena, coordinateSnapshot),
-            coordinateSnapshot.size.toLong(),
-          ) as Int
-      )
+      mapStringViewAddressLongStatusFunction("mln_map_set_image_source_coordinates")
+        .invokeNative(
+          map,
+          stringView(arena, sourceId),
+          latLngArray(arena, coordinateSnapshot),
+          coordinateSnapshot.size.toLong(),
+          completion,
+        ) as Int
     }
   }
 
-  internal fun imageSourceCoordinates(map: NativeMap, sourceId: String): List<LatLng>? =
+  internal fun imageSourceCoordinates(map: NativeMap, sourceId: String): Deferred<List<LatLng>?> =
     Arena.ofConfined().use { arena ->
-      val outCoordinates = arena.allocate(latLngLayout.byteSize() * IMAGE_SOURCE_COORDINATE_COUNT)
-      val outCoordinateCount = arena.allocate(ValueLayout.JAVA_LONG)
-      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        mapStringViewAddressLongTwoAddressStatusFunction("mln_map_get_image_source_coordinates")
-          .invokeNative(
-            map,
+      CompletionBridge.submit(
+        { result ->
+          val count = checkedInt(mln_completion_result.value_count(result))
+          if (count == 0) null
+          else latLngArray(completionValue(result, mln_lat_lng.sizeof() * count.toLong()), count)
+        },
+        { completion ->
+          MapLibreNativeC.mln_map_get_image_source_coordinates(
+            map.raw,
             stringView(arena, sourceId),
-            outCoordinates,
-            IMAGE_SOURCE_COORDINATE_COUNT.toLong(),
-            outCoordinateCount,
-            outFound,
-          ) as Int
+            completion,
+          )
+        },
       )
-      if (outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
-        latLngArray(
-          outCoordinates,
-          Math.toIntExact(outCoordinateCount.get(ValueLayout.JAVA_LONG, 0)),
-        )
-      } else null
     }
 
-  internal fun addStyleLayerJson(map: NativeMap, layerJson: ByteArray, beforeLayerId: String) {
+  internal fun addStyleLayerJson(
+    map: NativeMap,
+    layerJson: ByteArray,
+    beforeLayerId: String,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapAddressStringViewStatusFunction("mln_map_add_style_layer_json")
-          .invokeNative(map, byteArrayView(arena, layerJson), stringView(arena, beforeLayerId))
-          as Int
-      )
+      mapAddressStringViewStatusFunction("mln_map_add_style_layer_json")
+        .invokeNative(
+          map,
+          byteArrayView(arena, layerJson),
+          stringView(arena, beforeLayerId),
+          completion,
+        ) as Int
     }
   }
 
-  internal fun removeStyleLayer(map: NativeMap, layerId: String): Boolean =
-    Arena.ofConfined().use { arena ->
-      val outRemoved = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        mapStringViewAddressStatusFunction("mln_map_remove_style_layer")
-          .invokeNative(map, stringView(arena, layerId), outRemoved) as Int
-      )
-      outRemoved.get(ValueLayout.JAVA_BOOLEAN, 0)
+  internal fun removeStyleLayer(map: NativeMap, layerId: String): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      Arena.ofConfined().use { arena ->
+        downcall("mln_map_remove_style_layer")
+          .invokeNative(map, stringView(arena, layerId), completion) as Int
+      }
     }
 
-  internal fun styleLayerExists(map: NativeMap, layerId: String): Boolean =
+  internal fun styleLayerInfo(map: NativeMap, layerId: String): Deferred<LayerInfo?> =
     Arena.ofConfined().use { arena ->
-      val outExists = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        mapStringViewAddressStatusFunction("mln_map_style_layer_exists")
-          .invokeNative(map, stringView(arena, layerId), outExists) as Int
+      CompletionBridge.submit(
+        { result ->
+          if (mln_completion_result.value_count(result) == 0L) null
+          else {
+            val raw = completionValue(result, mln_style_layer_result.sizeof())
+            val info = mln_style_layer_result.info(raw)
+            LayerInfo(
+              stringView(mln_style_layer_info.type(info)),
+              mln_style_layer_info.min_zoom(info),
+              mln_style_layer_info.max_zoom(info),
+              StyleLayerVisibility.fromNative(mln_style_layer_info.visibility(info)),
+              optionalStringView(mln_style_layer_result.source_id(raw)),
+              optionalStringView(mln_style_layer_result.source_layer(raw)),
+            )
+          }
+        },
+        { completion ->
+          MapLibreNativeC.mln_map_get_style_layer_info(
+            map.raw,
+            stringView(arena, layerId),
+            completion,
+          )
+        },
       )
-      outExists.get(ValueLayout.JAVA_BOOLEAN, 0)
     }
 
-  internal fun styleLayerType(map: NativeMap, layerId: String): String? =
-    Arena.ofConfined().use { arena ->
-      val outType = arena.allocate(STRING_VIEW_SIZE)
-      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        mapStringViewTwoAddressStatusFunction("mln_map_get_style_layer_type")
-          .invokeNative(map, stringView(arena, layerId), outType, outFound) as Int
-      )
-      if (outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) stringView(outType) else null
-    }
-
-  internal fun styleLayerIds(map: NativeMap): List<String> =
-    Arena.ofConfined().use { arena ->
-      val outList = arena.allocate(ValueLayout.JAVA_LONG)
-      outList.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(mapListStyleLayerIdsFunction().invokeNative(map, outList) as Int)
-      styleIdList(NativeStyleIdList(outList.get(ValueLayout.JAVA_LONG, 0)))
-    }
+  internal fun styleLayerIds(map: NativeMap): Deferred<List<String>> =
+    CompletionBridge.submit(
+      ::stringViewsCompletion,
+      { completion -> MapLibreNativeC.mln_map_list_style_layer_ids(map.raw, completion) },
+    )
 
   internal fun addHillshadeLayer(
     map: NativeMap,
     layerId: String,
     sourceId: String,
     beforeLayerId: String,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapThreeStringViewsStatusFunction("mln_map_add_hillshade_layer")
-          .invokeNative(
-            map,
-            stringView(arena, layerId),
-            stringView(arena, sourceId),
-            stringView(arena, beforeLayerId),
-          ) as Int
-      )
+      mapThreeStringViewsStatusFunction("mln_map_add_hillshade_layer")
+        .invokeNative(
+          map,
+          stringView(arena, layerId),
+          stringView(arena, sourceId),
+          stringView(arena, beforeLayerId),
+          completion,
+        ) as Int
     }
   }
 
@@ -1279,26 +1255,28 @@ internal object NativeAccess {
     layerId: String,
     sourceId: String,
     beforeLayerId: String,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapThreeStringViewsStatusFunction("mln_map_add_color_relief_layer")
-          .invokeNative(
-            map,
-            stringView(arena, layerId),
-            stringView(arena, sourceId),
-            stringView(arena, beforeLayerId),
-          ) as Int
-      )
+      mapThreeStringViewsStatusFunction("mln_map_add_color_relief_layer")
+        .invokeNative(
+          map,
+          stringView(arena, layerId),
+          stringView(arena, sourceId),
+          stringView(arena, beforeLayerId),
+          completion,
+        ) as Int
     }
   }
 
-  internal fun addLocationIndicatorLayer(map: NativeMap, layerId: String, beforeLayerId: String) {
+  internal fun addLocationIndicatorLayer(
+    map: NativeMap,
+    layerId: String,
+    beforeLayerId: String,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapTwoStringViewsStatusFunction("mln_map_add_location_indicator_layer")
-          .invokeNative(map, stringView(arena, layerId), stringView(arena, beforeLayerId)) as Int
-      )
+      mapTwoStringViewsStatusFunction("mln_map_add_location_indicator_layer")
+        .invokeNative(map, stringView(arena, layerId), stringView(arena, beforeLayerId), completion)
+        as Int
     }
   }
 
@@ -1307,30 +1285,38 @@ internal object NativeAccess {
     layerId: String,
     coordinate: LatLng,
     altitude: Double,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewLatLngDoubleStatusFunction("mln_map_set_location_indicator_location")
-          .invokeNative(map, stringView(arena, layerId), latLng(coordinate, arena), altitude) as Int
-      )
+      mapStringViewLatLngDoubleStatusFunction("mln_map_set_location_indicator_location")
+        .invokeNative(
+          map,
+          stringView(arena, layerId),
+          latLng(coordinate, arena),
+          altitude,
+          completion,
+        ) as Int
     }
   }
 
-  internal fun setLocationIndicatorBearing(map: NativeMap, layerId: String, bearing: Double) {
+  internal fun setLocationIndicatorBearing(
+    map: NativeMap,
+    layerId: String,
+    bearing: Double,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewDoubleStatusFunction("mln_map_set_location_indicator_bearing")
-          .invokeNative(map, stringView(arena, layerId), bearing) as Int
-      )
+      mapStringViewDoubleStatusFunction("mln_map_set_location_indicator_bearing")
+        .invokeNative(map, stringView(arena, layerId), bearing, completion) as Int
     }
   }
 
-  internal fun setLocationIndicatorAccuracyRadius(map: NativeMap, layerId: String, radius: Double) {
+  internal fun setLocationIndicatorAccuracyRadius(
+    map: NativeMap,
+    layerId: String,
+    radius: Double,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewDoubleStatusFunction("mln_map_set_location_indicator_accuracy_radius")
-          .invokeNative(map, stringView(arena, layerId), radius) as Int
-      )
+      mapStringViewDoubleStatusFunction("mln_map_set_location_indicator_accuracy_radius")
+        .invokeNative(map, stringView(arena, layerId), radius, completion) as Int
     }
   }
 
@@ -1339,153 +1325,164 @@ internal object NativeAccess {
     layerId: String,
     imageKind: LocationIndicatorImageKind,
     imageId: String,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewIntStringViewStatusFunction("mln_map_set_location_indicator_image_name")
-          .invokeNative(
-            map,
+      mapStringViewIntStringViewStatusFunction("mln_map_set_location_indicator_image_name")
+        .invokeNative(
+          map,
+          stringView(arena, layerId),
+          imageKind.nativeValue,
+          stringView(arena, imageId),
+          completion,
+        ) as Int
+    }
+  }
+
+  internal fun moveStyleLayer(
+    map: NativeMap,
+    layerId: String,
+    beforeLayerId: String,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
+    Arena.ofConfined().use { arena ->
+      mapTwoStringViewsStatusFunction("mln_map_move_style_layer")
+        .invokeNative(map, stringView(arena, layerId), stringView(arena, beforeLayerId), completion)
+        as Int
+    }
+  }
+
+  internal fun styleLayerJson(map: NativeMap, layerId: String): Deferred<ByteArray?> =
+    Arena.ofConfined().use { arena ->
+      CompletionBridge.submit(
+        ::optionalBufferCompletion,
+        { completion ->
+          MapLibreNativeC.mln_map_get_style_layer_json(
+            map.raw,
             stringView(arena, layerId),
-            imageKind.nativeValue,
-            stringView(arena, imageId),
-          ) as Int
+            completion,
+          )
+        },
       )
+    }
+
+  internal fun setStyleLightJson(
+    map: NativeMap,
+    lightJson: ByteArray,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
+    Arena.ofConfined().use { arena ->
+      mapAddressStatusFunction("mln_map_set_style_light_json")
+        .invokeNative(map, byteArrayView(arena, lightJson), completion) as Int
     }
   }
 
-  internal fun moveStyleLayer(map: NativeMap, layerId: String, beforeLayerId: String) {
+  internal fun setStyleLightProperty(
+    map: NativeMap,
+    propertyName: String,
+    value: ByteArray,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapTwoStringViewsStatusFunction("mln_map_move_style_layer")
-          .invokeNative(map, stringView(arena, layerId), stringView(arena, beforeLayerId)) as Int
-      )
+      mapStringViewAddressStatusFunction("mln_map_set_style_light_property")
+        .invokeNative(map, stringView(arena, propertyName), byteArrayView(arena, value), completion)
+        as Int
     }
   }
 
-  internal fun styleLayerJson(map: NativeMap, layerId: String): ByteArray? =
+  internal fun styleLightProperty(map: NativeMap, propertyName: String): Deferred<ByteArray?> =
     Arena.ofConfined().use { arena ->
-      val outSnapshot = arena.allocate(ValueLayout.JAVA_LONG)
-      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      outSnapshot.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(
-        mapStringViewTwoAddressStatusFunction("mln_map_get_style_layer_json")
-          .invokeNative(map, stringView(arena, layerId), outSnapshot, outFound) as Int
+      CompletionBridge.submit(
+        ::optionalBufferCompletion,
+        { completion ->
+          MapLibreNativeC.mln_map_get_style_light_property(
+            map.raw,
+            stringView(arena, propertyName),
+            completion,
+          )
+        },
       )
-      if (outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
-        ownedBuffer(NativeOwnedBuffer(outSnapshot.get(ValueLayout.JAVA_LONG, 0)))
-      } else null
     }
 
-  internal fun setStyleLightJson(map: NativeMap, lightJson: ByteArray) {
+  internal fun setStyleTransitionOptions(
+    map: NativeMap,
+    options: StyleTransitionOptions,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapAddressStatusFunction("mln_map_set_style_light_json")
-          .invokeNative(map, byteArrayView(arena, lightJson)) as Int
-      )
+      mapAddressStatusFunction("mln_map_set_style_transition_options")
+        .invokeNative(map, styleTransitionOptions(arena, options), completion) as Int
     }
   }
 
-  internal fun setStyleLightProperty(map: NativeMap, propertyName: String, value: ByteArray) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewAddressStatusFunction("mln_map_set_style_light_property")
-          .invokeNative(map, stringView(arena, propertyName), byteArrayView(arena, value)) as Int
-      )
-    }
-  }
-
-  internal fun styleLightProperty(map: NativeMap, propertyName: String): ByteArray? =
-    Arena.ofConfined().use { arena ->
-      val outSnapshot = arena.allocate(ValueLayout.JAVA_LONG)
-      outSnapshot.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(
-        mapStringViewAddressStatusFunction("mln_map_get_style_light_property")
-          .invokeNative(map, stringView(arena, propertyName), outSnapshot) as Int
-      )
-      ownedBuffer(NativeOwnedBuffer(outSnapshot.get(ValueLayout.JAVA_LONG, 0)))
-    }
-
-  internal fun setStyleTransitionOptions(map: NativeMap, options: StyleTransitionOptions) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapAddressStatusFunction("mln_map_set_style_transition_options")
-          .invokeNative(map, styleTransitionOptions(arena, options)) as Int
-      )
-    }
-  }
-
-  internal fun styleTransitionOptions(map: NativeMap): StyleTransitionOptions =
-    Arena.ofConfined().use { arena ->
-      val outOptions = styleTransitionOptionsDefault(arena)
-      Status.check(
-        mapAddressStatusFunction("mln_map_get_style_transition_options")
-          .invokeNative(map, outOptions) as Int
-      )
-      styleTransitionOptions(outOptions)
-    }
+  internal fun styleTransitionOptions(map: NativeMap): Deferred<StyleTransitionOptions> =
+    CompletionBridge.submit(
+      { result ->
+        styleTransitionOptions(completionValue(result, mln_style_transition_options.sizeof()))
+      },
+      { completion -> MapLibreNativeC.mln_map_get_style_transition_options(map.raw, completion) },
+    )
 
   internal fun setLayerProperty(
     map: NativeMap,
     layerId: String,
     propertyName: String,
     value: ByteArray,
-  ) {
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapTwoStringViewsAddressStatusFunction("mln_map_set_layer_property")
-          .invokeNative(
-            map,
+      mapTwoStringViewsAddressStatusFunction("mln_map_set_layer_property")
+        .invokeNative(
+          map,
+          stringView(arena, layerId),
+          stringView(arena, propertyName),
+          byteArrayView(arena, value),
+          completion,
+        ) as Int
+    }
+  }
+
+  internal fun layerProperty(
+    map: NativeMap,
+    layerId: String,
+    propertyName: String,
+  ): Deferred<ByteArray?> =
+    Arena.ofConfined().use { arena ->
+      CompletionBridge.submit(
+        ::optionalBufferCompletion,
+        { completion ->
+          MapLibreNativeC.mln_map_get_layer_property(
+            map.raw,
             stringView(arena, layerId),
             stringView(arena, propertyName),
-            byteArrayView(arena, value),
-          ) as Int
+            completion,
+          )
+        },
       )
+    }
+
+  internal fun setLayerFilter(
+    map: NativeMap,
+    layerId: String,
+    filter: ByteArray,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
+    Arena.ofConfined().use { arena ->
+      mapStringViewAddressStatusFunction("mln_map_set_layer_filter")
+        .invokeNative(map, stringView(arena, layerId), byteArrayView(arena, filter), completion)
+        as Int
     }
   }
 
-  internal fun layerProperty(map: NativeMap, layerId: String, propertyName: String): ByteArray? =
-    Arena.ofConfined().use { arena ->
-      val outSnapshot = arena.allocate(ValueLayout.JAVA_LONG)
-      outSnapshot.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(
-        mapTwoStringViewsAddressStatusFunction("mln_map_get_layer_property")
-          .invokeNative(
-            map,
-            stringView(arena, layerId),
-            stringView(arena, propertyName),
-            outSnapshot,
-          ) as Int
-      )
-      ownedBuffer(NativeOwnedBuffer(outSnapshot.get(ValueLayout.JAVA_LONG, 0)))
-    }
-
-  internal fun setLayerFilter(map: NativeMap, layerId: String, filter: ByteArray) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
+  internal fun clearLayerFilter(map: NativeMap, layerId: String): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      Arena.ofConfined().use { arena ->
         mapStringViewAddressStatusFunction("mln_map_set_layer_filter")
-          .invokeNative(map, stringView(arena, layerId), byteArrayView(arena, filter)) as Int
-      )
+          .invokeNative(map, stringView(arena, layerId), MemorySegment.NULL, completion) as Int
+      }
     }
-  }
 
-  internal fun clearLayerFilter(map: NativeMap, layerId: String) {
+  internal fun layerFilter(map: NativeMap, layerId: String): Deferred<ByteArray?> =
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewAddressStatusFunction("mln_map_set_layer_filter")
-          .invokeNative(map, stringView(arena, layerId), MemorySegment.NULL) as Int
+      CompletionBridge.submit(
+        ::optionalBufferCompletion,
+        { completion ->
+          MapLibreNativeC.mln_map_get_layer_filter(map.raw, stringView(arena, layerId), completion)
+        },
       )
-    }
-  }
-
-  internal fun layerFilter(map: NativeMap, layerId: String): ByteArray? =
-    Arena.ofConfined().use { arena ->
-      val outSnapshot = arena.allocate(ValueLayout.JAVA_LONG)
-      outSnapshot.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(
-        mapStringViewAddressStatusFunction("mln_map_get_layer_filter")
-          .invokeNative(map, stringView(arena, layerId), outSnapshot) as Int
-      )
-      ownedBuffer(NativeOwnedBuffer(outSnapshot.get(ValueLayout.JAVA_LONG, 0)))
     }
 
   private fun stretchArray(arena: Arena, stretches: List<ImageStretch>): MemorySegment {
@@ -1499,56 +1496,34 @@ internal object NativeAccess {
     return array
   }
 
-  /**
-   * Probes the required interval counts, then copies. Null arrays with zero capacity are a size
-   * probe the C API answers with OK.
-   */
   internal fun styleImageStretches(
     map: NativeMap,
     imageId: String,
-  ): Pair<List<ImageStretch>, List<ImageStretch>>? =
+  ): Deferred<Pair<List<ImageStretch>, List<ImageStretch>>?> =
     Arena.ofConfined().use { arena ->
-      val function = downcall("mln_map_copy_style_image_stretches")
-      val outXCount = arena.allocate(ValueLayout.JAVA_LONG)
-      val outYCount = arena.allocate(ValueLayout.JAVA_LONG)
-      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        function.invokeNative(
-          map,
-          stringView(arena, imageId),
-          MemorySegment.NULL,
-          0L,
-          outXCount,
-          MemorySegment.NULL,
-          0L,
-          outYCount,
-          outFound,
-        ) as Int
+      CompletionBridge.submit(
+        { result ->
+          if (mln_completion_result.value_count(result) == 0L) null
+          else {
+            val value = completionValue(result, mln_style_image_stretches_result.sizeof())
+            readStretches(
+              mln_style_image_stretches_result.stretch_x(value),
+              mln_style_image_stretches_result.stretch_x_count(value),
+            ) to
+              readStretches(
+                mln_style_image_stretches_result.stretch_y(value),
+                mln_style_image_stretches_result.stretch_y_count(value),
+              )
+          }
+        },
+        { completion ->
+          MapLibreNativeC.mln_map_copy_style_image_stretches(
+            map.raw,
+            stringView(arena, imageId),
+            completion,
+          )
+        },
       )
-      if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
-        return@use null
-      }
-
-      val xCount = outXCount.get(ValueLayout.JAVA_LONG, 0)
-      val yCount = outYCount.get(ValueLayout.JAVA_LONG, 0)
-      val rawX =
-        if (xCount == 0L) MemorySegment.NULL else arena.allocate(IMAGE_STRETCH_SIZE * xCount)
-      val rawY =
-        if (yCount == 0L) MemorySegment.NULL else arena.allocate(IMAGE_STRETCH_SIZE * yCount)
-      Status.check(
-        function.invokeNative(
-          map,
-          stringView(arena, imageId),
-          rawX,
-          xCount,
-          outXCount,
-          rawY,
-          yCount,
-          outYCount,
-          outFound,
-        ) as Int
-      )
-      readStretches(rawX, xCount) to readStretches(rawY, yCount)
     }
 
   private fun readStretches(array: MemorySegment, count: Long): List<ImageStretch> =
@@ -1560,442 +1535,314 @@ internal object NativeAccess {
       )
     }
 
-  internal fun setLayerSourceLayer(map: NativeMap, layerId: String, sourceLayer: String) {
+  internal fun setLayerSourceLayer(
+    map: NativeMap,
+    layerId: String,
+    sourceLayer: String,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapTwoStringViewsStatusFunction("mln_map_set_layer_source_layer")
-          .invokeNative(map, stringView(arena, layerId), stringView(arena, sourceLayer)) as Int
-      )
+      mapTwoStringViewsStatusFunction("mln_map_set_layer_source_layer")
+        .invokeNative(
+          map.raw,
+          stringView(arena, layerId),
+          stringView(arena, sourceLayer),
+          completion,
+        ) as Int
     }
   }
 
-  internal fun layerSourceLayer(map: NativeMap, layerId: String): String =
-    copyLayerText(map, layerId, "mln_map_copy_layer_source_layer")
+  internal fun layerSourceLayer(map: NativeMap, layerId: String): Deferred<String> =
+    layerText(map, layerId, MapLibreNativeC::mln_map_copy_layer_source_layer)
 
-  internal fun setLayerSourceId(map: NativeMap, layerId: String, sourceId: String) {
+  internal fun setLayerSourceId(
+    map: NativeMap,
+    layerId: String,
+    sourceId: String,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapTwoStringViewsStatusFunction("mln_map_set_layer_source_id")
-          .invokeNative(map, stringView(arena, layerId), stringView(arena, sourceId)) as Int
-      )
+      mapTwoStringViewsStatusFunction("mln_map_set_layer_source_id")
+        .invokeNative(map.raw, stringView(arena, layerId), stringView(arena, sourceId), completion)
+        as Int
     }
   }
 
-  internal fun layerSourceId(map: NativeMap, layerId: String): String =
-    copyLayerText(map, layerId, "mln_map_copy_layer_source_id")
+  internal fun layerSourceId(map: NativeMap, layerId: String): Deferred<String> =
+    layerText(map, layerId, MapLibreNativeC::mln_map_copy_layer_source_id)
 
-  /**
-   * Probes the required length, then copies. A null buffer with zero capacity is a size probe the C
-   * API answers with OK.
-   */
-  internal fun loadedStyleJson(map: NativeMap): ByteArray =
-    copyMapBytes(map, "mln_map_copy_loaded_style_json")
+  internal fun loadedStyleJson(map: NativeMap): Deferred<ByteArray> =
+    styleBuffer(map, MapLibreNativeC::mln_map_loaded_style_json)
 
-  internal fun styleUrl(map: NativeMap): String = copyMapText(map, "mln_map_copy_style_url")
-
-  private fun copyMapBytes(map: NativeMap, name: String): ByteArray =
-    Arena.ofConfined().use { arena ->
-      val function = downcall(name)
-      val outSize = arena.allocate(ValueLayout.JAVA_LONG)
-      Status.check(function.invokeNative(map, MemorySegment.NULL, 0L, outSize) as Int)
-      val required = outSize.get(ValueLayout.JAVA_LONG, 0)
-      if (required == 0L) return@use byteArrayOf()
-      val buffer = arena.allocate(required)
-      val outCopied = arena.allocate(ValueLayout.JAVA_LONG)
-      Status.check(function.invokeNative(map, buffer, required, outCopied) as Int)
-      buffer.asSlice(0, outCopied.get(ValueLayout.JAVA_LONG, 0)).toArray(ValueLayout.JAVA_BYTE)
-    }
-
-  private fun copyMapText(map: NativeMap, name: String): String =
-    Arena.ofConfined().use { arena ->
-      val function = downcall(name)
-      val outSize = arena.allocate(ValueLayout.JAVA_LONG)
-      Status.check(function.invokeNative(map, MemorySegment.NULL, 0L, outSize) as Int)
-      val required = outSize.get(ValueLayout.JAVA_LONG, 0)
-      if (required == 0L) {
-        ""
-      } else {
-        val buffer = arena.allocate(required)
-        val outCopied = arena.allocate(ValueLayout.JAVA_LONG)
-        Status.check(function.invokeNative(map, buffer, required, outCopied) as Int)
-        val copied = outCopied.get(ValueLayout.JAVA_LONG, 0)
-        buffer.asSlice(0, copied).toArray(ValueLayout.JAVA_BYTE).decodeToString()
-      }
-    }
-
-  private fun copyLayerText(map: NativeMap, layerId: String, name: String): String =
-    Arena.ofConfined().use { arena ->
-      val function = mapStringViewAddressLongAddressStatusFunction(name)
-      val outSize = arena.allocate(ValueLayout.JAVA_LONG)
-      Status.check(
-        function.invokeNative(map, stringView(arena, layerId), MemorySegment.NULL, 0L, outSize)
-          as Int
-      )
-      val required = outSize.get(ValueLayout.JAVA_LONG, 0)
-      if (required == 0L) {
-        ""
-      } else {
-        val buffer = arena.allocate(required)
-        val outCopied = arena.allocate(ValueLayout.JAVA_LONG)
-        Status.check(
-          function.invokeNative(map, stringView(arena, layerId), buffer, required, outCopied) as Int
-        )
-        val copied = outCopied.get(ValueLayout.JAVA_LONG, 0)
-        buffer.asSlice(0, copied).toArray(ValueLayout.JAVA_BYTE).decodeToString()
-      }
-    }
-
-  internal fun setLayerMinZoom(map: NativeMap, layerId: String, minZoom: Double) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewDoubleStatusFunction("mln_map_set_layer_min_zoom")
-          .invokeNative(map, stringView(arena, layerId), minZoom) as Int
-      )
-    }
-  }
-
-  internal fun layerMinZoom(map: NativeMap, layerId: String): Double =
-    layerZoom(map, layerId, "mln_map_get_layer_min_zoom")
-
-  internal fun setLayerMaxZoom(map: NativeMap, layerId: String, maxZoom: Double) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewDoubleStatusFunction("mln_map_set_layer_max_zoom")
-          .invokeNative(map, stringView(arena, layerId), maxZoom) as Int
-      )
-    }
-  }
-
-  internal fun layerMaxZoom(map: NativeMap, layerId: String): Double =
-    layerZoom(map, layerId, "mln_map_get_layer_max_zoom")
-
-  private fun layerZoom(map: NativeMap, layerId: String, name: String): Double =
-    Arena.ofConfined().use { arena ->
-      val outZoom = arena.allocate(ValueLayout.JAVA_DOUBLE)
-      Status.check(
-        mapStringViewAddressStatusFunction(name)
-          .invokeNative(map, stringView(arena, layerId), outZoom) as Int
-      )
-      outZoom.get(ValueLayout.JAVA_DOUBLE, 0)
-    }
-
-  internal fun setLayerVisibility(map: NativeMap, layerId: String, visibility: Int) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewIntStatusFunction("mln_map_set_layer_visibility")
-          .invokeNative(map, stringView(arena, layerId), visibility) as Int
-      )
-    }
-  }
-
-  internal fun layerVisibility(map: NativeMap, layerId: String): Int =
-    Arena.ofConfined().use { arena ->
-      val outVisibility = arena.allocate(ValueLayout.JAVA_INT)
-      Status.check(
-        mapStringViewAddressStatusFunction("mln_map_get_layer_visibility")
-          .invokeNative(map, stringView(arena, layerId), outVisibility) as Int
-      )
-      outVisibility.get(ValueLayout.JAVA_INT, 0)
-    }
-
-  internal fun requestRepaint(map: NativeMap) {
-    Status.check(mapStatusFunction("mln_map_request_repaint").invokeNative(map) as Int)
-  }
-
-  internal fun requestStillImage(map: NativeMap) {
-    Status.check(mapStatusFunction("mln_map_request_still_image").invokeNative(map) as Int)
-  }
-
-  internal fun setDebugOptions(map: NativeMap, options: Set<DebugOption>) {
-    val mask = options.fold(0) { acc, option -> acc or option.nativeMask }
-    Status.check(mapIntStatusFunction("mln_map_set_debug_options").invokeNative(map, mask) as Int)
-  }
-
-  internal fun debugOptions(map: NativeMap): Set<DebugOption> =
-    Arena.ofConfined().use { arena ->
-      val outOptions = arena.allocate(ValueLayout.JAVA_INT)
-      Status.check(
-        mapAddressStatusFunction("mln_map_get_debug_options").invokeNative(map, outOptions) as Int
-      )
-      debugOptions(outOptions.get(ValueLayout.JAVA_INT, 0))
-    }
-
-  internal fun setRenderingStatsViewEnabled(map: NativeMap, enabled: Boolean) {
-    Status.check(
-      mapBooleanStatusFunction("mln_map_set_rendering_stats_view_enabled")
-        .invokeNative(map, enabled) as Int
+  internal fun styleUrl(map: NativeMap): Deferred<String> =
+    CompletionBridge.submit(
+      { result -> String(requiredBufferCompletion(result), StandardCharsets.UTF_8) },
+      { completion -> MapLibreNativeC.mln_map_style_url(map.raw, completion) },
     )
-  }
 
-  internal fun renderingStatsViewEnabled(map: NativeMap): Boolean =
-    Arena.ofConfined().use { arena ->
-      val outEnabled = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        mapAddressStatusFunction("mln_map_get_rendering_stats_view_enabled")
-          .invokeNative(map, outEnabled) as Int
-      )
-      outEnabled.get(ValueLayout.JAVA_BOOLEAN, 0)
+  private fun styleBuffer(
+    map: NativeMap,
+    submit: (Long, MemorySegment) -> Int,
+  ): Deferred<ByteArray> =
+    CompletionBridge.submit(::requiredBufferCompletion) { completion ->
+      submit(map.raw, completion)
     }
 
-  internal fun isFullyLoaded(map: NativeMap): Boolean =
+  private fun layerText(
+    map: NativeMap,
+    layerId: String,
+    submit: (Long, MemorySegment, MemorySegment) -> Int,
+  ): Deferred<String> =
     Arena.ofConfined().use { arena ->
-      val outLoaded = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        mapAddressStatusFunction("mln_map_is_fully_loaded").invokeNative(map, outLoaded) as Int
-      )
-      outLoaded.get(ValueLayout.JAVA_BOOLEAN, 0)
-    }
-
-  internal fun dumpDebugLogs(map: NativeMap) {
-    Status.check(mapStatusFunction("mln_map_dump_debug_logs").invokeNative(map) as Int)
-  }
-
-  internal fun mapSize(map: NativeMap): MapSize =
-    Arena.ofConfined().use { arena ->
-      val outWidth = arena.allocate(ValueLayout.JAVA_INT)
-      val outHeight = arena.allocate(ValueLayout.JAVA_INT)
-      val outScaleFactor = arena.allocate(ValueLayout.JAVA_DOUBLE)
-      Status.check(
-        mapAddressAddressAddressStatusFunction("mln_map_get_size")
-          .invokeNative(map, outWidth, outHeight, outScaleFactor) as Int
-      )
-      MapSize(
-        outWidth.get(ValueLayout.JAVA_INT, 0),
-        outHeight.get(ValueLayout.JAVA_INT, 0),
-        outScaleFactor.get(ValueLayout.JAVA_DOUBLE, 0),
+      CompletionBridge.submit(
+        { result -> String(requiredBufferCompletion(result), StandardCharsets.UTF_8) },
+        { completion -> submit(map.raw, stringView(arena, layerId), completion) },
       )
     }
 
-  internal fun viewportOptions(map: NativeMap): ViewportOptions =
+  internal fun setLayerMinZoom(
+    map: NativeMap,
+    layerId: String,
+    minZoom: Double,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      val outOptions = viewportOptionsDefault(arena)
-      Status.check(
-        mapAddressStatusFunction("mln_map_get_viewport_options").invokeNative(map, outOptions)
-          as Int
-      )
-      readViewportOptions(outOptions)
-    }
-
-  internal fun setViewportOptions(map: NativeMap, options: ViewportOptions) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapAddressStatusFunction("mln_map_set_viewport_options")
-          .invokeNative(map, viewportOptions(arena, options)) as Int
-      )
+      mapStringViewDoubleStatusFunction("mln_map_set_layer_min_zoom")
+        .invokeNative(map, stringView(arena, layerId), minZoom, completion) as Int
     }
   }
 
-  internal fun tileOptions(map: NativeMap): TileOptions =
+  internal fun setLayerMaxZoom(
+    map: NativeMap,
+    layerId: String,
+    maxZoom: Double,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      val outOptions = tileOptionsDefault(arena)
-      Status.check(
-        mapAddressStatusFunction("mln_map_get_tile_options").invokeNative(map, outOptions) as Int
-      )
-      readTileOptions(outOptions)
-    }
-
-  internal fun setTileOptions(map: NativeMap, options: TileOptions) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapAddressStatusFunction("mln_map_set_tile_options")
-          .invokeNative(map, tileOptions(arena, options)) as Int
-      )
+      mapStringViewDoubleStatusFunction("mln_map_set_layer_max_zoom")
+        .invokeNative(map.raw, stringView(arena, layerId), maxZoom, completion) as Int
     }
   }
 
-  internal fun projectionMode(map: NativeMap): ProjectionModeOptions =
+  internal fun setLayerVisibility(
+    map: NativeMap,
+    layerId: String,
+    visibility: Int,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
     Arena.ofConfined().use { arena ->
-      val outMode = projectionModeDefault(arena)
-      Status.check(
-        mapAddressStatusFunction("mln_map_get_projection_mode").invokeNative(map, outMode) as Int
-      )
-      projectionModeOptions(outMode)
-    }
-
-  internal fun setProjectionMode(map: NativeMap, mode: ProjectionModeOptions) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapAddressStatusFunction("mln_map_set_projection_mode")
-          .invokeNative(map, projectionModeOptions(arena, mode)) as Int
-      )
+      mapStringViewIntStatusFunction("mln_map_set_layer_visibility")
+        .invokeNative(map, stringView(arena, layerId), visibility, completion) as Int
     }
   }
 
-  internal fun camera(map: NativeMap): CameraOptions =
+  internal fun requestRepaint(map: NativeMap): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      MapLibreNativeC.mln_map_request_repaint(map.raw, completion)
+    }
+
+  internal fun requestStillImage(map: NativeMap): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      MapLibreNativeC.mln_map_request_still_image(map.raw, completion)
+    }
+
+  internal fun mapSnapshot(map: NativeMap): MapSnapshot =
+    Arena.ofConfined().use { arena ->
+      val snapshot = mln_map_snapshot.allocate(arena)
+      mln_map_snapshot.size(snapshot, mln_map_snapshot.sizeof().toInt())
+      Status.check(MapLibreNativeC.mln_map_snapshot_get(map.raw, snapshot))
+      val extent = mln_map_snapshot.logical_extent(snapshot)
+      MapSnapshot(
+        generation = mln_map_snapshot.generation(snapshot),
+        camera = cameraOptions(mln_map_snapshot.camera(snapshot)),
+        size =
+          MapSize(
+            mln_logical_extent.width(extent),
+            mln_logical_extent.height(extent),
+            mln_logical_extent.scale_factor(extent),
+          ),
+        projectionMode = projectionModeOptions(mln_map_snapshot.projection_mode(snapshot)),
+        viewportOptions = readViewportOptions(mln_map_snapshot.viewport(snapshot)),
+        debugOptions = debugOptions(mln_map_snapshot.debug_options(snapshot)),
+        isFullyLoaded = mln_map_snapshot.fully_loaded(snapshot),
+        renderingStatsViewEnabled = mln_map_snapshot.rendering_stats_view_enabled(snapshot),
+        repaintDemand = mln_map_snapshot.repaint_demand(snapshot),
+        gestureInProgress = mln_map_snapshot.gesture_in_progress(snapshot),
+        eventMask = RuntimeEventMask(mln_map_snapshot.event_mask(snapshot)),
+        latestRenderUpdateGeneration = mln_map_snapshot.latest_render_update_generation(snapshot),
+        tileOptions = readTileOptions(mln_map_snapshot.tile(snapshot)),
+        bounds = boundOptions(mln_map_snapshot.bounds(snapshot)),
+        freeCameraOptions = readFreeCameraOptions(mln_map_snapshot.free_camera(snapshot)),
+      )
+    }
+
+  internal fun setDebugOptions(
+    map: NativeMap,
+    options: Set<DebugOption>,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
+    MapLibreNativeC.mln_map_set_debug_options(map.raw, debugOptionMask(options), completion)
+  }
+
+  internal fun setRenderingStatsViewEnabled(
+    map: NativeMap,
+    enabled: Boolean,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
+    MapLibreNativeC.mln_map_set_rendering_stats_view_enabled(map.raw, enabled, completion)
+  }
+
+  internal fun setViewportOptions(
+    map: NativeMap,
+    options: ViewportOptions,
+  ): Deferred<CommandCompletion> =
+    Arena.ofConfined().use { arena ->
+      val native = viewportOptions(arena, options)
+      CompletionBridge.command { completion ->
+        MapLibreNativeC.mln_map_set_viewport_options(map.raw, native, completion)
+      }
+    }
+
+  internal fun setTileOptions(map: NativeMap, options: TileOptions): Deferred<CommandCompletion> =
+    Arena.ofConfined().use { arena ->
+      val native = tileOptions(arena, options)
+      CompletionBridge.command { completion ->
+        MapLibreNativeC.mln_map_set_tile_options(map.raw, native, completion)
+      }
+    }
+
+  internal fun setBounds(map: NativeMap, options: BoundOptions): Deferred<CommandCompletion> =
+    Arena.ofConfined().use { arena ->
+      val native = boundOptions(arena, options)
+      CompletionBridge.command { completion ->
+        MapLibreNativeC.mln_map_set_bounds(map.raw, native, completion)
+      }
+    }
+
+  internal fun setFreeCameraOptions(
+    map: NativeMap,
+    options: FreeCameraOptions,
+  ): Deferred<CommandCompletion> =
+    Arena.ofConfined().use { arena ->
+      val native = freeCameraOptions(arena, options)
+      CompletionBridge.command { completion ->
+        MapLibreNativeC.mln_map_set_free_camera_options(map.raw, native, completion)
+      }
+    }
+
+  internal fun resizeMap(map: NativeMap, size: MapSize): Deferred<CommandCompletion> =
+    Arena.ofConfined().use { arena ->
+      val extent = mln_logical_extent.allocate(arena)
+      mln_logical_extent.width(extent, size.width)
+      mln_logical_extent.height(extent, size.height)
+      mln_logical_extent.scale_factor(extent, size.scaleFactor)
+      CompletionBridge.command { completion ->
+        downcall("mln_map_resize").invokeNative(map.raw, extent, completion) as Int
+      }
+    }
+
+  internal fun cameraSnapshot(map: NativeMap): CameraSnapshot =
     Arena.ofConfined().use { arena ->
       val outCamera = cameraOptionsDefault(arena)
-      Status.check(
-        mapAddressStatusFunction("mln_map_get_camera").invokeNative(map, outCamera) as Int
-      )
-      cameraOptions(outCamera)
+      val outGeneration = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(MapLibreNativeC.mln_map_camera_snapshot_get(map.raw, outCamera, outGeneration))
+      CameraSnapshot(outGeneration.get(ValueLayout.JAVA_LONG, 0), cameraOptions(outCamera))
     }
 
-  internal fun jumpTo(map: NativeMap, camera: CameraOptions) {
+  internal fun updateCamera(map: NativeMap, update: CameraUpdate): Deferred<CommandCompletion> =
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapAddressStatusFunction("mln_map_jump_to").invokeNative(map, cameraOptions(arena, camera))
-          as Int
-      )
+      val nativeUpdate = MapLibreNativeC.mln_camera_update_default(arena)
+      mln_camera_update.mode(nativeUpdate, update.mode.nativeValue)
+      mln_camera_update.camera(nativeUpdate, cameraOptions(arena, update.camera))
+      mln_camera_update.animation(nativeUpdate, animationOptions(arena, update.animation))
+      mln_camera_update.gesture_phase(nativeUpdate, update.gesturePhase.nativeValue)
+      CompletionBridge.command { completion ->
+        MapLibreNativeC.mln_map_update_camera(map.raw, nativeUpdate, completion)
+      }
     }
-  }
 
-  internal fun easeTo(map: NativeMap, camera: CameraOptions, animation: AnimationOptions?) {
-    mapCameraAnimationCommand("mln_map_ease_to", map, camera, animation)
-  }
+  internal fun applyCameraDelta(map: NativeMap, delta: CameraDelta): Deferred<CommandCompletion> =
+    Arena.ofConfined().use { arena ->
+      val nativeDelta = MapLibreNativeC.mln_camera_delta_default(arena)
+      mln_camera_delta.kind(nativeDelta, delta.kind.nativeValue)
+      mln_camera_delta.offset(nativeDelta, screenPoint(delta.offset, arena))
+      mln_camera_delta.amount(nativeDelta, delta.amount)
+      mln_camera_delta.has_anchor(nativeDelta, delta.anchor != null)
+      delta.anchor?.let { mln_camera_delta.anchor(nativeDelta, screenPoint(it, arena)) }
+      mln_camera_delta.animation(nativeDelta, animationOptions(arena, delta.animation))
+      CompletionBridge.command { completion ->
+        MapLibreNativeC.mln_map_apply_camera_delta(map.raw, nativeDelta, completion)
+      }
+    }
 
-  internal fun flyTo(map: NativeMap, camera: CameraOptions, animation: AnimationOptions?) {
-    mapCameraAnimationCommand("mln_map_fly_to", map, camera, animation)
-  }
-
-  internal fun moveBy(map: NativeMap, deltaX: Double, deltaY: Double) {
-    Status.check(
-      mapDoubleDoubleStatusFunction("mln_map_move_by").invokeNative(map, deltaX, deltaY) as Int
+  internal fun queryCamera(map: NativeMap): Deferred<CameraSnapshot> =
+    CompletionBridge.submit(
+      { completion ->
+        val result = completionValue(completion, mln_camera_query_result.sizeof())
+        CameraSnapshot(
+          mln_camera_query_result.generation(result),
+          cameraOptions(mln_camera_query_result.camera(result)),
+        )
+      },
+      { completion -> MapLibreNativeC.mln_map_camera_query(map.raw, completion) },
     )
-  }
 
-  internal fun moveByAnimated(
+  internal fun cancelTransitions(map: NativeMap): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      MapLibreNativeC.mln_map_cancel_transitions(map.raw, completion)
+    }
+
+  internal fun dumpDebugLogs(map: NativeMap): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      MapLibreNativeC.mln_map_dump_debug_logs(map.raw, completion)
+    }
+
+  internal fun setProjectionMode(
     map: NativeMap,
-    deltaX: Double,
-    deltaY: Double,
-    animation: AnimationOptions?,
-  ) {
+    options: ProjectionModeOptions,
+  ): Deferred<CommandCompletion> =
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapDoubleDoubleAddressStatusFunction("mln_map_move_by_animated")
-          .invokeNative(map, deltaX, deltaY, animationOptions(arena, animation)) as Int
-      )
-    }
-  }
-
-  internal fun scaleBy(map: NativeMap, scale: Double, anchor: ScreenPoint?) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapDoubleAddressStatusFunction("mln_map_scale_by")
-          .invokeNative(map, scale, anchor?.let { screenPoint(it, arena) } ?: MemorySegment.NULL)
-          as Int
-      )
-    }
-  }
-
-  internal fun scaleByAnimated(
-    map: NativeMap,
-    scale: Double,
-    anchor: ScreenPoint?,
-    animation: AnimationOptions?,
-  ) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapDoubleAddressAddressStatusFunction("mln_map_scale_by_animated")
-          .invokeNative(
-            map,
-            scale,
-            anchor?.let { screenPoint(it, arena) } ?: MemorySegment.NULL,
-            animationOptions(arena, animation),
-          ) as Int
-      )
-    }
-  }
-
-  internal fun rotateBy(map: NativeMap, first: ScreenPoint, second: ScreenPoint) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapTwoScreenPointsStatusFunction("mln_map_rotate_by")
-          .invokeNative(map, screenPoint(first, arena), screenPoint(second, arena)) as Int
-      )
-    }
-  }
-
-  internal fun rotateByAnimated(
-    map: NativeMap,
-    first: ScreenPoint,
-    second: ScreenPoint,
-    animation: AnimationOptions?,
-  ) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapTwoScreenPointsAddressStatusFunction("mln_map_rotate_by_animated")
-          .invokeNative(
-            map,
-            screenPoint(first, arena),
-            screenPoint(second, arena),
-            animationOptions(arena, animation),
-          ) as Int
-      )
-    }
-  }
-
-  internal fun pitchBy(map: NativeMap, pitch: Double) {
-    Status.check(mapDoubleStatusFunction("mln_map_pitch_by").invokeNative(map, pitch) as Int)
-  }
-
-  internal fun pitchByAnimated(map: NativeMap, pitch: Double, animation: AnimationOptions?) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapDoubleAddressStatusFunction("mln_map_pitch_by_animated")
-          .invokeNative(map, pitch, animationOptions(arena, animation)) as Int
-      )
-    }
-  }
-
-  internal fun cancelTransitions(map: NativeMap) {
-    Status.check(mapStatusFunction("mln_map_cancel_transitions").invokeNative(map) as Int)
-  }
-
-  internal fun setGestureInProgress(map: NativeMap, inProgress: Boolean) {
-    Status.check(
-      mapBooleanStatusFunction("mln_map_set_gesture_in_progress").invokeNative(map, inProgress)
-        as Int
-    )
-  }
-
-  internal fun isGestureInProgress(map: NativeMap): Boolean =
-    Arena.ofConfined().use { arena ->
-      val outInProgress = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        mapAddressStatusFunction("mln_map_is_gesture_in_progress").invokeNative(map, outInProgress)
-          as Int
-      )
-      outInProgress.get(ValueLayout.JAVA_BOOLEAN, 0)
+      val native = projectionModeOptions(arena, options)
+      CompletionBridge.command { completion ->
+        MapLibreNativeC.mln_map_set_projection_mode(map.raw, native, completion)
+      }
     }
 
   internal fun cameraForLatLngBounds(
     map: NativeMap,
     bounds: LatLngBounds,
     fitOptions: CameraFitOptions?,
-  ): CameraOptions =
+  ): Deferred<CameraOptions> =
     Arena.ofConfined().use { arena ->
-      val outCamera = cameraOptionsDefault(arena)
-      Status.check(
-        mapLatLngBoundsAddressAddressStatusFunction("mln_map_camera_for_lat_lng_bounds")
-          .invokeNative(
-            map,
-            latLngBounds(arena, bounds),
-            cameraFitOptions(arena, fitOptions),
-            outCamera,
-          ) as Int
+      val nativeBounds = latLngBounds(arena, bounds)
+      val nativeFitOptions = cameraFitOptions(arena, fitOptions)
+      CompletionBridge.submit(
+        ::cameraOptionsCompletion,
+        { completion ->
+          MapLibreNativeC.mln_map_camera_for_lat_lng_bounds(
+            map.raw,
+            nativeBounds,
+            nativeFitOptions,
+            completion,
+          )
+        },
       )
-      cameraOptions(outCamera)
     }
 
   internal fun cameraForLatLngs(
     map: NativeMap,
     coordinates: List<LatLng>,
     fitOptions: CameraFitOptions?,
-  ): CameraOptions {
+  ): Deferred<CameraOptions> {
     val coordinateSnapshot = coordinates.toList()
     return Arena.ofConfined().use { arena ->
-      val outCamera = cameraOptionsDefault(arena)
-      Status.check(
-        mapAddressLongAddressAddressStatusFunction("mln_map_camera_for_lat_lngs")
-          .invokeNative(
-            map,
-            latLngArray(arena, coordinateSnapshot),
+      val nativeCoordinates = latLngArray(arena, coordinateSnapshot)
+      val nativeFitOptions = cameraFitOptions(arena, fitOptions)
+      CompletionBridge.submit(
+        ::cameraOptionsCompletion,
+        { completion ->
+          MapLibreNativeC.mln_map_camera_for_lat_lngs(
+            map.raw,
+            nativeCoordinates,
             coordinateSnapshot.size.toLong(),
-            cameraFitOptions(arena, fitOptions),
-            outCamera,
-          ) as Int
+            nativeFitOptions,
+            completion,
+          )
+        },
       )
-      cameraOptions(outCamera)
     }
   }
 
@@ -2003,406 +1850,514 @@ internal object NativeAccess {
     map: NativeMap,
     geometry: ByteArray,
     fitOptions: CameraFitOptions?,
-  ): CameraOptions =
+  ): Deferred<CameraOptions> =
     Arena.ofConfined().use { arena ->
-      val outCamera = cameraOptionsDefault(arena)
-      Status.check(
-        mapAddressAddressAddressStatusFunction("mln_map_camera_for_geometry")
-          .invokeNative(
-            map,
-            byteArrayView(arena, geometry),
-            cameraFitOptions(arena, fitOptions),
-            outCamera,
-          ) as Int
-      )
-      cameraOptions(outCamera)
-    }
-
-  internal fun latLngBoundsForCamera(map: NativeMap, camera: CameraOptions): LatLngBounds =
-    mapLatLngBoundsForCamera("mln_map_lat_lng_bounds_for_camera", map, camera)
-
-  internal fun latLngBoundsForCameraUnwrapped(map: NativeMap, camera: CameraOptions): LatLngBounds =
-    mapLatLngBoundsForCamera("mln_map_lat_lng_bounds_for_camera_unwrapped", map, camera)
-
-  internal fun bounds(map: NativeMap): BoundOptions =
-    Arena.ofConfined().use { arena ->
-      val outBounds = boundOptionsDefault(arena)
-      Status.check(
-        mapAddressStatusFunction("mln_map_get_bounds").invokeNative(map, outBounds) as Int
-      )
-      boundOptions(outBounds)
-    }
-
-  internal fun setBounds(map: NativeMap, options: BoundOptions) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapAddressStatusFunction("mln_map_set_bounds")
-          .invokeNative(map, boundOptions(arena, options)) as Int
+      val nativeGeometry = byteArrayView(arena, geometry)
+      val nativeFitOptions = cameraFitOptions(arena, fitOptions)
+      CompletionBridge.submit(
+        ::cameraOptionsCompletion,
+        { completion ->
+          MapLibreNativeC.mln_map_camera_for_geometry(
+            map.raw,
+            nativeGeometry,
+            nativeFitOptions,
+            completion,
+          )
+        },
       )
     }
-  }
 
-  internal fun freeCameraOptions(map: NativeMap): FreeCameraOptions =
+  internal fun latLngBoundsForCamera(
+    map: NativeMap,
+    camera: CameraOptions,
+    unwrapped: Boolean,
+  ): Deferred<LatLngBounds> =
     Arena.ofConfined().use { arena ->
-      val outOptions = freeCameraOptionsDefault(arena)
-      Status.check(
-        mapAddressStatusFunction("mln_map_get_free_camera_options").invokeNative(map, outOptions)
-          as Int
+      val nativeCamera = cameraOptions(arena, camera)
+      CompletionBridge.submit(
+        { result -> latLngBounds(completionValue(result, mln_lat_lng_bounds.sizeof())) },
+        { completion ->
+          if (unwrapped)
+            MapLibreNativeC.mln_map_lat_lng_bounds_for_camera_unwrapped(
+              map.raw,
+              nativeCamera,
+              completion,
+            )
+          else MapLibreNativeC.mln_map_lat_lng_bounds_for_camera(map.raw, nativeCamera, completion)
+        },
       )
-      readFreeCameraOptions(outOptions)
     }
 
-  internal fun setFreeCameraOptions(map: NativeMap, options: FreeCameraOptions) {
+  private fun cameraOptionsCompletion(result: MemorySegment): CameraOptions =
+    cameraOptions(completionValue(result, mln_camera_options.sizeof()))
+
+  internal fun pixelForLatLng(map: NativeMap, coordinate: LatLng): Deferred<ScreenPoint> =
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapAddressStatusFunction("mln_map_set_free_camera_options")
-          .invokeNative(map, freeCameraOptions(arena, options)) as Int
+      CompletionBridge.submit(
+        { result -> screenPoint(completionValue(result, mln_screen_point.sizeof())) },
+        { completion ->
+          MapLibreNativeC.mln_map_pixel_for_lat_lng(map.raw, latLng(coordinate, arena), completion)
+        },
       )
     }
-  }
 
-  internal fun pixelForLatLng(map: NativeMap, coordinate: LatLng): ScreenPoint =
+  internal fun latLngForPixel(
+    map: NativeMap,
+    point: ScreenPoint,
+    unwrapped: Boolean,
+  ): Deferred<LatLng> =
     Arena.ofConfined().use { arena ->
-      val outPoint = arena.allocate(screenPointLayout)
-      Status.check(
-        mapLatLngAddressStatusFunction("mln_map_pixel_for_lat_lng")
-          .invokeNative(map, latLng(coordinate, arena), outPoint) as Int
+      val nativePoint = screenPoint(point, arena)
+      CompletionBridge.submit(
+        { result -> latLng(completionValue(result, mln_lat_lng.sizeof())) },
+        { completion ->
+          if (unwrapped)
+            MapLibreNativeC.mln_map_lat_lng_for_pixel_unwrapped(map.raw, nativePoint, completion)
+          else MapLibreNativeC.mln_map_lat_lng_for_pixel(map.raw, nativePoint, completion)
+        },
       )
-      screenPoint(outPoint)
     }
 
-  internal fun latLngForPixel(map: NativeMap, point: ScreenPoint): LatLng =
-    Arena.ofConfined().use { arena ->
-      val outCoordinate = arena.allocate(latLngLayout)
-      Status.check(
-        mapScreenPointAddressStatusFunction("mln_map_lat_lng_for_pixel")
-          .invokeNative(map, screenPoint(point, arena), outCoordinate) as Int
-      )
-      latLng(outCoordinate)
-    }
-
-  internal fun latLngForPixelUnwrapped(map: NativeMap, point: ScreenPoint): LatLng =
-    Arena.ofConfined().use { arena ->
-      val outCoordinate = arena.allocate(latLngLayout)
-      Status.check(
-        mapScreenPointAddressStatusFunction("mln_map_lat_lng_for_pixel_unwrapped")
-          .invokeNative(map, screenPoint(point, arena), outCoordinate) as Int
-      )
-      latLng(outCoordinate)
-    }
-
-  internal fun pixelsForLatLngs(map: NativeMap, coordinates: List<LatLng>): List<ScreenPoint> {
+  internal fun pixelsForLatLngs(
+    map: NativeMap,
+    coordinates: List<LatLng>,
+  ): Deferred<List<ScreenPoint>> {
     val coordinateSnapshot = coordinates.toList()
-    if (coordinateSnapshot.isEmpty()) {
-      Arena.ofConfined().use { arena ->
-        Status.check(
-          mapAddressLongAddressStatusFunction("mln_map_pixels_for_lat_lngs")
-            .invokeNative(map, MemorySegment.NULL, 0L, MemorySegment.NULL) as Int
-        )
-      }
-      return emptyList()
-    }
     return Arena.ofConfined().use { arena ->
-      val outPoints = arena.allocate(screenPointLayout.byteSize() * coordinateSnapshot.size)
-      Status.check(
-        mapAddressLongAddressStatusFunction("mln_map_pixels_for_lat_lngs")
-          .invokeNative(
-            map,
+      CompletionBridge.submit(
+        { result ->
+          val count = checkedInt(mln_completion_result.value_count(result))
+          if (count == 0) emptyList()
+          else
+            screenPointArray(
+              completionValue(result, mln_screen_point.sizeof() * count.toLong()),
+              count,
+            )
+        },
+        { completion ->
+          MapLibreNativeC.mln_map_pixels_for_lat_lngs(
+            map.raw,
             latLngArray(arena, coordinateSnapshot),
             coordinateSnapshot.size.toLong(),
-            outPoints,
-          ) as Int
+            completion,
+          )
+        },
       )
-      screenPointArray(outPoints, coordinateSnapshot.size)
     }
   }
 
-  internal fun latLngsForPixels(map: NativeMap, points: List<ScreenPoint>): List<LatLng> {
+  internal fun latLngsForPixels(
+    map: NativeMap,
+    points: List<ScreenPoint>,
+    unwrapped: Boolean,
+  ): Deferred<List<LatLng>> {
     val pointSnapshot = points.toList()
-    if (pointSnapshot.isEmpty()) {
-      Arena.ofConfined().use { arena ->
-        Status.check(
-          mapAddressLongAddressStatusFunction("mln_map_lat_lngs_for_pixels")
-            .invokeNative(map, MemorySegment.NULL, 0L, MemorySegment.NULL) as Int
-        )
-      }
-      return emptyList()
-    }
     return Arena.ofConfined().use { arena ->
-      val outCoordinates = arena.allocate(latLngLayout.byteSize() * pointSnapshot.size)
-      Status.check(
-        mapAddressLongAddressStatusFunction("mln_map_lat_lngs_for_pixels")
-          .invokeNative(
-            map,
-            screenPointArray(arena, pointSnapshot),
-            pointSnapshot.size.toLong(),
-            outCoordinates,
-          ) as Int
+      val nativePoints = screenPointArray(arena, pointSnapshot)
+      val pointCount = pointSnapshot.size.toLong()
+      CompletionBridge.submit(
+        { result ->
+          val count = checkedInt(mln_completion_result.value_count(result))
+          if (count == 0) emptyList()
+          else latLngArray(completionValue(result, mln_lat_lng.sizeof() * count.toLong()), count)
+        },
+        { completion ->
+          if (unwrapped)
+            MapLibreNativeC.mln_map_lat_lngs_for_pixels_unwrapped(
+              map.raw,
+              nativePoints,
+              pointCount,
+              completion,
+            )
+          else
+            MapLibreNativeC.mln_map_lat_lngs_for_pixels(
+              map.raw,
+              nativePoints,
+              pointCount,
+              completion,
+            )
+        },
       )
-      latLngArray(outCoordinates, pointSnapshot.size)
-    }
-  }
-
-  internal fun latLngsForPixelsUnwrapped(map: NativeMap, points: List<ScreenPoint>): List<LatLng> {
-    val pointSnapshot = points.toList()
-    if (pointSnapshot.isEmpty()) {
-      Arena.ofConfined().use {
-        Status.check(
-          mapAddressLongAddressStatusFunction("mln_map_lat_lngs_for_pixels_unwrapped")
-            .invokeNative(map, MemorySegment.NULL, 0L, MemorySegment.NULL) as Int
-        )
-      }
-      return emptyList()
-    }
-    return Arena.ofConfined().use { arena ->
-      val outCoordinates = arena.allocate(latLngLayout.byteSize() * pointSnapshot.size)
-      Status.check(
-        mapAddressLongAddressStatusFunction("mln_map_lat_lngs_for_pixels_unwrapped")
-          .invokeNative(
-            map,
-            screenPointArray(arena, pointSnapshot),
-            pointSnapshot.size.toLong(),
-            outCoordinates,
-          ) as Int
-      )
-      latLngArray(outCoordinates, pointSnapshot.size)
     }
   }
 
   internal fun attachMetalOwnedTexture(
     map: NativeMap,
     descriptor: MetalOwnedTextureDescriptor,
-  ): NativeRenderSession =
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Deferred<Unit>> =
     attachRenderSession(
       map,
       "mln_metal_owned_texture_attach",
       metalOwnedTextureDescriptor(descriptor),
+      options,
     )
 
   internal fun attachMetalBorrowedTexture(
     map: NativeMap,
     descriptor: MetalBorrowedTextureDescriptor,
-  ): NativeRenderSession =
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Deferred<Unit>> =
     attachRenderSession(
       map,
       "mln_metal_borrowed_texture_attach",
       metalBorrowedTextureDescriptor(descriptor),
+      options,
     )
 
   internal fun attachVulkanOwnedTexture(
     map: NativeMap,
     descriptor: VulkanOwnedTextureDescriptor,
-  ): NativeRenderSession =
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Deferred<Unit>> =
     attachRenderSession(
       map,
       "mln_vulkan_owned_texture_attach",
       vulkanOwnedTextureDescriptor(descriptor),
+      options,
     )
 
   internal fun attachVulkanBorrowedTexture(
     map: NativeMap,
     descriptor: VulkanBorrowedTextureDescriptor,
-  ): NativeRenderSession =
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Deferred<Unit>> =
     attachRenderSession(
       map,
       "mln_vulkan_borrowed_texture_attach",
       vulkanBorrowedTextureDescriptor(descriptor),
+      options,
     )
 
   internal fun attachOpenGLOwnedTexture(
     map: NativeMap,
     descriptor: OpenGLOwnedTextureDescriptor,
-  ): NativeRenderSession =
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Deferred<Unit>> =
     attachRenderSession(
       map,
       "mln_opengl_owned_texture_attach",
       openglOwnedTextureDescriptor(descriptor),
+      options,
     )
 
   internal fun attachOpenGLBorrowedTexture(
     map: NativeMap,
     descriptor: OpenGLBorrowedTextureDescriptor,
-  ): NativeRenderSession =
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Deferred<Unit>> =
     attachRenderSession(
       map,
       "mln_opengl_borrowed_texture_attach",
       openglBorrowedTextureDescriptor(descriptor),
+      options,
     )
 
   internal fun attachMetalSurface(
     map: NativeMap,
     descriptor: MetalSurfaceDescriptor,
-  ): NativeRenderSession =
-    attachRenderSession(map, "mln_metal_surface_attach", metalSurfaceDescriptor(descriptor))
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Deferred<Unit>> =
+    attachRenderSession(
+      map,
+      "mln_metal_surface_attach",
+      metalSurfaceDescriptor(descriptor),
+      options,
+    )
 
   internal fun attachVulkanSurface(
     map: NativeMap,
     descriptor: VulkanSurfaceDescriptor,
-  ): NativeRenderSession =
-    attachRenderSession(map, "mln_vulkan_surface_attach", vulkanSurfaceDescriptor(descriptor))
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Deferred<Unit>> =
+    attachRenderSession(
+      map,
+      "mln_vulkan_surface_attach",
+      vulkanSurfaceDescriptor(descriptor),
+      options,
+    )
 
   internal fun attachOpenGLSurface(
     map: NativeMap,
     descriptor: OpenGLSurfaceDescriptor,
-  ): NativeRenderSession =
-    attachRenderSession(map, "mln_opengl_surface_attach", openglSurfaceDescriptor(descriptor))
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Deferred<Unit>> =
+    attachRenderSession(
+      map,
+      "mln_opengl_surface_attach",
+      openglSurfaceDescriptor(descriptor),
+      options,
+    )
 
   internal fun destroyRenderSession(session: NativeRenderSession): Int =
-    renderSessionStatusFunction("mln_render_session_destroy").invokeNative(session) as Int
+    MapLibreNativeC.mln_render_session_destroy(session.raw)
+
+  internal fun renderSessionCapabilities(session: NativeRenderSession): RenderSessionCapabilities =
+    Arena.ofConfined().use { arena ->
+      val out = mln_render_session_capabilities.allocate(arena)
+      mln_render_session_capabilities.size(out, mln_render_session_capabilities.sizeof().toInt())
+      Status.check(MapLibreNativeC.mln_render_session_get_capabilities(session.raw, out))
+      val flags = mln_render_session_capabilities.flags(out)
+      RenderSessionCapabilities(
+        driver = RenderDriver.fromNative(mln_render_session_capabilities.driver(out)),
+        textureRingDepth = mln_render_session_capabilities.texture_ring_depth(out),
+        frameAcquisition = flags and RENDER_CAPABILITY_FRAME_ACQUISITION != 0,
+        readback = flags and RENDER_CAPABILITY_READBACK != 0,
+        consumerSync = flags and RENDER_CAPABILITY_CONSUMER_SYNC != 0,
+        presentation = flags and RENDER_CAPABILITY_PRESENTATION != 0,
+      )
+    }
+
+  internal fun renderSessionSnapshot(session: NativeRenderSession): RenderSessionSnapshot =
+    Arena.ofConfined().use { arena ->
+      val out = mln_render_session_snapshot.allocate(arena)
+      mln_render_session_snapshot.size(out, mln_render_session_snapshot.sizeof().toInt())
+      Status.check(MapLibreNativeC.mln_render_session_get_snapshot(session.raw, out))
+      val extent = mln_render_session_snapshot.extent(out)
+      RenderSessionSnapshot(
+        state = RenderSessionState.fromNative(mln_render_session_snapshot.state(out)),
+        driver = RenderDriver.fromNative(mln_render_session_snapshot.driver(out)),
+        latestResult = RenderResult.fromNative(mln_render_session_snapshot.latest_result(out)),
+        extent =
+          RenderTargetExtent(
+            mln_render_target_extent.width(extent),
+            mln_render_target_extent.height(extent),
+            mln_render_target_extent.scale_factor(extent),
+          ),
+        generation = mln_render_session_snapshot.generation(out),
+        mapUpdateGeneration = mln_render_session_snapshot.map_update_generation(out),
+        renderedUpdateGeneration = mln_render_session_snapshot.rendered_update_generation(out),
+        extentGeneration = mln_render_session_snapshot.extent_generation(out),
+        frameGeneration = mln_render_session_snapshot.frame_generation(out),
+        latestDemandToken = mln_render_session_snapshot.latest_demand_token(out),
+        pendingDemandCount = mln_render_session_snapshot.pending_demand_count(out),
+        acquiredFrameCount = mln_render_session_snapshot.acquired_frame_count(out),
+        targetReady = mln_render_session_snapshot.target_ready(out),
+        pendingChanges = mln_render_session_snapshot.pending_changes(out),
+      )
+    }
+
+  internal fun requestRenderFrame(session: NativeRenderSession, demand: FrameDemand) {
+    Arena.ofConfined().use { arena ->
+      val nativeDemand = mln_frame_demand.allocate(arena)
+      mln_frame_demand.size(nativeDemand, mln_frame_demand.sizeof().toInt())
+      var flags = 0
+      if (demand.ifNeeded) flags = flags or FRAME_DEMAND_IF_NEEDED
+      if (demand.present) flags = flags or FRAME_DEMAND_PRESENT
+      mln_frame_demand.flags(nativeDemand, flags)
+      mln_frame_demand.token(nativeDemand, demand.token)
+      mln_frame_demand.coalescing_boundary(nativeDemand, demand.coalescingBoundary)
+      mln_frame_demand.timeout_ns(nativeDemand, demand.timeoutNanoseconds)
+      Status.check(MapLibreNativeC.mln_render_session_request_frame(session.raw, nativeDemand))
+    }
+  }
+
+  internal fun drainRenderFrameResults(session: NativeRenderSession): List<RenderFrameResult> =
+    Arena.ofConfined().use { arena ->
+      val outBatch = zeroHandle(arena)
+      val drained = MapLibreNativeC.mln_render_session_drain_frame_results(session.raw, outBatch)
+      if (drained == MaplibreStatus.NOT_READY.nativeCode) return@use emptyList()
+      Status.check(drained)
+      val batch = outBatch.get(ValueLayout.JAVA_LONG, 0)
+      try {
+        val outCount = arena.allocate(ValueLayout.JAVA_LONG)
+        Status.check(MapLibreNativeC.mln_render_frame_batch_count(batch, outCount))
+        val outResult = mln_render_frame_result.allocate(arena)
+        List(Math.toIntExact(outCount.get(ValueLayout.JAVA_LONG, 0))) { index ->
+          mln_render_frame_result.size(outResult, mln_render_frame_result.sizeof().toInt())
+          Status.check(MapLibreNativeC.mln_render_frame_batch_get(batch, index.toLong(), outResult))
+          renderFrameResult(outResult)
+        }
+      } finally {
+        MapLibreNativeC.mln_render_frame_batch_release(batch)
+      }
+    }
+
+  internal fun serviceRenderDriverWork(session: NativeRenderSession, maxWork: Int): Int =
+    Arena.ofConfined().use { arena ->
+      val outServiced = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(
+        MapLibreNativeC.mln_render_session_service_driver_work(
+          session.raw,
+          maxWork.toLong(),
+          outServiced,
+        )
+      )
+      Math.toIntExact(outServiced.get(ValueLayout.JAVA_LONG, 0))
+    }
+
+  internal fun acquireRenderFrame(session: NativeRenderSession): Long? =
+    Arena.ofConfined().use { arena ->
+      val outFrame = zeroHandle(arena)
+      val status = MapLibreNativeC.mln_render_session_acquire_frame(session.raw, outFrame)
+      if (status == MaplibreStatus.NOT_READY.nativeCode) return@use null
+      Status.check(status)
+      outFrame.get(ValueLayout.JAVA_LONG, 0).also {
+        require(it != 0L) { "frame acquisition returned the null handle" }
+      }
+    }
+
+  internal fun acquiredFrameResult(frame: Long): RenderFrameResult =
+    Arena.ofConfined().use { arena ->
+      val out = mln_render_frame_result.allocate(arena)
+      mln_render_frame_result.size(out, mln_render_frame_result.sizeof().toInt())
+      Status.check(MapLibreNativeC.mln_acquired_frame_get_result(frame, out))
+      renderFrameResult(out)
+    }
+
+  internal fun acquiredFrameProducerSync(frame: Long): GpuSync =
+    Arena.ofConfined().use { arena ->
+      val out = gpuSync(arena, GpuSync())
+      Status.check(MapLibreNativeC.mln_acquired_frame_get_producer_sync(frame, out))
+      readGpuSync(out)
+    }
+
+  internal fun acquiredMetalTexture(frame: Long, scope: FrameScope): MetalOwnedTextureFrame =
+    Arena.ofConfined().use { arena ->
+      val out = mln_metal_owned_texture_frame.allocate(arena)
+      mln_metal_owned_texture_frame.size(out, mln_metal_owned_texture_frame.sizeof().toInt())
+      Status.check(MapLibreNativeC.mln_acquired_frame_get_metal_texture(frame, out))
+      metalOwnedTextureFrame(out, scope)
+    }
+
+  internal fun acquiredVulkanTexture(frame: Long, scope: FrameScope): VulkanOwnedTextureFrame =
+    Arena.ofConfined().use { arena ->
+      val out = mln_vulkan_owned_texture_frame.allocate(arena)
+      mln_vulkan_owned_texture_frame.size(out, mln_vulkan_owned_texture_frame.sizeof().toInt())
+      Status.check(MapLibreNativeC.mln_acquired_frame_get_vulkan_texture(frame, out))
+      vulkanOwnedTextureFrame(out, scope)
+    }
+
+  internal fun acquiredOpenGLTexture(frame: Long, scope: FrameScope): OpenGLOwnedTextureFrame =
+    Arena.ofConfined().use { arena ->
+      val out = mln_opengl_owned_texture_frame.allocate(arena)
+      mln_opengl_owned_texture_frame.size(out, mln_opengl_owned_texture_frame.sizeof().toInt())
+      Status.check(MapLibreNativeC.mln_acquired_frame_get_opengl_texture(frame, out))
+      openglOwnedTextureFrame(out, scope)
+    }
+
+  internal fun releaseAcquiredFrame(frame: Long, sync: GpuSync): Long =
+    Arena.ofConfined().use { arena ->
+      val inOutFrame = arena.allocate(ValueLayout.JAVA_LONG)
+      inOutFrame.set(ValueLayout.JAVA_LONG, 0, frame)
+      Status.check(MapLibreNativeC.mln_acquired_frame_release(inOutFrame, gpuSync(arena, sync)))
+      inOutFrame.get(ValueLayout.JAVA_LONG, 0)
+    }
 
   internal fun resizeRenderSession(
     session: NativeRenderSession,
-    width: Int,
-    height: Int,
-    scaleFactor: Double,
-  ) {
-    Status.check(
-      renderSessionResizeFunction().invokeNative(session, width, height, scaleFactor) as Int
-    )
-  }
+    extent: RenderTargetExtent,
+  ): Deferred<Unit> =
+    Arena.ofConfined().use { arena ->
+      val nativeExtent = mln_render_target_extent.allocate(arena)
+      fillRenderTargetExtent(nativeExtent, extent)
+      renderOperation("mln_render_session_resize", session, nativeExtent)
+    }
 
   internal fun setMetalSurfaceTarget(
     session: NativeRenderSession,
     descriptor: MetalSurfaceDescriptor,
-  ) {
-    setRenderSessionTarget(
+  ): Deferred<Unit> =
+    renderTargetOperation(
       session,
       "mln_metal_surface_set_target",
       metalSurfaceDescriptor(descriptor),
     )
-  }
 
   internal fun setVulkanSurfaceTarget(
     session: NativeRenderSession,
     descriptor: VulkanSurfaceDescriptor,
-  ) {
-    setRenderSessionTarget(
+  ): Deferred<Unit> =
+    renderTargetOperation(
       session,
       "mln_vulkan_surface_set_target",
       vulkanSurfaceDescriptor(descriptor),
     )
-  }
 
   internal fun setOpenGLSurfaceTarget(
     session: NativeRenderSession,
     descriptor: OpenGLSurfaceDescriptor,
-  ) {
-    setRenderSessionTarget(
+  ): Deferred<Unit> =
+    renderTargetOperation(
       session,
       "mln_opengl_surface_set_target",
       openglSurfaceDescriptor(descriptor),
     )
-  }
 
   internal fun setMetalBorrowedTextureTarget(
     session: NativeRenderSession,
     descriptor: MetalBorrowedTextureDescriptor,
-  ) {
-    setRenderSessionTarget(
+  ): Deferred<Unit> =
+    renderTargetOperation(
       session,
       "mln_metal_borrowed_texture_set_target",
       metalBorrowedTextureDescriptor(descriptor),
     )
-  }
 
   internal fun setVulkanBorrowedTextureTarget(
     session: NativeRenderSession,
     descriptor: VulkanBorrowedTextureDescriptor,
-  ) {
-    setRenderSessionTarget(
+  ): Deferred<Unit> =
+    renderTargetOperation(
       session,
       "mln_vulkan_borrowed_texture_set_target",
       vulkanBorrowedTextureDescriptor(descriptor),
     )
-  }
 
   internal fun setOpenGLBorrowedTextureTarget(
     session: NativeRenderSession,
     descriptor: OpenGLBorrowedTextureDescriptor,
-  ) {
-    setRenderSessionTarget(
+  ): Deferred<Unit> =
+    renderTargetOperation(
       session,
       "mln_opengl_borrowed_texture_set_target",
       openglBorrowedTextureDescriptor(descriptor),
     )
-  }
 
-  internal fun renderUpdate(session: NativeRenderSession): RenderUpdate =
-    Arena.ofConfined().use { arena ->
-      val outResult = arena.allocate(ValueLayout.JAVA_INT)
-      val outNeedsRepaint = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(
-        renderSessionRenderUpdateFunction().invokeNative(session, outResult, outNeedsRepaint) as Int
-      )
-      RenderUpdate(
-        RenderResult.fromNative(outResult.get(ValueLayout.JAVA_INT, 0)),
-        outNeedsRepaint.get(ValueLayout.JAVA_BOOLEAN, 0),
-      )
+  internal fun renderBarrier(session: NativeRenderSession): Deferred<Unit> =
+    CompletionBridge.unit { completion ->
+      MapLibreNativeC.mln_render_session_barrier(session.raw, completion)
     }
 
-  internal fun detachRenderSession(session: NativeRenderSession) {
-    Status.check(
-      renderSessionStatusFunction("mln_render_session_detach").invokeNative(session) as Int
-    )
-  }
-
-  internal fun reduceRenderSessionMemoryUse(session: NativeRenderSession) {
-    Status.check(
-      renderSessionStatusFunction("mln_render_session_reduce_memory_use").invokeNative(session)
-        as Int
-    )
-  }
-
-  internal fun clearRenderSessionData(session: NativeRenderSession) {
-    Status.check(
-      renderSessionStatusFunction("mln_render_session_clear_data").invokeNative(session) as Int
-    )
-  }
-
-  internal fun dumpRenderSessionDebugLogs(session: NativeRenderSession) {
-    Status.check(
-      renderSessionStatusFunction("mln_render_session_dump_debug_logs").invokeNative(session) as Int
-    )
-  }
+  internal fun renderControl(session: NativeRenderSession, functionName: String): Deferred<Unit> =
+    renderOperation(functionName, session)
 
   internal fun queryRenderedFeatures(
     session: NativeRenderSession,
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): List<QueriedFeature> =
+  ): Deferred<List<QueriedFeature>> =
     Arena.ofConfined().use { arena ->
-      val outResult = arena.allocate(ValueLayout.JAVA_LONG)
-      outResult.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(
-        renderSessionQueryRenderedFeaturesFunction()
-          .invokeNative(
-            session,
+      CompletionBridge.submit(
+        ::queriedFeaturesCompletion,
+        { completion ->
+          MapLibreNativeC.mln_render_session_query_rendered_features(
+            session.raw,
             renderedQueryGeometry(arena, geometry),
             renderedFeatureQueryOptions(arena, options),
-            outResult,
-          ) as Int
+            completion,
+          )
+        },
       )
-      queriedFeatureList(NativeQueriedFeatureList(outResult.get(ValueLayout.JAVA_LONG, 0)))
     }
 
   internal fun querySourceFeatures(
     session: NativeRenderSession,
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): List<QueriedFeature> =
+  ): Deferred<List<QueriedFeature>> =
     Arena.ofConfined().use { arena ->
-      val outResult = arena.allocate(ValueLayout.JAVA_LONG)
-      outResult.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(
-        renderSessionQuerySourceFeaturesFunction()
-          .invokeNative(
-            session,
+      CompletionBridge.submit(
+        ::queriedFeaturesCompletion,
+        { completion ->
+          MapLibreNativeC.mln_render_session_query_source_features(
+            session.raw,
             stringView(arena, sourceId),
             sourceFeatureQueryOptions(arena, options),
-            outResult,
-          ) as Int
+            completion,
+          )
+        },
       )
-      queriedFeatureList(NativeQueriedFeatureList(outResult.get(ValueLayout.JAVA_LONG, 0)))
     }
 
   internal fun queryFeatureExtension(
@@ -2412,111 +2367,42 @@ internal object NativeAccess {
     extension: String,
     extensionField: String,
     arguments: ByteArray?,
-  ): ByteArray =
+  ): Deferred<ByteArray> =
     Arena.ofConfined().use { arena ->
-      val outResult = arena.allocate(ValueLayout.JAVA_LONG)
-      outResult.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(
-        renderSessionQueryFeatureExtensionsFunction()
-          .invokeNative(
-            session,
+      CompletionBridge.submit(
+        ::requiredBufferCompletion,
+        { completion ->
+          MapLibreNativeC.mln_render_session_query_feature_extensions(
+            session.raw,
             stringView(arena, sourceId),
             byteArrayView(arena, feature),
             stringView(arena, extension),
             stringView(arena, extensionField),
             arguments?.let { byteArrayView(arena, it) } ?: MemorySegment.NULL,
-            outResult,
-          ) as Int
+            completion,
+          )
+        },
       )
-      ownedBuffer(NativeOwnedBuffer(outResult.get(ValueLayout.JAVA_LONG, 0)))!!
     }
 
-  internal fun textureImageInfo(session: NativeRenderSession): TextureImageInfo =
+  internal fun textureReadback(session: NativeRenderSession): Deferred<TextureReadback> =
+    CompletionBridge.submit(
+      ::textureReadbackCompletion,
+      { completion ->
+        MapLibreNativeC.mln_texture_read_premultiplied_rgba8(session.raw, completion)
+      },
+    )
+
+  internal fun abandonRenderSession(session: NativeRenderSession): RenderAbandonResult =
     Arena.ofConfined().use { arena ->
-      val outInfo = textureImageInfo(arena)
-      val status =
-        textureReadPremultipliedRgba8Function()
-          .invokeNative(session, MemorySegment.NULL, 0L, outInfo) as Int
-      val info = readTextureImageInfo(outInfo)
-      if (status == 0 || (status == -1 && info.byteLength > 0L)) {
-        info
-      } else {
-        Status.check(status)
-        error("unreachable")
-      }
+      val out = mln_render_abandon_result.allocate(arena)
+      mln_render_abandon_result.size(out, mln_render_abandon_result.sizeof().toInt())
+      Status.check(MapLibreNativeC.mln_render_session_abandon(session.raw, out))
+      RenderAbandonResult(
+        RenderAbandonDisposition.fromNative(mln_render_abandon_result.disposition(out)),
+        mln_render_abandon_result.quarantined_resource_count(out),
+      )
     }
-
-  internal fun readPremultipliedRgba8(
-    session: NativeRenderSession,
-    buffer: NativeBuffer,
-  ): TextureImageInfo =
-    Arena.ofConfined().use { arena ->
-      val outInfo = textureImageInfo(arena)
-      buffer.borrow { segment, length ->
-        Status.check(
-          textureReadPremultipliedRgba8Function().invokeNative(session, segment, length, outInfo)
-            as Int
-        )
-      }
-      readTextureImageInfo(outInfo)
-    }
-
-  internal fun acquireMetalOwnedTextureFrame(
-    session: NativeRenderSession
-  ): OwnedTextureFrameSegment {
-    val arena = Arena.ofShared()
-    val frame = mln_metal_owned_texture_frame.allocate(arena)
-    mln_metal_owned_texture_frame.size(frame, mln_metal_owned_texture_frame.sizeof().toInt())
-    try {
-      Status.check(metalOwnedTextureAcquireFrameFunction().invokeNative(session, frame) as Int)
-      return OwnedTextureFrameSegment(frame, arena)
-    } catch (error: Throwable) {
-      arena.close()
-      throw error
-    }
-  }
-
-  internal fun acquireVulkanOwnedTextureFrame(
-    session: NativeRenderSession
-  ): OwnedTextureFrameSegment {
-    val arena = Arena.ofShared()
-    val frame = mln_vulkan_owned_texture_frame.allocate(arena)
-    mln_vulkan_owned_texture_frame.size(frame, mln_vulkan_owned_texture_frame.sizeof().toInt())
-    try {
-      Status.check(vulkanOwnedTextureAcquireFrameFunction().invokeNative(session, frame) as Int)
-      return OwnedTextureFrameSegment(frame, arena)
-    } catch (error: Throwable) {
-      arena.close()
-      throw error
-    }
-  }
-
-  internal fun acquireOpenGLOwnedTextureFrame(
-    session: NativeRenderSession
-  ): OwnedTextureFrameSegment {
-    val arena = Arena.ofShared()
-    val frame = mln_opengl_owned_texture_frame.allocate(arena)
-    mln_opengl_owned_texture_frame.size(frame, mln_opengl_owned_texture_frame.sizeof().toInt())
-    try {
-      Status.check(openglOwnedTextureAcquireFrameFunction().invokeNative(session, frame) as Int)
-      return OwnedTextureFrameSegment(frame, arena)
-    } catch (error: Throwable) {
-      arena.close()
-      throw error
-    }
-  }
-
-  internal fun releaseMetalOwnedTextureFrame(session: NativeRenderSession, frame: MemorySegment) {
-    Status.check(metalOwnedTextureReleaseFrameFunction().invokeNative(session, frame) as Int)
-  }
-
-  internal fun releaseVulkanOwnedTextureFrame(session: NativeRenderSession, frame: MemorySegment) {
-    Status.check(vulkanOwnedTextureReleaseFrameFunction().invokeNative(session, frame) as Int)
-  }
-
-  internal fun releaseOpenGLOwnedTextureFrame(session: NativeRenderSession, frame: MemorySegment) {
-    Status.check(openglOwnedTextureReleaseFrameFunction().invokeNative(session, frame) as Int)
-  }
 
   internal fun metalOwnedTextureFrame(
     segment: MemorySegment,
@@ -2570,37 +2456,33 @@ internal object NativeAccess {
       mln_opengl_owned_texture_frame.type(segment),
     )
 
-  internal fun createMapProjection(map: NativeMap): NativeMapProjection =
-    Arena.ofConfined().use { arena ->
-      val outProjection = arena.allocate(ValueLayout.JAVA_LONG)
-      outProjection.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(
-        mapAddressStatusFunction("mln_map_projection_create").invokeNative(map, outProjection)
-          as Int
-      )
-      NativeMapProjection(outProjection.get(ValueLayout.JAVA_LONG, 0)).also { projection ->
-        require(!projection.isNull) { "mln_map_projection_create returned the null handle" }
-      }
-    }
+  internal fun createMapProjection(map: NativeMap): Deferred<NativeMapProjection> =
+    CompletionBridge.submit(
+      { result ->
+        NativeMapProjection(
+            completionValue(result, ValueLayout.JAVA_LONG.byteSize()).get(ValueLayout.JAVA_LONG, 0)
+          )
+          .also { projection ->
+            require(!projection.isNull) { "mln_map_projection_create returned the null handle" }
+          }
+      },
+      { completion -> MapLibreNativeC.mln_map_projection_create(map.raw, completion) },
+    )
 
-  internal fun destroyMapProjection(projection: NativeMapProjection): Int =
-    mapStatusFunction("mln_map_projection_destroy").invokeNative(projection) as Int
+  internal fun closeProjection(projection: NativeMapProjection): Int =
+    MapLibreNativeC.mln_map_projection_close(projection.raw)
 
   internal fun projectionCamera(projection: NativeMapProjection): CameraOptions =
     Arena.ofConfined().use { arena ->
       val outCamera = cameraOptionsDefault(arena)
-      Status.check(
-        mapAddressStatusFunction("mln_map_projection_get_camera")
-          .invokeNative(projection, outCamera) as Int
-      )
+      Status.check(MapLibreNativeC.mln_map_projection_get_camera(projection.raw, outCamera))
       cameraOptions(outCamera)
     }
 
   internal fun setProjectionCamera(projection: NativeMapProjection, camera: CameraOptions) {
     Arena.ofConfined().use { arena ->
       Status.check(
-        mapAddressStatusFunction("mln_map_projection_set_camera")
-          .invokeNative(projection, cameraOptions(arena, camera)) as Int
+        MapLibreNativeC.mln_map_projection_set_camera(projection.raw, cameraOptions(arena, camera))
       )
     }
   }
@@ -2613,13 +2495,12 @@ internal object NativeAccess {
     val coordinateSnapshot = coordinates.toList()
     Arena.ofConfined().use { arena ->
       Status.check(
-        projectionAddressLongEdgeInsetsStatusFunction("mln_map_projection_set_visible_coordinates")
-          .invokeNative(
-            projection,
-            latLngArray(arena, coordinateSnapshot),
-            coordinateSnapshot.size.toLong(),
-            edgeInsets(arena, padding),
-          ) as Int
+        MapLibreNativeC.mln_map_projection_set_visible_coordinates(
+          projection.raw,
+          latLngArray(arena, coordinateSnapshot),
+          coordinateSnapshot.size.toLong(),
+          edgeInsets(arena, padding),
+        )
       )
     }
   }
@@ -2631,9 +2512,11 @@ internal object NativeAccess {
   ) {
     Arena.ofConfined().use { arena ->
       Status.check(
-        projectionAddressEdgeInsetsStatusFunction("mln_map_projection_set_visible_geometry")
-          .invokeNative(projection, byteArrayView(arena, geometry), edgeInsets(arena, padding))
-          as Int
+        MapLibreNativeC.mln_map_projection_set_visible_geometry(
+          projection.raw,
+          byteArrayView(arena, geometry),
+          edgeInsets(arena, padding),
+        )
       )
     }
   }
@@ -2645,8 +2528,11 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       val outPoint = arena.allocate(screenPointLayout)
       Status.check(
-        projectionLatLngAddressStatusFunction("mln_map_projection_pixel_for_lat_lng")
-          .invokeNative(projection, latLng(coordinate, arena), outPoint) as Int
+        MapLibreNativeC.mln_map_projection_pixel_for_lat_lng(
+          projection.raw,
+          latLng(coordinate, arena),
+          outPoint,
+        )
       )
       screenPoint(outPoint)
     }
@@ -2658,8 +2544,11 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       val outCoordinate = arena.allocate(latLngLayout)
       Status.check(
-        projectionScreenPointAddressStatusFunction("mln_map_projection_lat_lng_for_pixel")
-          .invokeNative(projection, screenPoint(point, arena), outCoordinate) as Int
+        MapLibreNativeC.mln_map_projection_lat_lng_for_pixel(
+          projection.raw,
+          screenPoint(point, arena),
+          outCoordinate,
+        )
       )
       latLng(outCoordinate)
     }
@@ -2671,8 +2560,11 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       val outCoordinate = arena.allocate(latLngLayout)
       Status.check(
-        projectionScreenPointAddressStatusFunction("mln_map_projection_lat_lng_for_pixel_unwrapped")
-          .invokeNative(projection, screenPoint(point, arena), outCoordinate) as Int
+        MapLibreNativeC.mln_map_projection_lat_lng_for_pixel_unwrapped(
+          projection.raw,
+          screenPoint(point, arena),
+          outCoordinate,
+        )
       )
       latLng(outCoordinate)
     }
@@ -2701,6 +2593,25 @@ internal object NativeAccess {
           valueBytes.size.toLong(),
         ) as Int
     }
+
+  internal fun completeResourceRequest(
+    request: NativeResourceRequest,
+    response: ResourceResponse,
+  ): Int =
+    Arena.ofConfined().use { arena ->
+      MapLibreNativeC.mln_resource_request_complete(request.raw, resourceResponse(response, arena))
+    }
+
+  internal fun isResourceRequestCancelled(request: NativeResourceRequest): Boolean =
+    Arena.ofConfined().use { arena ->
+      val cancelled = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(MapLibreNativeC.mln_resource_request_cancelled(request.raw, cancelled))
+      cancelled.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
+
+  internal fun releaseResourceRequest(request: NativeResourceRequest) {
+    MapLibreNativeC.mln_resource_request_release(request.raw)
+  }
 
   internal fun customGeometrySourceOptions(
     arena: Arena,
@@ -2815,33 +2726,63 @@ internal object NativeAccess {
     map: NativeMap,
     functionName: String,
     descriptor: (Arena) -> MemorySegment,
-  ): NativeRenderSession =
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Deferred<Unit>> =
     Arena.ofConfined().use { arena ->
-      val outSession = arena.allocate(ValueLayout.JAVA_LONG)
-      outSession.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(
-        mapAddressAddressStatusFunction(functionName)
-          .invokeNative(map, descriptor(arena), outSession) as Int
+      val nativeOptions = MapLibreNativeC.mln_render_session_attach_options_default(arena)
+      mln_render_session_attach_options.driver(nativeOptions, options.driver.nativeValue)
+      mln_render_session_attach_options.requested_texture_ring_depth(
+        nativeOptions,
+        options.requestedTextureRingDepth,
       )
-      NativeRenderSession(outSession.get(ValueLayout.JAVA_LONG, 0)).also { session ->
-        require(!session.isNull) { "render session attach returned the null handle" }
+      val outSession = zeroHandle(arena)
+      val completed = CompletionBridge.unitChecked { completion ->
+        dynamicStatusDowncall(
+            functionName,
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(map, descriptor(arena), nativeOptions, outSession, completion) as Int
       }
+      val session = NativeRenderSession(outSession.get(ValueLayout.JAVA_LONG, 0))
+      require(!session.isNull) { "render session attach returned the null handle" }
+      session to completed
     }
 
-  // The C API borrows the replacement descriptor for the call alone, so the
-  // confined arena that materialized it closes once the call returns.
-  private fun setRenderSessionTarget(
+  private fun renderTargetOperation(
     session: NativeRenderSession,
     functionName: String,
     descriptor: (Arena) -> MemorySegment,
-  ) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        renderSessionAddressStatusFunction(functionName).invokeNative(session, descriptor(arena))
-          as Int
-      )
+  ): Deferred<Unit> =
+    Arena.ofConfined().use { arena -> renderOperation(functionName, session, descriptor(arena)) }
+
+  private fun renderOperation(
+    functionName: String,
+    session: NativeRenderSession,
+    argument: MemorySegment? = null,
+  ): Deferred<Unit> = CompletionBridge.unit { completion ->
+    if (argument == null) {
+      dynamicStatusDowncall(functionName, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS)
+        .invokeNative(session, completion) as Int
+    } else {
+      dynamicStatusDowncall(
+          functionName,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.ADDRESS,
+        )
+        .invokeNative(session, argument, completion) as Int
     }
   }
+
+  private fun optionalStringView(arena: Arena, value: String?): MemorySegment =
+    stringView(arena, value.orEmpty())
+
+  private fun zeroHandle(arena: Arena): MemorySegment =
+    arena.allocate(ValueLayout.JAVA_LONG).also { it.set(ValueLayout.JAVA_LONG, 0, 0L) }
 
   private fun metalOwnedTextureDescriptor(
     descriptor: MetalOwnedTextureDescriptor
@@ -3185,169 +3126,74 @@ internal object NativeAccess {
     if (pointer == MemorySegment.NULL) NativePointer.NULL_POINTER
     else NativePointer.scoped(pointer.address(), scope)
 
-  internal fun takeOfflineRegionStatusResult(
-    runtime: NativeRuntime,
-    operationId: Long,
-    markTaken: () -> Unit,
-  ): OfflineRegionStatus =
+  /** Copies every queued event out of the owned batch before releasing it. */
+  internal fun drainRuntimeEvents(runtime: NativeRuntime): NativeRuntimeEventBatch =
     Arena.ofConfined().use { arena ->
-      val status = arena.allocate(OFFLINE_REGION_STATUS_SIZE)
-      status.set(
-        ValueLayout.JAVA_INT,
-        OFFLINE_REGION_STATUS_SIZE_OFFSET,
-        OFFLINE_REGION_STATUS_SIZE.toInt(),
-      )
-      Status.check(
-        runtimeOfflineRegionStatusTakeResultFunction().invokeNative(runtime, operationId, status)
-          as Int
-      )
+      val batch = arena.allocate(RUNTIME_EVENT_BATCH_SIZE)
+      val outBatch = arena.allocate(ValueLayout.JAVA_LONG)
+      outBatch.set(ValueLayout.JAVA_LONG, 0, 0L)
+      Status.check(MapLibreNativeC.mln_runtime_drain_events(runtime.raw, outBatch))
+      val batchHandle = outBatch.get(ValueLayout.JAVA_LONG, 0)
+      require(batchHandle != 0L) { "mln_runtime_drain_events returned the null handle" }
       try {
-        offlineRegionStatus(status)
-      } finally {
-        markTaken()
-      }
-    }
-
-  internal fun takeCreateOfflineRegionResult(
-    runtime: NativeRuntime,
-    operationId: Long,
-    markTaken: () -> Unit,
-  ): OfflineRegionInfo =
-    takeOfflineRegionSnapshot(
-      runtime,
-      operationId,
-      runtimeOfflineRegionCreateTakeResultFunction(),
-      markTaken,
-    )
-
-  internal fun takeOfflineRegionResult(
-    runtime: NativeRuntime,
-    operationId: Long,
-    markTaken: () -> Unit,
-  ): OfflineRegionInfo? =
-    Arena.ofConfined().use { arena ->
-      val outSnapshot = arena.allocate(ValueLayout.JAVA_LONG)
-      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      outSnapshot.set(ValueLayout.JAVA_LONG, 0, 0L)
-      outFound.set(ValueLayout.JAVA_BOOLEAN, 0, false)
-      Status.check(
-        runtimeOfflineRegionGetTakeResultFunction()
-          .invokeNative(runtime, operationId, outSnapshot, outFound) as Int
-      )
-      if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
-        markTaken()
-        return@use null
-      }
-      try {
-        offlineRegionSnapshot(
-          NativeOfflineRegionSnapshot(outSnapshot.get(ValueLayout.JAVA_LONG, 0))
+        batch.set(
+          ValueLayout.JAVA_INT,
+          RUNTIME_EVENT_BATCH_SIZE_OFFSET,
+          RUNTIME_EVENT_BATCH_SIZE.toInt(),
+        )
+        Status.check(MapLibreNativeC.mln_event_batch_get(batchHandle, batch))
+        val eventCount = batch.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_BATCH_EVENT_COUNT_OFFSET)
+        if (eventCount == 0L) {
+          return@use NativeRuntimeEventBatch(emptyList())
+        }
+        // The stride the batch reports can exceed this binding's compiled event
+        // record, so index by it rather than by mln_runtime_event.sizeof().
+        val eventSize =
+          Integer.toUnsignedLong(
+            batch.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_BATCH_EVENT_SIZE_OFFSET)
+          )
+        val payloadExtent = eventSize - RUNTIME_EVENT_PAYLOAD_OFFSET
+        val events =
+          batch
+            .get(ValueLayout.ADDRESS, RUNTIME_EVENT_BATCH_EVENTS_OFFSET)
+            .reinterpret(eventCount * eventSize)
+        val messagesSize =
+          batch.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_BATCH_MESSAGES_SIZE_OFFSET)
+        val messages =
+          batch
+            .get(ValueLayout.ADDRESS, RUNTIME_EVENT_BATCH_MESSAGES_OFFSET)
+            .reinterpret(messagesSize)
+        NativeRuntimeEventBatch(
+          List(Math.toIntExact(eventCount)) { index ->
+            val base = index * eventSize
+            val payloadType =
+              events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_PAYLOAD_TYPE_OFFSET)
+            NativeRuntimeEvent(
+              type = events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_TYPE_OFFSET),
+              sourceType =
+                events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_SOURCE_TYPE_OFFSET),
+              sourceId = events.get(ValueLayout.JAVA_LONG, base + RUNTIME_EVENT_SOURCE_OFFSET),
+              code = events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_CODE_OFFSET),
+              payload =
+                runtimeEventPayload(
+                  payloadType,
+                  events.asSlice(base + RUNTIME_EVENT_PAYLOAD_OFFSET, payloadExtent),
+                ),
+              message =
+                copyMessage(
+                  messages,
+                  events.get(ValueLayout.JAVA_LONG, base + RUNTIME_EVENT_MESSAGE_OFFSET_OFFSET),
+                  Integer.toUnsignedLong(
+                    events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_MESSAGE_SIZE_OFFSET)
+                  ),
+                ),
+            )
+          }
         )
       } finally {
-        markTaken()
+        MapLibreNativeC.mln_event_batch_release(batchHandle)
       }
     }
-
-  internal fun takeOfflineRegionsResult(
-    runtime: NativeRuntime,
-    operationId: Long,
-    markTaken: () -> Unit,
-  ): List<OfflineRegionInfo> =
-    takeOfflineRegionList(
-      runtime,
-      operationId,
-      runtimeOfflineRegionsListTakeResultFunction(),
-      markTaken,
-    )
-
-  internal fun takeMergeOfflineRegionsDatabaseResult(
-    runtime: NativeRuntime,
-    operationId: Long,
-    markTaken: () -> Unit,
-  ): List<OfflineRegionInfo> =
-    takeOfflineRegionList(
-      runtime,
-      operationId,
-      runtimeOfflineRegionsMergeDatabaseTakeResultFunction(),
-      markTaken,
-    )
-
-  internal fun takeUpdateOfflineRegionMetadataResult(
-    runtime: NativeRuntime,
-    operationId: Long,
-    markTaken: () -> Unit,
-  ): OfflineRegionInfo =
-    takeOfflineRegionSnapshot(
-      runtime,
-      operationId,
-      runtimeOfflineRegionUpdateMetadataTakeResultFunction(),
-      markTaken,
-    )
-
-  /** Allocates the reused batch struct that [drainRuntimeEvents] fills. */
-  internal fun allocateRuntimeEventBatch(arena: Arena): MemorySegment =
-    arena.allocate(RUNTIME_EVENT_BATCH_SIZE)
-
-  /**
-   * Drains at most [maxEvents] events into [batch], zero draining every queued event, and copies
-   * every field of every event out of the runtime-owned arena before returning.
-   */
-  internal fun drainRuntimeEvents(
-    runtime: NativeRuntime,
-    maxEvents: Long,
-    batch: MemorySegment,
-  ): NativeRuntimeEventBatch {
-    batch.set(
-      ValueLayout.JAVA_INT,
-      RUNTIME_EVENT_BATCH_SIZE_OFFSET,
-      RUNTIME_EVENT_BATCH_SIZE.toInt(),
-    )
-    Status.check(MapLibreNativeC.mln_runtime_drain_events(runtime.raw, maxEvents, batch))
-    val eventCount = batch.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_BATCH_EVENT_COUNT_OFFSET)
-    val remainingCount = batch.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_BATCH_REMAINING_OFFSET)
-    if (eventCount == 0L) {
-      return NativeRuntimeEventBatch(emptyList(), remainingCount)
-    }
-    // The stride the batch reports can exceed this binding's compiled event
-    // record, so index by it rather than by mln_runtime_event.sizeof().
-    val eventSize =
-      Integer.toUnsignedLong(batch.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_BATCH_EVENT_SIZE_OFFSET))
-    val payloadExtent = eventSize - RUNTIME_EVENT_PAYLOAD_OFFSET
-    val events =
-      batch
-        .get(ValueLayout.ADDRESS, RUNTIME_EVENT_BATCH_EVENTS_OFFSET)
-        .reinterpret(eventCount * eventSize)
-    val messagesSize = batch.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_BATCH_MESSAGES_SIZE_OFFSET)
-    val messages =
-      batch.get(ValueLayout.ADDRESS, RUNTIME_EVENT_BATCH_MESSAGES_OFFSET).reinterpret(messagesSize)
-    return NativeRuntimeEventBatch(
-      List(Math.toIntExact(eventCount)) { index ->
-        val base = index * eventSize
-        val payloadType = events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_PAYLOAD_TYPE_OFFSET)
-        NativeRuntimeEvent(
-          type = events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_TYPE_OFFSET),
-          sourceType = events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_SOURCE_TYPE_OFFSET),
-          sourceId = events.get(ValueLayout.JAVA_LONG, base + RUNTIME_EVENT_SOURCE_OFFSET),
-          code = events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_CODE_OFFSET),
-          payload =
-            runtimeEventPayload(
-              payloadType,
-              events.asSlice(base + RUNTIME_EVENT_PAYLOAD_OFFSET, payloadExtent),
-            ),
-          message =
-            copyMessage(
-              messages,
-              Integer.toUnsignedLong(
-                events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_MESSAGE_OFFSET_OFFSET)
-              ),
-              Integer.toUnsignedLong(
-                events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_MESSAGE_SIZE_OFFSET)
-              ),
-            ),
-        )
-      },
-      remainingCount,
-    )
-  }
 
   internal fun setRuntimeEventMask(runtime: NativeRuntime, mask: Long) {
     Status.check(MapLibreNativeC.mln_runtime_set_event_mask(runtime.raw, mask))
@@ -3360,15 +3206,9 @@ internal object NativeAccess {
       outMask.get(ValueLayout.JAVA_LONG, 0)
     }
 
-  internal fun setMapEventMask(map: NativeMap, mask: Long) {
-    Status.check(MapLibreNativeC.mln_map_set_event_mask(map.raw, mask))
-  }
-
-  internal fun mapEventMask(map: NativeMap): Long =
-    Arena.ofConfined().use { arena ->
-      val outMask = arena.allocate(ValueLayout.JAVA_LONG)
-      Status.check(MapLibreNativeC.mln_map_get_event_mask(map.raw, outMask))
-      outMask.get(ValueLayout.JAVA_LONG, 0)
+  internal fun setMapEventMask(map: NativeMap, mask: Long): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      MapLibreNativeC.mln_map_set_event_mask(map.raw, mask, completion)
     }
 
   private fun copyMessage(messages: MemorySegment, offset: Long, size: Long): String {
@@ -3394,30 +3234,14 @@ internal object NativeAccess {
   private fun latLngForProjectedMetersFunction(): MethodHandle =
     downcall("mln_lat_lng_for_projected_meters")
 
-  private fun runtimeCreateFunction(): MethodHandle = downcall("mln_runtime_create")
-
-  private fun runtimeStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun runtimePumpFunction(): MethodHandle = downcall("mln_runtime_pump")
-
-  private fun runtimeWakeSourceAcquireFunction(): MethodHandle =
-    downcall("mln_runtime_wake_source_acquire")
-
-  private fun wakeSourceSignalFunction(): MethodHandle = downcall("mln_wake_source_signal")
-
-  private fun wakeSourceDestroyFunction(): MethodHandle = downcall("mln_wake_source_destroy")
-
   private fun runtimeAmbientCacheOperationStartFunction(): MethodHandle =
-    downcall("mln_runtime_run_ambient_cache_operation_start")
+    downcall("mln_runtime_run_ambient_cache_operation")
 
   private fun runtimeSetMaximumAmbientCacheSizeStartFunction(): MethodHandle =
-    downcall("mln_runtime_set_maximum_ambient_cache_size_start")
+    downcall("mln_runtime_set_maximum_ambient_cache_size")
 
   private fun runtimeOfflineRegionCreateStartFunction(): MethodHandle =
-    downcall("mln_runtime_offline_region_create_start")
-
-  private fun runtimeOfflineOperationDiscardFunction(): MethodHandle =
-    downcall("mln_runtime_offline_operation_discard")
+    downcall("mln_runtime_offline_region_create")
 
   private fun runtimeSetResourceProviderFunction(): MethodHandle =
     downcall("mln_runtime_set_resource_provider")
@@ -3455,19 +3279,9 @@ internal object NativeAccess {
   private fun resourceRequestReleaseFunction(): MethodHandle =
     downcall("mln_resource_request_release")
 
-  private fun mapCreateFunction(): MethodHandle = downcall("mln_map_create")
-
-  private fun mapStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapIntStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapBooleanStatusFunction(name: String): MethodHandle = downcall(name)
-
   private fun mapAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapAddressAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapAddressAddressAddressStatusFunction(name: String): MethodHandle = downcall(name)
+  private fun mapTwoAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun mapStringViewAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
@@ -3499,94 +3313,15 @@ internal object NativeAccess {
 
   private fun mapStringViewLatLngDoubleStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapDoubleStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapDoubleDoubleStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapDoubleAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapDoubleDoubleAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapDoubleAddressAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapTwoAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapTwoScreenPointsStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapTwoScreenPointsAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapLatLngBoundsAddressAddressStatusFunction(name: String): MethodHandle =
-    downcall(name)
-
-  private fun mapAddressLongAddressAddressStatusFunction(name: String): MethodHandle =
-    downcall(name)
-
-  private fun projectionAddressLongEdgeInsetsStatusFunction(name: String): MethodHandle =
-    downcall(name)
-
-  private fun projectionAddressEdgeInsetsStatusFunction(name: String): MethodHandle = downcall(name)
-
   private fun mapLatLngAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun mapScreenPointAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapAddressLongAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun projectionLatLngAddressStatusFunction(name: String): MethodHandle =
-    mapLatLngAddressStatusFunction(name)
-
-  private fun projectionScreenPointAddressStatusFunction(name: String): MethodHandle =
-    mapScreenPointAddressStatusFunction(name)
-
-  private fun renderSessionStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun renderSessionRenderUpdateFunction(): MethodHandle =
-    downcall("mln_render_session_render_update")
-
-  private fun renderSessionResizeFunction(): MethodHandle = downcall("mln_render_session_resize")
-
-  private fun renderSessionAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun renderSessionTwoAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun renderSessionQueryRenderedFeaturesFunction(): MethodHandle =
-    downcall("mln_render_session_query_rendered_features")
-
-  private fun renderSessionQuerySourceFeaturesFunction(): MethodHandle =
-    downcall("mln_render_session_query_source_features")
-
-  private fun renderSessionQueryFeatureExtensionsFunction(): MethodHandle =
-    downcall("mln_render_session_query_feature_extensions")
-
-  private fun textureReadPremultipliedRgba8Function(): MethodHandle =
-    downcall("mln_texture_read_premultiplied_rgba8")
-
-  private fun metalOwnedTextureAcquireFrameFunction(): MethodHandle =
-    renderSessionAddressStatusFunction("mln_metal_owned_texture_acquire_frame")
-
-  private fun vulkanOwnedTextureAcquireFrameFunction(): MethodHandle =
-    renderSessionAddressStatusFunction("mln_vulkan_owned_texture_acquire_frame")
-
-  private fun openglOwnedTextureAcquireFrameFunction(): MethodHandle =
-    renderSessionAddressStatusFunction("mln_opengl_owned_texture_acquire_frame")
-
-  private fun metalOwnedTextureReleaseFrameFunction(): MethodHandle =
-    renderSessionAddressStatusFunction("mln_metal_owned_texture_release_frame")
-
-  private fun vulkanOwnedTextureReleaseFrameFunction(): MethodHandle =
-    renderSessionAddressStatusFunction("mln_vulkan_owned_texture_release_frame")
-
-  private fun openglOwnedTextureReleaseFrameFunction(): MethodHandle =
-    renderSessionAddressStatusFunction("mln_opengl_owned_texture_release_frame")
 
   private fun mapStringViewDoubleStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun mapStringViewIntStringViewStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun mapStringViewTwoAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapStringViewAddressLongTwoAddressStatusFunction(name: String): MethodHandle =
-    downcall(name)
 
   private fun mapStringViewAddressLongStatusFunction(name: String): MethodHandle = downcall(name)
 
@@ -3598,105 +3333,24 @@ internal object NativeAccess {
   private fun mapStringViewAddressLongAddressStatusFunction(name: String): MethodHandle =
     downcall(name)
 
-  private fun mapListStyleSourceIdsFunction(): MethodHandle =
-    downcall("mln_map_list_style_source_ids")
-
-  private fun mapListStyleLayerIdsFunction(): MethodHandle =
-    downcall("mln_map_list_style_layer_ids")
-
-  private fun styleIdListCountFunction(): MethodHandle = downcall("mln_style_id_list_count")
-
-  private fun styleIdListGetFunction(): MethodHandle = downcall("mln_style_id_list_get")
-
-  private fun styleIdListDestroyFunction(): MethodHandle = downcall("mln_style_id_list_destroy")
-
-  private fun queriedFeatureListCountFunction(): MethodHandle =
-    downcall("mln_queried_feature_list_count")
-
-  private fun queriedFeatureListGetFunction(): MethodHandle =
-    downcall("mln_queried_feature_list_get")
-
-  private fun queriedFeatureListDestroyFunction(): MethodHandle =
-    downcall("mln_queried_feature_list_destroy")
-
-  private fun mapGetStyleSourceTileUrlsFunction(): MethodHandle =
-    downcall("mln_map_get_style_source_tile_urls")
-
-  private fun styleStringListCountFunction(): MethodHandle = downcall("mln_style_string_list_count")
-
-  private fun styleStringListGetFunction(): MethodHandle = downcall("mln_style_string_list_get")
-
-  private fun styleStringListDestroyFunction(): MethodHandle =
-    downcall("mln_style_string_list_destroy")
-
-  private fun copyStyleSourceAttributionFunction(): MethodHandle =
-    downcall("mln_map_copy_style_source_attribution")
-
-  private fun copyStyleSourceUrlFunction(): MethodHandle = downcall("mln_map_copy_style_source_url")
-
-  private fun runtimeOfflineRegionStatusTakeResultFunction(): MethodHandle =
-    downcall("mln_runtime_offline_region_get_status_take_result")
-
-  private fun runtimeOfflineRegionCreateTakeResultFunction(): MethodHandle =
-    runtimeOfflineOperationSnapshotTakeResultFunction(
-      "mln_runtime_offline_region_create_take_result"
-    )
-
-  private fun runtimeOfflineRegionGetTakeResultFunction(): MethodHandle =
-    downcall("mln_runtime_offline_region_get_take_result")
-
-  private fun runtimeOfflineRegionsListTakeResultFunction(): MethodHandle =
-    runtimeOfflineOperationListTakeResultFunction("mln_runtime_offline_regions_list_take_result")
-
-  private fun runtimeOfflineRegionsMergeDatabaseTakeResultFunction(): MethodHandle =
-    runtimeOfflineOperationListTakeResultFunction(
-      "mln_runtime_offline_regions_merge_database_take_result"
-    )
-
-  private fun runtimeOfflineRegionUpdateMetadataTakeResultFunction(): MethodHandle =
-    runtimeOfflineOperationSnapshotTakeResultFunction(
-      "mln_runtime_offline_region_update_metadata_take_result"
-    )
-
-  private fun runtimeOfflineOperationSnapshotTakeResultFunction(name: String): MethodHandle =
-    downcall(name)
-
-  private fun runtimeOfflineOperationListTakeResultFunction(name: String): MethodHandle =
-    runtimeOfflineOperationSnapshotTakeResultFunction(name)
-
-  private fun offlineRegionSnapshotGetFunction(): MethodHandle =
-    downcall("mln_offline_region_snapshot_get")
-
-  private fun offlineRegionSnapshotDestroyFunction(): MethodHandle =
-    downcall("mln_offline_region_snapshot_destroy")
-
-  private fun offlineRegionListCountFunction(): MethodHandle =
-    downcall("mln_offline_region_list_count")
-
-  private fun offlineRegionListGetFunction(): MethodHandle = downcall("mln_offline_region_list_get")
-
-  private fun offlineRegionListDestroyFunction(): MethodHandle =
-    downcall("mln_offline_region_list_destroy")
-
   private fun addTileSourceUrl(
     functionName: String,
     map: NativeMap,
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ) {
+    completion: MemorySegment,
+  ): Int =
     Arena.ofConfined().use { arena ->
-      Status.check(
-        mapTwoStringViewsAddressStatusFunction(functionName)
-          .invokeNative(
-            map,
-            stringView(arena, sourceId),
-            stringView(arena, url),
-            tileSourceOptions(arena, options),
-          ) as Int
-      )
+      mapTwoStringViewsAddressStatusFunction(functionName)
+        .invokeNative(
+          map,
+          stringView(arena, sourceId),
+          stringView(arena, url),
+          tileSourceOptions(arena, options),
+          completion,
+        ) as Int
     }
-  }
 
   private fun addTileSourceTiles(
     functionName: String,
@@ -3704,50 +3358,21 @@ internal object NativeAccess {
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ) {
+    completion: MemorySegment,
+  ): Int {
     val tileSnapshot = tiles.toList()
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapStringViewAddressLongAddressStatusFunction(functionName)
-          .invokeNative(
-            map,
-            stringView(arena, sourceId),
-            stringViewArray(arena, tileSnapshot),
-            tileSnapshot.size.toLong(),
-            tileSourceOptions(arena, options),
-          ) as Int
-      )
+    return Arena.ofConfined().use { arena ->
+      mapStringViewAddressLongAddressStatusFunction(functionName)
+        .invokeNative(
+          map,
+          stringView(arena, sourceId),
+          stringViewArray(arena, tileSnapshot),
+          tileSnapshot.size.toLong(),
+          tileSourceOptions(arena, options),
+          completion,
+        ) as Int
     }
   }
-
-  private fun startRuntimeOperation(name: String, runtime: NativeRuntime): Long =
-    Arena.ofConfined().use { arena ->
-      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
-      Status.check(runtimeOperationStartFunction(name).invokeNative(runtime, outOperationId) as Int)
-      outOperationId.get(ValueLayout.JAVA_LONG, 0)
-    }
-
-  private fun startRuntimeLongOperation(name: String, runtime: NativeRuntime, value: Long): Long =
-    Arena.ofConfined().use { arena ->
-      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
-      Status.check(
-        runtimeLongOperationStartFunction(name).invokeNative(runtime, value, outOperationId) as Int
-      )
-      outOperationId.get(ValueLayout.JAVA_LONG, 0)
-    }
-
-  private fun runtimeOperationStartFunction(name: String): MethodHandle = downcall(name)
-
-  private fun runtimeLongOperationStartFunction(name: String): MethodHandle = downcall(name)
-
-  private fun runtimeAddressOperationStartFunction(name: String): MethodHandle = downcall(name)
-
-  private fun runtimeLongAddressLongOperationStartFunction(name: String): MethodHandle =
-    downcall(name)
-
-  private fun runtimeLongBooleanOperationStartFunction(name: String): MethodHandle = downcall(name)
-
-  private fun runtimeLongIntOperationStartFunction(name: String): MethodHandle = downcall(name)
 
   internal fun defaultRuntimeOptionsEventMask(): Long {
     ensureLoaded()
@@ -4226,35 +3851,6 @@ internal object NativeAccess {
     return segment
   }
 
-  private fun mapCameraAnimationCommand(
-    functionName: String,
-    map: NativeMap,
-    camera: CameraOptions,
-    animation: AnimationOptions?,
-  ) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapTwoAddressStatusFunction(functionName)
-          .invokeNative(map, cameraOptions(arena, camera), animationOptions(arena, animation))
-          as Int
-      )
-    }
-  }
-
-  private fun mapLatLngBoundsForCamera(
-    functionName: String,
-    map: NativeMap,
-    camera: CameraOptions,
-  ): LatLngBounds =
-    Arena.ofConfined().use { arena ->
-      val outBounds = arena.allocate(latLngBoundsLayout)
-      Status.check(
-        mapTwoAddressStatusFunction(functionName)
-          .invokeNative(map, cameraOptions(arena, camera), outBounds) as Int
-      )
-      latLngBounds(outBounds)
-    }
-
   private fun boundOptionsDefault(arena: Arena): MemorySegment =
     MapLibreNativeC.mln_bound_options_default(arena)
 
@@ -4373,7 +3969,7 @@ internal object NativeAccess {
       fields = fields or STYLE_IMAGE_OPTION_SDF
       segment.set(ValueLayout.JAVA_BOOLEAN, STYLE_IMAGE_OPTIONS_SDF_OFFSET, it)
     }
-    value?.stretchX?.let {
+    value.stretchX?.let {
       fields = fields or STYLE_IMAGE_OPTION_STRETCH_X
       segment.set(
         ValueLayout.ADDRESS,
@@ -4386,7 +3982,7 @@ internal object NativeAccess {
         it.size.toLong(),
       )
     }
-    value?.stretchY?.let {
+    value.stretchY?.let {
       fields = fields or STYLE_IMAGE_OPTION_STRETCH_Y
       segment.set(
         ValueLayout.ADDRESS,
@@ -4399,7 +3995,7 @@ internal object NativeAccess {
         it.size.toLong(),
       )
     }
-    value?.content?.let {
+    value.content?.let {
       fields = fields or STYLE_IMAGE_OPTION_CONTENT
       val content = segment.asSlice(STYLE_IMAGE_OPTIONS_CONTENT_OFFSET, mln_image_content.sizeof())
       content.set(ValueLayout.JAVA_FLOAT, IMAGE_CONTENT_LEFT_OFFSET, it.left)
@@ -4407,11 +4003,11 @@ internal object NativeAccess {
       content.set(ValueLayout.JAVA_FLOAT, IMAGE_CONTENT_RIGHT_OFFSET, it.right)
       content.set(ValueLayout.JAVA_FLOAT, IMAGE_CONTENT_BOTTOM_OFFSET, it.bottom)
     }
-    value?.textFitWidth?.let {
+    value.textFitWidth?.let {
       fields = fields or STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH
       segment.set(ValueLayout.JAVA_INT, STYLE_IMAGE_OPTIONS_TEXT_FIT_WIDTH_OFFSET, it.nativeValue)
     }
-    value?.textFitHeight?.let {
+    value.textFitHeight?.let {
       fields = fields or STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT
       segment.set(ValueLayout.JAVA_INT, STYLE_IMAGE_OPTIONS_TEXT_FIT_HEIGHT_OFFSET, it.nativeValue)
     }
@@ -4533,6 +4129,9 @@ internal object NativeAccess {
 
   private fun debugOptions(mask: Int): Set<DebugOption> =
     DebugOption.entries.filterTo(mutableSetOf()) { option -> (mask and option.nativeMask) != 0 }
+
+  private fun debugOptionMask(options: Set<DebugOption>): Int =
+    options.fold(0) { mask, option -> mask or option.nativeMask }
 
   private fun latLng(value: LatLng, arena: Arena): MemorySegment {
     val segment = arena.allocate(latLngLayout)
@@ -4686,30 +4285,6 @@ internal object NativeAccess {
     return address.reinterpret(byteCount).toArray(ValueLayout.JAVA_BYTE)
   }
 
-  private fun ownedBuffer(buffer: NativeOwnedBuffer): ByteArray? =
-    ownedBuffer(
-      buffer,
-      getter = { handle, bytes -> downcall("mln_buffer_get").invokeNative(handle, bytes) as Int },
-      destroyer = { handle -> downcall("mln_buffer_destroy").invokeNative(handle) },
-    )
-
-  private fun ownedBuffer(
-    buffer: NativeOwnedBuffer,
-    getter: (NativeOwnedBuffer, MemorySegment) -> Int,
-    destroyer: (NativeOwnedBuffer) -> Unit,
-  ): ByteArray? {
-    if (buffer.isNull) return null
-    return try {
-      Arena.ofConfined().use { arena ->
-        val bytes = mln_buffer_view.allocate(arena)
-        Status.check(getter(buffer, bytes))
-        copyBytes(mln_buffer_view.data(bytes), mln_buffer_view.size(bytes))
-      }
-    } finally {
-      destroyer(buffer)
-    }
-  }
-
   private fun copyString(address: MemorySegment, byteCount: Long): String =
     String(copyBytes(address, byteCount), StandardCharsets.UTF_8)
 
@@ -4729,6 +4304,10 @@ internal object NativeAccess {
       segment.get(ValueLayout.ADDRESS, STRING_VIEW_DATA_OFFSET),
       segment.get(ValueLayout.JAVA_LONG, STRING_VIEW_SIZE_OFFSET),
     )
+
+  /** Reads one buffer view that reports an absent value as an empty view. */
+  private fun optionalStringView(segment: MemorySegment): String? =
+    stringView(segment).ifEmpty { null }
 
   internal fun resourceRequest(request: MemorySegment): ResourceRequest =
     ResourceRequest(
@@ -4841,15 +4420,16 @@ internal object NativeAccess {
 
   private fun mapOptions(options: MapOptions, arena: Arena): MemorySegment {
     val segment = MapLibreNativeC.mln_map_options_default(arena)
+    val extent = mln_map_options.initial_extent(segment)
     options.width?.let {
       Status.requireArgument(it >= 0) { "width must be non-negative" }
-      mln_map_options.width(segment, it)
+      mln_logical_extent.width(extent, it)
     }
     options.height?.let {
       Status.requireArgument(it >= 0) { "height must be non-negative" }
-      mln_map_options.height(segment, it)
+      mln_logical_extent.height(extent, it)
     }
-    options.scaleFactor?.let { mln_map_options.scale_factor(segment, it) }
+    options.scaleFactor?.let { mln_logical_extent.scale_factor(extent, it) }
     options.mapMode?.let {
       Status.requireArgument(it.isKnown) {
         "Unknown map mode cannot be used as input: ${it.nativeValue}"
@@ -4877,6 +4457,122 @@ internal object NativeAccess {
         OFFLINE_REGION_STATUS_REQUIRED_RESOURCE_COUNT_IS_PRECISE_OFFSET,
       ),
       status.get(ValueLayout.JAVA_BOOLEAN, OFFLINE_REGION_STATUS_COMPLETE_OFFSET),
+    )
+
+  private fun completionValue(result: MemorySegment, byteSize: Long): MemorySegment {
+    val value = mln_completion_result.value(result)
+    check(value != MemorySegment.NULL) { "native completion omitted its result value" }
+    return value.reinterpret(byteSize)
+  }
+
+  private fun stringViewsCompletion(result: MemorySegment): List<String> {
+    val count = checkedInt(mln_completion_result.value_count(result))
+    if (count == 0) return emptyList()
+    val values = completionValue(result, mln_buffer_view.sizeof() * count.toLong())
+    return List(count) { index ->
+      stringView(values.asSlice(index * mln_buffer_view.sizeof(), mln_buffer_view.sizeof()))
+    }
+  }
+
+  private fun stringViews(array: MemorySegment, rawCount: Long): List<String> {
+    val count = checkedInt(rawCount)
+    if (count == 0) return emptyList()
+    val views = array.reinterpret(mln_buffer_view.sizeof() * count.toLong())
+    return List(count) { index ->
+      stringView(views.asSlice(index * mln_buffer_view.sizeof(), mln_buffer_view.sizeof()))
+    }
+  }
+
+  private fun optionalBufferCompletion(result: MemorySegment): ByteArray? {
+    if (mln_completion_result.value_count(result) == 0L) return null
+    val view = completionValue(result, mln_buffer_view.sizeof())
+    return copyBytes(mln_buffer_view.data(view), mln_buffer_view.size(view))
+  }
+
+  private fun requiredBufferCompletion(result: MemorySegment): ByteArray =
+    checkNotNull(optionalBufferCompletion(result)) { "native completion omitted its byte result" }
+
+  private fun queriedFeaturesCompletion(result: MemorySegment): List<QueriedFeature> {
+    val count = checkedInt(mln_completion_result.value_count(result))
+    if (count == 0) return emptyList()
+    val values = completionValue(result, mln_queried_feature.sizeof() * count.toLong())
+    return List(count) { index ->
+      queriedFeature(
+        values.asSlice(index * mln_queried_feature.sizeof(), mln_queried_feature.sizeof())
+      )
+    }
+  }
+
+  private fun textureReadbackCompletion(result: MemorySegment): TextureReadback {
+    val value = completionValue(result, mln_texture_readback_result.sizeof())
+    return TextureReadback(
+      copyBufferView(mln_texture_readback_result.data(value)),
+      readTextureImageInfo(mln_texture_readback_result.info(value)),
+    )
+  }
+
+  private fun sourceInfoCompletion(result: MemorySegment): SourceInfo? {
+    if (mln_completion_result.value_count(result) == 0L) return null
+    val raw = completionValue(result, mln_style_source_result.sizeof())
+    val info = mln_style_source_result.info(raw)
+    val fields = mln_style_source_info.fields(info)
+    val tileUrls =
+      stringViews(
+        mln_style_source_result.tile_urls(raw),
+        mln_style_source_result.tile_url_count(raw),
+      )
+    return SourceInfo(
+      SourceType.fromNative(mln_style_source_info.type(info)),
+      mln_style_source_info.is_volatile(info),
+      if (mln_style_source_info.has_attribution(info))
+        stringView(mln_style_source_result.attribution(raw))
+      else null,
+      if (fields and STYLE_SOURCE_INFO_URL != 0) stringView(mln_style_source_result.url(raw))
+      else null,
+      if (fields and STYLE_SOURCE_INFO_TILEJSON != 0)
+        TileJson(
+          tileUrls,
+          mln_style_source_info.min_zoom(info),
+          mln_style_source_info.max_zoom(info),
+          TileScheme.fromNative(mln_style_source_info.scheme(info)),
+          if (fields and STYLE_SOURCE_INFO_BOUNDS != 0)
+            latLngBounds(mln_style_source_info.bounds(info))
+          else null,
+        )
+      else null,
+      if (fields and STYLE_SOURCE_INFO_TILE_SIZE != 0)
+        Math.toIntExact(Integer.toUnsignedLong(mln_style_source_info.tile_size(info)))
+      else null,
+      if (fields and STYLE_SOURCE_INFO_VECTOR_ENCODING != 0)
+        VectorTileEncoding.fromNative(mln_style_source_info.vector_encoding(info))
+      else null,
+      if (fields and STYLE_SOURCE_INFO_RASTER_ENCODING != 0)
+        RasterDemEncoding.fromNative(mln_style_source_info.raster_encoding(info))
+      else null,
+    )
+  }
+
+  private fun offlineRegionList(
+    runtime: NativeRuntime,
+    submit: (MemorySegment) -> Int,
+  ): Deferred<List<OfflineRegionInfo>> =
+    CompletionBridge.submit(
+      { result ->
+        val count = Math.toIntExact(mln_completion_result.value_count(result))
+        if (count == 0) emptyList()
+        else {
+          val values = completionValue(result, mln_offline_region_info.sizeof() * count.toLong())
+          List(count) { index ->
+            offlineRegionInfo(
+              values.asSlice(
+                index * mln_offline_region_info.sizeof(),
+                mln_offline_region_info.sizeof(),
+              )
+            )
+          }
+        }
+      },
+      submit,
     )
 
   private fun offlineRegionDefinition(value: OfflineRegionDefinition, arena: Arena): MemorySegment {
@@ -5028,96 +4724,6 @@ internal object NativeAccess {
       ),
     )
 
-  private fun offlineRegionSnapshot(snapshot: NativeOfflineRegionSnapshot): OfflineRegionInfo =
-    try {
-      Arena.ofConfined().use { arena ->
-        val info = arena.allocate(OFFLINE_REGION_INFO_SIZE)
-        info.set(
-          ValueLayout.JAVA_INT,
-          OFFLINE_REGION_INFO_SIZE_OFFSET,
-          OFFLINE_REGION_INFO_SIZE.toInt(),
-        )
-        Status.check(offlineRegionSnapshotGetFunction().invokeNative(snapshot, info) as Int)
-        offlineRegionInfo(info)
-      }
-    } finally {
-      offlineRegionSnapshotDestroyFunction().invokeNative(snapshot)
-    }
-
-  private fun offlineRegionList(list: NativeOfflineRegionList): List<OfflineRegionInfo> =
-    offlineRegionList(
-      list,
-      counter = { handle, outCount ->
-        offlineRegionListCountFunction().invokeNative(handle, outCount) as Int
-      },
-      getter = { handle, index, outInfo ->
-        offlineRegionListGetFunction().invokeNative(handle, index, outInfo) as Int
-      },
-      destroyer = { handle -> offlineRegionListDestroyFunction().invokeNative(handle) },
-    )
-
-  private fun offlineRegionList(
-    list: NativeOfflineRegionList,
-    counter: (NativeOfflineRegionList, MemorySegment) -> Int,
-    getter: (NativeOfflineRegionList, Long, MemorySegment) -> Int,
-    destroyer: (NativeOfflineRegionList) -> Unit,
-  ): List<OfflineRegionInfo> =
-    try {
-      Arena.ofConfined().use { arena ->
-        val outCount = arena.allocate(ValueLayout.JAVA_LONG)
-        Status.check(counter(list, outCount))
-        val count = Math.toIntExact(outCount.get(ValueLayout.JAVA_LONG, 0))
-        List(count) { index ->
-          val info = arena.allocate(OFFLINE_REGION_INFO_SIZE)
-          info.set(
-            ValueLayout.JAVA_INT,
-            OFFLINE_REGION_INFO_SIZE_OFFSET,
-            OFFLINE_REGION_INFO_SIZE.toInt(),
-          )
-          Status.check(getter(list, index.toLong(), info))
-          offlineRegionInfo(info)
-        }
-      }
-    } finally {
-      destroyer(list)
-    }
-
-  private fun styleIdList(list: NativeStyleIdList): List<String> =
-    try {
-      Arena.ofConfined().use { arena ->
-        val outCount = arena.allocate(ValueLayout.JAVA_LONG)
-        Status.check(styleIdListCountFunction().invokeNative(list, outCount) as Int)
-        val count = Math.toIntExact(outCount.get(ValueLayout.JAVA_LONG, 0))
-        List(count) { index ->
-          val outId = arena.allocate(STRING_VIEW_SIZE)
-          Status.check(styleIdListGetFunction().invokeNative(list, index.toLong(), outId) as Int)
-          stringView(outId)
-        }
-      }
-    } finally {
-      styleIdListDestroyFunction().invokeNative(list)
-    }
-
-  private fun queriedFeatureList(list: NativeQueriedFeatureList): List<QueriedFeature> =
-    try {
-      check(!list.isNull) { "mln_queried_feature_list returned the null handle" }
-      Arena.ofConfined().use { arena ->
-        val outCount = arena.allocate(ValueLayout.JAVA_LONG)
-        Status.check(queriedFeatureListCountFunction().invokeNative(list, outCount) as Int)
-        val count = Math.toIntExact(outCount.get(ValueLayout.JAVA_LONG, 0))
-        List(count) { index ->
-          val outFeature = mln_queried_feature.allocate(arena)
-          mln_queried_feature.size(outFeature, mln_queried_feature.sizeof().toInt())
-          Status.check(
-            queriedFeatureListGetFunction().invokeNative(list, index.toLong(), outFeature) as Int
-          )
-          queriedFeature(outFeature)
-        }
-      }
-    } finally {
-      queriedFeatureListDestroyFunction().invokeNative(list)
-    }
-
   private fun queriedFeature(segment: MemorySegment): QueriedFeature {
     val fields = mln_queried_feature.fields(segment)
     return QueriedFeature(
@@ -5135,134 +4741,6 @@ internal object NativeAccess {
 
   private fun copyBufferView(view: MemorySegment): ByteArray =
     copyBytes(mln_buffer_view.data(view), mln_buffer_view.size(view))
-
-  private fun styleSourceTileUrls(
-    map: NativeMap,
-    sourceId: MemorySegment,
-    arena: Arena,
-  ): List<String> {
-    val outList = arena.allocate(ValueLayout.JAVA_LONG)
-    outList.set(ValueLayout.JAVA_LONG, 0, 0L)
-    val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-    Status.check(
-      mapGetStyleSourceTileUrlsFunction().invokeNative(map, sourceId, outList, outFound) as Int
-    )
-    check(outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
-      "style source disappeared while its metadata was copied"
-    }
-    val list = NativeStyleStringList(outList.get(ValueLayout.JAVA_LONG, 0))
-    check(!list.isNull) { "mln_map_get_style_source_tile_urls returned the null handle" }
-    return styleStringList(list)
-  }
-
-  private fun styleStringList(list: NativeStyleStringList): List<String> =
-    styleStringList(
-      list,
-      counter = { handle, outCount ->
-        styleStringListCountFunction().invokeNative(handle, outCount) as Int
-      },
-      getter = { handle, index, outValue ->
-        styleStringListGetFunction().invokeNative(handle, index, outValue) as Int
-      },
-      destroyer = { handle -> styleStringListDestroyFunction().invokeNative(handle) },
-    )
-
-  private fun styleStringList(
-    list: NativeStyleStringList,
-    counter: (NativeStyleStringList, MemorySegment) -> Int,
-    getter: (NativeStyleStringList, Long, MemorySegment) -> Int,
-    destroyer: (NativeStyleStringList) -> Unit,
-  ): List<String> =
-    try {
-      Arena.ofConfined().use { arena ->
-        val outCount = arena.allocate(ValueLayout.JAVA_LONG)
-        Status.check(counter(list, outCount))
-        val count = Math.toIntExact(outCount.get(ValueLayout.JAVA_LONG, 0))
-        List(count) { index ->
-          val outValue = arena.allocate(STRING_VIEW_SIZE)
-          Status.check(getter(list, index.toLong(), outValue))
-          stringView(outValue)
-        }
-      }
-    } finally {
-      destroyer(list)
-    }
-
-  private fun copyStyleSourceAttribution(
-    map: NativeMap,
-    sourceId: MemorySegment,
-    attributionSize: Long,
-    arena: Arena,
-  ): String? {
-    if (attributionSize == 0L) {
-      return ""
-    }
-    val outAttribution = arena.allocate(attributionSize)
-    val outAttributionSize = arena.allocate(ValueLayout.JAVA_LONG)
-    val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-    Status.check(
-      copyStyleSourceAttributionFunction()
-        .invokeNative(map, sourceId, outAttribution, attributionSize, outAttributionSize, outFound)
-        as Int
-    )
-    if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
-      return null
-    }
-    return copyString(outAttribution, outAttributionSize.get(ValueLayout.JAVA_LONG, 0))
-  }
-
-  private fun copyStyleSourceUrl(
-    map: NativeMap,
-    sourceId: MemorySegment,
-    urlSize: Long,
-    arena: Arena,
-  ): String? {
-    val outUrl = if (urlSize == 0L) MemorySegment.NULL else arena.allocate(urlSize)
-    val outUrlSize = arena.allocate(ValueLayout.JAVA_LONG)
-    val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-    Status.check(
-      copyStyleSourceUrlFunction()
-        .invokeNative(map, sourceId, outUrl, urlSize, outUrlSize, outFound) as Int
-    )
-    if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) return null
-    return if (urlSize == 0L) "" else copyString(outUrl, outUrlSize.get(ValueLayout.JAVA_LONG, 0))
-  }
-
-  private fun takeOfflineRegionSnapshot(
-    runtime: NativeRuntime,
-    operationId: Long,
-    function: MethodHandle,
-    markTaken: () -> Unit,
-  ): OfflineRegionInfo =
-    Arena.ofConfined().use { arena ->
-      val outSnapshot = arena.allocate(ValueLayout.JAVA_LONG)
-      outSnapshot.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(function.invokeNative(runtime, operationId, outSnapshot) as Int)
-      try {
-        offlineRegionSnapshot(
-          NativeOfflineRegionSnapshot(outSnapshot.get(ValueLayout.JAVA_LONG, 0))
-        )
-      } finally {
-        markTaken()
-      }
-    }
-
-  private fun takeOfflineRegionList(
-    runtime: NativeRuntime,
-    operationId: Long,
-    function: MethodHandle,
-    markTaken: () -> Unit,
-  ): List<OfflineRegionInfo> =
-    Arena.ofConfined().use { arena ->
-      val outList = arena.allocate(ValueLayout.JAVA_LONG)
-      outList.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(function.invokeNative(runtime, operationId, outList) as Int)
-      try {
-        offlineRegionList(NativeOfflineRegionList(outList.get(ValueLayout.JAVA_LONG, 0)))
-      } finally {
-        markTaken()
-      }
-    }
 
   private fun offlineRegionInfo(info: MemorySegment): OfflineRegionInfo =
     OfflineRegionInfo(
@@ -5357,7 +4835,6 @@ internal object NativeAccess {
       PAYLOAD_OFFLINE_REGION_STATUS -> offlineRegionStatusPayload(payload)
       PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR -> offlineRegionResponseErrorPayload(payload)
       PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT -> offlineRegionTileCountLimitPayload(payload)
-      PAYLOAD_OFFLINE_OPERATION_COMPLETED -> offlineOperationCompletedPayload(payload)
       PAYLOAD_CAMERA_TRANSITION_FINISHED -> cameraTransitionFinishedPayload(payload)
       else -> unknownPayload(payloadType, payload)
     }
@@ -5443,27 +4920,6 @@ internal object NativeAccess {
       payload.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_LIMIT_OFFSET),
     )
 
-  private fun offlineOperationCompletedPayload(
-    payload: MemorySegment
-  ): RuntimeEventPayload.OfflineOperationCompleted =
-    RuntimeEventPayload.OfflineOperationCompleted(
-      payload.get(
-        ValueLayout.JAVA_LONG,
-        RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_OPERATION_ID_OFFSET,
-      ),
-      OfflineOperationKind.fromNative(
-        payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_KIND_OFFSET)
-      ),
-      OfflineOperationResultKind.fromNative(
-        payload.get(
-          ValueLayout.JAVA_INT,
-          RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_RESULT_KIND_OFFSET,
-        )
-      ),
-      payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET),
-      payload.get(ValueLayout.JAVA_BOOLEAN, RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET),
-    )
-
   private fun cameraTransitionFinishedPayload(
     payload: MemorySegment
   ): RuntimeEventPayload.CameraTransitionFinished =
@@ -5472,6 +4928,30 @@ internal object NativeAccess {
         ValueLayout.JAVA_LONG,
         RUNTIME_EVENT_CAMERA_TRANSITION_FINISHED_TRANSITION_ID_OFFSET,
       )
+    )
+
+  private fun renderFrameResult(segment: MemorySegment): RenderFrameResult =
+    RenderFrameResult(
+      disposition = RenderResult.fromNative(mln_render_frame_result.disposition(segment)),
+      token = mln_render_frame_result.token(segment),
+      mapUpdateGeneration = mln_render_frame_result.map_update_generation(segment),
+      extentGeneration = mln_render_frame_result.extent_generation(segment),
+      frameGeneration = mln_render_frame_result.frame_generation(segment),
+      needsRepaint = mln_render_frame_result.needs_repaint(segment),
+    )
+
+  private fun gpuSync(arena: Arena, sync: GpuSync): MemorySegment =
+    MapLibreNativeC.mln_gpu_sync_default(arena).also { segment ->
+      mln_gpu_sync.kind(segment, sync.kind.nativeValue)
+      mln_gpu_sync.`object`(segment, sync.objectHandle)
+      mln_gpu_sync.value(segment, sync.value)
+    }
+
+  private fun readGpuSync(segment: MemorySegment): GpuSync =
+    GpuSync(
+      kind = GpuSyncKind.fromNative(mln_gpu_sync.kind(segment)),
+      objectHandle = mln_gpu_sync.`object`(segment),
+      value = mln_gpu_sync.value(segment),
     )
 
   /**
@@ -5485,6 +4965,26 @@ internal object NativeAccess {
 
   private fun downcall(name: String): MethodHandle =
     MapLibreNativeC::class.java.getMethod("${name}\$handle").invoke(null) as MethodHandle
+
+  /** One symbol looked up at run time, keyed by the exact signature the call site passes. */
+  private data class DynamicDowncall(val name: String, val descriptor: FunctionDescriptor)
+
+  private fun dynamicStatusDowncall(
+    name: String,
+    vararg argumentLayouts: MemoryLayout,
+  ): MethodHandle {
+    val key = DynamicDowncall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, *argumentLayouts))
+    dynamicDowncallCache[key]?.let {
+      return it
+    }
+    ensureLoaded()
+    val address =
+      SymbolLookup.loaderLookup().find(name).orElseThrow {
+        UnsatisfiedLinkError("Loaded native library does not expose $name.")
+      }
+    val handle = Linker.nativeLinker().downcallHandle(address, key.descriptor)
+    return dynamicDowncallCache.putIfAbsent(key, handle) ?: handle
+  }
 
   private fun nativeAccessFailure(cause: Throwable): IllegalStateException =
     IllegalStateException(
@@ -5515,6 +5015,14 @@ internal object NativeAccess {
   private val latLngBoundsLayout = mln_lat_lng_bounds.layout()
   private val canonicalTileIdLayout = mln_canonical_tile_id.layout()
   private val unitBezierLayout = mln_unit_bezier.layout()
+
+  private val dynamicDowncallCache = ConcurrentHashMap<DynamicDowncall, MethodHandle>()
+  private const val RENDER_CAPABILITY_FRAME_ACQUISITION: Int = 1 shl 0
+  private const val RENDER_CAPABILITY_READBACK: Int = 1 shl 1
+  private const val RENDER_CAPABILITY_CONSUMER_SYNC: Int = 1 shl 2
+  private const val RENDER_CAPABILITY_PRESENTATION: Int = 1 shl 3
+  private const val FRAME_DEMAND_IF_NEEDED: Int = 1 shl 0
+  private const val FRAME_DEMAND_PRESENT: Int = 1 shl 1
   private val vec3Layout = mln_vec3.layout()
   private val quaternionLayout = mln_quaternion.layout()
   private val stringViewLayout = mln_buffer_view.layout()
@@ -5534,18 +5042,15 @@ internal object NativeAccess {
   private val SCREEN_LINE_STRING_POINT_COUNT_OFFSET: Long =
     mln_screen_line_string.`point_count$offset`()
 
-  private val UNIT_BEZIER_SIZE: Long = mln_unit_bezier.sizeof()
   private val UNIT_BEZIER_X1_OFFSET: Long = mln_unit_bezier.`x1$offset`()
   private val UNIT_BEZIER_Y1_OFFSET: Long = mln_unit_bezier.`y1$offset`()
   private val UNIT_BEZIER_X2_OFFSET: Long = mln_unit_bezier.`x2$offset`()
   private val UNIT_BEZIER_Y2_OFFSET: Long = mln_unit_bezier.`y2$offset`()
 
-  private val VEC3_SIZE: Long = mln_vec3.sizeof()
   private val VEC3_X_OFFSET: Long = mln_vec3.`x$offset`()
   private val VEC3_Y_OFFSET: Long = mln_vec3.`y$offset`()
   private val VEC3_Z_OFFSET: Long = mln_vec3.`z$offset`()
 
-  private val QUATERNION_SIZE: Long = mln_quaternion.sizeof()
   private val QUATERNION_X_OFFSET: Long = mln_quaternion.`x$offset`()
   private val QUATERNION_Y_OFFSET: Long = mln_quaternion.`y$offset`()
   private val QUATERNION_Z_OFFSET: Long = mln_quaternion.`z$offset`()
@@ -5553,7 +5058,6 @@ internal object NativeAccess {
 
   private val LAT_LNG_BOUNDS_SIZE: Long = mln_lat_lng_bounds.sizeof()
 
-  private val CANONICAL_TILE_ID_SIZE: Long = mln_canonical_tile_id.sizeof()
   private val CANONICAL_TILE_ID_Z_OFFSET: Long = mln_canonical_tile_id.`z$offset`()
   private val CANONICAL_TILE_ID_X_OFFSET: Long = mln_canonical_tile_id.`x$offset`()
   private val CANONICAL_TILE_ID_Y_OFFSET: Long = mln_canonical_tile_id.`y$offset`()
@@ -5610,9 +5114,6 @@ internal object NativeAccess {
     mln_style_source_info.`is_volatile$offset`()
   private val STYLE_SOURCE_INFO_HAS_ATTRIBUTION_OFFSET: Long =
     mln_style_source_info.`has_attribution$offset`()
-  private val STYLE_SOURCE_INFO_ATTRIBUTION_SIZE_OFFSET: Long =
-    mln_style_source_info.`attribution_size$offset`()
-  private val STYLE_SOURCE_INFO_URL_SIZE_OFFSET: Long = mln_style_source_info.`url_size$offset`()
   private val STYLE_SOURCE_INFO_MIN_ZOOM_OFFSET: Long = mln_style_source_info.`min_zoom$offset`()
   private val STYLE_SOURCE_INFO_MAX_ZOOM_OFFSET: Long = mln_style_source_info.`max_zoom$offset`()
   private val STYLE_SOURCE_INFO_SCHEME_OFFSET: Long = mln_style_source_info.`scheme$offset`()
@@ -5630,9 +5131,11 @@ internal object NativeAccess {
   private const val STYLE_SOURCE_INFO_VECTOR_ENCODING: Int = 1 shl 4
   private const val STYLE_SOURCE_INFO_RASTER_ENCODING: Int = 1 shl 5
 
+  private const val STYLE_LAYER_INFO_SOURCE_ID: Int = 1 shl 0
+  private const val STYLE_LAYER_INFO_SOURCE_LAYER: Int = 1 shl 1
+
   private const val IMAGE_SOURCE_COORDINATE_COUNT: Int = 4
 
-  private val EDGE_INSETS_SIZE: Long = mln_edge_insets.sizeof()
   private val EDGE_INSETS_TOP_OFFSET: Long = mln_edge_insets.`top$offset`()
   private val EDGE_INSETS_LEFT_OFFSET: Long = mln_edge_insets.`left$offset`()
   private val EDGE_INSETS_BOTTOM_OFFSET: Long = mln_edge_insets.`bottom$offset`()
@@ -5876,19 +5379,18 @@ internal object NativeAccess {
     mln_runtime_event.`message_offset$offset`()
   private val RUNTIME_EVENT_MESSAGE_SIZE_OFFSET: Long = mln_runtime_event.`message_size$offset`()
 
-  private val RUNTIME_EVENT_BATCH_SIZE: Long = mln_runtime_event_batch.sizeof()
-  private val RUNTIME_EVENT_BATCH_SIZE_OFFSET: Long = mln_runtime_event_batch.`size$offset`()
+  private val RUNTIME_EVENT_BATCH_SIZE: Long = mln_runtime_event_batch_view.sizeof()
+  private val RUNTIME_EVENT_BATCH_SIZE_OFFSET: Long = mln_runtime_event_batch_view.`size$offset`()
   private val RUNTIME_EVENT_BATCH_EVENT_SIZE_OFFSET: Long =
-    mln_runtime_event_batch.`event_size$offset`()
-  private val RUNTIME_EVENT_BATCH_EVENTS_OFFSET: Long = mln_runtime_event_batch.`events$offset`()
+    mln_runtime_event_batch_view.`event_size$offset`()
+  private val RUNTIME_EVENT_BATCH_EVENTS_OFFSET: Long =
+    mln_runtime_event_batch_view.`events$offset`()
   private val RUNTIME_EVENT_BATCH_EVENT_COUNT_OFFSET: Long =
-    mln_runtime_event_batch.`event_count$offset`()
+    mln_runtime_event_batch_view.`event_count$offset`()
   private val RUNTIME_EVENT_BATCH_MESSAGES_OFFSET: Long =
-    mln_runtime_event_batch.`messages$offset`()
+    mln_runtime_event_batch_view.`messages$offset`()
   private val RUNTIME_EVENT_BATCH_MESSAGES_SIZE_OFFSET: Long =
-    mln_runtime_event_batch.`messages_size$offset`()
-  private val RUNTIME_EVENT_BATCH_REMAINING_OFFSET: Long =
-    mln_runtime_event_batch.`remaining_count$offset`()
+    mln_runtime_event_batch_view.`messages_size$offset`()
 
   private val RESOURCE_REQUEST_REQUESTED_URL_OFFSET: Long =
     mln_resource_request.`requested_url$offset`()
@@ -5954,11 +5456,8 @@ internal object NativeAccess {
     MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR()
   private val PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT: Int =
     MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT()
-  private val PAYLOAD_OFFLINE_OPERATION_COMPLETED: Int =
-    MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED()
   private val PAYLOAD_CAMERA_TRANSITION_FINISHED: Int =
     MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED()
-
   private val OFFLINE_REGION_STATUS_SIZE: Long = mln_offline_region_status.sizeof()
   private val OFFLINE_REGION_STATUS_SIZE_OFFSET: Long = mln_offline_region_status.`size$offset`()
   private val OFFLINE_REGION_STATUS_DOWNLOAD_STATE_OFFSET: Long =
@@ -6028,17 +5527,6 @@ internal object NativeAccess {
     mln_runtime_event_offline_region_tile_count_limit.`region_id$offset`()
   private val RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_LIMIT_OFFSET: Long =
     mln_runtime_event_offline_region_tile_count_limit.`limit$offset`()
-
-  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_OPERATION_ID_OFFSET: Long =
-    mln_runtime_event_offline_operation_completed.`operation_id$offset`()
-  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_KIND_OFFSET: Long =
-    mln_runtime_event_offline_operation_completed.`operation_kind$offset`()
-  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_RESULT_KIND_OFFSET: Long =
-    mln_runtime_event_offline_operation_completed.`result_kind$offset`()
-  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET: Long =
-    mln_runtime_event_offline_operation_completed.`result_status$offset`()
-  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET: Long =
-    mln_runtime_event_offline_operation_completed.`found$offset`()
 
   private val RUNTIME_EVENT_CAMERA_TRANSITION_FINISHED_TRANSITION_ID_OFFSET: Long =
     mln_runtime_event_camera_transition_finished.`transition_id$offset`()
@@ -6144,35 +5632,6 @@ internal object NativeAccess {
         native.get(ValueLayout.JAVA_INT, RENDERED_QUERY_GEOMETRY_TYPE_OFFSET)
       }
 
-    fun featureStateSelectorSnapshot(value: FeatureStateSelector): FeatureStateSelectorSnapshot =
-      Arena.ofConfined().use { arena ->
-        val native = featureStateSelector(arena, value)
-        val fields = native.get(ValueLayout.JAVA_INT, FEATURE_STATE_SELECTOR_FIELDS_OFFSET)
-        FeatureStateSelectorSnapshot(
-          fields,
-          stringView(native.asSlice(FEATURE_STATE_SELECTOR_SOURCE_ID_OFFSET, STRING_VIEW_SIZE)),
-          if ((fields and FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID) != 0)
-            stringView(
-              native.asSlice(FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID_OFFSET, STRING_VIEW_SIZE)
-            )
-          else null,
-          if ((fields and FEATURE_STATE_SELECTOR_FEATURE_ID) != 0)
-            stringView(native.asSlice(FEATURE_STATE_SELECTOR_FEATURE_ID_OFFSET, STRING_VIEW_SIZE))
-          else null,
-          if ((fields and FEATURE_STATE_SELECTOR_STATE_KEY) != 0)
-            stringView(native.asSlice(FEATURE_STATE_SELECTOR_STATE_KEY_OFFSET, STRING_VIEW_SIZE))
-          else null,
-        )
-      }
-
-    data class FeatureStateSelectorSnapshot(
-      val fields: Int,
-      val sourceId: String,
-      val sourceLayerId: String?,
-      val featureId: String?,
-      val stateKey: String?,
-    )
-
     fun offlineRegionDefinitionRoundTrip(value: OfflineRegionDefinition): OfflineRegionDefinition =
       Arena.ofConfined().use { arena ->
         offlineRegionDefinition(offlineRegionDefinition(value, arena))
@@ -6276,67 +5735,14 @@ internal object NativeAccess {
         runtimeEventPayload(type, payload)
       }
 
-    fun ownedBufferCleanupAfterCopyFailure(): Int {
-      var destroys = 0
-      try {
-        ownedBuffer(
-          NativeOwnedBuffer(1L),
-          getter = { _, bytes ->
-            mln_buffer_view.data(bytes, MemorySegment.ofAddress(1L))
-            mln_buffer_view.size(bytes, -1L)
-            MaplibreStatus.OK.nativeCode
-          },
-          destroyer = { destroys++ },
-        )
-      } catch (_: IllegalArgumentException) {
-        return destroys
-      }
-      error("buffer conversion unexpectedly succeeded")
-    }
-
-    fun offlineRegionListCleanupAfterCopyFailure(): Int {
-      var destroys = 0
-      try {
-        offlineRegionList(
-          NativeOfflineRegionList(1L),
-          counter = { _, outCount ->
-            outCount.set(ValueLayout.JAVA_LONG, 0, Long.MAX_VALUE)
-            MaplibreStatus.OK.nativeCode
-          },
-          getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
-          destroyer = { destroys++ },
-        )
-      } catch (_: ArithmeticException) {
-        return destroys
-      }
-      error("offline list conversion unexpectedly succeeded")
-    }
-
-    fun styleStringListCleanupAfterCopyFailure(): Int {
-      var destroys = 0
-      try {
-        styleStringList(
-          NativeStyleStringList(1L),
-          counter = { _, outCount ->
-            outCount.set(ValueLayout.JAVA_LONG, 0, Long.MAX_VALUE)
-            MaplibreStatus.OK.nativeCode
-          },
-          getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
-          destroyer = { destroys++ },
-        )
-      } catch (_: ArithmeticException) {
-        return destroys
-      }
-      error("style list conversion unexpectedly succeeded")
-    }
-
     fun mapOptionsSnapshot(value: MapOptions): MapOptionsSnapshot =
       Arena.ofConfined().use { arena ->
         val native = mapOptions(value, arena)
+        val extent = mln_map_options.initial_extent(native)
         MapOptionsSnapshot(
-          mln_map_options.width(native),
-          mln_map_options.height(native),
-          mln_map_options.scale_factor(native),
+          mln_logical_extent.width(extent),
+          mln_logical_extent.height(extent),
+          mln_logical_extent.scale_factor(extent),
           mln_map_options.map_mode(native),
           mln_map_options.fast_pfor_enabled(native),
         )
@@ -6448,16 +5854,6 @@ internal object NativeAccess {
     val message: String,
   )
 
-  /** Events copied out of one drained batch, plus the count the drain left queued. */
-  internal data class NativeRuntimeEventBatch(
-    val events: List<NativeRuntimeEvent>,
-    val remainingCount: Long,
-  )
-
-  internal class OwnedTextureFrameSegment(val segment: MemorySegment, private val arena: Arena) :
-    AutoCloseable {
-    override fun close() {
-      arena.close()
-    }
-  }
+  /** Events copied out of one drained batch. */
+  internal data class NativeRuntimeEventBatch(val events: List<NativeRuntimeEvent>)
 }

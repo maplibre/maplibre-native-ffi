@@ -5,10 +5,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class CallbackGateTest {
   @Test
-  fun closeWithoutEnteredCallbacksClosesNativeStateOnce() {
+  fun closeWithoutEnteredCallbacksClosesNativeStateOnce(): Unit = runSuspendTest {
     var closes = 0
     val gate = CallbackGate("test callbacks") { closes++ }
 
@@ -21,7 +22,7 @@ class CallbackGateTest {
   }
 
   @Test
-  fun closeFromEnteredCallbackDefersNativeCloseUntilCallbackExits() {
+  fun closeFromEnteredCallbackDefersNativeCloseUntilCallbackExits(): Unit = runSuspendTest {
     var closes = 0
     val gate = CallbackGate("test callbacks") { closes++ }
     val lease = assertNotNull(gate.enter())
@@ -37,7 +38,7 @@ class CallbackGateTest {
   }
 
   @Test
-  fun multipleEnteredCallbacksCanExitBeforeClose() {
+  fun multipleEnteredCallbacksCanExitBeforeClose(): Unit = runSuspendTest {
     var closes = 0
     val gate = CallbackGate("test callbacks") { closes++ }
     val first = assertNotNull(gate.enter())

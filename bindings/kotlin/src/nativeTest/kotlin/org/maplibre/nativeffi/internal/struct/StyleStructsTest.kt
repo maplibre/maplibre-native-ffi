@@ -15,7 +15,6 @@ import kotlinx.cinterop.rawValue
 import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.usePinned
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER
@@ -33,8 +32,6 @@ import org.maplibre.nativeffi.internal.c.mln_style_image_info
 import org.maplibre.nativeffi.internal.c.mln_style_image_options
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options
-import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
-import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.memory.CSizeVar
 import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
@@ -143,87 +140,6 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(defaults.tolerance, options.tolerance)
       assertEquals(defaults.tile_size, options.tile_size)
       assertEquals(defaults.cluster_radius, options.cluster_radius)
-    }
-  }
-
-  @Test
-  fun styleIdListCopiesIdsAndDestroysNativeHandle() {
-    var destroys = 0
-    val ids = memScoped {
-      val list = SyntheticHandles.styleIdList()
-
-      StyleStructs.styleIdList(
-        list.rawHandleValue,
-        counter = { _, outCount ->
-          outCount[0] = 1.toCSize()
-          MaplibreStatus.OK.nativeCode
-        },
-        getter = { _, _, outId ->
-          CoreStructs.setStringView(outId.pointed, "roads", this)
-          MaplibreStatus.OK.nativeCode
-        },
-        destroyer = { destroys++ },
-      )
-    }
-
-    assertEquals(listOf("roads"), ids)
-    assertEquals(1, destroys)
-  }
-
-  @Test
-  fun styleIdListDestroysNativeHandleWhenCopyFails() {
-    memScoped {
-      var destroys = 0
-      val list = SyntheticHandles.styleIdList()
-
-      assertFailsWith<IllegalArgumentException> {
-        StyleStructs.styleIdList(
-          list.rawHandleValue,
-          counter = { _, outCount ->
-            outCount[0] = (Int.MAX_VALUE.toULong() + 1UL).toCSize()
-            MaplibreStatus.OK.nativeCode
-          },
-          getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
-          destroyer = { destroys++ },
-        )
-      }
-
-      assertEquals(1, destroys)
-    }
-  }
-
-  @Test
-  fun styleStringListCopiesValuesAndDestroysOnSuccessAndFailure() {
-    memScoped {
-      var destroys = 0
-      val values =
-        StyleStructs.styleStringList(
-          123UL,
-          counter = { _, outCount ->
-            outCount[0] = 1.toCSize()
-            MaplibreStatus.OK.nativeCode
-          },
-          getter = { _, _, outValue ->
-            CoreStructs.setStringView(outValue.pointed, "tile", this)
-            MaplibreStatus.OK.nativeCode
-          },
-          destroyer = { destroys++ },
-        )
-      assertEquals(listOf("tile"), values)
-      assertEquals(1, destroys)
-
-      assertFailsWith<IllegalArgumentException> {
-        StyleStructs.styleStringList(
-          456UL,
-          counter = { _, outCount ->
-            outCount[0] = (Int.MAX_VALUE.toULong() + 1UL).toCSize()
-            MaplibreStatus.OK.nativeCode
-          },
-          getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
-          destroyer = { destroys++ },
-        )
-      }
-      assertEquals(2, destroys)
     }
   }
 

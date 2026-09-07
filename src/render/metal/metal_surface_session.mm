@@ -1,6 +1,13 @@
 #include <memory>
 #include <stdexcept>
 
+#include <mln/gfx/backend_scope.hpp>
+#include <mln/mtl/context.hpp>
+#include <mln/mtl/renderable_resource.hpp>
+#include <mln/mtl/renderer_backend.hpp>
+#include <mln/mtl/texture2d.hpp>
+#include <mln/util/size.hpp>
+
 #include <Foundation/NSSharedPtr.hpp>
 #include <Metal/MTLBlitPass.hpp>
 #include <Metal/MTLCommandBuffer.hpp>
@@ -10,12 +17,6 @@
 #include <Metal/MTLRenderPass.hpp>
 #include <QuartzCore/CAMetalDrawable.hpp>
 #include <QuartzCore/CAMetalLayer.hpp>
-#include <mln/gfx/backend_scope.hpp>
-#include <mln/mtl/context.hpp>
-#include <mln/mtl/renderable_resource.hpp>
-#include <mln/mtl/renderer_backend.hpp>
-#include <mln/mtl/texture2d.hpp>
-#include <mln/util/size.hpp>
 
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
@@ -320,9 +321,10 @@ class MetalSurfaceSessionBackend final
 
 namespace mln::core {
 
-auto metal_surface_attach(
+auto metal_surface_attach_start(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   MapObject* live_map = nullptr;
   const auto map_status = validate_map_live(map, live_map);
@@ -333,13 +335,6 @@ auto metal_surface_attach(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  const auto output_status = validate_attach_output(
-    out_session, "out_session must not be null",
-    "out_session must point to a null handle"
-  );
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
   const auto physical_status = validate_physical_size(
     descriptor->extent.width, descriptor->extent.height,
     descriptor->extent.scale_factor, "scaled surface dimensions are too large"
@@ -347,44 +342,74 @@ auto metal_surface_attach(
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
+  // The retains below send messages to the descriptor's layer and device, so
+  // this session validates the request before start_attach_render_session does.
+  const auto request_status =
+    validate_render_session_attach_request(options, out_session, completion);
+  if (request_status != MLN_STATUS_OK) {
+    return request_status;
+  }
 
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
   set_session_extent(*session, descriptor->extent);
-  session->surface.backend = std::make_unique<MetalSurfaceSessionBackend>(
-    static_cast<CA::MetalLayer*>(descriptor->layer),
-    static_cast<MTL::Device*>(descriptor->context.device),
-    mln::Size{session->physical_width, session->physical_height}
-  );
-  return attach_render_session(
-    std::move(session), out_session, RenderSessionKind::Surface,
-    RenderSessionAttachMessages{
-      .null_session = "surface session must not be null",
-      .null_output = "out_session must not be null",
-      .non_null_output = "out_session must point to a null handle"
-    }
+  auto layer = NS::RetainPtr(static_cast<CA::MetalLayer*>(descriptor->layer));
+  auto device =
+    NS::RetainPtr(static_cast<MTL::Device*>(descriptor->context.device));
+  session->initialize_backend =
+    [layer = std::move(layer),
+     device = std::move(device)](mln_render_session_object& target) mutable {
+      target.surface.backend = std::make_unique<MetalSurfaceSessionBackend>(
+        layer.get(), device.get(),
+        mln::Size{target.physical_width, target.physical_height}
+      );
+      return MLN_STATUS_OK;
+    };
+  const auto capabilities = mln_render_session_capabilities{
+    .size = sizeof(mln_render_session_capabilities),
+    .driver = 0,
+    .texture_ring_depth = 0,
+    .flags = MLN_RENDER_SESSION_CAPABILITY_PRESENTATION
+  };
+  return start_attach_render_session(
+    std::move(session), RenderSessionKind::Surface, options, capabilities,
+    out_session, completion
   );
 }
 
-auto metal_surface_set_target(
-  mln_render_session session, const mln_metal_surface_descriptor* descriptor
+auto metal_surface_set_target_start(
+  mln_render_session session, const mln_metal_surface_descriptor* descriptor,
+  const mln_completion* completion
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::Surface, live
+  const auto submission_status = validate_render_session_retarget_submission(
+    session, RetargetTargetKind::Surface, completion
   );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
+  if (submission_status != MLN_STATUS_OK) {
+    return submission_status;
   }
   const auto descriptor_status = validate_metal_surface_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  return surface_session_set_target(
-    session, descriptor->extent,
-    [descriptor](mln_render_session_object& target_session) -> mln_status {
-      return target_session.surface.backend->set_metal_target(*descriptor);
-    }
+  const auto copied = *descriptor;
+  auto layer = NS::RetainPtr(static_cast<CA::MetalLayer*>(descriptor->layer));
+  auto device =
+    NS::RetainPtr(static_cast<MTL::Device*>(descriptor->context.device));
+  return enqueue_driver_operation(
+    session,
+    [copied, layer = std::move(layer),
+     device = std::move(device)](mln_render_session_object& target) {
+      auto retained = copied;
+      retained.layer = layer.get();
+      retained.context.device = device.get();
+      return surface_session_set_target(
+        target.self, retained.extent,
+        [&retained](mln_render_session_object& live) {
+          return live.surface.backend->set_metal_target(retained);
+        }
+      );
+    },
+    completion
   );
 }
 

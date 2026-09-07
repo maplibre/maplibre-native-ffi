@@ -17,10 +17,16 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Camera.BoundsConstraint+Bounded",
             "Maplibre.NativeFfi.Camera.BoundsConstraint+Unbounded",
             "Maplibre.NativeFfi.Camera.CameraChangeMode",
+            "Maplibre.NativeFfi.Camera.CameraDelta",
+            "Maplibre.NativeFfi.Camera.CameraDeltaKind",
+            "Maplibre.NativeFfi.Camera.CameraSnapshot",
+            "Maplibre.NativeFfi.Camera.CameraUpdate",
+            "Maplibre.NativeFfi.Camera.CameraUpdateMode",
             "Maplibre.NativeFfi.Camera.CameraFitOptions",
             "Maplibre.NativeFfi.Camera.CameraOptions",
             "Maplibre.NativeFfi.Camera.EdgeInsets",
             "Maplibre.NativeFfi.Camera.FreeCameraOptions",
+            "Maplibre.NativeFfi.Camera.GesturePhase",
             "Maplibre.NativeFfi.Camera.UnitBezier",
             "Maplibre.NativeFfi.Error.InvalidArgumentException",
             "Maplibre.NativeFfi.Error.InvalidStateException",
@@ -45,9 +51,11 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Log.LogSeverityMask",
             "Maplibre.NativeFfi.Map.ConstrainMode",
             "Maplibre.NativeFfi.Map.DebugOptions",
+            "Maplibre.NativeFfi.Map.LogicalExtent",
             "Maplibre.NativeFfi.Map.MapHandle",
             "Maplibre.NativeFfi.Map.MapMode",
             "Maplibre.NativeFfi.Map.MapOptions",
+            "Maplibre.NativeFfi.Map.MapSnapshot",
             "Maplibre.NativeFfi.Map.MapProjectionHandle",
             "Maplibre.NativeFfi.Map.NorthOrientation",
             "Maplibre.NativeFfi.Map.ProjectionModeOptions",
@@ -74,14 +82,17 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Query.RenderedQueryGeometry+LineString",
             "Maplibre.NativeFfi.Query.RenderedQueryGeometry+Point",
             "Maplibre.NativeFfi.Query.SourceFeatureQueryOptions",
+            "Maplibre.NativeFfi.Render.AcquiredFrameHandle",
             "Maplibre.NativeFfi.Render.EglContextDescriptor",
+            "Maplibre.NativeFfi.Render.FrameDemand",
+            "Maplibre.NativeFfi.Render.FrameDemandFlags",
+            "Maplibre.NativeFfi.Render.GpuSync",
+            "Maplibre.NativeFfi.Render.GpuSyncKind",
             "Maplibre.NativeFfi.Render.MetalBorrowedTextureDescriptor",
             "Maplibre.NativeFfi.Render.MetalContextDescriptor",
             "Maplibre.NativeFfi.Render.MetalOwnedTextureDescriptor",
             "Maplibre.NativeFfi.Render.MetalOwnedTextureFrame",
-            "Maplibre.NativeFfi.Render.MetalOwnedTextureFrameHandle",
             "Maplibre.NativeFfi.Render.MetalSurfaceDescriptor",
-            "Maplibre.NativeFfi.Render.NativeBuffer",
             "Maplibre.NativeFfi.Render.OpenGLBorrowedTextureDescriptor",
             "Maplibre.NativeFfi.Render.OpenGLClientApi",
             "Maplibre.NativeFfi.Render.OpenGLContextDescriptor",
@@ -89,22 +100,35 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Render.OpenGLContextProvider",
             "Maplibre.NativeFfi.Render.OpenGLOwnedTextureDescriptor",
             "Maplibre.NativeFfi.Render.OpenGLOwnedTextureFrame",
-            "Maplibre.NativeFfi.Render.OpenGLOwnedTextureFrameHandle",
             "Maplibre.NativeFfi.Render.OpenGLSurfaceDescriptor",
             "Maplibre.NativeFfi.Render.PremultipliedRgba8Image",
+            "Maplibre.NativeFfi.Render.RenderAbandonDisposition",
+            "Maplibre.NativeFfi.Render.RenderAbandonResult",
             "Maplibre.NativeFfi.Render.RenderBackend",
+            "Maplibre.NativeFfi.Render.RenderDriverKind",
+            "Maplibre.NativeFfi.Render.RenderFrameResult",
             "Maplibre.NativeFfi.Render.RenderMode",
             "Maplibre.NativeFfi.Render.RenderResult",
+            "Maplibre.NativeFfi.Render.RenderSessionAttachOptions",
+            "Maplibre.NativeFfi.Render.RenderSessionCapabilities",
+            "Maplibre.NativeFfi.Render.RenderSessionCapabilityInfo",
             "Maplibre.NativeFfi.Render.RenderSessionHandle",
+            "Maplibre.NativeFfi.Render.RenderSessionSnapshot",
+            "Maplibre.NativeFfi.Render.RenderSessionState",
             "Maplibre.NativeFfi.Render.RenderTargetExtent",
-            "Maplibre.NativeFfi.Render.RenderUpdate",
             "Maplibre.NativeFfi.Render.TextureImageInfo",
             "Maplibre.NativeFfi.Render.VulkanBorrowedTextureDescriptor",
             "Maplibre.NativeFfi.Render.VulkanContextDescriptor",
             "Maplibre.NativeFfi.Render.VulkanOwnedTextureDescriptor",
             "Maplibre.NativeFfi.Render.VulkanOwnedTextureFrame",
-            "Maplibre.NativeFfi.Render.VulkanOwnedTextureFrameHandle",
             "Maplibre.NativeFfi.Render.VulkanSurfaceDescriptor",
+            "Maplibre.NativeFfi.Render.WebGLContextDescriptor",
+            "Maplibre.NativeFfi.Render.WebGLContextKind",
+            "Maplibre.NativeFfi.Render.WebGpuBorrowedTextureDescriptor",
+            "Maplibre.NativeFfi.Render.WebGpuContextDescriptor",
+            "Maplibre.NativeFfi.Render.WebGpuOwnedTextureDescriptor",
+            "Maplibre.NativeFfi.Render.WebGpuOwnedTextureFrame",
+            "Maplibre.NativeFfi.Render.WebGpuSurfaceDescriptor",
             "Maplibre.NativeFfi.Render.WglContextDescriptor",
             "Maplibre.NativeFfi.Resource.ByteRange",
             "Maplibre.NativeFfi.Resource.HttpHeader",
@@ -125,17 +149,13 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Resource.ResourceTransformRequest",
             "Maplibre.NativeFfi.Resource.ResourceUsage",
             "Maplibre.NativeFfi.Runtime.AmbientCacheOperation",
-            "Maplibre.NativeFfi.Runtime.OfflineOperationHandle",
-            "Maplibre.NativeFfi.Runtime.OfflineOperationKind",
-            "Maplibre.NativeFfi.Runtime.OfflineOperationResultKind",
-            "Maplibre.NativeFfi.Runtime.OwnerThread",
+            "Maplibre.NativeFfi.Runtime.CommandCompletion",
+            "Maplibre.NativeFfi.Runtime.CommandDisposition",
             "Maplibre.NativeFfi.Runtime.RuntimeEvent",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventBatch",
             "Maplibre.NativeFfi.Runtime.RuntimeEventMask",
             "Maplibre.NativeFfi.Runtime.RuntimeEventPayload",
             "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+CameraTransitionFinished",
             "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+None",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+OfflineOperationCompleted",
             "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+OfflineRegionResponseError",
             "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+OfflineRegionStatusChanged",
             "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+OfflineRegionTileCountLimit",
@@ -147,13 +167,13 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Runtime.RuntimeEventType",
             "Maplibre.NativeFfi.Runtime.RuntimeHandle",
             "Maplibre.NativeFfi.Runtime.RuntimeOptions",
-            "Maplibre.NativeFfi.Runtime.WakeSource",
             "Maplibre.NativeFfi.Style.CustomGeometrySourceCallback",
             "Maplibre.NativeFfi.Style.CustomGeometrySourceOptions",
             "Maplibre.NativeFfi.Style.CustomMvtVectorSourceCallback",
             "Maplibre.NativeFfi.Style.CustomMvtVectorSourceOptions",
             "Maplibre.NativeFfi.Style.GeoJsonSourceDataHandle",
             "Maplibre.NativeFfi.Style.GeoJsonSourceOptions",
+            "Maplibre.NativeFfi.Style.LayerInfo",
             "Maplibre.NativeFfi.Style.LocationIndicatorImageKind",
             "Maplibre.NativeFfi.Style.RasterDemEncoding",
             "Maplibre.NativeFfi.Style.SourceInfo",
@@ -271,9 +291,10 @@ public sealed class PublicApiSurfaceTests
         );
     }
 
-    // Default parameter values would create shortcut workflows outside the C API shape.
+    // Optional cancellation tokens follow the .NET asynchronous API convention. Other default
+    // parameter values would create shortcut workflows outside the C API shape.
     [Fact]
-    public void PublicSurfaceDoesNotUseDefaultParameterValues()
+    public void PublicSurfaceUsesDefaultsOnlyForCancellationTokens()
     {
         var violations = new List<string>();
         foreach (var type in typeof(Maplibre).Assembly.GetExportedTypes())
@@ -296,6 +317,57 @@ public sealed class PublicApiSurfaceTests
         Assert.Empty(violations);
     }
 
+    // Every wrapper over a C completion hands the caller a task to await, so it takes a
+    // cancellation token. A create is the exception: its task carries the only reference to a
+    // native handle, and abandoning that task would leak it.
+    [Fact]
+    public void CompletionWrappersTakeACancellationTokenUnlessTheyProduceAHandle()
+    {
+        var handleProducing = new[] { "CreateAsync", "CreateProjectionAsync" };
+        var consumesTheHandle = new[] { "CloseAsync" };
+        var violations = new List<string>();
+
+        foreach (var type in typeof(Maplibre).Assembly.GetExportedTypes())
+        {
+            foreach (
+                var method in type.GetMethods(
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static
+                )
+            )
+            {
+                if (
+                    method.DeclaringType != type
+                    || method.IsSpecialName
+                    || !typeof(Task).IsAssignableFrom(method.ReturnType)
+                )
+                {
+                    continue;
+                }
+
+                var takesToken = method
+                    .GetParameters()
+                    .Any(parameter => parameter.ParameterType == typeof(CancellationToken));
+                if (
+                    handleProducing.Contains(method.Name) || consumesTheHandle.Contains(method.Name)
+                )
+                {
+                    if (takesToken)
+                    {
+                        violations.Add($"{type.FullName}.{method.Name} takes a token");
+                    }
+                    continue;
+                }
+
+                if (!takesToken)
+                {
+                    violations.Add($"{type.FullName}.{method.Name} takes no token");
+                }
+            }
+        }
+
+        Assert.Empty(violations);
+    }
+
     [Fact]
     public void OwnedNativeHandlesDoNotExposePublicConstructors()
     {
@@ -304,12 +376,9 @@ public sealed class PublicApiSurfaceTests
         {
             "Maplibre.NativeFfi.Map.MapHandle",
             "Maplibre.NativeFfi.Map.MapProjectionHandle",
-            "Maplibre.NativeFfi.Render.MetalOwnedTextureFrameHandle",
-            "Maplibre.NativeFfi.Render.OpenGLOwnedTextureFrameHandle",
+            "Maplibre.NativeFfi.Render.AcquiredFrameHandle",
             "Maplibre.NativeFfi.Render.RenderSessionHandle",
-            "Maplibre.NativeFfi.Render.VulkanOwnedTextureFrameHandle",
             "Maplibre.NativeFfi.Resource.ResourceRequestHandle",
-            "Maplibre.NativeFfi.Runtime.OfflineOperationHandle",
             "Maplibre.NativeFfi.Runtime.RuntimeHandle",
         };
 
@@ -351,7 +420,10 @@ public sealed class PublicApiSurfaceTests
     {
         foreach (var parameter in parameters)
         {
-            if (parameter.HasDefaultValue || parameter.IsOptional)
+            if (
+                (parameter.HasDefaultValue || parameter.IsOptional)
+                && parameter.ParameterType != typeof(CancellationToken)
+            )
             {
                 violations.Add(
                     $"{member.DeclaringType?.FullName}.{member.Name} has default parameter {parameter.Name}."

@@ -8,7 +8,6 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.cValue
 import kotlinx.cinterop.get
-import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.value
@@ -24,10 +23,6 @@ import org.maplibre.nativeffi.internal.c.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_
 import org.maplibre.nativeffi.internal.c.mln_buffer_view
 import org.maplibre.nativeffi.internal.c.mln_feature_state_selector
 import org.maplibre.nativeffi.internal.c.mln_queried_feature
-import org.maplibre.nativeffi.internal.c.mln_queried_feature_default
-import org.maplibre.nativeffi.internal.c.mln_queried_feature_list_count
-import org.maplibre.nativeffi.internal.c.mln_queried_feature_list_destroy
-import org.maplibre.nativeffi.internal.c.mln_queried_feature_list_get
 import org.maplibre.nativeffi.internal.c.mln_rendered_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_rendered_feature_query_options_default
 import org.maplibre.nativeffi.internal.c.mln_rendered_query_geometry
@@ -37,12 +32,8 @@ import org.maplibre.nativeffi.internal.c.mln_rendered_query_geometry_point
 import org.maplibre.nativeffi.internal.c.mln_screen_box
 import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options_default
-import org.maplibre.nativeffi.internal.lifecycle.NativeQueriedFeatureList
-import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.memory.CSize
-import org.maplibre.nativeffi.internal.memory.CSizeVar
 import org.maplibre.nativeffi.internal.memory.toCSize
-import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
@@ -110,34 +101,12 @@ internal object QueryStructs {
     return native.ptr
   }
 
-  fun queriedFeatureList(list: NativeQueriedFeatureList): List<QueriedFeature> =
-    queriedFeatureList(
-      list.rawHandleValue,
-      counter = ::mln_queried_feature_list_count,
-      getter = ::mln_queried_feature_list_get,
-      destroyer = ::mln_queried_feature_list_destroy,
-    )
-
-  fun queriedFeatureList(
-    list: ULong,
-    counter: (ULong, CPointer<CSizeVar>) -> Int,
-    getter: (ULong, CSize, CPointer<mln_queried_feature>) -> Int,
-    destroyer: (ULong) -> Unit,
-  ): List<QueriedFeature> =
-    try {
-      memScoped {
-        val outCount = alloc<CSizeVar>()
-        Status.check(counter(list, outCount.ptr))
-        List(checkedInt(outCount.value.toULong(), "queried feature count")) { index ->
-          val outFeature = alloc<mln_queried_feature>()
-          mln_queried_feature_default().place(outFeature.ptr)
-          Status.check(getter(list, index.toCSize(), outFeature.ptr))
-          queriedFeature(outFeature)
-        }
-      }
-    } finally {
-      destroyer(list)
-    }
+  fun queriedFeatures(values: CPointer<mln_queried_feature>?, count: CSize): List<QueriedFeature> {
+    val size = checkedInt(count.toULong(), "queried feature count")
+    if (size == 0) return emptyList()
+    requireNotNull(values) { "native completion omitted its queried features" }
+    return List(size) { index -> queriedFeature(values[index]) }
+  }
 
   fun featureStateSelector(
     value: FeatureStateSelector,

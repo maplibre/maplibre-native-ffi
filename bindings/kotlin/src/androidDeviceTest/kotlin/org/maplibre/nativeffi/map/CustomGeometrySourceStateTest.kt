@@ -6,33 +6,35 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.runtime.runSuspendTest
 import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 
 class CustomGeometrySourceStateTest {
   @Test
-  fun callbacksCopyTileIdsContainFailuresAndStopAfterClosureDuringCallback() {
-    val received = mutableListOf<CanonicalTileId>()
-    lateinit var state: CustomGeometrySourceState
-    state =
-      CustomGeometrySourceState(
-        CustomGeometrySourceOptions(
-          object : CustomGeometrySourceCallback {
-            override fun fetchTile(tileId: CanonicalTileId) {
-              received += tileId
-              state.close()
-              throw IllegalStateException("contained")
+  fun callbacksCopyTileIdsContainFailuresAndStopAfterClosureDuringCallback(): Unit =
+    runSuspendTest {
+      val received = mutableListOf<CanonicalTileId>()
+      lateinit var state: CustomGeometrySourceState
+      state =
+        CustomGeometrySourceState(
+          CustomGeometrySourceOptions(
+            object : CustomGeometrySourceCallback {
+              override fun fetchTile(tileId: CanonicalTileId) {
+                received += tileId
+                state.close()
+                throw IllegalStateException("contained")
+              }
             }
-          }
-        )
-      ) {}
+          )
+        ) {}
 
-    state.fetchTileForTesting(CanonicalTileId(4, 5, 6))
-    state.fetchTileForTesting(CanonicalTileId(7, 8, 9))
+      state.fetchTileForTesting(CanonicalTileId(4, 5, 6))
+      state.fetchTileForTesting(CanonicalTileId(7, 8, 9))
 
-    assertEquals(listOf(CanonicalTileId(4, 5, 6)), received)
-    assertTrue(state.isClosedForTesting())
-  }
+      assertEquals(listOf(CanonicalTileId(4, 5, 6)), received)
+      assertTrue(state.isClosedForTesting())
+    }
 
   @Test
   fun trampolinesDispatchByUserDataPastTheJavaCppPool() {

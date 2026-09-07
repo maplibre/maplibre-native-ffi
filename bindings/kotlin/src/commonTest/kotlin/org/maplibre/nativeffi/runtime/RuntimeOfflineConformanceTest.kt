@@ -6,27 +6,23 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
-import org.maplibre.nativeffi.offline.OfflineRegionInfo
-import org.maplibre.nativeffi.offline.OfflineRegionStatus
 
 class RuntimeOfflineConformanceTest {
   private val drained = mutableListOf<RuntimeEvent>()
 
   @Test
-  fun offlineRegionApisCreateObserveAndCopyPublicEvents() {
+  fun offlineRegionApisCreateObserveAndCopyPublicEvents(): Unit = runSuspendTest {
     val runtime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
     try {
       val definition = tileDefinition()
       val createMetadata = byteArrayOf(1, 2, 3)
-      val createOperation = runtime.startCreateOfflineRegion(definition, createMetadata)
+      val create = runtime.createOfflineRegion(definition, createMetadata)
       createMetadata[0] = 9
-      waitForOperation(runtime, createOperation)
-      val created = runtime.takeCreateOfflineRegionResult(createOperation)
+      val created = create.await()
       assertTrue(created.id > 0)
       assertEquals(definition, created.definition)
       assertContentEquals(byteArrayOf(1, 2, 3), created.metadata)
@@ -34,25 +30,21 @@ class RuntimeOfflineConformanceTest {
       copiedMetadata[0] = 9
       assertContentEquals(byteArrayOf(1, 2, 3), created.metadata)
 
-      assertEquals(created, offlineRegion(runtime, created.id))
-      assertTrue(offlineRegions(runtime).contains(created))
+      assertEquals(created, runtime.offlineRegion(created.id).await())
+      assertTrue(runtime.offlineRegions().await().contains(created))
 
       val updateMetadata = byteArrayOf(4, 5)
-      val updateOperation = runtime.startUpdateOfflineRegionMetadata(created.id, updateMetadata)
+      val update = runtime.updateOfflineRegionMetadata(created.id, updateMetadata)
       updateMetadata[0] = 9
-      waitForOperation(runtime, updateOperation)
-      val updated = runtime.takeUpdateOfflineRegionMetadataResult(updateOperation)
+      val updated = update.await()
       assertEquals(created.id, updated.id)
       assertContentEquals(byteArrayOf(4, 5), updated.metadata)
 
-      val status = offlineRegionStatus(runtime, created.id)
+      val status = runtime.offlineRegionStatus(created.id).await()
       assertEquals(OfflineRegionDownloadState.INACTIVE, status.downloadState)
 
-      completeVoidOperation(runtime, runtime.startSetOfflineRegionObserved(created.id, true))
-      completeVoidOperation(
-        runtime,
-        runtime.startSetOfflineRegionDownloadState(created.id, OfflineRegionDownloadState.ACTIVE),
-      )
+      runtime.setOfflineRegionObserved(created.id, true).await()
+      runtime.setOfflineRegionDownloadState(created.id, OfflineRegionDownloadState.ACTIVE).await()
       val observed = waitForObservedOfflineRegionEvent(runtime, created.id)
       assertEquals(RuntimeEventSourceType.RUNTIME, observed.sourceType)
       assertEquals(runtime, observed.runtimeSource)
@@ -63,69 +55,17 @@ class RuntimeOfflineConformanceTest {
       runtime.drainEvents()
       assertEquals(copiedMessage, observed.message)
 
-      completeVoidOperation(runtime, runtime.startSetOfflineRegionObserved(created.id, false))
-      completeVoidOperation(
-        runtime,
-        runtime.startSetOfflineRegionDownloadState(created.id, OfflineRegionDownloadState.INACTIVE),
-      )
-      completeVoidOperation(runtime, runtime.startInvalidateOfflineRegion(created.id))
-      completeVoidOperation(runtime, runtime.startDeleteOfflineRegion(created.id))
-      assertNull(offlineRegion(runtime, created.id))
+      runtime.setOfflineRegionObserved(created.id, false).await()
+      runtime.setOfflineRegionDownloadState(created.id, OfflineRegionDownloadState.INACTIVE).await()
+      runtime.invalidateOfflineRegion(created.id).await()
+      runtime.deleteOfflineRegion(created.id).await()
+      assertNull(runtime.offlineRegion(created.id).await())
     } finally {
-      runtime.close()
+      runtime.close().await()
     }
   }
 
-  private fun waitForOperation(
-    runtime: RuntimeHandle,
-    operation: OfflineOperationHandle<*>,
-  ): RuntimeEventPayload.OfflineOperationCompleted {
-    repeat(10_000) {
-      drain(runtime)
-      for (event in drained) {
-        val completed = event.payload as? RuntimeEventPayload.OfflineOperationCompleted
-        if (completed == null || completed.operationId != operation.id) {
-          continue
-        }
-        assertEquals(operation.kind, completed.operationKind)
-        assertEquals(operation.resultKind, completed.resultKind)
-        if (completed.resultStatus != MaplibreStatus.OK.nativeCode) {
-          error("offline operation failed: ${event.message}")
-        }
-        return completed
-      }
-      runtime.pump(1)
-    }
-    error("offline operation did not complete: ${operation.id}")
-  }
-
-  private fun completeVoidOperation(
-    runtime: RuntimeHandle,
-    operation: OfflineOperationHandle<Unit>,
-  ) {
-    waitForOperation(runtime, operation)
-    operation.close()
-  }
-
-  private fun offlineRegion(runtime: RuntimeHandle, id: Long): OfflineRegionInfo? {
-    val operation = runtime.startOfflineRegion(id)
-    waitForOperation(runtime, operation)
-    return runtime.takeOfflineRegionResult(operation)
-  }
-
-  private fun offlineRegions(runtime: RuntimeHandle): List<OfflineRegionInfo> {
-    val operation = runtime.startOfflineRegions()
-    waitForOperation(runtime, operation)
-    return runtime.takeOfflineRegionsResult(operation)
-  }
-
-  private fun offlineRegionStatus(runtime: RuntimeHandle, id: Long): OfflineRegionStatus {
-    val operation = runtime.startOfflineRegionStatus(id)
-    waitForOperation(runtime, operation)
-    return runtime.takeOfflineRegionStatusResult(operation)
-  }
-
-  private fun waitForObservedOfflineRegionEvent(
+  private suspend fun waitForObservedOfflineRegionEvent(
     runtime: RuntimeHandle,
     regionId: Long,
   ): RuntimeEvent {
@@ -142,19 +82,19 @@ class RuntimeOfflineConformanceTest {
           else -> Unit
         }
       }
-      runtime.pump(1)
+      runtime.barrier().await()
     }
     error("offline region observation event did not arrive for region $regionId")
   }
 
   /**
-   * Pumps once and keeps every event this test has drained. One offline step drains the events of
+   * Drains once and keeps every event this test has observed. One offline step drains the events of
    * the steps before it, so the waiters below scan what the whole test has seen rather than one
    * batch.
    */
-  private fun drain(runtime: RuntimeHandle) {
-    runtime.pump(0)
-    drained += runtime.drainEvents().events
+  private suspend fun drain(runtime: RuntimeHandle) {
+    runtime.barrier().await()
+    drained += runtime.drainEvents()
   }
 
   private fun assertObservedOfflineRegionStatusPayload(

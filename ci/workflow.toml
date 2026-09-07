@@ -74,11 +74,9 @@ commands = [{ task = "//examples/c-map:build" }]
 platforms = ["linux-gnu", "macos", "windows"]
 commands = [{ task = "//bindings/python:test" }]
 
-# TODO(#412): Re-enable //bindings/dart:test once thread-affine ownership is
-# safe across isolate migration; test processes otherwise wedge until timeout.
 [[suites]]
 platforms = ["linux-gnu", "macos", "windows"]
-commands = [{ task = "//bindings/dart:build" }]
+commands = [{ task = "//bindings/dart:test" }]
 
 # Run Rust browser tests against the Emscripten build.
 [[suites]]

@@ -74,9 +74,6 @@ class FeatureStateStore {
 auto validate_feature_state_selector(
   const mln_feature_state_selector* selector, bool require_feature_id
 ) -> mln_status;
-auto selector_has_field(
-  const mln_feature_state_selector& selector, uint32_t field
-) -> bool;
 auto optional_selector_string(
   const mln_feature_state_selector& selector, uint32_t field,
   mln_buffer_view value

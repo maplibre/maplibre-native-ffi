@@ -8,6 +8,7 @@ extern "c" fn MTLCreateSystemDefaultDevice() ?*anyopaque;
 const vk = if (build_options.supports_vulkan) @import("vulkan") else struct {};
 
 const supports_egl = build_options.supports_opengl and (builtin.os.tag == .linux or builtin.os.tag == .macos);
+const uses_caller_driver = build_options.supports_opengl and !supports_egl;
 
 const egl = if (supports_egl) @import("egl") else struct {};
 
@@ -16,96 +17,11 @@ const sdl = if (build_options.supports_opengl and builtin.os.tag == .windows) @i
 const width = 512;
 const height = 512;
 const style_url = "https://tiles.openfreemap.org/styles/bright";
-const park_timeout_milliseconds = 100;
 
-const RuntimeLoopArgs = struct {
-    allocator: std.mem.Allocator,
-    context: *OwnedTextureContext,
-    shared: *Shared,
-};
-
-/// Owns the runtime and the map for their whole lifetime, on one thread that is
-/// not the one presenting.
-fn runtimeLoop(args: RuntimeLoopArgs) void {
-    runtimeLoopFallible(args) catch |err| args.shared.fail(err);
-}
-
-fn runtimeLoopFallible(args: RuntimeLoopArgs) !void {
-    const shared = args.shared;
-
-    var diagnostic_store = maplibre.DiagnosticStore.init(args.allocator);
-    defer diagnostic_store.deinit();
-
-    var runtime = try maplibre.RuntimeHandle.create(args.allocator, .{ .cache_path = ":memory:" }, &diagnostic_store);
-    defer runtime.close() catch {};
-
-    var map = try maplibre.MapHandle.create(&runtime, .{
-        .width = width,
-        .height = height,
-        .scale_factor = 1.0,
-        .mode = .static,
-    });
-    defer map.close() catch {};
-
-    // The five event types the runtime loop reads. A map queues no event of an
-    // unselected type, so this runs before the style load.
-    try map.setEventMask(.{
-        .map_render_update_available = true,
-        .map_still_image_finished = true,
-        .map_still_image_failed = true,
-        .map_loading_failed = true,
-        .map_render_error = true,
-    });
-
-    try setInitialCamera(&map);
-    try map.setStyleUrl(args.allocator, style_url);
-    try map.requestStillImage();
-
-    // The render loop signals this to release the parked pump.
-    const wake = try runtime.wakeSource();
-    defer wake.release();
-
-    // A map with an attached session cannot be destroyed, so wait for the render
-    // loop to close its session before the deferred map close. Installing this
-    // before the setup above would deadlock a setup failure: the render loop
-    // would still be in awaitMap() with nothing to close.
-    defer shared.awaitSessionClosed();
-    shared.publish(map, wake);
-
-    pumpUntilSessionCloses(args, &runtime, &map, &diagnostic_store) catch |err| {
-        shared.fail(err);
-    };
-}
-
-fn pumpUntilSessionCloses(
-    args: RuntimeLoopArgs,
-    runtime: *maplibre.RuntimeHandle,
-    map: *maplibre.MapHandle,
-    diagnostic_store: *maplibre.DiagnosticStore,
-) !void {
-    const shared = args.shared;
-    const map_id = try map.id();
-    while (shared.failureValue() == null and !shared.sessionClosed()) {
-        runtime.pump(park_timeout_milliseconds, null) catch |err| {
-            logLatestDiagnostic(diagnostic_store);
-            return err;
-        };
-        var batch = try runtime.drainEvents(args.allocator, 0);
-        defer batch.deinit();
-        for (0..batch.len()) |index| {
-            const event = try batch.at(index);
-            if (event.source_type != .map or event.source_id == null or
-                !std.meta.eql(event.source_id.?, map_id)) continue;
-            switch (event.event_type) {
-                .map_render_update_available => shared.requestRender(),
-                .map_still_image_finished => shared.finishStillImage(),
-                .map_loading_failed => return error.MapLoadingFailed,
-                .map_render_error => return error.MapRenderFailed,
-                .map_still_image_failed => return error.StillImageFailed,
-                else => {},
-            }
-        }
-    }
+fn waitForSessionFuture(session: *maplibre.RenderSessionHandle, future: *maplibre.Future(void), diagnostic_store: ?*maplibre.DiagnosticStore) !void {
+    if (!uses_caller_driver) return future.wait(diagnostic_store);
+    while (!try future.poll()) _ = try session.serviceDriverWork(0);
+    try future.wait(diagnostic_store);
 }
 
 pub fn main(init_args: std.process.Init) !void {
@@ -119,77 +35,141 @@ pub fn main(init_args: std.process.Init) !void {
     defer maplibre.setAsyncLogSeverityMask(.default, null) catch {};
     try logAndValidateRenderBackend();
 
-    // The graphics context belongs to this thread, which attaches the session,
-    // presents, and reads back. It stays current here for the whole run.
+    var diagnostic_store = maplibre.DiagnosticStore.init(allocator);
+    defer diagnostic_store.deinit();
+
+    var runtime = try maplibre.RuntimeHandle.create(allocator, .{ .cache_path = ":memory:" }, &diagnostic_store);
+    defer if (runtime.close()) |future| {
+        var teardown = future;
+        _ = teardown.wait(null) catch {};
+        teardown.deinit();
+    } else |_| {};
+
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .mode = .static });
+    defer map_future.deinit();
+    var map = try map_future.wait(&diagnostic_store);
+    defer if (map.close()) |future| {
+        var teardown = future;
+        _ = teardown.wait(null) catch {};
+        teardown.deinit();
+    } else |_| {};
+
+    // This example selects no event types: the still-image request and the
+    // readback report through their own futures, and a frame that does not
+    // render arrives as the demand's disposition.
+    var resize = try map.resize(width, height, 1.0);
+    resize.deinit();
+    try setInitialCamera(&map);
+    var style = try map.setStyleUrl(allocator, style_url);
+    style.deinit();
+
+    var barrier = try runtime.barrier();
+    defer barrier.deinit();
+    try barrier.wait(&diagnostic_store);
+
     var context = try OwnedTextureContext.init();
     defer context.deinit();
-
-    var shared = Shared{ .io = init_args.io };
-    const thread = try std.Thread.spawn(.{}, runtimeLoop, .{RuntimeLoopArgs{
-        .allocator = allocator,
-        .context = &context,
-        .shared = &shared,
-    }});
-
-    const render_result = renderOnThisThread(init_args.io, allocator, &context, &shared, output_path);
-    if (render_result) |_| {} else |err| shared.fail(err);
-    shared.markSessionClosed();
-    thread.join();
-
-    if (shared.failureValue()) |err| return err;
+    try renderWithDriver(
+        init_args.io,
+        allocator,
+        &map,
+        &context,
+        output_path,
+    );
 }
 
-/// The render loop. Attaches its own session against the runtime loop's map,
-/// renders until the still image is both finished and drawn, then reads back
-/// and writes the file.
-fn renderOnThisThread(
+/// Uses a native core worker except for WGL, whose device context stays on this
+/// graphics thread.
+fn renderWithDriver(
     io: std.Io,
     allocator: std.mem.Allocator,
+    map: *maplibre.MapHandle,
     context: *OwnedTextureContext,
-    shared: *Shared,
     output_path: []const u8,
 ) !void {
-    var map = try shared.awaitMap();
-    var session = try attachOwnedTexture(context, &map, .{
-        .extent = .{ .width = width, .height = height, .scale_factor = 1.0 },
+    var attachment = try attachOwnedTexture(context, map, .{
+        .width = width,
+        .height = height,
+        .scale_factor = 1.0,
     });
-    // The runtime loop cannot destroy the map until this closes, so it must
-    // close on every path.
-    defer session.close() catch {};
+    var attachment_needs_cleanup = true;
+    errdefer if (attachment_needs_cleanup) {
+        _ = attachment.session.abandon() catch {};
+        attachment.session.destroy() catch {};
+    };
+    defer attachment.attached.deinit();
+    try waitForSessionFuture(&attachment.session, &attachment.attached, null);
 
-    var rendered_frame = false;
-    const started = std.Io.Clock.awake.now(io);
-    while (started.durationTo(std.Io.Clock.awake.now(io)).toNanoseconds() < 5 * std.time.ns_per_s) {
-        if (shared.failureValue()) |err| return err;
-        // Attempt a frame every iteration rather than only when the runtime loop
-        // asks: in a still-image map the render attempts themselves advance
-        // loading.
-        _ = shared.consumeRenderRequest();
-        switch ((try session.renderUpdate()).result) {
-            .rendered => rendered_frame = true,
-            else => {},
+    var session = attachment.session;
+    defer {
+        var detach = session.detach() catch null;
+        if (detach) |*completion| {
+            defer completion.deinit();
+            waitForSessionFuture(&session, completion, null) catch {
+                _ = session.abandon() catch {};
+            };
+        } else {
+            _ = session.abandon() catch {};
         }
-        // The still-image completion can land before or after the frame that
-        // satisfied it, so finish only once both have happened.
-        if (shared.stillImageDone() and rendered_frame) break;
-        try io.sleep(.fromMilliseconds(2), .awake);
-    } else {
-        return error.RenderTimedOut;
+        session.destroy() catch {};
     }
+    attachment_needs_cleanup = false;
 
-    const image_data = try allocator.alloc(u8, @as(usize, width) * @as(usize, height) * 4);
-    defer allocator.free(image_data);
-    const image_info = try session.readPremultipliedRgba8Into(image_data);
+    var still_image = try map.requestStillImage();
+    defer still_image.deinit();
 
-    try writePpm(io, allocator, output_path, image_data, image_info);
-    std.debug.print("wrote {s} ({d}x{d})\n", .{ output_path, image_info.width, image_info.height });
+    try session.requestFrame(.{ .token = 1, .if_needed = false });
+    try waitForRenderedFrame(io, allocator, &session, &still_image, 1);
+
+    var readback = try session.readback(allocator);
+    defer readback.deinit();
+    if (uses_caller_driver) {
+        while (!try readback.poll()) _ = try session.serviceDriverWork(0);
+    }
+    var image = try readback.wait(null);
+    defer image.deinit();
+
+    try writePpm(io, allocator, output_path, image.data, image.info);
+    std.debug.print("wrote {s} ({d}x{d})\n", .{ output_path, image.info.width, image.info.height });
 }
 
-fn logLatestDiagnostic(diagnostic_store: *const maplibre.DiagnosticStore) void {
-    const diagnostic = diagnostic_store.get() orelse return;
-    std.debug.print("native diagnostic", .{});
-    if (diagnostic.raw_status) |raw_status| std.debug.print(" ({d})", .{raw_status});
-    std.debug.print(": {s}\n", .{diagnostic.message});
+fn waitForRenderedFrame(
+    io: std.Io,
+    allocator: std.mem.Allocator,
+    session: *maplibre.RenderSessionHandle,
+    still_image: *maplibre.Future(void),
+    token: u64,
+) !void {
+    var rendered = false;
+    var demand_pending = true;
+    for (0..10_000) |_| {
+        if (uses_caller_driver) {
+            _ = try session.serviceDriverWork(0);
+        }
+        var results = try session.drainFrameResults(allocator);
+        defer results.deinit();
+        for (0..results.len()) |index| {
+            const result = try results.at(index);
+            if (result.token != token) continue;
+            demand_pending = false;
+            switch (result.disposition) {
+                .rendered => rendered = true,
+                .no_update, .size_pending, .target_not_ready => {},
+                else => return error.FrameNotRendered,
+            }
+        }
+        const still_completed = try still_image.poll();
+        if (still_completed) {
+            try still_image.wait(null);
+            if (rendered) return;
+        }
+        if (!demand_pending) {
+            try session.requestFrame(.{ .token = token, .if_needed = false });
+            demand_pending = true;
+        }
+        try io.sleep(.fromMilliseconds(1), .awake);
+    }
+    return error.FrameResultTimedOut;
 }
 
 fn logAndValidateRenderBackend() !void {
@@ -221,121 +201,7 @@ fn appendBackendLabel(buffer: []u8, len: *usize, has_backend: *bool, label: []co
     has_backend.* = true;
 }
 
-const OwnedTextureDescriptor = struct {
-    extent: maplibre.RenderTargetExtent,
-};
-
-/// The cross-thread surface between the render loop, which owns the graphics
-/// context and the render session, and the runtime loop, which owns the runtime
-/// and the map.
-const Shared = struct {
-    io: std.Io,
-
-    lock: std.Io.Mutex = std.Io.Mutex.init,
-    /// Published by the runtime loop once it has created the map. The render
-    /// loop attaches its own session against this.
-    map: ?maplibre.MapHandle = null,
-    wake: ?maplibre.WakeSourceHandle = null,
-    /// First fatal error from either loop.
-    failure: ?anyerror = null,
-
-    map_published: std.atomic.Value(bool) = .init(false),
-    /// Set by the render loop once its session is closed, which is what frees
-    /// the runtime loop to destroy the map.
-    session_closed: std.atomic.Value(bool) = .init(false),
-    /// Set by the runtime loop when the map has published a new render update.
-    render_requested: std.atomic.Value(bool) = .init(false),
-    /// Set by the runtime loop when the still image completed. The render loop
-    /// waits for both this and a rendered frame.
-    still_image_done: std.atomic.Value(bool) = .init(false),
-    failed: std.atomic.Value(bool) = .init(false),
-
-    fn fail(self: *Shared, err: anyerror) void {
-        std.Io.Threaded.mutexLock(&self.lock);
-        defer std.Io.Threaded.mutexUnlock(&self.lock);
-        if (self.failure == null) self.failure = err;
-        self.failed.store(true, .release);
-    }
-
-    fn failureValue(self: *Shared) ?anyerror {
-        if (!self.failed.load(.acquire)) return null;
-        std.Io.Threaded.mutexLock(&self.lock);
-        defer std.Io.Threaded.mutexUnlock(&self.lock);
-        return self.failure;
-    }
-
-    fn publish(
-        self: *Shared,
-        handle: maplibre.MapHandle,
-        wake: maplibre.WakeSourceHandle,
-    ) void {
-        std.Io.Threaded.mutexLock(&self.lock);
-        defer std.Io.Threaded.mutexUnlock(&self.lock);
-        self.map = handle;
-        self.wake = wake;
-        self.map_published.store(true, .release);
-    }
-
-    /// Render loop: releases the runtime loop's parked pump.
-    fn wakeRuntimeLoop(self: *Shared) void {
-        if (!self.map_published.load(.acquire)) return;
-        std.Io.Threaded.mutexLock(&self.lock);
-        defer std.Io.Threaded.mutexUnlock(&self.lock);
-        if (self.wake) |wake| wake.signal() catch {};
-    }
-
-    fn tryTakeMap(self: *Shared) ?maplibre.MapHandle {
-        if (!self.map_published.load(.acquire)) return null;
-        std.Io.Threaded.mutexLock(&self.lock);
-        defer std.Io.Threaded.mutexUnlock(&self.lock);
-        return self.map;
-    }
-
-    /// Waits for the runtime loop to create the map.
-    fn awaitMap(self: *Shared) !maplibre.MapHandle {
-        while (true) {
-            if (self.failureValue()) |err| return err;
-            if (self.tryTakeMap()) |handle| return handle;
-            self.io.sleep(.fromMilliseconds(1), .awake) catch {};
-        }
-    }
-
-    fn requestRender(self: *Shared) void {
-        self.render_requested.store(true, .release);
-    }
-
-    /// Consumes the render request before the caller renders, so a request
-    /// published during the render is not lost.
-    fn consumeRenderRequest(self: *Shared) bool {
-        return self.render_requested.swap(false, .acq_rel);
-    }
-
-    fn finishStillImage(self: *Shared) void {
-        self.still_image_done.store(true, .release);
-    }
-
-    fn stillImageDone(self: *Shared) bool {
-        return self.still_image_done.load(.acquire);
-    }
-
-    fn markSessionClosed(self: *Shared) void {
-        self.session_closed.store(true, .release);
-        // Release the pump so the runtime loop observes this now.
-        self.wakeRuntimeLoop();
-    }
-
-    fn sessionClosed(self: *Shared) bool {
-        return self.session_closed.load(.acquire);
-    }
-
-    fn awaitSessionClosed(self: *Shared) void {
-        while (!self.sessionClosed()) {
-            self.io.sleep(.fromMilliseconds(1), .awake) catch {};
-        }
-    }
-};
-
-const OwnedTextureContext = if (build_options.supports_opengl) OpenGLAttachContext else if (build_options.supports_vulkan) VulkanAttachContext else if (build_options.supports_metal) struct {
+const OwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachContext else if (build_options.supports_metal) struct {
     device: *anyopaque,
 
     fn init() !@This() {
@@ -347,32 +213,35 @@ const OwnedTextureContext = if (build_options.supports_opengl) OpenGLAttachConte
     fn descriptor(self: *const @This()) maplibre.MetalContextDescriptor {
         return .{ .device = maplibre.NativePointer.fromPtr(self.device) };
     }
-} else struct {};
+} else if (build_options.supports_opengl) OpenGLAttachContext else struct {};
 
-/// Attaches an owned-texture session on the calling thread, which becomes the
-/// session's owner thread.
+/// Supplies transferable state to a core worker or a WGL context to the caller
+/// driver.
 fn attachOwnedTexture(
     context: *OwnedTextureContext,
     map: *maplibre.MapHandle,
-    descriptor: OwnedTextureDescriptor,
-) !maplibre.RenderSessionHandle {
-    return if (build_options.supports_opengl)
-        try maplibre.attachOpenGLOwnedTexture(map, .{
-            .extent = descriptor.extent,
-            .context = context.descriptor(),
-        })
-    else if (build_options.supports_vulkan)
+    extent: maplibre.RenderTargetExtent,
+) !maplibre.RenderSessionAttachment {
+    return if (build_options.supports_vulkan)
         try maplibre.attachVulkanOwnedTexture(map, .{
-            .extent = descriptor.extent,
+            .extent = extent,
             .context = context.descriptor(),
-        })
+        }, .{ .driver = .core_worker, .requested_texture_ring_depth = 1 })
     else if (build_options.supports_metal)
         try maplibre.attachMetalOwnedTexture(map, .{
-            .extent = descriptor.extent,
+            .extent = extent,
             .context = context.descriptor(),
+        }, .{ .driver = .core_worker, .requested_texture_ring_depth = 1 })
+    else if (build_options.supports_opengl)
+        try maplibre.attachOpenGLOwnedTexture(map, .{
+            .extent = extent,
+            .context = context.descriptor(),
+        }, .{
+            .driver = if (supports_egl) .core_worker else .caller_graphics_thread,
+            .requested_texture_ring_depth = 1,
         })
     else
-        unreachable;
+        return error.RenderBackendUnavailable;
 }
 
 const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
@@ -433,14 +302,10 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
 } else if (supports_egl) struct {
     display: egl.EGLDisplay,
     config: egl.EGLConfig,
-    surface: egl.EGLSurface,
-    share_context: egl.EGLContext,
 
     fn init() !@This() {
         const display = try initDisplay();
         errdefer _ = egl.eglTerminate(display);
-
-        if (egl.eglBindAPI(egl.EGL_OPENGL_ES_API) == egl.EGL_FALSE) return error.EglUnavailable;
 
         const config_attributes = [_]egl.EGLint{
             egl.EGL_SURFACE_TYPE,    egl.EGL_PBUFFER_BIT,
@@ -461,36 +326,13 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
             return error.EglUnavailable;
         }
 
-        const context_attributes = [_]egl.EGLint{
-            egl.EGL_CONTEXT_CLIENT_VERSION, 3,
-            egl.EGL_NONE,
-        };
-        const share_context = egl.eglCreateContext(display, config, egl.EGL_NO_CONTEXT, &context_attributes);
-        if (share_context == egl.EGL_NO_CONTEXT) return error.EglUnavailable;
-        errdefer _ = egl.eglDestroyContext(display, share_context);
-
-        const surface_attributes = [_]egl.EGLint{
-            egl.EGL_WIDTH,  8,
-            egl.EGL_HEIGHT, 8,
-            egl.EGL_NONE,
-        };
-        const surface = egl.eglCreatePbufferSurface(display, config, &surface_attributes);
-        if (surface == egl.EGL_NO_SURFACE) return error.EglUnavailable;
-        errdefer _ = egl.eglDestroySurface(display, surface);
-
-        if (egl.eglMakeCurrent(display, surface, surface, share_context) == egl.EGL_FALSE) return error.EglUnavailable;
         return .{
             .display = display,
             .config = config,
-            .surface = surface,
-            .share_context = share_context,
         };
     }
 
     fn deinit(self: *@This()) void {
-        _ = egl.eglMakeCurrent(self.display, egl.EGL_NO_SURFACE, egl.EGL_NO_SURFACE, egl.EGL_NO_CONTEXT);
-        _ = egl.eglDestroySurface(self.display, self.surface);
-        _ = egl.eglDestroyContext(self.display, self.share_context);
         _ = egl.eglTerminate(self.display);
     }
 
@@ -519,7 +361,9 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
         return .{ .egl = .{
             .display = maplibre.NativePointer.fromPtr(@ptrCast(self.display.?)),
             .config = maplibre.NativePointer.fromPtr(@ptrCast(self.config.?)),
-            .share_context = maplibre.NativePointer.fromPtr(@ptrCast(self.share_context.?)),
+            .share_context = null,
+            .client_api = .gles,
+            .ownership = .dedicated,
             .get_proc_address = null,
         } };
     }
@@ -708,12 +552,13 @@ fn expectVk(result: if (build_options.supports_vulkan) vk.VkResult else i32) !vo
 }
 
 fn setInitialCamera(map: *maplibre.MapHandle) !void {
-    try map.jumpTo(.{
+    var completion = try map.updateCamera(.{ .camera = .{
         .center = .{ .latitude = 37.7749, .longitude = -122.4194 },
         .zoom = 13.0,
         .bearing = 12.0,
         .pitch = 30.0,
-    });
+    } });
+    completion.deinit();
 }
 
 fn writePpm(
@@ -723,14 +568,23 @@ fn writePpm(
     rgba: []const u8,
     info: maplibre.TextureImageInfo,
 ) !void {
-    const pixel_count = @as(usize, @intCast(info.width)) * @as(usize, @intCast(info.height));
-    const rgb = try allocator.alloc(u8, pixel_count * 3);
+    const image_width: usize = @intCast(info.width);
+    const image_height: usize = @intCast(info.height);
+    const stride: usize = @intCast(info.stride);
+    const row_bytes = image_width * 4;
+    const required_bytes = stride * image_height;
+    if (stride < row_bytes or info.byte_length < required_bytes or rgba.len < required_bytes) return error.InvalidReadbackLayout;
+    const rgb = try allocator.alloc(u8, image_width * image_height * 3);
     defer allocator.free(rgb);
 
-    for (0..pixel_count) |index| {
-        rgb[index * 3 + 0] = rgba[index * 4 + 0];
-        rgb[index * 3 + 1] = rgba[index * 4 + 1];
-        rgb[index * 3 + 2] = rgba[index * 4 + 2];
+    for (0..image_height) |row| {
+        const source = rgba[row * stride ..][0..row_bytes];
+        const destination = rgb[row * image_width * 3 ..][0 .. image_width * 3];
+        for (0..image_width) |column| {
+            destination[column * 3 + 0] = source[column * 4 + 0];
+            destination[column * 3 + 1] = source[column * 4 + 1];
+            destination[column * 3 + 2] = source[column * 4 + 2];
+        }
     }
 
     var file = try std.Io.Dir.cwd().createFile(io, output_path, .{});

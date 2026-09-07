@@ -1,233 +1,74 @@
 package maplibre
 
-import (
-	"errors"
-	"math"
-	"testing"
-)
+import "testing"
 
-func TestRenderBackendAndOpenGLProviderMasks(t *testing.T) {
-	backends := RenderBackendMetal | RenderBackendVulkan | RenderBackendOpenGL | RenderBackendWebGPU | RenderBackendMask(1<<30)
-	if !backends.Has(RenderBackendOpenGL) || !backends.Has(RenderBackendWebGPU) {
-		t.Fatalf("backend mask %08x should include OpenGL and WebGPU", uint32(backends))
-	}
-	if !backends.Has(RenderBackendMask(1 << 30)) {
-		t.Fatalf("backend mask should preserve unknown future bits")
-	}
-
-	providers := OpenGLContextProviderWGL | OpenGLContextProviderEGL | OpenGLContextProviderWebGL | OpenGLContextProviderMask(1<<30)
-	if !providers.Has(OpenGLContextProviderWGL) || !providers.Has(OpenGLContextProviderEGL) ||
-		!providers.Has(OpenGLContextProviderWebGL) {
-		t.Fatalf("provider mask %08x should include WGL, EGL, and WebGL", uint32(providers))
-	}
-	if !providers.Has(OpenGLContextProviderMask(1 << 30)) {
-		t.Fatalf("provider mask should preserve unknown future bits")
+func TestRenderExtentPhysicalSizeRejectsInvalidScale(t *testing.T) {
+	if _, _, err := (RenderTargetExtent{Width: 1, Height: 1}).PhysicalSize(); err == nil {
+		t.Fatal("zero scale factor accepted")
 	}
 }
 
-func TestVulkanContextDescriptorMaterialization(t *testing.T) {
-	descriptor := VulkanContextDescriptor{
-		Instance:                 0x101,
-		PhysicalDevice:           0x202,
-		Device:                   0x303,
-		GraphicsQueue:            0x404,
-		GraphicsQueueFamilyIndex: 7,
-		GetInstanceProcAddr:      0x505,
-		GetDeviceProcAddr:        0x606,
+// A Vulkan non-dispatchable handle is 64 bits wide on every platform, so the
+// binding must carry one that a pointer-width field would truncate. Both
+// handles below have a bit set above the low 32 bits, and neither survives a
+// 32-bit carrier: the image would lose its top bit and the image view would
+// read as VK_NULL_HANDLE.
+func TestVulkanDescriptorsKeepHighHandleBits(t *testing.T) {
+	const (
+		image     = VulkanHandle(0x8000_0000_0000_0001)
+		imageView = VulkanHandle(0x0000_0001_0000_0000)
+		surface   = VulkanHandle(0xFEDC_BA98_7654_3210)
+	)
+	context := VulkanContextDescriptor{
+		Instance:       NativePointer(0x30),
+		PhysicalDevice: NativePointer(0x40),
+		Device:         NativePointer(0x50),
+		GraphicsQueue:  NativePointer(0x60),
+	}
+	extent := RenderTargetExtent{Width: 64, Height: 32, ScaleFactor: 2}
+
+	texture := VulkanBorrowedTextureDescriptor{
+		Extent:         extent,
+		PhysicalWidth:  128,
+		PhysicalHeight: 64,
+		Context:        context,
+		Image:          image,
+		ImageView:      imageView,
+		Format:         44,
+		InitialLayout:  1,
+		FinalLayout:    2,
+	}.toC()
+	if got := VulkanHandle(texture.image); got != image {
+		t.Errorf("image = %#x, want %#x", got, image)
+	}
+	if got := VulkanHandle(texture.image_view); got != imageView {
+		t.Errorf("image_view = %#x, want %#x", got, imageView)
+	}
+	if got := uint32(texture.physical_width); got != 128 {
+		t.Errorf("physical_width = %d, want 128", got)
 	}
 
-	fields := testVulkanContextDescriptorFields(descriptor)
-	if fields.Size != uint32(testVulkanContextDescriptorSize()) {
-		t.Fatalf("size = %d, want %d", fields.Size, testVulkanContextDescriptorSize())
-	}
-	if fields.Instance != uintptr(descriptor.Instance) ||
-		fields.PhysicalDevice != uintptr(descriptor.PhysicalDevice) ||
-		fields.Device != uintptr(descriptor.Device) ||
-		fields.GraphicsQueue != uintptr(descriptor.GraphicsQueue) ||
-		fields.GraphicsQueueFamilyIndex != descriptor.GraphicsQueueFamilyIndex ||
-		fields.GetInstanceProcAddr != uintptr(descriptor.GetInstanceProcAddr) ||
-		fields.GetDeviceProcAddr != uintptr(descriptor.GetDeviceProcAddr) {
-		t.Fatalf("Vulkan context descriptor fields = %#v", fields)
+	raw := VulkanSurfaceDescriptor{Extent: extent, Context: context, Surface: surface}.toC()
+	if got := VulkanHandle(raw.surface); got != surface {
+		t.Errorf("surface = %#x, want %#x", got, surface)
 	}
 }
 
-func TestOpenGLContextDescriptorMaterialization(t *testing.T) {
-	wglDescriptor := OpenGLContextDescriptor{WGL: &WGLContextDescriptor{
-		DeviceContext:  0x111,
-		ShareContext:   0x222,
-		GetProcAddress: 0x333,
-	}}
-	wgl := testWGLContextDescriptorFields(wglDescriptor)
-	if wgl.OpenGLSize != uint32(testOpenGLContextDescriptorSize()) {
-		t.Fatalf("OpenGL size = %d, want %d", wgl.OpenGLSize, testOpenGLContextDescriptorSize())
-	}
-	if wgl.Platform != testOpenGLContextPlatformWGL() {
-		t.Fatalf("WGL platform = %d, want %d", wgl.Platform, testOpenGLContextPlatformWGL())
-	}
-	if wgl.Ownership != uint32(OpenGLContextOwnershipShared) {
-		t.Fatalf("default WGL ownership = %d, want shared", wgl.Ownership)
-	}
-	if wgl.WGLSize != uint32(testWGLContextDescriptorSize()) ||
-		wgl.DeviceContext != uintptr(wglDescriptor.WGL.DeviceContext) ||
-		wgl.ShareContext != uintptr(wglDescriptor.WGL.ShareContext) ||
-		wgl.GetProcAddress != uintptr(wglDescriptor.WGL.GetProcAddress) {
-		t.Fatalf("WGL context descriptor fields = %#v", wgl)
-	}
+// The GPU synchronization object shares that 64-bit carrier: a Vulkan timeline
+// semaphore with a bit set above the low 32 bits must reach the C struct whole.
+func TestGPUSyncKeepsHighSemaphoreBits(t *testing.T) {
+	const semaphore = VulkanHandle(0xFEED_FACE_0000_0007)
 
-	eglDescriptor := OpenGLContextDescriptor{EGL: &EGLContextDescriptor{
-		Display:        0x444,
-		Config:         0x555,
-		ShareContext:   0x666,
-		GetProcAddress: 0x777,
-	}}
-	egl := testEGLContextDescriptorFields(eglDescriptor)
-	if egl.OpenGLSize != uint32(testOpenGLContextDescriptorSize()) {
-		t.Fatalf("OpenGL size = %d, want %d", egl.OpenGLSize, testOpenGLContextDescriptorSize())
-	}
-	if egl.Platform != testOpenGLContextPlatformEGL() {
-		t.Fatalf("EGL platform = %d, want %d", egl.Platform, testOpenGLContextPlatformEGL())
-	}
-	if egl.Ownership != uint32(OpenGLContextOwnershipShared) {
-		t.Fatalf("default EGL ownership = %d, want shared", egl.Ownership)
-	}
-	if egl.EGLSize != uint32(testEGLContextDescriptorSize()) ||
-		egl.Display != uintptr(eglDescriptor.EGL.Display) ||
-		egl.Config != uintptr(eglDescriptor.EGL.Config) ||
-		egl.ShareContext != uintptr(eglDescriptor.EGL.ShareContext) ||
-		egl.ClientAPI != uint32(OpenGLClientAPIUnspecified) ||
-		egl.GetProcAddress != uintptr(eglDescriptor.EGL.GetProcAddress) {
-		t.Fatalf("EGL context descriptor fields = %#v", egl)
-	}
+	raw := GPUSync{
+		Kind:   GPUSyncVulkanTimelineSemaphore,
+		Object: uint64(semaphore),
+		Value:  9,
+	}.toC()
 
-	dedicated := testEGLContextDescriptorFields(OpenGLContextDescriptor{
-		EGL:       &EGLContextDescriptor{Display: 0x888, Config: 0x999, ClientAPI: OpenGLClientAPIGLES},
-		Ownership: OpenGLContextOwnershipDedicated,
-	})
-	if dedicated.Ownership != uint32(OpenGLContextOwnershipDedicated) ||
-		dedicated.ClientAPI != uint32(OpenGLClientAPIGLES) ||
-		dedicated.ShareContext != 0 {
-		t.Fatalf("dedicated EGL context descriptor fields = %#v", dedicated)
+	if got := VulkanHandle(raw.object); got != semaphore {
+		t.Errorf("object = %#x, want %#x", got, semaphore)
 	}
-}
-
-func TestRenderDescriptorValidation(t *testing.T) {
-	for _, extent := range []RenderTargetExtent{
-		{Width: 1, Height: 1, ScaleFactor: 0},
-		{Width: 1, Height: 1, ScaleFactor: -1},
-		{Width: 1, Height: 1, ScaleFactor: math.NaN()},
-		{Width: 1, Height: 1, ScaleFactor: math.Inf(1)},
-	} {
-		if err := extent.validate(); !errors.Is(err, ErrInvalidArgument) {
-			t.Fatalf("extent.validate() error = %v, want ErrInvalidArgument", err)
-		}
-	}
-	if err := (RenderTargetExtent{Width: 1, Height: 1, ScaleFactor: 1}).validate(); err != nil {
-		t.Fatalf("valid extent.validate() error = %v", err)
-	}
-
-	if err := (OpenGLContextDescriptor{}).validate(); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("empty OpenGL context validate error = %v, want ErrInvalidArgument", err)
-	}
-	if err := (OpenGLContextDescriptor{WGL: &WGLContextDescriptor{}, EGL: &EGLContextDescriptor{}}).validate(); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("ambiguous OpenGL context validate error = %v, want ErrInvalidArgument", err)
-	}
-	if err := (OpenGLContextDescriptor{WGL: &WGLContextDescriptor{}}).validate(); err != nil {
-		t.Fatalf("valid WGL context validate error = %v", err)
-	}
-	if err := (OpenGLContextDescriptor{EGL: &EGLContextDescriptor{}}).validate(); err != nil {
-		t.Fatalf("valid EGL context validate error = %v", err)
-	}
-}
-
-func TestOpenGLFrameNilClose(t *testing.T) {
-	var nilFrame *OpenGLOwnedTextureFrame
-	if err := nilFrame.Close(); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("nil OpenGLOwnedTextureFrame Close() error = %v, want ErrInvalidArgument", err)
-	}
-}
-
-func TestTextureFrameWithInfoRejectsClosedFrames(t *testing.T) {
-	metal := &MetalOwnedTextureFrame{
-		info:    MetalOwnedTextureFrameInfo{Generation: 7},
-		texture: NativePointer(0xabc),
-		device:  NativePointer(0xdef),
-		state:   &metalOwnedTextureFrameState{},
-	}
-	if err := metal.WithInfo(func(info MetalOwnedTextureFrameInfo) error {
-		if info.Generation != 7 {
-			t.Fatalf("Metal info = %+v", info)
-		}
-		texture, err := metal.Texture()
-		if err != nil {
-			t.Fatalf("Metal Texture(): %v", err)
-		}
-		if texture != NativePointer(0xabc) {
-			t.Fatalf("Metal Texture() = %#x, want 0xabc", uintptr(texture))
-		}
-		return nil
-	}); err != nil {
-		t.Fatalf("Metal WithInfo(): %v", err)
-	}
-	metal.state.closed = true
-	if err := metal.WithInfo(func(MetalOwnedTextureFrameInfo) error { return nil }); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("closed Metal WithInfo() error = %v, want ErrInvalidState", err)
-	}
-	if _, err := metal.Texture(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("closed Metal Texture() error = %v, want ErrInvalidState", err)
-	}
-	if _, err := metal.Device(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("closed Metal Device() error = %v, want ErrInvalidState", err)
-	}
-
-	vulkan := &VulkanOwnedTextureFrame{
-		info:      VulkanOwnedTextureFrameInfo{Generation: 8},
-		image:     VulkanHandle(0x111),
-		imageView: VulkanHandle(0x222),
-		device:    NativePointer(0x333),
-		state:     &vulkanOwnedTextureFrameState{},
-	}
-	image, err := vulkan.Image()
-	if err != nil {
-		t.Fatalf("Vulkan Image(): %v", err)
-	}
-	if image != VulkanHandle(0x111) {
-		t.Fatalf("Vulkan Image() = %#x, want 0x111", uint64(image))
-	}
-	vulkan.state.closed = true
-	if err := vulkan.WithInfo(func(VulkanOwnedTextureFrameInfo) error { return nil }); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("closed Vulkan WithInfo() error = %v, want ErrInvalidState", err)
-	}
-	if _, err := vulkan.Image(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("closed Vulkan Image() error = %v, want ErrInvalidState", err)
-	}
-	if _, err := vulkan.ImageView(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("closed Vulkan ImageView() error = %v, want ErrInvalidState", err)
-	}
-	if _, err := vulkan.Device(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("closed Vulkan Device() error = %v, want ErrInvalidState", err)
-	}
-
-	opengl := &OpenGLOwnedTextureFrame{
-		info:    OpenGLOwnedTextureFrameInfo{Generation: 9},
-		texture: 11,
-		target:  12,
-		state:   &openglOwnedTextureFrameState{},
-	}
-	texture, err := opengl.Texture()
-	if err != nil {
-		t.Fatalf("OpenGL Texture(): %v", err)
-	}
-	if texture != 11 {
-		t.Fatalf("OpenGL Texture() = %d, want 11", texture)
-	}
-	opengl.state.closed = true
-	if err := opengl.WithInfo(func(OpenGLOwnedTextureFrameInfo) error { return nil }); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("closed OpenGL WithInfo() error = %v, want ErrInvalidState", err)
-	}
-	if _, err := opengl.Texture(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("closed OpenGL Texture() error = %v, want ErrInvalidState", err)
-	}
-	if _, err := opengl.Target(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("closed OpenGL Target() error = %v, want ErrInvalidState", err)
+	if got := uint64(raw.value); got != 9 {
+		t.Errorf("value = %d, want 9", got)
 	}
 }

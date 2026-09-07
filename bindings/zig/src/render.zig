@@ -1,66 +1,24 @@
 const std = @import("std");
 
 const c = @import("c.zig").raw;
+const completion = @import("completion.zig");
 const diagnostics = @import("diagnostics.zig");
 const map_module = @import("map.zig");
 const native_temp = @import("native_temp.zig");
-const runtime_module = @import("runtime.zig");
 const status = @import("status.zig");
 const values = @import("values.zig");
 
-const MetalOwnedTextureFrameStorage = struct { raw: c.mln_metal_owned_texture_frame };
-const OpenGLOwnedTextureFrameStorage = struct { raw: c.mln_opengl_owned_texture_frame };
-const VulkanOwnedTextureFrameStorage = struct { raw: c.mln_vulkan_owned_texture_frame };
-
-const RenderSessionFrameState = struct {
-    metal_frame: ?MetalOwnedTextureFrameStorage = null,
-    metal_frame_active: bool = false,
-    metal_frame_generation: u64 = 0,
-    opengl_frame: ?OpenGLOwnedTextureFrameStorage = null,
-    opengl_frame_active: bool = false,
-    opengl_frame_generation: u64 = 0,
-    vulkan_frame: ?VulkanOwnedTextureFrameStorage = null,
-    vulkan_frame_active: bool = false,
-    vulkan_frame_generation: u64 = 0,
-};
-
 const RenderSessionState = struct {
-    /// Cleared once a successful detach or close releases the registration.
     map_handle: ?map_module.MapHandle,
-    /// The session's own store, never the map's: a session's owner thread need
-    /// not be the map's, and `DiagnosticStore` is unsynchronized.
     diagnostic_store: ?*diagnostics.DiagnosticStore,
-    frame_state: ?*RenderSessionFrameState,
     active_leases: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
     closing: bool = false,
-};
-
-const OwnedTextureFrameKind = enum {
-    metal,
-    vulkan,
-    opengl,
-};
-
-const OwnedTextureFrameState = struct {
-    kind: OwnedTextureFrameKind,
-    session_native: c.mln_render_session,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-    frame_state: ?*RenderSessionFrameState,
-    generation: u64,
-    active_leases: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
-    closing: bool = false,
-};
-
-const OwnedTextureFrameRegistrySlot = struct {
-    state: ?*OwnedTextureFrameState,
-    generation: u64,
 };
 
 const RenderSessionLease = struct {
     state: *RenderSessionState,
     native: c.mln_render_session,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
-    frame_state: *RenderSessionFrameState,
 
     fn release(self: RenderSessionLease) void {
         _ = self.state.active_leases.fetchSub(1, .seq_cst);
@@ -71,30 +29,10 @@ const RenderSessionClose = struct {
     state: *RenderSessionState,
     native: c.mln_render_session,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
-    frame_state: *RenderSessionFrameState,
 };
 
-const OwnedTextureFrameLease = struct {
-    state: *OwnedTextureFrameState,
-    session_native: c.mln_render_session,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-    frame_state: *RenderSessionFrameState,
-    generation: u64,
-
-    fn release(self: OwnedTextureFrameLease) void {
-        _ = self.state.active_leases.fetchSub(1, .seq_cst);
-    }
-};
-
-// An owned texture frame is a binding concept with no C handle behind it, so
-// the frame tables below carry their own generations.
 var render_session_registry_lock = std.atomic.Value(bool).init(false);
 var render_session_registry: std.AutoHashMapUnmanaged(c.mln_render_session, *RenderSessionState) = .empty;
-
-var owned_texture_frame_registry_lock = std.atomic.Value(bool).init(false);
-var owned_texture_frame_registry: std.ArrayList(OwnedTextureFrameRegistrySlot) = .empty;
-var owned_texture_frame_free_list: std.ArrayList(usize) = .empty;
-var fail_next_owned_texture_frame_wrapper_allocation_for_testing = std.atomic.Value(bool).init(false);
 
 pub const NativePointer = enum(usize) {
     _,
@@ -114,6 +52,23 @@ pub const NativePointer = enum(usize) {
     }
 };
 
+pub const RenderDriver = enum {
+    core_worker,
+    caller_graphics_thread,
+
+    fn toRaw(self: RenderDriver) u32 {
+        return switch (self) {
+            .core_worker => c.MLN_RENDER_DRIVER_CORE_WORKER,
+            .caller_graphics_thread => c.MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+        };
+    }
+};
+
+pub const RenderSessionAttachOptions = struct {
+    driver: RenderDriver,
+    requested_texture_ring_depth: u32 = 1,
+};
+
 /// Borrowed Vulkan non-dispatchable handle represented with Vulkan's stable
 /// 64-bit ABI width on every target.
 pub const VulkanHandle = enum(u64) {
@@ -129,16 +84,15 @@ pub const VulkanHandle = enum(u64) {
     }
 };
 
-/// Which outcome a successful `RenderSessionHandle.renderUpdate` call reached.
+/// Which outcome one frame a `RenderSessionHandle.requestFrame` demand asked
+/// for reached, as reported through `RenderSessionHandle.drainFrameResults`.
 pub const RenderResult = union(enum) {
-    /// The call rendered a frame into the render target.
     rendered,
-    /// The call produced no frame.
     no_update,
-    /// The map has not applied the session's current size yet.
     size_pending,
-    /// The render target had no frame to draw into.
     target_not_ready,
+    superseded,
+    deadline_missed,
     unknown: u32,
 
     fn fromRaw(raw: u32) RenderResult {
@@ -147,21 +101,100 @@ pub const RenderResult = union(enum) {
             c.MLN_RENDER_RESULT_NO_UPDATE => .no_update,
             c.MLN_RENDER_RESULT_SIZE_PENDING => .size_pending,
             c.MLN_RENDER_RESULT_TARGET_NOT_READY => .target_not_ready,
+            c.MLN_RENDER_RESULT_SUPERSEDED => .superseded,
+            c.MLN_RENDER_RESULT_DEADLINE_MISSED => .deadline_missed,
             else => .{ .unknown = raw },
         };
     }
 };
 
-/// Outcome of a successful `RenderSessionHandle.renderUpdate` call.
-pub const RenderUpdate = struct {
-    /// Which outcome the call reached.
-    result: RenderResult,
+/// One request for a rendered frame. `FrameDemand{}` matches the C API's
+/// default demand: render only when the map has an update, without presenting.
+pub const FrameDemand = struct {
+    /// Renders only when the map published an update since the last frame.
+    if_needed: bool = true,
+    /// Presents the rendered frame on a presenting target. A demand that
+    /// clears this bit still renders, and the target keeps whatever it
+    /// presented last.
+    present: bool = false,
+    token: u64 = 0,
+    coalescing_boundary: u64 = 0,
+    timeout_ns: u64 = 0,
+};
+
+pub const FrameResult = struct {
+    disposition: RenderResult,
+    token: u64,
+    map_update_generation: u64,
+    extent_generation: u64,
+    frame_generation: u64,
     /// Whether the map asked for another frame while it rendered this one, as
-    /// during an ongoing camera transition. True only when `result` is
-    /// `.rendered`; this is the same signal that a map-render-frame-finished
-    /// event carries in its `needs_repaint` field, delivered without the
-    /// event round trip.
+    /// during an ongoing camera transition. Set only when `disposition` is
+    /// `.rendered`, and false for every other outcome.
     needs_repaint: bool,
+};
+
+pub const RenderSessionCapabilities = struct {
+    driver: RenderDriver,
+    texture_ring_depth: u32,
+    frame_acquisition: bool,
+    readback: bool,
+    consumer_sync: bool,
+    presentation: bool,
+};
+pub const RenderSessionLifecycle = union(enum) {
+    attaching,
+    attached,
+    detaching,
+    detached,
+    target_lost,
+    abandoned,
+    unknown: u32,
+};
+
+pub const RenderSessionSnapshot = struct {
+    state: RenderSessionLifecycle,
+    driver: RenderDriver,
+    latest_result: RenderResult,
+    extent: RenderTargetExtent,
+    generation: u64,
+    map_update_generation: u64,
+    rendered_update_generation: u64,
+    extent_generation: u64,
+    frame_generation: u64,
+    latest_demand_token: u64,
+    pending_demand_count: u32,
+    acquired_frame_count: u32,
+    target_ready: bool,
+    pending_changes: bool,
+};
+
+/// Backend synchronization for an acquired texture frame. Each payload carries
+/// the backend object in the type that names it: a `NativePointer` for the
+/// pointer-typed backends and a `VulkanHandle` for the Vulkan semaphore.
+pub const GpuSync = union(enum) {
+    cpu_complete,
+    metal_shared_event: struct { object: NativePointer, value: u64 },
+    vulkan_timeline_semaphore: struct { semaphore: VulkanHandle, value: u64 },
+    opengl_fence: NativePointer,
+    webgpu_token: struct { object: NativePointer, value: u64 },
+};
+
+pub const AbandonDisposition = union(enum) {
+    clean,
+    quarantined,
+    unknown: u32,
+};
+
+pub const AbandonResult = struct {
+    disposition: AbandonDisposition,
+    quarantined_resource_count: u32,
+};
+
+pub const RenderSessionAttachment = struct {
+    session: RenderSessionHandle,
+    /// Completes once the session finished attaching to its target.
+    attached: completion.Future(void),
 };
 
 pub const RenderBackendSupport = struct {
@@ -232,18 +265,23 @@ pub const VulkanContextDescriptor = struct {
     get_instance_proc_addr: ?NativePointer = null,
     get_device_proc_addr: ?NativePointer = null,
 };
+pub const WebGPUContextDescriptor = struct {
+    instance: ?NativePointer = null,
+    device: NativePointer,
+    queue: ?NativePointer = null,
+};
 
-/// How a render session's OpenGL context relates to the thread that attached
-/// it.
+/// How a render session's OpenGL context relates to its driver thread and host
+/// graphics state.
 pub const OpenGLContextOwnership = union(enum) {
     /// The session shares its thread with host graphics work. Every render
     /// makes the session context current and restores whatever was current
     /// before, and the session context joins the share group that the
     /// descriptor names.
     shared,
-    /// The session owns its thread's OpenGL context. It makes its context
-    /// current once, keeps it current between renders, and joins no share
-    /// group. Use this for a thread that exists to drive one render session.
+    /// The session owns its driver thread's OpenGL context. It keeps the
+    /// context current between renders and joins no share group. The driver may
+    /// be a native core worker or a dedicated host thread.
     dedicated,
     unknown: u32,
 
@@ -303,10 +341,15 @@ pub const EglContextDescriptor = struct {
     ownership: OpenGLContextOwnership = .shared,
     get_proc_address: ?NativePointer = null,
 };
+pub const WebGLContextDescriptor = union(enum) {
+    existing: i32,
+    transferred_canvas: []const u8,
+};
 
 pub const OpenGLContextDescriptor = union(enum) {
     wgl: WglContextDescriptor,
     egl: EglContextDescriptor,
+    webgl: WebGLContextDescriptor,
 };
 
 pub const MetalOwnedTextureDescriptor = struct {
@@ -338,6 +381,21 @@ pub const VulkanBorrowedTextureDescriptor = struct {
     format: u32,
     initial_layout: u32,
     final_layout: u32,
+};
+
+pub const WebGPUOwnedTextureDescriptor = struct {
+    extent: RenderTargetExtent = .{},
+    context: WebGPUContextDescriptor,
+};
+
+pub const WebGPUBorrowedTextureDescriptor = struct {
+    extent: RenderTargetExtent = .{},
+    physical_width: u32,
+    physical_height: u32,
+    context: WebGPUContextDescriptor,
+    texture: NativePointer,
+    texture_view: NativePointer,
+    format: u32,
 };
 
 pub const OpenGLOwnedTextureDescriptor = struct {
@@ -373,14 +431,19 @@ pub const OpenGLSurfaceDescriptor = struct {
     surface: NativePointer,
 };
 
+pub const WebGPUSurfaceDescriptor = struct {
+    extent: RenderTargetExtent = .{},
+    context: WebGPUContextDescriptor,
+    surface: NativePointer,
+    format: u32,
+};
+
 pub const TextureImageInfo = struct {
     width: u32,
     height: u32,
     stride: u32,
     byte_length: usize,
 };
-
-pub const FeatureStateSelector = map_module.FeatureStateSelector;
 
 /// Screen-space box in logical map pixels. Corners may be given in any order
 /// and may extend past the viewport; rendered queries normalize and clip them.
@@ -492,846 +555,559 @@ pub const OpenGLOwnedTextureFrameInfo = struct {
     format: u32,
     type: u32,
 };
+pub const WebGPUOwnedTextureFrameInfo = struct {
+    generation: u64,
+    width: u32,
+    height: u32,
+    scale_factor: f64,
+    texture: NativePointer,
+    texture_view: NativePointer,
+    device: NativePointer,
+    format: u32,
+};
+
+/// Frame results copied out of one drain, owned by the caller's allocator.
+pub const RenderFrameBatch = struct {
+    allocator: std.mem.Allocator,
+    results: []FrameResult,
+
+    pub fn deinit(self: *RenderFrameBatch) void {
+        self.allocator.free(self.results);
+        self.results = &.{};
+    }
+
+    pub fn len(self: RenderFrameBatch) usize {
+        return self.results.len;
+    }
+
+    pub fn at(self: RenderFrameBatch, index: usize) status.Error!FrameResult {
+        if (index >= self.results.len) return error.InvalidArgument;
+        return self.results[index];
+    }
+};
+
+pub const AcquiredFrame = struct {
+    native: c.mln_acquired_frame,
+    session: RenderSessionHandle,
+
+    pub fn result(self: AcquiredFrame) status.Error!FrameResult {
+        const lease = try renderSessionLease(self.session);
+        defer lease.release();
+        var raw: c.mln_render_frame_result = undefined;
+        raw.size = @sizeOf(c.mln_render_frame_result);
+        try status.checkStatus(c.mln_acquired_frame_get_result(self.native, &raw), lease.diagnostic_store);
+        return frameResultFromNative(raw);
+    }
+
+    pub fn producerSync(self: AcquiredFrame) status.Error!GpuSync {
+        const lease = try renderSessionLease(self.session);
+        defer lease.release();
+        var raw = gpuSyncToNative(.cpu_complete);
+        try status.checkStatus(c.mln_acquired_frame_get_producer_sync(self.native, &raw), lease.diagnostic_store);
+        return gpuSyncFromNative(raw);
+    }
+
+    pub fn metalTexture(self: AcquiredFrame) status.Error!MetalOwnedTextureFrameInfo {
+        const lease = try renderSessionLease(self.session);
+        defer lease.release();
+        var raw: c.mln_metal_owned_texture_frame = undefined;
+        raw.size = @sizeOf(c.mln_metal_owned_texture_frame);
+        try status.checkStatus(c.mln_acquired_frame_get_metal_texture(self.native, &raw), lease.diagnostic_store);
+        return .{ .generation = raw.generation, .width = raw.width, .height = raw.height, .scale_factor = raw.scale_factor, .texture = NativePointer.fromPtr(raw.texture orelse return error.NativeError), .device = NativePointer.fromPtr(raw.device orelse return error.NativeError), .pixel_format = raw.pixel_format };
+    }
+
+    pub fn vulkanTexture(self: AcquiredFrame) status.Error!VulkanOwnedTextureFrameInfo {
+        const lease = try renderSessionLease(self.session);
+        defer lease.release();
+        var raw: c.mln_vulkan_owned_texture_frame = undefined;
+        raw.size = @sizeOf(c.mln_vulkan_owned_texture_frame);
+        try status.checkStatus(c.mln_acquired_frame_get_vulkan_texture(self.native, &raw), lease.diagnostic_store);
+        return .{ .generation = raw.generation, .width = raw.width, .height = raw.height, .scale_factor = raw.scale_factor, .image = VulkanHandle.fromBits(raw.image), .image_view = VulkanHandle.fromBits(raw.image_view), .device = NativePointer.fromPtr(raw.device orelse return error.NativeError), .format = raw.format, .layout = raw.layout };
+    }
+
+    pub fn openGLTexture(self: AcquiredFrame) status.Error!OpenGLOwnedTextureFrameInfo {
+        const lease = try renderSessionLease(self.session);
+        defer lease.release();
+        var raw: c.mln_opengl_owned_texture_frame = undefined;
+        raw.size = @sizeOf(c.mln_opengl_owned_texture_frame);
+        try status.checkStatus(c.mln_acquired_frame_get_opengl_texture(self.native, &raw), lease.diagnostic_store);
+        return .{ .generation = raw.generation, .width = raw.width, .height = raw.height, .scale_factor = raw.scale_factor, .texture = raw.texture, .target = raw.target, .internal_format = raw.internal_format, .format = raw.format, .type = raw.type };
+    }
+
+    pub fn webGPUTexture(self: AcquiredFrame) status.Error!WebGPUOwnedTextureFrameInfo {
+        const lease = try renderSessionLease(self.session);
+        defer lease.release();
+        var raw: c.mln_webgpu_owned_texture_frame = undefined;
+        raw.size = @sizeOf(c.mln_webgpu_owned_texture_frame);
+        try status.checkStatus(c.mln_acquired_frame_get_webgpu_texture(self.native, &raw), lease.diagnostic_store);
+        return .{ .generation = raw.generation, .width = raw.width, .height = raw.height, .scale_factor = raw.scale_factor, .texture = NativePointer.fromPtr(raw.texture orelse return error.NativeError), .texture_view = NativePointer.fromPtr(raw.texture_view orelse return error.NativeError), .device = NativePointer.fromPtr(raw.device orelse return error.NativeError), .format = raw.format };
+    }
+
+    pub fn release(self: *AcquiredFrame, consumer_completion: GpuSync) status.Error!void {
+        const lease = try renderSessionLease(self.session);
+        defer lease.release();
+        var sync = gpuSyncToNative(consumer_completion);
+        try status.checkStatus(c.mln_acquired_frame_release(&self.native, &sync), lease.diagnostic_store);
+    }
+};
+
+pub const OwnedReadback = struct {
+    allocator: std.mem.Allocator,
+    data: []u8,
+    info: TextureImageInfo,
+
+    pub fn deinit(self: *OwnedReadback) void {
+        self.allocator.free(self.data);
+        self.data = &.{};
+    }
+};
 
 pub const RenderSessionHandle = enum(c.mln_render_session) {
     _,
 
-    /// Resizes this attached render session. Borrowed texture targets are sized
-    /// by their owner and return `error.Unsupported`; hand over a new texture
-    /// with the backend's `set*BorrowedTextureTarget` method instead.
-    ///
-    /// The session keeps its renderer, along with the tile pyramid, glyph and
-    /// image atlases, and symbol placement. A scale factor change retires the
-    /// renderer instead, because shaders are compiled for one pixel ratio.
-    /// Map-owned feature state survives either way.
-    pub fn resize(self: *RenderSessionHandle, extent: RenderTargetExtent) status.Error!void {
-        const lease = try renderSessionLease(self.*);
+    pub fn capabilities(self: RenderSessionHandle) status.Error!RenderSessionCapabilities {
+        const lease = try renderSessionLease(self);
         defer lease.release();
-        try ensureNoActiveOwnedFrame(lease);
-        try status.checkStatus(
-            c.mln_render_session_resize(lease.native, extent.width, extent.height, extent.scale_factor),
-            lease.diagnostic_store,
-        );
-    }
-
-    /// Presents this attached surface session through a new Metal surface,
-    /// keeping this session's renderer. The descriptor's extent applies as
-    /// `resize` applies one. A `context.device` that is neither null nor this
-    /// session's device returns `error.InvalidArgument` and leaves the session
-    /// on its current surface; the session assigns the layer its own device and
-    /// pixel format.
-    pub fn setMetalSurfaceTarget(self: *RenderSessionHandle, descriptor: MetalSurfaceDescriptor) status.Error!void {
-        var raw = metalSurfaceDescriptorToNative(descriptor);
-        return try setTarget(self.*, c.mln_metal_surface_set_target, &raw);
-    }
-
-    /// Presents this attached surface session through a new Vulkan surface,
-    /// keeping this session's renderer. The outgoing `VkSurfaceKHR` must still
-    /// be valid, since this session destroys the swapchain built from it. A
-    /// host that must release its surface first closes this session instead.
-    pub fn setVulkanSurfaceTarget(self: *RenderSessionHandle, descriptor: VulkanSurfaceDescriptor) status.Error!void {
-        var raw = vulkanSurfaceDescriptorToNative(descriptor);
-        return try setTarget(self.*, c.mln_vulkan_surface_set_target, &raw);
-    }
-
-    /// Presents this attached surface session through a new OpenGL surface,
-    /// keeping this session's renderer. The new surface is made current on the
-    /// next render, so the outgoing surface may already be destroyed, and an
-    /// unusable replacement surfaces as `error.NativeError` from the next
-    /// `renderUpdate` rather than from this call.
-    pub fn setOpenGLSurfaceTarget(self: *RenderSessionHandle, descriptor: OpenGLSurfaceDescriptor) status.Error!void {
-        var raw = openglSurfaceDescriptorToNative(descriptor);
-        return try setTarget(self.*, c.mln_opengl_surface_set_target, &raw);
-    }
-
-    /// Renders this attached texture session into a new caller-owned Metal
-    /// texture, keeping this session's renderer. The new extent applies as
-    /// `resize` applies one.
-    ///
-    /// The replacement must belong to the device this session attached with
-    /// (`error.InvalidArgument` otherwise) and carry the pixel format it
-    /// attached with (`error.Unsupported` otherwise); either leaves the session
-    /// on its current texture. The caller keeps the replacement valid until the
-    /// next replacement, detach, or close. The outgoing texture is neither read
-    /// nor released here.
-    pub fn setMetalBorrowedTextureTarget(self: *RenderSessionHandle, descriptor: MetalBorrowedTextureDescriptor) status.Error!void {
-        var raw = metalBorrowedTextureDescriptorToNative(descriptor);
-        return try setTarget(self.*, c.mln_metal_borrowed_texture_set_target, &raw);
-    }
-
-    /// Renders this attached texture session into a new caller-owned Vulkan
-    /// image. See `setMetalBorrowedTextureTarget`. The replacement must carry
-    /// the format and both layouts this session attached with.
-    pub fn setVulkanBorrowedTextureTarget(self: *RenderSessionHandle, descriptor: VulkanBorrowedTextureDescriptor) status.Error!void {
-        var raw = vulkanBorrowedTextureDescriptorToNative(descriptor);
-        return try setTarget(self.*, c.mln_vulkan_borrowed_texture_set_target, &raw);
-    }
-
-    /// Renders this attached texture session into a new caller-owned OpenGL
-    /// texture. See `setMetalBorrowedTextureTarget`. The replacement must
-    /// belong to the context this session attached with or one in its share
-    /// group, and that context must be current on this thread.
-    pub fn setOpenGLBorrowedTextureTarget(self: *RenderSessionHandle, descriptor: OpenGLBorrowedTextureDescriptor) status.Error!void {
-        var raw = openglBorrowedTextureDescriptorToNative(descriptor);
-        return try setTarget(self.*, c.mln_opengl_borrowed_texture_set_target, &raw);
-    }
-
-    /// Renders the latest available map render update. The map retains its
-    /// latest update, so repeated calls re-render it and report `.rendered`
-    /// again. Every other result names the wake to wait for: `.no_update` and
-    /// `.size_pending` resolve on a render-update-available event, and
-    /// `.target_not_ready` resolves when the host changes the render target.
-    pub fn renderUpdate(self: *RenderSessionHandle) status.Error!RenderUpdate {
-        const lease = try renderSessionLease(self.*);
-        defer lease.release();
-        try ensureNoActiveOwnedFrame(lease);
-        var result: c.mln_render_result = c.MLN_RENDER_RESULT_NO_UPDATE;
-        var needs_repaint: bool = false;
-        try status.checkStatus(
-            c.mln_render_session_render_update(lease.native, &result, &needs_repaint),
-            lease.diagnostic_store,
-        );
+        var raw: c.mln_render_session_capabilities = undefined;
+        raw.size = @sizeOf(c.mln_render_session_capabilities);
+        try status.checkStatus(c.mln_render_session_get_capabilities(lease.native, &raw), lease.diagnostic_store);
         return .{
-            .result = RenderResult.fromRaw(@intCast(result)),
-            .needs_repaint = needs_repaint,
+            .driver = try driverFromRaw(raw.driver),
+            .texture_ring_depth = raw.texture_ring_depth,
+            .frame_acquisition = (raw.flags & c.MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION) != 0,
+            .readback = (raw.flags & c.MLN_RENDER_SESSION_CAPABILITY_READBACK) != 0,
+            .consumer_sync = (raw.flags & c.MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC) != 0,
+            .presentation = (raw.flags & c.MLN_RENDER_SESSION_CAPABILITY_PRESENTATION) != 0,
         };
     }
 
-    /// Detaches the render target from this session. The session stays live and
-    /// still needs `close`, but releases its map, so the map may be closed while
-    /// this session is open and every operation needing an attached target
-    /// returns a native error. Detaching is permanent; attach a new session to
-    /// render again.
-    pub fn detach(self: *RenderSessionHandle) status.Error!void {
-        const lease = try renderSessionLease(self.*);
+    pub fn snapshot(self: RenderSessionHandle) status.Error!RenderSessionSnapshot {
+        const lease = try renderSessionLease(self);
         defer lease.release();
-        try ensureNoActiveOwnedFrame(lease);
-        try status.checkStatus(c.mln_render_session_detach(lease.native), lease.diagnostic_store);
-        if (takeMapRegistration(lease.state)) |map_handle| {
-            map_module.unregisterRenderSession(map_handle);
+        var raw: c.mln_render_session_snapshot = undefined;
+        raw.size = @sizeOf(c.mln_render_session_snapshot);
+        try status.checkStatus(c.mln_render_session_get_snapshot(lease.native, &raw), lease.diagnostic_store);
+        return .{
+            .state = lifecycleFromRaw(raw.state),
+            .driver = try driverFromRaw(raw.driver),
+            .latest_result = RenderResult.fromRaw(raw.latest_result),
+            .extent = renderTargetExtentFromNative(raw.extent),
+            .generation = raw.generation,
+            .map_update_generation = raw.map_update_generation,
+            .rendered_update_generation = raw.rendered_update_generation,
+            .extent_generation = raw.extent_generation,
+            .frame_generation = raw.frame_generation,
+            .latest_demand_token = raw.latest_demand_token,
+            .pending_demand_count = raw.pending_demand_count,
+            .acquired_frame_count = raw.acquired_frame_count,
+            .target_ready = raw.target_ready,
+            .pending_changes = raw.pending_changes,
+        };
+    }
+
+    /// Queues one frame demand. Detaching the session gives a demand still
+    /// outstanding the `.target_not_ready` disposition.
+    pub fn requestFrame(self: RenderSessionHandle, demand: FrameDemand) status.Error!void {
+        const lease = try renderSessionLease(self);
+        defer lease.release();
+        var raw = frameDemandToNative(demand);
+        try status.checkStatus(c.mln_render_session_request_frame(lease.native, &raw), lease.diagnostic_store);
+    }
+
+    /// Takes every queued frame result and copies it out of the native batch.
+    /// An empty queue is not an error: the drain reports it as an empty batch.
+    pub fn drainFrameResults(self: RenderSessionHandle, allocator: std.mem.Allocator) status.Error!RenderFrameBatch {
+        const lease = try renderSessionLease(self);
+        defer lease.release();
+        var batch: c.mln_render_frame_batch = 0;
+        status.checkStatus(c.mln_render_session_drain_frame_results(lease.native, &batch), lease.diagnostic_store) catch |err| {
+            if (err == error.NotReady) return .{ .allocator = allocator, .results = &.{} };
+            return err;
+        };
+        defer c.mln_render_frame_batch_release(batch);
+        var count: usize = 0;
+        try status.checkStatus(c.mln_render_frame_batch_count(batch, &count), lease.diagnostic_store);
+        const results = try allocator.alloc(FrameResult, count);
+        errdefer allocator.free(results);
+        for (results, 0..) |*result, index| {
+            var raw: c.mln_render_frame_result = undefined;
+            raw.size = @sizeOf(c.mln_render_frame_result);
+            try status.checkStatus(c.mln_render_frame_batch_get(batch, index, &raw), lease.diagnostic_store);
+            result.* = frameResultFromNative(raw);
         }
+        return .{ .allocator = allocator, .results = results };
     }
 
-    pub fn reduceMemoryUse(self: *RenderSessionHandle) status.Error!void {
-        const lease = try renderSessionLease(self.*);
+    /// Takes the next rendered frame from the session's texture ring.
+    ///
+    /// Reports `error.NotReady` while no rendered frame is available,
+    /// `error.Unsupported` for a session without frame acquisition, and
+    /// `error.InvalidState` for a session that is not attached.
+    pub fn acquireFrame(self: RenderSessionHandle) status.Error!AcquiredFrame {
+        const lease = try renderSessionLease(self);
         defer lease.release();
-        try status.checkStatus(c.mln_render_session_reduce_memory_use(lease.native), lease.diagnostic_store);
+        var frame: c.mln_acquired_frame = 0;
+        try status.checkStatus(c.mln_render_session_acquire_frame(lease.native, &frame), lease.diagnostic_store);
+        return .{ .native = frame, .session = self };
     }
 
-    pub fn clearData(self: *RenderSessionHandle) status.Error!void {
-        const lease = try renderSessionLease(self.*);
+    /// This is the only graphics-thread-affine session method.
+    ///
+    /// Runs up to `max_work` queued driver calls and reports how many ran.
+    ///
+    /// Reports `error.Busy` while another thread is inside a driver call,
+    /// `error.WrongThread` when the calling thread did not attach the session,
+    /// and `error.InvalidState` for a session that is not attached.
+    pub fn serviceDriverWork(self: RenderSessionHandle, max_work: usize) status.Error!usize {
+        const lease = try renderSessionLease(self);
         defer lease.release();
-        try status.checkStatus(c.mln_render_session_clear_data(lease.native), lease.diagnostic_store);
+        var serviced: usize = 0;
+        try status.checkStatus(c.mln_render_session_service_driver_work(lease.native, max_work, &serviced), lease.diagnostic_store);
+        return serviced;
     }
 
-    pub fn dumpDebugLogs(self: *RenderSessionHandle) status.Error!void {
-        const lease = try renderSessionLease(self.*);
-        defer lease.release();
-        try status.checkStatus(c.mln_render_session_dump_debug_logs(lease.native), lease.diagnostic_store);
+    /// Resizes the target and the map behind it.
+    ///
+    /// `extent.scale_factor` is fixed at attach: a different value is rejected
+    /// with `error.InvalidArgument`, as is a resize while a texture frame is
+    /// acquired, which reports `error.InvalidState`. A resize that a later
+    /// resize replaces still completes successfully; only the last one's extent
+    /// is what the session renders. A borrowed texture belongs to its host, so a session
+    /// attached to one reports `error.Unsupported`; give it a replacement
+    /// target of the new size instead.
+    pub fn resize(self: RenderSessionHandle, extent: RenderTargetExtent) status.Error!completion.Future(void) {
+        var raw = renderTargetExtentToNative(extent);
+        return submitRender(void, self, completion.unit, c.mln_render_session_resize, .{&raw});
     }
 
-    pub fn queryRenderedFeatures(
-        self: *RenderSessionHandle,
-        allocator: std.mem.Allocator,
-        geometry: RenderedQueryGeometry,
-        options: ?RenderedFeatureQueryOptions,
-    ) status.Error!QueriedFeatureList {
+    pub fn barrier(self: RenderSessionHandle) status.Error!completion.Future(void) {
+        return submitRender(void, self, completion.unit, c.mln_render_session_barrier, .{});
+    }
+
+    pub fn reduceMemoryUse(self: RenderSessionHandle) status.Error!completion.Future(void) {
+        return submitRender(void, self, completion.unit, c.mln_render_session_reduce_memory_use, .{});
+    }
+
+    pub fn clearData(self: RenderSessionHandle) status.Error!completion.Future(void) {
+        return submitRender(void, self, completion.unit, c.mln_render_session_clear_data, .{});
+    }
+
+    pub fn dumpDebugLogs(self: RenderSessionHandle) status.Error!completion.Future(void) {
+        return submitRender(void, self, completion.unit, c.mln_render_session_dump_debug_logs, .{});
+    }
+
+    pub fn queryRenderedFeatures(self: RenderSessionHandle, allocator: std.mem.Allocator, geometry: RenderedQueryGeometry, options: ?RenderedFeatureQueryOptions) status.Error!completion.Future(QueriedFeatureList) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_geometry = try renderedQueryGeometryToNative(&temp, geometry);
-        var raw_options = if (options) |query_options| try renderedFeatureQueryOptionsToNative(&temp, query_options) else undefined;
-        var result: c.mln_queried_feature_list = 0;
-        const lease = try renderSessionLease(self.*);
-        defer lease.release();
-        try status.checkStatus(
-            c.mln_render_session_query_rendered_features(lease.native, &raw_geometry, if (options != null) &raw_options else null, &result),
-            lease.diagnostic_store,
-        );
-        defer c.mln_queried_feature_list_destroy(result);
-        return try copyQueriedFeatureList(allocator, result, lease.diagnostic_store);
+        var raw_options = if (options) |value| try renderedFeatureQueryOptionsToNative(&temp, value) else undefined;
+        return submitAllocatedRender(QueriedFeatureList, self, allocator, copyQueriedFeaturesCompletion, c.mln_render_session_query_rendered_features, .{ &raw_geometry, if (options != null) &raw_options else null });
     }
 
-    pub fn querySourceFeatures(
-        self: *RenderSessionHandle,
-        allocator: std.mem.Allocator,
-        source_id: []const u8,
-        options: ?SourceFeatureQueryOptions,
-    ) status.Error!QueriedFeatureList {
+    pub fn querySourceFeatures(self: RenderSessionHandle, allocator: std.mem.Allocator, source_id: []const u8, options: ?SourceFeatureQueryOptions) status.Error!completion.Future(QueriedFeatureList) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        const raw_source_id = try temp.stringView(source_id);
-        var raw_options = if (options) |query_options| try sourceFeatureQueryOptionsToNative(&temp, query_options) else undefined;
-        var result: c.mln_queried_feature_list = 0;
-        const lease = try renderSessionLease(self.*);
-        defer lease.release();
-        try status.checkStatus(
-            c.mln_render_session_query_source_features(lease.native, raw_source_id, if (options != null) &raw_options else null, &result),
-            lease.diagnostic_store,
-        );
-        defer c.mln_queried_feature_list_destroy(result);
-        return try copyQueriedFeatureList(allocator, result, lease.diagnostic_store);
+        var raw_options = if (options) |value| try sourceFeatureQueryOptionsToNative(&temp, value) else undefined;
+        return submitAllocatedRender(QueriedFeatureList, self, allocator, copyQueriedFeaturesCompletion, c.mln_render_session_query_source_features, .{ try temp.stringView(source_id), if (options != null) &raw_options else null });
     }
 
-    /// Queries a feature extension from the latest render session state.
+    pub fn queryFeatureExtension(self: RenderSessionHandle, allocator: std.mem.Allocator, source_id: []const u8, feature: []const u8, extension: []const u8, extension_field: []const u8, arguments: ?[]const u8) status.Error!completion.Future(values.OwnedString) {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var raw_arguments = if (arguments) |value| try temp.stringView(value) else undefined;
+        return submitAllocatedRender(values.OwnedString, self, allocator, copyOwnedBufferViewCompletion, c.mln_render_session_query_feature_extensions, .{
+            try temp.stringView(source_id),
+            try temp.stringView(feature),
+            try temp.stringView(extension),
+            try temp.stringView(extension_field),
+            if (arguments != null) &raw_arguments else null,
+        });
+    }
+
+    pub fn readback(self: RenderSessionHandle, allocator: std.mem.Allocator) status.Error!completion.Future(OwnedReadback) {
+        return submitAllocatedRender(OwnedReadback, self, allocator, copyReadbackCompletion, c.mln_texture_read_premultiplied_rgba8, .{});
+    }
+
+    pub fn setMetalSurfaceTarget(self: RenderSessionHandle, descriptor: MetalSurfaceDescriptor) status.Error!completion.Future(void) {
+        var raw = metalSurfaceDescriptorToNative(descriptor);
+        return submitRender(void, self, completion.unit, c.mln_metal_surface_set_target, .{&raw});
+    }
+
+    pub fn setVulkanSurfaceTarget(self: RenderSessionHandle, descriptor: VulkanSurfaceDescriptor) status.Error!completion.Future(void) {
+        var raw = vulkanSurfaceDescriptorToNative(descriptor);
+        return submitRender(void, self, completion.unit, c.mln_vulkan_surface_set_target, .{&raw});
+    }
+
+    pub fn setOpenGLSurfaceTarget(self: RenderSessionHandle, descriptor: OpenGLSurfaceDescriptor) status.Error!completion.Future(void) {
+        var raw = openglSurfaceDescriptorToNative(descriptor);
+        return submitRender(void, self, completion.unit, c.mln_opengl_surface_set_target, .{&raw});
+    }
+
+    pub fn setMetalBorrowedTextureTarget(self: RenderSessionHandle, descriptor: MetalBorrowedTextureDescriptor) status.Error!completion.Future(void) {
+        var raw = metalBorrowedTextureDescriptorToNative(descriptor);
+        return submitRender(void, self, completion.unit, c.mln_metal_borrowed_texture_set_target, .{&raw});
+    }
+
+    pub fn setVulkanBorrowedTextureTarget(self: RenderSessionHandle, descriptor: VulkanBorrowedTextureDescriptor) status.Error!completion.Future(void) {
+        var raw = vulkanBorrowedTextureDescriptorToNative(descriptor);
+        return submitRender(void, self, completion.unit, c.mln_vulkan_borrowed_texture_set_target, .{&raw});
+    }
+
+    pub fn setOpenGLBorrowedTextureTarget(self: RenderSessionHandle, descriptor: OpenGLBorrowedTextureDescriptor) status.Error!completion.Future(void) {
+        var raw = openglBorrowedTextureDescriptorToNative(descriptor);
+        return submitRender(void, self, completion.unit, c.mln_opengl_borrowed_texture_set_target, .{&raw});
+    }
+    pub fn setWebGPUBorrowedTextureTarget(self: RenderSessionHandle, descriptor: WebGPUBorrowedTextureDescriptor) status.Error!completion.Future(void) {
+        var raw = webgpuBorrowedTextureDescriptorToNative(descriptor);
+        return submitRender(void, self, completion.unit, c.mln_webgpu_borrowed_texture_set_target, .{&raw});
+    }
+
+    pub fn setWebGPUSurfaceTarget(self: RenderSessionHandle, descriptor: WebGPUSurfaceDescriptor) status.Error!completion.Future(void) {
+        var raw = webgpuSurfaceDescriptorToNative(descriptor);
+        return submitRender(void, self, completion.unit, c.mln_webgpu_surface_set_target, .{&raw});
+    }
+
+    pub fn detach(self: RenderSessionHandle) status.Error!completion.Future(void) {
+        return submitRender(void, self, completion.unit, c.mln_render_session_detach, .{});
+    }
+
+    /// Irreversibly closes control and mailboxes without a graphics call.
     ///
-    /// The returned string contains either a JSON value or a GeoJSON Feature
-    /// Collection. The `supercluster` extension requires `cluster_id`, `limit`,
-    /// and `offset` to be nonnegative integer JSON literals. Floating-point or
-    /// negative representations are treated as absent. An absent cluster ID
-    /// produces JSON null; absent limit and offset values use ten leaves at
-    /// offset zero.
-    pub fn queryFeatureExtension(
-        self: *RenderSessionHandle,
-        allocator: std.mem.Allocator,
-        source_id: []const u8,
-        feature: []const u8,
-        extension: []const u8,
-        extension_field: []const u8,
-        arguments: ?[]const u8,
-    ) status.Error!values.OwnedString {
-        var temp = native_temp.TempStorage.init(allocator);
-        defer temp.deinit();
-        const raw_source_id = try temp.stringView(source_id);
-        const raw_feature = try temp.stringView(feature);
-        const raw_extension = try temp.stringView(extension);
-        const raw_extension_field = try temp.stringView(extension_field);
-        var raw_arguments_value = if (arguments) |value| try temp.stringView(value) else undefined;
-        const raw_arguments = if (arguments != null) &raw_arguments_value else null;
-        var result: c.mln_buffer = 0;
-        const lease = try renderSessionLease(self.*);
+    /// The call waits for the map's in-flight tile work before returning, so no
+    /// library thread touches the session's target or device afterward and the
+    /// host may destroy its graphics objects immediately. It reports
+    /// `error.Busy` while a driver call is in flight, and changes nothing then.
+    /// Call it from a thread other than a MapLibre worker callback.
+    pub fn abandon(self: RenderSessionHandle) status.Error!AbandonResult {
+        const lease = try renderSessionLease(self);
         defer lease.release();
-        try status.checkStatus(
-            c.mln_render_session_query_feature_extensions(lease.native, raw_source_id, raw_feature, raw_extension, raw_extension_field, raw_arguments, &result),
-            lease.diagnostic_store,
-        );
-        return (try native_temp.copyOwnedBuffer(allocator, result, lease.diagnostic_store)) orelse error.NativeError;
+        var raw: c.mln_render_abandon_result = undefined;
+        raw.size = @sizeOf(c.mln_render_abandon_result);
+        try status.checkStatus(c.mln_render_session_abandon(lease.native, &raw), lease.diagnostic_store);
+        if (takeMapRegistration(lease.state)) |map_handle| map_module.unregisterRenderSession(map_handle);
+        return .{ .disposition = abandonDispositionFromRaw(raw.disposition), .quarantined_resource_count = raw.quarantined_resource_count };
     }
 
-    pub fn readPremultipliedRgba8Into(self: *RenderSessionHandle, buffer: []u8) status.Error!TextureImageInfo {
-        var info = c.mln_texture_image_info_default();
-        const lease = try renderSessionLease(self.*);
-        defer lease.release();
-        try status.checkStatus(
-            c.mln_texture_read_premultiplied_rgba8(lease.native, buffer.ptr, buffer.len, &info),
-            lease.diagnostic_store,
-        );
-        return textureImageInfoFromNative(info);
-    }
-
-    pub fn acquireMetalOwnedTextureFrame(self: *RenderSessionHandle) status.Error!MetalOwnedTextureFrameHandle {
-        const lease = try renderSessionLease(self.*);
-        defer lease.release();
-        try ensureNoActiveOwnedFrame(lease);
-        var frame = c.mln_metal_owned_texture_frame{
-            .size = @sizeOf(c.mln_metal_owned_texture_frame),
-            .generation = 0,
-            .width = 0,
-            .height = 0,
-            .scale_factor = 0,
-            .frame_id = 0,
-            .texture = null,
-            .device = null,
-            .pixel_format = 0,
-        };
-        try status.checkStatus(c.mln_metal_owned_texture_acquire_frame(lease.native, &frame), lease.diagnostic_store);
-        const session_frame_state = lease.frame_state;
-        session_frame_state.metal_frame_generation +%= 1;
-        session_frame_state.metal_frame = .{ .raw = frame };
-        session_frame_state.metal_frame_active = true;
-        errdefer {
-            var release_frame = frame;
-            _ = c.mln_metal_owned_texture_release_frame(lease.native, &release_frame);
-            session_frame_state.metal_frame_active = false;
-            session_frame_state.metal_frame = null;
-        }
-        return try newOwnedTextureFrameHandle(MetalOwnedTextureFrameHandle, .{
-            .kind = .metal,
-            .session_native = lease.native,
-            .diagnostic_store = lease.diagnostic_store,
-            .frame_state = session_frame_state,
-            .generation = session_frame_state.metal_frame_generation,
-        });
-    }
-
-    pub fn acquireVulkanOwnedTextureFrame(self: *RenderSessionHandle) status.Error!VulkanOwnedTextureFrameHandle {
-        const lease = try renderSessionLease(self.*);
-        defer lease.release();
-        try ensureNoActiveOwnedFrame(lease);
-        var frame = c.mln_vulkan_owned_texture_frame{
-            .size = @sizeOf(c.mln_vulkan_owned_texture_frame),
-            .generation = 0,
-            .width = 0,
-            .height = 0,
-            .scale_factor = 0,
-            .frame_id = 0,
-            .image = c.MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL,
-            .image_view = c.MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL,
-            .device = null,
-            .format = 0,
-            .layout = 0,
-        };
-        try status.checkStatus(c.mln_vulkan_owned_texture_acquire_frame(lease.native, &frame), lease.diagnostic_store);
-        const session_frame_state = lease.frame_state;
-        session_frame_state.vulkan_frame_generation +%= 1;
-        session_frame_state.vulkan_frame = .{ .raw = frame };
-        session_frame_state.vulkan_frame_active = true;
-        errdefer {
-            var release_frame = frame;
-            _ = c.mln_vulkan_owned_texture_release_frame(lease.native, &release_frame);
-            session_frame_state.vulkan_frame_active = false;
-            session_frame_state.vulkan_frame = null;
-        }
-        return try newOwnedTextureFrameHandle(VulkanOwnedTextureFrameHandle, .{
-            .kind = .vulkan,
-            .session_native = lease.native,
-            .diagnostic_store = lease.diagnostic_store,
-            .frame_state = session_frame_state,
-            .generation = session_frame_state.vulkan_frame_generation,
-        });
-    }
-
-    pub fn acquireOpenGLOwnedTextureFrame(self: *RenderSessionHandle) status.Error!OpenGLOwnedTextureFrameHandle {
-        const lease = try renderSessionLease(self.*);
-        defer lease.release();
-        try ensureNoActiveOwnedFrame(lease);
-        var frame = c.mln_opengl_owned_texture_frame{
-            .size = @sizeOf(c.mln_opengl_owned_texture_frame),
-            .generation = 0,
-            .width = 0,
-            .height = 0,
-            .scale_factor = 0,
-            .frame_id = 0,
-            .texture = 0,
-            .target = 0,
-            .internal_format = 0,
-            .format = 0,
-            .type = 0,
-        };
-        try status.checkStatus(c.mln_opengl_owned_texture_acquire_frame(lease.native, &frame), lease.diagnostic_store);
-        const session_frame_state = lease.frame_state;
-        session_frame_state.opengl_frame_generation +%= 1;
-        session_frame_state.opengl_frame = .{ .raw = frame };
-        session_frame_state.opengl_frame_active = true;
-        errdefer {
-            var release_frame = frame;
-            _ = c.mln_opengl_owned_texture_release_frame(lease.native, &release_frame);
-            session_frame_state.opengl_frame_active = false;
-            session_frame_state.opengl_frame = null;
-        }
-        return try newOwnedTextureFrameHandle(OpenGLOwnedTextureFrameHandle, .{
-            .kind = .opengl,
-            .session_native = lease.native,
-            .diagnostic_store = lease.diagnostic_store,
-            .frame_state = session_frame_state,
-            .generation = session_frame_state.opengl_frame_generation,
-        });
-    }
-
-    pub fn close(self: *RenderSessionHandle) status.Error!void {
+    /// Releases the session handle after `detach` or `abandon`. It is callable
+    /// from one of the session's own completions.
+    pub fn destroy(self: *RenderSessionHandle) status.Error!void {
         const session_close = try beginRenderSessionClose(self.*) orelse return;
         status.checkStatus(c.mln_render_session_destroy(session_close.native), session_close.diagnostic_store) catch |err| {
             cancelRenderSessionClose(session_close.state);
             return err;
         };
-        if (takeMapRegistration(session_close.state)) |map_handle| {
-            map_module.unregisterRenderSession(map_handle);
-        }
-        std.heap.smp_allocator.destroy(session_close.frame_state);
-        const session_state = finishRenderSessionClose(self.*) orelse session_close.state;
-        if (session_state.diagnostic_store) |store| {
+        if (takeMapRegistration(session_close.state)) |map_handle| map_module.unregisterRenderSession(map_handle);
+        const state = finishRenderSessionClose(self.*) orelse session_close.state;
+        if (state.diagnostic_store) |store| {
             store.deinit();
             std.heap.smp_allocator.destroy(store);
         }
-        std.heap.smp_allocator.destroy(session_state);
+        std.heap.smp_allocator.destroy(state);
+        self.* = @enumFromInt(0);
     }
 };
 
-pub const MetalOwnedTextureFrameHandle = enum(u128) {
-    _,
-
-    /// Returns native Metal objects for this acquired frame.
-    ///
-    /// Safety: the returned pointers stay valid only until this frame handle is
-    /// released, under the C API's backend synchronization rules.
-    pub fn info(self: *const MetalOwnedTextureFrameHandle) status.BindingError!MetalOwnedTextureFrameInfo {
-        const lease = try ownedTextureFrameLease(self.*, .metal);
-        defer lease.release();
-        const frame = try metalFrame(lease);
-        return .{
-            .generation = frame.generation,
-            .width = frame.width,
-            .height = frame.height,
-            .scale_factor = frame.scale_factor,
-            .texture = NativePointer.fromPtr(frame.texture orelse return error.ClosedHandle),
-            .device = NativePointer.fromPtr(frame.device orelse return error.ClosedHandle),
-            .pixel_format = frame.pixel_format,
-        };
-    }
-
-    pub fn release(self: *MetalOwnedTextureFrameHandle) status.Error!void {
-        const frame_close = try beginOwnedTextureFrameClose(self.*, .metal) orelse return;
-        const session_frame_state = frame_close.frame_state;
-        const session_native = frame_close.session_native;
-        if (!session_frame_state.metal_frame_active or frame_close.generation != session_frame_state.metal_frame_generation) {
-            cancelOwnedTextureFrameClose(frame_close.state);
-            return;
-        }
-        var frame = (session_frame_state.metal_frame orelse {
-            cancelOwnedTextureFrameClose(frame_close.state);
-            return;
-        }).raw;
-        status.checkStatus(c.mln_metal_owned_texture_release_frame(session_native, &frame), frame_close.diagnostic_store) catch |err| {
-            cancelOwnedTextureFrameClose(frame_close.state);
-            return err;
-        };
-        session_frame_state.metal_frame_active = false;
-        session_frame_state.metal_frame = null;
-        const frame_state = unregisterOwnedTextureFrameState(self.*) orelse return;
-        std.heap.smp_allocator.destroy(frame_state);
-    }
-};
-
-pub const VulkanOwnedTextureFrameHandle = enum(u128) {
-    _,
-
-    /// Returns native Vulkan objects for this acquired frame.
-    ///
-    /// Safety: the returned Vulkan handles and device pointer stay valid only
-    /// until this frame handle is released, under the C API's backend
-    /// synchronization rules.
-    pub fn info(self: *const VulkanOwnedTextureFrameHandle) status.BindingError!VulkanOwnedTextureFrameInfo {
-        const lease = try ownedTextureFrameLease(self.*, .vulkan);
-        defer lease.release();
-        const frame = try vulkanFrame(lease);
-        return .{
-            .generation = frame.generation,
-            .width = frame.width,
-            .height = frame.height,
-            .scale_factor = frame.scale_factor,
-            .image = VulkanHandle.fromBits(frame.image),
-            .image_view = VulkanHandle.fromBits(frame.image_view),
-            .device = NativePointer.fromPtr(frame.device orelse return error.ClosedHandle),
-            .format = frame.format,
-            .layout = frame.layout,
-        };
-    }
-
-    pub fn release(self: *VulkanOwnedTextureFrameHandle) status.Error!void {
-        const frame_close = try beginOwnedTextureFrameClose(self.*, .vulkan) orelse return;
-        const session_frame_state = frame_close.frame_state;
-        const session_native = frame_close.session_native;
-        if (!session_frame_state.vulkan_frame_active or frame_close.generation != session_frame_state.vulkan_frame_generation) {
-            cancelOwnedTextureFrameClose(frame_close.state);
-            return;
-        }
-        var frame = (session_frame_state.vulkan_frame orelse {
-            cancelOwnedTextureFrameClose(frame_close.state);
-            return;
-        }).raw;
-        status.checkStatus(c.mln_vulkan_owned_texture_release_frame(session_native, &frame), frame_close.diagnostic_store) catch |err| {
-            cancelOwnedTextureFrameClose(frame_close.state);
-            return err;
-        };
-        session_frame_state.vulkan_frame_active = false;
-        session_frame_state.vulkan_frame = null;
-        const frame_state = unregisterOwnedTextureFrameState(self.*) orelse return;
-        std.heap.smp_allocator.destroy(frame_state);
-    }
-};
-
-pub const OpenGLOwnedTextureFrameHandle = enum(u128) {
-    _,
-
-    /// Returns native OpenGL object names for this acquired frame.
-    ///
-    /// Safety: the returned names stay valid only until this frame handle is
-    /// released, under the C API's context-sharing and synchronization rules.
-    pub fn info(self: *const OpenGLOwnedTextureFrameHandle) status.BindingError!OpenGLOwnedTextureFrameInfo {
-        const lease = try ownedTextureFrameLease(self.*, .opengl);
-        defer lease.release();
-        const frame = try openglFrame(lease);
-        return .{
-            .generation = frame.generation,
-            .width = frame.width,
-            .height = frame.height,
-            .scale_factor = frame.scale_factor,
-            .texture = frame.texture,
-            .target = frame.target,
-            .internal_format = frame.internal_format,
-            .format = frame.format,
-            .type = frame.type,
-        };
-    }
-
-    pub fn release(self: *OpenGLOwnedTextureFrameHandle) status.Error!void {
-        const frame_close = try beginOwnedTextureFrameClose(self.*, .opengl) orelse return;
-        const session_frame_state = frame_close.frame_state;
-        const session_native = frame_close.session_native;
-        if (!session_frame_state.opengl_frame_active or frame_close.generation != session_frame_state.opengl_frame_generation) {
-            cancelOwnedTextureFrameClose(frame_close.state);
-            return;
-        }
-        var frame = (session_frame_state.opengl_frame orelse {
-            cancelOwnedTextureFrameClose(frame_close.state);
-            return;
-        }).raw;
-        status.checkStatus(c.mln_opengl_owned_texture_release_frame(session_native, &frame), frame_close.diagnostic_store) catch |err| {
-            cancelOwnedTextureFrameClose(frame_close.state);
-            return err;
-        };
-        session_frame_state.opengl_frame_active = false;
-        session_frame_state.opengl_frame = null;
-        const frame_state = unregisterOwnedTextureFrameState(self.*) orelse return;
-        std.heap.smp_allocator.destroy(frame_state);
-    }
-};
-
-pub fn attachMetalOwnedTexture(map: *map_module.MapHandle, descriptor: MetalOwnedTextureDescriptor) status.Error!RenderSessionHandle {
+pub fn attachMetalOwnedTexture(map: *map_module.MapHandle, descriptor: MetalOwnedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = c.mln_metal_owned_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.context = metalContextToNative(descriptor.context);
-    return try attach(map, c.mln_metal_owned_texture_attach, &raw);
+    return attach(map, c.mln_metal_owned_texture_attach, &raw, options);
 }
 
-pub fn attachMetalBorrowedTexture(map: *map_module.MapHandle, descriptor: MetalBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
+pub fn attachMetalBorrowedTexture(map: *map_module.MapHandle, descriptor: MetalBorrowedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = metalBorrowedTextureDescriptorToNative(descriptor);
-    return try attach(map, c.mln_metal_borrowed_texture_attach, &raw);
+    return attach(map, c.mln_metal_borrowed_texture_attach, &raw, options);
 }
 
-pub fn attachVulkanOwnedTexture(map: *map_module.MapHandle, descriptor: VulkanOwnedTextureDescriptor) status.Error!RenderSessionHandle {
+pub fn attachVulkanOwnedTexture(map: *map_module.MapHandle, descriptor: VulkanOwnedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = c.mln_vulkan_owned_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.context = vulkanContextToNative(descriptor.context);
-    return try attach(map, c.mln_vulkan_owned_texture_attach, &raw);
+    return attach(map, c.mln_vulkan_owned_texture_attach, &raw, options);
 }
 
-pub fn attachVulkanBorrowedTexture(map: *map_module.MapHandle, descriptor: VulkanBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
+pub fn attachVulkanBorrowedTexture(map: *map_module.MapHandle, descriptor: VulkanBorrowedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = vulkanBorrowedTextureDescriptorToNative(descriptor);
-    return try attach(map, c.mln_vulkan_borrowed_texture_attach, &raw);
+    return attach(map, c.mln_vulkan_borrowed_texture_attach, &raw, options);
 }
 
-pub fn attachOpenGLOwnedTexture(map: *map_module.MapHandle, descriptor: OpenGLOwnedTextureDescriptor) status.Error!RenderSessionHandle {
+pub fn attachOpenGLOwnedTexture(map: *map_module.MapHandle, descriptor: OpenGLOwnedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = c.mln_opengl_owned_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.context = openglContextToNative(descriptor.context);
-    return try attach(map, c.mln_opengl_owned_texture_attach, &raw);
+    return attach(map, c.mln_opengl_owned_texture_attach, &raw, options);
 }
 
-pub fn attachOpenGLBorrowedTexture(map: *map_module.MapHandle, descriptor: OpenGLBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
+pub fn attachOpenGLBorrowedTexture(map: *map_module.MapHandle, descriptor: OpenGLBorrowedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = openglBorrowedTextureDescriptorToNative(descriptor);
-    return try attach(map, c.mln_opengl_borrowed_texture_attach, &raw);
+    return attach(map, c.mln_opengl_borrowed_texture_attach, &raw, options);
+}
+pub fn attachWebGPUOwnedTexture(map: *map_module.MapHandle, descriptor: WebGPUOwnedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
+    var raw = c.mln_webgpu_owned_texture_descriptor_default();
+    raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.context = webgpuContextToNative(descriptor.context);
+    return attach(map, c.mln_webgpu_owned_texture_attach, &raw, options);
 }
 
-pub fn attachMetalSurface(map: *map_module.MapHandle, descriptor: MetalSurfaceDescriptor) status.Error!RenderSessionHandle {
+pub fn attachWebGPUBorrowedTexture(map: *map_module.MapHandle, descriptor: WebGPUBorrowedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
+    var raw = webgpuBorrowedTextureDescriptorToNative(descriptor);
+    return attach(map, c.mln_webgpu_borrowed_texture_attach, &raw, options);
+}
+
+pub fn attachMetalSurface(map: *map_module.MapHandle, descriptor: MetalSurfaceDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = metalSurfaceDescriptorToNative(descriptor);
-    return try attach(map, c.mln_metal_surface_attach, &raw);
+    return attach(map, c.mln_metal_surface_attach, &raw, options);
 }
 
-pub fn attachVulkanSurface(map: *map_module.MapHandle, descriptor: VulkanSurfaceDescriptor) status.Error!RenderSessionHandle {
+pub fn attachVulkanSurface(map: *map_module.MapHandle, descriptor: VulkanSurfaceDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = vulkanSurfaceDescriptorToNative(descriptor);
-    return try attach(map, c.mln_vulkan_surface_attach, &raw);
+    return attach(map, c.mln_vulkan_surface_attach, &raw, options);
 }
 
-pub fn attachOpenGLSurface(map: *map_module.MapHandle, descriptor: OpenGLSurfaceDescriptor) status.Error!RenderSessionHandle {
+pub fn attachOpenGLSurface(map: *map_module.MapHandle, descriptor: OpenGLSurfaceDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = openglSurfaceDescriptorToNative(descriptor);
-    return try attach(map, c.mln_opengl_surface_attach, &raw);
+    return attach(map, c.mln_opengl_surface_attach, &raw, options);
+}
+pub fn attachWebGPUSurface(map: *map_module.MapHandle, descriptor: WebGPUSurfaceDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
+    var raw = webgpuSurfaceDescriptorToNative(descriptor);
+    return attach(map, c.mln_webgpu_surface_attach, &raw, options);
 }
 
-fn attach(
-    map: *map_module.MapHandle,
-    comptime attachFn: anytype,
-    descriptor: anytype,
-) status.Error!RenderSessionHandle {
-    var session: c.mln_render_session = 0;
+fn attach(map: *map_module.MapHandle, comptime attachFn: anytype, descriptor: anytype, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     const registration = try map_module.registerRenderSession(map);
-    errdefer map_module.unregisterRenderSession(map.*);
-    try status.checkStatus(
-        attachFn(registration.native, descriptor, &session),
-        registration.diagnostic_store,
-    );
-    errdefer _ = c.mln_render_session_destroy(session);
-    return try newRenderSession(session, map.*, registration.diagnostic_store);
+    var raw_options = attachOptionsToNative(options);
+    var session: c.mln_render_session = 0;
+    const Context = struct {
+        map: c.mln_map,
+        descriptor: @TypeOf(descriptor),
+        options: *const c.mln_render_session_attach_options,
+        out_session: *c.mln_render_session,
+    };
+    var attached = completion.submit(void, registration.diagnostic_store, completion.unit, Context{
+        .map = registration.native,
+        .descriptor = descriptor,
+        .options = &raw_options,
+        .out_session = &session,
+    }, struct {
+        fn start(context: Context, completion_descriptor: *const c.mln_completion) c.mln_status {
+            return attachFn(context.map, context.descriptor, context.options, context.out_session, completion_descriptor);
+        }
+    }.start) catch |err| {
+        map_module.unregisterRenderSession(map.*);
+        return err;
+    };
+    const handle = newRenderSession(session, map.*, registration.diagnostic_store) catch |err| {
+        attached.deinit();
+        var abandoned: c.mln_render_abandon_result = undefined;
+        abandoned.size = @sizeOf(c.mln_render_abandon_result);
+        _ = c.mln_render_session_abandon(session, &abandoned);
+        _ = c.mln_render_session_destroy(session);
+        map_module.unregisterRenderSession(map.*);
+        return err;
+    };
+    return .{ .session = handle, .attached = attached };
 }
 
-/// Shared body for the `set*Target` methods. The C API borrows the caller's
-/// native descriptor only for the duration of this call.
-fn setTarget(
+fn submitRender(
+    comptime T: type,
     handle: RenderSessionHandle,
-    comptime setTargetFn: anytype,
-    descriptor: anytype,
-) status.Error!void {
+    comptime copy: *const fn (*const c.mln_completion_result) status.Error!T,
+    comptime startFn: anytype,
+    arguments: anytype,
+) status.Error!completion.Future(T) {
     const lease = try renderSessionLease(handle);
     defer lease.release();
-    try ensureNoActiveOwnedFrame(lease);
-    try status.checkStatus(setTargetFn(lease.native, descriptor), lease.diagnostic_store);
+    const Arguments = @TypeOf(arguments);
+    const Context = struct { native: c.mln_render_session, arguments: Arguments };
+    return completion.submit(T, lease.diagnostic_store, copy, Context{ .native = lease.native, .arguments = arguments }, struct {
+        fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
+            return @call(.auto, startFn, .{context.native} ++ context.arguments ++ .{descriptor});
+        }
+    }.start);
 }
 
-fn newRenderSession(
-    session: c.mln_render_session,
-    map_handle: map_module.MapHandle,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-) std.mem.Allocator.Error!RenderSessionHandle {
-    const session_frame_state = try std.heap.smp_allocator.create(RenderSessionFrameState);
-    session_frame_state.* = .{};
-    errdefer std.heap.smp_allocator.destroy(session_frame_state);
+fn submitAllocatedRender(
+    comptime T: type,
+    handle: RenderSessionHandle,
+    allocator: std.mem.Allocator,
+    comptime copy: *const fn (*const c.mln_completion_result, *std.mem.Allocator) status.Error!T,
+    comptime startFn: anytype,
+    arguments: anytype,
+) status.Error!completion.Future(T) {
+    const lease = try renderSessionLease(handle);
+    defer lease.release();
+    const Arguments = @TypeOf(arguments);
+    const Context = struct { native: c.mln_render_session, arguments: Arguments };
+    return completion.submitWithCopyContext(T, std.mem.Allocator, lease.diagnostic_store, copy, allocator, Context{ .native = lease.native, .arguments = arguments }, struct {
+        fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
+            return @call(.auto, startFn, .{context.native} ++ context.arguments ++ .{descriptor});
+        }
+    }.start);
+}
 
-    // Allocated from the map store's allocator so host memory still accounts
-    // for it.
+fn newRenderSession(session: c.mln_render_session, map_handle: map_module.MapHandle, diagnostic_store: ?*diagnostics.DiagnosticStore) std.mem.Allocator.Error!RenderSessionHandle {
     const session_store: ?*diagnostics.DiagnosticStore = if (diagnostic_store) |map_store| store: {
-        const store = try std.heap.smp_allocator.create(diagnostics.DiagnosticStore);
-        store.* = diagnostics.DiagnosticStore.init(map_store.allocator);
-        break :store store;
+        const result = try std.heap.smp_allocator.create(diagnostics.DiagnosticStore);
+        result.* = diagnostics.DiagnosticStore.init(map_store.allocator);
+        break :store result;
     } else null;
     errdefer if (session_store) |store| {
         store.deinit();
         std.heap.smp_allocator.destroy(store);
     };
-
-    const session_state = try std.heap.smp_allocator.create(RenderSessionState);
-    session_state.* = .{
-        .map_handle = map_handle,
-        .diagnostic_store = session_store,
-        .frame_state = session_frame_state,
-    };
-    errdefer std.heap.smp_allocator.destroy(session_state);
-
-    return try registerRenderSessionState(session, session_state);
-}
-
-fn registerRenderSessionState(
-    session: c.mln_render_session,
-    session_state: *RenderSessionState,
-) std.mem.Allocator.Error!RenderSessionHandle {
+    const state = try std.heap.smp_allocator.create(RenderSessionState);
+    state.* = .{ .map_handle = map_handle, .diagnostic_store = session_store };
+    errdefer std.heap.smp_allocator.destroy(state);
     lockRenderSessionRegistry();
     defer unlockRenderSessionRegistry();
-
-    try render_session_registry.put(std.heap.smp_allocator, session, session_state);
+    try render_session_registry.put(std.heap.smp_allocator, session, state);
     return @enumFromInt(session);
 }
 
 fn renderSessionLease(handle: RenderSessionHandle) status.BindingError!RenderSessionLease {
     lockRenderSessionRegistry();
     defer unlockRenderSessionRegistry();
-
-    const session_state = render_session_registry.get(@intFromEnum(handle)) orelse return error.ClosedHandle;
-    if (session_state.closing) return error.ActiveBorrow;
-    const session_frame_state = session_state.frame_state orelse return error.ClosedHandle;
-    _ = session_state.active_leases.fetchAdd(1, .seq_cst);
-    return .{
-        .state = session_state,
-        .native = @intFromEnum(handle),
-        .diagnostic_store = session_state.diagnostic_store,
-        .frame_state = session_frame_state,
-    };
+    const state = render_session_registry.get(@intFromEnum(handle)) orelse return error.ClosedHandle;
+    if (state.closing) return error.ActiveBorrow;
+    _ = state.active_leases.fetchAdd(1, .seq_cst);
+    return .{ .state = state, .native = @intFromEnum(handle), .diagnostic_store = state.diagnostic_store };
 }
 
 fn beginRenderSessionClose(handle: RenderSessionHandle) status.BindingError!?RenderSessionClose {
     lockRenderSessionRegistry();
     defer unlockRenderSessionRegistry();
-
-    const session_state = render_session_registry.get(@intFromEnum(handle)) orelse return null;
-    if (session_state.closing) return error.ActiveBorrow;
-    if (session_state.active_leases.load(.seq_cst) != 0) return error.ActiveBorrow;
-    const session_frame_state = session_state.frame_state orelse return null;
-    if (session_frame_state.metal_frame_active or session_frame_state.opengl_frame_active or session_frame_state.vulkan_frame_active) return error.ActiveBorrow;
-    session_state.closing = true;
-    return .{
-        .state = session_state,
-        .native = @intFromEnum(handle),
-        .diagnostic_store = session_state.diagnostic_store,
-        .frame_state = session_frame_state,
-    };
+    const state = render_session_registry.get(@intFromEnum(handle)) orelse return null;
+    if (state.closing or state.active_leases.load(.seq_cst) != 0) return error.ActiveBorrow;
+    state.closing = true;
+    return .{ .state = state, .native = @intFromEnum(handle), .diagnostic_store = state.diagnostic_store };
 }
 
-/// Takes this session's map registration exactly once. The caller passes the
-/// returned handle to `map_module.unregisterRenderSession` outside the render
-/// session registry lock.
-fn takeMapRegistration(session_state: *RenderSessionState) ?map_module.MapHandle {
+fn takeMapRegistration(state: *RenderSessionState) ?map_module.MapHandle {
     lockRenderSessionRegistry();
     defer unlockRenderSessionRegistry();
-
-    const map_handle = session_state.map_handle orelse return null;
-    session_state.map_handle = null;
+    const map_handle = state.map_handle orelse return null;
+    state.map_handle = null;
     return map_handle;
 }
 
-fn cancelRenderSessionClose(session_state: *RenderSessionState) void {
+fn cancelRenderSessionClose(state: *RenderSessionState) void {
     lockRenderSessionRegistry();
     defer unlockRenderSessionRegistry();
-
-    session_state.closing = false;
+    state.closing = false;
 }
 
 fn finishRenderSessionClose(handle: RenderSessionHandle) ?*RenderSessionState {
     lockRenderSessionRegistry();
     defer unlockRenderSessionRegistry();
-
-    const entry = render_session_registry.fetchRemove(@intFromEnum(handle)) orelse return null;
-    entry.value.frame_state = null;
-    return entry.value;
+    return (render_session_registry.fetchRemove(@intFromEnum(handle)) orelse return null).value;
 }
 
 fn lockRenderSessionRegistry() void {
-    while (render_session_registry_lock.cmpxchgWeak(false, true, .seq_cst, .seq_cst) != null) {
-        std.Thread.yield() catch {};
-    }
+    while (render_session_registry_lock.cmpxchgWeak(false, true, .seq_cst, .seq_cst) != null) std.Thread.yield() catch {};
 }
 
 fn unlockRenderSessionRegistry() void {
     render_session_registry_lock.store(false, .seq_cst);
-}
-
-fn newOwnedTextureFrameHandle(comptime T: type, initial_state: OwnedTextureFrameState) std.mem.Allocator.Error!T {
-    if (fail_next_owned_texture_frame_wrapper_allocation_for_testing.swap(false, .seq_cst)) return error.OutOfMemory;
-    const frame_state_handle = try std.heap.smp_allocator.create(OwnedTextureFrameState);
-    frame_state_handle.* = initial_state;
-    errdefer std.heap.smp_allocator.destroy(frame_state_handle);
-    return try registerOwnedTextureFrameState(T, frame_state_handle);
-}
-
-pub fn failNextOwnedTextureFrameWrapperAllocationForTesting() void {
-    fail_next_owned_texture_frame_wrapper_allocation_for_testing.store(true, .seq_cst);
-}
-
-fn registerOwnedTextureFrameState(comptime T: type, frame_state_handle: *OwnedTextureFrameState) std.mem.Allocator.Error!T {
-    lockOwnedTextureFrameRegistry();
-    defer unlockOwnedTextureFrameRegistry();
-
-    if (owned_texture_frame_free_list.items.len > 0) {
-        const slot_index = owned_texture_frame_free_list.pop().?;
-        owned_texture_frame_registry.items[slot_index].state = frame_state_handle;
-        owned_texture_frame_registry.items[slot_index].generation = runtime_module.nextHandleGeneration();
-        return ownedTextureFrameHandle(T, slot_index + 1, owned_texture_frame_registry.items[slot_index].generation);
-    }
-
-    const generation = runtime_module.nextHandleGeneration();
-    try owned_texture_frame_free_list.ensureTotalCapacity(std.heap.smp_allocator, owned_texture_frame_registry.items.len + 1);
-    try owned_texture_frame_registry.append(std.heap.smp_allocator, .{ .state = frame_state_handle, .generation = generation });
-    return ownedTextureFrameHandle(T, owned_texture_frame_registry.items.len, generation);
-}
-
-fn ownedTextureFrameHandle(comptime T: type, index: usize, generation: u64) T {
-    return @enumFromInt((@as(u128, generation) << 64) | @as(u128, @intCast(index)));
-}
-
-fn ownedTextureFrameHandleIndex(handle_value: u128) ?usize {
-    const index = handle_value & std.math.maxInt(u64);
-    if (index == 0 or index > std.math.maxInt(usize)) return null;
-    return @intCast(index);
-}
-
-fn ownedTextureFrameHandleGeneration(handle_value: u128) u64 {
-    return @intCast(handle_value >> 64);
-}
-
-fn ownedTextureFrameLease(handle: anytype, kind: OwnedTextureFrameKind) status.BindingError!OwnedTextureFrameLease {
-    lockOwnedTextureFrameRegistry();
-    defer unlockOwnedTextureFrameRegistry();
-
-    const handle_value = @intFromEnum(handle);
-    const index = ownedTextureFrameHandleIndex(handle_value) orelse return error.ClosedHandle;
-    if (index > owned_texture_frame_registry.items.len) return error.ClosedHandle;
-    const slot = owned_texture_frame_registry.items[index - 1];
-    if (slot.generation != ownedTextureFrameHandleGeneration(handle_value)) return error.ClosedHandle;
-    const frame_state_handle = slot.state orelse return error.ClosedHandle;
-    if (frame_state_handle.kind != kind) return error.ClosedHandle;
-    if (frame_state_handle.closing) return error.ActiveBorrow;
-    if (frame_state_handle.session_native == 0) return error.ClosedHandle;
-    const session_native: c.mln_render_session = frame_state_handle.session_native;
-    const session_frame_state = frame_state_handle.frame_state orelse return error.ClosedHandle;
-    _ = frame_state_handle.active_leases.fetchAdd(1, .seq_cst);
-    return .{
-        .state = frame_state_handle,
-        .session_native = session_native,
-        .diagnostic_store = frame_state_handle.diagnostic_store,
-        .frame_state = session_frame_state,
-        .generation = frame_state_handle.generation,
-    };
-}
-
-fn beginOwnedTextureFrameClose(handle: anytype, kind: OwnedTextureFrameKind) status.BindingError!?OwnedTextureFrameLease {
-    lockOwnedTextureFrameRegistry();
-    defer unlockOwnedTextureFrameRegistry();
-
-    const handle_value = @intFromEnum(handle);
-    const index = ownedTextureFrameHandleIndex(handle_value) orelse return null;
-    if (index > owned_texture_frame_registry.items.len) return null;
-    const slot = owned_texture_frame_registry.items[index - 1];
-    if (slot.generation != ownedTextureFrameHandleGeneration(handle_value)) return null;
-    const frame_state_handle = slot.state orelse return null;
-    if (frame_state_handle.kind != kind) return null;
-    if (frame_state_handle.closing) return error.ActiveBorrow;
-    if (frame_state_handle.active_leases.load(.seq_cst) != 0) return error.ActiveBorrow;
-    if (frame_state_handle.session_native == 0) return null;
-    const session_native: c.mln_render_session = frame_state_handle.session_native;
-    const session_frame_state = frame_state_handle.frame_state orelse return null;
-    frame_state_handle.closing = true;
-    return .{
-        .state = frame_state_handle,
-        .session_native = session_native,
-        .diagnostic_store = frame_state_handle.diagnostic_store,
-        .frame_state = session_frame_state,
-        .generation = frame_state_handle.generation,
-    };
-}
-
-fn cancelOwnedTextureFrameClose(frame_state_handle: *OwnedTextureFrameState) void {
-    lockOwnedTextureFrameRegistry();
-    defer unlockOwnedTextureFrameRegistry();
-
-    frame_state_handle.closing = false;
-}
-
-fn unregisterOwnedTextureFrameState(handle: anytype) ?*OwnedTextureFrameState {
-    lockOwnedTextureFrameRegistry();
-    defer unlockOwnedTextureFrameRegistry();
-
-    const handle_value = @intFromEnum(handle);
-    const index = ownedTextureFrameHandleIndex(handle_value) orelse return null;
-    if (index > owned_texture_frame_registry.items.len) return null;
-    const slot_index = index - 1;
-    const slot = &owned_texture_frame_registry.items[slot_index];
-    if (slot.generation != ownedTextureFrameHandleGeneration(handle_value)) return null;
-    const frame_state_handle = slot.state orelse return null;
-    slot.state = null;
-    slot.generation = runtime_module.nextHandleGeneration();
-    frame_state_handle.session_native = 0;
-    frame_state_handle.frame_state = null;
-    owned_texture_frame_free_list.appendAssumeCapacity(slot_index);
-    return frame_state_handle;
-}
-
-fn lockOwnedTextureFrameRegistry() void {
-    while (owned_texture_frame_registry_lock.cmpxchgWeak(false, true, .seq_cst, .seq_cst) != null) {
-        std.Thread.yield() catch {};
-    }
-}
-
-fn unlockOwnedTextureFrameRegistry() void {
-    owned_texture_frame_registry_lock.store(false, .seq_cst);
-}
-
-fn ensureNoActiveOwnedFrame(lease: RenderSessionLease) status.BindingError!void {
-    const session_frame_state = lease.frame_state;
-    if (session_frame_state.metal_frame_active or session_frame_state.opengl_frame_active or session_frame_state.vulkan_frame_active) return error.ActiveBorrow;
-}
-
-fn metalFrame(lease: OwnedTextureFrameLease) status.BindingError!c.mln_metal_owned_texture_frame {
-    const session_frame_state = lease.frame_state;
-    if (!session_frame_state.metal_frame_active or lease.generation != session_frame_state.metal_frame_generation) return error.ClosedHandle;
-    return (session_frame_state.metal_frame orelse return error.ClosedHandle).raw;
-}
-
-fn vulkanFrame(lease: OwnedTextureFrameLease) status.BindingError!c.mln_vulkan_owned_texture_frame {
-    const session_frame_state = lease.frame_state;
-    if (!session_frame_state.vulkan_frame_active or lease.generation != session_frame_state.vulkan_frame_generation) return error.ClosedHandle;
-    return (session_frame_state.vulkan_frame orelse return error.ClosedHandle).raw;
-}
-
-fn openglFrame(lease: OwnedTextureFrameLease) status.BindingError!c.mln_opengl_owned_texture_frame {
-    const session_frame_state = lease.frame_state;
-    if (!session_frame_state.opengl_frame_active or lease.generation != session_frame_state.opengl_frame_generation) return error.ClosedHandle;
-    return (session_frame_state.opengl_frame orelse return error.ClosedHandle).raw;
 }
 
 fn renderTargetExtentToNative(extent: RenderTargetExtent) c.mln_render_target_extent {
@@ -1341,6 +1117,145 @@ fn renderTargetExtentToNative(extent: RenderTargetExtent) c.mln_render_target_ex
         .height = extent.height,
         .scale_factor = extent.scale_factor,
     };
+}
+
+fn lifecycleFromRaw(raw: u32) RenderSessionLifecycle {
+    return switch (raw) {
+        c.MLN_RENDER_SESSION_STATE_ATTACHING => .attaching,
+        c.MLN_RENDER_SESSION_STATE_ATTACHED => .attached,
+        c.MLN_RENDER_SESSION_STATE_DETACHING => .detaching,
+        c.MLN_RENDER_SESSION_STATE_DETACHED => .detached,
+        c.MLN_RENDER_SESSION_STATE_TARGET_LOST => .target_lost,
+        c.MLN_RENDER_SESSION_STATE_ABANDONED => .abandoned,
+        else => .{ .unknown = raw },
+    };
+}
+
+fn abandonDispositionFromRaw(raw: u32) AbandonDisposition {
+    return switch (raw) {
+        c.MLN_RENDER_ABANDON_DISPOSITION_CLEAN => .clean,
+        c.MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED => .quarantined,
+        else => .{ .unknown = raw },
+    };
+}
+fn renderTargetExtentFromNative(raw: c.mln_render_target_extent) RenderTargetExtent {
+    return .{ .width = raw.width, .height = raw.height, .scale_factor = raw.scale_factor };
+}
+
+fn driverFromRaw(raw: u32) status.Error!RenderDriver {
+    return switch (raw) {
+        c.MLN_RENDER_DRIVER_CORE_WORKER => .core_worker,
+        c.MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD => .caller_graphics_thread,
+        else => error.NativeError,
+    };
+}
+
+fn attachOptionsToNative(options: RenderSessionAttachOptions) c.mln_render_session_attach_options {
+    var raw = c.mln_render_session_attach_options_default();
+    raw.driver = options.driver.toRaw();
+    raw.requested_texture_ring_depth = options.requested_texture_ring_depth;
+    return raw;
+}
+
+// The C default seeds every field this binding does not name, so a later
+// field arrives with its C default rather than a zero.
+fn frameDemandToNative(demand: FrameDemand) c.mln_frame_demand {
+    var raw = c.mln_frame_demand_default();
+    raw.flags = 0;
+    if (demand.if_needed) raw.flags |= c.MLN_FRAME_DEMAND_IF_NEEDED;
+    if (demand.present) raw.flags |= c.MLN_FRAME_DEMAND_PRESENT;
+    raw.token = demand.token;
+    raw.coalescing_boundary = demand.coalescing_boundary;
+    raw.timeout_ns = demand.timeout_ns;
+    return raw;
+}
+
+fn frameResultFromNative(raw: c.mln_render_frame_result) FrameResult {
+    return .{ .disposition = RenderResult.fromRaw(raw.disposition), .token = raw.token, .map_update_generation = raw.map_update_generation, .extent_generation = raw.extent_generation, .frame_generation = raw.frame_generation, .needs_repaint = raw.needs_repaint };
+}
+
+fn gpuSyncToNative(sync: GpuSync) c.mln_gpu_sync {
+    var raw = c.mln_gpu_sync_default();
+    switch (sync) {
+        .cpu_complete => {},
+        .metal_shared_event => |value| {
+            raw.kind = c.MLN_GPU_SYNC_METAL_SHARED_EVENT;
+            raw.object = nativePointerBits(value.object);
+            raw.value = value.value;
+        },
+        .vulkan_timeline_semaphore => |value| {
+            raw.kind = c.MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE;
+            raw.object = value.semaphore.bits();
+            raw.value = value.value;
+        },
+        .opengl_fence => |value| {
+            raw.kind = c.MLN_GPU_SYNC_OPENGL_FENCE;
+            raw.object = nativePointerBits(value);
+        },
+        .webgpu_token => |value| {
+            raw.kind = c.MLN_GPU_SYNC_WEBGPU_TOKEN;
+            raw.object = nativePointerBits(value.object);
+            raw.value = value.value;
+        },
+    }
+    return raw;
+}
+
+fn nativePointerBits(pointer: NativePointer) u64 {
+    return @intFromEnum(pointer);
+}
+
+/// Reads a pointer-typed synchronization object out of the C carrier, which is
+/// wider than a pointer on 32-bit targets.
+fn nativePointerFromBits(bits: u64) status.Error!NativePointer {
+    if (bits == 0 or bits > std.math.maxInt(usize)) return error.NativeError;
+    return @enumFromInt(@as(usize, @intCast(bits)));
+}
+
+fn gpuSyncFromNative(raw: c.mln_gpu_sync) status.Error!GpuSync {
+    return switch (raw.kind) {
+        c.MLN_GPU_SYNC_CPU_COMPLETE => .cpu_complete,
+        c.MLN_GPU_SYNC_METAL_SHARED_EVENT => .{ .metal_shared_event = .{ .object = try nativePointerFromBits(raw.object), .value = raw.value } },
+        c.MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE => .{ .vulkan_timeline_semaphore = .{ .semaphore = VulkanHandle.fromBits(raw.object), .value = raw.value } },
+        c.MLN_GPU_SYNC_OPENGL_FENCE => .{ .opengl_fence = try nativePointerFromBits(raw.object) },
+        c.MLN_GPU_SYNC_WEBGPU_TOKEN => .{ .webgpu_token = .{ .object = try nativePointerFromBits(raw.object), .value = raw.value } },
+        else => error.NativeError,
+    };
+}
+
+fn copyOwnedBufferViewCompletion(result: *const c.mln_completion_result, allocator: *std.mem.Allocator) status.Error!values.OwnedString {
+    const view = try completion.value(c.mln_buffer_view)(result);
+    return .{ .allocator = allocator.*, .value = try copyBufferView(allocator.*, view) };
+}
+
+fn copyQueriedFeaturesCompletion(result: *const c.mln_completion_result, allocator: *std.mem.Allocator) status.Error!QueriedFeatureList {
+    if (result.value_count != 0 and result.value == null) return error.NativeError;
+    const raw = if (result.value_count == 0)
+        &.{}
+    else
+        @as([*]align(1) const c.mln_queried_feature, @ptrCast(result.value.?))[0..result.value_count];
+    const items = try allocator.alloc(QueriedFeature, raw.len);
+    var initialized: usize = 0;
+    errdefer {
+        for (items[0..initialized]) |*item| item.deinit();
+        allocator.free(items);
+    }
+    for (raw, items) |feature, *item| {
+        item.* = try copyQueriedFeature(allocator.*, feature);
+        initialized += 1;
+    }
+    return .{ .allocator = allocator.*, .items = items };
+}
+
+fn copyReadbackCompletion(result: *const c.mln_completion_result, allocator: *std.mem.Allocator) status.Error!OwnedReadback {
+    const raw = try completion.value(c.mln_texture_readback_result)(result);
+    const data = if (raw.data.size == 0)
+        try allocator.dupe(u8, "")
+    else blk: {
+        const pointer = raw.data.data orelse return error.NativeError;
+        break :blk try allocator.dupe(u8, @as([*]const u8, @ptrCast(pointer))[0..raw.data.size]);
+    };
+    return .{ .allocator = allocator.*, .data = data, .info = textureImageInfoFromNative(raw.info) };
 }
 
 fn textureImageInfoFromNative(info: c.mln_texture_image_info) TextureImageInfo {
@@ -1441,28 +1356,6 @@ fn copyQueriedFeature(
     };
 }
 
-fn copyQueriedFeatureList(
-    allocator: std.mem.Allocator,
-    list: c.mln_queried_feature_list,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-) status.Error!QueriedFeatureList {
-    var count: usize = 0;
-    try status.checkStatus(c.mln_queried_feature_list_count(list, &count), diagnostic_store);
-    const items = try allocator.alloc(QueriedFeature, count);
-    var initialized: usize = 0;
-    errdefer {
-        for (items[0..initialized]) |*item| item.deinit();
-        allocator.free(items);
-    }
-    for (items, 0..) |*item, index| {
-        var raw = c.mln_queried_feature_default();
-        try status.checkStatus(c.mln_queried_feature_list_get(list, index, &raw), diagnostic_store);
-        item.* = try copyQueriedFeature(allocator, raw);
-        initialized += 1;
-    }
-    return .{ .allocator = allocator, .items = items };
-}
-
 fn stringViewArray(temp: *native_temp.TempStorage, values_list: []const []const u8) status.Error![]c.mln_buffer_view {
     const raw = try temp.arena.allocator().alloc(c.mln_buffer_view, values_list.len);
     for (values_list, raw) |value, *out| out.* = try temp.stringView(value);
@@ -1490,6 +1383,14 @@ fn openglSurfaceDescriptorToNative(descriptor: OpenGLSurfaceDescriptor) c.mln_op
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.context = openglContextToNative(descriptor.context);
     raw.surface = descriptor.surface.toPtr();
+    return raw;
+}
+fn webgpuSurfaceDescriptorToNative(descriptor: WebGPUSurfaceDescriptor) c.mln_webgpu_surface_descriptor {
+    var raw = c.mln_webgpu_surface_descriptor_default();
+    raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.context = webgpuContextToNative(descriptor.context);
+    raw.surface = descriptor.surface.toPtr();
+    raw.format = descriptor.format;
     return raw;
 }
 
@@ -1526,6 +1427,17 @@ fn openglBorrowedTextureDescriptorToNative(descriptor: OpenGLBorrowedTextureDesc
     raw.target = descriptor.target;
     return raw;
 }
+fn webgpuBorrowedTextureDescriptorToNative(descriptor: WebGPUBorrowedTextureDescriptor) c.mln_webgpu_borrowed_texture_descriptor {
+    var raw = c.mln_webgpu_borrowed_texture_descriptor_default();
+    raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.physical_width = descriptor.physical_width;
+    raw.physical_height = descriptor.physical_height;
+    raw.context = webgpuContextToNative(descriptor.context);
+    raw.texture = descriptor.texture.toPtr();
+    raw.texture_view = descriptor.texture_view.toPtr();
+    raw.format = descriptor.format;
+    return raw;
+}
 
 fn metalContextToNative(context: MetalContextDescriptor) c.mln_metal_context_descriptor {
     return .{
@@ -1544,6 +1456,14 @@ fn vulkanContextToNative(context: VulkanContextDescriptor) c.mln_vulkan_context_
         .graphics_queue_family_index = context.graphics_queue_family_index,
         .get_instance_proc_addr = if (context.get_instance_proc_addr) |pointer| pointer.toPtr() else null,
         .get_device_proc_addr = if (context.get_device_proc_addr) |pointer| pointer.toPtr() else null,
+    };
+}
+fn webgpuContextToNative(context: WebGPUContextDescriptor) c.mln_webgpu_context_descriptor {
+    return .{
+        .size = @sizeOf(c.mln_webgpu_context_descriptor),
+        .instance = if (context.instance) |value| value.toPtr() else null,
+        .device = context.device.toPtr(),
+        .queue = if (context.queue) |value| value.toPtr() else null,
     };
 }
 
@@ -1576,6 +1496,28 @@ fn openglContextToNative(context: OpenGLContextDescriptor) c.mln_opengl_context_
                 .client_api = egl.client_api.toRaw(),
                 .get_proc_address = if (egl.get_proc_address) |pointer| pointer.toPtr() else null,
             };
+        },
+        .webgl => |webgl| {
+            raw.platform = c.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
+            raw.data.webgl = .{
+                .size = @sizeOf(c.mln_webgl_context_descriptor),
+                .kind = switch (webgl) {
+                    .existing => c.MLN_WEBGL_CONTEXT_EXISTING,
+                    .transferred_canvas => c.MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS,
+                },
+                .context = switch (webgl) {
+                    .existing => |value| value,
+                    .transferred_canvas => 0,
+                },
+                .canvas_selector = switch (webgl) {
+                    .existing => .{ .data = null, .size = 0 },
+                    .transferred_canvas => |value| .{ .data = value.ptr, .size = value.len },
+                },
+            };
+            switch (webgl) {
+                .existing => {},
+                .transferred_canvas => raw.ownership = c.MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED,
+            }
         },
     }
     return raw;

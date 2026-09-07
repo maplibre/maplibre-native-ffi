@@ -4,9 +4,7 @@ const build_options = @import("build_options");
 const testing = std.testing;
 
 const maplibre = @import("maplibre_native_ffi");
-const metal_support = @import("metal_support.zig");
 const support = @import("support.zig");
-const test_hooks = @import("test_hooks.zig");
 
 extern "c" fn MTLCreateSystemDefaultDevice() ?*anyopaque;
 
@@ -20,31 +18,6 @@ const egl = if (supports_egl) @import("egl") else struct {};
 
 const gl = if (supports_wgl or supports_egl) @import("gl") else struct {};
 const wgl_test = if (supports_wgl) @import("wgl_test_context") else struct {};
-
-const cluster_style_json =
-    \\{
-    \\  "version": 8,
-    \\  "name": "zig-binding-cluster-query-test",
-    \\  "sources": {
-    \\    "cluster-source": {
-    \\      "type": "geojson",
-    \\      "cluster": true,
-    \\      "data": {
-    \\        "type": "FeatureCollection",
-    \\        "features": [
-    \\          {"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{"name":"one"}},
-    \\          {"type":"Feature","geometry":{"type":"Point","coordinates":[0.001,0.001]},"properties":{"name":"two"}},
-    \\          {"type":"Feature","geometry":{"type":"Point","coordinates":[0.002,0.002]},"properties":{"name":"three"}}
-    \\        ]
-    \\      }
-    \\    }
-    \\  },
-    \\  "layers": [
-    \\    {"id":"background","type":"background","paint":{"background-color":"#ffffff"}},
-    \\    {"id":"cluster-circle","type":"circle","source":"cluster-source","filter":["has","point_count"],"paint":{"circle-color":"#2563eb","circle-radius":20}}
-    \\  ]
-    \\}
-;
 
 test "supported render backend is exposed semantically" {
     const support_mask = maplibre.supportedRenderBackends();
@@ -106,304 +79,12 @@ test "queried features compare copied buffers by content" {
     try testing.expect(!absent_source.eql(empty_source));
 }
 
-fn waitForRenderedFeatureQuery(
-    runtime: *maplibre.RuntimeHandle,
-    session: *maplibre.RenderSessionHandle,
-    geometry: maplibre.RenderedQueryGeometry,
-    options: maplibre.RenderedFeatureQueryOptions,
-) !maplibre.QueriedFeatureList {
-    for (0..1000) |_| {
-        var result = try session.queryRenderedFeatures(testing.allocator, geometry, options);
-        if (result.items.len != 0) return result;
-        result.deinit();
-        try runtime.pump(0, null);
-        _ = try session.renderUpdate();
-        try std.Thread.yield();
-    }
-    return error.RenderedFeatureNotQueryable;
-}
-
-fn waitForSourceFeatureQuery(
-    runtime: *maplibre.RuntimeHandle,
-    session: *maplibre.RenderSessionHandle,
-) !maplibre.QueriedFeatureList {
-    for (0..1000) |_| {
-        var result = try session.querySourceFeatures(testing.allocator, "point", .{
-            .filter = "[\"==\",[\"get\",\"kind\"],\"capital\"]",
-        });
-        if (result.items.len != 0) return result;
-        result.deinit();
-        try runtime.pump(0, null);
-        _ = try session.renderUpdate();
-        try std.Thread.yield();
-    }
-    return error.SourceFeatureNotQueryable;
-}
-
-fn skipWhitespace(json: []const u8, start: usize) usize {
-    var cursor = start;
-    while (cursor < json.len and std.ascii.isWhitespace(json[cursor])) cursor += 1;
-    return cursor;
-}
-
-fn jsonStringEnd(json: []const u8, start: usize) ?usize {
-    var escaped = false;
-    var cursor = start + 1;
-    while (cursor < json.len) : (cursor += 1) {
-        if (escaped) escaped = false else if (json[cursor] == '\\') escaped = true else if (json[cursor] == '"') return cursor + 1;
-    }
-    return null;
-}
-
-fn jsonValueEnd(json: []const u8, start: usize) ?usize {
-    if (start >= json.len) return null;
-    if (json[start] == '"') return jsonStringEnd(json, start);
-    if (json[start] != '{' and json[start] != '[') {
-        var cursor = start;
-        while (cursor < json.len and !std.ascii.isWhitespace(json[cursor]) and json[cursor] != ',' and json[cursor] != '}' and json[cursor] != ']') cursor += 1;
-        return cursor;
-    }
-    var depth: usize = 0;
-    var cursor = start;
-    while (cursor < json.len) {
-        if (json[cursor] == '"') {
-            cursor = jsonStringEnd(json, cursor) orelse return null;
-            continue;
-        }
-        if (json[cursor] == '{' or json[cursor] == '[') depth += 1;
-        if (json[cursor] == '}' or json[cursor] == ']') {
-            depth -= 1;
-            if (depth == 0) return cursor + 1;
-        }
-        cursor += 1;
-    }
-    return null;
-}
-
-fn rawMember(json: []const u8, key: []const u8) ?[]const u8 {
-    var cursor = skipWhitespace(json, 0);
-    if (cursor >= json.len or json[cursor] != '{') return null;
-    cursor += 1;
-    while (true) {
-        cursor = skipWhitespace(json, cursor);
-        if (cursor >= json.len or json[cursor] == '}') return null;
-        const key_end = jsonStringEnd(json, cursor) orelse return null;
-        const member_name = json[cursor + 1 .. key_end - 1];
-        cursor = skipWhitespace(json, key_end);
-        if (cursor >= json.len or json[cursor] != ':') return null;
-        const value_start = skipWhitespace(json, cursor + 1);
-        const value_end = jsonValueEnd(json, value_start) orelse return null;
-        if (std.mem.eql(u8, member_name, key)) return json[value_start..value_end];
-        cursor = skipWhitespace(json, value_end);
-        if (cursor >= json.len or json[cursor] != ',') return null;
-        cursor += 1;
-    }
-}
-
-fn firstArrayElement(json: []const u8) ?[]const u8 {
-    var cursor = skipWhitespace(json, 0);
-    if (cursor >= json.len or json[cursor] != '[') return null;
-    cursor = skipWhitespace(json, cursor + 1);
-    if (cursor >= json.len or json[cursor] == ']') return null;
-    return json[cursor .. jsonValueEnd(json, cursor) orelse return null];
-}
-
-fn queryFeatureProperty(feature: []const u8, key: []const u8) ?[]const u8 {
-    const properties = rawMember(feature, "properties") orelse return null;
-    return rawMember(properties, key);
-}
-
-const TransitionFramePump = struct {
-    finished_count: usize = 0,
-    last_transition_id: ?u64 = null,
-};
-
-fn pumpTransitionFrame(
-    runtime: *maplibre.RuntimeHandle,
-    map: *maplibre.MapHandle,
-    session: *maplibre.RenderSessionHandle,
-) !TransitionFramePump {
-    // Metal hosts drain autoreleased backend objects once per frame-loop
-    // iteration.
-    const pool = if (build_options.supports_metal) try metal_support.AutoreleasePool.init() else {};
-    defer if (build_options.supports_metal) pool.deinit();
-
-    try map.requestRepaint();
-    try runtime.pump(0, null);
-
-    var result = TransitionFramePump{};
-    var render_update_available = false;
-    {
-        var batch = try runtime.drainEvents(testing.allocator, 0);
-        defer batch.deinit();
-        for (0..batch.len()) |index| {
-            const event = try batch.at(index);
-            if (std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_render_update_available)) {
-                render_update_available = true;
-                continue;
-            }
-            switch (event.payload) {
-                .camera_transition_finished => |payload| {
-                    try testing.expect(std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_camera_transition_finished));
-                    result.finished_count += 1;
-                    result.last_transition_id = payload.transition_id;
-                },
-                else => {},
-            }
-        }
-    }
-    if (render_update_available) try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-    return result;
-}
-
-fn expectPixelApprox(actual: [4]u8, expected: [4]u8, tolerance: u8) !void {
-    for (actual, expected) |actual_channel, expected_channel| {
-        const delta = if (actual_channel > expected_channel)
-            actual_channel - expected_channel
-        else
-            expected_channel - actual_channel;
-        try testing.expect(delta <= tolerance);
-    }
-}
-
 fn hasNonZeroByte(bytes: []const u8) bool {
     for (bytes) |byte| {
         if (byte != 0) return true;
     }
     return false;
 }
-
-const TestImage = struct {
-    allocator: std.mem.Allocator,
-    info: maplibre.TextureImageInfo,
-    data: []u8,
-
-    fn deinit(self: *TestImage) void {
-        self.allocator.free(self.data);
-        self.data = &.{};
-        self.info = .{ .width = 0, .height = 0, .stride = 0, .byte_length = 0 };
-    }
-};
-
-fn readTestImage(session: *maplibre.RenderSessionHandle, allocator: std.mem.Allocator, byte_length: usize) !TestImage {
-    const data = try allocator.alloc(u8, byte_length);
-    errdefer allocator.free(data);
-    @memset(data, 0);
-    const info = try session.readPremultipliedRgba8Into(data);
-    return .{ .allocator = allocator, .info = info, .data = data };
-}
-
-const RenderSessionThreadCall = enum {
-    render_update,
-    resize,
-    set_target,
-    detach,
-    reduce_memory_use,
-    clear_data,
-    dump_debug_logs,
-    close,
-    acquire_metal_frame,
-    acquire_opengl_frame,
-    acquire_vulkan_frame,
-};
-
-fn callRenderSessionOnThread(session: *maplibre.RenderSessionHandle, call: RenderSessionThreadCall, out_error: *?anyerror) void {
-    const result = switch (call) {
-        .render_update => blk: {
-            _ = session.renderUpdate() catch |err| break :blk err;
-            break :blk {};
-        },
-        .resize => session.resize(.{ .width = 16, .height = 16, .scale_factor = 1.0 }),
-        .set_target => setPlaceholderBorrowedTextureTarget(session),
-        .detach => session.detach(),
-        .reduce_memory_use => session.reduceMemoryUse(),
-        .clear_data => session.clearData(),
-        .dump_debug_logs => session.dumpDebugLogs(),
-        .close => session.close(),
-        .acquire_metal_frame => blk: {
-            var frame = session.acquireMetalOwnedTextureFrame() catch |err| break :blk err;
-            frame.release() catch {};
-            break :blk {};
-        },
-        .acquire_opengl_frame => blk: {
-            var frame = session.acquireOpenGLOwnedTextureFrame() catch |err| break :blk err;
-            frame.release() catch {};
-            break :blk {};
-        },
-        .acquire_vulkan_frame => blk: {
-            var frame = session.acquireVulkanOwnedTextureFrame() catch |err| break :blk err;
-            frame.release() catch {};
-            break :blk {};
-        },
-    };
-    if (result) |_| {
-        out_error.* = null;
-    } else |err| {
-        out_error.* = err;
-    }
-}
-
-fn expectRenderSessionCallWrongThread(session: *maplibre.RenderSessionHandle, call: RenderSessionThreadCall) !void {
-    var observed: ?anyerror = null;
-    const thread = try std.Thread.spawn(.{}, callRenderSessionOnThread, .{ session, call, &observed });
-    thread.join();
-    try testing.expect(observed != null);
-    try testing.expect(observed.? == error.WrongThread);
-}
-
-fn releaseMetalFrameOnThread(frame: *maplibre.MetalOwnedTextureFrameHandle, out_error: *?anyerror) void {
-    frame.release() catch |err| {
-        out_error.* = err;
-        return;
-    };
-    out_error.* = null;
-}
-
-fn releaseOpenGLFrameOnThread(frame: *maplibre.OpenGLOwnedTextureFrameHandle, out_error: *?anyerror) void {
-    frame.release() catch |err| {
-        out_error.* = err;
-        return;
-    };
-    out_error.* = null;
-}
-
-fn releaseVulkanFrameOnThread(frame: *maplibre.VulkanOwnedTextureFrameHandle, out_error: *?anyerror) void {
-    frame.release() catch |err| {
-        out_error.* = err;
-        return;
-    };
-    out_error.* = null;
-}
-
-fn expectMetalFrameReleaseWrongThread(frame: *maplibre.MetalOwnedTextureFrameHandle) !void {
-    var observed: ?anyerror = null;
-    const thread = try std.Thread.spawn(.{}, releaseMetalFrameOnThread, .{ frame, &observed });
-    thread.join();
-    try testing.expectEqual(error.WrongThread, observed.?);
-    _ = try frame.info();
-}
-
-fn expectOpenGLFrameReleaseWrongThread(frame: *maplibre.OpenGLOwnedTextureFrameHandle) !void {
-    var observed: ?anyerror = null;
-    const thread = try std.Thread.spawn(.{}, releaseOpenGLFrameOnThread, .{ frame, &observed });
-    thread.join();
-    try testing.expectEqual(error.WrongThread, observed.?);
-    _ = try frame.info();
-}
-
-fn expectVulkanFrameReleaseWrongThread(frame: *maplibre.VulkanOwnedTextureFrameHandle) !void {
-    var observed: ?anyerror = null;
-    const thread = try std.Thread.spawn(.{}, releaseVulkanFrameOnThread, .{ frame, &observed });
-    thread.join();
-    try testing.expectEqual(error.WrongThread, observed.?);
-    _ = try frame.info();
-}
-
-const TestOwnedTextureDescriptor = struct {
-    extent: maplibre.RenderTargetExtent = .{},
-};
-
-const gl_texture_2d = if (supports_wgl) gl.TEXTURE_2D else 0x0DE1;
 
 fn fakeNativePointer() maplibre.NativePointer {
     return maplibre.NativePointer.fromPtr(@ptrFromInt(1));
@@ -440,10 +121,6 @@ fn fakeVulkanContext() maplibre.VulkanContextDescriptor {
         .graphics_queue = fake_pointer,
         .graphics_queue_family_index = 0,
     };
-}
-
-fn fakeVulkanHandle() maplibre.VulkanHandle {
-    return maplibre.VulkanHandle.fromBits(1);
 }
 
 fn vulkanHandleToBinding(handle: anytype) maplibre.VulkanHandle {
@@ -795,67 +472,6 @@ const EglAttachContext = if (supports_egl) struct {
     }
 } else struct {};
 
-/// Pbuffer fixture for a dedicated session. It creates no EGL context and makes
-/// nothing current, because naming dedicated ownership is what asks the session
-/// to create its own context and keep it current.
-const DedicatedEglSurface = if (supports_egl) struct {
-    display: egl.EGLDisplay,
-    config: egl.EGLConfig,
-    egl_surface: egl.EGLSurface,
-
-    pub fn initWithSize(width: u32, height: u32) !DedicatedEglSurface {
-        const display = try EglAttachContext.initDisplay();
-        errdefer _ = egl.eglTerminate(display);
-
-        const config_attributes = [_]egl.EGLint{
-            egl.EGL_SURFACE_TYPE,    egl.EGL_PBUFFER_BIT,
-            egl.EGL_RENDERABLE_TYPE, egl.EGL_OPENGL_ES3_BIT,
-            egl.EGL_RED_SIZE,        8,
-            egl.EGL_GREEN_SIZE,      8,
-            egl.EGL_BLUE_SIZE,       8,
-            egl.EGL_ALPHA_SIZE,      8,
-            egl.EGL_DEPTH_SIZE,      24,
-            egl.EGL_STENCIL_SIZE,    8,
-            egl.EGL_NONE,
-        };
-        var config: egl.EGLConfig = null;
-        var config_count: egl.EGLint = 0;
-        if (egl.eglChooseConfig(display, &config_attributes, &config, 1, &config_count) == egl.EGL_FALSE or
-            config_count == 0 or config == null)
-        {
-            return error.EglUnavailable;
-        }
-
-        const surface_attributes = [_]egl.EGLint{
-            egl.EGL_WIDTH,  @intCast(width),
-            egl.EGL_HEIGHT, @intCast(height),
-            egl.EGL_NONE,
-        };
-        const pbuffer = egl.eglCreatePbufferSurface(display, config, &surface_attributes);
-        if (pbuffer == egl.EGL_NO_SURFACE) return error.EglUnavailable;
-        return .{ .display = display, .config = config, .egl_surface = pbuffer };
-    }
-
-    pub fn deinit(self: *DedicatedEglSurface) void {
-        _ = egl.eglDestroySurface(self.display, self.egl_surface);
-        _ = egl.eglTerminate(self.display);
-    }
-
-    pub fn descriptor(self: *const DedicatedEglSurface) maplibre.OpenGLContextDescriptor {
-        return .{ .egl = .{
-            .display = maplibre.NativePointer.fromPtr(@ptrCast(self.display.?)),
-            .config = maplibre.NativePointer.fromPtr(@ptrCast(self.config.?)),
-            .share_context = null,
-            .client_api = .gles,
-            .ownership = .dedicated,
-        } };
-    }
-
-    pub fn surface(self: *const DedicatedEglSurface) maplibre.NativePointer {
-        return maplibre.NativePointer.fromPtr(@ptrCast(self.egl_surface.?));
-    }
-} else struct {};
-
 const OpenGLBorrowedTexture = if (supports_wgl) WglBorrowedTexture else if (supports_egl) struct {
     context: EglAttachContext,
     texture: gl.uint,
@@ -922,121 +538,61 @@ const TestOwnedTextureSession = struct {
             self.context.deinit();
             self.context_active = false;
         }
-        try self.session.close();
+        try support.closeSession(&self.session, true);
     }
 };
 
-fn attachTestOwnedTexture(map: *maplibre.MapHandle, descriptor: TestOwnedTextureDescriptor) !TestOwnedTextureSession {
-    if (!supports_test_owned_texture) return error.SkipZigTest;
+fn resolveFuture(comptime T: type, session: maplibre.RenderSessionHandle, future_value: maplibre.Future(T)) !T {
+    return support.resolveSessionFuture(T, session, future_value, true);
+}
+
+fn finishOperation(session: maplibre.RenderSessionHandle, future: maplibre.Future(void)) !void {
+    try support.finishOperation(session, future, true);
+}
+
+fn finishAttachment(attachment: maplibre.RenderSessionAttachment) !maplibre.RenderSessionHandle {
+    return support.finishAttachment(attachment, true);
+}
+
+fn attachTestOwnedTexture(map: *maplibre.MapHandle, extent: maplibre.RenderTargetExtent) !TestOwnedTextureSession {
     var context = try TestOwnedTextureContext.init();
     errdefer context.deinit();
-
-    var session = if (build_options.supports_vulkan)
-        try maplibre.attachVulkanOwnedTexture(map, .{
-            .extent = descriptor.extent,
-            .context = context.descriptor(),
-        })
-    else if (build_options.supports_opengl)
-        try maplibre.attachOpenGLOwnedTexture(map, .{
-            .extent = descriptor.extent,
-            .context = context.descriptor(),
-        })
-    else if (build_options.supports_metal)
-        try maplibre.attachMetalOwnedTexture(map, .{
-            .extent = descriptor.extent,
-            .context = context.descriptor(),
-        })
-    else
-        unreachable;
-    errdefer session.close() catch {};
-
+    const session = try attachOwnedTexture(map, &context, extent);
     return .{ .context = context, .session = session };
 }
 
-fn expectInvalidOwnedTextureExtent(map: *maplibre.MapHandle, extent: maplibre.RenderTargetExtent) !void {
-    if (!supports_test_owned_texture) return error.SkipZigTest;
-    if (build_options.supports_vulkan) {
-        try testing.expectError(error.InvalidArgument, maplibre.attachVulkanOwnedTexture(map, .{
+/// Attaches an owned-texture session on the backend this build supports,
+/// leaving the graphics context to the caller.
+fn attachOwnedTexture(
+    map: *maplibre.MapHandle,
+    context: *TestOwnedTextureContext,
+    extent: maplibre.RenderTargetExtent,
+) !maplibre.RenderSessionHandle {
+    var session = if (build_options.supports_vulkan)
+        try finishAttachment(try maplibre.attachVulkanOwnedTexture(map, .{
             .extent = extent,
-            .context = fakeVulkanContext(),
-        }));
-    } else if (build_options.supports_opengl) {
-        try testing.expectError(error.InvalidArgument, maplibre.attachOpenGLOwnedTexture(map, .{
+            .context = context.descriptor(),
+        }, .{ .driver = .core_worker, .requested_texture_ring_depth = 2 }))
+    else if (build_options.supports_opengl)
+        try finishAttachment(try maplibre.attachOpenGLOwnedTexture(map, .{
             .extent = extent,
-            .context = fakeOpenGLContext(),
-        }));
-    } else if (build_options.supports_metal) {
-        try testing.expectError(error.InvalidArgument, maplibre.attachMetalOwnedTexture(map, .{
+            .context = context.descriptor(),
+        }, .{ .driver = .caller_graphics_thread, .requested_texture_ring_depth = 2 }))
+    else if (build_options.supports_metal)
+        try finishAttachment(try maplibre.attachMetalOwnedTexture(map, .{
             .extent = extent,
-            .context = .{ .device = fakeNativePointer() },
-        }));
-    } else {
+            .context = context.descriptor(),
+        }, .{ .driver = .core_worker, .requested_texture_ring_depth = 2 }))
+    else
         unreachable;
+    errdefer {
+        if (session.detach()) |operation| {
+            finishOperation(session, operation) catch {};
+        } else |_| {}
+        session.destroy() catch {};
     }
-}
 
-/// Hands a session a caller-owned texture target carrying placeholder backend
-/// handles, which call sites expect to be rejected before the descriptor is
-/// read.
-fn setPlaceholderBorrowedTextureTarget(session: *maplibre.RenderSessionHandle) maplibre.Error!void {
-    const extent = maplibre.RenderTargetExtent{ .width = 16, .height = 16, .scale_factor = 1.0 };
-    if (build_options.supports_vulkan) {
-        return session.setVulkanBorrowedTextureTarget(.{
-            .extent = extent,
-            .physical_width = extent.width,
-            .physical_height = extent.height,
-            .context = fakeVulkanContext(),
-            .image = fakeVulkanHandle(),
-            .image_view = fakeVulkanHandle(),
-            .format = @as(u32, vk.VK_FORMAT_R8G8B8A8_UNORM),
-            .initial_layout = @as(u32, vk.VK_IMAGE_LAYOUT_UNDEFINED),
-            .final_layout = @as(u32, vk.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
-        });
-    } else if (build_options.supports_opengl) {
-        return session.setOpenGLBorrowedTextureTarget(.{
-            .extent = extent,
-            .physical_width = extent.width,
-            .physical_height = extent.height,
-            .context = fakeOpenGLContext(),
-            .texture = 1,
-            .target = gl_texture_2d,
-        });
-    } else if (build_options.supports_metal) {
-        return session.setMetalBorrowedTextureTarget(.{
-            .extent = extent,
-            .physical_width = extent.width,
-            .physical_height = extent.height,
-            .texture = fakeNativePointer(),
-        });
-    } else {
-        unreachable;
-    }
-}
-
-fn createMovedMetalSessionWithFrame(device: *anyopaque) !struct {
-    runtime: maplibre.RuntimeHandle,
-    map: maplibre.MapHandle,
-    session: maplibre.RenderSessionHandle,
-    frame: maplibre.MetalOwnedTextureFrameHandle,
-} {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    errdefer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    errdefer map.close() catch @panic("map close failed");
-
-    var session = try maplibre.attachMetalOwnedTexture(&map, .{
-        .extent = .{ .width = 32, .height = 32, .scale_factor = 1.0 },
-        .context = .{ .device = maplibre.NativePointer.fromPtr(device) },
-    });
-    errdefer session.close() catch {};
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-
-    const frame = try session.acquireMetalOwnedTextureFrame();
-    return .{ .runtime = runtime, .map = map, .session = session, .frame = frame };
+    return session;
 }
 
 const VulkanAttachContext = if (build_options.supports_vulkan) struct {
@@ -1385,1202 +941,901 @@ fn findVulkanMemoryType(dispatch: *const VulkanDispatch, physical_device: if (bu
     return error.NoSuitableVulkanMemoryType;
 }
 
-test "render update without pending update reports no update and keeps session live" {
-    if (!supports_test_owned_texture) return error.SkipZigTest;
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 64, .mode = .static });
-    defer map.close() catch @panic("map close failed");
-
-    var owned = try attachTestOwnedTexture(&map, .{
-        .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
-    });
-    defer owned.close() catch {};
-
-    const update = try owned.session.renderUpdate();
-    try testing.expectEqual(@as(maplibre.RenderResult, .no_update), update.result);
-    // A non-rendered outcome never asks for another frame.
-    try testing.expect(!update.needs_repaint);
-    try owned.session.resize(.{ .width = 32, .height = 16, .scale_factor = 1.0 });
+fn expectOwnedFrameExtent(
+    session: maplibre.RenderSessionHandle,
+    extent: maplibre.RenderTargetExtent,
+) !void {
+    var frame = try session.acquireFrame();
+    if (build_options.supports_vulkan) {
+        const info = try frame.vulkanTexture();
+        try testing.expectEqual(extent.width, info.width);
+        try testing.expectEqual(extent.height, info.height);
+        try testing.expectEqual(extent.scale_factor, info.scale_factor);
+        try testing.expect(info.image.bits() != 0);
+        // The image is a Vulkan non-dispatchable handle, not the device pointer.
+        try testing.expect(info.image.bits() != @intFromPtr(info.device.toPtr()));
+    } else if (build_options.supports_opengl) {
+        const info = try frame.openGLTexture();
+        try testing.expectEqual(extent.width, info.width);
+        try testing.expectEqual(extent.height, info.height);
+        try testing.expectEqual(extent.scale_factor, info.scale_factor);
+        try testing.expect(info.texture != 0);
+    } else if (build_options.supports_metal) {
+        const info = try frame.metalTexture();
+        try testing.expectEqual(extent.width, info.width);
+        try testing.expectEqual(extent.height, info.height);
+        try testing.expectEqual(extent.scale_factor, info.scale_factor);
+        try testing.expect(@intFromEnum(info.texture) != 0);
+    } else {
+        unreachable;
+    }
+    // The producer sync tells the consumer when the frame's GPU work is done.
+    _ = try frame.producerSync();
+    try frame.release(.cpu_complete);
 }
 
-test "owned texture render session lifecycle and readback" {
+test "owned texture session renders acquires resizes and reads back" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 32, .height = 16 });
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    const initial_extent = maplibre.RenderTargetExtent{ .width = 32, .height = 16 };
+    var owned = try attachTestOwnedTexture(&map, initial_extent);
+    defer owned.close() catch @panic("render session close failed");
+    const capabilities = try owned.session.capabilities();
+    try testing.expect(capabilities.frame_acquisition);
+    try testing.expectEqual(.attached, std.meta.activeTag((try owned.session.snapshot()).state));
 
-    var owned = try attachTestOwnedTexture(&map, .{
-        .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
-    });
-    defer owned.close() catch {};
-    const session = &owned.session;
+    try support.expectCommitted(try map.setStyleJson(support.style_json));
+    try support.waitForBarrier(&runtime);
+    try testing.expectEqual(.rendered, std.meta.activeTag((try support.renderFrame(owned.session, false, true)).disposition));
+    try expectOwnedFrameExtent(owned.session, initial_extent);
 
-    var readback_buffer: [32 * 16 * 4]u8 = undefined;
-    try testing.expectError(error.InvalidState, session.readPremultipliedRgba8Into(&readback_buffer));
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-    try session.reduceMemoryUse();
-    try session.dumpDebugLogs();
-    try session.clearData();
-
-    var too_small_buffer: [4]u8 = undefined;
-    try testing.expectError(error.InvalidArgument, session.readPremultipliedRgba8Into(&too_small_buffer));
-    too_small_buffer[0] = 0xaa;
-
-    var image = try readTestImage(session, testing.allocator, 32 * 16 * 4);
-    defer image.deinit();
-    try testing.expectEqual(@as(u32, 32), image.info.width);
-    try testing.expectEqual(@as(u32, 16), image.info.height);
-    try testing.expectEqual(@as(u32, 32 * 4), image.info.stride);
-    try testing.expectEqual(@as(usize, 32 * 16 * 4), image.info.byte_length);
-    try testing.expectEqual(image.info.byte_length, image.data.len);
-
-    try session.resize(.{ .width = 64, .height = 64, .scale_factor = 1.0 });
-    try session.detach();
-    try testing.expectError(error.InvalidState, session.renderUpdate());
-    try owned.close();
-}
-
-test "map size follows attach and resize and keeps the creation scale factor" {
-    if (!supports_test_owned_texture) return error.SkipZigTest;
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 32, .scale_factor = 2.0 });
-    defer map.close() catch @panic("map close failed");
-    const created = try map.getSize();
-    try testing.expectEqual(@as(u32, 64), created.width);
-    try testing.expectEqual(@as(u32, 32), created.height);
-    try testing.expectEqual(@as(f64, 2.0), created.scale_factor);
-
-    // A session enqueues the map size for the map's owner thread rather than
-    // setting it in place, so the map keeps its previous size until the runtime
-    // is pumped. The target's scale factor leaves the map's pixel ratio alone.
-    var owned = try attachTestOwnedTexture(&map, .{
-        .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
-    });
-    defer owned.close() catch {};
-    const before_pump = try map.getSize();
-    try testing.expectEqual(@as(u32, 64), before_pump.width);
-    try testing.expectEqual(@as(u32, 32), before_pump.height);
-
-    try runtime.pump(0, null);
-    const attached = try map.getSize();
-    try testing.expectEqual(@as(u32, 32), attached.width);
-    try testing.expectEqual(@as(u32, 16), attached.height);
-    try testing.expectEqual(@as(f64, 2.0), attached.scale_factor);
-
-    try owned.session.resize(.{ .width = 48, .height = 24, .scale_factor = 1.0 });
-    try runtime.pump(0, null);
-    const resized = try map.getSize();
-    try testing.expectEqual(@as(u32, 48), resized.width);
-    try testing.expectEqual(@as(u32, 24), resized.height);
-    try testing.expectEqual(@as(f64, 2.0), resized.scale_factor);
-}
-
-test "set target reports unsupported for a session-owned texture" {
-    if (!supports_test_owned_texture) return error.SkipZigTest;
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var owned = try attachTestOwnedTexture(&map, .{
-        .extent = .{ .width = 32, .height = 32, .scale_factor = 1.0 },
-    });
-    defer owned.close() catch {};
-
-    // A session-owned texture is sized by its own session, so the session is
-    // rejected before the placeholder handles are read.
-    try testing.expectError(error.Unsupported, setPlaceholderBorrowedTextureTarget(&owned.session));
-
-    // The rejection left the session usable.
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try owned.session.renderUpdate()).result);
-}
-
-test "an ease pumped through rendered frames reports its transition finish once" {
-    if (!supports_test_owned_texture) return error.SkipZigTest;
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var owned = try attachTestOwnedTexture(&map, .{
-        .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
-    });
-    defer owned.close() catch {};
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    // A pending style frame suppresses the update event that drives the eased
-    // frame, so consume it before starting the transition.
+    try testing.expect(capabilities.readback);
     {
-        const pool = if (build_options.supports_metal) try metal_support.AutoreleasePool.init() else {};
-        defer if (build_options.supports_metal) pool.deinit();
-        try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try owned.session.renderUpdate()).result);
+        var image = try resolveFuture(maplibre.OwnedReadback, owned.session, try owned.session.readback(testing.allocator));
+        defer image.deinit();
+        try testing.expectEqual(@as(u32, 32), image.info.width);
+        try testing.expectEqual(@as(u32, 16), image.info.height);
+        try testing.expectEqual(@as(u32, 32 * 4), image.info.stride);
+        try testing.expectEqual(image.info.byte_length, image.data.len);
+        try testing.expect(hasNonZeroByte(image.data));
     }
 
-    // A camera transition advances when the host requests and renders frames.
-    try map.easeTo(
-        .{ .center = .{ .latitude = 37.7749, .longitude = -122.4194 }, .zoom = 4.0 },
-        .{ .duration_ms = 50, .transition_id = 31 },
-    );
-
-    var finished_count: usize = 0;
-    var last_transition_id: ?u64 = null;
-    for (0..200) |_| {
-        const frame = try pumpTransitionFrame(&runtime, &map, &owned.session);
-        finished_count += frame.finished_count;
-        if (frame.last_transition_id) |transition_id| last_transition_id = transition_id;
-        if (finished_count > 0) break;
-        try testing.io.sleep(.fromMilliseconds(1), .awake);
-    }
-
-    try testing.expectEqual(@as(usize, 1), finished_count);
-    try testing.expectEqual(@as(?u64, 31), last_transition_id);
-
-    // A completed transform cannot report the same transition again.
-    var trailing_finished_count: usize = 0;
-    for (0..8) |_| {
-        const frame = try pumpTransitionFrame(&runtime, &map, &owned.session);
-        trailing_finished_count += frame.finished_count;
-    }
-    try testing.expectEqual(@as(usize, 0), trailing_finished_count);
-
-    const settled_camera = try map.getCamera();
-    try testing.expectApproxEqAbs(@as(f64, 4.0), settled_camera.zoom.?, 0.000001);
+    const resized_extent = maplibre.RenderTargetExtent{ .width = 48, .height = 24 };
+    try finishOperation(owned.session, try owned.session.resize(resized_extent));
+    try support.waitForBarrier(&runtime);
+    for (0..1000) |_| {
+        const result = try support.renderFrame(owned.session, false, true);
+        if (std.meta.activeTag(result.disposition) == .rendered) break;
+        try testing.expectEqual(.size_pending, std.meta.activeTag(result.disposition));
+        // The repaint signal is meaningful only on a rendered frame.
+        try testing.expect(!result.needs_repaint);
+    } else return error.ResizeDidNotConverge;
+    try expectOwnedFrameExtent(owned.session, resized_extent);
+    const snapshot = try owned.session.snapshot();
+    try testing.expectEqual(resized_extent.width, snapshot.extent.width);
+    try testing.expectEqual(resized_extent.height, snapshot.extent.height);
 }
 
-test "map close rejects live render session through public bindings" {
+test "a session with no rendered frame has nothing to acquire or read back" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 16, .height = 16 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+    var owned = try attachTestOwnedTexture(&map, .{ .width = 16, .height = 16 });
+    defer owned.close() catch @panic("render session close failed");
+
+    try testing.expect((try owned.session.capabilities()).readback);
+    // No frame has rendered, so neither a readback nor an acquisition has a
+    // frame to take.
+    try testing.expectError(error.NotReady, owned.session.acquireFrame());
+    try testing.expectError(error.InvalidState, resolveFuture(maplibre.OwnedReadback, owned.session, try owned.session.readback(testing.allocator)));
+}
+
+test "live render session blocks map close until detached" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
     defer diagnostics.deinit();
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
-    errdefer runtime.close() catch {};
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    errdefer map.close() catch {};
-
-    var owned = try attachTestOwnedTexture(&map, .{});
+    errdefer support.closeRuntime(&runtime) catch {};
+    var map = try support.createMap(&runtime, .{ .width = 32, .height = 32 });
+    errdefer support.closeMap(&map) catch {};
+    var owned = try attachTestOwnedTexture(&map, .{ .width = 32, .height = 32 });
     errdefer owned.close() catch {};
 
     try testing.expectError(error.InvalidState, map.close());
     try testing.expectEqualStrings("map has an attached render session", diagnostics.get().?.message);
 
     try owned.close();
-    try map.close();
-    try runtime.close();
+    try support.closeMap(&map);
+    try support.closeRuntime(&runtime);
 }
 
-test "map close succeeds after render session detach through public bindings" {
-    if (!supports_test_owned_texture) return error.SkipZigTest;
-    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
-    defer diagnostics.deinit();
-
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
-    errdefer runtime.close() catch {};
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    errdefer map.close() catch {};
-
-    var owned = try attachTestOwnedTexture(&map, .{});
-    errdefer owned.close() catch {};
-
-    try owned.session.detach();
-    // Detaching releases the map, so the map closes while the session is open.
-    try map.close();
-
-    try owned.close();
-    try runtime.close();
-}
-
-test "owned texture frame wrapper allocation failure releases native frame" {
-    if (!supports_test_owned_texture) return error.SkipZigTest;
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var owned = try attachTestOwnedTexture(&map, .{
-        .extent = .{ .width = 32, .height = 32, .scale_factor = 1.0 },
-    });
-    defer owned.close() catch {};
-    const session = &owned.session;
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-
-    test_hooks.failNextOwnedTextureFrameWrapperAllocation();
-    if (build_options.supports_vulkan) {
-        try testing.expectError(error.OutOfMemory, session.acquireVulkanOwnedTextureFrame());
-        var frame = try session.acquireVulkanOwnedTextureFrame();
-        try frame.release();
-    } else if (build_options.supports_opengl) {
-        try testing.expectError(error.OutOfMemory, session.acquireOpenGLOwnedTextureFrame());
-        var frame = try session.acquireOpenGLOwnedTextureFrame();
-        try frame.release();
-    } else if (build_options.supports_metal) {
-        try testing.expectError(error.OutOfMemory, session.acquireMetalOwnedTextureFrame());
-        var frame = try session.acquireMetalOwnedTextureFrame();
-        try frame.release();
-    } else {
-        unreachable;
-    }
-}
-
-test "still-image map modes drive owned texture rendering" {
+test "still-image map modes complete owned texture renders" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     inline for (.{ maplibre.MapMode.static, maplibre.MapMode.tile }) |mode| {
         var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-        defer runtime.close() catch @panic("runtime close failed");
+        defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+        var map = try support.createMap(&runtime, .{ .width = 32, .height = 32, .mode = mode });
+        defer support.closeMap(&map) catch @panic("map close failed");
+        var owned = try attachTestOwnedTexture(&map, .{ .width = 32, .height = 32 });
+        defer owned.close() catch @panic("render session close failed");
 
-        var map = try maplibre.MapHandle.create(&runtime, .{ .mode = mode });
-        defer map.close() catch @panic("map close failed");
-
-        var owned = try attachTestOwnedTexture(&map, .{ .extent = .{ .width = 32, .height = 32 } });
-        defer owned.close() catch {};
-
-        try map.setStyleJson(testing.allocator, support.style_json);
-        try map.requestStillImage();
-        try testing.expectError(error.InvalidState, map.requestStillImage());
+        try support.expectCommitted(try map.setStyleJson(support.style_json));
+        try support.waitForBarrier(&runtime);
+        var future = try map.requestStillImage();
+        defer future.deinit();
+        for (0..1000) |_| {
+            _ = try support.renderFrame(owned.session, false, true);
+            if (try future.poll()) break;
+            try std.Thread.yield();
+        } else return error.StillImageDidNotComplete;
+        _ = try future.wait(null);
+        try expectOwnedFrameExtent(owned.session, .{ .width = 32, .height = 32 });
     }
 }
 
-test "owned texture attachment validates public descriptors" {
-    if (!supports_test_owned_texture) return error.SkipZigTest;
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+const feature_state_style_json =
+    \\{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}}]}}},"layers":[{"id":"circle","type":"circle","source":"point","paint":{"circle-radius":8}}]}
+;
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+const cluster_style_json =
+    \\{"version":8,"sources":{"cluster-source":{"type":"geojson","cluster":true,"data":{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{"name":"one"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.001,0.001]},"properties":{"name":"two"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.002,0.002]},"properties":{"name":"three"}}]}}},"layers":[{"id":"cluster-circle","type":"circle","source":"cluster-source","filter":["has","point_count"],"paint":{"circle-radius":20}}]}
+;
 
-    try expectInvalidOwnedTextureExtent(&map, .{ .width = 0 });
-    try expectInvalidOwnedTextureExtent(&map, .{ .height = 0 });
-    try expectInvalidOwnedTextureExtent(&map, .{ .scale_factor = 0 });
+fn skipJsonWhitespace(json: []const u8, start: usize) usize {
+    var cursor = start;
+    while (cursor < json.len and std.ascii.isWhitespace(json[cursor])) cursor += 1;
+    return cursor;
 }
 
-test "owned texture attachment rejects another active session" {
-    if (!supports_test_owned_texture) return error.SkipZigTest;
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var first = try attachTestOwnedTexture(&map, .{});
-    defer first.close() catch {};
-    try testing.expectError(error.InvalidState, attachTestOwnedTexture(&map, .{}));
+fn jsonStringEnd(json: []const u8, start: usize) ?usize {
+    var escaped = false;
+    var cursor = start + 1;
+    while (cursor < json.len) : (cursor += 1) {
+        if (escaped) escaped = false else if (json[cursor] == '\\') escaped = true else if (json[cursor] == '"') return cursor + 1;
+    }
+    return null;
 }
 
-test "map feature state set get and remove" {
+fn jsonValueEnd(json: []const u8, start: usize) ?usize {
+    if (start >= json.len) return null;
+    if (json[start] == '"') return jsonStringEnd(json, start);
+    if (json[start] != '{' and json[start] != '[') {
+        var cursor = start;
+        while (cursor < json.len and !std.ascii.isWhitespace(json[cursor]) and json[cursor] != ',' and json[cursor] != '}' and json[cursor] != ']') cursor += 1;
+        return cursor;
+    }
+    var depth: usize = 0;
+    var cursor = start;
+    while (cursor < json.len) {
+        if (json[cursor] == '"') {
+            cursor = jsonStringEnd(json, cursor) orelse return null;
+            continue;
+        }
+        if (json[cursor] == '{' or json[cursor] == '[') depth += 1;
+        if (json[cursor] == '}' or json[cursor] == ']') {
+            depth -= 1;
+            if (depth == 0) return cursor + 1;
+        }
+        cursor += 1;
+    }
+    return null;
+}
+
+fn rawJsonMember(json: []const u8, key: []const u8) ?[]const u8 {
+    var cursor = skipJsonWhitespace(json, 0);
+    if (cursor >= json.len or json[cursor] != '{') return null;
+    cursor += 1;
+    while (true) {
+        cursor = skipJsonWhitespace(json, cursor);
+        if (cursor >= json.len or json[cursor] == '}') return null;
+        const key_end = jsonStringEnd(json, cursor) orelse return null;
+        const member_name = json[cursor + 1 .. key_end - 1];
+        cursor = skipJsonWhitespace(json, key_end);
+        if (cursor >= json.len or json[cursor] != ':') return null;
+        const value_start = skipJsonWhitespace(json, cursor + 1);
+        const value_end = jsonValueEnd(json, value_start) orelse return null;
+        if (std.mem.eql(u8, member_name, key)) return json[value_start..value_end];
+        cursor = skipJsonWhitespace(json, value_end);
+        if (cursor >= json.len or json[cursor] != ',') return null;
+        cursor += 1;
+    }
+}
+
+fn firstJsonArrayElement(json: []const u8) ?[]const u8 {
+    var cursor = skipJsonWhitespace(json, 0);
+    if (cursor >= json.len or json[cursor] != '[') return null;
+    cursor = skipJsonWhitespace(json, cursor + 1);
+    if (cursor >= json.len or json[cursor] == ']') return null;
+    return json[cursor .. jsonValueEnd(json, cursor) orelse return null];
+}
+
+fn firstLeafName(collection: []const u8) ?[]const u8 {
+    const features = rawJsonMember(collection, "features") orelse return null;
+    const feature = firstJsonArrayElement(features) orelse return null;
+    const properties = rawJsonMember(feature, "properties") orelse return null;
+    return rawJsonMember(properties, "name");
+}
+
+test "feature state and rendered queries copy operation results" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 64, .height = 64 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+    var owned = try attachTestOwnedTexture(&map, .{ .width = 64, .height = 64 });
+    defer owned.close() catch @panic("render session close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    try support.expectCommitted(try map.setStyleJson(feature_state_style_json));
+    try support.waitForBarrier(&runtime);
+    _ = try support.renderFrame(owned.session, false, true);
 
-    var owned = try attachTestOwnedTexture(&map, .{ .extent = .{ .width = 64, .height = 64 } });
-    defer owned.close() catch {};
-    const session = &owned.session;
+    const selector = maplibre.FeatureStateSelector{ .source_id = "point", .feature_id = "feature-1" };
+    try support.expectCommitted(try map.setFeatureState(testing.allocator, selector, "{\"hover\":true,\"count\":3}"));
+    var state_future = try map.getFeatureState(testing.allocator, selector);
+    defer state_future.deinit();
+    var state = try state_future.wait(null);
+    defer state.deinit();
+    try testing.expect(std.mem.indexOf(u8, state.value, "\"hover\":true") != null);
+
+    for (0..1000) |_| {
+        var result = try resolveFuture(
+            maplibre.QueriedFeatureList,
+            owned.session,
+            try owned.session.queryRenderedFeatures(
+                testing.allocator,
+                .{ .box = .{
+                    .min = .{ .x = 0, .y = 0 },
+                    .max = .{ .x = 64, .y = 64 },
+                } },
+                null,
+            ),
+        );
+        defer result.deinit();
+        if (result.items.len != 0 and result.items[0].state != null) {
+            try testing.expectEqualStrings("point", result.items[0].source_id.?);
+            try testing.expect(std.mem.indexOf(u8, result.items[0].state.?, "\"hover\":true") != null);
+            break;
+        }
+        try support.expectCommitted(try map.requestRepaint());
+        try support.waitForBarrier(&runtime);
+        _ = try support.renderFrame(owned.session, false, true);
+    } else return error.RenderedFeatureNotQueryable;
+
+    var source = try resolveFuture(
+        maplibre.QueriedFeatureList,
+        owned.session,
+        try owned.session.querySourceFeatures(testing.allocator, "point", null),
+    );
+    defer source.deinit();
+    try testing.expectEqualStrings("point", source.items[0].source_id.?);
+    try testing.expect(std.mem.indexOf(u8, source.items[0].feature, "\"type\":\"Point\"") != null);
+
+    try support.expectCommitted(try map.removeFeatureState(testing.allocator, selector));
+}
+
+fn featureState(map: *maplibre.MapHandle, selector: maplibre.FeatureStateSelector) !maplibre.OwnedString {
+    var future = try map.getFeatureState(testing.allocator, selector);
+    defer future.deinit();
+    return future.wait(null);
+}
+
+// Feature state belongs to the map, so it needs no loaded style, ordered reads
+// observe every earlier command, and it survives style loads and a renderer
+// retirement driven by a scale-factor change.
+test "map feature state set get and remove (BND-183)" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 64, .height = 64 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+    var owned = try attachTestOwnedTexture(&map, .{ .width = 64, .height = 64 });
+    defer owned.close() catch @panic("render session close failed");
 
     const selector = maplibre.FeatureStateSelector{ .source_id = "point", .feature_id = "feature-1" };
     const feature_state = "{\"hover\":true,\"radius\":18446744073709551615}";
-    try map.setFeatureState(testing.allocator, selector, feature_state);
-    try map.removeFeatureState(testing.allocator, .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" });
-    var queued = try map.getFeatureState(testing.allocator, selector);
+    try support.expectCommitted(try map.setFeatureState(testing.allocator, selector, feature_state));
+    try support.expectCommitted(try map.removeFeatureState(testing.allocator, .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" }));
+    var queued = try featureState(&map, selector);
     defer queued.deinit();
-    try testing.expect(rawMember(queued.value, "hover") == null);
-    try testing.expectEqualStrings("18446744073709551615", rawMember(queued.value, "radius").?);
+    try testing.expect(rawJsonMember(queued.value, "hover") == null);
+    try testing.expectEqualStrings("18446744073709551615", rawJsonMember(queued.value, "radius").?);
 
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    _ = try session.renderUpdate();
-    var before_style = try map.getFeatureState(testing.allocator, selector);
-    defer before_style.deinit();
-    try testing.expect(rawMember(before_style.value, "hover") == null);
-    try testing.expectEqualStrings("18446744073709551615", rawMember(before_style.value, "radius").?);
+    // A style load drops style-owned objects, not map-owned feature state.
+    try support.expectCommitted(try map.setStyleJson(feature_state_style_json));
+    try support.waitForBarrier(&runtime);
+    _ = try support.renderFrame(owned.session, false, true);
+    var after_style = try featureState(&map, selector);
+    defer after_style.deinit();
+    try testing.expect(rawJsonMember(after_style.value, "hover") == null);
+    try testing.expectEqualStrings("18446744073709551615", rawJsonMember(after_style.value, "radius").?);
 
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-
-    var snapshot = try map.getFeatureState(testing.allocator, selector);
-    defer snapshot.deinit();
-    try testing.expect(rawMember(snapshot.value, "hover") == null);
-    try testing.expectEqualStrings("18446744073709551615", rawMember(snapshot.value, "radius").?);
-
-    try map.setFeatureState(testing.allocator, selector, feature_state);
-    var restored = try map.getFeatureState(testing.allocator, selector);
+    try support.expectCommitted(try map.setFeatureState(testing.allocator, selector, feature_state));
+    var restored = try featureState(&map, selector);
     defer restored.deinit();
-    try testing.expectEqualStrings("true", rawMember(restored.value, "hover").?);
-    try testing.expectEqualStrings("18446744073709551615", rawMember(restored.value, "radius").?);
-
-    try map.removeFeatureState(testing.allocator, .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" });
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-
-    var after_remove = try map.getFeatureState(testing.allocator, selector);
-    defer after_remove.deinit();
-    try testing.expect(rawMember(after_remove.value, "hover") == null);
-    try testing.expectEqualStrings("18446744073709551615", rawMember(after_remove.value, "radius").?);
+    try testing.expectEqualStrings("true", rawJsonMember(restored.value, "hover").?);
+    try testing.expectEqualStrings("18446744073709551615", rawJsonMember(restored.value, "radius").?);
 
     try testing.expectError(error.InvalidArgument, map.removeFeatureState(testing.allocator, .{ .source_id = "point", .state_key = "hover" }));
 
-    try session.resize(.{ .width = 64, .height = 64, .scale_factor = 2.0 });
-    switch ((try session.renderUpdate()).result) {
-        .rendered => {},
-        .size_pending => {
-            try runtime.pump(0, null);
-            try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-        },
-        else => return error.UnexpectedRenderResult,
+    // The scale factor is fixed at attach, so a resize that changes it is
+    // rejected and the session keeps the extent it had.
+    try testing.expectError(
+        error.InvalidArgument,
+        owned.session.resize(.{ .width = 64, .height = 64, .scale_factor = 2.0 }),
+    );
+    try testing.expectEqual(@as(f64, 1.0), (try owned.session.snapshot()).extent.scale_factor);
+
+    // A size change retires the renderer; map-owned state survives.
+    try finishOperation(owned.session, try owned.session.resize(.{ .width = 96, .height = 48 }));
+    _ = try support.expectRenderedFrame(owned.session, true);
+    var after_resize = try featureState(&map, selector);
+    defer after_resize.deinit();
+    try testing.expectEqualStrings("true", rawJsonMember(after_resize.value, "hover").?);
+    try testing.expectEqualStrings("18446744073709551615", rawJsonMember(after_resize.value, "radius").?);
+}
+
+test "cluster feature extensions copy values and feature collections" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 64, .height = 64 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+    var owned = try attachTestOwnedTexture(&map, .{ .width = 64, .height = 64 });
+    defer owned.close() catch @panic("render session close failed");
+
+    try support.expectCommitted(try map.setStyleJson(cluster_style_json));
+    try support.waitForBarrier(&runtime);
+    _ = try support.renderFrame(owned.session, false, true);
+
+    var cluster_result: ?maplibre.QueriedFeatureList = null;
+    for (0..1000) |_| {
+        var result = try resolveFuture(
+            maplibre.QueriedFeatureList,
+            owned.session,
+            try owned.session.queryRenderedFeatures(
+                testing.allocator,
+                .{ .box = .{
+                    .min = .{ .x = 0, .y = 0 },
+                    .max = .{ .x = 64, .y = 64 },
+                } },
+                null,
+            ),
+        );
+        if (result.items.len != 0) {
+            cluster_result = result;
+            break;
+        }
+        result.deinit();
+        try support.expectCommitted(try map.requestRepaint());
+        try support.waitForBarrier(&runtime);
+        _ = try support.renderFrame(owned.session, false, true);
     }
-    var after_scale = try map.getFeatureState(testing.allocator, selector);
-    defer after_scale.deinit();
-    try testing.expect(rawMember(after_scale.value, "hover") == null);
-    try testing.expectEqualStrings("18446744073709551615", rawMember(after_scale.value, "radius").?);
-}
-
-test "render session queries rendered and source features" {
-    if (!supports_test_owned_texture) return error.SkipZigTest;
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var owned = try attachTestOwnedTexture(&map, .{});
-    defer owned.close() catch {};
-    const session = &owned.session;
-
-    try testing.expectError(error.InvalidState, session.queryRenderedFeatures(testing.allocator, .{ .point = .{ .x = 256, .y = 256 } }, null));
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-
-    const query_point = try map.pixelForLatLng(.{ .latitude = 37.7749, .longitude = -122.4194 });
-    var rendered = try waitForRenderedFeatureQuery(&runtime, session, .{ .box = .{
-        .min = .{ .x = query_point.x - 20, .y = query_point.y - 20 },
-        .max = .{ .x = query_point.x + 20, .y = query_point.y + 20 },
-    } }, .{
-        .layer_ids = &.{"point-circle"},
-        .filter = "[\"==\",[\"get\",\"kind\"],\"capital\"]",
-    });
-    defer rendered.deinit();
-    try testing.expectEqualStrings("point", rendered.items[0].source_id.?);
-    try testing.expectEqualStrings("\"capital\"", queryFeatureProperty(rendered.items[0].feature, "kind").?);
-
-    var source = try waitForSourceFeatureQuery(&runtime, session);
-    defer source.deinit();
-    try testing.expectEqualStrings("point", source.items[0].source_id.?);
-    try testing.expectEqualStrings("\"capital\"", queryFeatureProperty(source.items[0].feature, "kind").?);
-
-    var failing_allocator = testing.FailingAllocator.init(testing.allocator, .{ .fail_index = 0 });
-    try testing.expectError(error.OutOfMemory, session.querySourceFeatures(failing_allocator.allocator(), "point", null));
-
-    try testing.expectError(error.InvalidArgument, session.queryRenderedFeatures(testing.allocator, .{ .point = .{ .x = std.math.inf(f64), .y = 0.0 } }, null));
-    try testing.expectError(error.InvalidArgument, session.querySourceFeatures(testing.allocator, "", null));
-}
-
-test "render session clips rendered box queries to the viewport" {
-    if (!supports_test_owned_texture) return error.SkipZigTest;
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var owned = try attachTestOwnedTexture(&map, .{});
-    defer owned.close() catch {};
-    const session = &owned.session;
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-
-    const options = maplibre.RenderedFeatureQueryOptions{ .layer_ids = &.{"point-circle"} };
-
-    // A box that over-covers the viewport must answer like the viewport.
-    var oversized = try waitForRenderedFeatureQuery(&runtime, session, .{ .box = .{
-        .min = .{ .x = -8192, .y = -8192 },
-        .max = .{ .x = 8192, .y = 8192 },
-    } }, options);
-    defer oversized.deinit();
-    try testing.expectEqualStrings("\"capital\"", queryFeatureProperty(oversized.items[0].feature, "kind").?);
-
-    // Corners in either order describe the same box.
-    var inverted = try session.queryRenderedFeatures(testing.allocator, .{ .box = .{
-        .min = .{ .x = 8192, .y = 8192 },
-        .max = .{ .x = -8192, .y = -8192 },
-    } }, options);
-    defer inverted.deinit();
-    try testing.expect(inverted.items.len != 0);
-
-    // Clipping keeps a fully off-screen box empty rather than collapsing it
-    // onto a viewport edge.
-    var offscreen = try session.queryRenderedFeatures(testing.allocator, .{ .box = .{
-        .min = .{ .x = 2048, .y = 2048 },
-        .max = .{ .x = 4096, .y = 4096 },
-    } }, options);
-    defer offscreen.deinit();
-    try testing.expect(offscreen.items.len == 0);
-}
-
-test "render session queries cluster feature extensions" {
-    if (!supports_test_owned_texture) return error.SkipZigTest;
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var owned = try attachTestOwnedTexture(&map, .{});
-    defer owned.close() catch {};
-    const session = &owned.session;
-
-    try map.jumpTo(.{ .center = .{ .latitude = 0, .longitude = 0 }, .zoom = 0 });
-    try map.setStyleJson(testing.allocator, cluster_style_json);
-    for (0..5) |_| {
-        if (!try support.waitForEvent(&runtime, .map_render_update_available)) break;
-        _ = try session.renderUpdate();
-    }
-
-    const query_point = try map.pixelForLatLng(.{ .latitude = 0, .longitude = 0 });
-    var clusters = try waitForRenderedFeatureQuery(&runtime, session, .{ .box = .{
-        .min = .{ .x = query_point.x - 30, .y = query_point.y - 30 },
-        .max = .{ .x = query_point.x + 30, .y = query_point.y + 30 },
-    } }, .{ .layer_ids = &.{"cluster-circle"} });
+    var clusters = cluster_result orelse return error.ClusterFeatureNotQueryable;
     defer clusters.deinit();
-
     const feature = clusters.items[0].feature;
-    var children = try session.queryFeatureExtension(testing.allocator, "cluster-source", feature, "supercluster", "children", null);
-    defer children.deinit();
-    try testing.expect(firstArrayElement(rawMember(children.value, "features").?) != null);
+    const properties = rawJsonMember(feature, "properties").?;
+    _ = try std.fmt.parseInt(u64, rawJsonMember(properties, "cluster_id").?, 10);
+    try testing.expectEqualStrings("3", rawJsonMember(properties, "point_count").?);
 
-    var expansion_zoom = try session.queryFeatureExtension(testing.allocator, "cluster-source", feature, "supercluster", "expansion-zoom", null);
+    var children = try resolveFuture(
+        maplibre.OwnedString,
+        owned.session,
+        try owned.session.queryFeatureExtension(
+            testing.allocator,
+            "cluster-source",
+            feature,
+            "supercluster",
+            "children",
+            null,
+        ),
+    );
+    defer children.deinit();
+    try testing.expect(firstJsonArrayElement(rawJsonMember(children.value, "features").?) != null);
+
+    var expansion_zoom = try resolveFuture(
+        maplibre.OwnedString,
+        owned.session,
+        try owned.session.queryFeatureExtension(
+            testing.allocator,
+            "cluster-source",
+            feature,
+            "supercluster",
+            "expansion-zoom",
+            null,
+        ),
+    );
     defer expansion_zoom.deinit();
     _ = try std.fmt.parseInt(u64, expansion_zoom.value, 10);
 
-    // Native reads `limit` and `offset` only as unsigned values, falling back
-    // to ten leaves at offset zero, so both must move the observed result.
-    var first = try session.queryFeatureExtension(testing.allocator, "cluster-source", feature, "supercluster", "leaves", "{\"limit\":1,\"offset\":0}");
-    defer first.deinit();
-    var second = try session.queryFeatureExtension(testing.allocator, "cluster-source", feature, "supercluster", "leaves", "{\"limit\":1,\"offset\":1}");
-    defer second.deinit();
-    try testing.expect(!std.mem.eql(u8, leafName(first.value).?, leafName(second.value).?));
+    var first_leaf = try resolveFuture(
+        maplibre.OwnedString,
+        owned.session,
+        try owned.session.queryFeatureExtension(
+            testing.allocator,
+            "cluster-source",
+            feature,
+            "supercluster",
+            "leaves",
+            "{\"limit\":1,\"offset\":0}",
+        ),
+    );
+    defer first_leaf.deinit();
+    var second_leaf = try resolveFuture(
+        maplibre.OwnedString,
+        owned.session,
+        try owned.session.queryFeatureExtension(
+            testing.allocator,
+            "cluster-source",
+            feature,
+            "supercluster",
+            "leaves",
+            "{\"limit\":1,\"offset\":1}",
+        ),
+    );
+    defer second_leaf.deinit();
+    try testing.expect(!std.mem.eql(u8, firstLeafName(first_leaf.value).?, firstLeafName(second_leaf.value).?));
 }
 
-fn leafName(collection: []const u8) ?[]const u8 {
-    const features = rawMember(collection, "features") orelse return null;
-    const feature = firstArrayElement(features) orelse return null;
-    const properties = rawMember(feature, "properties") orelse return null;
-    return rawMember(properties, "name");
-}
-
-test "GeoJSON source options cluster nearby points and aggregate cluster properties" {
+test "sustained frame demands outlast the texture ring depth" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 32, .height = 32 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+    var owned = try attachTestOwnedTexture(&map, .{ .width = 32, .height = 32 });
+    defer owned.close() catch @panic("render session close failed");
+    try support.expectCommitted(try map.setStyleJson(support.style_json));
+    try support.waitForBarrier(&runtime);
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var owned = try attachTestOwnedTexture(&map, .{});
-    defer owned.close() catch {};
-    const session = &owned.session;
-
-    try map.jumpTo(.{ .center = .{ .latitude = 0, .longitude = 0 }, .zoom = 0 });
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_style_loaded));
-
-    const features = "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]},\"properties\":{\"rank\":1}},{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0.001,0.001]},\"properties\":{\"rank\":2}},{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0.002,0.002]},\"properties\":{\"rank\":3}}]}";
-    const cluster_data = try maplibre.GeoJsonSourceDataHandle.create(
-        testing.allocator,
-        features,
-        .{
-            .cluster = true,
-            .cluster_radius = 50,
-            .cluster_min_points = 2,
-            .cluster_max_zoom = 14,
-            .cluster_properties = "{\"total\":[\"+\",[\"get\",\"rank\"]]}",
-        },
-    );
-    defer cluster_data.release();
-    try map.addGeoJsonSourceData(
-        testing.allocator,
-        "cluster-options-source",
-        cluster_data,
-    );
-
-    try map.addStyleLayerJson(testing.allocator, "{\"id\":\"cluster-options-circle\",\"type\":\"circle\",\"source\":\"cluster-options-source\",\"filter\":[\"has\",\"point_count\"],\"paint\":{\"circle-radius\":20}}", "");
-
-    for (0..5) |_| {
-        if (!try support.waitForEvent(&runtime, .map_render_update_available)) break;
-        _ = try session.renderUpdate();
+    for (0..64) |_| {
+        try support.expectCommitted(try map.requestRepaint());
+        try support.waitForBarrier(&runtime);
+        try testing.expectEqual(.rendered, std.meta.activeTag((try support.renderFrame(owned.session, false, true)).disposition));
     }
-
-    // The layer only draws features carrying point_count, so a queried feature
-    // proves the source options clustered the points.
-    const query_point = try map.pixelForLatLng(.{ .latitude = 0, .longitude = 0 });
-    var clusters = try waitForRenderedFeatureQuery(&runtime, session, .{ .box = .{
-        .min = .{ .x = query_point.x - 30, .y = query_point.y - 30 },
-        .max = .{ .x = query_point.x + 30, .y = query_point.y + 30 },
-    } }, .{ .layer_ids = &.{"cluster-options-circle"} });
-    defer clusters.deinit();
-
-    try testing.expectEqualStrings("true", queryFeatureProperty(clusters.items[0].feature, "cluster").?);
-    try testing.expectEqualStrings("3", queryFeatureProperty(clusters.items[0].feature, "point_count").?);
-    try testing.expectEqualStrings("6.0", queryFeatureProperty(clusters.items[0].feature, "total").?);
+    try testing.expect((try owned.session.snapshot()).frame_generation >= 64);
 }
 
-test "unsupported backend owned texture attachment reports unsupported" {
+test "a rendered frame during an ease reports needs repaint" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 32, .height = 16 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+    var owned = try attachTestOwnedTexture(&map, .{ .width = 32, .height = 16 });
+    defer owned.close() catch @panic("render session close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    try support.expectCommitted(try map.setStyleJson(support.style_json));
+    try support.waitForBarrier(&runtime);
+    // Settle the style's own frames so the transition drives what follows.
+    try testing.expectEqual(.rendered, std.meta.activeTag((try support.renderFrame(owned.session, false, true)).disposition));
 
-    const fake_pointer = fakeNativePointer();
-    if (build_options.supports_metal) {
-        try testing.expectError(error.Unsupported, maplibre.attachVulkanOwnedTexture(&map, .{
-            .context = .{
-                .instance = fake_pointer,
-                .physical_device = fake_pointer,
-                .device = fake_pointer,
-                .graphics_queue = fake_pointer,
-                .graphics_queue_family_index = 0,
-                .get_instance_proc_addr = null,
-                .get_device_proc_addr = null,
-            },
-        }));
+    try support.expectCommitted(try map.updateCamera(.{
+        .mode = .ease,
+        .camera = .{ .center = .{ .latitude = 37.7749, .longitude = -122.4194 }, .zoom = 4.0 },
+        .animation = .{ .duration_ms = 60_000 },
+    }));
+    try support.waitForBarrier(&runtime);
+
+    // Mid-transition the map asks for the next frame with the one it renders,
+    // the same signal a map-render-frame-finished event carries.
+    var observed_repaint = false;
+    for (0..100) |_| {
+        const result = try support.renderFrame(owned.session, false, true);
+        if (std.meta.activeTag(result.disposition) == .rendered and result.needs_repaint) {
+            observed_repaint = true;
+            break;
+        }
     }
-    if (build_options.supports_vulkan) {
-        try testing.expectError(error.Unsupported, maplibre.attachMetalOwnedTexture(&map, .{
-            .context = .{ .device = fake_pointer },
-        }));
-    }
-    if (!build_options.supports_opengl) {
-        const context = fakeOpenGLContext();
-        try testing.expectError(error.Unsupported, maplibre.attachOpenGLOwnedTexture(&map, .{
-            .context = context,
-        }));
-        try testing.expectError(error.Unsupported, maplibre.attachOpenGLBorrowedTexture(&map, .{
-            .physical_width = 512,
-            .physical_height = 512,
-            .context = context,
-            .texture = 1,
-            .target = gl_texture_2d,
-        }));
-        try testing.expectError(error.Unsupported, maplibre.attachOpenGLSurface(&map, .{
-            .context = context,
-            .surface = fake_pointer,
-        }));
-    }
+    try testing.expect(observed_repaint);
 }
 
-test "OpenGL texture and surface descriptors validate through public bindings" {
+fn readSnapshotOnThread(session: maplibre.RenderSessionHandle, failure: *?anyerror) void {
+    _ = session.snapshot() catch |err| {
+        failure.* = err;
+        return;
+    };
+}
+
+test "render session controls are usable from another thread" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 16, .height = 16 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+    var owned = try attachTestOwnedTexture(&map, .{ .width = 16, .height = 16 });
+    defer owned.close() catch @panic("render session close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    const context = fakeOpenGLContext();
-    try testing.expectError(error.InvalidArgument, maplibre.attachOpenGLOwnedTexture(&map, .{
-        .extent = .{ .width = 0 },
-        .context = context,
-    }));
-    try testing.expectError(error.InvalidArgument, maplibre.attachOpenGLBorrowedTexture(&map, .{
-        .physical_width = 512,
-        .physical_height = 512,
-        .context = context,
-        .texture = 0,
-        .target = gl_texture_2d,
-    }));
-    try testing.expectError(error.InvalidArgument, maplibre.attachOpenGLBorrowedTexture(&map, .{
-        .physical_width = 512,
-        .physical_height = 512,
-        .context = context,
-        .texture = 1,
-        .target = 0,
-    }));
-    try testing.expectError(error.InvalidArgument, maplibre.attachOpenGLSurface(&map, .{
-        .extent = .{ .width = 0 },
-        .context = context,
-        .surface = fakeNativePointer(),
-    }));
+    var failure: ?anyerror = null;
+    const thread = try std.Thread.spawn(.{}, readSnapshotOnThread, .{ owned.session, &failure });
+    thread.join();
+    try testing.expectEqual(@as(?anyerror, null), failure);
 }
 
-test "OpenGL owned texture frame scopes public binding access" {
+test "Vulkan borrowed texture replaces its target (BND-183)" {
+    if (!build_options.supports_vulkan) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 32, .height = 16 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+    var borrowed = try VulkanBorrowedImage.create(32, 16);
+    defer borrowed.deinit();
+    var session = try finishAttachment(try maplibre.attachVulkanBorrowedTexture(
+        &map,
+        borrowed.descriptor(),
+        .{ .driver = .core_worker, .requested_texture_ring_depth = 1 },
+    ));
+    defer support.closeSession(&session, true) catch @panic("render session close failed");
+
+    try support.expectCommitted(try map.setStyleJson(support.style_json));
+    try support.waitForBarrier(&runtime);
+    for (0..1000) |_| {
+        if (std.meta.activeTag((try support.renderFrame(session, false, true)).disposition) == .rendered) break;
+        try support.expectCommitted(try map.requestRepaint());
+        try support.waitForBarrier(&runtime);
+    } else return error.FrameDidNotRender;
+
+    const replacement = try borrowed.allocateReplacement(48, 24);
+    errdefer borrowed.release(replacement);
+    try finishOperation(
+        session,
+        try session.setVulkanBorrowedTextureTarget(borrowed.descriptorFor(replacement, 48, 24)),
+    );
+    borrowed.adopt(replacement, 48, 24);
+    // A borrowed texture belongs to the host, so the session cannot resize it;
+    // the replacement target carries the new size and the map takes it here.
+    try testing.expectError(error.Unsupported, session.resize(.{ .width = 48, .height = 24 }));
+    try support.expectCommitted(try map.resize(48, 24, 1.0));
+    try support.waitForBarrier(&runtime);
+    for (0..1000) |_| {
+        if (std.meta.activeTag((try support.renderFrame(session, false, true)).disposition) == .rendered) break;
+        try support.expectCommitted(try map.requestRepaint());
+        try support.waitForBarrier(&runtime);
+    } else return error.FrameDidNotRender;
+    const snapshot = try session.snapshot();
+    try testing.expectEqual(@as(u32, 48), snapshot.extent.width);
+    try testing.expectEqual(@as(u32, 24), snapshot.extent.height);
+}
+
+test "OpenGL borrowed texture replaces its target (BND-183)" {
     if (!build_options.supports_opengl) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 32, .height = 16 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+    var borrowed = try OpenGLBorrowedTexture.create(32, 16);
+    defer borrowed.deinit();
+    var session = try finishAttachment(try maplibre.attachOpenGLBorrowedTexture(
+        &map,
+        borrowed.descriptor(),
+        .{ .driver = .caller_graphics_thread, .requested_texture_ring_depth = 1 },
+    ));
+    defer support.closeSession(&session, true) catch @panic("render session close failed");
 
+    try support.expectCommitted(try map.setStyleJson(support.style_json));
+    try support.waitForBarrier(&runtime);
+    try testing.expectEqual(.rendered, std.meta.activeTag((try support.renderFrame(session, false, true)).disposition));
+    var initial_pixels: [32 * 16 * 4]u8 = undefined;
+    try borrowed.readRGBA8(&initial_pixels);
+    try testing.expect(hasNonZeroByte(&initial_pixels));
+
+    const replacement = try borrowed.allocateReplacement(48, 24);
+    errdefer borrowed.context.destroyTexture(replacement);
+    try finishOperation(
+        session,
+        try session.setOpenGLBorrowedTextureTarget(borrowed.descriptorFor(replacement, 48, 24)),
+    );
+    borrowed.adopt(replacement, 48, 24);
+    // A borrowed texture belongs to the host, so the session cannot resize it;
+    // the replacement target carries the new size and the map takes it here.
+    try testing.expectError(error.Unsupported, session.resize(.{ .width = 48, .height = 24 }));
+    try support.expectCommitted(try map.resize(48, 24, 1.0));
+    try support.waitForBarrier(&runtime);
+    for (0..1000) |_| {
+        if (std.meta.activeTag((try support.renderFrame(session, false, true)).disposition) == .rendered) break;
+        try support.expectCommitted(try map.requestRepaint());
+        try support.waitForBarrier(&runtime);
+    } else return error.FrameDidNotRender;
+}
+
+test "a map takes one render session at a time" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 16, .height = 16 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+    var owned = try attachTestOwnedTexture(&map, .{ .width = 16, .height = 16 });
+    defer owned.close() catch @panic("render session close failed");
+
+    try testing.expectError(error.InvalidState, attachTestOwnedTexture(&map, .{ .width = 16, .height = 16 }));
+
+    // Detaching frees the map for the next session.
+    try owned.close();
+    var replacement = try attachTestOwnedTexture(&map, .{ .width = 16, .height = 16 });
+    defer replacement.close() catch @panic("render session close failed");
+    try testing.expectEqual(.attached, std.meta.activeTag((try replacement.session.snapshot()).state));
+}
+
+test "a detached session rejects the calls that need a target" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 16, .height = 16 });
+    defer support.closeMap(&map) catch @panic("map close failed");
     var context = try TestOwnedTextureContext.init();
     defer context.deinit();
+    var session = try attachOwnedTexture(&map, &context, .{ .width = 16, .height = 16 });
+    defer session.destroy() catch @panic("render session destroy failed");
 
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    // A demand still outstanding at detach reports a target that went away.
+    const token = support.nextFrameToken();
+    try session.requestFrame(.{ .if_needed = false, .token = token });
+    try finishOperation(session, try session.detach());
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    try testing.expectEqual(.detached, std.meta.activeTag((try session.snapshot()).state));
+    try testing.expectError(error.InvalidState, session.acquireFrame());
+    try testing.expectError(error.InvalidState, session.resize(.{ .width = 32, .height = 32 }));
 
-    var session = try maplibre.attachOpenGLOwnedTexture(&map, .{
-        .extent = .{ .width = 32, .height = 32, .scale_factor = 1.0 },
-        .context = context.descriptor(),
-    });
-    defer session.close() catch {};
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-
-    var image = try readTestImage(&session, testing.allocator, 32 * 32 * 4);
-    defer image.deinit();
-    try testing.expectEqual(@as(u32, 32), image.info.width);
-    try testing.expectEqual(@as(u32, 32), image.info.height);
-    try testing.expect(hasNonZeroByte(image.data));
-
-    var frame = try session.acquireOpenGLOwnedTextureFrame();
-    var frame_alias = frame;
-    const info = try frame.info();
-    try testing.expectEqual(@as(u32, 32), info.width);
-    try testing.expectEqual(@as(u32, 32), info.height);
-    try testing.expectEqual(@as(u32, gl.TEXTURE_2D), info.target);
-    try testing.expectEqual(@as(u32, gl.RGBA8), info.internal_format);
-    try testing.expectEqual(@as(u32, gl.RGBA), info.format);
-    try testing.expectEqual(@as(u32, gl.UNSIGNED_BYTE), info.type);
-    try testing.expect(info.texture != 0);
-
-    // The acquired texture belongs to the session context, so this readback
-    // covers the cross-context handoff.
-    var host_pixels: [32 * 32 * 4]u8 = undefined;
-    @memset(&host_pixels, 0);
-    try context.readRgbaTexture(info.texture, 32, 32, &host_pixels);
-    try expectPixelApprox(host_pixels[0..4].*, .{ 0xd8, 0xf1, 0xff, 0xff }, 8);
-
-    try expectOpenGLFrameReleaseWrongThread(&frame);
-
-    try testing.expectError(error.ActiveBorrow, setPlaceholderBorrowedTextureTarget(&session));
-    try testing.expectError(error.ActiveBorrow, session.renderUpdate());
-    try testing.expectError(error.ActiveBorrow, session.detach());
-    try testing.expectError(error.ActiveBorrow, session.acquireOpenGLOwnedTextureFrame());
-    try testing.expectError(error.ActiveBorrow, session.close());
-
-    try frame.release();
-    try frame_alias.release();
-    try testing.expectError(error.ClosedHandle, frame_alias.info());
-
-    try expectRenderSessionCallWrongThread(&session, .acquire_opengl_frame);
-    try session.close();
-}
-
-test "OpenGL borrowed texture renders through public bindings" {
-    if (!build_options.supports_opengl) return error.SkipZigTest;
-
-    var borrowed = try OpenGLBorrowedTexture.create(128, 128);
-    defer borrowed.deinit();
-
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var session = try maplibre.attachOpenGLBorrowedTexture(&map, borrowed.descriptor());
-    defer session.close() catch {};
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-
-    const pixels = try testing.allocator.alloc(u8, 128 * 128 * 4);
-    defer testing.allocator.free(pixels);
-    @memset(pixels, 0);
-    try borrowed.readRGBA8(pixels);
-    try expectPixelApprox(pixels[0..4].*, .{ 0xd8, 0xf1, 0xff, 0xff }, 8);
-
-    try testing.expectError(error.Unsupported, session.acquireOpenGLOwnedTextureFrame());
-    var readback_buffer: [128 * 128 * 4]u8 = undefined;
-    try testing.expectError(error.Unsupported, session.readPremultipliedRgba8Into(&readback_buffer));
-}
-
-test "OpenGL borrowed texture set target renders into a replacement texture" {
-    if (!build_options.supports_opengl) return error.SkipZigTest;
-
-    var borrowed = try OpenGLBorrowedTexture.create(128, 128);
-    defer borrowed.deinit();
-
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var session = try maplibre.attachOpenGLBorrowedTexture(&map, borrowed.descriptor());
-    defer session.close() catch {};
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-
-    // A caller-owned texture is sized by its owner, so resize is rejected and
-    // the host hands over a texture at the new size instead.
-    try testing.expectError(error.Unsupported, session.resize(.{ .width = 64, .height = 96, .scale_factor = 1.0 }));
-
-    const replacement = try borrowed.allocateReplacement(64, 96);
-    try session.setOpenGLBorrowedTextureTarget(borrowed.descriptorFor(replacement, 64, 96));
-    borrowed.adopt(replacement, 64, 96);
-
-    // A surface descriptor names a target this session does not have; the
-    // rejection leaves it on the texture just handed over.
-    try testing.expectError(error.Unsupported, session.setOpenGLSurfaceTarget(.{
-        .extent = .{ .width = 64, .height = 96 },
-        .context = borrowed.context.descriptor(),
-        .surface = fakeNativePointer(),
-    }));
-
-    // Replacing the target enqueues the new size for the map's owner thread,
-    // so the map publishes a matching update only once pumped.
-    const size_pending_update = try session.renderUpdate();
-    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), size_pending_update.result);
-    try testing.expect(!size_pending_update.needs_repaint);
-    try runtime.pump(0, null);
-    const resized = try map.getSize();
-    try testing.expectEqual(@as(u32, 64), resized.width);
-    try testing.expectEqual(@as(u32, 96), resized.height);
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-
-    const pixels = try testing.allocator.alloc(u8, 64 * 96 * 4);
-    defer testing.allocator.free(pixels);
-    @memset(pixels, 0);
-    try borrowed.readRGBA8(pixels);
-    try expectPixelApprox(pixels[0..4].*, .{ 0xd8, 0xf1, 0xff, 0xff }, 8);
-}
-
-test "OpenGL surface renders through public bindings" {
-    if (!build_options.supports_opengl) return error.SkipZigTest;
-
-    var context = try TestOwnedTextureContext.initWithSize(128, 128);
-    defer context.deinit();
-
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var session = try maplibre.attachOpenGLSurface(&map, .{
-        .extent = .{ .width = 128, .height = 128, .scale_factor = 1.0 },
-        .context = context.descriptor(),
-        .surface = context.surface(),
-    });
-    defer session.close() catch {};
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-
-    const pixels = try testing.allocator.alloc(u8, 128 * 128 * 4);
-    defer testing.allocator.free(pixels);
-    @memset(pixels, 0);
-    try context.readSurfaceRGBA8(128, 128, pixels);
-    // The style's background color reaches the surface through the clear the
-    // session's exclusive context allows, so a corner away from the circle
-    // layer carries it exactly.
-    try testing.expectEqualSlices(u8, &.{ 0xd8, 0xf1, 0xff, 0xff }, pixels[0..4]);
-
-    try testing.expectError(error.Unsupported, session.acquireOpenGLOwnedTextureFrame());
-    var readback_buffer: [128 * 128 * 4]u8 = undefined;
-    try testing.expectError(error.Unsupported, session.readPremultipliedRgba8Into(&readback_buffer));
-}
-
-test "dedicated OpenGL surface renders through a context it owns" {
-    if (!supports_egl) return error.SkipZigTest;
-
-    var context = try DedicatedEglSurface.initWithSize(64, 64);
-    defer context.deinit();
-
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var session = try maplibre.attachOpenGLSurface(&map, .{
-        .extent = .{ .width = 64, .height = 64, .scale_factor = 1.0 },
-        .context = context.descriptor(),
-        .surface = context.surface(),
-    });
-    errdefer session.close() catch {};
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    // The session owns this thread, which is also the map's, so the map reaches
-    // the style and the extent only while this loop pumps the runtime.
-    var result: maplibre.RenderResult = .no_update;
-    for (0..1000) |_| {
-        try runtime.pump(0, null);
-        result = (try session.renderUpdate()).result;
-        if (result == .rendered) break;
-        try std.Thread.yield();
+    // Detach resolves the demand either way: the frame it rendered before the
+    // detach, or the target that went away.
+    var batch = try session.drainFrameResults(testing.allocator);
+    defer batch.deinit();
+    var saw_token = false;
+    for (0..batch.len()) |index| {
+        const result = try batch.at(index);
+        if (result.token != token) continue;
+        saw_token = true;
+        switch (result.disposition) {
+            .rendered, .target_not_ready => {},
+            else => return error.UnexpectedFrameDisposition,
+        }
     }
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), result);
-    // A dedicated session leaves its context current, so the next render costs
-    // no EGL call.
-    try testing.expect(egl.eglGetCurrentContext() != egl.EGL_NO_CONTEXT);
-
-    // Closing the session releases the thread it had taken over.
-    try session.close();
-    try testing.expect(egl.eglGetCurrentContext() == egl.EGL_NO_CONTEXT);
+    try testing.expect(saw_token);
 }
 
-test "Metal owned texture frame handle scopes native pointers" {
-    if (!build_options.supports_metal) return error.SkipZigTest;
-    const device = MTLCreateSystemDefaultDevice() orelse return error.MetalDeviceUnavailable;
-
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var session = try maplibre.attachMetalOwnedTexture(&map, .{
-        .extent = .{ .width = 32, .height = 32, .scale_factor = 1.0 },
-        .context = .{ .device = maplibre.NativePointer.fromPtr(device) },
-    });
-    defer session.close() catch {};
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-
-    var image = try readTestImage(&session, testing.allocator, 32 * 32 * 4);
-    defer image.deinit();
-    try testing.expectEqual(@as(u32, 32), image.info.width);
-    try testing.expectEqual(@as(u32, 32), image.info.height);
-    try testing.expectEqual(@as(usize, 32 * 32 * 4), image.info.byte_length);
-
-    var frame = try session.acquireMetalOwnedTextureFrame();
-    var frame_alias = frame;
-    const info = try frame.info();
-    try testing.expectEqual(@as(u32, 32), info.width);
-    try testing.expectEqual(@as(u32, 32), info.height);
-    try testing.expectEqual(@as(u64, 1), info.generation);
-    try testing.expect(info.texture.toPtr() != info.device.toPtr());
-    try expectMetalFrameReleaseWrongThread(&frame);
-
-    try testing.expectError(error.ActiveBorrow, session.resize(.{ .width = 16, .height = 16, .scale_factor = 1.0 }));
-    try testing.expectError(error.ActiveBorrow, setPlaceholderBorrowedTextureTarget(&session));
-    try testing.expectError(error.ActiveBorrow, session.renderUpdate());
-    try testing.expectError(error.ActiveBorrow, session.detach());
-    try testing.expectError(error.ActiveBorrow, session.acquireMetalOwnedTextureFrame());
-    try testing.expectError(error.ActiveBorrow, session.close());
-
-    try frame.release();
-    try frame_alias.release();
-    try testing.expectError(error.ClosedHandle, frame_alias.info());
-
-    // Resizing enqueues the new logical size for the map's owner thread, so
-    // the map publishes a matching update only once pumped.
-    try session.resize(.{ .width = 16, .height = 8, .scale_factor = 2.0 });
-    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), (try session.renderUpdate()).result);
-    try runtime.pump(0, null);
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-    var resized_frame = try session.acquireMetalOwnedTextureFrame();
-    const resized_info = try resized_frame.info();
-    try testing.expectEqual(@as(u32, 32), resized_info.width);
-    try testing.expectEqual(@as(u32, 16), resized_info.height);
-    try testing.expectEqual(@as(f64, 2.0), resized_info.scale_factor);
-    try testing.expectEqual(@as(u64, 2), resized_info.generation);
-    try resized_frame.release();
-
-    try expectRenderSessionCallWrongThread(&session, .acquire_metal_frame);
-    try session.close();
-}
-
-test "Metal owned texture frame release follows moved session wrapper" {
-    if (!build_options.supports_metal) return error.SkipZigTest;
-    const device = MTLCreateSystemDefaultDevice() orelse return error.MetalDeviceUnavailable;
-
-    const pool = try metal_support.AutoreleasePool.init();
-    defer pool.deinit();
-
-    var handles = try createMovedMetalSessionWithFrame(device);
-    try testing.expectError(error.ActiveBorrow, handles.session.close());
-    try handles.frame.release();
-    try handles.session.close();
-    try handles.map.close();
-    try handles.runtime.close();
-}
-
-test "render session rejects wrong-thread calls through public bindings" {
+test "a set-target call for another target kind reports unsupported (BND-176)" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 16, .height = 16 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+    var owned = try attachTestOwnedTexture(&map, .{ .width = 16, .height = 16 });
+    defer owned.close() catch @panic("render session close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var owned = try attachTestOwnedTexture(&map, .{});
-    defer owned.close() catch {};
-    const session = &owned.session;
-
-    inline for (.{
-        RenderSessionThreadCall.render_update,
-        .resize,
-        .set_target,
-        .detach,
-        .reduce_memory_use,
-        .clear_data,
-        .dump_debug_logs,
-        .close,
-    }) |call| {
-        try expectRenderSessionCallWrongThread(session, call);
+    // The session validates its retarget kind before it reads host handles, so
+    // a placeholder surface descriptor is enough.
+    const extent = maplibre.RenderTargetExtent{ .width = 16, .height = 16 };
+    if (build_options.supports_vulkan) {
+        try testing.expectError(error.Unsupported, owned.session.setVulkanSurfaceTarget(.{
+            .extent = extent,
+            .surface = maplibre.VulkanHandle.fromBits(1),
+            .context = fakeVulkanContext(),
+        }));
+    } else if (build_options.supports_opengl) {
+        try testing.expectError(error.Unsupported, owned.session.setOpenGLSurfaceTarget(.{
+            .extent = extent,
+            .surface = fakeNativePointer(),
+            .context = fakeOpenGLContext(),
+        }));
+    } else if (build_options.supports_metal) {
+        try testing.expectError(error.Unsupported, owned.session.setMetalSurfaceTarget(.{
+            .extent = extent,
+            .layer = fakeNativePointer(),
+        }));
     }
 }
 
-test "Metal borrowed texture renders through public bindings" {
-    if (!build_options.supports_metal) return error.SkipZigTest;
-    const device = MTLCreateSystemDefaultDevice() orelse return error.MetalDeviceUnavailable;
-
-    const pool = try metal_support.AutoreleasePool.init();
-    defer pool.deinit();
-
-    const borrowed = try metal_support.createTexture(device, 128, 128);
-    defer metal_support.releaseObject(borrowed);
-    try metal_support.clearTextureRGBA8(borrowed, .{ 255, 0, 255, 255 });
-    try expectPixelApprox(try metal_support.readTexturePixelRGBA8(borrowed, 0, 0), .{ 255, 0, 255, 255 }, 0);
-
+test "an empty frame-result drain reports an empty batch (BND-181)" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 16, .height = 16 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+    var owned = try attachTestOwnedTexture(&map, .{ .width = 16, .height = 16 });
+    defer owned.close() catch @panic("render session close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var session = try maplibre.attachMetalBorrowedTexture(&map, .{
-        .extent = .{ .width = 128, .height = 128 },
-        .physical_width = 128,
-        .physical_height = 128,
-        .texture = maplibre.NativePointer.fromPtr(borrowed),
-    });
-    defer session.close() catch {};
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-    try expectPixelApprox(try metal_support.readTexturePixelRGBA8(borrowed, 0, 0), .{ 0xd8, 0xf1, 0xff, 0xff }, 8);
-
-    try testing.expectError(error.Unsupported, session.acquireMetalOwnedTextureFrame());
-    try testing.expectError(error.Unsupported, session.resize(.{ .width = 64, .height = 64, .scale_factor = 1.0 }));
-    var readback_buffer: [128 * 128 * 4]u8 = undefined;
-    try testing.expectError(error.Unsupported, session.readPremultipliedRgba8Into(&readback_buffer));
+    var batch = try owned.session.drainFrameResults(testing.allocator);
+    defer batch.deinit();
+    try testing.expectEqual(@as(usize, 0), batch.len());
+    try testing.expectError(error.InvalidArgument, batch.at(0));
 }
 
-test "Metal borrowed texture set target renders into a replacement texture" {
-    if (!build_options.supports_metal) return error.SkipZigTest;
-    const device = MTLCreateSystemDefaultDevice() orelse return error.MetalDeviceUnavailable;
-
-    const pool = try metal_support.AutoreleasePool.init();
-    defer pool.deinit();
-
-    // Allocated up front so the host outlives the session that borrows it.
-    const borrowed = try metal_support.createTexture(device, 128, 128);
-    defer metal_support.releaseObject(borrowed);
-    const replacement = try metal_support.createTexture(device, 64, 96);
-    defer metal_support.releaseObject(replacement);
-    try metal_support.clearTextureRGBA8(replacement, .{ 0, 0, 0, 0 });
-
+test "memory and data maintenance commands leave the session rendering" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 32, .height = 32 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+    var owned = try attachTestOwnedTexture(&map, .{ .width = 32, .height = 32 });
+    defer owned.close() catch @panic("render session close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    try support.expectCommitted(try map.setStyleJson(support.style_json));
+    try support.waitForBarrier(&runtime);
+    _ = try support.expectRenderedFrame(owned.session, true);
 
-    var session = try maplibre.attachMetalBorrowedTexture(&map, .{
-        .extent = .{ .width = 128, .height = 128 },
-        .physical_width = 128,
-        .physical_height = 128,
-        .texture = maplibre.NativePointer.fromPtr(borrowed),
-    });
-    defer session.close() catch {};
+    try finishOperation(owned.session, try owned.session.reduceMemoryUse());
+    try finishOperation(owned.session, try owned.session.clearData());
+    try finishOperation(owned.session, try owned.session.dumpDebugLogs());
+    try finishOperation(owned.session, try owned.session.barrier());
 
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-
-    // A caller-owned texture is sized by its owner, so resize is rejected and
-    // the host hands over a texture at the new size instead.
-    try testing.expectError(error.Unsupported, session.resize(.{ .width = 64, .height = 96, .scale_factor = 1.0 }));
-
-    try session.setMetalBorrowedTextureTarget(.{
-        .extent = .{ .width = 64, .height = 96 },
-        .physical_width = 64,
-        .physical_height = 96,
-        .texture = maplibre.NativePointer.fromPtr(replacement),
-    });
-
-    // A surface descriptor names a target this session does not have; the
-    // rejection leaves it on the texture just handed over.
-    try testing.expectError(error.Unsupported, session.setMetalSurfaceTarget(.{
-        .extent = .{ .width = 64, .height = 96 },
-        .layer = fakeNativePointer(),
-    }));
-
-    // Replacing the target enqueues the new size for the map's owner thread,
-    // so the map publishes a matching update only once pumped.
-    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), (try session.renderUpdate()).result);
-    try runtime.pump(0, null);
-    const resized = try map.getSize();
-    try testing.expectEqual(@as(u32, 64), resized.width);
-    try testing.expectEqual(@as(u32, 96), resized.height);
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-    try expectPixelApprox(try metal_support.readTexturePixelRGBA8(replacement, 0, 0), .{ 0xd8, 0xf1, 0xff, 0xff }, 8);
+    try support.expectCommitted(try map.requestRepaint());
+    try support.waitForBarrier(&runtime);
+    _ = try support.expectRenderedFrame(owned.session, true);
 }
 
-test "Vulkan owned texture frame handle scopes native handles" {
-    if (!build_options.supports_vulkan) return error.SkipZigTest;
+test "abandoning a session releases the map without a graphics call" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 16, .height = 16 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+    var context = try TestOwnedTextureContext.init();
+    defer context.deinit();
+    var session = try attachOwnedTexture(&map, &context, .{ .width = 16, .height = 16 });
 
-    var context = try VulkanAttachContext.init();
+    const abandoned = try session.abandon();
+    switch (abandoned.disposition) {
+        .clean => try testing.expectEqual(@as(u32, 0), abandoned.quarantined_resource_count),
+        .quarantined => try testing.expect(abandoned.quarantined_resource_count != 0),
+        .unknown => return error.UnexpectedAbandonDisposition,
+    }
+    try testing.expectEqual(.abandoned, std.meta.activeTag((try session.snapshot()).state));
+    // An abandoned session is no longer attached, so a frame acquisition has
+    // no target to take from.
+    try testing.expectError(error.InvalidState, session.acquireFrame());
+    try session.destroy();
+
+    // The abandoned session no longer holds the map, so the map closes.
+    try support.closeMap(&map);
+}
+
+test "rendered and source queries clip and filter their inputs" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 64, .height = 64 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+    var owned = try attachTestOwnedTexture(&map, .{ .width = 64, .height = 64 });
+    defer owned.close() catch @panic("render session close failed");
+
+    try support.expectCommitted(try map.setStyleJson(support.style_json));
+    try support.expectCommitted(try map.updateCamera(.{ .camera = .{
+        .center = .{ .latitude = 37.7749, .longitude = -122.4194 },
+        .zoom = 4.0,
+    } }));
+    try support.waitForBarrier(&runtime);
+    _ = try support.expectRenderedFrame(owned.session, true);
+
+    const layer_options = maplibre.RenderedFeatureQueryOptions{ .layer_ids = &.{"point-circle"} };
+    // A box wider than the viewport, an inverted box, and the viewport box all
+    // normalize to the same clipped query.
+    const boxes = [_]maplibre.ScreenBox{
+        .{ .min = .{ .x = 0, .y = 0 }, .max = .{ .x = 64, .y = 64 } },
+        .{ .min = .{ .x = -400, .y = -400 }, .max = .{ .x = 400, .y = 400 } },
+        .{ .min = .{ .x = 64, .y = 64 }, .max = .{ .x = 0, .y = 0 } },
+    };
+    var hits: usize = 0;
+    for (0..1000) |_| {
+        hits = 0;
+        for (boxes) |box| {
+            var result = try resolveFuture(
+                maplibre.QueriedFeatureList,
+                owned.session,
+                try owned.session.queryRenderedFeatures(testing.allocator, .{ .box = box }, layer_options),
+            );
+            defer result.deinit();
+            if (result.items.len != 0) hits += 1;
+        }
+        if (hits == boxes.len) break;
+        try support.expectCommitted(try map.requestRepaint());
+        try support.waitForBarrier(&runtime);
+        _ = try support.renderFrame(owned.session, false, true);
+    }
+    try testing.expectEqual(boxes.len, hits);
+
+    // A box entirely outside the viewport clips to nothing.
+    var offscreen = try resolveFuture(
+        maplibre.QueriedFeatureList,
+        owned.session,
+        try owned.session.queryRenderedFeatures(testing.allocator, .{ .box = .{
+            .min = .{ .x = 400, .y = 400 },
+            .max = .{ .x = 500, .y = 500 },
+        } }, layer_options),
+    );
+    defer offscreen.deinit();
+    try testing.expectEqual(@as(usize, 0), offscreen.items.len);
+
+    // A layer ID that names nothing filters every hit out.
+    var filtered = try resolveFuture(
+        maplibre.QueriedFeatureList,
+        owned.session,
+        try owned.session.queryRenderedFeatures(testing.allocator, .{ .box = boxes[0] }, .{
+            .layer_ids = &.{"no-such-layer"},
+        }),
+    );
+    defer filtered.deinit();
+    try testing.expectEqual(@as(usize, 0), filtered.items.len);
+
+    // A source query takes its own options; a filter that matches nothing
+    // leaves the result empty.
+    var source_hits = try resolveFuture(
+        maplibre.QueriedFeatureList,
+        owned.session,
+        try owned.session.querySourceFeatures(testing.allocator, "point", .{
+            .filter = "[\"==\", [\"get\", \"kind\"], \"capital\"]",
+        }),
+    );
+    defer source_hits.deinit();
+    try testing.expect(source_hits.items.len != 0);
+
+    var source_misses = try resolveFuture(
+        maplibre.QueriedFeatureList,
+        owned.session,
+        try owned.session.querySourceFeatures(testing.allocator, "point", .{
+            .filter = "[\"==\", [\"get\", \"kind\"], \"village\"]",
+        }),
+    );
+    defer source_misses.deinit();
+    try testing.expectEqual(@as(usize, 0), source_misses.items.len);
+}
+
+const supports_opengl_surface = supports_wgl or supports_egl;
+
+const OpenGLSurfaceContext = if (supports_wgl) WglAttachContext else if (supports_egl) EglAttachContext else struct {};
+
+test "OpenGL surface renders through the caller's driver" {
+    if (!supports_opengl_surface) return error.SkipZigTest;
+    var context = try OpenGLSurfaceContext.initWithSize(32, 16);
     defer context.deinit();
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 32, .height = 16 });
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var session = try maplibre.attachVulkanOwnedTexture(&map, .{
-        .extent = .{ .width = 32, .height = 32, .scale_factor = 1.0 },
+    var session = try support.finishAttachment(try maplibre.attachOpenGLSurface(&map, .{
+        .extent = .{ .width = 32, .height = 16 },
         .context = context.descriptor(),
-    });
-    defer session.close() catch {};
+        .surface = context.surface(),
+    }, .{ .driver = .caller_graphics_thread }), true);
+    defer support.closeSession(&session, true) catch @panic("render session close failed");
 
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
+    const capabilities = try session.capabilities();
+    try testing.expectEqual(.caller_graphics_thread, capabilities.driver);
+    try testing.expect(capabilities.presentation);
 
-    var image = try readTestImage(&session, testing.allocator, 32 * 32 * 4);
-    defer image.deinit();
-    try testing.expectEqual(@as(u32, 32), image.info.width);
-    try testing.expectEqual(@as(u32, 32), image.info.height);
-    try testing.expectEqual(@as(usize, 32 * 32 * 4), image.info.byte_length);
+    try support.expectCommitted(try map.setStyleJson(support.style_json));
+    try support.waitForBarrier(&runtime);
+    _ = try support.expectRenderedFrame(session, true);
 
-    var frame = try session.acquireVulkanOwnedTextureFrame();
-    var frame_alias = frame;
-    const info = try frame.info();
-    try testing.expectEqual(@as(u32, 32), info.width);
-    try testing.expectEqual(@as(u32, 32), info.height);
-    try testing.expectEqual(@as(u64, 1), info.generation);
-    try testing.expect(info.image.bits() != @intFromPtr(info.device.toPtr()));
-    try expectVulkanFrameReleaseWrongThread(&frame);
-
-    try testing.expectError(error.ActiveBorrow, session.resize(.{ .width = 16, .height = 16, .scale_factor = 1.0 }));
-    try testing.expectError(error.ActiveBorrow, setPlaceholderBorrowedTextureTarget(&session));
-    try testing.expectError(error.ActiveBorrow, session.renderUpdate());
-    try testing.expectError(error.ActiveBorrow, session.detach());
-    try testing.expectError(error.ActiveBorrow, session.acquireVulkanOwnedTextureFrame());
-    try testing.expectError(error.ActiveBorrow, session.close());
-
-    try frame.release();
-    try frame_alias.release();
-    try testing.expectError(error.ClosedHandle, frame_alias.info());
-
-    // Resizing enqueues the new logical size for the map's owner thread, so
-    // the map publishes a matching update only once pumped.
-    try session.resize(.{ .width = 16, .height = 8, .scale_factor = 2.0 });
-    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), (try session.renderUpdate()).result);
-    try runtime.pump(0, null);
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-    var resized_frame = try session.acquireVulkanOwnedTextureFrame();
-    const resized_info = try resized_frame.info();
-    try testing.expectEqual(@as(u32, 32), resized_info.width);
-    try testing.expectEqual(@as(u32, 16), resized_info.height);
-    try testing.expectEqual(@as(f64, 2.0), resized_info.scale_factor);
-    try testing.expectEqual(@as(u64, 2), resized_info.generation);
-    try resized_frame.release();
-
-    try expectRenderSessionCallWrongThread(&session, .acquire_vulkan_frame);
-    try session.close();
+    var pixels: [32 * 16 * 4]u8 = undefined;
+    try context.readSurfaceRGBA8(32, 16, &pixels);
+    try testing.expect(hasNonZeroByte(&pixels));
 }
 
-test "Vulkan borrowed texture renders through public bindings" {
+test "Vulkan surface attach rejects a descriptor with no surface" {
     if (!build_options.supports_vulkan) return error.SkipZigTest;
-
-    var borrowed = try VulkanBorrowedImage.create(128, 128);
-    defer borrowed.deinit();
-
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 32, .height = 16 });
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var session = try maplibre.attachVulkanBorrowedTexture(&map, borrowed.descriptor());
-    defer session.close() catch {};
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-
-    try testing.expectError(error.Unsupported, session.acquireVulkanOwnedTextureFrame());
-    try testing.expectError(error.Unsupported, session.resize(.{ .width = 64, .height = 64, .scale_factor = 1.0 }));
-    var readback_buffer: [128 * 128 * 4]u8 = undefined;
-    try testing.expectError(error.Unsupported, session.readPremultipliedRgba8Into(&readback_buffer));
-}
-
-test "Vulkan borrowed texture set target renders into a replacement image" {
-    if (!build_options.supports_vulkan) return error.SkipZigTest;
-
-    var borrowed = try VulkanBorrowedImage.create(128, 128);
-    defer borrowed.deinit();
-
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var session = try maplibre.attachVulkanBorrowedTexture(&map, borrowed.descriptor());
-    defer session.close() catch {};
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
-
-    // A caller-owned image is sized by its owner, so resize is rejected and
-    // the host hands over an image at the new size instead.
-    try testing.expectError(error.Unsupported, session.resize(.{ .width = 64, .height = 96, .scale_factor = 1.0 }));
-
-    const replacement = try borrowed.allocateReplacement(64, 96);
-    try session.setVulkanBorrowedTextureTarget(borrowed.descriptorFor(replacement, 64, 96));
-    borrowed.adopt(replacement, 64, 96);
-
-    // A surface descriptor names a target this session does not have; the
-    // rejection leaves it on the image just handed over.
-    try testing.expectError(error.Unsupported, session.setVulkanSurfaceTarget(.{
-        .extent = .{ .width = 64, .height = 96 },
-        .context = borrowed.context.descriptor(),
-        .surface = fakeVulkanHandle(),
-    }));
-
-    // Replacing the target enqueues the new size for the map's owner thread,
-    // so the map publishes a matching update only once pumped.
-    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), (try session.renderUpdate()).result);
-    try runtime.pump(0, null);
-    const resized = try map.getSize();
-    try testing.expectEqual(@as(u32, 64), resized.width);
-    try testing.expectEqual(@as(u32, 96), resized.height);
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
+    // The descriptor is validated before any Vulkan call, so placeholder
+    // handles reach the rejection rather than the driver.
+    try testing.expectError(error.InvalidArgument, maplibre.attachVulkanSurface(&map, .{
+        .extent = .{ .width = 32, .height = 16 },
+        .context = fakeVulkanContext(),
+        .surface = maplibre.VulkanHandle.null_handle,
+    }, .{ .driver = .core_worker }));
+    try testing.expectError(error.InvalidArgument, maplibre.attachVulkanSurface(&map, .{
+        .extent = .{ .width = 0, .height = 16 },
+        .context = fakeVulkanContext(),
+        .surface = maplibre.VulkanHandle.fromBits(1),
+    }, .{ .driver = .core_worker }));
 }

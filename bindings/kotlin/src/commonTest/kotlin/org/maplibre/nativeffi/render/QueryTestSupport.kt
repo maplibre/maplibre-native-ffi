@@ -1,10 +1,7 @@
 package org.maplibre.nativeffi.render
 
-import kotlin.test.assertEquals
-import org.maplibre.nativeffi.map.MapHandle
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.query.QueriedFeature
-import org.maplibre.nativeffi.runtime.RuntimeEventType
-import org.maplibre.nativeffi.runtime.RuntimeHandle
 
 internal const val QUERY_STYLE_JSON =
   """
@@ -36,46 +33,17 @@ internal const val QUERY_STYLE_JSON =
 
 internal fun jsonBytes(value: String): ByteArray = value.trimIndent().encodeToByteArray()
 
-internal fun waitForMapEvent(
-  runtime: RuntimeHandle,
-  map: MapHandle,
-  eventType: RuntimeEventType,
-): Boolean {
-  repeat(10_000) {
-    runtime.pump(1)
-    if (runtime.drainEvents().events.any { it.type == eventType && it.mapSource == map }) {
-      return true
-    }
-  }
-  return false
-}
-
-internal fun waitForQueriedFeature(
-  runtime: RuntimeHandle,
-  map: MapHandle,
+internal suspend fun waitForQueriedFeature(
   session: RenderSessionHandle,
-  query: () -> List<QueriedFeature>,
+  attempts: Int = 500,
+  query: () -> Deferred<List<QueriedFeature>>,
 ): QueriedFeature {
-  repeat(100) {
-    val feature = query().firstOrNull()
+  repeat(attempts) {
+    session.renderOneFrame()
+    val feature = session.completeOnDriver(query()).firstOrNull()
     if (feature != null) return feature
-    renderIfAvailable(runtime, map, session)
   }
   error("query returned no features")
-}
-
-internal fun renderIfAvailable(
-  runtime: RuntimeHandle,
-  map: MapHandle,
-  session: RenderSessionHandle,
-) {
-  runtime.pump(1)
-  for (event in runtime.drainEvents().events) {
-    if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE && event.mapSource == map) {
-      assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
-      return
-    }
-  }
 }
 
 internal fun featureStringProperty(feature: ByteArray, key: String): String? =
@@ -87,7 +55,7 @@ internal fun firstFeature(collection: ByteArray): ByteArray? =
 internal fun numberMember(value: ByteArray, key: String): Double? =
   rawMember(value, key)?.decodeToString()?.toDoubleOrNull()
 
-internal fun stringMember(value: ByteArray, key: String): String? {
+private fun stringMember(value: ByteArray, key: String): String? {
   val encoded = rawMember(value, key)?.decodeToString() ?: return null
   if (encoded.length < 2 || encoded.first() != '"' || encoded.last() != '"') return null
   return encoded.substring(1, encoded.lastIndex)

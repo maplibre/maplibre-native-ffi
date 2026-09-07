@@ -14,8 +14,6 @@ const char* app_error_name(app_error error) {
       return "texture attach failed";
     case APP_ERROR_STYLE_LOAD_FAILED:
       return "style load failed";
-    case APP_ERROR_CAMERA_JUMP_FAILED:
-      return "camera jump failed";
     case APP_ERROR_CAMERA_COMMAND_FAILED:
       return "camera command failed";
     case APP_ERROR_TEXTURE_RESIZE_FAILED:
@@ -34,16 +32,10 @@ const char* app_error_name(app_error error) {
       return "backend draw failed";
     case APP_ERROR_RENDER_BACKEND_MISMATCH:
       return "render backend mismatch";
-    case APP_ERROR_WAKE_SOURCE_FAILED:
-      return "wake source acquire failed";
-    case APP_ERROR_RUNTIME_PUMP_FAILED:
-      return "runtime pump failed";
     case APP_ERROR_EVENT_MASK_FAILED:
       return "event mask select failed";
     case APP_ERROR_EVENT_DRAIN_FAILED:
       return "event drain failed";
-    case APP_ERROR_THREAD_SPAWN_FAILED:
-      return "thread spawn failed";
   }
   return "unknown error";
 }

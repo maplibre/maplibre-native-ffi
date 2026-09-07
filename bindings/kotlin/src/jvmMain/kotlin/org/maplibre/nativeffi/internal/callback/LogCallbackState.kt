@@ -6,10 +6,9 @@ import java.lang.foreign.MemorySegment
 import java.lang.foreign.ValueLayout
 import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
-import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.AtomicReference
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import org.maplibre.nativeffi.internal.c.mln_log_callback
+import org.maplibre.nativeffi.internal.c.mln_log_callback_release
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.log.LogCallback
@@ -18,16 +17,16 @@ import org.maplibre.nativeffi.log.LogRecord
 import org.maplibre.nativeffi.log.LogSeverity
 
 /** Owns process-global JVM FFM logging callback state. */
-@OptIn(ExperimentalAtomicApi::class)
-internal class LogCallbackState private constructor(private val callback: LogCallback) :
-  AutoCloseable {
-  private val arena = Arena.ofShared()
-  private val gate = CallbackGate("log callbacks") { arena.close() }
-  private val stub: MemorySegment
+internal class LogCallbackState(private val callback: LogCallback) : AutoCloseable {
+  private val arena = Arena.ofAuto()
+  private val gate = CallbackGate("log callbacks") {}
+  private val callbackStub: MemorySegment
+  private val releaseStub: MemorySegment
 
   init {
-    val method =
-      MethodHandles.lookup()
+    val lookup = MethodHandles.lookup()
+    val callbackMethod =
+      lookup
         .findVirtual(
           LogCallbackState::class.java,
           "invoke",
@@ -41,7 +40,18 @@ internal class LogCallbackState private constructor(private val callback: LogCal
           ),
         )
         .bindTo(this)
-    stub = Linker.nativeLinker().upcallStub(method, callbackDescriptor, arena)
+    callbackStub =
+      Linker.nativeLinker().upcallStub(callbackMethod, mln_log_callback.descriptor(), arena)
+    val releaseMethod =
+      lookup
+        .findVirtual(
+          LogCallbackState::class.java,
+          "release",
+          MethodType.methodType(Void.TYPE, MemorySegment::class.java),
+        )
+        .bindTo(this)
+    releaseStub =
+      Linker.nativeLinker().upcallStub(releaseMethod, mln_log_callback_release.descriptor(), arena)
   }
 
   @Suppress("UNUSED_PARAMETER")
@@ -69,16 +79,18 @@ internal class LogCallbackState private constructor(private val callback: LogCal
     }
   }
 
-  fun checkCanClose() = gate.checkCanClose()
-
-  fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
+  @Suppress("UNUSED_PARAMETER")
+  fun release(userData: MemorySegment) {
+    HandleLeakCleaner.releaseNativeCallbackRoot(this)
+    close()
+  }
 
   override fun close() = gate.close()
 
+  fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
+
   private fun copyCString(address: MemorySegment): String {
-    if (address == MemorySegment.NULL) {
-      return ""
-    }
+    if (address == MemorySegment.NULL) return ""
     var length = 0L
     while (address.reinterpret(length + 1).get(ValueLayout.JAVA_BYTE, length) != 0.toByte()) {
       length++
@@ -87,76 +99,22 @@ internal class LogCallbackState private constructor(private val callback: LogCal
   }
 
   internal companion object {
-    private val updateLock = AtomicInt(0)
-    private val current = AtomicReference<LogCallbackState?>(null)
-
     fun set(callback: LogCallback) {
       NativeAccess.ensureLoaded()
-      replace(callback) { replacement ->
-        Status.check(NativeAccess.setLogCallback(replacement.stub))
-      }
-    }
-
-    internal fun setForTesting(callback: LogCallback, register: (LogCallbackState) -> Unit = {}) {
-      replace(callback, register)
-    }
-
-    private fun replace(callback: LogCallback, register: (LogCallbackState) -> Unit) {
       val replacement = LogCallbackState(callback)
-      var previous: LogCallbackState? = null
+      HandleLeakCleaner.retainNativeCallbackRoot(replacement)
       try {
-        withUpdateLock {
-          current.load()?.checkCanClose()
-          register(replacement)
-          previous = current.exchange(replacement)
-        }
+        Status.check(NativeAccess.setLogCallback(replacement.callbackStub, replacement.releaseStub))
       } catch (error: Throwable) {
-        closeAndSuppress(error, replacement)
+        HandleLeakCleaner.releaseNativeCallbackRoot(replacement)
+        replacement.close()
         throw error
       }
-      closeQuietly(previous)
     }
 
     fun clear() {
       NativeAccess.ensureLoaded()
-      var previous: LogCallbackState? = null
-      withUpdateLock {
-        current.load()?.checkCanClose()
-        Status.check(NativeAccess.clearLogCallback())
-        previous = current.exchange(null)
-      }
-      closeQuietly(previous)
+      Status.check(NativeAccess.clearLogCallback())
     }
-
-    fun currentForTesting(): LogCallbackState? = current.load()
-
-    internal fun clearForTesting() {
-      closeQuietly(current.exchange(null))
-    }
-
-    private fun closeQuietly(state: LogCallbackState?) {
-      try {
-        state?.close()
-      } catch (_: RuntimeException) {}
-    }
-
-    private fun closeAndSuppress(error: Throwable, state: LogCallbackState?) {
-      try {
-        state?.close()
-      } catch (cleanup: Throwable) {
-        error.addSuppressed(cleanup)
-      }
-    }
-
-    private inline fun <R> withUpdateLock(block: () -> R): R {
-      while (!updateLock.compareAndSet(0, 1)) {}
-      try {
-        return block()
-      } finally {
-        updateLock.store(0)
-      }
-    }
-
-    private val callbackDescriptor = mln_log_callback.descriptor()
   }
 }

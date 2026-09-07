@@ -299,49 +299,6 @@ pub fn metadata_ptr(metadata: &[u8]) -> *const u8 {
     }
 }
 
-/// Copies an owned native offline-region snapshot into owned Rust data.
-///
-/// # Safety
-///
-/// `ptr` must point to a live `mln_offline_region_snapshot` handle owned by
-/// the caller and returned by the matching C API. This function takes ownership
-/// of that handle and releases it before returning, including on copy errors.
-pub unsafe fn copy_offline_region_snapshot(
-    handle: sys::mln_offline_region_snapshot,
-) -> Result<OfflineRegionInfo> {
-    // SAFETY: handle is an owned snapshot returned by the C API and released by the guard.
-    let snapshot = unsafe { crate::handle::offline_region_snapshot(handle) }?;
-    let mut raw = empty_offline_region_info();
-    // SAFETY: snapshot is live and raw points to writable storage with size initialized.
-    crate::check(unsafe { sys::mln_offline_region_snapshot_get(snapshot.handle(), &mut raw) })?;
-    copy_offline_region_info(&raw)
-}
-
-/// Copies an owned native offline-region list into owned Rust data.
-///
-/// # Safety
-///
-/// `ptr` must point to a live `mln_offline_region_list` handle owned by the
-/// caller and returned by the matching C API. This function takes ownership of
-/// that handle and releases it before returning, including on copy errors.
-pub unsafe fn copy_offline_region_list(
-    handle: sys::mln_offline_region_list,
-) -> Result<Vec<OfflineRegionInfo>> {
-    // SAFETY: handle is an owned list returned by the C API and released by the guard.
-    let list = unsafe { crate::handle::offline_region_list(handle) }?;
-    let mut count = 0;
-    // SAFETY: list is live and count points to writable storage.
-    crate::check(unsafe { sys::mln_offline_region_list_count(list.handle(), &mut count) })?;
-    let mut regions = Vec::with_capacity(count);
-    for index in 0..count {
-        let mut raw = empty_offline_region_info();
-        // SAFETY: list is live, index is in range, and raw points to writable storage.
-        crate::check(unsafe { sys::mln_offline_region_list_get(list.handle(), index, &mut raw) })?;
-        regions.push(copy_offline_region_info(&raw)?);
-    }
-    Ok(regions)
-}
-
 #[derive(Debug)]
 pub struct NativeRuntimeOptions {
     asset_path: Option<CString>,

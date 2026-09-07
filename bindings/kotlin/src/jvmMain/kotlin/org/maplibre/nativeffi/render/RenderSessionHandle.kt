@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.render
 
-import java.lang.foreign.MemorySegment
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
@@ -12,116 +13,106 @@ import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 
-/** Owned JVM FFM render session handle. Close it on the thread that attached it. */
+/** Owned JVM FFM render-session control handle. */
 public actual class RenderSessionHandle
-internal constructor(private val map: MapHandle, private val handle: NativeRenderSession) :
+internal constructor(private val ownerMap: MapHandle, private val handle: NativeRenderSession) :
   AutoCloseable {
-  private val mapRetention = map.retainChild("RenderSessionHandle")
-  private val core = HandleStateCore("RenderSessionHandle", handle.raw, map)
+  private val core = HandleStateCore("RenderSessionHandle", handle.raw, ownerMap)
+  private val runtime = ownerMap.runtime()
+  private val acquiredFrameScopes = ConcurrentHashMap.newKeySet<FrameScope>()
 
   init {
     HandleLeakCleaner.register(this, core.leakReport)
   }
 
-  private val activeFrame = ActiveFrameState()
-
   public actual val isClosed: Boolean
     get() = core.isReleased()
 
-  public actual fun map(): MapHandle = map
+  public actual fun map(): MapHandle = ownerMap
 
-  public actual fun resize(width: Int, height: Int, scaleFactor: Double) {
+  public actual fun capabilities(): RenderSessionCapabilities {
     NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("resize")
-    Status.requireArgument(width >= 0) { "width must be non-negative" }
-    Status.requireArgument(height >= 0) { "height must be non-negative" }
-    NativeAccess.resizeRenderSession(requireLiveHandle(), width, height, scaleFactor)
+    return NativeAccess.renderSessionCapabilities(requireLiveHandle())
   }
 
-  public actual fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor) {
+  public actual fun snapshot(): RenderSessionSnapshot {
     NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("set target")
+    return NativeAccess.renderSessionSnapshot(requireLiveHandle())
+  }
+
+  public actual fun requestFrame(demand: FrameDemand) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.requestRenderFrame(requireLiveHandle(), demand)
+  }
+
+  public actual fun drainFrameResults(): List<RenderFrameResult> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.drainRenderFrameResults(requireLiveHandle())
+  }
+
+  public actual fun serviceDriverWork(maxWork: Int): Int {
+    NativeAccess.ensureLoaded()
+    Status.requireArgument(maxWork >= 0) { "maxWork must be non-negative" }
+    return NativeAccess.serviceRenderDriverWork(requireLiveHandle(), maxWork)
+  }
+
+  public actual fun acquireFrame(): AcquiredFrameHandle? {
+    NativeAccess.ensureLoaded()
+    val nativeFrame = NativeAccess.acquireRenderFrame(requireLiveHandle()) ?: return null
+    val scope = FrameScope()
+    acquiredFrameScopes.add(scope)
+    return AcquiredFrameHandle(this, nativeFrame, scope)
+  }
+
+  public actual fun resize(extent: RenderTargetExtent): Deferred<Unit> =
+    NativeAccess.resizeRenderSession(requireLiveHandle(), extent)
+
+  public actual fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor): Deferred<Unit> =
     NativeAccess.setMetalSurfaceTarget(requireLiveHandle(), descriptor)
-  }
 
-  public actual fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor) {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("set target")
+  public actual fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor): Deferred<Unit> =
     NativeAccess.setVulkanSurfaceTarget(requireLiveHandle(), descriptor)
-  }
 
-  public actual fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor) {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("set target")
+  public actual fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor): Deferred<Unit> =
     NativeAccess.setOpenGLSurfaceTarget(requireLiveHandle(), descriptor)
-  }
 
-  public actual fun setMetalBorrowedTextureTarget(descriptor: MetalBorrowedTextureDescriptor) {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("set target")
-    NativeAccess.setMetalBorrowedTextureTarget(requireLiveHandle(), descriptor)
-  }
+  public actual fun setMetalBorrowedTextureTarget(
+    descriptor: MetalBorrowedTextureDescriptor
+  ): Deferred<Unit> = NativeAccess.setMetalBorrowedTextureTarget(requireLiveHandle(), descriptor)
 
-  public actual fun setVulkanBorrowedTextureTarget(descriptor: VulkanBorrowedTextureDescriptor) {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("set target")
-    NativeAccess.setVulkanBorrowedTextureTarget(requireLiveHandle(), descriptor)
-  }
+  public actual fun setVulkanBorrowedTextureTarget(
+    descriptor: VulkanBorrowedTextureDescriptor
+  ): Deferred<Unit> = NativeAccess.setVulkanBorrowedTextureTarget(requireLiveHandle(), descriptor)
 
-  public actual fun setOpenGLBorrowedTextureTarget(descriptor: OpenGLBorrowedTextureDescriptor) {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("set target")
-    NativeAccess.setOpenGLBorrowedTextureTarget(requireLiveHandle(), descriptor)
-  }
+  public actual fun setOpenGLBorrowedTextureTarget(
+    descriptor: OpenGLBorrowedTextureDescriptor
+  ): Deferred<Unit> = NativeAccess.setOpenGLBorrowedTextureTarget(requireLiveHandle(), descriptor)
 
-  public actual fun renderUpdate(): RenderUpdate {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("render")
-    return NativeAccess.renderUpdate(requireLiveHandle())
-  }
+  public actual fun reduceMemoryUse(): Deferred<Unit> =
+    NativeAccess.renderControl(requireLiveHandle(), "mln_render_session_reduce_memory_use")
 
-  public actual fun detach() {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("detach")
-    NativeAccess.detachRenderSession(requireLiveHandle())
-    mapRetention.close()
-  }
+  public actual fun clearData(): Deferred<Unit> =
+    NativeAccess.renderControl(requireLiveHandle(), "mln_render_session_clear_data")
 
-  public actual fun reduceMemoryUse() {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("reduce memory use")
-    NativeAccess.reduceRenderSessionMemoryUse(requireLiveHandle())
-  }
+  public actual fun dumpDebugLogs(): Deferred<Unit> =
+    NativeAccess.renderControl(requireLiveHandle(), "mln_render_session_dump_debug_logs")
 
-  public actual fun clearData() {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("clear data")
-    NativeAccess.clearRenderSessionData(requireLiveHandle())
-  }
+  public actual fun barrier(): Deferred<Unit> = NativeAccess.renderBarrier(requireLiveHandle())
 
-  public actual fun dumpDebugLogs() {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("dump debug logs")
-    NativeAccess.dumpRenderSessionDebugLogs(requireLiveHandle())
-  }
+  public actual fun detach(): Deferred<Unit> =
+    NativeAccess.renderControl(requireLiveHandle(), "mln_render_session_detach")
 
   public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): List<QueriedFeature> {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("query rendered features")
-    return NativeAccess.queryRenderedFeatures(requireLiveHandle(), geometry, options)
-  }
+  ): Deferred<List<QueriedFeature>> =
+    NativeAccess.queryRenderedFeatures(requireLiveHandle(), geometry, options)
 
   public actual fun querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): List<QueriedFeature> {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("query source features")
-    return NativeAccess.querySourceFeatures(requireLiveHandle(), sourceId, options)
-  }
+  ): Deferred<List<QueriedFeature>> =
+    NativeAccess.querySourceFeatures(requireLiveHandle(), sourceId, options)
 
   public actual fun queryFeatureExtension(
     sourceId: String,
@@ -129,10 +120,8 @@ internal constructor(private val map: MapHandle, private val handle: NativeRende
     extension: String,
     extensionField: String,
     arguments: ByteArray?,
-  ): ByteArray {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("query feature extension")
-    return NativeAccess.queryFeatureExtension(
+  ): Deferred<ByteArray> =
+    NativeAccess.queryFeatureExtension(
       requireLiveHandle(),
       sourceId,
       feature,
@@ -140,113 +129,77 @@ internal constructor(private val map: MapHandle, private val handle: NativeRende
       extensionField,
       arguments,
     )
-  }
 
-  public actual fun textureImageInfo(): TextureImageInfo {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("read texture data")
-    return NativeAccess.textureImageInfo(requireLiveHandle())
-  }
+  public actual fun readPremultipliedRgba8(): Deferred<TextureReadback> =
+    NativeAccess.textureReadback(requireLiveHandle())
 
-  public actual fun readPremultipliedRgba8(buffer: NativeBuffer): TextureImageInfo {
+  public actual fun abandon(): RenderAbandonResult {
     NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("read texture data")
-    val info = NativeAccess.readPremultipliedRgba8(requireLiveHandle(), buffer)
-    // Native reads an empty destination as a size probe rather than a copy, so the
-    // capacity is rechecked here.
-    buffer.ensureCapacity(info.byteLength)
-    return info
-  }
-
-  public actual fun acquireMetalOwnedTextureFrame(): MetalOwnedTextureFrameHandle {
-    NativeAccess.ensureLoaded()
-    activeFrame.beginAcquire()
-    var frame: NativeAccess.OwnedTextureFrameSegment? = null
-    try {
-      frame = NativeAccess.acquireMetalOwnedTextureFrame(requireLiveHandle())
-      val scope = FrameScope()
-      return MetalOwnedTextureFrameHandle(
-        this,
-        frame,
-        scope,
-        NativeAccess.metalOwnedTextureFrame(frame.segment, scope),
-      )
-    } catch (error: Throwable) {
-      activeFrame.endBorrow()
-      frame?.close()
-      throw error
-    }
-  }
-
-  public actual fun acquireVulkanOwnedTextureFrame(): VulkanOwnedTextureFrameHandle {
-    NativeAccess.ensureLoaded()
-    activeFrame.beginAcquire()
-    var frame: NativeAccess.OwnedTextureFrameSegment? = null
-    try {
-      frame = NativeAccess.acquireVulkanOwnedTextureFrame(requireLiveHandle())
-      val scope = FrameScope()
-      return VulkanOwnedTextureFrameHandle(
-        this,
-        frame,
-        scope,
-        NativeAccess.vulkanOwnedTextureFrame(frame.segment, scope),
-      )
-    } catch (error: Throwable) {
-      activeFrame.endBorrow()
-      frame?.close()
-      throw error
-    }
-  }
-
-  public actual fun acquireOpenGLOwnedTextureFrame(): OpenGLOwnedTextureFrameHandle {
-    NativeAccess.ensureLoaded()
-    activeFrame.beginAcquire()
-    var frame: NativeAccess.OwnedTextureFrameSegment? = null
-    try {
-      frame = NativeAccess.acquireOpenGLOwnedTextureFrame(requireLiveHandle())
-      val scope = FrameScope()
-      return OpenGLOwnedTextureFrameHandle(
-        this,
-        frame,
-        scope,
-        NativeAccess.openglOwnedTextureFrame(frame.segment, scope),
-      )
-    } catch (error: Throwable) {
-      activeFrame.endBorrow()
-      frame?.close()
-      throw error
-    }
+    val result = NativeAccess.abandonRenderSession(requireLiveHandle())
+    acquiredFrameScopes.forEach(FrameScope::close)
+    return result
   }
 
   public actual override fun close() {
     NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("destroy")
-    core.closeOnce(
-      destroy = { NativeAccess.destroyRenderSession(handle) },
-      afterSuccess = { mapRetention.close() },
-    )
+    core.closeOnce(destroy = { NativeAccess.destroyRenderSession(handle) })
   }
 
-  internal fun nativeHandleId(): Long = handle.raw
-
-  internal fun releaseMetalFrame(frame: java.lang.foreign.MemorySegment) {
-    NativeAccess.releaseMetalOwnedTextureFrame(requireLiveHandle(), frame)
-  }
-
-  internal fun releaseVulkanFrame(frame: java.lang.foreign.MemorySegment) {
-    NativeAccess.releaseVulkanOwnedTextureFrame(requireLiveHandle(), frame)
-  }
-
-  internal fun releaseOpenGLFrame(frame: java.lang.foreign.MemorySegment) {
-    NativeAccess.releaseOpenGLOwnedTextureFrame(requireLiveHandle(), frame)
-  }
-
-  internal fun finishFrameBorrow() {
-    activeFrame.endBorrow()
+  internal fun frameReleased(scope: FrameScope) {
+    acquiredFrameScopes.remove(scope)
   }
 
   private fun requireLiveHandle(): NativeRenderSession {
     core.requireLive()
     return handle
+  }
+}
+
+/** JVM FFM acquired-frame lease. */
+public actual class AcquiredFrameHandle
+internal constructor(
+  private val session: RenderSessionHandle,
+  frame: Long,
+  private val scope: FrameScope,
+) {
+  @Volatile private var nativeFrame: Long = frame
+
+  public actual val isReleased: Boolean
+    get() = nativeFrame == 0L
+
+  public actual fun result(): RenderFrameResult =
+    NativeAccess.acquiredFrameResult(requireAccessibleFrame())
+
+  public actual fun producerSync(): GpuSync =
+    NativeAccess.acquiredFrameProducerSync(requireAccessibleFrame())
+
+  public actual fun metalTexture(): MetalOwnedTextureFrame =
+    NativeAccess.acquiredMetalTexture(requireAccessibleFrame(), scope)
+
+  public actual fun vulkanTexture(): VulkanOwnedTextureFrame =
+    NativeAccess.acquiredVulkanTexture(requireAccessibleFrame(), scope)
+
+  public actual fun openGLTexture(): OpenGLOwnedTextureFrame =
+    NativeAccess.acquiredOpenGLTexture(requireAccessibleFrame(), scope)
+
+  @Synchronized
+  public actual fun release(consumerCompletion: GpuSync) {
+    val frame = requireFrame()
+    val remainingFrame = NativeAccess.releaseAcquiredFrame(frame, consumerCompletion)
+    check(remainingFrame == 0L) { "native frame release did not consume the handle" }
+    nativeFrame = 0L
+    scope.close()
+    session.frameReleased(scope)
+  }
+
+  private fun requireAccessibleFrame(): Long {
+    scope.ensureActive()
+    return requireFrame()
+  }
+
+  private fun requireFrame(): Long {
+    val frame = nativeFrame
+    if (frame == 0L) throw Status.invalidState("AcquiredFrameHandle is released")
+    return frame
   }
 }

@@ -1,15 +1,17 @@
 use std::fmt;
+use std::sync::Arc;
 
 use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_core::ptr::const_ptr_or_null;
-use maplibre_native_ffi_core::values::{empty_lat_lng, empty_screen_point, lat_lngs_to_native};
+use maplibre_native_ffi_core::values::lat_lngs_to_native;
 use maplibre_native_ffi_sys as sys;
 
 use crate::camera::CameraOptionsNativeExt;
-use crate::handle::{ConcurrentNativeHandle, closed_handle_error, out_handle};
+use crate::handle::{ConcurrentNativeHandle, closed_handle_error};
 use crate::values::NativeValue;
 use crate::{
-    CameraOptions, EdgeInsets, Error, HandleOperationError, LatLng, MapHandle, Result, ScreenPoint,
+    CameraOptions, EdgeInsets, Error, HandleOperationError, LatLng, MapHandle, NativeFuture,
+    Result, ScreenPoint,
 };
 
 #[derive(Debug)]
@@ -19,15 +21,9 @@ pub(crate) struct MapProjectionState {
 
 impl MapProjectionState {
     fn new(native: sys::mln_map_projection) -> Result<Self> {
-        // SAFETY: native came from successful mln_map_projection_create and is
-        // paired with the matching projection destroy function.
-        let handle = unsafe {
-            ConcurrentNativeHandle::from_handle(
-                native,
-                sys::mln_map_projection_destroy,
-                "mln_map_projection",
-            )
-        }?;
+        // SAFETY: native came from the typed creation take and projection
+        // control state supports calls from any thread.
+        let handle = unsafe { ConcurrentNativeHandle::from_handle(native, "mln_map_projection") }?;
         Ok(Self { handle })
     }
 
@@ -42,16 +38,33 @@ impl MapProjectionState {
     }
 
     fn close(&self) -> Result<()> {
-        self.handle.close()
+        self.handle.close_with(|projection| {
+            // SAFETY: projection is live; the synchronous close waits for
+            // calls already running on other threads before it retires the
+            // handle.
+            maplibre_core::check(unsafe { sys::mln_map_projection_close(projection) })
+        })?;
+        Ok(())
     }
 }
 
-/// Standalone projection snapshot created from a map transform.
+impl Drop for MapProjectionState {
+    fn drop(&mut self) {
+        if self.close().is_err() {
+            self.handle.leak_for_report();
+        }
+    }
+}
+
+/// Any-thread standalone projection snapshot created from a map transform.
 ///
-/// The projection does not retain the source map after creation. It remains
-/// usable from any thread, and native calls serialize access to its transform.
+/// Every call after creation is synchronous, runs on the calling thread, and
+/// is internally serialized, so a projection is usable from any thread. A
+/// projection copies the map transform once at creation and never observes
+/// map changes made after it and remains usable after that map and its runtime
+/// close.
 pub struct MapProjectionHandle {
-    inner: MapProjectionState,
+    inner: Arc<MapProjectionState>,
 }
 
 impl fmt::Debug for MapProjectionHandle {
@@ -63,135 +76,136 @@ impl fmt::Debug for MapProjectionHandle {
 }
 
 impl MapProjectionHandle {
-    pub(crate) fn new(map: &MapHandle) -> Result<Self> {
+    pub(crate) fn new(map: &MapHandle) -> Result<NativeFuture<Self>> {
         let map_ptr = map.inner.native()?;
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map_projection>::new();
-        // SAFETY: map_ptr is a live map handle. out is a valid null-initialized
-        // out-pointer owned by this call.
-        maplibre_core::check(unsafe { sys::mln_map_projection_create(map_ptr, out.as_mut_ptr()) })?;
-        let ptr = out_handle(out, "mln_map_projection")?;
-        Ok(Self {
-            inner: MapProjectionState::new(ptr)?,
-        })
+        crate::completion::submit(
+            // SAFETY: the handle is live and every borrowed argument stays valid for this
+            // synchronous submission.
+            move |completion| unsafe { sys::mln_map_projection_create(map_ptr, completion) },
+            |result| {
+                let native = crate::completion::copy_value::<sys::mln_map_projection>(result)?;
+                Ok(Self {
+                    inner: Arc::new(MapProjectionState::new(native)?),
+                })
+            },
+        )
     }
 
-    /// Explicitly destroys the projection snapshot.
+    /// Closes the projection synchronously.
     pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         self.inner
             .close()
             .map_err(|error| HandleOperationError::new(error, self))
     }
 
-    /// Reads the projection helper's current camera snapshot.
+    /// Copies the projection camera, observing every earlier setter.
     pub fn camera(&self) -> Result<CameraOptions> {
-        let projection = self.inner.native()?;
-        // SAFETY: Default constructor takes no arguments and initializes size.
+        // SAFETY: the constructor initializes this ABI version's descriptor.
         let mut raw = unsafe { sys::mln_camera_options_default() };
-        // SAFETY: projection is live and raw has a valid size field for C to fill.
-        maplibre_core::check(unsafe { sys::mln_map_projection_get_camera(projection, &mut raw) })?;
+        // SAFETY: projection is live and raw is size-tagged writable storage.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_get_camera(self.inner.native()?, &mut raw)
+        })?;
         Ok(CameraOptions::from_native(raw))
     }
 
-    /// Applies camera fields to this projection helper.
+    /// Applies a camera update before returning; the map camera is unaffected.
     pub fn set_camera(&self, camera: &CameraOptions) -> Result<()> {
-        let projection = self.inner.native()?;
-        let raw = camera.to_native();
-        // SAFETY: projection is live and raw is a materialized descriptor valid
-        // for the duration of this call.
-        maplibre_core::check(unsafe { sys::mln_map_projection_set_camera(projection, &raw) })
+        // SAFETY: projection is live and the native camera struct is borrowed
+        // for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_set_camera(self.inner.native()?, &camera.to_native())
+        })
     }
 
-    /// Updates the projection camera so coordinates are visible within padding.
+    /// Applies a camera fit for geographic coordinates before returning.
     pub fn set_visible_coordinates(
         &self,
         coordinates: &[LatLng],
         padding: EdgeInsets,
     ) -> Result<()> {
-        let projection = self.inner.native()?;
         if coordinates.is_empty() {
             return Err(Error::invalid_argument(
                 "set_visible_coordinates requires at least one coordinate",
             ));
         }
-        let raw_coordinates = lat_lngs_to_native(coordinates);
-        // SAFETY: projection is live. coordinates points to coordinate_count
-        // non-empty entries. padding is passed by value.
+        let coordinates = lat_lngs_to_native(coordinates);
+        // SAFETY: projection is live and coordinates points to call-scoped
+        // native coordinate storage.
         maplibre_core::check(unsafe {
             sys::mln_map_projection_set_visible_coordinates(
-                projection,
-                const_ptr_or_null(&raw_coordinates),
-                raw_coordinates.len(),
+                self.inner.native()?,
+                const_ptr_or_null(&coordinates),
+                coordinates.len(),
                 padding.to_native(),
             )
         })
     }
 
-    /// Updates the projection camera so geometry coordinates are visible.
+    /// Applies a camera fit for GeoJSON Geometry bytes before returning.
     pub fn set_visible_geometry(&self, geometry: &[u8], padding: EdgeInsets) -> Result<()> {
-        let projection = self.inner.native()?;
-        let native_geometry = maplibre_core::string::buffer_view(geometry);
-        // SAFETY: projection is live, native_geometry owns backing storage for
-        // the duration of this call, and padding is passed by value.
+        // SAFETY: projection is live and geometry is borrowed for this call.
         maplibre_core::check(unsafe {
             sys::mln_map_projection_set_visible_geometry(
-                projection,
-                native_geometry,
+                self.inner.native()?,
+                maplibre_core::string::buffer_view(geometry),
                 padding.to_native(),
             )
         })
     }
 
-    /// Converts a geographic world coordinate to a screen point.
+    /// Converts a geographic coordinate to a screen point synchronously.
     pub fn pixel_for_lat_lng(&self, coordinate: LatLng) -> Result<ScreenPoint> {
-        let projection = self.inner.native()?;
-        let mut raw_point = empty_screen_point();
-        // SAFETY: projection is live, coordinate is passed by value, and
-        // raw_point is writable output storage.
+        let mut raw = sys::mln_screen_point { x: 0.0, y: 0.0 };
+        // SAFETY: projection is live and raw is writable storage.
         maplibre_core::check(unsafe {
             sys::mln_map_projection_pixel_for_lat_lng(
-                projection,
+                self.inner.native()?,
                 coordinate.to_native(),
-                &mut raw_point,
+                &mut raw,
             )
         })?;
-        Ok(ScreenPoint::from_native(raw_point))
+        Ok(ScreenPoint::from_native(raw))
     }
 
-    /// Converts a screen point to a geographic world coordinate.
+    /// Converts a screen point to a geographic coordinate synchronously.
     ///
     /// The longitude is wrapped to the range from -180 to 180 degrees.
     pub fn lat_lng_for_pixel(&self, point: ScreenPoint) -> Result<LatLng> {
-        let projection = self.inner.native()?;
-        let mut raw_coordinate = empty_lat_lng();
-        // SAFETY: projection is live, point is passed by value, and
-        // raw_coordinate is writable output storage.
+        let mut raw = sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        };
+        // SAFETY: projection is live and raw is writable storage.
         maplibre_core::check(unsafe {
             sys::mln_map_projection_lat_lng_for_pixel(
-                projection,
+                self.inner.native()?,
                 point.to_native(),
-                &mut raw_coordinate,
+                &mut raw,
             )
         })?;
-        Ok(LatLng::from_native(raw_coordinate))
+        Ok(LatLng::from_native(raw))
     }
 
-    /// Converts a screen point to an unwrapped geographic coordinate.
+    /// Converts a screen point to an unwrapped geographic coordinate
+    /// synchronously.
     ///
     /// The longitude preserves the visible world copy and may fall outside
     /// -180 to 180.
     pub fn lat_lng_for_pixel_unwrapped(&self, point: ScreenPoint) -> Result<LatLng> {
-        let projection = self.inner.native()?;
-        let mut raw_coordinate = empty_lat_lng();
-        // SAFETY: projection is live, point is passed by value, and
-        // raw_coordinate is writable output storage.
+        let mut raw = sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        };
+        // SAFETY: projection is live and raw is writable storage.
         maplibre_core::check(unsafe {
             sys::mln_map_projection_lat_lng_for_pixel_unwrapped(
-                projection,
+                self.inner.native()?,
                 point.to_native(),
-                &mut raw_coordinate,
+                &mut raw,
             )
         })?;
-        Ok(LatLng::from_native(raw_coordinate))
+        Ok(LatLng::from_native(raw))
     }
 }
 
@@ -206,22 +220,31 @@ mod tests {
 
     #[test]
     // Spec coverage: BND-043 and BND-103.
-    fn projection_create_round_trip_close_and_stays_live_after_map_close() {
+    fn projection_observes_earlier_camera_commands_and_round_trips_synchronously() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-        let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
+        let map = crate::completion::blocking(MapHandle::with_options(
+            &runtime,
+            &MapOptions::new(512, 512, 1.0),
+        ));
         let center = LatLng::new(37.7749, -122.4194);
         let mut camera_options = CameraOptions::default();
         camera_options.center = Some(center);
         camera_options.zoom = Some(5.0);
-        map.jump_to(&camera_options).unwrap();
+        let mut update = crate::CameraUpdate::default();
+        update.camera = camera_options.clone();
+        map.update_camera(&update).unwrap();
 
-        let projection = map.create_projection().unwrap();
-        map.close().unwrap();
-        runtime.close().unwrap();
+        // Creation is ordered after the accepted camera command, so the
+        // projection observes it: the committed center is the viewport center.
+        let projection = crate::completion::blocking(map.create_projection());
+        let center_point = projection.pixel_for_lat_lng(center).unwrap();
+        assert!((center_point.x - 256.0).abs() < 1e-6);
+        assert!((center_point.y - 256.0).abs() < 1e-6);
 
+        map.close_and_wait();
+        runtime.close_and_wait();
         std::thread::spawn(move || {
-            let point = projection.pixel_for_lat_lng(center).unwrap();
-            let round_tripped = projection.lat_lng_for_pixel(point).unwrap();
+            let round_tripped = projection.lat_lng_for_pixel(center_point).unwrap();
             assert!((round_tripped.latitude - center.latitude).abs() < 1e-7);
             assert!((round_tripped.longitude - center.longitude).abs() < 1e-7);
             projection.close().unwrap();
@@ -235,35 +258,49 @@ mod tests {
     // attempt unsafe cleanup from an uncontrolled destructor path.
     fn projection_drops_without_explicit_close() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+        let map =
+            crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
         {
-            let _projection = map.create_projection().unwrap();
+            let _projection = crate::completion::blocking(map.create_projection());
         }
 
-        map.close().unwrap();
-        runtime.close().unwrap();
+        map.close_and_wait();
+        runtime.close_and_wait();
     }
 
     #[test]
     // Spec coverage: BND-103.
-    fn projection_camera_and_visible_region_helpers_call_c_api() {
+    fn projection_setters_change_later_conversions_synchronously() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-        let projection = map.create_projection().unwrap();
+        let map = crate::completion::blocking(MapHandle::with_options(
+            &runtime,
+            &MapOptions::new(512, 512, 1.0),
+        ));
+        let projection = crate::completion::blocking(map.create_projection());
 
+        let center = LatLng::new(10.0, 20.0);
         let mut camera_options = CameraOptions::default();
-        camera_options.center = Some(LatLng::new(0.0, 0.0));
+        camera_options.center = Some(center);
         camera_options.zoom = Some(2.0);
         projection.set_camera(&camera_options).unwrap();
         let camera = projection.camera().unwrap();
-        assert_eq!(camera.center, Some(LatLng::new(0.0, 0.0)));
+        let read_center = camera.center.unwrap();
+        assert!((read_center.latitude - center.latitude).abs() < 1e-9);
+        assert!((read_center.longitude - center.longitude).abs() < 1e-9);
         assert_eq!(camera.zoom, Some(2.0));
+        // The setter completed before returning, so the very next conversion
+        // maps the new center to the viewport center.
+        let center_point = projection.pixel_for_lat_lng(center).unwrap();
+        assert!((center_point.x - 256.0).abs() < 1e-6);
+        assert!((center_point.y - 256.0).abs() < 1e-6);
 
         let padding = EdgeInsets::new(0.0, 0.0, 0.0, 0.0);
         projection
             .set_visible_coordinates(&[LatLng::new(0.0, 0.0), LatLng::new(1.0, 1.0)], padding)
             .unwrap();
+        let fitted = projection.camera().unwrap();
+        assert_ne!(fitted.center, Some(center));
         let error = projection
             .set_visible_coordinates(&[], padding)
             .unwrap_err();
@@ -278,7 +315,43 @@ mod tests {
             .unwrap();
 
         projection.close().unwrap();
-        map.close().unwrap();
-        runtime.close().unwrap();
+        map.close_and_wait();
+        runtime.close_and_wait();
+    }
+
+    #[test]
+    // Spec coverage: BND-049 and BND-190.
+    fn projection_calls_work_from_a_second_thread_and_never_observe_later_map_changes() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let map = crate::completion::blocking(MapHandle::with_options(
+            &runtime,
+            &MapOptions::new(512, 512, 1.0),
+        ));
+        let projection = crate::completion::blocking(map.create_projection());
+        let creation_camera = projection.camera().unwrap();
+
+        // A later map camera command leaves the projection's snapshot alone.
+        let mut update = crate::CameraUpdate::default();
+        update.camera.center = Some(LatLng::new(45.0, 45.0));
+        update.camera.zoom = Some(9.0);
+        map.update_camera(&update).unwrap();
+        let barrier = runtime.barrier().unwrap();
+        assert!(barrier.wait(std::time::Duration::from_secs(5)).unwrap());
+        barrier.take().unwrap();
+        assert_eq!(projection.camera().unwrap(), creation_camera);
+
+        std::thread::scope(|scope| {
+            let worker = scope.spawn(|| {
+                let point = projection.pixel_for_lat_lng(LatLng::new(0.0, 0.0)).unwrap();
+                projection.lat_lng_for_pixel(point).unwrap()
+            });
+            let round_tripped = worker.join().unwrap();
+            assert!(round_tripped.latitude.abs() < 1e-7);
+            assert!(round_tripped.longitude.abs() < 1e-7);
+        });
+
+        projection.close().unwrap();
+        map.close_and_wait();
+        runtime.close_and_wait();
     }
 }

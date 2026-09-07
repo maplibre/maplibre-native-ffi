@@ -1,8 +1,9 @@
 #include <string>
 
-#include <hilog/log.h>
 #include <mln/util/enum.hpp>
 #include <mln/util/logging.hpp>
+
+#include <hilog/log.h>
 
 namespace mln {
 namespace {

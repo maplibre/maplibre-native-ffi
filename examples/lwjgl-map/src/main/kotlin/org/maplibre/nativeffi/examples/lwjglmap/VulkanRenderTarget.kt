@@ -35,7 +35,11 @@ internal object VulkanRenderTarget {
         descriptor(context),
         VulkanHandle.ofBits(context.surfaceAddress()),
       )
-    return Surface(map.attachVulkanSurface(descriptor))
+    return Surface(
+      RenderTarget.completeAttachment(
+        map.attachVulkanSurface(descriptor, RenderTarget.callerDriverOptions)
+      )
+    )
   }
 
   private fun attachOwnedTexture(
@@ -48,7 +52,10 @@ internal object VulkanRenderTarget {
     var session: RenderSessionHandle? = null
     var compositor: VulkanTextureCompositor? = null
     try {
-      session = map.attachVulkanOwnedTexture(descriptor)
+      session =
+        RenderTarget.completeAttachment(
+          map.attachVulkanOwnedTexture(descriptor, RenderTarget.ownedTextureOptions)
+        )
       compositor = VulkanTextureCompositor(context, viewport)
       return OwnedTexture(session, compositor)
     } catch (error: RuntimeException) {
@@ -68,7 +75,13 @@ internal object VulkanRenderTarget {
     var compositor: VulkanTextureCompositor? = null
     try {
       image = VulkanBorrowedImage.create(context, viewport)
-      session = map.attachVulkanBorrowedTexture(borrowedDescriptor(context, viewport, image))
+      session =
+        RenderTarget.completeAttachment(
+          map.attachVulkanBorrowedTexture(
+            borrowedDescriptor(context, viewport, image),
+            RenderTarget.callerDriverOptions,
+          )
+        )
       compositor = VulkanTextureCompositor(context, viewport)
       return BorrowedTexture(context, session, compositor, image)
     } catch (error: RuntimeException) {
@@ -109,13 +122,16 @@ internal object VulkanRenderTarget {
 
   private class Surface(private val session: RenderSessionHandle) : RenderTarget {
     override fun resize(viewport: Viewport) {
-      session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
+      RenderTarget.completeDriverOperation(session, session.resize(RenderTarget.extent(viewport)))
     }
 
-    override fun renderUpdate(): Boolean = session.renderUpdate().result == RenderResult.RENDERED
+    override fun renderUpdate(): Boolean {
+      val result = RenderTarget.renderFrame(session) ?: return false
+      return result.disposition == RenderResult.RENDERED && !result.needsRepaint
+    }
 
     override fun close() {
-      session.close()
+      RenderTarget.closeSession(session)
     }
   }
 
@@ -125,30 +141,35 @@ internal object VulkanRenderTarget {
   ) : RenderTarget {
     override fun resize(viewport: Viewport) {
       compositor.resize(viewport)
-      session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
+      RenderTarget.completeDriverOperation(session, session.resize(RenderTarget.extent(viewport)))
     }
 
     override fun renderUpdate(): Boolean {
-      if (session.renderUpdate().result != RenderResult.RENDERED) {
-        return false
-      }
-      return session.acquireVulkanOwnedTextureFrame().use { frameHandle ->
-        val frame = frameHandle.frame()
-        check(frame.width() > 0 && frame.height() > 0) {
-          "MapLibre returned an empty Vulkan owned texture frame"
+      val result = RenderTarget.renderFrame(session) ?: return false
+      if (result.disposition != RenderResult.RENDERED) return false
+      // An empty ring keeps the previously composited frame on screen.
+      val frameHandle = session.acquireFrame() ?: return false
+      val presented =
+        try {
+          val frame = frameHandle.vulkanTexture()
+          check(frame.width() > 0 && frame.height() > 0) {
+            "MapLibre returned an empty Vulkan owned texture frame"
+          }
+          check(frame.layout() == VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+            "MapLibre owned texture frame is not shader-readable: layout=${frame.layout()}"
+          }
+          compositor.drawImageView(frame.imageView().bits)
+        } finally {
+          frameHandle.release()
         }
-        check(frame.layout() == VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-          "MapLibre owned texture frame is not shader-readable: layout=${frame.layout()}"
-        }
-        compositor.drawImageView(frame.imageView().bits)
-      }
+      return presented && !result.needsRepaint
     }
 
     override fun close() {
       try {
         compositor.close()
       } finally {
-        session.close()
+        RenderTarget.closeSession(session)
       }
     }
   }
@@ -159,29 +180,36 @@ internal object VulkanRenderTarget {
     private val compositor: VulkanTextureCompositor,
     private var image: VulkanBorrowedImage,
   ) : RenderTarget {
+    private var sessionReleased = false
+
     /** Local to the render loop thread: allocate an image at the new size and hand it over. */
     override fun resize(viewport: Viewport) {
       compositor.resize(viewport)
       val replacement = VulkanBorrowedImage.create(context, viewport)
       try {
-        session.setVulkanBorrowedTextureTarget(borrowedDescriptor(context, viewport, replacement))
+        RenderTarget.completeDriverOperation(
+          session,
+          session.setVulkanBorrowedTextureTarget(borrowedDescriptor(context, viewport, replacement)),
+        )
       } catch (error: RuntimeException) {
         // A failed handover leaves it unknown which image the session holds, so detach before
         // either is released.
         RenderTarget.detachSuppressed(error, session)
+        sessionReleased = true
         RenderTarget.closeSuppressed(error, replacement)
         throw error
       }
       // Released only once the session has taken the replacement.
       image.close()
       image = replacement
+      // A handover replaces only the graphics resource, so the map still needs the new extent.
+      RenderTarget.resizeMap(session.map(), viewport)
     }
 
     override fun renderUpdate(): Boolean {
-      if (session.renderUpdate().result != RenderResult.RENDERED) {
-        return false
-      }
-      return compositor.drawImageView(image.view())
+      val result = RenderTarget.renderFrame(session) ?: return false
+      if (result.disposition != RenderResult.RENDERED) return false
+      return compositor.drawImageView(image.view()) && !result.needsRepaint
     }
 
     override fun close() {
@@ -189,7 +217,7 @@ internal object VulkanRenderTarget {
         compositor.close()
       } finally {
         try {
-          session.close()
+          RenderTarget.closeSession(session, sessionReleased)
         } finally {
           image.close()
         }

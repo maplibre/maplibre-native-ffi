@@ -29,6 +29,8 @@
 #include <EGL/egl.h>
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
 #include <emscripten/html5.h>
+#include <emscripten/threading.h>
+#include <pthread.h>
 #endif
 
 #include "diagnostics/diagnostics.hpp"
@@ -38,6 +40,7 @@
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 #include "render/opengl/egl_context.hpp"
 #endif
+#include "render/opengl/webgl_worker.hpp"
 #include "render/opengl/wgl_common.hpp"
 #include "render/render_session_common.hpp"
 #include "render/texture_session.hpp"
@@ -194,11 +197,13 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
                                    public mln::gfx::HeadlessBackend {
  public:
   OpenGLTextureBackend(
-    const mln_opengl_owned_texture_descriptor& descriptor, mln::Size size
+    const mln_opengl_owned_texture_descriptor& descriptor, mln::Size size,
+    std::size_t ring_depth
   )
       : mln::gl::RendererBackend(mln::core::opengl::session_context_mode),
         mln::gfx::HeadlessBackend(size),
-        context_(descriptor.context) {}
+        context_(descriptor.context),
+        ring_(ring_depth) {}
 
   OpenGLTextureBackend(
     const mln_opengl_borrowed_texture_descriptor& descriptor, mln::Size size
@@ -206,7 +211,8 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
       : mln::gl::RendererBackend(mln::core::opengl::session_context_mode),
         mln::gfx::HeadlessBackend(size),
         context_(descriptor.context),
-        borrowed_texture_(descriptor.texture) {}
+        borrowed_texture_(descriptor.texture),
+        ring_(0) {}
 
   OpenGLTextureBackend(const OpenGLTextureBackend&) = delete;
   auto operator=(const OpenGLTextureBackend&) -> OpenGLTextureBackend& = delete;
@@ -226,6 +232,7 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
   void destroy_backend() {
     auto cleanup = [this] {
       resource.reset();
+      ring_.clear();
       context.reset();
     };
     if (has_native_context()) {
@@ -245,6 +252,9 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
         getContext<mln::gl::Context>(), current_size, borrowed_texture_
       );
       resource_size_ = current_size;
+      // Recorded with the resource it describes, so a slot that keeps an older
+      // resource keeps the size that resource was built for.
+      ring_.record_size(current_size);
     }
     return *this;
   }
@@ -270,6 +280,14 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
       getDefaultRenderable().getResource<OpenGLTextureRenderableResource>();
     return renderable.texture();
   }
+
+  auto select_slot(std::size_t slot) -> bool {
+    if (!ring_.select(slot, size, resource)) return false;
+    resource_size_ = ring_.selected_size();
+    return true;
+  }
+
+  void set_ring_size(mln::Size new_size) { size = new_size; }
 
   void finish_rendering() { getContext<mln::gl::Context>().finish(); }
 
@@ -367,9 +385,7 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
     }
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
     if (!egl_context_) {
-      egl_context_.emplace(
-        context_.data.egl, MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED
-      );
+      egl_context_.emplace(context_.data.egl, context_.ownership);
     }
     egl_context_->activate_pbuffer();
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
@@ -432,8 +448,15 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   void destroy_native_context() { egl_context_.reset(); }
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
-  // The host owns the context this session borrowed.
-  void destroy_native_context() {}
+  void destroy_native_context() {
+    if (
+      context_.data.webgl.kind == MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS &&
+      context_.data.webgl.context > 0
+    ) {
+      emscripten_webgl_destroy_context(context_.data.webgl.context);
+      context_.data.webgl.context = 0;
+    }
+  }
 #else
   void destroy_native_context() {}
 #endif
@@ -441,6 +464,7 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
   mln_opengl_context_descriptor context_{};
   uint32_t borrowed_texture_ = 0;
   mln::Size resource_size_{};
+  mln::core::RenderableSlotRing ring_;
 
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
   void* render_context_ = nullptr;
@@ -457,9 +481,10 @@ class OpenGLTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
   OpenGLTextureSessionBackend(
-    const mln_opengl_owned_texture_descriptor& descriptor, mln::Size size
+    const mln_opengl_owned_texture_descriptor& descriptor, mln::Size size,
+    std::size_t ring_depth
   )
-      : backend_(descriptor, size) {}
+      : backend_(descriptor, size, ring_depth) {}
 
   OpenGLTextureSessionBackend(
     const mln_opengl_borrowed_texture_descriptor& descriptor, mln::Size size
@@ -469,6 +494,7 @@ class OpenGLTextureSessionBackend final
   auto headless_backend() -> mln::gfx::HeadlessBackend& override {
     return backend_;
   }
+  void resize(mln::Size size) override { backend_.set_ring_size(size); }
 
   auto set_opengl_borrowed_target(
     const mln_opengl_borrowed_texture_descriptor& descriptor
@@ -489,30 +515,32 @@ class OpenGLTextureSessionBackend final
     return MLN_STATUS_OK;
   }
 
-  auto after_render(mln_render_session_object& texture, bool& out_rendered)
-    -> mln_status override {
-    texture.texture.rendered_native_texture =
-      reinterpret_cast<void*>(static_cast<uintptr_t>(backend_.texture()));
-    out_rendered = true;
-    return MLN_STATUS_OK;
+  auto select_render_slot(std::size_t slot) -> mln_status override {
+    return backend_.select_slot(slot) ? MLN_STATUS_OK
+                                      : MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto acquire_opengl_owned_frame(
-    const mln_render_session_object& texture,
-    mln_opengl_owned_texture_frame& out_frame
+  auto record_frame_metadata(
+    const mln::core::RenderFrameMetadata& frame, std::any& out_metadata
   ) -> mln_status override {
-    // The host samples this texture from its own context, so the session
-    // completes its rendering before exposing the texture name.
+    // CPU-complete producer synchronization requires all preceding writes to
+    // finish before the texture name is published. The flush runs here, on the
+    // driver thread, rather than on the host thread that acquires the frame.
     auto guard = mln::gfx::BackendScope{backend_};
+    const auto texture = backend_.texture();
+    if (texture == 0) {
+      mln::core::set_thread_error("rendered OpenGL texture is not available");
+      return MLN_STATUS_NOT_READY;
+    }
     backend_.finish_rendering();
-    out_frame = mln_opengl_owned_texture_frame{
+    out_metadata = mln_opengl_owned_texture_frame{
       .size = sizeof(mln_opengl_owned_texture_frame),
-      .generation = texture.generation,
-      .width = texture.physical_width,
-      .height = texture.physical_height,
-      .scale_factor = texture.scale_factor,
-      .frame_id = texture.texture.next_frame_id,
-      .texture = backend_.texture(),
+      .generation = frame.generation,
+      .width = frame.physical_width,
+      .height = frame.physical_height,
+      .scale_factor = frame.scale_factor,
+      .frame_id = frame.frame_id,
+      .texture = texture,
       .target = opengl_texture_target,
       .internal_format = opengl_internal_format,
       .format = opengl_pixel_format,
@@ -525,14 +553,6 @@ class OpenGLTextureSessionBackend final
   OpenGLTextureBackend backend_;
 };
 
-auto fill_opengl_frame(
-  mln_render_session_object* texture, mln_opengl_owned_texture_frame* out_frame
-) -> mln_status {
-  return texture->texture.backend->acquire_opengl_owned_frame(
-    *texture, *out_frame
-  );
-}
-
 }  // namespace
 
 namespace mln::core {
@@ -541,9 +561,10 @@ auto supported_render_backend_mask() noexcept -> uint32_t {
   return MLN_RENDER_BACKEND_FLAG_OPENGL;
 }
 
-auto opengl_owned_texture_attach(
+auto opengl_owned_texture_attach_start(
   mln_map map, const mln_opengl_owned_texture_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   MapObject* live_map = nullptr;
   const auto map_status = validate_map_live(map, live_map);
@@ -554,13 +575,6 @@ auto opengl_owned_texture_attach(
     validate_opengl_owned_texture_descriptor(descriptor, true);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
-  }
-  const auto output_status = validate_attach_output(
-    out_session, "out_session must not be null",
-    "out_session must point to a null handle"
-  );
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
   }
   const auto physical_status = validate_physical_size(
     descriptor->extent.width, descriptor->extent.height,
@@ -573,24 +587,61 @@ auto opengl_owned_texture_attach(
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
   set_session_extent(*session, descriptor->extent);
-  session->texture.api_kind = TextureSessionApi::OpenGL;
   session->texture.mode = TextureSessionMode::Owned;
-  session->texture.backend = std::make_unique<OpenGLTextureSessionBackend>(
-    *descriptor, mln::Size{session->physical_width, session->physical_height}
+  auto copied = *descriptor;
+  const auto private_target =
+    copied.context.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
+  const auto transferred = opengl::is_transferred_webgl_canvas(copied.context);
+  auto selector =
+    transferred ? opengl::webgl_canvas_selector(copied.context) : std::string{};
+  if (transferred) {
+    opengl::configure_transferred_webgl_worker(*session, selector);
+  }
+  const auto driver_status = require_render_driver(
+    options,
+    private_target ? MLN_RENDER_DRIVER_CORE_WORKER
+                   : MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+    "OpenGL driver does not match its context placement"
   );
-  return attach_render_session(
-    std::move(session), out_session, RenderSessionKind::Texture,
-    RenderSessionAttachMessages{
-      .null_session = "texture session must not be null",
-      .null_output = "out_session must not be null",
-      .non_null_output = "out_session must point to a null handle"
-    }
+  if (driver_status != MLN_STATUS_OK) {
+    return driver_status;
+  }
+  const auto ring_depth = private_target ? 1U : attach_ring_depth(options);
+  session->initialize_backend =
+    [copied, selector = std::move(selector), transferred,
+     ring_depth](mln_render_session_object& target) mutable {
+      if (transferred) {
+        const auto context_status =
+          opengl::create_transferred_webgl_context(copied.context, selector);
+        if (context_status != MLN_STATUS_OK) {
+          return context_status;
+        }
+      }
+      target.texture.backend = std::make_unique<OpenGLTextureSessionBackend>(
+        copied, mln::Size{target.physical_width, target.physical_height},
+        ring_depth
+      );
+      return MLN_STATUS_OK;
+    };
+  const auto capabilities = mln_render_session_capabilities{
+    .size = sizeof(mln_render_session_capabilities),
+    .driver = 0,
+    .texture_ring_depth = ring_depth,
+    .flags = MLN_RENDER_SESSION_CAPABILITY_READBACK |
+             (private_target ? 0u
+                             : MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
+                                 MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC)
+  };
+  return start_attach_render_session(
+    std::move(session), RenderSessionKind::Texture, options, capabilities,
+    out_session, completion
   );
 }
 
-auto opengl_borrowed_texture_attach(
+auto opengl_borrowed_texture_attach_start(
   mln_map map, const mln_opengl_borrowed_texture_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   MapObject* live_map = nullptr;
   const auto map_status = validate_map_live(map, live_map);
@@ -602,18 +653,16 @@ auto opengl_borrowed_texture_attach(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  // The shared validator accepts any nonzero target; this backend renders only
-  // into GL_TEXTURE_2D.
+  const auto driver_status = require_render_driver(
+    options, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+    "borrowed OpenGL textures require the caller graphics thread driver"
+  );
+  if (driver_status != MLN_STATUS_OK) {
+    return driver_status;
+  }
   if (descriptor->target != opengl_texture_target) {
     set_thread_error("OpenGL texture target must be GL_TEXTURE_2D");
     return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto output_status = validate_attach_output(
-    out_session, "out_session must not be null",
-    "out_session must point to a null handle"
-  );
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
   }
   const auto physical_status = validate_borrowed_physical_size(
     descriptor->physical_width, descriptor->physical_height
@@ -628,39 +677,42 @@ auto opengl_borrowed_texture_attach(
     *session, descriptor->extent, descriptor->physical_width,
     descriptor->physical_height
   );
-  session->texture.api_kind = TextureSessionApi::OpenGL;
   session->texture.mode = TextureSessionMode::Borrowed;
-  session->texture.backend = std::make_unique<OpenGLTextureSessionBackend>(
-    *descriptor, mln::Size{session->physical_width, session->physical_height}
-  );
-  return attach_render_session(
-    std::move(session), out_session, RenderSessionKind::Texture,
-    RenderSessionAttachMessages{
-      .null_session = "texture session must not be null",
-      .null_output = "out_session must not be null",
-      .non_null_output = "out_session must point to a null handle"
-    }
+  const auto copied = *descriptor;
+  session->initialize_backend = [copied](mln_render_session_object& target) {
+    target.texture.backend = std::make_unique<OpenGLTextureSessionBackend>(
+      copied, mln::Size{target.physical_width, target.physical_height}
+    );
+    return MLN_STATUS_OK;
+  };
+  const auto capabilities = mln_render_session_capabilities{
+    .size = sizeof(mln_render_session_capabilities),
+    .driver = 0,
+    .texture_ring_depth = 0,
+    .flags = 0
+  };
+  return start_attach_render_session(
+    std::move(session), RenderSessionKind::Texture, options, capabilities,
+    out_session, completion
   );
 }
 
-auto opengl_borrowed_texture_set_target(
+auto opengl_borrowed_texture_set_target_start(
   mln_render_session session,
-  const mln_opengl_borrowed_texture_descriptor* descriptor
+  const mln_opengl_borrowed_texture_descriptor* descriptor,
+  const mln_completion* completion
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::BorrowedTexture, live
+  const auto submission_status = validate_render_session_retarget_submission(
+    session, RetargetTargetKind::BorrowedTexture, completion
   );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
+  if (submission_status != MLN_STATUS_OK) {
+    return submission_status;
   }
   const auto descriptor_status =
     validate_opengl_borrowed_texture_descriptor(descriptor, true);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  // The same check attach makes. Without it a cube-map target fails only on the
-  // next render, once the outgoing target is already discarded.
   if (descriptor->target != opengl_texture_target) {
     set_thread_error("OpenGL texture target must be GL_TEXTURE_2D");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -671,95 +723,20 @@ auto opengl_borrowed_texture_set_target(
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
-  return render_session_set_target(
-    session, RetargetTargetKind::BorrowedTexture, descriptor->extent,
-    descriptor->physical_width, descriptor->physical_height,
-    [descriptor](mln_render_session_object& target_session) -> mln_status {
-      return target_session.texture.backend->set_opengl_borrowed_target(
-        *descriptor
+  const auto copied = *descriptor;
+  return enqueue_driver_operation(
+    session,
+    [copied](mln_render_session_object& target) {
+      return render_session_set_target(
+        target.self, RetargetTargetKind::BorrowedTexture, copied.extent,
+        copied.physical_width, copied.physical_height,
+        [&copied](mln_render_session_object& live) {
+          return live.texture.backend->set_opengl_borrowed_target(copied);
+        }
       );
-    }
+    },
+    completion
   );
-}
-
-auto opengl_owned_texture_acquire_frame(
-  mln_render_session texture, mln_opengl_owned_texture_frame* out_frame
-) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto status = validate_live_attached_texture(texture, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    out_frame == nullptr ||
-    out_frame->size < sizeof(mln_opengl_owned_texture_frame)
-  ) {
-    set_thread_error("out_frame must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (live->texture.acquired) {
-    set_thread_error("a texture frame is already acquired");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  if (live->rendered_generation != live->generation) {
-    set_thread_error("no rendered frame is available for this generation");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  if (
-    live->texture.mode != TextureSessionMode::Owned ||
-    live->texture.api_kind != TextureSessionApi::OpenGL
-  ) {
-    set_thread_error("texture session cannot expose an OpenGL texture frame");
-    return MLN_STATUS_UNSUPPORTED;
-  }
-
-  const auto frame_status = fill_opengl_frame(live, out_frame);
-  if (frame_status != MLN_STATUS_OK) {
-    return frame_status;
-  }
-  live->texture.acquired_native_texture =
-    reinterpret_cast<void*>(static_cast<uintptr_t>(out_frame->texture));
-  live->texture.acquired = true;
-  live->texture.acquired_frame_id = out_frame->frame_id;
-  live->texture.acquired_frame_kind = TextureSessionFrameKind::OpenGLOwned;
-  ++live->texture.next_frame_id;
-  return MLN_STATUS_OK;
-}
-
-auto opengl_owned_texture_release_frame(
-  mln_render_session texture, const mln_opengl_owned_texture_frame* frame
-) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto status = validate_texture(texture, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    frame == nullptr || frame->size < sizeof(mln_opengl_owned_texture_frame)
-  ) {
-    set_thread_error("frame must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (
-    !live->texture.acquired ||
-    live->texture.acquired_frame_kind != TextureSessionFrameKind::OpenGLOwned
-  ) {
-    set_thread_error("no texture frame is currently acquired");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  if (frame->generation != live->generation) {
-    set_thread_error("frame generation does not match acquired frame");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (frame->frame_id != live->texture.acquired_frame_id) {
-    set_thread_error("frame identity does not match acquired frame");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  live->texture.acquired = false;
-  live->texture.acquired_frame_id = 0;
-  live->texture.acquired_frame_kind = TextureSessionFrameKind::None;
-  live->texture.acquired_native_texture = nullptr;
-  return MLN_STATUS_OK;
 }
 
 }  // namespace mln::core

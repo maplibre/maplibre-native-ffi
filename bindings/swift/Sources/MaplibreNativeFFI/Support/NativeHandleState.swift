@@ -10,7 +10,6 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
   private let typeName: String
   private let lock = NSCondition()
   private var state: State
-  private var activeUses = 0
 
   init(typeName: String, handle: Handle) throws {
     guard !handle.isNull else {
@@ -58,37 +57,11 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     }
   }
 
-  /// Runs `use` with the handle and holds off release until it returns. Use
-  /// this for handles the host may use and release from different threads;
-  /// handles confined to one thread can call native after `requireLive()`.
-  ///
-  /// `use` runs outside the lock, so concurrent uses proceed together. Calling
-  /// `closeOnce` from inside `use` on the same thread deadlocks.
-  func withLive<T>(_ use: (Handle) throws -> T) throws -> T {
-    let handle = try lock.withLock {
-      let handle = try requireLiveLocked()
-      activeUses += 1
-      return handle
-    }
-    defer {
-      lock.withLock {
-        activeUses -= 1
-        lock.broadcast()
-      }
-    }
-    return try use(handle)
-  }
-
   func closeOnce(_ destroy: (Handle) throws -> Void) throws {
     let liveHandle: Handle? = try lock.withLock {
       switch state {
       case let .live(handle):
         state = .closing(handle)
-        // Uses that already passed their liveness check still hold the handle,
-        // so wait for them before destroying it.
-        while activeUses > 0 {
-          lock.wait()
-        }
         return handle
       case .closing:
         throw NativeStatusFailure(

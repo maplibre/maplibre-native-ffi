@@ -2,6 +2,7 @@ const std = @import("std");
 const testing = std.testing;
 
 const maplibre = @import("maplibre_native_ffi");
+const support = @import("support.zig");
 
 const LogState = struct {
     count: usize = 0,
@@ -31,23 +32,20 @@ test "log callback receives and consumes native logs" {
     }
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try testing.expectError(error.NativeError, map.setStyleJson(testing.allocator, "{"));
+    // An unparseable style fails the command; the logs and events it produces
+    // are what these tests read.
+    try support.expectCommandError(try map.setStyleJson("{"), error.NativeError);
+    var barrier = try runtime.barrier();
+    defer barrier.deinit();
+    _ = try barrier.wait(null);
     try testing.expect(state.count > 0);
     try testing.expect(state.saw_parse_style);
     try testing.expect(state.saw_message);
-}
-
-test "log async severity mask exposes semantic masks" {
-    try maplibre.setAsyncLogSeverityMask(.default, null);
-    try maplibre.setAsyncLogSeverityMask(.all, null);
-    try maplibre.setAsyncLogSeverityMask(.none, null);
-    try maplibre.setAsyncLogSeverityMask(.{ .info = true, .@"error" = true }, null);
-    try maplibre.setAsyncLogSeverityMask(.default, null);
 }
 
 test "log callback can be cleared" {
@@ -58,12 +56,17 @@ test "log callback can be cleared" {
     try maplibre.clearLogCallback(null);
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try testing.expectError(error.NativeError, map.setStyleJson(testing.allocator, "{"));
+    // An unparseable style fails the command; the logs and events it produces
+    // are what these tests read.
+    try support.expectCommandError(try map.setStyleJson("{"), error.NativeError);
+    var barrier = try runtime.barrier();
+    defer barrier.deinit();
+    _ = try barrier.wait(null);
     try testing.expectEqual(@as(usize, 0), state.count);
 }
 
@@ -79,12 +82,17 @@ test "log callback replacement invokes only the replacement" {
     try maplibre.setLogCallback(.{ .handler = recordLog, .context = &replacement_state }, null);
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try testing.expectError(error.NativeError, map.setStyleJson(testing.allocator, "{"));
+    // An unparseable style fails the command; the logs and events it produces
+    // are what these tests read.
+    try support.expectCommandError(try map.setStyleJson("{"), error.NativeError);
+    var barrier = try runtime.barrier();
+    defer barrier.deinit();
+    _ = try barrier.wait(null);
     try testing.expectEqual(@as(usize, 0), first_state.count);
     try testing.expect(replacement_state.count > 0);
     try testing.expect(replacement_state.saw_parse_style);

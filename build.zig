@@ -14,6 +14,7 @@ const BuildOptions = struct {
     dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: RenderBackend,
     system_root: ?std.Build.LazyPath,
+    target_libc: ?std.Build.LazyPath,
 };
 
 pub const RenderBackend = enum {
@@ -158,6 +159,14 @@ pub fn dependencyLibraryDirs(b: *std.Build) []const std.Build.LazyPath {
 
 pub fn maybeSystemRootPath(b: *std.Build) ?std.Build.LazyPath {
     return b.option(std.Build.LazyPath, "system-root", "Target platform SDK or sysroot");
+}
+
+fn takeTargetLibCPath(b: *std.Build) ?std.Build.LazyPath {
+    const path = b.libc_file orelse return null;
+    // `--libc` is a global Zig build option. Keep it off host tools such as
+    // zigglgen, and attach it only to target executables.
+    b.libc_file = null;
+    return lazyPath(path);
 }
 
 pub fn addIncludePaths(module: *std.Build.Module, include_dirs: []const std.Build.LazyPath) void {
@@ -555,6 +564,7 @@ fn addTestCompile(b: *std.Build, options: BuildOptions, root_source_file: std.Bu
         }),
         .use_lld = if (isAppleMobile(options.target)) false else null,
     });
+    tests.setLibCFile(options.target_libc);
     if (isAppleMobile(options.target)) {
         tests.root_module.addCSourceFile(.{ .file = b.path("src/zig_test_support/ios_simulator_dyld_stub.m") });
     }
@@ -589,14 +599,11 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *s
             tests.root_module.addImport("wgl_test_context", wgl_test_context);
         }
     }
-    if (options.render_backend == .metal) {
-        if (isAppleMobile(options.target)) {
-            tests.root_module.addCSourceFile(.{ .file = b.path("bindings/zig/tests/metal_support_ios.m") });
-            tests.root_module.linkSystemLibrary("objc", .{});
-            tests.root_module.linkFramework("Foundation", .{});
-        }
+    if (options.render_backend == .metal and options.target.result.os.tag.isDarwin()) {
+        tests.root_module.addCSourceFile(.{ .file = b.path("bindings/zig/tests/metal_support_apple.m") });
+        tests.root_module.linkSystemLibrary("objc", .{});
+        tests.root_module.linkFramework("Foundation", .{});
         if (options.target.result.os.tag == .macos) {
-            tests.root_module.addCSourceFile(.{ .file = b.path("bindings/zig/tests/metal_support_macos.m") });
             tests.root_module.linkFramework("AppKit", .{});
         }
     }
@@ -628,14 +635,21 @@ pub fn addTestRunStep(
 fn addAndroidTestRunStep(
     b: *std.Build,
     tests: []const *std.Build.Step.Compile,
+    target: std.Build.ResolvedTarget,
     native_install_dir: std.Build.LazyPath,
     android_runner: std.Build.LazyPath,
     emulator_api: ?[]const u8,
 ) *std.Build.Step.Run {
+    const abi = switch (target.result.cpu.arch) {
+        .aarch64 => "arm64-v8a",
+        .x86_64 => "x86_64",
+        else => @panic("Android test runner supports ARM64 and x64 targets only"),
+    };
     const run_tests = b.addSystemCommand(&.{
         "bash",
         android_runner.getPath(b),
         "180",
+        abi,
         installPath(b, native_install_dir, "lib/libmaplibre-native-c.so").getPath(b),
     });
     if (emulator_api) |api| {
@@ -650,6 +664,7 @@ fn addAndroidTestRunStep(
 
 pub fn build(b: *std.Build) void {
     const native_install_dir = maybeNativeInstallDirPath(b);
+    const target_libc = takeTargetLibCPath(b);
     const target = if (native_install_dir) |install_dir|
         nativeTarget(b, install_dir)
     else
@@ -683,6 +698,7 @@ pub fn build(b: *std.Build) void {
         .dependency_library_dirs = dependency_library_dirs,
         .render_backend = backend,
         .system_root = system_root,
+        .target_libc = target_libc,
     };
 
     const maplibre_native_ffi = addMaplibreNativeModule(b, options);
@@ -711,6 +727,7 @@ pub fn build(b: *std.Build) void {
         const run_tests = addAndroidTestRunStep(
             b,
             &test_compiles,
+            options.target,
             options.native_install_dir,
             b.path("scripts/run-android-emulator-test.sh"),
             if (options.target.result.cpu.arch == .x86_64 and options.render_backend == .opengl) "26" else null,

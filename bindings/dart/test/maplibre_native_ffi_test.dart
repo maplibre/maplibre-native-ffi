@@ -1,14 +1,15 @@
-import 'dart:ffi';
+import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'dart:ffi';
 import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
-import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
+import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart'
+    show expectedCAbiVersion;
 import 'package:maplibre_native_ffi/src/maplibre.dart'
     show logCallbackStateForTesting;
 import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
@@ -27,11 +28,20 @@ final _maskWithoutStyleLoaded = RuntimeEventMask(
 
 Uint8List _jsonBytes(String value) => Uint8List.fromList(utf8.encode(value));
 
+Future<void> _expectCommandFailure(
+  Future<CommandCompletion> future,
+  MaplibreStatus status,
+) async {
+  final completion = await future;
+  expect(completion.disposition, CommandDisposition.failed);
+  expect(completion.status, status);
+  expect(completion.diagnostic, isNotEmpty);
+}
+
 /// Dispatches one record through the registered adapter log callback, the way
 /// MapLibre's logging threads do, and reports the consume value native code
 /// sees.
-int _dispatchLogRecord(
-  MaplibreNativeCApi c, {
+int _dispatchLogRecord({
   required int severity,
   required int event,
   required int code,
@@ -52,87 +62,67 @@ int _dispatchLogRecord(
 }
 
 void main() {
-  test('map options carry FastPFOR decoding to native', () {
+  test('map options carry FastPFOR decoding to native', () async {
     expect(const MapOptions().fastPforEnabled, isFalse);
     expect(const MapOptions(fastPforEnabled: true), isNot(const MapOptions()));
 
     final runtime = RuntimeHandle.create();
-    final map = runtime.createMap(
+    final map = await runtime.createMap(
       options: const MapOptions(width: 64, height: 64, fastPforEnabled: true),
     );
-    expect(map.size(), const MapSize(width: 64, height: 64, scaleFactor: 1));
-    map.close();
-    runtime.close();
+    expect(
+      map.snapshot().size,
+      const MapSize(width: 64, height: 64, scaleFactor: 1),
+    );
+    await map.close();
+    await runtime.close();
   });
   test('one drain takes every event a style load queued', () async {
     final runtime = RuntimeHandle.create();
     addTearDown(runtime.close);
 
     // A fresh runtime has nothing queued.
-    final empty = runtime.drainEvents();
-    expect(empty.events, isEmpty);
-    expect(empty.remainingCount, 0);
+    expect(runtime.drainEvents(), isEmpty);
 
-    final map = runtime.createMap();
+    final map = await runtime.createMap();
     addTearDown(map.close);
-    // Start the style load with an empty queue.
-    _quiesce(runtime);
-
-    map.setStyleJson(_jsonBytes(_emptyStyleJson));
-    late RuntimeEventBatch batch;
-    await _waitUntil(() {
-      runtime.pump();
-      batch = runtime.drainEvents();
-      return batch.events.any(
-        (event) => event.eventType == RuntimeEventType.mapStyleLoaded,
-      );
-    });
+    await _expectCommandCommitted(
+      map.setStyleJson(_jsonBytes(_emptyStyleJson)),
+    );
+    await runtime.barrier();
 
     // A style load reports several event types, and one drain takes them all.
-    expect(batch.events.length, greaterThan(1));
-    expect(batch.remainingCount, 0);
-    expect(
-      batch.events.map((event) => event.eventType),
-      contains(RuntimeEventType.mapRenderUpdateAvailable),
-    );
-
-    // A bounded drain reports what stayed queued, and an unbounded one reaches
-    // the end of the queue.
-    map.setStyleJson(_jsonBytes(_emptyStyleJson));
-    late RuntimeEventBatch bounded;
-    await _waitUntil(() {
-      runtime.pump();
-      bounded = runtime.drainEvents(maxEvents: 1);
-      return bounded.remainingCount > 0;
-    });
-    expect(bounded.events, hasLength(1));
-    expect(runtime.drainEvents().remainingCount, 0);
+    final batch = runtime.drainEvents();
+    expect(batch.length, greaterThan(1));
+    final types = batch.map((event) => event.eventType);
+    expect(types, contains(RuntimeEventType.mapStyleLoaded));
+    expect(types, contains(RuntimeEventType.mapRenderUpdateAvailable));
+    expect(runtime.drainEvents(), isEmpty);
   });
 
-  test('both handles report and narrow their event masks', () {
+  test('both handles report and narrow their event masks', () async {
     final runtime = RuntimeHandle.create();
     addTearDown(runtime.close);
-    final map = runtime.createMap();
+    final map = await runtime.createMap();
     addTearDown(map.close);
 
     // The default options select every event type.
     expect(runtime.eventMask, RuntimeEventMask.all);
-    expect(map.eventMask, RuntimeEventMask.all);
-
-    map.setEventMask(RuntimeEventMask.all);
-    runtime.setEventMask(RuntimeEventMask.all);
-    expect(map.eventMask, RuntimeEventMask.all);
-    expect(runtime.eventMask, RuntimeEventMask.all);
+    expect(map.snapshot().eventMask, RuntimeEventMask.all);
 
     // A host reads the mask, clears one bit, and writes it back; every other
     // bit survives.
     final withoutIdle = RuntimeEventMask(
-      map.eventMask.value & ~RuntimeEventMask.mapIdle.value,
+      map.snapshot().eventMask.value & ~RuntimeEventMask.mapIdle.value,
     );
-    map.setEventMask(withoutIdle);
-    expect(map.eventMask, withoutIdle);
-    expect(map.eventMask.contains(RuntimeEventType.mapIdle), isFalse);
-    expect(map.eventMask.contains(RuntimeEventType.mapStyleLoaded), isTrue);
+    await _expectCommandCommitted(map.setEventMask(withoutIdle));
+    final narrowed = map.snapshot().eventMask;
+    expect(narrowed, withoutIdle);
+    expect(narrowed.contains(RuntimeEventType.mapIdle), isFalse);
+    expect(narrowed.contains(RuntimeEventType.mapStyleLoaded), isTrue);
+
+    runtime.setEventMask(withoutIdle);
+    expect(runtime.eventMask, withoutIdle);
 
     const outsideAll = RuntimeEventMask(1 << 40);
     expect(
@@ -144,7 +134,8 @@ void main() {
       throwsA(isA<InvalidArgumentException>()),
     );
     // A rejected mask leaves the installed one in place.
-    expect(map.eventMask, withoutIdle);
+    expect(map.snapshot().eventMask, withoutIdle);
+    expect(runtime.eventMask, withoutIdle);
   });
 
   test(
@@ -152,7 +143,7 @@ void main() {
     () async {
       final runtime = RuntimeHandle.create();
       addTearDown(runtime.close);
-      final map = runtime.createMap();
+      final map = await runtime.createMap();
       addTearDown(map.close);
       map.setEventMask(
         RuntimeEventMask.mapStyleLoaded | RuntimeEventMask.mapLoadingFailed,
@@ -161,10 +152,7 @@ void main() {
       map.setStyleJson(_jsonBytes(_emptyStyleJson));
       final types = <RuntimeEventType>{};
       await _waitUntil(() {
-        runtime.pump();
-        types.addAll(
-          runtime.drainEvents().events.map((event) => event.eventType),
-        );
+        types.addAll(runtime.drainEvents().map((event) => event.eventType));
         return types.contains(RuntimeEventType.mapStyleLoaded);
       });
       expect(types, isNot(contains(RuntimeEventType.mapRenderUpdateAvailable)));
@@ -180,13 +168,14 @@ void main() {
       const sourceId = 'dart-released-source';
       final runtime = RuntimeHandle.create();
       addTearDown(runtime.close);
-      final map = runtime.createMap(
+      final map = await runtime.createMap(
         options: MapOptions(eventMask: _maskWithoutStyleLoaded),
       );
       addTearDown(map.close);
-      map.setStyleJson(_jsonBytes(_emptyStyleJson));
-      _quiesce(runtime);
-      map.addCustomGeometrySource(
+      await _expectCommandCommitted(
+        map.setStyleJson(_jsonBytes(_emptyStyleJson)),
+      );
+      await map.addCustomGeometrySource(
         sourceId,
         CustomGeometrySourceOptions(fetchTile: (_) {}),
       );
@@ -194,15 +183,14 @@ void main() {
 
       // The mask reads back as the host set it, because the binding selects
       // nothing of its own.
-      expect(map.eventMask, _maskWithoutStyleLoaded);
+      expect(map.snapshot().eventMask, _maskWithoutStyleLoaded);
 
-      map.setStyleJson(_jsonBytes(_emptyStyleJson));
+      await _expectCommandCommitted(
+        map.setStyleJson(_jsonBytes(_emptyStyleJson)),
+      );
       final types = <RuntimeEventType>{};
       await _waitUntil(() {
-        runtime.pump();
-        types.addAll(
-          runtime.drainEvents().events.map((event) => event.eventType),
-        );
+        types.addAll(runtime.drainEvents().map((event) => event.eventType));
         return probe.retirementQueued;
       });
       expect(types, isNot(contains(RuntimeEventType.mapStyleLoaded)));
@@ -212,32 +200,33 @@ void main() {
   );
 
   test(
-    'a style replacement releases a custom MVT vector source with style loads unselected',
+    'a style replacement releases a custom MVT vector source with style loads '
+    'unselected',
     () async {
       const sourceId = 'dart-released-mvt-source';
       final runtime = RuntimeHandle.create();
       addTearDown(runtime.close);
-      final map = runtime.createMap(
+      final map = await runtime.createMap(
         options: MapOptions(eventMask: _maskWithoutStyleLoaded),
       );
       addTearDown(map.close);
-      map.setStyleJson(_jsonBytes(_emptyStyleJson));
-      _quiesce(runtime);
-      map.addCustomMvtVectorSource(
+      await _expectCommandCommitted(
+        map.setStyleJson(_jsonBytes(_emptyStyleJson)),
+      );
+      await map.addCustomMvtVectorSource(
         sourceId,
         CustomMvtVectorSourceOptions(fetchTile: (_) {}),
       );
       final probe = customMvtVectorCallbackProbeForTesting(map, sourceId)!;
 
-      expect(map.eventMask, _maskWithoutStyleLoaded);
+      expect(map.snapshot().eventMask, _maskWithoutStyleLoaded);
 
-      map.setStyleJson(_jsonBytes(_emptyStyleJson));
+      await _expectCommandCommitted(
+        map.setStyleJson(_jsonBytes(_emptyStyleJson)),
+      );
       final types = <RuntimeEventType>{};
       await _waitUntil(() {
-        runtime.pump();
-        types.addAll(
-          runtime.drainEvents().events.map((event) => event.eventType),
-        );
+        types.addAll(runtime.drainEvents().map((event) => event.eventType));
         return probe.retirementQueued;
       });
       expect(types, isNot(contains(RuntimeEventType.mapStyleLoaded)));
@@ -247,25 +236,13 @@ void main() {
   );
 
   test('process-global APIs cross the native C ABI', () {
-    expect(Maplibre.cVersion(), greaterThanOrEqualTo(0));
-    final backends = Maplibre.supportedRenderBackends();
-    expect(backends.bits, greaterThanOrEqualTo(0));
-    expect(backends.contains(const RenderBackendMask(0)), isTrue);
-    expect(RenderBackendMask.opengl.bits, 1 << 2);
-    final openGLProviders = Maplibre.supportedOpenGLContextProviders();
-    expect(openGLProviders.bits, greaterThanOrEqualTo(0));
-    expect(
-      const OpenGLContextProviderMask(
-        3,
-      ).contains(OpenGLContextProviderMask.wgl),
-      isTrue,
-    );
-    expect(
-      const OpenGLContextProviderMask(
-        3,
-      ).contains(OpenGLContextProviderMask.egl),
-      isTrue,
-    );
+    expect(Maplibre.cVersion(), expectedCAbiVersion);
+    // The host library was built with at least one renderer, and it reports
+    // the OpenGL context providers that renderer can use.
+    expect(Maplibre.supportedRenderBackends().bits, isNot(0));
+    if (Maplibre.supportedRenderBackends().contains(RenderBackendMask.opengl)) {
+      expect(Maplibre.supportedOpenGLContextProviders().bits, isNot(0));
+    }
 
     final meters = Maplibre.projectedMetersForLatLng(const LatLng(0, 0));
     expect(meters.northing.isFinite, isTrue);
@@ -299,23 +276,34 @@ void main() {
   });
 
   test('process-global log callbacks retire across isolates', () async {
-    Maplibre.setLogCallback((_) {});
+    Maplibre.setLogCallback((_) {}, consume: true);
+    // The registration is process-global, so another isolate clears the one
+    // this isolate installed.
     await Isolate.run(_clearLogCallback);
     await Future<void>.delayed(Duration.zero);
+
+    // Native code dispatches to no callback, so it consumes nothing.
+    expect(
+      _dispatchLogRecord(
+        severity: LogSeverity.info.rawValue,
+        event: LogEvent.general.rawValue,
+        code: 404,
+        message: 'after cross-isolate clear',
+      ),
+      0,
+    );
 
     Maplibre.setLogCallback((_) {});
     Maplibre.clearLogCallback();
   });
 
   test('log callback replacement and clear change native delivery', () async {
-    final c = MaplibreNativeCApi.open();
     final first = <LogRecord>[];
     final replacement = <LogRecord>[];
 
     Maplibre.setLogCallback(first.add, consume: true);
     expect(
       _dispatchLogRecord(
-        c,
         severity: LogSeverity.info.rawValue,
         event: LogEvent.general.rawValue,
         code: 101,
@@ -330,7 +318,6 @@ void main() {
     Maplibre.setLogCallback(replacement.add);
     expect(
       _dispatchLogRecord(
-        c,
         severity: LogSeverity.warning.rawValue,
         event: LogEvent.setup.rawValue,
         code: 202,
@@ -346,7 +333,6 @@ void main() {
     Maplibre.clearLogCallback();
     expect(
       _dispatchLogRecord(
-        c,
         severity: LogSeverity.error.rawValue,
         event: LogEvent.render.rawValue,
         code: 303,
@@ -372,10 +358,10 @@ void main() {
           ),
         ),
       ]);
-      final map = runtime.createMap();
+      final map = await runtime.createMap();
 
       map.setStyleUrl(styleUrl);
-      final event = await _pumpUntilEvent(
+      final event = await _waitUntilEvent(
         runtime,
         (candidate) =>
             candidate.eventType == RuntimeEventType.mapStyleLoaded &&
@@ -383,8 +369,8 @@ void main() {
       );
       expect((event.source as MapRuntimeEventSource).map, same(map));
 
-      map.close();
-      runtime.close();
+      await map.close();
+      await runtime.close();
     },
   );
 
@@ -406,18 +392,18 @@ void main() {
         },
       ),
     );
-    final map = runtime.createMap();
+    final map = await runtime.createMap();
 
     map.setStyleUrl(unmatchedUrl);
-    final event = await _pumpUntilEvent(
+    final event = await _waitUntilEvent(
       runtime,
       (candidate) => candidate.eventType == RuntimeEventType.mapLoadingFailed,
     );
     expect(event.source, isA<MapRuntimeEventSource>());
     expect(providerCalls, 0);
 
-    map.close();
-    runtime.close();
+    await map.close();
+    await runtime.close();
   });
 
   test('queued resource provider callbacks cross the native C ABI', () async {
@@ -452,9 +438,9 @@ void main() {
       ),
     );
 
-    final map = runtime.createMap();
+    final map = await runtime.createMap();
     map.setStyleUrl(styleUrl);
-    await _pumpUntil(runtime, () => requests.isNotEmpty);
+    await _waitUntil(() => requests.isNotEmpty);
 
     ownerToken.waitUntilRetired();
     expect(
@@ -462,8 +448,8 @@ void main() {
       throwsA(isA<InvalidArgumentException>()),
     );
     ownerToken.close();
-    map.close();
-    runtime.close();
+    await map.close();
+    await runtime.close();
     expect(await completion, isTrue);
   });
 
@@ -496,9 +482,9 @@ void main() {
       ),
     );
 
-    final map = runtime.createMap();
+    final map = await runtime.createMap();
     map.setStyleUrl(aliasUrl);
-    await _pumpUntil(runtime, () => requests.isNotEmpty);
+    await _waitUntil(() => requests.isNotEmpty);
 
     expect(requests.first.requestedUrl, aliasUrl);
     expect(
@@ -506,8 +492,8 @@ void main() {
       'https://demotiles.maplibre.org/style.json',
     );
 
-    map.close();
-    runtime.close();
+    await map.close();
+    await runtime.close();
   });
 
   // BND-156: a glob route claims a URL family whose members are known only
@@ -535,9 +521,9 @@ void main() {
       ),
     );
 
-    final map = runtime.createMap();
+    final map = await runtime.createMap();
     map.setStyleUrl('${origin}unenumerated/style.json');
-    await _pumpUntilEvent(
+    await _waitUntilEvent(
       runtime,
       (candidate) => candidate.eventType == RuntimeEventType.mapStyleLoaded,
     );
@@ -545,15 +531,15 @@ void main() {
     // A pattern matches the complete URL, so a URL that merely contains the
     // route's origin stays with native loading.
     map.setStyleUrl('custom://elsewhere/${origin}style.json');
-    await _pumpUntilEvent(
+    await _waitUntilEvent(
       runtime,
       (candidate) => candidate.eventType == RuntimeEventType.mapLoadingFailed,
     );
 
     expect(claimed, ['${origin}unenumerated/style.json']);
 
-    map.close();
-    runtime.close();
+    await map.close();
+    await runtime.close();
   });
 
   // BND-157: a route picks which of the request's two URLs it compares, so a
@@ -583,11 +569,11 @@ void main() {
             },
           ),
         );
-        final map = runtime.createMap();
+        final map = await runtime.createMap();
         map.setStyleUrl(aliasUrl);
-        await _pumpUntil(runtime, () => requests.isNotEmpty);
-        map.close();
-        runtime.close();
+        await _waitUntil(() => requests.isNotEmpty);
+        await map.close();
+        await runtime.close();
         return requests.single;
       }
 
@@ -626,17 +612,17 @@ void main() {
       ),
     );
 
-    final map = runtime.createMap();
+    final map = await runtime.createMap();
     map.setStyleUrl(styleUrl);
-    await _pumpUntil(runtime, () => token != null);
+    await _waitUntil(() => token != null);
     final liveToken = token!;
     final waiter = Isolate.run(() {
       liveToken.waitUntilRetired();
       return true;
     });
 
-    map.close();
-    runtime.close();
+    await map.close();
+    await runtime.close();
     await _waitUntil(liveToken.cancelled);
     expect(
       () => liveToken.complete(
@@ -662,9 +648,9 @@ void main() {
         },
       ),
     );
-    final map = runtime.createMap();
+    final map = await runtime.createMap();
     map.setStyleUrl(styleUrl);
-    await _pumpUntil(runtime, () => token != null);
+    await _waitUntil(() => token != null);
 
     final liveToken = token!;
     expect(
@@ -690,8 +676,8 @@ void main() {
       throwsA(isA<InvalidArgumentException>()),
     );
 
-    map.close();
-    runtime.close();
+    await map.close();
+    await runtime.close();
   });
 
   test('transferred token aliases have one terminal winner', () async {
@@ -709,9 +695,9 @@ void main() {
         },
       ),
     );
-    final map = runtime.createMap();
+    final map = await runtime.createMap();
     map.setStyleUrl(styleUrl);
-    await _pumpUntil(runtime, () => token != null);
+    await _waitUntil(() => token != null);
 
     final liveToken = token!;
     final waiter = Isolate.run(() {
@@ -725,8 +711,8 @@ void main() {
       Isolate.run(() => _completeTokenAlias(liveToken)),
       Isolate.run(() => _completeTokenAlias(liveToken)),
     ]);
-    map.close();
-    runtime.close();
+    await map.close();
+    await runtime.close();
     final results = await race;
 
     // Teardown may retire the request before either alias reaches it, so the
@@ -757,12 +743,20 @@ void main() {
       ),
     );
 
-    final map = runtime.createMap();
+    final map = await runtime.createMap();
     map.setStyleUrl(styleUrl);
-    await _pumpUntil(runtime, () => calls > 0);
+    await _waitUntil(() => calls > 0);
 
-    map.close();
-    runtime.close();
+    // The binding fails the request the throwing callback abandoned, so the
+    // style load reports its failure rather than hanging.
+    final failure = await _waitUntilEvent(
+      runtime,
+      (candidate) => candidate.eventType == RuntimeEventType.mapLoadingFailed,
+    );
+    expect(failure.message, isNotNull);
+
+    await map.close();
+    await runtime.close();
   });
 
   test('closed resource request handles reject further use', () async {
@@ -798,16 +792,16 @@ void main() {
         },
       ),
     );
-    final map = runtime.createMap();
+    final map = await runtime.createMap();
     map.setStyleUrl(styleUrl);
-    await _pumpUntil(runtime, () => callbackFinished);
+    await _waitUntil(() => callbackFinished);
 
     expect(cancelledRejected, isTrue);
     expect(completionRejected, isTrue);
     expect(repeatedCloseSucceeded, isTrue);
 
-    map.close();
-    runtime.close();
+    await map.close();
+    await runtime.close();
   });
 
   // BND-198: a cancel callback registered on a handled request runs once when
@@ -844,20 +838,22 @@ void main() {
         ),
       );
 
-      final map = runtime.createMap();
+      final map = await runtime.createMap();
       map.setStyleUrl(styleUrl);
-      await _pumpUntil(runtime, () => token != null);
+      await _waitUntil(() => token != null);
       final liveToken = token!;
       expect(
         () => liveToken.setCancelCallback(() {}),
         throwsA(isA<InvalidStateException>()),
       );
 
-      map.close();
-      runtime.close();
+      await map.close();
+      await runtime.close();
       await _waitUntil(() => cancels > 0);
-      await Future<void>.delayed(const Duration(milliseconds: 50));
 
+      // A second delivery would arrive on a later turn, so settle before
+      // asserting the callback ran once.
+      await Future<void>.delayed(const Duration(milliseconds: 50));
       expect(insideError, isNull);
       expect(cancelledInsideCallback, isTrue);
       expect(cancels, 1);
@@ -891,16 +887,15 @@ void main() {
       ),
     );
 
-    final map = runtime.createMap();
+    final map = await runtime.createMap();
     map.setStyleUrl(styleUrl);
-    await _pumpUntilEvent(
+    await _waitUntilEvent(
       runtime,
       (candidate) => candidate.eventType == RuntimeEventType.mapStyleLoaded,
     );
 
-    map.close();
-    runtime.close();
-    await Future<void>.delayed(const Duration(milliseconds: 100));
+    await map.close();
+    await runtime.close();
 
     expect(cancels, 0);
   });
@@ -924,13 +919,13 @@ void main() {
       ),
     );
 
-    final map = runtime.createMap();
+    final map = await runtime.createMap();
     map.setStyleUrl(styleUrl);
-    await _pumpUntil(runtime, () => token != null);
+    await _waitUntil(() => token != null);
     final liveToken = token!;
 
-    map.close();
-    runtime.close();
+    await map.close();
+    await runtime.close();
     await _waitUntil(liveToken.cancelled);
 
     liveToken.setCancelCallback(() => cancels += 1);
@@ -941,61 +936,121 @@ void main() {
     liveToken.close();
   });
 
-  test('projection remains usable after its source map closes', () async {
-    final runtime = RuntimeHandle.create();
-    final map = runtime.createMap();
-    final projection = map.createProjection();
+  test(
+    'projection is synchronous and observes only earlier commands',
+    () async {
+      final runtime = RuntimeHandle.create();
+      final map = await runtime.createMap(
+        options: const MapOptions(width: 256, height: 256),
+      );
+      addTearDown(runtime.close);
+      addTearDown(map.close);
+      // A projection created after a camera command observes that command.
+      map.updateCamera(const CameraOptions(center: LatLng(10, 20), zoom: 3));
+      final projection = await map.createProjection();
+      addTearDown(projection.close);
+      {
+        final created = projection.camera();
+        expect(created.zoom, closeTo(3, 0.0001));
+        expect(created.center!.latitude, closeTo(10, 0.0001));
+        expect(created.center!.longitude, closeTo(20, 0.0001));
 
-    map.close();
-    runtime.close();
-    await Future<void>.delayed(Duration.zero);
-    expect(projection.pixelForLatLng(const LatLng(0, 0)).x.isFinite, isTrue);
-    projection.setCamera(const CameraOptions(center: LatLng(1, 1), zoom: 2));
-    expect(projection.camera().zoom, closeTo(2, 0.0001));
+        // A synchronous conversion round-trip returns to the same coordinate.
+        const coordinate = LatLng(10, 20);
+        final pixel = projection.pixelForLatLng(coordinate);
+        expect(pixel.x.isFinite, isTrue);
+        final roundTrip = projection.latLngForPixel(pixel);
+        expect(roundTrip.latitude, closeTo(coordinate.latitude, 1e-6));
+        expect(roundTrip.longitude, closeTo(coordinate.longitude, 1e-6));
 
-    projection.close();
-  });
+        // A setter is applied before it returns, so it changes later
+        // conversions, and the map's own camera stays untouched.
+        final before = projection.pixelForLatLng(const LatLng(0, 0));
+        projection.setCamera(
+          const CameraOptions(center: LatLng(1, 1), zoom: 2),
+        );
+        expect(projection.camera().zoom, closeTo(2, 0.0001));
+        final after = projection.pixelForLatLng(const LatLng(0, 0));
+        expect(after == before, isFalse);
+        expect((await map.queryCamera()).camera.zoom, closeTo(3, 0.0001));
 
-  test('unwrapped coordinate conversions preserve visible world copies', () {
-    final runtime = RuntimeHandle.create();
-    final map = runtime.createMap(
-      options: const MapOptions(width: 1024, height: 512),
-    );
-    addTearDown(() {
-      map.close();
-      runtime.close();
-    });
-    map.jumpTo(const CameraOptions(center: LatLng(0, 180), zoom: 0));
-    const points = [ScreenPoint(0, 256), ScreenPoint(1024, 256)];
+        // A later map command never reaches an existing projection.
+        map.updateCamera(const CameraOptions(zoom: 9));
+        await map.queryCamera();
+        expect(projection.camera().zoom, closeTo(2, 0.0001));
 
-    final wrapped = map.latLngsForPixels(points);
-    final unwrapped = map.latLngsForPixelsUnwrapped(points);
-    expect(
-      wrapped.every(
-        (coordinate) =>
-            coordinate.longitude >= -180 && coordinate.longitude <= 180,
-      ),
-      isTrue,
-    );
-    expect(unwrapped[1].longitude - unwrapped[0].longitude, greaterThan(360));
-    expect(
-      map.latLngForPixel(points[1]).longitude,
-      inInclusiveRange(-180, 180),
-    );
-    final right = map.latLngForPixelUnwrapped(points[1]);
-    expect(right.longitude, closeTo(unwrapped[1].longitude, 1e-10));
+        // Projection calls remain valid when Dart resumes the isolate on
+        // another native thread.
+        await Isolate.run(() {});
+        projection.setVisibleCoordinates(const [LatLng(-1, -1), LatLng(1, 1)]);
+        projection.setVisibleGeometry(
+          _jsonBytes('{"type":"Point","coordinates":[0,0]}'),
+        );
+        await map.close();
+        await runtime.close();
 
-    final projection = map.createProjection();
-    addTearDown(projection.close);
-    expect(
-      projection.latLngForPixel(points[1]).longitude,
-      inInclusiveRange(-180, 180),
-    );
-    expect(
-      projection.latLngForPixelUnwrapped(points[1]).longitude,
-      closeTo(right.longitude, 1e-10),
-    );
-  });
+        // A projection owns its copy of the transform, so every accessor and
+        // setter keeps working after the map and runtime are gone.
+        expect(projection.camera().center, isNotNull);
+        expect(
+          projection.pixelForLatLng(const LatLng(0, 0)).x.isFinite,
+          isTrue,
+        );
+        projection.setCamera(
+          const CameraOptions(center: LatLng(2, 2), zoom: 5),
+        );
+        expect(projection.camera().zoom, closeTo(5, 0.0001));
+
+        projection.close();
+        expect(projection.isClosed, isTrue);
+      }
+    },
+  );
+
+  test(
+    'unwrapped coordinate conversions preserve visible world copies',
+    () async {
+      final runtime = RuntimeHandle.create();
+      final map = await runtime.createMap(
+        options: const MapOptions(width: 1024, height: 512),
+      );
+      await _expectCommandCommitted(
+        map.updateCamera(const CameraOptions(center: LatLng(0, 180), zoom: 0)),
+      );
+      const points = [ScreenPoint(0, 256), ScreenPoint(1024, 256)];
+
+      final wrapped = await map.latLngsForPixels(points);
+      final unwrapped = await map.latLngsForPixelsUnwrapped(points);
+      expect(
+        wrapped.every(
+          (coordinate) =>
+              coordinate.longitude >= -180 && coordinate.longitude <= 180,
+        ),
+        isTrue,
+      );
+      expect(unwrapped[1].longitude - unwrapped[0].longitude, greaterThan(360));
+      expect(
+        (await map.latLngForPixel(points[1])).longitude,
+        inInclusiveRange(-180, 180),
+      );
+      final right = await map.latLngForPixelUnwrapped(points[1]);
+      expect(right.longitude, closeTo(unwrapped[1].longitude, 1e-10));
+
+      final projection = await map.createProjection();
+      expect(
+        projection.latLngForPixel(points[1]).longitude,
+        inInclusiveRange(-180, 180),
+      );
+      expect(
+        projection.latLngForPixelUnwrapped(points[1]).longitude,
+        closeTo(right.longitude, 1e-10),
+      );
+
+      projection.close();
+      await map.close();
+      await runtime.close();
+    },
+  );
 
   test('custom geometry tile callbacks reach their isolate', () async {
     final deliveredTiles = <CanonicalTileId>[];
@@ -1025,91 +1080,172 @@ void main() {
     callback.close();
   });
 
-  test('loaded style document and URL read back what was loaded', () {
+  test('loaded style document and URL read back what was loaded', () async {
     final runtime = RuntimeHandle.create();
-    final map = runtime.createMap();
+    final map = await runtime.createMap();
+    try {
+      // Nothing parsed and nothing requested yet.
+      expect(await map.getLoadedStyleJson(), isEmpty);
+      expect(await map.getStyleUrl(), '');
 
-    // Nothing parsed and nothing requested yet.
-    expect(map.getLoadedStyleJson(), isEmpty);
-    expect(map.getStyleUrl(), '');
+      // The document reads back byte-for-byte, so it can be reloaded unchanged.
+      map.setStyleJson(_jsonBytes(_emptyStyleJson));
+      expect(await map.getLoadedStyleJson(), _jsonBytes(_emptyStyleJson));
+      // Inline JSON clears the URL.
+      expect(await map.getStyleUrl(), '');
 
-    // The document reads back byte-for-byte, so it can be reloaded unchanged.
-    map.setStyleJson(_jsonBytes(_emptyStyleJson));
-    expect(map.getLoadedStyleJson(), _jsonBytes(_emptyStyleJson));
-    // Inline JSON clears the URL.
-    expect(map.getStyleUrl(), '');
-
-    // The URL is request state, recorded before the load can succeed, while the
-    // document still reports the style that last parsed.
-    map.setStyleUrl('https://example.com/style.json');
-    expect(map.getStyleUrl(), 'https://example.com/style.json');
-    expect(map.getLoadedStyleJson(), _jsonBytes(_emptyStyleJson));
-
-    map.close();
-    runtime.close();
+      // The URL is request state, recorded before the load can succeed, while
+      // the document still reports the style that last parsed.
+      map.setStyleUrl('https://example.com/style.json');
+      expect(await map.getStyleUrl(), 'https://example.com/style.json');
+      expect(await map.getLoadedStyleJson(), _jsonBytes(_emptyStyleJson));
+    } finally {
+      await map.close();
+      await runtime.close();
+    }
   });
 
   test('a removal and a map close each release a callback root', () async {
     const sourceId = 'dart-lifecycle-source';
     final runtime = RuntimeHandle.create();
-    final map = runtime.createMap();
-    map.setStyleJson(_jsonBytes(_emptyStyleJson));
+    final map = await runtime.createMap();
+    await _expectCommandCommitted(
+      map.setStyleJson(_jsonBytes(_emptyStyleJson)),
+    );
 
-    map.addCustomGeometrySource(
+    await map.addCustomGeometrySource(
       sourceId,
       CustomGeometrySourceOptions(fetchTile: (_) {}),
     );
     final removedProbe = customGeometryCallbackProbeForTesting(map, sourceId)!;
-    expect(map.removeStyleSource(sourceId), isTrue);
-    expect(removedProbe.retirementQueued, isTrue);
+    await _expectCommandCommitted(map.removeStyleSource(sourceId));
+    await _waitUntil(() => removedProbe.retirementQueued);
     expect(customGeometryCallbackProbeForTesting(map, sourceId), isNull);
 
-    map.addCustomGeometrySource(
+    await map.addCustomGeometrySource(
       sourceId,
       CustomGeometrySourceOptions(fetchTile: (_) {}),
     );
     final closeProbe = customGeometryCallbackProbeForTesting(map, sourceId)!;
-    map.close();
-    runtime.close();
+    await map.close();
+    await runtime.close();
     expect(closeProbe.retirementQueued, isTrue);
     await _waitUntil(() => removedProbe.closed && closeProbe.closed);
   });
 
-  test(
-    'a custom MVT vector source removal and map close each release a callback root',
-    () async {
-      const sourceId = 'dart-mvt-lifecycle-source';
-      final runtime = RuntimeHandle.create();
-      final map = runtime.createMap();
-      map.setStyleJson(_jsonBytes(_emptyStyleJson));
-
-      map.addCustomMvtVectorSource(
-        sourceId,
-        CustomMvtVectorSourceOptions(fetchTile: (_) {}),
-      );
-      final removedProbe = customMvtVectorCallbackProbeForTesting(
-        map,
-        sourceId,
-      )!;
-      expect(map.removeStyleSource(sourceId), isTrue);
-      expect(removedProbe.retirementQueued, isTrue);
-      expect(customMvtVectorCallbackProbeForTesting(map, sourceId), isNull);
-
-      map.addCustomMvtVectorSource(
-        sourceId,
-        CustomMvtVectorSourceOptions(fetchTile: (_) {}),
-      );
-      final closeProbe = customMvtVectorCallbackProbeForTesting(map, sourceId)!;
-      map.close();
-      runtime.close();
-      expect(closeProbe.retirementQueued, isTrue);
-      await _waitUntil(() => removedProbe.closed && closeProbe.closed);
-    },
-  );
-
-  test('nine-patch style images round-trip through the native C ABI', () {
+  test('a custom MVT vector source removal and map close each release a '
+      'callback root', () async {
+    const sourceId = 'dart-mvt-lifecycle-source';
     final runtime = RuntimeHandle.create();
-    final map = runtime.createMap();
+    final map = await runtime.createMap();
+    await _expectCommandCommitted(
+      map.setStyleJson(_jsonBytes(_emptyStyleJson)),
+    );
+
+    await map.addCustomMvtVectorSource(
+      sourceId,
+      CustomMvtVectorSourceOptions(fetchTile: (_) {}),
+    );
+    final removedProbe = customMvtVectorCallbackProbeForTesting(map, sourceId)!;
+    await _expectCommandCommitted(map.removeStyleSource(sourceId));
+    await _waitUntil(() => removedProbe.retirementQueued);
+    expect(customMvtVectorCallbackProbeForTesting(map, sourceId), isNull);
+
+    await map.addCustomMvtVectorSource(
+      sourceId,
+      CustomMvtVectorSourceOptions(fetchTile: (_) {}),
+    );
+    final closeProbe = customMvtVectorCallbackProbeForTesting(map, sourceId)!;
+    await map.close();
+    await runtime.close();
+    expect(closeProbe.retirementQueued, isTrue);
+    await _waitUntil(() => removedProbe.closed && closeProbe.closed);
+  });
+
+  test('feature state round-trips through the map store', () async {
+    final runtime = RuntimeHandle.create();
+    final map = await runtime.createMap();
+    try {
+      await _expectCommandCommitted(
+        map.setStyleJson(_jsonBytes(_emptyStyleJson)),
+      );
+      const selector = FeatureStateSelector(
+        sourceId: 'dart-feature-state-source',
+        featureId: 'feature-1',
+      );
+
+      // The map store answers reads without a render session or a loaded
+      // source, and missing state reads back as an empty object.
+      expect(
+        jsonDecode(utf8.decode(await map.getFeatureState(selector))),
+        <String, Object?>{},
+      );
+
+      await _expectCommandCommitted(
+        map.setFeatureState(selector, _jsonBytes('{"hover":true,"rank":2}')),
+      );
+      expect(jsonDecode(utf8.decode(await map.getFeatureState(selector))), {
+        'hover': true,
+        'rank': 2,
+      });
+
+      // Removing one key leaves the rest of the feature's state.
+      await _expectCommandCommitted(
+        map.removeFeatureState(
+          const FeatureStateSelector(
+            sourceId: 'dart-feature-state-source',
+            featureId: 'feature-1',
+            stateKey: 'hover',
+          ),
+        ),
+      );
+      expect(jsonDecode(utf8.decode(await map.getFeatureState(selector))), {
+        'rank': 2,
+      });
+
+      // A source-wide removal clears the remaining state.
+      await _expectCommandCommitted(
+        map.removeFeatureState(
+          const FeatureStateSelector(sourceId: 'dart-feature-state-source'),
+        ),
+      );
+      expect(
+        jsonDecode(utf8.decode(await map.getFeatureState(selector))),
+        <String, Object?>{},
+      );
+
+      // A selector without a feature ID cannot name state to set, and a state
+      // key without a feature ID cannot name state to remove.
+      expect(
+        () => map.setFeatureState(
+          const FeatureStateSelector(sourceId: 'dart-feature-state-source'),
+          _jsonBytes('{"hover":true}'),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => map.removeFeatureState(
+          const FeatureStateSelector(
+            sourceId: 'dart-feature-state-source',
+            stateKey: 'hover',
+          ),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      // Feature state must be one JSON object.
+      expect(
+        () => map.setFeatureState(selector, _jsonBytes('[1,2]')),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+    } finally {
+      await map.close();
+      await runtime.close();
+    }
+  });
+
+  test('nine-patch style images round-trip through the native C ABI', () async {
+    final runtime = RuntimeHandle.create();
+    final map = await runtime.createMap();
     try {
       map.setStyleJson(_jsonBytes(_emptyStyleJson));
       final image = PremultipliedRgba8Image(
@@ -1134,7 +1270,7 @@ void main() {
         ),
       );
 
-      final info = map.getStyleImageInfo('patch');
+      final info = await map.getStyleImageInfo('patch');
       expect(info, isNotNull);
       expect(info!.stretchXCount, 1);
       expect(info.stretchYCount, 2);
@@ -1143,14 +1279,14 @@ void main() {
       expect(info.textFitWidth, isNull);
       expect(info.textFitHeight, StyleImageTextFit.proportional);
 
-      final stretches = map.getStyleImageStretches('patch');
+      final stretches = await map.getStyleImageStretches('patch');
       expect(stretches, isNotNull);
       expect(stretches!.stretchX, [const ImageStretch(0, 1)]);
       expect(stretches.stretchY, [
         const ImageStretch(0, 1),
         const ImageStretch(1, 2),
       ]);
-      expect(map.getStyleImageStretches('missing'), isNull);
+      expect(await map.getStyleImageStretches('missing'), isNull);
 
       // A backwards interval is rejected by C.
       expect(
@@ -1168,334 +1304,384 @@ void main() {
       callerStretches.add(const ImageStretch(1, 2));
       expect(snapshotted.stretchX, [const ImageStretch(0, 1)]);
     } finally {
-      map.close();
-      runtime.close();
+      await map.close();
+      await runtime.close();
     }
   });
 
-  test('layer base accessors round-trip through the native C ABI', () {
+  test('layer base accessors round-trip through the native C ABI', () async {
     final runtime = RuntimeHandle.create();
-    final map = runtime.createMap();
+    final map = await runtime.createMap();
     try {
-      map.setStyleJson(
-        _jsonBytes(
-          '{"version":8,"sources":{"geo":{"type":"geojson","data":'
-          '{"type":"FeatureCollection","features":[]}}},"layers":['
-          '{"id":"bg","type":"background"},'
-          '{"id":"fill","type":"fill","source":"geo"}]}',
+      await _expectCommandCommitted(
+        map.setStyleJson(
+          _jsonBytes(
+            '{"version":8,"sources":{"geo":{"type":"geojson","data":'
+            '{"type":"FeatureCollection","features":[]}}},"layers":['
+            '{"id":"bg","type":"background"},'
+            '{"id":"fill","type":"fill","source":"geo"}]}',
+          ),
         ),
       );
 
-      expect(map.getLayerSourceLayer('fill'), '');
-      map.setLayerSourceLayer('fill', 'roads');
-      expect(map.getLayerSourceLayer('fill'), 'roads');
-      expect(map.getLayerSourceId('fill'), 'geo');
+      expect(await map.getLayerSourceLayer('fill'), '');
+      await map.setLayerSourceLayer('fill', 'roads');
+      expect(await map.getLayerSourceLayer('fill'), 'roads');
+      expect(await map.getLayerSourceId('fill'), 'geo');
 
-      // A layer type that takes no source is rejected, not silently ignored.
-      expect(
-        () => map.setLayerSourceLayer('bg', 'roads'),
-        throwsA(isA<InvalidArgumentException>()),
+      // A layer type that takes no source rejects a source-layer command and
+      // preserves its previous value.
+      await _expectCommandFailure(
+        map.setLayerSourceLayer('bg', 'roads'),
+        MaplibreStatus.invalidArgument,
       );
-      expect(map.getLayerSourceId('bg'), '');
+      expect(await map.getLayerSourceId('bg'), '');
 
-      // An unset zoom range crosses the boundary as infinities.
-      expect(map.getLayerMinZoom('fill'), double.negativeInfinity);
-      expect(map.getLayerMaxZoom('fill'), double.infinity);
+      // An unset zoom range crosses the boundary as infinities, and the
+      // reported source ID and source-layer sizes feed the copy operations.
+      var fillInfo = (await map.getStyleLayerInfo('fill'))!;
+      expect(fillInfo.type, 'fill');
+      expect(fillInfo.minZoom, double.negativeInfinity);
+      expect(fillInfo.maxZoom, double.infinity);
+      expect(fillInfo.visibility, StyleLayerVisibility.visible);
+      expect(fillInfo.sourceId, 'geo');
+      expect(fillInfo.sourceLayer, 'roads');
+
       map.setLayerMinZoom('fill', 4);
       map.setLayerMaxZoom('fill', 12.5);
-      expect(map.getLayerMinZoom('fill'), 4);
-      expect(map.getLayerMaxZoom('fill'), 12.5);
-
-      expect(map.getLayerVisibility('fill'), StyleLayerVisibility.visible);
       map.setLayerVisibility('fill', StyleLayerVisibility.none);
-      expect(map.getLayerVisibility('fill'), StyleLayerVisibility.none);
+      fillInfo = (await map.getStyleLayerInfo('fill'))!;
+      expect(fillInfo.minZoom, 4);
+      expect(fillInfo.maxZoom, 12.5);
+      expect(fillInfo.visibility, StyleLayerVisibility.none);
 
-      expect(
-        () => map.getLayerMinZoom('missing'),
-        throwsA(isA<InvalidArgumentException>()),
-      );
+      // A layer that carries no source reports absent source fields.
+      final bgInfo = (await map.getStyleLayerInfo('bg'))!;
+      expect(bgInfo.type, 'background');
+      expect(bgInfo.sourceId, isNull);
+      expect(bgInfo.sourceLayer, isNull);
+
+      // A missing layer reports null rather than metadata.
+      expect(await map.getStyleLayerInfo('missing'), isNull);
     } finally {
-      map.close();
-      runtime.close();
+      await map.close();
+      await runtime.close();
     }
   });
 
-  test('style transition options round-trip through the native C ABI', () {
-    const transitionStyleJson =
-        '{"version":8,"transition":{"duration":750,"delay":100},'
-        '"sources":{},"layers":[]}';
-    final runtime = RuntimeHandle.create();
-    final map = runtime.createMap();
-    try {
-      // A map with no style yet reports no duration or delay. The placement
-      // flag always reports, because native always holds a value for it.
-      final empty = map.getStyleTransitionOptions();
-      expect(empty.durationMs, isNull);
-      expect(empty.delayMs, isNull);
-      expect(empty.enablePlacementTransitions, isTrue);
+  test(
+    'style transition options round-trip through the native C ABI',
+    () async {
+      const transitionStyleJson =
+          '{"version":8,"transition":{"duration":750,"delay":100},'
+          '"sources":{},"layers":[]}';
+      final runtime = RuntimeHandle.create();
+      final map = await runtime.createMap();
+      try {
+        // A map with no style yet reports no duration or delay. The placement
+        // flag always reports, because native always holds a value for it.
+        final empty = await map.getStyleTransitionOptions();
+        expect(empty.durationMs, isNull);
+        expect(empty.delayMs, isNull);
+        expect(empty.enablePlacementTransitions, isTrue);
 
-      // The style parser fills in its own 300ms duration for a style that
-      // declares no transition.
-      map.setStyleJson(_jsonBytes(_emptyStyleJson));
-      final parsed = map.getStyleTransitionOptions();
-      expect(parsed.durationMs, 300);
-      expect(parsed.delayMs, isNull);
+        // The style parser fills in its own 300ms duration for a style that
+        // declares no transition.
+        map.setStyleJson(_jsonBytes(_emptyStyleJson));
+        final parsed = await map.getStyleTransitionOptions();
+        expect(parsed.durationMs, 300);
+        expect(parsed.delayMs, isNull);
 
-      map.setStyleJson(_jsonBytes(transitionStyleJson));
-      final declared = map.getStyleTransitionOptions();
-      expect(declared.durationMs, 750);
-      expect(declared.delayMs, 100);
-      expect(declared.enablePlacementTransitions, isTrue);
+        map.setStyleJson(_jsonBytes(transitionStyleJson));
+        final declared = await map.getStyleTransitionOptions();
+        expect(declared.durationMs, 750);
+        expect(declared.delayMs, 100);
+        expect(declared.enablePlacementTransitions, isTrue);
 
-      // A present zero stays distinguishable from an absent field, and an
-      // absent field clears what the style declared rather than merging.
-      const options = StyleTransitionOptions(
-        durationMs: 0,
-        enablePlacementTransitions: false,
-      );
-      map.setStyleTransitionOptions(options);
-      expect(map.getStyleTransitionOptions(), options);
-      expect(map.getStyleTransitionOptions().hashCode, options.hashCode);
+        // A present zero stays distinguishable from an absent field, and an
+        // absent field clears what the style declared rather than merging.
+        const options = StyleTransitionOptions(
+          durationMs: 0,
+          enablePlacementTransitions: false,
+        );
+        map.setStyleTransitionOptions(options);
+        expect(await map.getStyleTransitionOptions(), options);
+        expect(
+          (await map.getStyleTransitionOptions()).hashCode,
+          options.hashCode,
+        );
 
-      // Omitting the flag leaves the cross-fade on rather than clearing it.
-      map.setStyleTransitionOptions(
-        const StyleTransitionOptions(durationMs: 250),
-      );
-      expect(
-        map.getStyleTransitionOptions().enablePlacementTransitions,
-        isTrue,
-      );
+        // Omitting the flag leaves the cross-fade on rather than clearing it.
+        map.setStyleTransitionOptions(
+          const StyleTransitionOptions(durationMs: 250),
+        );
+        expect(
+          (await map.getStyleTransitionOptions()).enablePlacementTransitions,
+          isTrue,
+        );
 
-      // Loading a style replaces the override with what that style declares.
-      map.setStyleJson(_jsonBytes(transitionStyleJson));
-      expect(map.getStyleTransitionOptions(), declared);
+        // Loading a style replaces the override with what that style declares.
+        map.setStyleJson(_jsonBytes(transitionStyleJson));
+        expect(await map.getStyleTransitionOptions(), declared);
 
-      expect(
-        () => map.setStyleTransitionOptions(
+        final rejectedCommand = map.setStyleTransitionOptions(
           const StyleTransitionOptions(delayMs: -1),
-        ),
+        );
+        await _expectCommandFailure(
+          rejectedCommand,
+          MaplibreStatus.invalidArgument,
+        );
+        // The next ordered read observes the last committed options unchanged.
+        expect(await map.getStyleTransitionOptions(), declared);
+      } finally {
+        await map.close();
+        await runtime.close();
+      }
+    },
+  );
+
+  test(
+    'runtime rules, ambient cache, and offline regions cross the native C ABI',
+    () async {
+      final cacheSizeRuntime = RuntimeHandle.create(
+        options: const RuntimeOptions(cachePath: ':memory:'),
+      );
+      // An out-of-domain unsigned value is rejected before crossing into C.
+      expect(
+        () => cacheSizeRuntime.setMaximumAmbientCacheSize(BigInt.from(-1)),
         throwsA(isA<InvalidArgumentException>()),
       );
-    } finally {
-      map.close();
-      runtime.close();
-    }
-  });
+      await cacheSizeRuntime.setMaximumAmbientCacheSize(BigInt.zero);
+      await cacheSizeRuntime.close();
 
-  test('runtime and map handles use the native C ABI', () async {
-    final cacheSizeRuntime = RuntimeHandle.create(
-      options: const RuntimeOptions(cachePath: ':memory:'),
-    );
-    // An out-of-domain unsigned value is rejected before crossing into C.
-    expect(
-      () => cacheSizeRuntime.setMaximumAmbientCacheSize(BigInt.from(-1)),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    final cacheSizeOperation = cacheSizeRuntime.setMaximumAmbientCacheSize(
-      BigInt.zero,
-    );
-    expect(cacheSizeOperation.isDiscarded, isFalse);
-    cacheSizeOperation.discard();
-    expect(cacheSizeOperation.isDiscarded, isTrue);
-    cacheSizeRuntime.close();
-
-    final runtime = RuntimeHandle.create();
-    expect(runtime.isClosed, isFalse);
-    expect(
-      () => runtime.setResourceUrlRewriteRules([
-        const ResourceUrlRewriteRule(
-          url: 'https://example.com/original\u0000truncated',
-          replacementUrl: 'https://example.com/replacement',
-        ),
-      ]),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    expect(
-      () => runtime.setResourceUrlRewriteRules([
-        const ResourceUrlRewriteRule(
-          url: 'https://example.com/original',
-          replacementUrl: 'https://example.com/replacement\u0000truncated',
-        ),
-      ]),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    expect(
-      () => runtime.setHttpHeaderTransformRules([
+      final runtime = RuntimeHandle.create();
+      expect(runtime.isClosed, isFalse);
+      expect(
+        () => runtime.setResourceUrlRewriteRules([
+          const ResourceUrlRewriteRule(
+            url: 'https://example.com/original\u0000truncated',
+            replacementUrl: 'https://example.com/replacement',
+          ),
+        ]),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => runtime.setResourceUrlRewriteRules([
+          const ResourceUrlRewriteRule(
+            url: 'https://example.com/original',
+            replacementUrl: 'https://example.com/replacement\u0000truncated',
+          ),
+        ]),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => runtime.setHttpHeaderTransformRules([
+          const HttpHeaderTransformRule(
+            url: 'https://example.com/',
+            headers: [HttpHeader(name: 'Bad Name', value: 'secret')],
+          ),
+        ]),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => runtime.setHttpHeaderTransformRules([
+          const HttpHeaderTransformRule(
+            url: 'https://example.com/',
+            headers: [HttpHeader(name: 'Range', value: 'secret')],
+          ),
+        ]),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      runtime.setHttpHeaderTransformRules([
         const HttpHeaderTransformRule(
-          url: 'https://example.com/',
-          headers: [HttpHeader(name: 'Bad Name', value: 'secret')],
+          url: 'https://example.com/**',
+          matchGlob: true,
+          headers: [HttpHeader(name: 'X-Test', value: 'café')],
         ),
-      ]),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    expect(
-      () => runtime.setHttpHeaderTransformRules([
-        const HttpHeaderTransformRule(
-          url: 'https://example.com/',
-          headers: [HttpHeader(name: 'Range', value: 'secret')],
-        ),
-      ]),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    runtime.setHttpHeaderTransformRules([
-      const HttpHeaderTransformRule(
-        url: 'https://example.com/**',
-        matchGlob: true,
-        headers: [HttpHeader(name: 'X-Test', value: 'café')],
-      ),
-    ]);
-    runtime.clearHttpHeaderTransform();
-    expect(
-      () => runtime.setResourceProviderRules([
-        ResourceProviderRule(
-          requestedUrl: 'https://example.com/provider\u0000truncated',
-          response: ResourceResponse(status: ResourceResponseStatus.ok),
-        ),
-      ]),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    expect(
-      () => runtime.setResourceProviderRules([
-        ResourceProviderRule(
-          requestedUrl: 'https://example.com/provider-error-message',
-          response: ResourceResponse(
-            status: ResourceResponseStatus.error,
-            errorMessage: 'bad\u0000message',
+      ]);
+      runtime.clearHttpHeaderTransform();
+      expect(
+        () => runtime.setResourceProviderRules([
+          ResourceProviderRule(
+            requestedUrl: 'https://example.com/provider\u0000truncated',
+            response: ResourceResponse(status: ResourceResponseStatus.ok),
+          ),
+        ]),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => runtime.setResourceProviderRules([
+          ResourceProviderRule(
+            requestedUrl: 'https://example.com/provider-error-message',
+            response: ResourceResponse(
+              status: ResourceResponseStatus.error,
+              errorMessage: 'bad\u0000message',
+            ),
+          ),
+        ]),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => runtime.setResourceProviderRules([
+          ResourceProviderRule(
+            requestedUrl: 'https://example.com/provider-etag',
+            response: ResourceResponse(
+              status: ResourceResponseStatus.ok,
+              etag: 'etag\u0000tail',
+            ),
+          ),
+        ]),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => runtime.setResourceProvider(
+          ResourceProvider(
+            routes: const [
+              ResourceProviderRoute(url: 'https://example.com/provider\u0000x'),
+            ],
+            callback: (_, _) {},
           ),
         ),
-      ]),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    expect(
-      () => runtime.setResourceProviderRules([
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      await expectLater(
+        runtime.createMap(options: const MapOptions(width: -1)),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      runtime.setResourceUrlRewriteRules([
+        const ResourceUrlRewriteRule(
+          kind: ResourceKind.unknown,
+          url: 'https://example.com/style.json',
+          replacementUrl: 'https://example.com/rewritten-style.json',
+        ),
+      ]);
+      runtime.clearResourceTransform();
+      runtime.setResourceProviderRules([
         ResourceProviderRule(
-          requestedUrl: 'https://example.com/provider-etag',
+          kind: ResourceKind.style,
+          requestedUrl: 'https://example.com/provider-style.json',
           response: ResourceResponse(
             status: ResourceResponseStatus.ok,
-            etag: 'etag\u0000tail',
+            bytes: Uint8List.fromList([123]),
           ),
         ),
-      ]),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    expect(
-      () => runtime.setResourceProvider(
+      ]);
+      runtime.setResourceProvider(
         ResourceProvider(
           routes: const [
-            ResourceProviderRoute(url: 'https://example.com/provider\u0000x'),
-          ],
-          callback: (_, _) {},
-        ),
-      ),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    expect(
-      () => runtime.createMap(options: const MapOptions(width: -1)),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    runtime.setResourceUrlRewriteRules([
-      const ResourceUrlRewriteRule(
-        kind: ResourceKind.unknown,
-        url: 'https://example.com/style.json',
-        replacementUrl: 'https://example.com/rewritten-style.json',
-      ),
-    ]);
-    runtime.clearResourceTransform();
-    runtime.setResourceProviderRules([
-      ResourceProviderRule(
-        kind: ResourceKind.style,
-        requestedUrl: 'https://example.com/provider-style.json',
-        response: ResourceResponse(
-          status: ResourceResponseStatus.ok,
-          bytes: Uint8List.fromList([123]),
-        ),
-      ),
-    ]);
-    runtime.setResourceProvider(
-      ResourceProvider(
-        routes: const [
-          ResourceProviderRoute(
-            kind: ResourceKind.style,
-            url: 'https://example.com/provider-style.json',
-          ),
-        ],
-        callback: (request, handle) {
-          expect(request.kind, ResourceKind.style);
-          handle.complete(
-            ResourceResponse(
-              status: ResourceResponseStatus.ok,
-              bytes: Uint8List.fromList([123]),
+            ResourceProviderRoute(
+              kind: ResourceKind.style,
+              url: 'https://example.com/provider-style.json',
             ),
-          );
-        },
-      ),
-    );
-    final offlineOperation = runtime.runAmbientCacheOperation(
-      AmbientCacheOperation.clear,
-    );
-    expect(offlineOperation.isDiscarded, isFalse);
-    expect(() => runtime.close(), throwsA(isA<InvalidStateException>()));
-    RuntimeEventOfflineOperationCompleted? offlineCompletion;
-    await _waitUntil(() {
-      runtime.pump();
-      for (final event in runtime.drainEvents().events) {
-        final payload = event.payload;
-        if (payload is RuntimeEventOfflineOperationCompleted &&
-            identical(payload.operation, offlineOperation)) {
-          offlineCompletion = payload;
-        }
-      }
-      return offlineCompletion != null;
-    });
-    expect(offlineCompletion!.operation, same(offlineOperation));
-    expect(offlineCompletion!.resultStatus, MaplibreStatus.ok);
-    expect(runtime.drainEvents().events, isEmpty);
-    offlineOperation.discard();
-    expect(offlineOperation.isDiscarded, isTrue);
-    final offlineListOperation = runtime.listOfflineRegions();
-    expect(offlineListOperation.isDiscarded, isFalse);
-    expect(
-      () => offlineListOperation.takeRegionStatus(),
-      throwsA(isA<InvalidStateException>()),
-    );
-    offlineListOperation.discard();
-    expect(
-      () => offlineListOperation.takeRegionList(),
-      throwsA(isA<InvalidStateException>()),
-    );
-    final offlineCreateOperation = runtime.createOfflineRegion(
-      const OfflineTilePyramidRegionDefinition(
-        styleUrl: 'https://example.com/style.json',
-        bounds: LatLngBounds(
-          southwest: LatLng(-1, -1),
-          northeast: LatLng(1, 1),
+          ],
+          callback: (request, handle) {
+            expect(request.kind, ResourceKind.style);
+            handle.complete(
+              ResourceResponse(
+                status: ResourceResponseStatus.ok,
+                bytes: Uint8List.fromList([123]),
+              ),
+            );
+          },
         ),
-        minZoom: 0,
-        maxZoom: 1,
-        pixelRatio: 1,
-      ),
-      metadata: Uint8List.fromList([1, 2, 3]),
-    );
-    expect(offlineCreateOperation.isDiscarded, isFalse);
-    offlineCreateOperation.discard();
+      );
+      await runtime.runAmbientCacheOperation(AmbientCacheOperation.clear);
+      expect(await runtime.listOfflineRegions(), isEmpty);
+      final offlineRegion = await runtime.createOfflineRegion(
+        const OfflineTilePyramidRegionDefinition(
+          styleUrl: 'https://example.com/style.json',
+          bounds: LatLngBounds(
+            southwest: LatLng(-1, -1),
+            northeast: LatLng(1, 1),
+          ),
+          minZoom: 0,
+          maxZoom: 1,
+          pixelRatio: 1,
+        ),
+        metadata: Uint8List.fromList([1, 2, 3]),
+      );
+      expect(offlineRegion.metadata, [1, 2, 3]);
 
-    final map = runtime.createMap();
-    expect(map.isClosed, isFalse);
-    expect(map.size(), const MapSize(width: 256, height: 256, scaleFactor: 1));
-    runtime.setResourceProviderRules(const []);
-    runtime.setResourceProvider(
-      ResourceProvider(
-        routes: const [],
-        callback: (_, handle) => handle.close(),
-      ),
+      // Every region operation reports not found for an unknown region ID.
+      final missingRegion = offlineRegion.id + 1000;
+      expect(await runtime.getOfflineRegion(missingRegion), isNull);
+      await expectLater(
+        runtime.updateOfflineRegionMetadata(
+          missingRegion,
+          Uint8List.fromList([1]),
+        ),
+        throwsA(isA<NotFoundException>()),
+      );
+      await expectLater(
+        runtime.getOfflineRegionStatus(missingRegion),
+        throwsA(isA<NotFoundException>()),
+      );
+      await expectLater(
+        runtime.setOfflineRegionObserved(missingRegion, true),
+        throwsA(isA<NotFoundException>()),
+      );
+      await expectLater(
+        runtime.setOfflineRegionDownloadState(
+          missingRegion,
+          OfflineRegionDownloadState.inactive,
+        ),
+        throwsA(isA<NotFoundException>()),
+      );
+      await expectLater(
+        runtime.invalidateOfflineRegion(missingRegion),
+        throwsA(isA<NotFoundException>()),
+      );
+      await expectLater(
+        runtime.deleteOfflineRegion(missingRegion),
+        throwsA(isA<NotFoundException>()),
+      );
+
+      runtime.setResourceProviderRules(const []);
+      runtime.setResourceProvider(
+        ResourceProvider(
+          routes: const [],
+          callback: (_, handle) => handle.close(),
+        ),
+      );
+      runtime.clearResourceProvider();
+      final operationAfterClose = runtime.runAmbientCacheOperation(
+        AmbientCacheOperation.clear,
+      );
+      await runtime.close();
+      expect(runtime.isClosed, isTrue);
+      // A command accepted before the release still reaches a terminal result.
+      await operationAfterClose;
+    },
+  );
+
+  test('map snapshots fence the commands that committed them', () async {
+    final runtime = RuntimeHandle.create();
+    final map = await runtime.createMap(
+      options: const MapOptions(mapMode: MapMode.staticMap),
     );
-    runtime.clearResourceProvider();
-    map.setStyleJson(_jsonBytes(_emptyStyleJson));
-    map.requestRepaint();
-    expect(() => map.requestStillImage(), throwsA(isA<MaplibreException>()));
-    map.setDebugOptions(MapDebugOptions.tileBorders);
-    expect(map.debugOptions().contains(MapDebugOptions.tileBorders), isTrue);
-    map.setDebugOptions(MapDebugOptions.none);
+    expect(map.isClosed, isFalse);
+    expect(
+      map.snapshot().size,
+      const MapSize(width: 256, height: 256, scaleFactor: 1),
+    );
+    await _expectCommandCommitted(
+      map.setStyleJson(_jsonBytes(_emptyStyleJson)),
+    );
+    // A static map has no repaint loop, and the rejection is synchronous.
+    expect(() => map.requestRepaint(), throwsA(isA<InvalidStateException>()));
+    // The scale factor is fixed at creation, so only width and height change.
+    expect(
+      () => map.resize(const MapSize(width: 64, height: 64, scaleFactor: 2)),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+    await _expectCommandCommitted(
+      map.resize(const MapSize(width: 64, height: 32, scaleFactor: 1)),
+    );
+    expect(
+      map.snapshot().size,
+      const MapSize(width: 64, height: 32, scaleFactor: 1),
+    );
+
     var throwingLogCalls = 0;
     Maplibre.setLogCallback((_) {
       throwingLogCalls += 1;
@@ -1504,47 +1690,161 @@ void main() {
     map.dumpDebugLogs();
     await _waitUntil(() => throwingLogCalls > 0);
     Maplibre.clearLogCallback();
-    map.setStyleImage(
-      'dart-image',
-      PremultipliedRgba8Image(
-        width: 1,
-        height: 1,
-        stride: 4,
-        bytes: Uint8List.fromList([255, 0, 0, 255]),
-      ),
-      options: StyleImageOptions(pixelRatio: 2, sdf: true),
-    );
-    expect(map.styleImageExists('dart-image'), isTrue);
-    final styleImageInfo = map.getStyleImageInfo('dart-image');
-    expect(styleImageInfo, isNotNull);
-    expect(styleImageInfo!.width, 1);
-    expect(styleImageInfo.height, 1);
-    expect(styleImageInfo.pixelRatio, closeTo(2, 0.0001));
-    expect(styleImageInfo.sdf, isTrue);
-    final styleImage = map.copyStyleImagePremultipliedRgba8('dart-image');
-    expect(styleImage, isNotNull);
-    expect(styleImage!.bytes, [255, 0, 0, 255]);
-    expect(map.removeStyleImage('dart-image'), isTrue);
-    expect(map.styleImageExists('dart-image'), isFalse);
-    runtime.pump();
-    final copiedEvents = runtime.drainEvents().events;
+    final copiedEvents = runtime.drainEvents();
     final styleLoadedEvent = copiedEvents.firstWhere(
       (event) => event.eventType == RuntimeEventType.mapStyleLoaded,
     );
     expect(styleLoadedEvent.source, isA<MapRuntimeEventSource>());
     expect((styleLoadedEvent.source as MapRuntimeEventSource).map, same(map));
-    expect(runtime.drainEvents().events, isEmpty);
-    map.jumpTo(const CameraOptions(center: LatLng(0, 0), zoom: 1));
-    final camera = map.camera();
-    expect(camera.center, const LatLng(0, 0));
-    expect(camera.zoom, closeTo(1, 0.0001));
+    expect(runtime.drainEvents(), isEmpty);
+
+    // A committed command reports the published snapshot generation, and a
+    // snapshot at or past that generation observes the commit.
+    final debugFinished = await map.setDebugOptions(
+      MapDebugOptions.tileBorders,
+    );
+    expect(debugFinished.disposition, CommandDisposition.committed);
+    expect(debugFinished.generation, greaterThan(BigInt.zero));
+    final debugSnapshot = map.snapshot();
+    expect(
+      debugSnapshot.generation,
+      greaterThanOrEqualTo(debugFinished.generation),
+    );
+    expect(
+      debugSnapshot.debugOptions.contains(MapDebugOptions.tileBorders),
+      isTrue,
+    );
+    map.setDebugOptions(MapDebugOptions.none);
+
+    // Each new snapshot field round-trips through its set command.
+    final statsFinished = await map.setRenderingStatsViewEnabled(true);
+    final statsSnapshot = map.snapshot();
+    expect(statsSnapshot.renderingStatsViewEnabled, isTrue);
+    expect(
+      statsSnapshot.generation,
+      greaterThanOrEqualTo(statsFinished.generation),
+    );
+    map.setRenderingStatsViewEnabled(false);
+    await _expectCommandCommitted(
+      map.setViewportOptions(
+        const MapViewportOptions(viewportMode: ViewportMode.flippedY),
+      ),
+    );
+    expect(map.snapshot().viewportOptions.viewportMode, ViewportMode.flippedY);
+    map.setViewportOptions(
+      const MapViewportOptions(viewportMode: ViewportMode.defaultMode),
+    );
+    await _expectCommandCommitted(
+      map.setTileOptions(const MapTileOptions(prefetchZoomDelta: 0)),
+    );
+    expect(map.snapshot().tileOptions.prefetchZoomDelta, 0);
+    const cameraBounds = LatLngBounds(
+      southwest: LatLng(-10, -20),
+      northeast: LatLng(10, 20),
+    );
+    await _expectCommandCommitted(
+      map.setBounds(
+        const BoundOptions(
+          bounds: BoundsConstraint.bounded(cameraBounds),
+          minZoom: 0,
+          maxZoom: 24,
+        ),
+      ),
+    );
+    expect(
+      map.snapshot().bounds.bounds,
+      const BoundsConstraint.bounded(cameraBounds),
+    );
+    await _expectCommandCommitted(
+      map.setBounds(const BoundOptions(bounds: BoundsConstraint.unbounded())),
+    );
+    expect(map.snapshot().bounds.bounds, const BoundsConstraint.unbounded());
+    await _expectCommandCommitted(
+      map.setProjectionMode(
+        const ProjectionModeOptions(axonometric: true, xSkew: 0.25),
+      ),
+    );
+    final axonometric = map.snapshot().projectionMode;
+    expect(axonometric.axonometric, isTrue);
+    expect(axonometric.xSkew, closeTo(0.25, 1e-9));
+    const orientation = Quaternion(
+      0,
+      0,
+      0.7071067811865476,
+      0.7071067811865476,
+    );
+    await _expectCommandCommitted(
+      map.setFreeCameraOptions(
+        const FreeCameraOptions(orientation: orientation),
+      ),
+    );
+    final storedOrientation = map.snapshot().freeCameraOptions.orientation!;
+    expect(storedOrientation.z, closeTo(orientation.z, 1e-9));
+    expect(storedOrientation.w, closeTo(orientation.w, 1e-9));
+
+    await map.close();
+    await runtime.close();
+  });
+
+  test('gesture phases bracket the camera writes they carry', () async {
+    final runtime = RuntimeHandle.create();
+    final map = await runtime.createMap();
+    expect(map.snapshot().gestureInProgress, isFalse);
+
+    await _expectCommandCommitted(
+      map.updateCamera(
+        const CameraOptions(zoom: 2),
+        gesturePhase: GesturePhase.begin,
+      ),
+    );
+    expect(map.snapshot().gestureInProgress, isTrue);
+
+    await _expectCommandCommitted(
+      map.updateCamera(
+        const CameraOptions(zoom: 3),
+        gesturePhase: GesturePhase.update,
+      ),
+    );
+    expect(map.snapshot().gestureInProgress, isTrue);
+
+    await _expectCommandCommitted(
+      map.updateCamera(
+        const CameraOptions(zoom: 4),
+        gesturePhase: GesturePhase.end,
+      ),
+    );
+    expect(map.snapshot().gestureInProgress, isFalse);
+    expect((await map.queryCamera()).camera.zoom, closeTo(4, 0.0001));
+
+    await map.close();
+    await runtime.close();
+  });
+
+  test('ordered camera commands and queries observe map state', () async {
+    final runtime = RuntimeHandle.create();
+    final map = await runtime.createMap(
+      options: const MapOptions(mapMode: MapMode.staticMap),
+    );
+    await _expectCommandCommitted(
+      map.setStyleJson(_jsonBytes(_emptyStyleJson)),
+    );
+
+    final jumpCommand = map.updateCamera(
+      const CameraOptions(center: LatLng(0, 0), zoom: 1),
+    );
+    final camera = await map.queryCamera();
+    expect((await jumpCommand).disposition, CommandDisposition.committed);
+    expect(camera.camera.center, const LatLng(0, 0));
+    expect(camera.camera.zoom, closeTo(1, 0.0001));
     runtime.drainEvents();
-    final transitionId = (BigInt.one << 64) - BigInt.one;
-    map.easeTo(
+    final transitionId = (BigInt.one << 63) - BigInt.one;
+    map.updateCamera(
       const CameraOptions(zoom: 2),
+      mode: CameraUpdateMode.ease,
       animation: AnimationOptions(durationMs: 0, transitionId: transitionId),
     );
-    final cameraEvents = runtime.drainEvents().events;
+    await runtime.barrier();
+    final cameraEvents = runtime.drainEvents();
     final transitionEvent = cameraEvents.firstWhere(
       (event) =>
           event.eventType == RuntimeEventType.mapCameraTransitionFinished,
@@ -1562,75 +1862,36 @@ void main() {
           .map((event) => CameraChangeMode.fromRawValue(event.code)),
       contains(CameraChangeMode.immediate),
     );
-    map.setRenderingStatsViewEnabled(true);
-    expect(map.renderingStatsViewEnabled(), isTrue);
-    map.setRenderingStatsViewEnabled(false);
-    expect(map.isFullyLoaded(), isA<bool>());
-    map.setViewportOptions(
-      const MapViewportOptions(viewportMode: ViewportMode.defaultMode),
-    );
-    expect(map.viewportOptions().viewportMode, isNotNull);
-    map.setTileOptions(const MapTileOptions(prefetchZoomDelta: 0));
-    expect(map.tileOptions().prefetchZoomDelta, isNotNull);
-    const cameraBounds = LatLngBounds(
-      southwest: LatLng(-10, -20),
-      northeast: LatLng(10, 20),
-    );
-    map.setBounds(
-      const BoundOptions(
-        bounds: BoundsConstraint.bounded(cameraBounds),
-        minZoom: 0,
-        maxZoom: 24,
-      ),
-    );
-    expect(map.bounds().bounds, const BoundsConstraint.bounded(cameraBounds));
-    map.setBounds(const BoundOptions(bounds: BoundsConstraint.unbounded()));
-    expect(map.bounds().bounds, const BoundsConstraint.unbounded());
-    final projectionMode = map.projectionMode();
-    expect(projectionMode.axonometric, isNotNull);
-    map.setProjectionMode(const ProjectionModeOptions(axonometric: false));
-    expect(map.freeCameraOptions(), isA<FreeCameraOptions>());
+
+    // The published camera snapshot carries the same state the ordered query
+    // answers, and the generation it was published at.
+    final published = map.cameraSnapshot();
+    expect(published.camera.zoom, closeTo(2, 0.0001));
+    expect(published.generation, greaterThan(BigInt.zero));
+    expect((await map.queryCamera()).camera.zoom, closeTo(2, 0.0001));
+
     expect(
-      map
-          .cameraForLatLngBounds(
-            const LatLngBounds(
-              southwest: LatLng(-1, -1),
-              northeast: LatLng(1, 1),
-            ),
-          )
-          .zoom,
+      (await map.cameraForLatLngBounds(
+        const LatLngBounds(southwest: LatLng(-1, -1), northeast: LatLng(1, 1)),
+      )).zoom,
       isNotNull,
     );
     expect(
-      map.cameraForLatLngs(const [LatLng(-1, -1), LatLng(1, 1)]).zoom,
+      (await map.cameraForLatLngs(const [LatLng(-1, -1), LatLng(1, 1)])).zoom,
       isNotNull,
     );
     expect(
-      map
-          .latLngBoundsForCamera(const CameraOptions(center: LatLng(0, 0)))
-          .southwest
-          .latitude
-          .isFinite,
+      (await map.latLngBoundsForCamera(
+        const CameraOptions(center: LatLng(0, 0)),
+      )).southwest.latitude.isFinite,
       isTrue,
     );
-    map.moveBy(1, 1);
-    map.scaleBy(1.01, anchor: const ScreenPoint(128, 128));
-    map.rotateBy(const ScreenPoint(0, 0), const ScreenPoint(1, 1));
-    map.pitchBy(0);
-    map.cancelTransitions();
-    expect(map.isGestureInProgress(), isFalse);
-    map.setGestureInProgress(true);
-    map.moveBy(8, -4);
-    expect(map.isGestureInProgress(), isTrue);
-    map.setGestureInProgress(false);
-    expect(map.isGestureInProgress(), isFalse);
-    expect(() => map.scaleBy(-1), throwsA(isA<InvalidArgumentException>()));
-    final centerPixel = map.pixelForLatLng(const LatLng(0, 0));
+    final centerPixel = await map.pixelForLatLng(const LatLng(0, 0));
     expect(centerPixel.x.isFinite, isTrue);
-    expect(map.latLngForPixel(centerPixel).latitude.isFinite, isTrue);
-    expect(map.pixelsForLatLngs(const [LatLng(0, 0)]), hasLength(1));
-    expect(map.latLngsForPixels([centerPixel]), hasLength(1));
-    final projection = map.createProjection();
+    expect((await map.latLngForPixel(centerPixel)).latitude.isFinite, isTrue);
+    expect(await map.pixelsForLatLngs(const [LatLng(0, 0)]), hasLength(1));
+    expect(await map.latLngsForPixels([centerPixel]), hasLength(1));
+    final projection = await map.createProjection();
     final projectionCamera = projection.camera();
     expect(projectionCamera.center, isNotNull);
     expect(projection.pixelForLatLng(const LatLng(0, 0)).x.isFinite, isTrue);
@@ -1642,8 +1903,135 @@ void main() {
     expect(projection.camera().zoom, closeTo(2, 0.0001));
     projection.close();
     expect(projection.isClosed, isTrue);
+
+    await map.close();
+    await runtime.close();
+  });
+
+  test(
+    'a superseding camera update finishes the transition it replaced',
+    () async {
+      final runtime = RuntimeHandle.create();
+      final map = await runtime.createMap();
+      await _expectCommandCommitted(
+        map.setStyleJson(_jsonBytes(_emptyStyleJson)),
+      );
+      runtime.drainEvents();
+
+      final transitionId = BigInt.from(4242);
+      await _expectCommandCommitted(
+        map.updateCamera(
+          const CameraOptions(zoom: 6),
+          mode: CameraUpdateMode.ease,
+          animation: AnimationOptions(
+            durationMs: 5000,
+            transitionId: transitionId,
+          ),
+        ),
+      );
+      await runtime.barrier();
+      expect(
+        runtime.drainEvents().where(
+          (event) =>
+              event.eventType == RuntimeEventType.mapCameraTransitionFinished,
+        ),
+        isEmpty,
+      );
+
+      // A jump replaces the running transition, which reports its end with the
+      // identity the replaced transition carried.
+      await _expectCommandCommitted(
+        map.updateCamera(const CameraOptions(zoom: 1)),
+      );
+      await runtime.barrier();
+      final finished = runtime
+          .drainEvents()
+          .where(
+            (event) =>
+                event.eventType == RuntimeEventType.mapCameraTransitionFinished,
+          )
+          .toList();
+      expect(finished, hasLength(1));
+      expect(
+        (finished.single.payload as RuntimeEventCameraTransitionFinished)
+            .transitionId,
+        transitionId,
+      );
+
+      await map.close();
+      await runtime.close();
+    },
+  );
+
+  test('cancelTransitions ends the transition that was running', () async {
+    final runtime = RuntimeHandle.create();
+    final map = await runtime.createMap();
+    await _expectCommandCommitted(
+      map.setStyleJson(_jsonBytes(_emptyStyleJson)),
+    );
+    runtime.drainEvents();
+
+    final transitionId = BigInt.from(77);
+    await _expectCommandCommitted(
+      map.updateCamera(
+        const CameraOptions(zoom: 9),
+        mode: CameraUpdateMode.fly,
+        animation: AnimationOptions(
+          durationMs: 5000,
+          transitionId: transitionId,
+        ),
+      ),
+    );
+    await _expectCommandCommitted(map.cancelTransitions());
+    await runtime.barrier();
+
+    final finished = runtime
+        .drainEvents()
+        .where(
+          (event) =>
+              event.eventType == RuntimeEventType.mapCameraTransitionFinished,
+        )
+        .toList();
+    expect(finished, hasLength(1));
     expect(
-      () => map.attachRef().attachMetalSurface(
+      (finished.single.payload as RuntimeEventCameraTransitionFinished)
+          .transitionId,
+      transitionId,
+    );
+
+    // Cancelling with nothing running commits and changes nothing.
+    await _expectCommandCommitted(map.cancelTransitions());
+
+    await map.close();
+    await runtime.close();
+  });
+
+  test('closing a map cancels the commands it still owes', () async {
+    final runtime = RuntimeHandle.create();
+    final map = await runtime.createMap(
+      options: const MapOptions(mapMode: MapMode.staticMap),
+    );
+    await _expectCommandCommitted(
+      map.setStyleJson(_jsonBytes(_emptyStyleJson)),
+    );
+
+    // A static map with no render session never produces the image, so the
+    // request is still owed when the map closes.
+    final pending = map.requestStillImage();
+    // The expectation is attached before the close, because the cancellation
+    // reaches the future while the close is still running.
+    final cancelled = expectLater(pending, throwsA(isA<CancelledException>()));
+    await map.close();
+    await cancelled;
+
+    await runtime.close();
+  });
+
+  test('render target attachment rejects invalid descriptors', () async {
+    final runtime = RuntimeHandle.create();
+    final map = await runtime.createMap();
+    expect(
+      () => map.attachMetalSurface(
         const MetalSurfaceDescriptor(
           extent: RenderTargetExtent(width: -1, height: 16),
           context: MetalContextDescriptor(device: NativePointer.nullPointer),
@@ -1653,7 +2041,7 @@ void main() {
       throwsA(isA<InvalidArgumentException>()),
     );
     expect(
-      () => map.attachRef().attachMetalSurface(
+      () => map.attachMetalSurface(
         const MetalSurfaceDescriptor(
           extent: RenderTargetExtent(width: 16, height: 16),
           context: MetalContextDescriptor(device: NativePointer.nullPointer),
@@ -1663,7 +2051,7 @@ void main() {
       throwsA(isA<MaplibreException>()),
     );
     expect(
-      () => map.attachRef().attachMetalOwnedTexture(
+      () => map.attachMetalOwnedTexture(
         const MetalOwnedTextureDescriptor(
           extent: RenderTargetExtent(width: 16, height: 16),
           context: MetalContextDescriptor(device: NativePointer.nullPointer),
@@ -1672,7 +2060,7 @@ void main() {
       throwsA(isA<MaplibreException>()),
     );
     expect(
-      () => map.attachRef().attachOpenGLOwnedTexture(
+      () => map.attachOpenGLOwnedTexture(
         const OpenGLOwnedTextureDescriptor(
           extent: RenderTargetExtent(width: -1, height: 16),
           context: EglContextDescriptor(
@@ -1685,7 +2073,7 @@ void main() {
       throwsA(isA<InvalidArgumentException>()),
     );
     expect(
-      () => map.attachRef().attachOpenGLOwnedTexture(
+      () => map.attachOpenGLOwnedTexture(
         const OpenGLOwnedTextureDescriptor(
           extent: RenderTargetExtent(width: 16, height: 16),
           context: EglContextDescriptor(
@@ -1698,7 +2086,7 @@ void main() {
       throwsA(isA<MaplibreException>()),
     );
     expect(
-      () => map.attachRef().attachOpenGLBorrowedTexture(
+      () => map.attachOpenGLBorrowedTexture(
         const OpenGLBorrowedTextureDescriptor(
           extent: RenderTargetExtent(width: 16, height: 16),
           physicalWidth: 16,
@@ -1715,7 +2103,7 @@ void main() {
       throwsA(isA<MaplibreException>()),
     );
     expect(
-      () => map.attachRef().attachOpenGLSurface(
+      () => map.attachOpenGLSurface(
         const OpenGLSurfaceDescriptor(
           extent: RenderTargetExtent(width: 16, height: 16),
           context: EglContextDescriptor(
@@ -1729,362 +2117,442 @@ void main() {
       throwsA(isA<MaplibreException>()),
     );
 
-    final sourceIds = map.listStyleSourceIds();
-    expect(sourceIds, contains('org.maplibre.annotations'));
-    expect(
-      map.listStyleLayerIds(),
-      contains('org.maplibre.annotations.points'),
-    );
-    expect(map.styleSourceExists('missing-source'), isFalse);
-    expect(map.styleLayerExists('missing-layer'), isFalse);
-    expect(map.removeStyleSource('missing-source'), isFalse);
-    expect(map.removeStyleLayer('missing-layer'), isFalse);
-
-    map.addGeoJsonSourceUrl(
-      'dart-geojson-url-source',
-      'https://example.com/a.geojson',
-    );
-    expect(
-      map.getStyleSourceInfo('dart-geojson-url-source')!.type,
-      SourceType.geoJson,
-    );
-    map.setGeoJsonSourceUrl(
-      'dart-geojson-url-source',
-      'https://example.com/b.geojson',
-    );
-    expect(map.removeStyleSource('dart-geojson-url-source'), isTrue);
-    expect(
-      () => GeoJsonSourceDataHandle.prepare(
-        _jsonBytes('{"type":"FeatureCollection","features":[]}'),
-        options: GeoJsonSourceOptions(tileSize: 4294967296),
-      ),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    // Cluster validation runs at preparation: clustering rejects a bare
-    // geometry because it accepts only point-feature collections.
-    expect(
-      () => GeoJsonSourceDataHandle.prepare(
-        _jsonBytes('{"type":"Point","coordinates":[0,0]}'),
-        options: GeoJsonSourceOptions(cluster: true),
-      ),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    final clusteredData = GeoJsonSourceDataHandle.prepare(
-      _jsonBytes(
-        '{"type":"FeatureCollection","features":[{"type":"Feature",'
-        '"geometry":{"type":"Point","coordinates":[0,0]},"properties":{}}]}',
-      ),
-      options: GeoJsonSourceOptions(cluster: true, clusterRadius: 60),
-    );
-    map.addGeoJsonSourceData('dart-clustered-geojson-source', clusteredData);
-    // Installing rejects data whose baked-in options differ from the source's.
-    final plainData = GeoJsonSourceDataHandle.prepare(
-      _jsonBytes('{"type":"Point","coordinates":[0,0]}'),
-    );
-    expect(
-      () =>
-          map.setGeoJsonSourceData('dart-clustered-geojson-source', plainData),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    plainData.close();
-    map.setGeoJsonSourceSynchronousTiling(
-      'dart-clustered-geojson-source',
-      true,
-    );
-    map.setGeoJsonSourceSynchronousTiling(
-      'dart-clustered-geojson-source',
-      false,
-    );
-    expect(
-      () => map.setGeoJsonSourceSynchronousTiling('missing-source', true),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    // One prepared handle installs on any number of sources.
-    map.addGeoJsonSourceData('dart-clustered-geojson-copy', clusteredData);
-    clusteredData.close();
-    // Closing the handle never invalidates a source it was installed on.
-    expect(map.styleSourceExists('dart-clustered-geojson-source'), isTrue);
-    expect(map.removeStyleSource('dart-clustered-geojson-copy'), isTrue);
-    expect(map.removeStyleSource('dart-clustered-geojson-source'), isTrue);
-    clusteredData.close();
-    expect(clusteredData.isClosed, isTrue);
-    expect(
-      () => map.addGeoJsonSourceData('dart-closed-data', clusteredData),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    map.addVectorSourceUrl(
-      'dart-vector-source',
-      'https://example.com/vector.json',
-    );
-    expect(
-      map.getStyleSourceInfo('dart-vector-source')!.type,
-      SourceType.vector,
-    );
-    expect(map.removeStyleSource('dart-vector-source'), isTrue);
-    expect(
-      () => map.addVectorSourceTiles(
-        'dart-vector-invalid-tiles-source',
-        const ['https://example.com/{z}/{x}/{y}.mvt'],
-        options: const TileSourceOptions(tileSize: 4294967297),
-      ),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    map.addVectorSourceTiles(
-      'dart-vector-tiles-source',
-      const ['https://example.com/{z}/{x}/{y}.mvt'],
-      options: const TileSourceOptions(minZoom: 0, maxZoom: 14),
-    );
-    expect(
-      map.getStyleSourceInfo('dart-vector-tiles-source')!.type,
-      SourceType.vector,
-    );
-    expect(map.removeStyleSource('dart-vector-tiles-source'), isTrue);
-    map.addRasterSourceTiles('dart-raster-tiles-source', const [
-      'https://example.com/{z}/{x}/{y}.png',
-    ], options: const TileSourceOptions(tileSize: 256));
-    expect(
-      map.getStyleSourceInfo('dart-raster-tiles-source')!.type,
-      SourceType.raster,
-    );
-    expect(map.removeStyleSource('dart-raster-tiles-source'), isTrue);
-    map.addRasterDemSourceTiles(
-      'dart-raster-dem-tiles-source',
-      const ['https://example.com/{z}/{x}/{y}.png'],
-      options: const TileSourceOptions(
-        tileSize: 256,
-        rasterDemEncoding: RasterDemEncoding.terrarium,
-      ),
-    );
-    expect(
-      map.getStyleSourceInfo('dart-raster-dem-tiles-source')!.type,
-      SourceType.rasterDem,
-    );
-    map.addHillshadeLayer(
-      'dart-hillshade-layer',
-      'dart-raster-dem-tiles-source',
-    );
-    expect(map.getStyleLayerType('dart-hillshade-layer'), 'hillshade');
-    map.addColorReliefLayer(
-      'dart-color-relief-layer',
-      'dart-raster-dem-tiles-source',
-    );
-    expect(map.getStyleLayerType('dart-color-relief-layer'), 'color-relief');
-    map.moveStyleLayer(
-      'dart-color-relief-layer',
-      beforeLayerId: 'dart-hillshade-layer',
-    );
-    expect(map.removeStyleLayer('dart-color-relief-layer'), isTrue);
-    expect(map.removeStyleLayer('dart-hillshade-layer'), isTrue);
-    expect(map.removeStyleSource('dart-raster-dem-tiles-source'), isTrue);
-    map.addLocationIndicatorLayer('dart-location-layer');
-    expect(map.getStyleLayerType('dart-location-layer'), 'location-indicator');
-    map.setLocationIndicatorLocation(
-      'dart-location-layer',
-      const LatLng(37.7749, -122.4194),
-    );
-    final location =
-        jsonDecode(
-              utf8.decode(
-                map.getLayerProperty('dart-location-layer', 'location')!,
-              ),
-            )
-            as List<dynamic>;
-    expect(location.cast<num>(), [
-      closeTo(37.7749, 1e-6),
-      closeTo(-122.4194, 1e-6),
-      closeTo(0, 1e-6),
-    ]);
-    map.setLocationIndicatorBearing('dart-location-layer', 0);
-    map.setLocationIndicatorAccuracyRadius('dart-location-layer', 1);
-    map.setLocationIndicatorImageName(
-      'dart-location-layer',
-      LocationIndicatorImageKind.top,
-      'dart-location-image',
-    );
-    expect(map.removeStyleLayer('dart-location-layer'), isTrue);
-    const imageSourceCoordinates = [
-      LatLng(1, -1),
-      LatLng(1, 1),
-      LatLng(-1, 1),
-      LatLng(-1, -1),
-    ];
-    map.addImageSourceImage(
-      'dart-image-source',
-      imageSourceCoordinates,
-      PremultipliedRgba8Image(
-        width: 1,
-        height: 1,
-        stride: 4,
-        bytes: Uint8List.fromList([0, 255, 0, 255]),
-      ),
-    );
-    expect(map.getStyleSourceInfo('dart-image-source')!.type, SourceType.image);
-    expect(
-      map.getImageSourceCoordinates('dart-image-source'),
-      imageSourceCoordinates,
-    );
-    map.setImageSourceUrl('dart-image-source', 'https://example.com/image.png');
-    map.setImageSourceCoordinates(
-      'dart-image-source',
-      imageSourceCoordinates.reversed.toList(),
-    );
-    expect(
-      map.getImageSourceCoordinates('dart-image-source'),
-      imageSourceCoordinates.reversed.toList(),
-    );
-    expect(map.removeStyleSource('dart-image-source'), isTrue);
-
-    final fetchedTiles = <CanonicalTileId>[];
-    expect(
-      () => map.addCustomGeometrySource(
-        'dart-custom-invalid-source',
-        CustomGeometrySourceOptions(fetchTile: (_) {}, tileSize: 4294967297),
-      ),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    expect(
-      () => map.addCustomGeometrySource(
-        'dart-custom-invalid-buffer-source',
-        CustomGeometrySourceOptions(fetchTile: (_) {}, buffer: 4294967297),
-      ),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    expect(
-      () => map.addCustomGeometrySource(
-        'dart-custom-negative-tile-size-source',
-        CustomGeometrySourceOptions(fetchTile: (_) {}, tileSize: -1),
-      ),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    expect(
-      () => map.addCustomGeometrySource(
-        'dart-custom-negative-buffer-source',
-        CustomGeometrySourceOptions(fetchTile: (_) {}, buffer: -1),
-      ),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    map.addCustomGeometrySource(
-      'dart-custom-source',
-      CustomGeometrySourceOptions(fetchTile: fetchedTiles.add),
-    );
-    expect(
-      map.getStyleSourceInfo('dart-custom-source')!.type,
-      SourceType.customVector,
-    );
-    map.setCustomGeometrySourceTileData(
-      'dart-custom-source',
-      const CanonicalTileId(z: 0, x: 0, y: 0),
-      _jsonBytes('{"type":"FeatureCollection","features":[]}'),
-    );
-    map.invalidateCustomGeometrySourceTile(
-      'dart-custom-source',
-      const CanonicalTileId(z: 0, x: 0, y: 0),
-    );
-    expect(
-      () => map.invalidateCustomGeometrySourceTile(
-        'dart-custom-source',
-        const CanonicalTileId(z: -1, x: 0, y: 0),
-      ),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    map.invalidateCustomGeometrySourceRegion(
-      'dart-custom-source',
-      const LatLngBounds(southwest: LatLng(-1, -1), northeast: LatLng(1, 1)),
-    );
-    expect(map.removeStyleSource('dart-custom-source'), isTrue);
-    map.addCustomGeometrySource(
-      'dart-custom-source',
-      CustomGeometrySourceOptions(fetchTile: fetchedTiles.add),
-    );
-    expect(map.removeStyleSource('dart-custom-source'), isTrue);
-    map.addCustomMvtVectorSource(
-      'dart-custom-mvt-source',
-      CustomMvtVectorSourceOptions(fetchTile: fetchedTiles.add),
-    );
-    expect(
-      map.getStyleSourceInfo('dart-custom-mvt-source')!.type,
-      SourceType.customMvtVector,
-    );
-    map.setCustomMvtVectorSourceTileData(
-      'dart-custom-mvt-source',
-      const CanonicalTileId(z: 0, x: 0, y: 0),
-      Uint8List(0),
-    );
-    map.setCustomMvtVectorSourceTileError(
-      'dart-custom-mvt-source',
-      const CanonicalTileId(z: 0, x: 0, y: 0),
-      'tile missing',
-    );
-    map.invalidateCustomMvtVectorSourceTile(
-      'dart-custom-mvt-source',
-      const CanonicalTileId(z: 0, x: 0, y: 0),
-    );
-    expect(map.removeStyleSource('dart-custom-mvt-source'), isTrue);
-
-    final geoJsonData = GeoJsonSourceDataHandle.prepare(
-      _jsonBytes(
-        '{"type":"Feature","geometry":{"type":"Point","coordinates":[0,0]},'
-        '"properties":{"kind":"dart"}}',
-      ),
-    );
-    map.addGeoJsonSourceData('dart-geojson-source', geoJsonData);
-    geoJsonData.close();
-    expect(map.styleSourceExists('dart-geojson-source'), isTrue);
-    final info = map.getStyleSourceInfo('dart-geojson-source');
-    expect(info, isNotNull);
-    expect(info!.type, SourceType.geoJson);
-    expect(info.id, 'dart-geojson-source');
-    expect(info.attribution, isNull);
-    expect(map.listStyleSourceIds(), contains('dart-geojson-source'));
-
-    final updatedGeoJsonData = GeoJsonSourceDataHandle.prepare(
-      _jsonBytes('{"type":"Point","coordinates":[2,1]}'),
-    );
-    map.setGeoJsonSourceData('dart-geojson-source', updatedGeoJsonData);
-    updatedGeoJsonData.close();
-    map.addStyleLayerJson(
-      _jsonBytes(
-        '{"id":"dart-circle-layer","type":"circle","source":"dart-geojson-source"}',
-      ),
-    );
-    expect(map.styleLayerExists('dart-circle-layer'), isTrue);
-    expect(map.getStyleLayerType('dart-circle-layer'), 'circle');
-    expect(map.listStyleLayerIds(), contains('dart-circle-layer'));
-    final layerJson = map.getStyleLayerJson('dart-circle-layer');
-    expect(
-      jsonDecode(utf8.decode(layerJson!)),
-      containsPair('id', 'dart-circle-layer'),
-    );
-
-    map.setLayerProperty(
-      'dart-circle-layer',
-      'circle-radius',
-      _jsonBytes('6.5'),
-    );
-    expect(
-      map.getLayerProperty('dart-circle-layer', 'circle-radius'),
-      _jsonBytes('6.5'),
-    );
-    map.setLayerFilter(
-      'dart-circle-layer',
-      _jsonBytes('["==",["get","kind"],"dart"]'),
-    );
-    expect(
-      map.getLayerFilter('dart-circle-layer'),
-      _jsonBytes('["==",["get","kind"],"dart"]'),
-    );
-    map.setLayerFilter('dart-circle-layer', null);
-    expect(map.getLayerFilter('dart-circle-layer'), isNull);
-
-    expect(map.removeStyleLayer('dart-circle-layer'), isTrue);
-    expect(map.removeStyleSource('dart-geojson-source'), isTrue);
-
-    map.close();
-    expect(map.isClosed, isTrue);
-    runtime.close();
-    expect(runtime.isClosed, isTrue);
+    await map.close();
+    await runtime.close();
   });
 
+  test(
+    'style sources, layers, and images round-trip through the native C ABI',
+    () async {
+      final runtime = RuntimeHandle.create();
+      final map = await runtime.createMap();
+      await _expectCommandCommitted(
+        map.setStyleJson(_jsonBytes(_emptyStyleJson)),
+      );
+
+      // Style image metadata answers existence, and a removal is a command that
+      // commits once and then fails with not-found.
+      map.setStyleImage(
+        'dart-image',
+        PremultipliedRgba8Image(
+          width: 1,
+          height: 1,
+          stride: 4,
+          bytes: Uint8List.fromList([255, 0, 0, 255]),
+        ),
+        options: StyleImageOptions(pixelRatio: 2, sdf: true),
+      );
+      final styleImageInfo = await map.getStyleImageInfo('dart-image');
+      expect(styleImageInfo, isNotNull);
+      expect(styleImageInfo!.width, 1);
+      expect(styleImageInfo.height, 1);
+      expect(styleImageInfo.pixelRatio, closeTo(2, 0.0001));
+      expect(styleImageInfo.sdf, isTrue);
+      expect(await map.copyStyleImagePremultipliedRgba8('dart-image'), [
+        255,
+        0,
+        0,
+        255,
+      ]);
+      await _expectCommandCommitted(map.removeStyleImage('dart-image'));
+      expect(await map.getStyleImageInfo('dart-image'), isNull);
+      await _expectCommandFailure(
+        map.removeStyleImage('dart-image'),
+        MaplibreStatus.notFound,
+      );
+
+      final sourceIds = await map.listStyleSourceIds();
+      expect(sourceIds, contains('org.maplibre.annotations'));
+      expect(
+        await map.listStyleLayerIds(),
+        contains('org.maplibre.annotations.points'),
+      );
+      // Existence is answered by the info getters' found flag, and removing a
+      // missing object fails with not-found.
+      expect(await map.getStyleSourceInfo('missing-source'), isNull);
+      expect(await map.getStyleLayerInfo('missing-layer'), isNull);
+      await _expectCommandFailure(
+        map.removeStyleSource('missing-source'),
+        MaplibreStatus.notFound,
+      );
+      await _expectCommandFailure(
+        map.removeStyleLayer('missing-layer'),
+        MaplibreStatus.notFound,
+      );
+
+      map.addGeoJsonSourceUrl(
+        'dart-geojson-url-source',
+        'https://example.com/a.geojson',
+      );
+      expect(
+        (await map.getStyleSourceInfo('dart-geojson-url-source'))!.type,
+        SourceType.geoJson,
+      );
+      map.setGeoJsonSourceUrl(
+        'dart-geojson-url-source',
+        'https://example.com/b.geojson',
+      );
+      await _expectCommandCommitted(
+        map.removeStyleSource('dart-geojson-url-source'),
+      );
+      expect(
+        () => GeoJsonSourceDataHandle.prepare(
+          _jsonBytes('{"type":"FeatureCollection","features":[]}'),
+          options: GeoJsonSourceOptions(tileSize: 4294967296),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      // Cluster validation runs at preparation: clustering rejects a bare
+      // geometry because it accepts only point-feature collections.
+      expect(
+        () => GeoJsonSourceDataHandle.prepare(
+          _jsonBytes('{"type":"Point","coordinates":[0,0]}'),
+          options: GeoJsonSourceOptions(cluster: true),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      final clusteredData = GeoJsonSourceDataHandle.prepare(
+        _jsonBytes(
+          '{"type":"FeatureCollection","features":[{"type":"Feature",'
+          '"geometry":{"type":"Point","coordinates":[0,0]},"properties":{}}]}',
+        ),
+        options: GeoJsonSourceOptions(cluster: true, clusterRadius: 60),
+      );
+      await _expectCommandCommitted(
+        map.addGeoJsonSourceData(
+          'dart-clustered-geojson-source',
+          clusteredData,
+        ),
+      );
+      // The map thread rejects data whose baked-in options differ from the
+      // source's, reported through the command's terminal event.
+      final plainData = GeoJsonSourceDataHandle.prepare(
+        _jsonBytes('{"type":"Point","coordinates":[0,0]}'),
+      );
+      final mismatchedInstallCommand = map.setGeoJsonSourceData(
+        'dart-clustered-geojson-source',
+        plainData,
+      );
+      // A prepared handle may close as soon as the install command is submitted.
+      plainData.close();
+      await _expectCommandFailure(
+        mismatchedInstallCommand,
+        MaplibreStatus.invalidArgument,
+      );
+      await _expectCommandCommitted(
+        map.setGeoJsonSourceSynchronousTiling(
+          'dart-clustered-geojson-source',
+          true,
+        ),
+      );
+      await _expectCommandCommitted(
+        map.setGeoJsonSourceSynchronousTiling(
+          'dart-clustered-geojson-source',
+          false,
+        ),
+      );
+      await _expectCommandFailure(
+        map.setGeoJsonSourceSynchronousTiling('missing-source', true),
+        MaplibreStatus.notFound,
+      );
+      // One prepared handle installs on any number of sources.
+      await _expectCommandCommitted(
+        map.addGeoJsonSourceData('dart-clustered-geojson-copy', clusteredData),
+      );
+      clusteredData.close();
+      // Closing the handle never invalidates a source it was installed on.
+      expect(
+        await map.getStyleSourceInfo('dart-clustered-geojson-source'),
+        isNotNull,
+      );
+      await _expectCommandCommitted(
+        map.removeStyleSource('dart-clustered-geojson-copy'),
+      );
+      await _expectCommandCommitted(
+        map.removeStyleSource('dart-clustered-geojson-source'),
+      );
+      clusteredData.close();
+      expect(clusteredData.isClosed, isTrue);
+      expect(
+        () => map.addGeoJsonSourceData('dart-closed-data', clusteredData),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => map.addVectorSourceTiles(
+          'dart-vector-invalid-tiles-source',
+          const ['https://example.com/{z}/{x}/{y}.mvt'],
+          options: const TileSourceOptions(tileSize: 4294967297),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      map.addRasterDemSourceTiles(
+        'dart-raster-dem-tiles-source',
+        const ['https://example.com/{z}/{x}/{y}.png'],
+        options: const TileSourceOptions(
+          tileSize: 256,
+          rasterDemEncoding: RasterDemEncoding.terrarium,
+        ),
+      );
+      map.addHillshadeLayer(
+        'dart-hillshade-layer',
+        'dart-raster-dem-tiles-source',
+      );
+      expect(
+        (await map.getStyleLayerInfo('dart-hillshade-layer'))!.type,
+        'hillshade',
+      );
+      map.addColorReliefLayer(
+        'dart-color-relief-layer',
+        'dart-raster-dem-tiles-source',
+      );
+      expect(
+        (await map.getStyleLayerInfo('dart-color-relief-layer'))!.type,
+        'color-relief',
+      );
+      map.moveStyleLayer(
+        'dart-color-relief-layer',
+        beforeLayerId: 'dart-hillshade-layer',
+      );
+      await _expectCommandCommitted(
+        map.removeStyleLayer('dart-color-relief-layer'),
+      );
+      await _expectCommandCommitted(
+        map.removeStyleLayer('dart-hillshade-layer'),
+      );
+      await _expectCommandCommitted(
+        map.removeStyleSource('dart-raster-dem-tiles-source'),
+      );
+      map.addLocationIndicatorLayer('dart-location-layer');
+      expect(
+        (await map.getStyleLayerInfo('dart-location-layer'))!.type,
+        'location-indicator',
+      );
+      map.setLocationIndicatorLocation(
+        'dart-location-layer',
+        const LatLng(37.7749, -122.4194),
+      );
+      final location =
+          jsonDecode(
+                utf8.decode(
+                  (await map.getLayerProperty(
+                    'dart-location-layer',
+                    'location',
+                  ))!,
+                ),
+              )
+              as List<dynamic>;
+      expect(location.cast<num>(), [
+        closeTo(37.7749, 1e-6),
+        closeTo(-122.4194, 1e-6),
+        closeTo(0, 1e-6),
+      ]);
+      map.setLocationIndicatorBearing('dart-location-layer', 0);
+      map.setLocationIndicatorAccuracyRadius('dart-location-layer', 1);
+      map.setLocationIndicatorImageName(
+        'dart-location-layer',
+        LocationIndicatorImageKind.top,
+        'dart-location-image',
+      );
+      await _expectCommandCommitted(
+        map.removeStyleLayer('dart-location-layer'),
+      );
+      const imageSourceCoordinates = [
+        LatLng(1, -1),
+        LatLng(1, 1),
+        LatLng(-1, 1),
+        LatLng(-1, -1),
+      ];
+      map.addImageSourceImage(
+        'dart-image-source',
+        imageSourceCoordinates,
+        PremultipliedRgba8Image(
+          width: 1,
+          height: 1,
+          stride: 4,
+          bytes: Uint8List.fromList([0, 255, 0, 255]),
+        ),
+      );
+      expect(
+        (await map.getStyleSourceInfo('dart-image-source'))!.type,
+        SourceType.image,
+      );
+      expect(
+        await map.getImageSourceCoordinates('dart-image-source'),
+        imageSourceCoordinates,
+      );
+      map.setImageSourceUrl(
+        'dart-image-source',
+        'https://example.com/image.png',
+      );
+      map.setImageSourceCoordinates(
+        'dart-image-source',
+        imageSourceCoordinates.reversed.toList(),
+      );
+      expect(
+        await map.getImageSourceCoordinates('dart-image-source'),
+        imageSourceCoordinates.reversed.toList(),
+      );
+      await _expectCommandCommitted(map.removeStyleSource('dart-image-source'));
+
+      expect(
+        () => map.addCustomGeometrySource(
+          'dart-custom-invalid-source',
+          CustomGeometrySourceOptions(fetchTile: (_) {}, tileSize: 4294967297),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => map.addCustomGeometrySource(
+          'dart-custom-invalid-buffer-source',
+          CustomGeometrySourceOptions(fetchTile: (_) {}, buffer: 4294967297),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => map.addCustomGeometrySource(
+          'dart-custom-negative-tile-size-source',
+          CustomGeometrySourceOptions(fetchTile: (_) {}, tileSize: -1),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => map.addCustomGeometrySource(
+          'dart-custom-negative-buffer-source',
+          CustomGeometrySourceOptions(fetchTile: (_) {}, buffer: -1),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      map.addCustomGeometrySource(
+        'dart-custom-source',
+        CustomGeometrySourceOptions(fetchTile: (_) {}),
+      );
+      expect(
+        (await map.getStyleSourceInfo('dart-custom-source'))!.type,
+        SourceType.customVector,
+      );
+      map.setCustomGeometrySourceTileData(
+        'dart-custom-source',
+        const CanonicalTileId(z: 0, x: 0, y: 0),
+        _jsonBytes('{"type":"FeatureCollection","features":[]}'),
+      );
+      map.invalidateCustomGeometrySourceTile(
+        'dart-custom-source',
+        const CanonicalTileId(z: 0, x: 0, y: 0),
+      );
+      expect(
+        () => map.invalidateCustomGeometrySourceTile(
+          'dart-custom-source',
+          const CanonicalTileId(z: -1, x: 0, y: 0),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      map.invalidateCustomGeometrySourceRegion(
+        'dart-custom-source',
+        const LatLngBounds(southwest: LatLng(-1, -1), northeast: LatLng(1, 1)),
+      );
+      await _expectCommandCommitted(
+        map.removeStyleSource('dart-custom-source'),
+      );
+      map.addCustomGeometrySource(
+        'dart-custom-source',
+        CustomGeometrySourceOptions(fetchTile: (_) {}),
+      );
+      await _expectCommandCommitted(
+        map.removeStyleSource('dart-custom-source'),
+      );
+      map.addCustomMvtVectorSource(
+        'dart-custom-mvt-source',
+        CustomMvtVectorSourceOptions(fetchTile: (_) {}),
+      );
+      expect(
+        (await map.getStyleSourceInfo('dart-custom-mvt-source'))!.type,
+        SourceType.customMvtVector,
+      );
+      map.setCustomMvtVectorSourceTileData(
+        'dart-custom-mvt-source',
+        const CanonicalTileId(z: 0, x: 0, y: 0),
+        Uint8List(0),
+      );
+      map.setCustomMvtVectorSourceTileError(
+        'dart-custom-mvt-source',
+        const CanonicalTileId(z: 0, x: 0, y: 0),
+        'tile missing',
+      );
+      map.invalidateCustomMvtVectorSourceTile(
+        'dart-custom-mvt-source',
+        const CanonicalTileId(z: 0, x: 0, y: 0),
+      );
+      await _expectCommandCommitted(
+        map.removeStyleSource('dart-custom-mvt-source'),
+      );
+
+      final geoJsonData = GeoJsonSourceDataHandle.prepare(
+        _jsonBytes(
+          '{"type":"Feature","geometry":{"type":"Point","coordinates":[0,0]},'
+          '"properties":{"kind":"dart"}}',
+        ),
+      );
+      await _expectCommandCommitted(
+        map.addGeoJsonSourceData('dart-geojson-source', geoJsonData),
+      );
+      geoJsonData.close();
+      final info = await map.getStyleSourceInfo('dart-geojson-source');
+      expect(info, isNotNull);
+      expect(info!.type, SourceType.geoJson);
+      expect(info.id, 'dart-geojson-source');
+      expect(info.attribution, isNull);
+      expect(await map.listStyleSourceIds(), contains('dart-geojson-source'));
+
+      final updatedGeoJsonData = GeoJsonSourceDataHandle.prepare(
+        _jsonBytes('{"type":"Point","coordinates":[2,1]}'),
+      );
+      map.setGeoJsonSourceData('dart-geojson-source', updatedGeoJsonData);
+      updatedGeoJsonData.close();
+      map.addStyleLayerJson(
+        _jsonBytes(
+          '{"id":"dart-circle-layer","type":"circle","source":"dart-geojson-source"}',
+        ),
+      );
+      final circleInfo = await map.getStyleLayerInfo('dart-circle-layer');
+      expect(circleInfo, isNotNull);
+      expect(circleInfo!.type, 'circle');
+      expect(circleInfo.sourceId, 'dart-geojson-source');
+      expect(await map.listStyleLayerIds(), contains('dart-circle-layer'));
+      final layerJson = await map.getStyleLayerJson('dart-circle-layer');
+      expect(
+        jsonDecode(utf8.decode(layerJson!)),
+        containsPair('id', 'dart-circle-layer'),
+      );
+
+      map.setLayerProperty(
+        'dart-circle-layer',
+        'circle-radius',
+        _jsonBytes('6.5'),
+      );
+      expect(
+        await map.getLayerProperty('dart-circle-layer', 'circle-radius'),
+        _jsonBytes('6.5'),
+      );
+      map.setLayerFilter(
+        'dart-circle-layer',
+        _jsonBytes('["==",["get","kind"],"dart"]'),
+      );
+      expect(
+        await map.getLayerFilter('dart-circle-layer'),
+        _jsonBytes('["==",["get","kind"],"dart"]'),
+      );
+      map.setLayerFilter('dart-circle-layer', null);
+      expect(await map.getLayerFilter('dart-circle-layer'), isNull);
+
+      await _expectCommandCommitted(map.removeStyleLayer('dart-circle-layer'));
+      await _expectCommandCommitted(
+        map.removeStyleSource('dart-geojson-source'),
+      );
+
+      await map.close();
+      await runtime.close();
+    },
+  );
   test('native pointer preserves address value semantics', () {
     const pointer = NativePointer(0x1234);
 
@@ -2096,105 +2564,132 @@ void main() {
     expect(NativePointer.nullPointer.isNull, isTrue);
   });
 
-  test('BND-109 source inspection returns independent copied metadata', () {
+  test(
+    'BND-109 source inspection returns independent copied metadata',
+    () async {
+      final runtime = RuntimeHandle.create();
+      final map = await runtime.createMap();
+      map.setStyleJson(_jsonBytes(_emptyStyleJson));
+
+      const tileUrls = [
+        'https://a.example.com/{z}/{x}/{y}.mvt',
+        'https://b.example.com/{z}/{x}/{y}.mvt',
+      ];
+      const bounds = LatLngBounds(
+        southwest: LatLng(-12, -34),
+        northeast: LatLng(56, 78),
+      );
+      map.addVectorSourceTiles(
+        'inline-vector',
+        tileUrls,
+        options: const TileSourceOptions(
+          minZoom: 0,
+          maxZoom: 12,
+          attribution: 'Inline attribution',
+          scheme: TileScheme.tms,
+          bounds: bounds,
+          tileSize: 512,
+          vectorEncoding: VectorTileEncoding.mlt,
+        ),
+      );
+
+      final inline = (await map.getStyleSourceInfo('inline-vector'))!;
+      expect(inline.type, SourceType.vector);
+      expect(inline.url, isNull);
+      expect(inline.attribution, 'Inline attribution');
+      expect(inline.tileSize, 512);
+      expect(inline.vectorEncoding, VectorTileEncoding.mlt);
+      expect(inline.rasterDemEncoding, isNull);
+      expect(inline.tileJson, isNotNull);
+      expect(inline.tileJson!.tileUrls, tileUrls);
+      expect(inline.tileJson!.minZoom, 0);
+      expect(inline.tileJson!.maxZoom, 12);
+      expect(inline.tileJson!.scheme, TileScheme.tms);
+      expect(inline.tileJson!.bounds, bounds);
+      expect(
+        () => inline.tileJson!.tileUrls.add('https://example.com/extra'),
+        throwsUnsupportedError,
+      );
+
+      map.addVectorSourceUrl(
+        'url-vector',
+        'https://example.com/vector-tilejson.json',
+      );
+      final urlBacked = (await map.getStyleSourceInfo('url-vector'))!;
+      expect(urlBacked.url, 'https://example.com/vector-tilejson.json');
+      expect(urlBacked.tileJson, isNull);
+
+      expect(
+        await map.getStyleSourceAttribution('inline-vector'),
+        'Inline attribution',
+      );
+      expect(await map.getStyleSourceUrl('inline-vector'), isNull);
+      expect(await map.getStyleSourceTileUrls('inline-vector'), tileUrls);
+      expect(await map.getStyleSourceAttribution('url-vector'), isNull);
+      expect(await map.getStyleSourceUrl('url-vector'), urlBacked.url);
+      expect(await map.getStyleSourceTileUrls('url-vector'), isEmpty);
+      expect(await map.getStyleSourceAttribution('missing-source'), isNull);
+      expect(await map.getStyleSourceUrl('missing-source'), isNull);
+      expect(await map.getStyleSourceTileUrls('missing-source'), isNull);
+
+      map.addRasterDemSourceTiles(
+        'inline-dem',
+        const ['https://example.com/{z}/{x}/{y}.png'],
+        options: const TileSourceOptions(
+          tileSize: 256,
+          rasterDemEncoding: RasterDemEncoding.terrarium,
+        ),
+      );
+      final rasterDem = (await map.getStyleSourceInfo('inline-dem'))!;
+      expect(rasterDem.tileSize, 256);
+      expect(rasterDem.rasterDemEncoding, RasterDemEncoding.terrarium);
+      expect(rasterDem.vectorEncoding, isNull);
+
+      await _expectCommandCommitted(map.removeStyleSource('inline-vector'));
+      await _expectCommandCommitted(map.removeStyleSource('url-vector'));
+      await _expectCommandCommitted(map.removeStyleSource('inline-dem'));
+      await map.close();
+      await runtime.close();
+
+      expect(inline.id, 'inline-vector');
+      expect(inline.tileJson!.tileUrls, tileUrls);
+      expect(urlBacked.url, 'https://example.com/vector-tilejson.json');
+    },
+  );
+
+  test('style source volatility round-trips through the public API', () async {
     final runtime = RuntimeHandle.create();
-    final map = runtime.createMap();
-    map.setStyleJson(_jsonBytes(_emptyStyleJson));
-
-    const tileUrls = [
-      'https://a.example.com/{z}/{x}/{y}.mvt',
-      'https://b.example.com/{z}/{x}/{y}.mvt',
-    ];
-    const bounds = LatLngBounds(
-      southwest: LatLng(-12, -34),
-      northeast: LatLng(56, 78),
-    );
-    map.addVectorSourceTiles(
-      'inline-vector',
-      tileUrls,
-      options: const TileSourceOptions(
-        minZoom: 0,
-        maxZoom: 12,
-        attribution: 'Inline attribution',
-        scheme: TileScheme.tms,
-        bounds: bounds,
-        tileSize: 512,
-        vectorEncoding: VectorTileEncoding.mlt,
-      ),
-    );
-
-    final inline = map.getStyleSourceInfo('inline-vector')!;
-    expect(inline.type, SourceType.vector);
-    expect(inline.url, isNull);
-    expect(inline.attribution, 'Inline attribution');
-    expect(inline.tileSize, 512);
-    expect(inline.vectorEncoding, VectorTileEncoding.mlt);
-    expect(inline.rasterDemEncoding, isNull);
-    expect(inline.tileJson, isNotNull);
-    expect(inline.tileJson!.tileUrls, tileUrls);
-    expect(inline.tileJson!.minZoom, 0);
-    expect(inline.tileJson!.maxZoom, 12);
-    expect(inline.tileJson!.scheme, TileScheme.tms);
-    expect(inline.tileJson!.bounds, bounds);
-    expect(
-      () => inline.tileJson!.tileUrls.add('https://example.com/extra'),
-      throwsUnsupportedError,
-    );
-
-    map.addVectorSourceUrl(
-      'url-vector',
-      'https://example.com/vector-tilejson.json',
-    );
-    final urlBacked = map.getStyleSourceInfo('url-vector')!;
-    expect(urlBacked.url, 'https://example.com/vector-tilejson.json');
-    expect(urlBacked.tileJson, isNull);
-
-    map.addRasterDemSourceTiles(
-      'inline-dem',
-      const ['https://example.com/{z}/{x}/{y}.png'],
-      options: const TileSourceOptions(
-        tileSize: 256,
-        rasterDemEncoding: RasterDemEncoding.terrarium,
-      ),
-    );
-    final rasterDem = map.getStyleSourceInfo('inline-dem')!;
-    expect(rasterDem.tileSize, 256);
-    expect(rasterDem.rasterDemEncoding, RasterDemEncoding.terrarium);
-    expect(rasterDem.vectorEncoding, isNull);
-
-    expect(map.removeStyleSource('inline-vector'), isTrue);
-    expect(map.removeStyleSource('url-vector'), isTrue);
-    expect(map.removeStyleSource('inline-dem'), isTrue);
-    map.close();
-    runtime.close();
-
-    expect(inline.id, 'inline-vector');
-    expect(inline.tileJson!.tileUrls, tileUrls);
-    expect(urlBacked.url, 'https://example.com/vector-tilejson.json');
-    expect(TileScheme.fromRaw(91).rawValue, 91);
-    expect(VectorTileEncoding.fromRaw(92).rawValue, 92);
-    expect(RasterDemEncoding.fromRaw(93).rawValue, 93);
-  });
-
-  test('style source volatility round-trips through the public API', () {
-    final runtime = RuntimeHandle.create();
-    addTearDown(runtime.close);
-    final map = runtime.createMap();
-    addTearDown(map.close);
+    final map = await runtime.createMap();
     map.setStyleJson(_jsonBytes(_emptyStyleJson));
     map.addVectorSourceTiles('dart-volatile-source', const [
       'https://example.com/{z}/{x}/{y}.mvt',
     ]);
 
-    expect(map.getStyleSourceInfo('dart-volatile-source')!.isVolatile, isFalse);
-    map.setStyleSourceVolatile('dart-volatile-source', true);
-    expect(map.getStyleSourceInfo('dart-volatile-source')!.isVolatile, isTrue);
-    map.setStyleSourceVolatile('dart-volatile-source', false);
-    expect(map.getStyleSourceInfo('dart-volatile-source')!.isVolatile, isFalse);
     expect(
-      () => map.setStyleSourceVolatile('missing-source', true),
-      throwsA(isA<InvalidArgumentException>()),
+      (await map.getStyleSourceInfo('dart-volatile-source'))!.isVolatile,
+      isFalse,
     );
+    await _expectCommandCommitted(
+      map.setStyleSourceVolatile('dart-volatile-source', true),
+    );
+    expect(
+      (await map.getStyleSourceInfo('dart-volatile-source'))!.isVolatile,
+      isTrue,
+    );
+    await _expectCommandCommitted(
+      map.setStyleSourceVolatile('dart-volatile-source', false),
+    );
+    expect(
+      (await map.getStyleSourceInfo('dart-volatile-source'))!.isVolatile,
+      isFalse,
+    );
+    await _expectCommandFailure(
+      map.setStyleSourceVolatile('missing-source', true),
+      MaplibreStatus.notFound,
+    );
+
+    await map.close();
+    await runtime.close();
   });
 
   test('scoped native values validate before exposing borrowed values', () {
@@ -2225,215 +2720,72 @@ void main() {
     expect(() => value.value, throwsStateError);
   });
 
-  test('native buffer owns reusable native byte storage', () {
-    final buffer = NativeBuffer(4);
-    try {
-      buffer.writeBytes(Uint8List.fromList([42]));
-
-      expect(buffer.byteLength, 4);
-      expect(buffer.isClosed, isFalse);
-      expect(buffer.copyBytes(length: 1).single, 42);
-      expect(() => buffer.copyBytes(length: 5), throwsRangeError);
-      expect(() => buffer.writeBytes(Uint8List(5)), throwsRangeError);
-    } finally {
-      buffer.close();
-    }
-
-    expect(buffer.isClosed, isTrue);
-    expect(() => buffer.copyBytes(), throwsStateError);
-    expect(() => NativeBuffer(0), throwsArgumentError);
-  });
-
-  test('runtime value wrappers preserve unknown raw values', () {
-    final eventType = RuntimeEventType.fromRawValue(0xfeed);
-    final sourceType = RuntimeEventSourceType.fromRawValue(0xbeef);
-    final renderMode = RenderMode.fromRawValue(42);
-    final renderResult = RenderResult.fromRawValue(42);
-    final operationKind = OfflineOperationKind.fromRawValue(99);
-    final resultKind = OfflineOperationResultKind.fromRawValue(100);
-    const unknownDefinition = UnknownOfflineRegionDefinition(101);
-    final ownership = OpenGLContextOwnership.fromRawValue(102);
-    final clientApi = OpenGLClientApi.fromRawValue(103);
-
-    expect(eventType.rawValue, 0xfeed);
-    expect(eventType, RuntimeEventType.fromRawValue(0xfeed));
-    expect(sourceType.rawValue, 0xbeef);
-    expect(renderMode.name, 'unknown(42)');
-    expect(renderResult, RenderResult.fromRawValue(42));
-    expect(renderResult.name, 'unknown(42)');
-    expect(operationKind.rawValue, 99);
-    expect(resultKind.rawValue, 100);
-    expect(unknownDefinition.rawType, 101);
-    expect(ownership, OpenGLContextOwnership.fromRawValue(102));
-    expect(ownership.name, 'unknown(102)');
-    expect(clientApi.rawValue, 103);
-  });
-
   test(
-    'a parked owner isolate wakes for native work and for a signal',
+    'runtime and map survive isolate execution and await resumption',
     () async {
-      final ready = ReceivePort();
-      final signalled = ReceivePort();
-      await Isolate.spawn(_signalWakeSource, [
-        ready.sendPort,
-        signalled.sendPort,
-      ]);
-      final worker = await ready.first as SendPort;
-
-      // No await below this line: the VM may resume an isolate on another OS
-      // thread, and runtime calls are owner-thread affine. The worker
-      // handshake finishes above so this isolate owns the runtime throughout.
       final runtime = RuntimeHandle.create(
         options: const RuntimeOptions(cachePath: ':memory:'),
       );
-      final map = runtime.createMap();
-      _quiesce(runtime);
-
-      // The scheme is unsupported, so native reports the failure from its own
-      // threads and that failure reaches the parked owner isolate.
-      map.setStyleUrl('unsupported://style.json');
-      var loadingFailed = false;
-      final loadStarted = Stopwatch()..start();
-      for (var attempt = 0; attempt < 20 && !loadingFailed; attempt += 1) {
-        runtime.pump(timeout: _parkTimeout);
-        expect(
-          loadStarted.elapsed,
-          lessThan(_promptReturn),
-          reason: 'parks sat out their timeouts while loading was pending',
-        );
-        for (final event in runtime.drainEvents().events) {
-          if (event.eventType == RuntimeEventType.mapLoadingFailed) {
-            loadingFailed = true;
-          }
-        }
-      }
-      expect(loadingFailed, isTrue);
-
-      // A source signalled from another isolate matches a host's submission
-      // path, and the park it releases has no other work to end it.
-      final source = runtime.acquireWakeSource();
-      _quiesce(runtime);
-      worker.send(source);
-
-      final parkStarted = Stopwatch()..start();
-      runtime.pump(timeout: _parkTimeout);
-      expect(
-        parkStarted.elapsed,
-        lessThan(_promptReturn),
-        reason:
-            'the parked owner isolate timed out instead of taking the signal',
+      final map = await runtime.createMap(
+        options: const MapOptions(width: 64, height: 64),
       );
 
-      // A wake source stays usable after its runtime closes, so hosts tear the
-      // two down in either order.
-      map.close();
-      runtime.close();
-      source.signal();
-      source.close();
-      expect(source.isClosed, isTrue);
-      expect(source.close, returnsNormally);
-      expect(source.signal, throwsA(isA<InvalidArgumentException>()));
+      await Isolate.run(() {});
 
-      await signalled.first;
-      ready.close();
-      signalled.close();
+      final before = map.snapshot();
+      final completion = map.requestRepaint();
+      final camera = await map.queryCamera();
+      expect((await completion).disposition, CommandDisposition.committed);
+      expect(camera.generation, greaterThanOrEqualTo(before.generation));
+
+      await map.close();
+      await runtime.close();
+      expect(map.isClosed, isTrue);
+      expect(runtime.isClosed, isTrue);
     },
   );
 
-  test('a pump clears the wake flag it returns on', () {
-    final runtime = RuntimeHandle.create(
-      options: const RuntimeOptions(cachePath: ':memory:'),
-    );
-    final source = runtime.acquireWakeSource();
-    _quiesce(runtime);
-
-    source.signal();
-    final signalledStarted = Stopwatch()..start();
-    runtime.pump(timeout: _parkTimeout);
-    expect(
-      signalledStarted.elapsed,
-      lessThan(_promptReturn),
-      reason: 'a pump waited even though the wake flag was set',
-    );
-
-    // The pump above cleared the wake flag, so this one waits its full timeout.
-    final idleStarted = Stopwatch()..start();
-    runtime.pump(timeout: const Duration(milliseconds: 200));
-    expect(
-      idleStarted.elapsed,
-      greaterThanOrEqualTo(const Duration(milliseconds: 100)),
-      reason: 'the first pump left the wake flag set',
-    );
-
-    source.close();
-    runtime.close();
-  });
-
-  test('an attach reference reaches native from another isolate', () async {
+  test('native execution progresses without blocking the isolate', () async {
     final runtime = RuntimeHandle.create();
-    final map = runtime.createMap(
-      options: const MapOptions(width: 64, height: 64),
+    final map = await runtime.createMap();
+
+    // An ordered query hands the isolate back to its event loop while native
+    // code works, so a zero-delay timer runs before the query answers.
+    var timerRan = false;
+    unawaited(Future<void>.delayed(Duration.zero, () => timerRan = true));
+    await map.queryCamera();
+    expect(timerRan, isTrue);
+
+    map.setStyleUrl('unsupported://autonomous-progress.json');
+    final event = await _waitUntilEvent(
+      runtime,
+      (candidate) => candidate.eventType == RuntimeEventType.mapLoadingFailed,
     );
-    // A MapHandle cannot cross isolates, so the reference carries the address.
-    final attachRef = map.attachRef();
+    expect(event.eventType, RuntimeEventType.mapLoadingFailed);
 
-    // Close before awaiting: the isolate may resume on a different OS thread
-    // after an await, which would make these handles unusable. The reference
-    // outliving them is the point here.
-    map.close();
-    runtime.close();
-
-    // The extent is valid, so the binding's own checks pass and the attach
-    // reaches native, which validates the retired map id before the descriptor.
-    final diagnostic = await Isolate.run(() {
-      try {
-        attachRef.attachMetalSurface(
-          const MetalSurfaceDescriptor(
-            extent: RenderTargetExtent(width: 16, height: 16),
-            context: MetalContextDescriptor(device: NativePointer.nullPointer),
-            layer: NativePointer.nullPointer,
-          ),
-        );
-        return 'attached';
-      } on MaplibreException catch (error) {
-        return error.diagnostic;
-      }
-    });
-    // BND-196: the C API rejects the released id as stale rather than binding
-    // the session to whatever map is created next.
-    expect(diagnostic, contains('stale'));
+    await map.close();
+    await runtime.close();
   });
-}
 
-/// Long enough that a park only ends early because something woke it.
-const _parkTimeout = Duration(seconds: 10);
+  test('runtime close waits for native teardown', () async {
+    final runtime = RuntimeHandle.create();
+    final map = await runtime.createMap();
+    map.setStyleUrl('unsupported://runtime-teardown.json');
 
-/// Well below [_parkTimeout], and far above the scheduling noise a loaded CI
-/// machine adds to a wake.
-const _promptReturn = Duration(seconds: 5);
+    // The live map rejects the release before native teardown starts.
+    await expectLater(runtime.close(), throwsA(isA<InvalidStateException>()));
+    expect(runtime.isClosed, isFalse);
 
-/// Pumps until the runtime is idle, so a park that follows is released by the
-/// signal the test raises rather than by leftover work.
-void _quiesce(RuntimeHandle runtime) {
-  for (var attempt = 0; attempt < 100; attempt += 1) {
-    runtime.pump();
-    if (runtime.drainEvents().events.isEmpty) {
-      return;
-    }
-  }
-  fail('the runtime kept producing events while idle');
-}
+    await map.close();
+    // This future resolves only after the runtime's threads and its released
+    // map's teardown are gone.
+    await runtime.close();
+    expect(runtime.isClosed, isTrue);
 
-/// Signals a wake source transferred from the owner isolate, once that isolate
-/// has had time to enter its park.
-Future<void> _signalWakeSource(List<SendPort> ports) async {
-  final inbox = ReceivePort();
-  ports[0].send(inbox.sendPort);
-  final source = await inbox.first as WakeSource;
-  sleep(const Duration(milliseconds: 20));
-  source.signal();
-  ports[1].send(null);
-  inbox.close();
+    // A second close no-ops rather than releasing again.
+    await runtime.close();
+    expect(runtime.isClosed, isTrue);
+  });
 }
 
 Future<bool> _completeTransferredRequest(ResourceRequestHandle token) {
@@ -2481,26 +2833,19 @@ void _clearLogCallback() {
   Maplibre.clearLogCallback();
 }
 
-Future<void> _pumpUntil(
-  RuntimeHandle runtime,
-  bool Function() condition, {
-  Duration timeout = const Duration(seconds: 5),
-}) async {
-  await _waitUntil(() {
-    runtime.pump();
-    runtime.drainEvents();
-    return condition();
-  }, timeout: timeout);
+Future<void> _expectCommandCommitted(
+  Future<CommandCompletion> completion,
+) async {
+  expect((await completion).disposition, CommandDisposition.committed);
 }
 
-Future<RuntimeEvent> _pumpUntilEvent(
+Future<RuntimeEvent> _waitUntilEvent(
   RuntimeHandle runtime,
   bool Function(RuntimeEvent event) predicate,
 ) async {
   RuntimeEvent? matched;
   await _waitUntil(() {
-    runtime.pump();
-    for (final event in runtime.drainEvents().events) {
+    for (final event in runtime.drainEvents()) {
       if (predicate(event)) {
         matched = event;
       }

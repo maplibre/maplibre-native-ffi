@@ -162,6 +162,9 @@ kotlin {
   }
 
   sourceSets {
+    // Deferred is part of the public binding surface.
+    commonMain.dependencies { api(libs.coroutines) }
+
     androidMain { dependencies { implementation(libs.javacpp) } }
 
     named("androidDeviceTest") {

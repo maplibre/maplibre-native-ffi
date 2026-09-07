@@ -4,15 +4,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.camera.CameraOptions
+import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
-import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
-import org.maplibre.nativeffi.runtime.RuntimeEventType
+import org.maplibre.nativeffi.runtime.runSuspendTest
 import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 
@@ -21,53 +20,61 @@ class RenderClusterQueryTest {
   // unsigned leaves limit bounds the returned features.
 
   @Test
-  fun clusterFeatureExtensionQueriesResolveUnsignedClusterIdAndLimit() {
-    Maplibre.setLogCallback(LogCallback { true })
-    Maplibre.setAsyncLogSeverities(emptySet())
-    try {
-      withOwnedTextureSession(width = 64, height = 64) { runtime, map, owned ->
-        val session = owned.session
-        map.jumpTo(
-          CameraOptions().apply {
-            center = LatLng(0.0, 0.0)
-            zoom = 0.0
-          }
-        )
-        map.setStyleJson(CLUSTER_STYLE_JSON.encodeToByteArray())
-        GeoJsonSourceDataHandle.create(clusterPoints(), clusterSourceOptions()).use { clusterData ->
-          map.addGeoJsonSourceData("cluster-source", clusterData)
-        }
-        map.addStyleLayerJson(clusterCircleLayer(), "")
-        assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
-        assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
-
-        val queryPoint = map.pixelForLatLng(LatLng(0.0, 0.0))
-        val queryGeometry =
-          RenderedQueryGeometry.Box(
-            ScreenBox(
-              ScreenPoint(queryPoint.x - 30.0, queryPoint.y - 30.0),
-              ScreenPoint(queryPoint.x + 30.0, queryPoint.y + 30.0),
-            )
+  fun clusterFeatureExtensionQueriesResolveUnsignedClusterIdAndLimit(): Unit = runSuspendTest {
+    withOwnedTextureSession(width = 64, height = 64) { runtime, map, owned ->
+      val session = owned.session
+      session.completeOnDriver(
+        map.updateCamera(
+          CameraUpdate(
+            camera =
+              CameraOptions().apply {
+                center = LatLng(0.0, 0.0)
+                zoom = 0.0
+              }
           )
-        val cluster =
-          waitForQueriedFeature(runtime, map, session) {
-            session.queryRenderedFeatures(
-              queryGeometry,
-              RenderedFeatureQueryOptions().apply { layerIds = listOf("cluster-circle") },
-            )
-          }
-        val clusterProperties =
-          rawMember(cluster.feature, "properties") ?: error("feature has no properties")
-        // The serialized feature must keep cluster_id as an integral value so
-        // MapLibre can resolve it when the bytes are passed back in.
-        assertTrue(numberMember(clusterProperties, "cluster_id") != null)
+        )
+      )
+      session.completeOnDriver(map.setStyleJson(CLUSTER_STYLE_JSON.encodeToByteArray()))
+      GeoJsonSourceDataHandle.create(clusterPoints(), clusterSourceOptions()).use { clusterData ->
+        session.completeOnDriver(map.addGeoJsonSourceData("cluster-source", clusterData))
+      }
+      session.completeOnDriver(map.addStyleLayerJson(clusterCircleLayer(), ""))
+      session.completeOnDriver(runtime.barrier())
 
-        // The rendered cluster exists because GeoJsonSourceOptions enables
-        // clustering, and weightSum comes from the byte-encoded aggregation.
-        assertEquals(3.0, numberMember(clusterProperties, "point_count"))
-        assertEquals(6.0, numberMember(clusterProperties, "weightSum"))
+      val projection = session.completeOnDriver(map.createProjection())
+      val queryPoint =
+        try {
+          projection.pixelForLatLng(LatLng(0.0, 0.0))
+        } finally {
+          projection.close()
+        }
+      val queryGeometry =
+        RenderedQueryGeometry.Box(
+          ScreenBox(
+            ScreenPoint(queryPoint.x - 30.0, queryPoint.y - 30.0),
+            ScreenPoint(queryPoint.x + 30.0, queryPoint.y + 30.0),
+          )
+        )
+      val cluster =
+        waitForQueriedFeature(session) {
+          session.queryRenderedFeatures(
+            queryGeometry,
+            RenderedFeatureQueryOptions().apply { layerIds = listOf("cluster-circle") },
+          )
+        }
+      val clusterProperties =
+        rawMember(cluster.feature, "properties") ?: error("feature has no properties")
+      // The serialized feature must keep cluster_id as an integral value so
+      // MapLibre can resolve it when the bytes are passed back in.
+      assertTrue(numberMember(clusterProperties, "cluster_id") != null)
 
-        val children =
+      // The rendered cluster exists because GeoJsonSourceOptions enables
+      // clustering, and weightSum comes from the byte-encoded aggregation.
+      assertEquals(3.0, numberMember(clusterProperties, "point_count"))
+      assertEquals(6.0, numberMember(clusterProperties, "weightSum"))
+
+      val children =
+        session.completeOnDriver(
           session.queryFeatureExtension(
             "cluster-source",
             cluster.feature,
@@ -75,9 +82,11 @@ class RenderClusterQueryTest {
             "children",
             null,
           )
-        assertTrue(firstFeature(children) != null)
+        )
+      assertTrue(firstFeature(children) != null)
 
-        val expansionZoom =
+      val expansionZoom =
+        session.completeOnDriver(
           session.queryFeatureExtension(
             "cluster-source",
             cluster.feature,
@@ -85,36 +94,37 @@ class RenderClusterQueryTest {
             "expansion-zoom",
             null,
           )
-        assertTrue(expansionZoom.decodeToString().toULongOrNull() != null)
+        )
+      assertTrue(expansionZoom.decodeToString().toULongOrNull() != null)
 
-        // An unsigned limit bounds the collection, and an unsigned offset
-        // selects a later leaf. Native ignores arguments of another type and
-        // falls back to ten leaves at offset zero, so both bounds must move
-        // the observed result.
-        val feature = cluster.feature
-        val first = singleClusterLeaf(session, feature, 0)
-        val second = singleClusterLeaf(session, feature, 1)
-        assertNotEquals(featureStringProperty(first, "name"), featureStringProperty(second, "name"))
-      }
-    } finally {
-      Maplibre.clearLogCallback()
-      Maplibre.restoreDefaultAsyncLogSeverities()
+      // An unsigned limit bounds the collection, and an unsigned offset
+      // selects a later leaf. Native ignores arguments of another type and
+      // falls back to ten leaves at offset zero, so both bounds must move
+      // the observed result.
+      val feature = cluster.feature
+      val first = singleClusterLeaf(session, feature, 0)
+      val second = singleClusterLeaf(session, feature, 1)
+      assertNotEquals(featureStringProperty(first, "name"), featureStringProperty(second, "name"))
+
+      session.completeOnDriver(session.detach())
     }
   }
 
   /** Returns the one leaf at [offset] through a bounded supercluster query. */
-  private fun singleClusterLeaf(
+  private suspend fun singleClusterLeaf(
     session: RenderSessionHandle,
     feature: ByteArray,
     offset: Long,
   ): ByteArray {
     val leaves =
-      session.queryFeatureExtension(
-        "cluster-source",
-        feature,
-        "supercluster",
-        "leaves",
-        jsonBytes("""{"limit":1,"offset":$offset}"""),
+      session.completeOnDriver(
+        session.queryFeatureExtension(
+          "cluster-source",
+          feature,
+          "supercluster",
+          "leaves",
+          jsonBytes("""{"limit":1,"offset":$offset}"""),
+        )
       )
     return firstFeature(leaves) ?: error("expected one leaf")
   }

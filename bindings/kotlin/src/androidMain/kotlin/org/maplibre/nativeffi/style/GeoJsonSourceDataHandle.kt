@@ -31,7 +31,7 @@ public actual class GeoJsonSourceDataHandle internal constructor(private val han
     )
   }
 
-  /** Runs [block] with the live native handle and release held off for the borrow window. */
+  /** Runs [block] after checking that this wrapper still owns the native handle. */
   internal fun <R> withNativeHandle(block: (Long) -> R): R = core.withLive { block(handleId) }
 
   public actual companion object {

@@ -7,8 +7,7 @@ use maplibre_native_ffi_sys as sys;
 
 use crate::{Error, Result};
 use crate::{
-    OfflineOperationKind, OfflineOperationResultKind, OfflineRegionDownloadState, RenderMode,
-    ResourceErrorReason, RuntimeEventType, TileOperation,
+    OfflineRegionDownloadState, RenderMode, ResourceErrorReason, RuntimeEventType, TileOperation,
 };
 
 /// Byte offset of the payload union inside a native event record. Every ABI
@@ -172,19 +171,6 @@ pub struct OfflineRegionTileCountLimitEvent {
     pub limit: u64,
 }
 
-/// Offline operation-completion event payload.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub struct OfflineOperationCompletedEvent {
-    pub operation_id: u64,
-    pub operation_kind: OfflineOperationKind,
-    pub raw_operation_kind: u32,
-    pub result_kind: OfflineOperationResultKind,
-    pub raw_result_kind: u32,
-    pub result_status: i32,
-    pub found: bool,
-}
-
 /// Camera transition-finished event payload.
 ///
 /// A transition reports its end once for every terminal outcome, and the
@@ -195,6 +181,28 @@ pub struct CameraTransitionFinishedEvent {
     /// The `transition_id` the caller set on the `AnimationOptions` that
     /// started this transition.
     pub transition_id: u64,
+}
+
+/// Terminal disposition of an accepted command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CommandDisposition {
+    Committed,
+    Superseded,
+    Failed,
+    Cancelled,
+    Unknown(u32),
+}
+
+impl CommandDisposition {
+    pub fn from_native(raw: u32) -> Self {
+        match raw {
+            sys::MLN_COMMAND_DISPOSITION_COMMITTED => Self::Committed,
+            sys::MLN_COMMAND_DISPOSITION_SUPERSEDED => Self::Superseded,
+            sys::MLN_COMMAND_DISPOSITION_FAILED => Self::Failed,
+            sys::MLN_COMMAND_DISPOSITION_CANCELLED => Self::Cancelled,
+            value => Self::Unknown(value),
+        }
+    }
 }
 
 /// Payload of a type this version does not define, preserved for forward
@@ -219,7 +227,6 @@ pub enum RuntimeEventPayload {
     OfflineRegionStatus(OfflineRegionStatusEvent),
     OfflineRegionResponseError(OfflineRegionResponseErrorEvent),
     OfflineRegionTileCountLimit(OfflineRegionTileCountLimitEvent),
-    OfflineOperationCompleted(OfflineOperationCompletedEvent),
     CameraTransitionFinished(CameraTransitionFinishedEvent),
     Unknown(UnknownRuntimeEventPayload),
 }
@@ -232,8 +239,7 @@ pub struct CopiedRuntimeEvent {
     pub source: RawRuntimeEventSource,
     /// Secondary event detail whose meaning `event_type` selects. Camera
     /// change events decode as
-    /// `CameraChangeMode::from_raw(code as u32)`, offline operation-completion
-    /// events carry the operation's native status, and map loading-failure
+    /// `CameraChangeMode::from_raw(code as u32)`, and map loading-failure
     /// events carry a load error ordinal whose text is in `message`.
     pub code: i32,
     pub message: Option<String>,
@@ -255,7 +261,7 @@ pub struct NativeEventView<'a> {
 
 /// Iterator over the events of one drained batch, in queue order.
 pub struct NativeEventViews<'a> {
-    batch: sys::mln_runtime_event_batch,
+    batch: sys::mln_runtime_event_batch_view,
     index: usize,
     _storage: PhantomData<&'a [u8]>,
 }
@@ -286,9 +292,9 @@ impl ExactSizeIterator for NativeEventViews<'_> {}
 ///
 /// # Safety
 ///
-/// `batch` must be a batch that `mln_runtime_drain_events` filled, whose event
-/// and message storage stays valid for `'a`.
-pub unsafe fn event_views<'a>(batch: &sys::mln_runtime_event_batch) -> NativeEventViews<'a> {
+/// `batch` must be a view that `mln_event_batch_get` filled, whose event and
+/// message storage stays valid for `'a`.
+pub unsafe fn event_views<'a>(batch: &sys::mln_runtime_event_batch_view) -> NativeEventViews<'a> {
     NativeEventViews {
         batch: *batch,
         index: 0,
@@ -303,11 +309,11 @@ pub unsafe fn event_views<'a>(batch: &sys::mln_runtime_event_batch) -> NativeEve
 ///
 /// # Safety
 ///
-/// `batch` must be a batch that `mln_runtime_drain_events` filled, whose event
-/// and message storage stays valid for `'a`, and `index` must be below
+/// `batch` must be a view that `mln_event_batch_get` filled, whose event and
+/// message storage stays valid for `'a`, and `index` must be below
 /// `batch.event_count`.
 pub unsafe fn event_view<'a>(
-    batch: &sys::mln_runtime_event_batch,
+    batch: &sys::mln_runtime_event_batch_view,
     index: usize,
 ) -> NativeEventView<'a> {
     let stride = batch.event_size as usize;
@@ -352,10 +358,10 @@ pub unsafe fn event_view<'a>(
 ///
 /// # Safety
 ///
-/// `batch` must be a batch that `mln_runtime_drain_events` filled, whose event
-/// and message storage stays valid for the returned iterator's lifetime.
+/// `batch` must be a view that `mln_event_batch_get` filled, whose event and
+/// message storage stays valid for the returned iterator's lifetime.
 pub unsafe fn drain_batch<'a>(
-    batch: &sys::mln_runtime_event_batch,
+    batch: &sys::mln_runtime_event_batch_view,
 ) -> impl Iterator<Item = Result<CopiedRuntimeEvent>> + 'a {
     // SAFETY: The caller promised the batch describes live storage.
     unsafe { event_views(batch) }.map(|view|
@@ -443,18 +449,6 @@ pub unsafe fn payload_from_view(view: &NativeEventView<'_>) -> RuntimeEventPaylo
                     limit: payload.limit,
                 })
             }
-            sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED => {
-                let payload = raw.payload.offline_operation_completed;
-                RuntimeEventPayload::OfflineOperationCompleted(OfflineOperationCompletedEvent {
-                    operation_id: payload.operation_id,
-                    operation_kind: OfflineOperationKind::from_raw(payload.operation_kind),
-                    raw_operation_kind: payload.operation_kind,
-                    result_kind: OfflineOperationResultKind::from_raw(payload.result_kind),
-                    raw_result_kind: payload.result_kind,
-                    result_status: payload.result_status,
-                    found: payload.found,
-                })
-            }
             sys::MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => {
                 RuntimeEventPayload::CameraTransitionFinished(CameraTransitionFinishedEvent {
                     transition_id: raw.payload.camera_transition_finished.transition_id,
@@ -508,7 +502,7 @@ mod tests {
         }
 
         fn push(&mut self, mut event: sys::mln_runtime_event, message: &[u8]) {
-            event.message_offset = u32::try_from(self.messages.len()).unwrap();
+            event.message_offset = u64::try_from(self.messages.len()).unwrap();
             event.message_size = u32::try_from(message.len()).unwrap();
             self.messages.extend_from_slice(message);
             self.messages.push(0);
@@ -525,15 +519,14 @@ mod tests {
             self.count += 1;
         }
 
-        fn raw(&self) -> sys::mln_runtime_event_batch {
-            sys::mln_runtime_event_batch {
-                size: mem::size_of::<sys::mln_runtime_event_batch>() as u32,
+        fn raw(&self) -> sys::mln_runtime_event_batch_view {
+            sys::mln_runtime_event_batch_view {
+                size: mem::size_of::<sys::mln_runtime_event_batch_view>() as u32,
                 event_size: u32::try_from(self.stride).unwrap(),
                 events: self.records.as_ptr().cast(),
                 event_count: self.count,
                 messages: self.messages.as_ptr().cast(),
                 messages_size: self.messages.len(),
-                remaining_count: 0,
             }
         }
     }

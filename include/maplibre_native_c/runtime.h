@@ -14,6 +14,8 @@
 #include <stdint.h>
 
 #include "base.h"
+#include "completion.h"
+#include "wake.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,34 +44,6 @@ typedef enum mln_offline_region_download_state : uint32_t {
   MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE = 0,
   MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1,
 } mln_offline_region_download_state;
-
-/** Offline database operation token. Zero is never a valid operation ID. */
-typedef uint64_t mln_offline_operation_id;
-
-/** Offline database operation kinds reported by completion events. */
-typedef enum mln_offline_operation_kind : uint32_t {
-  MLN_OFFLINE_OPERATION_AMBIENT_CACHE = 1,
-  MLN_OFFLINE_OPERATION_REGION_CREATE = 2,
-  MLN_OFFLINE_OPERATION_REGION_GET = 3,
-  MLN_OFFLINE_OPERATION_REGIONS_LIST = 4,
-  MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE = 5,
-  MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA = 6,
-  MLN_OFFLINE_OPERATION_REGION_GET_STATUS = 7,
-  MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED = 8,
-  MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE = 9,
-  MLN_OFFLINE_OPERATION_REGION_INVALIDATE = 10,
-  MLN_OFFLINE_OPERATION_REGION_DELETE = 11,
-  MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE = 12,
-} mln_offline_operation_kind;
-
-/** Offline database operation result kinds reported by completion events. */
-typedef enum mln_offline_operation_result_kind : uint32_t {
-  MLN_OFFLINE_OPERATION_RESULT_NONE = 0,
-  MLN_OFFLINE_OPERATION_RESULT_REGION = 1,
-  MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION = 2,
-  MLN_OFFLINE_OPERATION_RESULT_REGION_LIST = 3,
-  MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS = 4,
-} mln_offline_operation_result_kind;
 
 /** Offline region status snapshot. */
 typedef struct mln_offline_region_status {
@@ -127,10 +101,6 @@ typedef struct mln_offline_region_status {
  *   error text; payload OFFLINE_REGION_RESPONSE_ERROR.
  * - OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: code is 0; payload
  *   OFFLINE_REGION_TILE_COUNT_LIMIT.
- * - OFFLINE_OPERATION_COMPLETED: code is the operation result as an mln_status
- *   value, the same value the payload reports in result_status; message carries
- *   the failure text when the operation failed; payload
- *   OFFLINE_OPERATION_COMPLETED.
  */
 typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1,
@@ -154,8 +124,7 @@ typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 19,
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20,
   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21,
-  MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED = 22,
-  MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = 23,
+  MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = 22,
 } mln_runtime_event_type;
 
 /**
@@ -217,8 +186,6 @@ typedef enum mln_runtime_event_mask : uint64_t {
     1ULL << MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
   MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED =
     1ULL << MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
-  MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED =
-    1ULL << MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED,
   /** Selects every map-originated event type this version defines. */
   MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS =
     MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE |
@@ -244,14 +211,18 @@ typedef enum mln_runtime_event_mask : uint64_t {
   MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS =
     MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED |
     MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR |
-    MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED |
-    MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED,
+    MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
   /** Selects every event type this version defines. */
   MLN_RUNTIME_EVENT_MASK_ALL = MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS |
                                MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS,
 } mln_runtime_event_mask;
 
-/** Source kinds used by mln_runtime_event.source_type. */
+/**
+ * Source kinds used by mln_runtime_event.source_type.
+ *
+ * Value 2 is retired and no version reuses it. It named a projection source;
+ * projection calls are now synchronous and emit no events.
+ */
 typedef enum mln_runtime_event_source_type : uint32_t {
   MLN_RUNTIME_EVENT_SOURCE_RUNTIME = 0,
   MLN_RUNTIME_EVENT_SOURCE_MAP = 1,
@@ -260,8 +231,10 @@ typedef enum mln_runtime_event_source_type : uint32_t {
 /**
  * Payload kinds used by mln_runtime_event.payload_type.
  *
- * Value 3 is retired and no version reuses it. It was a style-image-missing
- * payload whose only content was the image ID that the event message carries.
+ * Values 3 and 8 are retired and no version reuses them. Value 3 was a
+ * style-image-missing payload whose only content was the image ID that the
+ * event message carries. Value 8 was an offline-operation completion payload;
+ * one-shot work now reports completion directly.
  */
 typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0,
@@ -271,7 +244,6 @@ typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 5,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7,
-  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED = 8,
   MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 9,
 } mln_runtime_event_payload_type;
 
@@ -397,7 +369,7 @@ typedef struct mln_runtime_options {
   /** Cache database path. Copied during runtime creation. */
   const char* cache_path;
   /**
-   * Runtime-originated event types this runtime queues, as a bitwise OR of
+   * Runtime-scoped event types this runtime queues, as a bitwise OR of
    * mln_runtime_event_mask values.
    *
    * This field is always read, so set it explicitly.
@@ -407,13 +379,15 @@ typedef struct mln_runtime_options {
    * mln_runtime_set_event_mask().
    */
   uint64_t event_mask;
+  /** Wakes the receiver when the runtime event queue becomes nonempty. */
+  mln_wake event_wake;
 } mln_runtime_options;
 
 /**
  * Rendering statistics reported in MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME.
  *
  * This struct has no size field, because it is a member of
- * mln_runtime_event_payload. mln_runtime_event_batch.event_size covers the
+ * mln_runtime_event_payload. mln_runtime_event_batch_view.event_size covers the
  * whole event, including its payload.
  */
 typedef struct mln_rendering_stats {
@@ -484,9 +458,8 @@ typedef struct mln_runtime_event_camera_transition_finished {
 typedef struct mln_runtime_event_offline_region_status {
   mln_offline_region_id region_id;
   /**
-   * Region status. This member keeps its own size field, because
-   * mln_offline_region_status is also the output struct of
-   * mln_runtime_offline_region_get_status_take_result().
+   * Region status. This member keeps its own size field because the same struct
+   * is also returned by mln_runtime_offline_region_get_status().
    */
   mln_offline_region_status status;
 } mln_runtime_event_offline_region_status;
@@ -504,19 +477,6 @@ typedef struct mln_runtime_event_offline_region_tile_count_limit {
   uint64_t limit;
 } mln_runtime_event_offline_region_tile_count_limit;
 
-/** Payload for MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED. */
-typedef struct mln_runtime_event_offline_operation_completed {
-  mln_offline_operation_id operation_id;
-  /** One of mln_offline_operation_kind. */
-  uint32_t operation_kind;
-  /** One of mln_offline_operation_result_kind. */
-  uint32_t result_kind;
-  /** Async result status as a mln_status value. */
-  int32_t result_status;
-  /** Meaningful for MLN_OFFLINE_OPERATION_REGION_GET. */
-  bool found;
-} mln_runtime_event_offline_operation_completed;
-
 /**
  * Typed event payload carried inline by every event.
  *
@@ -526,7 +486,7 @@ typedef struct mln_runtime_event_offline_operation_completed {
  * A host that decodes a payload type this version does not define treats the
  * payload as opaque bytes and forwards them unchanged. Those bytes run from the
  * payload's offset within mln_runtime_event to
- * mln_runtime_event_batch.event_size.
+ * mln_runtime_event_batch_view.event_size.
  */
 typedef union mln_runtime_event_payload {
   mln_runtime_event_render_frame render_frame;
@@ -536,7 +496,6 @@ typedef union mln_runtime_event_payload {
   mln_runtime_event_offline_region_response_error offline_region_response_error;
   mln_runtime_event_offline_region_tile_count_limit
     offline_region_tile_count_limit;
-  mln_runtime_event_offline_operation_completed offline_operation_completed;
   mln_runtime_event_camera_transition_finished camera_transition_finished;
 } mln_runtime_event_payload;
 
@@ -546,8 +505,9 @@ typedef union mln_runtime_event_payload {
  * Events have a fixed stride and hold no pointers, so a host can copy a whole
  * batch with one memory copy.
  *
- * Step through an array of these by mln_runtime_event_batch.event_size rather
- * than by the size of this struct: a later version may add a member to
+ * Step through an array of these by
+ * mln_runtime_event_batch_view.event_size rather than by the size of this
+ * struct: a later version may add a member to
  * mln_runtime_event_payload and widen the stride. Every field below, payload
  * included, keeps its offset across versions.
  */
@@ -557,9 +517,8 @@ typedef struct mln_runtime_event {
   /** One of mln_runtime_event_source_type. */
   uint32_t source_type;
   /**
-   * Source handle for this event: the mln_map for map-originated events, the
-   * mln_runtime for runtime-originated events, selected by source_type. Every
-   * handle type is uint64_t, so this needs no cast.
+   * Source handle selected by source_type: an mln_runtime or an mln_map.
+   * Every handle type is uint64_t, so this needs no cast.
    *
    * The value names one object for the life of the process, so a host may
    * compare it against a handle it holds even after that handle is released.
@@ -575,9 +534,9 @@ typedef struct mln_runtime_event {
   uint32_t payload_type;
   /**
    * Byte offset of this event's message inside
-   * mln_runtime_event_batch.messages. Zero when message_size is 0.
+   * mln_runtime_event_batch_view.messages. Zero when message_size is 0.
    */
-  uint32_t message_offset;
+  uint64_t message_offset;
   /**
    * Number of message bytes, excluding the trailing null terminator that
    * follows them in the arena. Zero when this event carries no message.
@@ -588,23 +547,19 @@ typedef struct mln_runtime_event {
 } mln_runtime_event;
 
 /**
- * A drained batch of runtime events.
+ * A borrowed view of one owned runtime-event batch.
  *
- * A caller zero-initializes this struct, sets size, and passes it to
- * mln_runtime_drain_events(). mln_runtime_event_batch_default() returns such a
- * struct.
+ * Step through events by event_size. The event and message pointers remain
+ * valid until the event-batch handle is released.
  */
-typedef struct mln_runtime_event_batch {
+typedef struct mln_runtime_event_batch_view {
   uint32_t size;
   /**
    * Stride of one event in bytes, at least sizeof(mln_runtime_event) in the
    * header a caller compiled against. Index events with this value.
    */
   uint32_t event_size;
-  /**
-   * Borrowed array of event_count events in queue order. Null when event_count
-   * is 0.
-   */
+  /** Borrowed array of event_count events in queue order. */
   const mln_runtime_event* events;
   /** Number of events in events. */
   size_t event_count;
@@ -615,12 +570,7 @@ typedef struct mln_runtime_event_batch {
   const char* messages;
   /** Number of bytes in messages, including every terminator. */
   size_t messages_size;
-  /**
-   * Events still queued for this runtime after this batch. A nonzero value
-   * means another drain reports more events.
-   */
-  size_t remaining_count;
-} mln_runtime_event_batch;
+} mln_runtime_event_batch_view;
 
 typedef struct mln_resource_transform_response {
   uint32_t size;
@@ -640,10 +590,12 @@ typedef struct mln_resource_transform_response {
  * valid until the current resource transform invocation finishes. Empty input
  * clears the replacement URL.
  *
- * Returns MLN_STATUS_INVALID_ARGUMENT when response is null, response->size is
- * too small, url is null with a non-zero size, or url contains embedded NUL.
- * Returns MLN_STATUS_INVALID_STATE when called outside a resource transform
- * callback.
+ * Returns:
+ * - MLN_STATUS_OK when the replacement URL was copied.
+ * - MLN_STATUS_INVALID_ARGUMENT when response is null, response->size is too
+ *   small, url is null with a non-zero size, or url contains embedded NUL.
+ * - MLN_STATUS_INVALID_STATE when called outside a resource transform callback.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_resource_transform_response_set_url(
   mln_resource_transform_response* response, const char* url, size_t url_size
@@ -657,8 +609,7 @@ MLN_API mln_status mln_resource_transform_response_set_url(
  *
  * Callback invocations follow these rules:
  *
- * - MapLibre may invoke the callback on a worker or network thread instead of
- *   the runtime owner thread.
+ * - MapLibre may invoke the callback on a runtime, worker, or network thread.
  * - The callback must be thread-safe, return quickly, and must not call C API
  *   functions other than mln_resource_transform_response_set_url().
  * - url and out_response are borrowed for the callback duration.
@@ -667,19 +618,34 @@ MLN_API mln_status mln_resource_transform_response_set_url(
  *   API-managed storage for the current transform invocation.
  * - A non-OK return status is treated as no rewrite and does not fail the
  *   resource request.
- * - The callback and user_data must remain valid until the transform is
- *   replaced, cleared, or the runtime is destroyed. Those calls wait for
- *   in-flight transform callbacks before returning.
+ * - The C API invokes release_user_data after the final callback returns.
  */
 typedef mln_status (*mln_resource_transform_callback)(
   void* user_data, uint32_t kind, const char* url,
   mln_resource_transform_response* out_response
 );
 
+/**
+ * Releases callback user data after its final possible invocation.
+ *
+ * For each accepted registration with a non-null release callback, the C API
+ * invokes the callback exactly once after replacement, clear, or runtime
+ * teardown has retired the registration and every in-flight callback has
+ * returned. It
+ * may run on a runtime, worker, network, or closing thread. The C API never
+ * invokes it for a rejected registration. Another thread may retire an
+ * accepted registration before its registration function returns, so the
+ * caller transfers user_data ownership before entering that function and
+ * reclaims it only when registration is rejected.
+ */
+typedef void (*mln_runtime_callback_release)(void* user_data);
+
 typedef struct mln_resource_transform {
   uint32_t size;
   mln_resource_transform_callback callback;
   void* user_data;
+  /** Optional. Invoked exactly once for each accepted registration. */
+  mln_runtime_callback_release release_user_data;
 } mln_resource_transform;
 
 typedef struct mln_http_header_transform_response {
@@ -695,15 +661,19 @@ typedef struct mln_http_header_transform_response {
  * The function copies name and value before returning. A later call using the
  * same case-insensitive name replaces the earlier value.
  *
- * Returns MLN_STATUS_INVALID_ARGUMENT when response is null, response->size is
- * too small, a pointer is null with a non-zero size, name is not a valid HTTP
- * field name, value is not valid UTF-8, value contains a disallowed control
- * byte, or name identifies a header managed by MapLibre or the platform
- * transport. A diagnostic for a rejected header names the header but never
- * includes its value.
- * Returns MLN_STATUS_INVALID_STATE when called outside an active HTTP header
- * transform callback.
- * Returns MLN_STATUS_NATIVE_ERROR when native allocation fails.
+ * A diagnostic for a rejected header names the header but never includes its
+ * value.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the header was recorded.
+ * - MLN_STATUS_INVALID_ARGUMENT when response is null, response->size is too
+ *   small, a pointer is null with a non-zero size, name is not a valid HTTP
+ *   field name, value is not valid UTF-8, value contains a disallowed control
+ *   byte, or name identifies a header managed by MapLibre or the platform
+ *   transport.
+ * - MLN_STATUS_INVALID_STATE when called outside an active HTTP header
+ *   transform callback.
+ * - MLN_STATUS_NATIVE_ERROR when native allocation fails.
  */
 MLN_API mln_status mln_http_header_transform_response_set(
   mln_http_header_transform_response* response, const char* name,
@@ -718,13 +688,12 @@ MLN_API mln_status mln_http_header_transform_response_set(
  * transport starts the attempt. kind is one mln_resource_kind value and url is
  * the transformed URL that the transport will request.
  *
- * The callback and user_data must be thread-safe and remain valid until the
- * transform is replaced, cleared, or the runtime is destroyed. Those calls
- * wait for in-flight callbacks before returning. url and out_response are
+ * The callback and user_data must be thread-safe. The C API invokes
+ * release_user_data after the final callback returns. url and out_response are
  * borrowed for the callback duration. Callback implementations call only
- * mln_http_header_transform_response_set() and return promptly. A non-OK
- * result discards every header collected during the invocation and lets the
- * request proceed unchanged.
+ * mln_http_header_transform_response_set() and return promptly. A non-OK result
+ * discards every header collected during the invocation and lets the request
+ * proceed unchanged.
  */
 typedef mln_status (*mln_http_header_transform_callback)(
   void* user_data, uint32_t kind, const char* url,
@@ -735,6 +704,8 @@ typedef struct mln_http_header_transform {
   uint32_t size;
   mln_http_header_transform_callback callback;
   void* user_data;
+  /** Optional. Invoked exactly once for each accepted registration. */
+  mln_runtime_callback_release release_user_data;
 } mln_http_header_transform;
 
 typedef struct mln_resource_request {
@@ -799,9 +770,8 @@ typedef struct mln_resource_response {
 /**
  * Intercepts a network resource request.
  *
- * The callback runs synchronously on the thread that reaches the C API network
- * file source. That thread may be a MapLibre worker or network thread instead
- * of the runtime owner thread.
+ * The callback runs synchronously on the MapLibre thread that reaches the C API
+ * network file source.
  *
  * Request handling follows these rules:
  *
@@ -824,6 +794,7 @@ typedef struct mln_resource_response {
  *   runtime C API functions.
  * - The callback may call resource request handle functions for the provided
  *   handle.
+ * - The C API invokes release_user_data after the final callback returns.
  */
 typedef uint32_t (*mln_resource_provider_callback)(
   void* user_data, const mln_resource_request* request,
@@ -835,11 +806,12 @@ typedef uint32_t (*mln_resource_provider_callback)(
  *
  * The callback runs at most once per request, on the thread that discards the
  * request, and only for a request the provider has not completed. That thread
- * is the runtime owner thread when a map or runtime call discards the request,
- * such as a style change or map destruction, and a MapLibre worker thread
- * otherwise. The callback must be thread-safe, return quickly, and must not
- * call map or runtime C API functions. It may call resource request handle
- * functions for the cancelled handle, including mln_resource_request_release().
+ * is the runtime's native scheduler thread when a committed map or runtime
+ * command discards the request, such as a style change or map destruction, and
+ * a MapLibre worker thread otherwise; it is never a host thread. The callback
+ * must be thread-safe, return quickly, and must not call map or runtime C API
+ * functions. It may call resource request handle functions for the cancelled
+ * handle, including mln_resource_request_release().
  */
 typedef void (*mln_resource_request_cancel_callback)(void* user_data);
 
@@ -847,6 +819,8 @@ typedef struct mln_resource_provider {
   uint32_t size;
   mln_resource_provider_callback callback;
   void* user_data;
+  /** Optional. Invoked exactly once for each accepted registration. */
+  mln_runtime_callback_release release_user_data;
 } mln_resource_provider;
 
 /**
@@ -855,19 +829,20 @@ typedef struct mln_resource_provider {
 MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
 
 /**
- * Creates a runtime handle.
+ * Creates a runtime with a new core-owned worker.
  *
- * The creating thread becomes the runtime owner thread. Each owner thread may
- * hold one live runtime.
+ * The calling thread blocks until worker initialization completes, so in the
+ * browser it must be a Web Worker rather than the main thread, which cannot
+ * block. The output must point to the null handle and receives ownership of the
+ * runtime on success.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when out_runtime is null, *out_runtime is not
- *   null, or options has an unsupported size, a nonzero flags value, or an
- *   event_mask bit outside MLN_RUNTIME_EVENT_MASK_ALL.
- * - MLN_STATUS_INVALID_STATE when the current thread already owns a live
- *   runtime.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when out_runtime receives an owned runtime.
+ * - MLN_STATUS_INVALID_ARGUMENT when options is null, options->size is too
+ *   small, options->flags or options->event_mask holds unknown bits, the wake
+ *   descriptor is invalid, or out_runtime is null or does not point to the null
+ *   handle.
+ * - MLN_STATUS_NATIVE_ERROR when the worker could not be started.
  */
 MLN_API mln_status mln_runtime_create(
   const mln_runtime_options* options, mln_runtime* out_runtime
@@ -880,47 +855,53 @@ MLN_API mln_status mln_runtime_create(
  * non-network schemes such as file, asset, mbtiles, and pmtiles are handled by
  * native MainResourceLoader before this extension point.
  *
- * This call may replace an existing provider while maps exist. The callback and
- * user_data are stored by reference and must remain valid until this call
- * returns having replaced them, mln_runtime_clear_resource_provider() returns,
- * or the runtime is destroyed. When this call returns, no in-flight request can
- * still invoke the previous provider. Requests the previous provider already
- * took a handle for keep that handle: complete and release each one as usual.
- * Native OnlineFileSource claims every remaining scheme, so a URL with a scheme
- * MapLibre does not recognize, such as jar:file:, reaches this callback and
- * completes as an HTTP error when the provider passes it through.
+ * The function copies the provider shape and accepts the change from any
+ * thread. Execution is ordered with every other command for this runtime.
+ * The completion reports the terminal command disposition.
+ *
+ * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
+ * releasing user_data to the C API. With a null release_user_data, the caller
+ * keeps user_data valid until a committed replacement or clear command, or
+ * until native runtime teardown finishes. Requests that the previous provider
+ * already handled retain their request handles.
+ *
+ * Native OnlineFileSource claims every remaining scheme. A URL with an
+ * unrecognized scheme, such as jar:file:, reaches this callback and completes
+ * as an HTTP error when the provider passes it through.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, provider is
- *   null, provider->size is too small, or callback is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *   null, provider->size is too small, callback is null, or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
 MLN_API mln_status mln_runtime_set_resource_provider(
-  mln_runtime runtime, const mln_resource_provider* provider
+  mln_runtime runtime, const mln_resource_provider* provider,
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Clears the runtime-scoped network resource provider.
  *
- * After this call succeeds, requests that reach the C API network file source
- * go to MapLibre's online file source. When it returns, no in-flight request
- * can still invoke the previous provider, and the C API holds no further
- * reference to its callback or user_data. Requests the previous provider
- * already took a handle for keep that handle: complete and release each one as
- * usual.
+ * The function accepts the change from any thread and orders it with every
+ * other command for this runtime. The completion reports the terminal command
+ * disposition. The C API invokes the previous provider's release_user_data
+ * after every in-flight callback returns. Later requests use MapLibre's online
+ * file source. Requests that the previous provider already handled retain their
+ * handles.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the command is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_API mln_status
-mln_runtime_clear_resource_provider(mln_runtime runtime) MLN_NOEXCEPT;
+MLN_API mln_status mln_runtime_clear_resource_provider(
+  mln_runtime runtime, const mln_completion* completion
+) MLN_NOEXCEPT;
 
 /**
  * Completes a C API resource provider request.
@@ -1028,36 +1009,46 @@ MLN_API mln_status mln_resource_request_wait_until_retired(
  * requests. It does not apply to file, asset, database, MBTiles, or registered
  * C API provider responses intercepted before OnlineFileSource.
  *
- * This call may replace an existing transform while maps exist. When it
- * returns, no in-flight request can still invoke the previous transform.
+ * The function copies the transform shape and accepts the change from any
+ * thread. Execution is ordered with every other command for this runtime.
+ * The completion reports the terminal command disposition.
+ * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
+ * releasing user_data to the C API. With a null release_user_data, the caller
+ * keeps user_data valid until a committed replacement or clear command, or
+ * until native runtime teardown finishes.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, transform is
- *   null, transform->size is too small, or callback is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *   null, transform->size is too small, callback is null, or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
 MLN_API mln_status mln_runtime_set_resource_transform(
-  mln_runtime runtime, const mln_resource_transform* transform
+  mln_runtime runtime, const mln_resource_transform* transform,
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Clears the runtime-scoped URL transform for network resources.
  *
- * After this call succeeds, network resource URLs pass through unchanged. When
- * it returns, no in-flight request can still invoke the previous transform.
+ * The function accepts the change from any thread and orders it with every
+ * other command for this runtime. The completion reports the terminal command
+ * disposition. The C API invokes the previous transform's release_user_data
+ * after every in-flight callback returns. Network resource URLs then pass
+ * through unchanged.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the command is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_API mln_status
-mln_runtime_clear_resource_transform(mln_runtime runtime) MLN_NOEXCEPT;
+MLN_API mln_status mln_runtime_clear_resource_transform(
+  mln_runtime runtime, const mln_completion* completion
+) MLN_NOEXCEPT;
 
 /**
  * Registers or replaces the runtime-scoped outgoing HTTP header transform.
@@ -1065,59 +1056,71 @@ mln_runtime_clear_resource_transform(mln_runtime runtime) MLN_NOEXCEPT;
  * The transform applies only to requests that reach the built-in HTTP client,
  * including online and offline requests and nested network-backed PMTiles
  * range requests. Cache hits, non-HTTP schemes, and provider-handled requests
- * do not invoke it. Replacement waits for in-flight callbacks before the old
- * callback and user_data become unreferenced.
+ * do not invoke it.
+ *
+ * The function copies the transform shape and accepts the change from any
+ * thread. Execution is ordered with every other command for this runtime.
+ * The completion reports the terminal command disposition.
+ * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
+ * releasing user_data to the C API. With a null release_user_data, the caller
+ * keeps user_data valid until a committed replacement or clear command, or
+ * until native runtime teardown finishes.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, transform is
- *   null, transform->size is too small, or callback is null.
+ *   null, transform->size is too small, callback is null, or completion is
+ *   invalid.
  * - MLN_STATUS_UNSUPPORTED on OpenHarmony and in the browser, whose HTTP
  *   clients cannot prevent transformed headers from following a cross-origin
  *   redirect. A resource provider serves those requests instead.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
 MLN_API mln_status mln_runtime_set_http_header_transform(
-  mln_runtime runtime, const mln_http_header_transform* transform
+  mln_runtime runtime, const mln_http_header_transform* transform,
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Clears the runtime-scoped outgoing HTTP header transform.
  *
- * When this call returns, no in-flight request can still invoke the previous
- * callback and the C API holds no reference to its user_data.
+ * The function accepts the change from any thread and orders it with every
+ * other command for this runtime. The completion reports the terminal command
+ * disposition. The C API invokes the previous transform's release_user_data
+ * after every in-flight callback returns.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the command is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_API mln_status
-mln_runtime_clear_http_header_transform(mln_runtime runtime) MLN_NOEXCEPT;
+MLN_API mln_status mln_runtime_clear_http_header_transform(
+  mln_runtime runtime, const mln_completion* completion
+) MLN_NOEXCEPT;
 
 /**
  * Starts a MapLibre ambient cache maintenance operation for this runtime.
  *
  * When runtime options omit cache_path, this operates on MapLibre's default
  * in-memory database and its effects are not durable beyond the native database
- * lifetime. Completion is reported through
- * MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
+ * lifetime. The completion reports the terminal status and carries no value.
  *
  * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or operation
- *   is not a mln_ambient_cache_operation value, or out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the operation is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, operation is
+ *   not an mln_ambient_cache_operation value, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK when the maintenance operation finished.
+ * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
-MLN_API mln_status mln_runtime_run_ambient_cache_operation_start(
-  mln_runtime runtime, uint32_t operation,
-  mln_offline_operation_id* out_operation_id
+MLN_API mln_status mln_runtime_run_ambient_cache_operation(
+  mln_runtime runtime, uint32_t operation, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1129,274 +1132,144 @@ MLN_API mln_status mln_runtime_run_ambient_cache_operation_start(
  *
  * When runtime options omit cache_path, this operates on MapLibre's default
  * in-memory database and its effects are not durable beyond the native database
- * lifetime. Completion is reported through
- * MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
+ * lifetime. The completion reports the terminal status and carries no value.
  *
  * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the operation is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK when the budget was applied.
+ * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
-MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size_start(
-  mln_runtime runtime, uint64_t size, mln_offline_operation_id* out_operation_id
+MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
+  mln_runtime runtime, uint64_t size, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Discards runtime-owned state for an offline database operation.
+ * Starts an ordered runtime barrier.
  *
- * Discarding does not cancel native database work. It drops stored results,
- * removes queued completion events for the operation, and suppresses later
- * completion delivery when the native operation is still pending.
+ * The completion runs after every earlier accepted runtime submission has
+ * reached a terminal disposition. It carries no value.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   operation_id is zero or unknown.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the barrier is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
  */
-MLN_API mln_status mln_runtime_offline_operation_discard(
-  mln_runtime runtime, mln_offline_operation_id operation_id
+MLN_API mln_status mln_runtime_barrier(
+  mln_runtime runtime, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Destroys a runtime handle.
+ * Releases a runtime after synchronous child preflight.
  *
- * The runtime must no longer own live maps.
- *
- * This call waits for in-flight resource transform, HTTP header transform, and
- * resource provider callbacks before returning, the same way the corresponding
- * set and clear functions do. Each callback and its user_data stay valid until
- * that point and are unreferenced once this call returns, so a host frees
- * callback-owned state only after it does.
- *
- * Do not call this while holding a host lock that one of those callbacks also
- * acquires; the callback cannot finish, and this call cannot return.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
- *   handle.
- * - MLN_STATUS_INVALID_STATE when runtime still owns live maps.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the creating
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_runtime_destroy(mln_runtime runtime) MLN_NOEXCEPT;
-
-/**
- * Advances this runtime.
- *
- * The call parks the owner thread when timeout_ms allows it, then drains the
- * owner-thread task queues. Drain the queued runtime events with
- * mln_runtime_drain_events() afterwards.
- *
- * timeout_ms sets the park bound:
- *
- * - Zero drains and returns. Hosts pumping from a frame callback pass zero.
- * - A positive value parks for up to that many milliseconds, then drains.
- * - A negative value parks until a wake arrives, then drains.
- *
- * The drain runs every task queued when it begins plus every task those tasks
- * enqueue, and services expired timers and ready file descriptors for the
- * runtime's own network and database work.
- *
- * budget_ms bounds the drain:
- *
- * - A negative value drains without a bound. One unbounded drain can span a
- *   full style parse, so budget for it as variable work.
- * - Zero or a positive value stops the drain at the first task boundary after
- *   that many milliseconds, measured from the start of the drain. The first
- *   queued task always runs, so a bounded pump always makes progress. Tasks
- *   left behind set the wake flag, so the next pump returns without parking
- *   and continues them.
- *
- * The budget bounds the task queues alone. Expired timers and ready file
- * descriptors are serviced regardless, and a single task runs to completion
- * once started, so one long task can overrun the budget.
- *
- * The runtime holds a wake flag. These set it:
- *
- * - the owner-thread run loop receiving queued work from any thread, which
- *   covers style, tile, offline database, and resource responses;
- * - the runtime queueing a runtime event that a subscription mask selects;
- * - mln_wake_source_signal() from any thread.
- *
- * A parking call returns as soon as the flag is set, and clears the flag before
- * it returns. Work that arrives during the drain sets the flag again, so the
- * next call returns right away and may find that work already done.
- *
- * A call also returns without parking while unread runtime events are queued. A
- * narrowed subscription leaves the queue empty more often, so a parking call
- * parks where it previously returned immediately.
- *
- * Timers and file descriptors set the flag only when they queue owner-thread
- * work, and the runtime registers none of its own on the owner-thread run loop.
- * Pass a positive timeout_ms so a call returns even when nothing sets the flag.
- *
- * A non-zero timeout_ms makes this a blocking query. Call it outside any host
- * lock that a thread signalling a wake source acquires, and outside C API
- * callbacks. Acquire a wake source with mln_runtime_wake_source_acquire() to
- * release the owner thread for host-driven work such as submitted tasks or
- * shutdown.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
- *   handle.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_runtime_pump(
-  mln_runtime runtime, int64_t timeout_ms, int64_t budget_ms
-) MLN_NOEXCEPT;
-
-/**
- * Acquires a wake source that releases this runtime's parked owner thread.
- *
- * Each call returns a distinct handle the host destroys with
- * mln_wake_source_destroy(). A wake source holds its own reference to the
- * runtime's wake state, so it stays valid after the runtime is destroyed and
- * hosts tear the two down in either order.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
- *   handle, out_source is null, or *out_source is not null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_runtime_wake_source_acquire(
-  mln_runtime runtime, mln_wake_source* out_source
-) MLN_NOEXCEPT;
-
-/**
- * Sets the runtime's wake flag and releases the parked owner thread.
- *
+ * The call rejects a runtime that has live or pending children and leaves it
+ * open. A successful call consumes the public handle before returning.
+ * Previously accepted work and native teardown continue in submission order;
+ * callback user data remains native-owned until its release callback runs.
  * This function may be called from any thread.
  *
- * A signal raised while the owner thread is running sets the wake flag, so the
- * next mln_runtime_pump() call returns without parking. Signalling a wake
- * source whose runtime is destroyed succeeds and does nothing, so hosts shut
- * the two down in either order.
+ * The completion runs after every earlier accepted submission, including
+ * released maps' teardown, has finished and the runtime's threads and
+ * resources are gone. The invoking thread touches no library state after the
+ * callback returns, so a host that waits for it may exit the process without
+ * racing native teardown. A host that outlives its runtimes may pass a
+ * discarding completion.
  *
  * Returns:
- * - MLN_STATUS_OK on success, including after the runtime is destroyed.
- * - MLN_STATUS_INVALID_ARGUMENT when source is null.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the handle was consumed.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime has a live or pending child or is
+ *   already closing.
+ * - MLN_STATUS_NATIVE_ERROR when teardown could not be scheduled.
  */
-MLN_API mln_status mln_wake_source_signal(mln_wake_source source) MLN_NOEXCEPT;
+MLN_API mln_status mln_runtime_release(
+  mln_runtime runtime, const mln_completion* completion
+) MLN_NOEXCEPT;
 
 /**
- * Destroys a wake source.
+ * Drains this runtime's queued events into a new owned batch.
  *
- * This function may be called from any thread. Null is a no-op. Destroy each
- * handle exactly once, once every thread that signals it has finished.
- */
-MLN_API void mln_wake_source_destroy(mln_wake_source source) MLN_NOEXCEPT;
-
-/** Returns a zeroed mln_runtime_event_batch with size filled in. */
-MLN_API mln_runtime_event_batch
-mln_runtime_event_batch_default(void) MLN_NOEXCEPT;
-
-/**
- * Drains this runtime's queued runtime events into one borrowed batch.
+ * The drain transfers every event that the queue holds, in queue order. Events
+ * that arrive later enter the next batch. The returned handle owns the event
+ * records and their message arena. Later drains and runtime destruction leave
+ * the batch readable. Release each batch with mln_event_batch_release().
  *
- * Events arrive in queue order. Map-originated events set source_type to
- * MLN_RUNTIME_EVENT_SOURCE_MAP and source to the source map;
- * runtime-originated events set source_type to
- * MLN_RUNTIME_EVENT_SOURCE_RUNTIME and source to this runtime.
+ * This queue operation may be called from any thread. Concurrent drains are
+ * serialized and each event enters exactly one returned batch.
  *
- * max_events bounds the drain. Zero drains every queued event. A positive value
- * drains at most that many events and reports the number that stayed queued in
- * out_batch->remaining_count. A drain also stops when one more message would
- * take the message arena past 4 GiB, so read out_batch->remaining_count after
- * an unbounded drain too.
- *
- * Read a payload as the mln_runtime_event_payload member that
- * event.payload_type selects. Read a message as event.message_size bytes at
- * out_batch->messages plus event.message_offset. Every offset and size pair
- * this call writes lies inside the arena.
- *
- * Copy any value a host keeps, because out_batch->events and
- * out_batch->messages point at runtime-owned storage that stays readable only
- * until the next mln_runtime_drain_events() call for the same runtime or until
- * the runtime is destroyed. Every other C API call leaves the batch readable,
- * including calls on the maps this runtime owns and mln_map_destroy() for a map
- * whose events the batch carries. Every drain invalidates the batch before it,
- * including a drain that finds no events.
- *
- * Destroying a map discards that map's queued events, so this call reports
- * events only for maps that were live when the events were queued. Read the
- * state a host mirrors from events before destroying the map that produces
- * them.
- *
- * The map and runtime subscription masks decide which events reach the queue.
- * An event of an unselected type is never built and never queued, so it reaches
- * no batch and raises no wake flag. See mln_map_set_event_mask() and
- * mln_runtime_set_event_mask().
- *
- * Draining is a queue operation: it runs no owner-thread work and never parks.
- * Call mln_runtime_pump() to advance the runtime, then drain the events that
- * pump produced.
- *
- * This function clears the calling thread's diagnostic message, so read
- * mln_thread_last_error_message() for a failed call before draining.
+ * The map and runtime subscription masks suppress unselected events before
+ * their payloads, messages, queue records, and wakeups are produced. A runtime
+ * whose release has begun no longer drains; events it already queued are
+ * discarded with the runtime.
  *
  * Returns:
- * - MLN_STATUS_OK when the drain completed, including when it found no events.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
- *   handle, out_batch is null, or out_batch->size is too small.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
+ * - MLN_STATUS_OK when out_batch receives an owned batch, including an empty
+ *   batch.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or out_batch
+ *   is null or does not point to the null handle.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_drain_events(
-  mln_runtime runtime, size_t max_events, mln_runtime_event_batch* out_batch
+  mln_runtime runtime, mln_event_batch* out_batch
 ) MLN_NOEXCEPT;
 
 /**
- * Selects which runtime-originated event types this runtime queues.
+ * Borrows the event and message view stored by an owned event batch.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when out_view receives the borrowed view.
+ * - MLN_STATUS_INVALID_ARGUMENT when batch is null or not live, or out_view is
+ *   null or out_view->size is too small.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_event_batch_get(
+  mln_event_batch batch, mln_runtime_event_batch_view* out_view
+) MLN_NOEXCEPT;
+
+/** Releases an owned event batch. A null handle is a no-op. */
+MLN_API void mln_event_batch_release(mln_event_batch batch) MLN_NOEXCEPT;
+
+/**
+ * Selects which runtime-scoped event types this runtime queues.
  *
  * A runtime queues an offline event when this mask selects its type. Region
  * status, response error, and tile count limit events also require the region
- * to be observed with mln_runtime_offline_region_set_observed_start(), so this
+ * to be observed with mln_runtime_offline_region_set_observed(), so this
  * mask narrows that subscription rather than replacing it.
  *
- * A runtime that has not been narrowed selects every runtime-originated event
- * type this library reports, which covers types a caller's header may not
+ * A runtime that has not been narrowed selects every runtime-scoped event type
+ * this library reports, which covers types a caller's header may not
  * declare. A new mask applies to later events and keeps the events already
  * queued.
  *
  * This call reads the bits in MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS and
- * ignores the rest, so MLN_RUNTIME_EVENT_MASK_ALL selects every
- * runtime-originated type. mln_runtime_get_event_mask() reports the value last
+ * ignores the rest, so MLN_RUNTIME_EVENT_MASK_ALL selects every runtime-scoped
+ * type. mln_runtime_get_event_mask() reports the value last
  * set, so a host reads it, changes one bit, and writes it back.
  *
- * A host that clears MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED still
- * takes each result with the matching take-result entry point, and still reads
- * a failed operation's error text from that call's thread diagnostic. An
- * offline operation records its result before this mask is consulted.
+ * Changing this mask does not affect one-shot completion or result ownership.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
  *   handle, or mask holds a bit outside MLN_RUNTIME_EVENT_MASK_ALL.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
 mln_runtime_set_event_mask(mln_runtime runtime, uint64_t mask) MLN_NOEXCEPT;
 
 /**
- * Reports which runtime-originated event types this runtime queues.
+ * Reports which runtime-scoped event types this runtime queues.
  *
  * The value is the mask last set, including bits outside
  * MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS that this runtime ignores. A
@@ -1407,8 +1280,7 @@ mln_runtime_set_event_mask(mln_runtime runtime, uint64_t mask) MLN_NOEXCEPT;
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
  *   handle, or out_mask is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_get_event_mask(

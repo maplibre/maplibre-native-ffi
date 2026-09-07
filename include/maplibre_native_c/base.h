@@ -49,6 +49,16 @@ typedef enum mln_status : int32_t {
   MLN_STATUS_UNSUPPORTED = -4,
   /** A native MapLibre error or C++ exception was converted to status. */
   MLN_STATUS_NATIVE_ERROR = -5,
+  /** The operation reached its terminal cancelled disposition. */
+  MLN_STATUS_CANCELLED = -6,
+  /** A conflicting driver call or lifecycle transition is in flight. */
+  MLN_STATUS_BUSY = -7,
+  /** The render target or graphics receiver was irreversibly lost. */
+  MLN_STATUS_TARGET_LOST = -8,
+  /** A nonblocking acquisition or service call has no result yet. */
+  MLN_STATUS_NOT_READY = -9,
+  /** A command or operation named an ID with no live object behind it. */
+  MLN_STATUS_NOT_FOUND = -10,
 } mln_status;
 
 /** Render backend support flags reported by this native library build. */
@@ -86,12 +96,14 @@ typedef enum mln_render_backend_flag : uint32_t {
 typedef uint64_t mln_runtime;
 typedef uint64_t mln_map;
 typedef uint64_t mln_map_projection;
-typedef uint64_t mln_offline_region_snapshot;
-typedef uint64_t mln_offline_region_list;
 typedef uint64_t mln_buffer;
 typedef uint64_t mln_resource_request_handle;
 typedef uint64_t mln_render_session;
-typedef uint64_t mln_wake_source;
+typedef uint64_t mln_event_batch;
+typedef uint64_t mln_adapter_resource_request_queue;
+typedef uint64_t mln_adapter_log_queue;
+typedef uint64_t mln_acquired_frame;
+typedef uint64_t mln_render_frame_batch;
 
 /**
  * Borrowed data. The data pointer may be null only when size is zero.

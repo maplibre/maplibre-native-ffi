@@ -2,49 +2,292 @@ import CMaplibreNativeC
 import Foundation
 @testable import MaplibreNativeFFI
 import Testing
+#if canImport(Metal)
+  import Metal
+  import QuartzCore
+#endif
 
-private final class RenderCounter: @unchecked Sendable {
-  private let lock = NSLock()
-  private var count = 0
+#if canImport(Metal)
+  /// Runs one caller-graphics-thread session's driver loop on a dedicated
+  /// thread, the way a host's render thread does.
+  ///
+  /// The session binds to the first thread that services it, so every driver
+  /// call has to come from one thread; running the loop off the test's own
+  /// task also leaves the test free to await the session's commands, which
+  /// only make progress while the loop runs.
+  private final class DriverLoop: @unchecked Sendable {
+    private let stopping = LockedBox(false)
+    private let stopped = DispatchSemaphore(value: 0)
 
-  func increment() {
-    lock.withLock { count += 1 }
+    init(_ session: RenderSessionHandle) {
+      let stopping = stopping
+      let stopped = stopped
+      let thread = Thread {
+        while !stopping.value {
+          _ = try? session.serviceDriverWork(maxWork: 0)
+          usleep(500)
+        }
+        stopped.signal()
+      }
+      thread.name = "test render driver"
+      thread.start()
+    }
+
+    func stop() {
+      stopping.update { $0 = true }
+      _ = stopped.wait(timeout: .now() + .seconds(10))
+    }
   }
 
-  func value() -> Int {
-    lock.withLock { count }
+  private func metalObjectPointer(_ object: AnyObject) -> NativePointer {
+    NativePointer(bitPattern: UInt(bitPattern:
+      Unmanaged.passUnretained(object).toOpaque()))
+  }
+
+  private func attachMetalTexture(
+    map: MapHandle,
+    device: MTLDevice
+  ) throws -> RenderSessionAttachment {
+    try map.attachMetalOwnedTexture(
+      MetalOwnedTextureDescriptor(
+        extent: RenderTargetExtent(width: 32, height: 32, scaleFactor: 1),
+        context: MetalContextDescriptor(device: metalObjectPointer(device))
+      ),
+      options: RenderSessionAttachOptions(driver: .callerGraphicsThread)
+    )
+  }
+
+  /// Builds a caller-owned texture the session renders into, cleared so a
+  /// readback starts from a known value.
+  private func makeBorrowedTexture(
+    device: MTLDevice,
+    width: Int,
+    height: Int
+  ) throws -> MTLTexture {
+    let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+      pixelFormat: .rgba8Unorm,
+      width: width,
+      height: height,
+      mipmapped: false
+    )
+    descriptor.usage = [.renderTarget, .shaderRead]
+    let texture = try #require(device.makeTexture(descriptor: descriptor))
+    texture.replace(
+      region: MTLRegionMake2D(0, 0, width, height),
+      mipmapLevel: 0,
+      withBytes: [UInt8](repeating: 0, count: width * height * 4),
+      bytesPerRow: width * 4
+    )
+    return texture
+  }
+
+  private func borrowedTextureDescriptor(
+    _ texture: MTLTexture
+  ) -> MetalBorrowedTextureDescriptor {
+    MetalBorrowedTextureDescriptor(
+      extent: RenderTargetExtent(
+        width: UInt32(texture.width),
+        height: UInt32(texture.height),
+        scaleFactor: 1
+      ),
+      physicalWidth: UInt32(texture.width),
+      physicalHeight: UInt32(texture.height),
+      texture: metalObjectPointer(texture)
+    )
+  }
+
+  /// Reports whether every pixel of `texture` carries the background color
+  /// that `redBackgroundStyleJSON` paints.
+  ///
+  /// A texture created without an explicit storage mode is managed on macOS,
+  /// so its CPU copy stays stale until a blit synchronizes it.
+  private func isPaintedRed(
+    _ texture: MTLTexture,
+    device: MTLDevice
+  ) throws -> Bool {
+    let queue = try #require(device.makeCommandQueue())
+    let buffer = try #require(queue.makeCommandBuffer())
+    let encoder = try #require(buffer.makeBlitCommandEncoder())
+    encoder.synchronize(resource: texture)
+    encoder.endEncoding()
+    buffer.commit()
+    buffer.waitUntilCompleted()
+
+    let bytesPerRow = texture.width * 4
+    var pixels = [UInt8](repeating: 0, count: bytesPerRow * texture.height)
+    try pixels.withUnsafeMutableBytes { bytes in
+      try texture.getBytes(
+        #require(bytes.baseAddress),
+        bytesPerRow: bytesPerRow,
+        from: MTLRegionMake2D(0, 0, texture.width, texture.height),
+        mipmapLevel: 0
+      )
+    }
+    return stride(from: 0, to: pixels.count, by: 4).allSatisfy {
+      Array(pixels[$0 ..< $0 + 4]) == [255, 0, 0, 255]
+    }
+  }
+
+  /// Requests one frame and returns the terminal result for its own token.
+  private func renderFrame(
+    _ session: RenderSessionHandle,
+    token: UInt64
+  ) async throws -> RenderFrameResult? {
+    try session.requestFrame(FrameDemand(options: [], token: token))
+    var results: [RenderFrameResult] = []
+    guard try await waitUntilTrue("frame \(token)", timeout: 20, condition: {
+      results += try session.drainFrameResults()
+      return results.contains { $0.token == token }
+    }) else { return nil }
+    return results.first { $0.token == token }
+  }
+
+  /// Renders one frame at a time until `condition` holds, the way a host's
+  /// render loop does. Records an issue naming `subject` at the deadline.
+  private func renderUntil(
+    _ subject: String,
+    session: RenderSessionHandle,
+    timeout: TimeInterval = 20,
+    condition: () throws -> Bool
+  ) async throws -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    var token: UInt64 = 0
+    while Date() < deadline {
+      token += 1
+      guard try await renderFrame(session, token: token) != nil else {
+        return false
+      }
+      if try condition() { return true }
+    }
+    Issue.record("timed out waiting for \(subject)")
+    return false
+  }
+
+  /// Runs `body` and asserts that it reports `kind`.
+  private func expectFailure(
+    _ subject: String,
+    kind: MaplibreErrorKind,
+    _ body: () async throws -> Void
+  ) async {
+    do {
+      try await body()
+      Issue.record("\(subject) should have been rejected")
+    } catch let error as MaplibreError {
+      #expect(error.kind == kind)
+    } catch {
+      Issue.record("\(subject) reported \(error)")
+    }
+  }
+
+  /// A style that paints every pixel, so a readback proves which target the
+  /// session rendered into.
+  private let redBackgroundStyleJSON = Data(##"""
+  {"version":8,"sources":{},"layers":[{"id":"background",
+  "type":"background","paint":{"background-color":"#ff0000"}}]}
+  """##.utf8)
+
+  @Test(.enabled(
+    if: Maplibre.supportedRenderBackends().contains(.metal),
+    "The selected native preset does not provide Metal."
+  )) func metalCallerDriverCanServiceAttachmentBeforeCompletion(
+  ) async throws {
+    let runtime = try RuntimeHandle(
+      options: RuntimeOptions(cachePath: ":memory:")
+    )
+    defer { try? runtime.closeBlockingForTests() }
+    let map = try await MapHandle(
+      runtime: runtime,
+      options: MapOptions(width: 32, height: 32)
+    )
+    defer { try? map.closeBlockingForTests() }
+    let device = try #require(MTLCreateSystemDefaultDevice())
+    let attachment = try attachMetalTexture(map: map, device: device)
+    let session = attachment.session
+    defer {
+      _ = try? session.abandon()
+      try? session.close()
+    }
+
+    #expect(try session.snapshot().state == RenderSessionState.attaching)
+    #expect(try session.serviceDriverWork(maxWork: 0) > 0)
+    try await attachment.completion.value
+    #expect(try session.snapshot().state == RenderSessionState.attached)
+    withExtendedLifetime(device) {}
+  }
+#endif
+
+@Test func frameDemandPreservesCoalescingAndTimeout() {
+  let demand = FrameDemand(
+    options: [.ifNeeded, .present],
+    token: 41,
+    coalescingBoundary: 7,
+    timeoutNanoseconds: 2000
+  ).native
+
+  #expect(demand.flags == 3)
+  #expect(demand.token == 41)
+  #expect(demand.coalescing_boundary == 7)
+  #expect(demand.timeout_ns == 2000)
+}
+
+/// A frame result kind a newer native library adds reaches the host with its
+/// raw value instead of collapsing onto a named one.
+@Test func anUnnamedRenderResultKeepsItsRawValue() {
+  #expect(RenderResult.fromNative(99) == .unknown(99))
+}
+
+@Test func gpuSynchronizationUsesFrozenKinds() {
+  #expect(GPUSynchronization.cpuComplete.native.kind ==
+    MLN_GPU_SYNC_CPU_COMPLETE.rawValue)
+  #expect(GPUSynchronization.metalSharedEvent(
+    NativePointer(bitPattern: 0x1234), value: 9
+  ).native.kind == MLN_GPU_SYNC_METAL_SHARED_EVENT.rawValue)
+  let semaphore = GPUSynchronization.vulkanTimelineSemaphore(
+    VulkanHandle(bitPattern: 0xFEED_FACE_0000_0007), value: 11
+  ).native
+  #expect(semaphore.kind == MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE.rawValue)
+  // A Vulkan handle stays 64 bits wide even where a pointer is not.
+  #expect(semaphore.object == 0xFEED_FACE_0000_0007)
+}
+
+@Test func transferredWebGLCanvasMaterializesWorkerDescriptor() throws {
+  let input = OpenGLContextDescriptor.webGL(
+    .transferredCanvas(selector: "#map")
+  ).nativeInput
+
+  try input.withNative { descriptor in
+    #expect(descriptor.platform == MLN_OPENGL_CONTEXT_PLATFORM_WEBGL)
+    #expect(descriptor.data.webgl.kind ==
+      MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS.rawValue)
+    #expect(descriptor.data.webgl.context == 0)
+    #expect(descriptor.data.webgl.canvas_selector.size == 4)
   }
 }
 
-private final class RenderLeakBox: @unchecked Sendable {
-  private let lock = NSLock()
-  private var leaks: [NativeHandleLeak] = []
-
-  func append(_ leak: NativeHandleLeak) {
-    lock.withLock { leaks.append(leak) }
-  }
-
-  func value() -> [NativeHandleLeak] {
-    lock.withLock { leaks }
-  }
-}
-
-@Test func renderTargetDescriptorsMaterializeNativePointersAndExtents() throws {
-  let extent = RenderTargetExtent(width: 640, height: 480, scaleFactor: 2)
-  let metalSurface = MetalSurfaceDescriptor(
-    extent: extent,
-    context: MetalContextDescriptor(device: NativePointer(bitPattern: 0x10)),
-    layer: NativePointer(bitPattern: 0x20)
+@Test func attachmentOptionsCarryDirectWakes() {
+  let options = RenderSessionAttachOptions(
+    driver: .coreWorker,
+    requestedTextureRingDepth: 3
   )
-  try metalSurface.nativeInput.withNativeDescriptor { descriptor in
-    #expect(descriptor.pointee.extent.width == 640)
-    #expect(descriptor.pointee.extent.height == 480)
-    #expect(descriptor.pointee.extent.scale_factor == 2)
-    #expect(UInt(bitPattern: descriptor.pointee.context.device) == 0x10)
-    #expect(UInt(bitPattern: descriptor.pointee.layer) == 0x20)
-  }
+  var frameWake = mln_wake()
+  frameWake.user_data = UnsafeMutableRawPointer(bitPattern: 17)
+  var driverWake = mln_wake()
+  driverWake.user_data = UnsafeMutableRawPointer(bitPattern: 23)
+  options
+    .withNative(frameWake: frameWake, driverWorkWake: driverWake) { native in
+      #expect(native.pointee.driver == MLN_RENDER_DRIVER_CORE_WORKER.rawValue)
+      #expect(native.pointee.requested_texture_ring_depth == 3)
+      #expect(native.pointee.frame_wake.user_data == frameWake.user_data)
+      #expect(native.pointee.driver_work_wake.user_data == driverWake.user_data)
+    }
+}
 
-  let vulkanContext = VulkanContextDescriptor(
+/// A Vulkan non-dispatchable handle is 64 bits wide on every platform, so a
+/// carrier sized like a pointer would drop the high half on a 32-bit host.
+/// Both halves of a handle that lives entirely above bit 32 have to survive
+/// the trip into the native descriptor.
+@Test func vulkanDescriptorsCarryFullWidthHandles() throws {
+  let context = VulkanContextDescriptor(
     instance: NativePointer(bitPattern: 0x30),
     physicalDevice: NativePointer(bitPattern: 0x40),
     device: NativePointer(bitPattern: 0x50),
@@ -53,374 +296,398 @@ private final class RenderLeakBox: @unchecked Sendable {
     getInstanceProcAddr: NativePointer(bitPattern: 0x90),
     getDeviceProcAddr: NativePointer(bitPattern: 0xA0)
   )
-  let vulkanTexture = VulkanBorrowedTextureDescriptor(
+  let extent = RenderTargetExtent(width: 64, height: 32, scaleFactor: 2)
+
+  let texture = VulkanBorrowedTextureDescriptor(
     extent: extent,
-    physicalWidth: 65,
-    physicalHeight: 33,
-    context: vulkanContext,
-    image: VulkanHandle(bitPattern: 0x70),
-    imageView: VulkanHandle(bitPattern: 0x80),
+    physicalWidth: 128,
+    physicalHeight: 64,
+    context: context,
+    image: VulkanHandle(bitPattern: 0x8000_0000_0000_0001),
+    imageView: VulkanHandle(bitPattern: 0x0000_0001_0000_0000),
     format: 44,
     initialLayout: 1,
     finalLayout: 2
   )
-  try vulkanTexture.nativeInput.withNativeDescriptor { descriptor in
-    #expect(UInt(bitPattern: descriptor.pointee.context.instance) == 0x30)
-    #expect(UInt(bitPattern: descriptor.pointee.context.physical_device) ==
-      0x40)
-    #expect(UInt(bitPattern: descriptor.pointee.context.device) == 0x50)
-    #expect(UInt(bitPattern: descriptor.pointee.context.graphics_queue) == 0x60)
-    #expect(descriptor.pointee.context.graphics_queue_family_index == 7)
-    #expect(UInt(
-      bitPattern: descriptor.pointee.context.get_instance_proc_addr
-    ) ==
-      0x90)
-    #expect(UInt(bitPattern: descriptor.pointee.context.get_device_proc_addr) ==
-      0xA0)
-    #expect(descriptor.pointee.image == 0x70)
-    #expect(descriptor.pointee.image_view == 0x80)
+  try texture.nativeInput.withNativeDescriptor { descriptor in
+    #expect(descriptor.pointee.image == 0x8000_0000_0000_0001)
+    #expect(descriptor.pointee.image_view == 0x0000_0001_0000_0000)
+    #expect(descriptor.pointee.physical_width == 128)
     #expect(descriptor.pointee.format == 44)
-    #expect(descriptor.pointee.initial_layout == 1)
-    #expect(descriptor.pointee.final_layout == 2)
   }
 
-  let wgl = OpenGLContextDescriptor.wgl(
-    WglContextDescriptor(
-      deviceContext: NativePointer(bitPattern: 0x110),
-      shareContext: NativePointer(bitPattern: 0x120),
-      getProcAddress: NativePointer(bitPattern: 0x130)
+  let surface = VulkanSurfaceDescriptor(
+    extent: extent,
+    context: context,
+    surface: VulkanHandle(bitPattern: 0xFEDC_BA98_7654_3210)
+  )
+  try surface.nativeInput.withNativeDescriptor { descriptor in
+    #expect(descriptor.pointee.surface == 0xFEDC_BA98_7654_3210)
+    #expect(UInt(bitPattern: descriptor.pointee.context.device) == 0x50)
+  }
+}
+
+#if canImport(Metal)
+  /// BND-167, BND-168, BND-169. An owned texture session leases one rendered
+  /// frame at a time: an empty ring polls without an error, a leased frame
+  /// reads its texture and its result, releasing returns the slot exactly
+  /// once, and a released frame rejects every read.
+  @Test(.enabled(
+    if: Maplibre.supportedRenderBackends().contains(.metal),
+    "The selected native preset does not provide Metal."
+  )) func acquiredFrameLeasesAndReturnsOneTextureRingSlot() async throws {
+    let runtime = try RuntimeHandle(
+      options: RuntimeOptions(cachePath: ":memory:")
     )
-  )
-  let openGLSurface = OpenGLSurfaceDescriptor(
-    extent: extent,
-    context: wgl,
-    surface: NativePointer(bitPattern: 0x140)
-  )
-  try openGLSurface.nativeInput.withNativeDescriptor { descriptor in
-    #expect(descriptor.pointee.extent.width == 640)
-    #expect(descriptor.pointee.context
-      .platform == MLN_OPENGL_CONTEXT_PLATFORM_WGL)
-    #expect(UInt(bitPattern: descriptor.pointee.context.data.wgl
-        .device_context) == 0x110)
-    #expect(UInt(
-      bitPattern: descriptor.pointee.context.data.wgl.share_context
-    ) ==
-      0x120)
-    #expect(UInt(bitPattern: descriptor.pointee.context.data.wgl
-        .get_proc_address) == 0x130)
-    #expect(descriptor.pointee.context
-      .ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED)
-    #expect(UInt(bitPattern: descriptor.pointee.surface) == 0x140)
-  }
-
-  let dedicatedEgl = OpenGLContextDescriptor.egl(
-    EglContextDescriptor(
-      display: NativePointer(bitPattern: 0x310),
-      config: NativePointer(bitPattern: 0x320),
-      shareContext: .null,
-      clientAPI: .gles
-    ),
-    ownership: .dedicated
-  )
-  let dedicatedSurface = OpenGLSurfaceDescriptor(
-    extent: extent,
-    context: dedicatedEgl,
-    surface: NativePointer(bitPattern: 0x340)
-  )
-  try dedicatedSurface.nativeInput.withNativeDescriptor { descriptor in
-    #expect(descriptor.pointee.context
-      .ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED)
-    #expect(descriptor.pointee.context.data.egl.share_context == nil)
-    #expect(descriptor.pointee.context.data.egl
-      .client_api == MLN_OPENGL_CLIENT_API_GLES)
-  }
-
-  let unknownEgl = OpenGLContextDescriptor.egl(
-    EglContextDescriptor(
-      display: NativePointer(bitPattern: 0x410),
-      config: NativePointer(bitPattern: 0x420),
-      shareContext: .null,
-      clientAPI: .unknown(97)
-    ),
-    ownership: .unknown(98)
-  )
-  let unknownSurface = OpenGLSurfaceDescriptor(
-    extent: extent,
-    context: unknownEgl,
-    surface: NativePointer(bitPattern: 0x440)
-  )
-  try unknownSurface.nativeInput.withNativeDescriptor { descriptor in
-    #expect(descriptor.pointee.context.ownership.rawValue == 98)
-    #expect(descriptor.pointee.context.data.egl.client_api.rawValue == 97)
-  }
-
-  let egl = OpenGLContextDescriptor.egl(
-    EglContextDescriptor(
-      display: NativePointer(bitPattern: 0x210),
-      config: NativePointer(bitPattern: 0x220),
-      shareContext: NativePointer(bitPattern: 0x230),
-      getProcAddress: NativePointer(bitPattern: 0x240)
+    defer { try? runtime.closeBlockingForTests() }
+    let map = try await MapHandle(
+      runtime: runtime,
+      options: MapOptions(width: 32, height: 32)
     )
-  )
-  let openGLTexture = OpenGLBorrowedTextureDescriptor(
-    extent: extent,
-    physicalWidth: 65,
-    physicalHeight: 33,
-    context: egl,
-    texture: 33,
-    target: 0x0DE1
-  )
-  try openGLTexture.nativeInput.withNativeDescriptor { descriptor in
-    #expect(descriptor.pointee.context
-      .platform == MLN_OPENGL_CONTEXT_PLATFORM_EGL)
-    #expect(UInt(bitPattern: descriptor.pointee.context.data.egl.display) ==
-      0x210)
-    #expect(UInt(bitPattern: descriptor.pointee.context.data.egl.config) ==
-      0x220)
-    #expect(UInt(
-      bitPattern: descriptor.pointee.context.data.egl.share_context
-    ) ==
-      0x230)
-    #expect(UInt(bitPattern: descriptor.pointee.context.data.egl
-        .get_proc_address) == 0x240)
-    #expect(descriptor.pointee.context.data.egl
-      .client_api == MLN_OPENGL_CLIENT_API_UNSPECIFIED)
-    #expect(descriptor.pointee.texture == 33)
-    #expect(descriptor.pointee.target == 0x0DE1)
-  }
-}
+    defer { try? map.closeBlockingForTests() }
+    try await map.setStyleJSON(emptyStyleJSON)
 
-@Test func metalOwnedTextureFrameInvalidatesAfterClose() throws {
-  let releases = RenderCounter()
-  var raw = mln_metal_owned_texture_frame()
-  raw.size = UInt32(MemoryLayout<mln_metal_owned_texture_frame>.size)
-  raw.texture = UnsafeMutableRawPointer(bitPattern: 0x1234)
-  raw.device = UnsafeMutableRawPointer(bitPattern: 0x5678)
-  let frame =
-    MetalOwnedTextureFrameHandle(frame: NativeMetalOwnedTextureFrame(
-      raw
-    )) { _ in
-      releases.increment()
+    let device = try #require(MTLCreateSystemDefaultDevice())
+    let attachment = try attachMetalTexture(map: map, device: device)
+    let session = attachment.session
+    defer {
+      _ = try? session.abandon()
+      try? session.close()
+      withExtendedLifetime(device) {}
     }
+    let loop = DriverLoop(session)
+    defer { loop.stop() }
+    try await attachment.completion.value
 
-  var capturedView: MetalOwnedTextureFrameView?
-  var escapedTexture: FrameNativePointer?
-  try frame.withBackendPointers { view in
-    capturedView = view
-    let texture = try view.texture
-    let device = try view.device
-    escapedTexture = texture
-    #expect(try texture.addressBitPattern == 0x1234)
-    #expect(try device.addressBitPattern == 0x5678)
-  }
-  do {
-    _ = try capturedView?.texture
-    Issue.record("frame view access after scope should throw")
-  } catch let error as MaplibreError {
-    #expect(error.kind == .invalidState)
-    #expect(error.rawStatus == nil)
-  }
-  do {
-    _ = try escapedTexture?.addressBitPattern
-    Issue.record("escaped frame pointer access after scope should throw")
-  } catch let error as MaplibreError {
-    #expect(error.kind == .invalidState)
-    #expect(error.rawStatus == nil)
-  }
-  do {
-    _ = try escapedTexture?.isNull
-    Issue.record("escaped frame pointer null check after scope should throw")
-  } catch let error as MaplibreError {
-    #expect(error.kind == .invalidState)
-    #expect(error.rawStatus == nil)
-  }
+    #expect(try session.capabilities().features.contains(.frameAcquisition))
+    // An empty ring polls without reporting an error.
+    #expect(try session.drainFrameResults().isEmpty)
+    #expect(try session.acquireFrame() == nil)
 
-  try frame.close()
-  try frame.close()
+    try session.requestFrame(FrameDemand(options: [], token: 7))
+    var results: [RenderFrameResult] = []
+    #expect(try await waitUntilTrue("a rendered frame", timeout: 20) {
+      results += try session.drainFrameResults()
+      return !results.isEmpty
+    })
+    let rendered = try #require(results.first { $0.token == 7 })
+    #expect(rendered.result == .rendered)
 
-  #expect(frame.isClosed)
-  #expect(releases.value() == 1)
-  do {
-    try frame.withBackendPointers { _ in }
-    Issue.record("closed frame access should throw")
-  } catch let error as MaplibreError {
-    #expect(error.kind == .invalidState)
-    #expect(error.rawStatus == nil)
-  }
-}
+    let frame = try #require(try session.acquireFrame())
+    // The handle's lock is released before the host closure runs, so the
+    // closure may call back into the same handle.
+    var readInsideTheClosure: RenderFrameResult?
+    let texture = try frame
+      .withMetalTexture { texture -> MetalOwnedTextureFrame in
+        readInsideTheClosure = try frame.result()
+        return texture
+      }
+    #expect(texture.width == 32)
+    #expect(texture.height == 32)
+    #expect(!texture.texture.isNull)
+    #expect(readInsideTheClosure?.frameGeneration == rendered.frameGeneration)
 
-@Test func vulkanOwnedTextureFrameInvalidatesAfterClose() throws {
-  let releases = RenderCounter()
-  var raw = mln_vulkan_owned_texture_frame()
-  raw.size = UInt32(MemoryLayout<mln_vulkan_owned_texture_frame>.size)
-  raw.image = 0x1234
-  raw.image_view = 0x5678
-  let frame =
-    VulkanOwnedTextureFrameHandle(frame: NativeVulkanOwnedTextureFrame(
-      raw
-    )) { _ in
-      releases.increment()
-    }
+    #expect(!frame.isReleased)
+    try frame.release()
+    #expect(frame.isReleased)
+    // Releasing an already released frame changes nothing.
+    try frame.release()
+    #expect(frame.isReleased)
 
-  var capturedView: VulkanOwnedTextureFrameView?
-  var escapedImage: FrameVulkanHandle?
-  try frame.withBackendHandles { view in
-    capturedView = view
-    let image = try view.image
-    let imageView = try view.imageView
-    escapedImage = image
-    #expect(try image.bits == 0x1234)
-    #expect(try imageView.bits == 0x5678)
-  }
-  do {
-    _ = try capturedView?.image
-    Issue.record("frame view access after scope should throw")
-  } catch let error as MaplibreError {
-    #expect(error.kind == .invalidState)
-    #expect(error.rawStatus == nil)
-  }
-  do {
-    _ = try escapedImage?.bits
-    Issue.record("escaped frame handle access after scope should throw")
-  } catch let error as MaplibreError {
-    #expect(error.kind == .invalidState)
-    #expect(error.rawStatus == nil)
-  }
-  do {
-    _ = try escapedImage?.isNull
-    Issue.record("escaped frame handle null check after scope should throw")
-  } catch let error as MaplibreError {
-    #expect(error.kind == .invalidState)
-    #expect(error.rawStatus == nil)
-  }
-
-  try frame.close()
-  try frame.close()
-
-  #expect(frame.isClosed)
-  #expect(releases.value() == 1)
-  do {
-    try frame.withBackendHandles { _ in }
-    Issue.record("closed frame access should throw")
-  } catch let error as MaplibreError {
-    #expect(error.kind == .invalidState)
-    #expect(error.rawStatus == nil)
-  }
-}
-
-@Test func openGLOwnedTextureFrameInvalidatesAfterClose() throws {
-  let releases = RenderCounter()
-  var raw = mln_opengl_owned_texture_frame()
-  raw.size = UInt32(MemoryLayout<mln_opengl_owned_texture_frame>.size)
-  raw.texture = 77
-  raw.target = 0x0DE1
-  let frame =
-    OpenGLOwnedTextureFrameHandle(frame: NativeOpenGLOwnedTextureFrame(
-      raw
-    )) { _ in
-      releases.increment()
-    }
-
-  var capturedView: OpenGLOwnedTextureFrameView?
-  var escapedTexture: FrameOpenGLTextureName?
-  try frame.withBackendPointers { view in
-    capturedView = view
-    let texture = try view.texture
-    let target = try view.target
-    escapedTexture = texture
-    #expect(try texture.value == 77)
-    #expect(target == 0x0DE1)
-  }
-  do {
-    _ = try capturedView?.texture
-    Issue.record("frame view access after scope should throw")
-  } catch let error as MaplibreError {
-    #expect(error.kind == .invalidState)
-    #expect(error.rawStatus == nil)
-  }
-  do {
-    _ = try escapedTexture?.value
-    Issue.record("escaped OpenGL texture access after scope should throw")
-  } catch let error as MaplibreError {
-    #expect(error.kind == .invalidState)
-    #expect(error.rawStatus == nil)
-  }
-  do {
-    _ = try escapedTexture?.isZero
-    Issue.record("escaped OpenGL texture zero check after scope should throw")
-  } catch let error as MaplibreError {
-    #expect(error.kind == .invalidState)
-    #expect(error.rawStatus == nil)
-  }
-
-  try frame.close()
-  try frame.close()
-
-  #expect(frame.isClosed)
-  #expect(releases.value() == 1)
-  do {
-    try frame.withBackendPointers { _ in }
-    Issue.record("closed frame access should throw")
-  } catch let error as MaplibreError {
-    #expect(error.kind == .invalidState)
-    #expect(error.rawStatus == nil)
-  }
-}
-
-@Test func ownedTextureFrameAllowsRetryAfterFailedRelease() throws {
-  struct ReleaseFailure: Error {}
-
-  let releases = RenderCounter()
-  var raw = mln_opengl_owned_texture_frame()
-  raw.size = UInt32(MemoryLayout<mln_opengl_owned_texture_frame>.size)
-  raw.texture = 77
-  raw.target = 0x0DE1
-  let frame =
-    OpenGLOwnedTextureFrameHandle(frame: NativeOpenGLOwnedTextureFrame(
-      raw
-    )) { _ in
-      releases.increment()
-      if releases.value() == 1 {
-        throw ReleaseFailure()
+    for read in [
+      { _ = try frame.result() },
+      { try frame.withMetalTexture { _ in } },
+      { _ = try frame.producerSynchronization() },
+    ] as [() throws -> Void] {
+      do {
+        try read()
+        Issue.record("a released frame should reject a read")
+      } catch let error as MaplibreError {
+        #expect(error.kind == .invalidState)
       }
     }
+  }
 
-  do {
-    try frame.close()
-    Issue.record("failed release should throw")
-  } catch is ReleaseFailure {}
+  /// BND-048. A frame handle that goes out of scope without being released
+  /// keeps its ring slot, and the leak reporter names it.
+  @Test(.enabled(
+    if: Maplibre.supportedRenderBackends().contains(.metal),
+    "The selected native preset does not provide Metal."
+  )) func droppingAnUnreleasedFrameIsReportedAsALeak() async throws {
+    let runtime = try RuntimeHandle(
+      options: RuntimeOptions(cachePath: ":memory:")
+    )
+    defer { try? runtime.closeBlockingForTests() }
+    let map = try await MapHandle(
+      runtime: runtime,
+      options: MapOptions(width: 32, height: 32)
+    )
+    defer { try? map.closeBlockingForTests() }
+    try await map.setStyleJSON(emptyStyleJSON)
 
-  #expect(!frame.isClosed)
-  try frame.close()
-  #expect(frame.isClosed)
-  #expect(releases.value() == 2)
-}
+    let device = try #require(MTLCreateSystemDefaultDevice())
+    let attachment = try attachMetalTexture(map: map, device: device)
+    let session = attachment.session
+    defer {
+      _ = try? session.abandon()
+      try? session.close()
+      withExtendedLifetime(device) {}
+    }
+    let loop = DriverLoop(session)
+    defer { loop.stop() }
+    try await attachment.completion.value
 
-@Test func textureFrameDeinitReportsLeakWithoutRelease() {
-  let releases = RenderCounter()
-  let leaks = RenderLeakBox()
+    try session.requestFrame(FrameDemand(options: [], token: 11))
+    var results: [RenderFrameResult] = []
+    #expect(try await waitUntilTrue("a rendered frame", timeout: 20) {
+      results += try session.drainFrameResults()
+      return !results.isEmpty
+    })
 
-  NativeHandleLeakTestSupport.withHandler({ leak in
-    leaks.append(leak)
-  }) {
-    do {
-      var raw = mln_metal_owned_texture_frame()
-      raw.size = UInt32(MemoryLayout<mln_metal_owned_texture_frame>.size)
-      raw.texture = UnsafeMutableRawPointer(bitPattern: 0x1234)
-      raw.device = UnsafeMutableRawPointer(bitPattern: 0x5678)
-      _ =
-        MetalOwnedTextureFrameHandle(frame: NativeMetalOwnedTextureFrame(
-          raw
-        )) { _ in
-          releases.increment()
-        }
+    let leaks = LockedBox([NativeHandleLeak]())
+    try NativeHandleLeakTestSupport.withHandler({ leak in
+      leaks.update { $0.append(leak) }
+    }) {
+      // The handle's last reference dies at the end of this scope.
+      let frame = try session.acquireFrame()
+      #expect(frame != nil)
     }
 
-    #expect(releases.value() == 0)
-    #expect(leaks.value() == [NativeHandleLeak(
-      typeName: "MetalOwnedTextureFrameHandle",
-      handle: 0,
-      detail: "texture 0x1234"
-    )])
+    let leak = try #require(leaks.read { $0.first })
+    #expect(leak.typeName == "AcquiredFrameHandle")
+    #expect(leak.handle != 0)
+    #expect(leak.detail.contains("release"))
   }
-}
+
+  /// The frame-ready wake schedules the host when results become drainable
+  /// and stops once the handler is cleared.
+  @Test(.enabled(
+    if: Maplibre.supportedRenderBackends().contains(.metal),
+    "The selected native preset does not provide Metal."
+  )) func frameReadyHandlerRunsUntilItIsCleared() async throws {
+    let runtime = try RuntimeHandle(
+      options: RuntimeOptions(cachePath: ":memory:")
+    )
+    defer { try? runtime.closeBlockingForTests() }
+    let map = try await MapHandle(
+      runtime: runtime,
+      options: MapOptions(width: 32, height: 32)
+    )
+    defer { try? map.closeBlockingForTests() }
+    try await map.setStyleJSON(emptyStyleJSON)
+
+    let device = try #require(MTLCreateSystemDefaultDevice())
+    let attachment = try attachMetalTexture(map: map, device: device)
+    let session = attachment.session
+    defer {
+      _ = try? session.abandon()
+      try? session.close()
+      withExtendedLifetime(device) {}
+    }
+    let loop = DriverLoop(session)
+    defer { loop.stop() }
+    try await attachment.completion.value
+
+    let wakes = LockedBox(0)
+    try session.setFrameReadyHandler { wakes.update { $0 += 1 } }
+    try session.requestFrame(FrameDemand(options: [], token: 21))
+    var results: [RenderFrameResult] = []
+    #expect(try await waitUntilTrue("the frame wake", timeout: 20) {
+      results += try session.drainFrameResults()
+      return !results.isEmpty && wakes.value > 0
+    })
+    let afterFirstFrame = wakes.value
+    #expect(afterFirstFrame > 0)
+
+    try session.setFrameReadyHandler(nil)
+    results = []
+    try session.requestFrame(FrameDemand(options: [], token: 22))
+    #expect(try await waitUntilTrue("the second frame", timeout: 20) {
+      results += try session.drainFrameResults()
+      return results.contains { $0.token == 22 }
+    })
+    #expect(wakes.value == afterFirstFrame)
+  }
+
+  /// BND-165, BND-183. A session resize is the one authority on an attached
+  /// map's size, and both it and a direct map resize keep the scale factor
+  /// they were created with.
+  @Test(.enabled(
+    if: Maplibre.supportedRenderBackends().contains(.metal),
+    "The selected native preset does not provide Metal."
+  )) func sessionResizeRejectsAnotherScaleFactorAndResizesTheMap(
+  ) async throws {
+    let runtime = try RuntimeHandle(
+      options: RuntimeOptions(cachePath: ":memory:")
+    )
+    defer { try? runtime.closeBlockingForTests() }
+    let map = try await MapHandle(
+      runtime: runtime,
+      options: MapOptions(width: 32, height: 32)
+    )
+    defer { try? map.closeBlockingForTests() }
+    try await map.setStyleJSON(emptyStyleJSON)
+
+    let device = try #require(MTLCreateSystemDefaultDevice())
+    let attachment = try attachMetalTexture(map: map, device: device)
+    let session = attachment.session
+    defer {
+      _ = try? session.abandon()
+      try? session.close()
+      withExtendedLifetime(device) {}
+    }
+    let loop = DriverLoop(session)
+    defer { loop.stop() }
+    try await attachment.completion.value
+
+    await expectFailure("another session scale factor",
+                        kind: .invalidArgument)
+    {
+      try await session.resize(
+        RenderTargetExtent(width: 48, height: 24, scaleFactor: 2)
+      )
+    }
+
+    try await session.resize(
+      RenderTargetExtent(width: 48, height: 24, scaleFactor: 1)
+    )
+    #expect(try session.snapshot().extent.width == 48)
+    #expect(try map.snapshot().logicalExtent.width == 48)
+    #expect(try map.snapshot().logicalExtent.height == 24)
+
+    await expectFailure("another map scale factor", kind: .invalidArgument) {
+      _ = try await map.resize(
+        to: MapLogicalExtent(width: 48, height: 24, scaleFactor: 3)
+      )
+    }
+  }
+
+  /// BND-176. A session renders through the target kind it attached with, so a
+  /// replacement of another kind is rejected and leaves the session usable.
+  @Test(.enabled(
+    if: Maplibre.supportedRenderBackends().contains(.metal),
+    "The selected native preset does not provide Metal."
+  )) func setTargetReportsUnsupportedForAnotherTargetKind() async throws {
+    let runtime = try RuntimeHandle(
+      options: RuntimeOptions(cachePath: ":memory:")
+    )
+    defer { try? runtime.closeBlockingForTests() }
+    let map = try await MapHandle(
+      runtime: runtime,
+      options: MapOptions(width: 32, height: 32)
+    )
+    defer { try? map.closeBlockingForTests() }
+    try await map.setStyleJSON(emptyStyleJSON)
+
+    let device = try #require(MTLCreateSystemDefaultDevice())
+    let attachment = try attachMetalTexture(map: map, device: device)
+    let session = attachment.session
+    defer {
+      _ = try? session.abandon()
+      try? session.close()
+      withExtendedLifetime(device) {}
+    }
+    let loop = DriverLoop(session)
+    defer { loop.stop() }
+    try await attachment.completion.value
+
+    // This session owns its texture, so it renders into neither a caller-owned
+    // texture nor a surface. Both replacements name a live backend object, so
+    // each rejection is about the target kind and not a null handle.
+    let replacement = try makeBorrowedTexture(
+      device: device,
+      width: 32,
+      height: 32
+    )
+    await expectFailure("a caller-owned texture", kind: .unsupported) {
+      try await session
+        .setMetalBorrowedTextureTarget(borrowedTextureDescriptor(replacement))
+    }
+
+    let layer = CAMetalLayer()
+    layer.device = device
+    layer.pixelFormat = .bgra8Unorm
+    layer.framebufferOnly = false
+    layer.drawableSize = CGSize(width: 32, height: 32)
+    await expectFailure("a surface", kind: .unsupported) {
+      try await session.setMetalSurfaceTarget(MetalSurfaceDescriptor(
+        extent: RenderTargetExtent(width: 32, height: 32, scaleFactor: 1),
+        context: MetalContextDescriptor(device: metalObjectPointer(device)),
+        layer: metalObjectPointer(layer)
+      ))
+    }
+
+    // The rejections left the session usable.
+    #expect(try await renderFrame(session, token: 5)?.result == .rendered)
+    withExtendedLifetime(replacement) {}
+    withExtendedLifetime(layer) {}
+  }
+
+  /// BND-175, BND-183. A caller-owned texture is sized by its owner, so a host
+  /// that follows a resize hands over a texture at the new size instead of
+  /// resizing the session: the session rejects the resize, paints whichever
+  /// texture it was handed, and the map takes the new extent from its own
+  /// resize.
+  @Test(.enabled(
+    if: Maplibre.supportedRenderBackends().contains(.metal),
+    "The selected native preset does not provide Metal."
+  )) func setTargetRendersIntoTheReplacementCallerOwnedTexture() async throws {
+    let runtime = try RuntimeHandle(
+      options: RuntimeOptions(cachePath: ":memory:")
+    )
+    defer { try? runtime.closeBlockingForTests() }
+    let map = try await MapHandle(
+      runtime: runtime,
+      options: MapOptions(width: 32, height: 32)
+    )
+    defer { try? map.closeBlockingForTests() }
+
+    let device = try #require(MTLCreateSystemDefaultDevice())
+    let texture = try makeBorrowedTexture(device: device, width: 32, height: 32)
+    let attachment = try map.attachMetalBorrowedTexture(
+      borrowedTextureDescriptor(texture),
+      options: RenderSessionAttachOptions(driver: .callerGraphicsThread)
+    )
+    let session = attachment.session
+    defer {
+      _ = try? session.abandon()
+      try? session.close()
+      withExtendedLifetime(device) {}
+      withExtendedLifetime(texture) {}
+    }
+    let loop = DriverLoop(session)
+    defer { loop.stop() }
+    try await attachment.completion.value
+
+    try await map.setStyleJSON(redBackgroundStyleJSON)
+    #expect(try await renderUntil("the attached texture", session: session) {
+      try isPaintedRed(texture, device: device)
+    })
+
+    await expectFailure("resizing a caller-owned texture", kind: .unsupported) {
+      try await session.resize(
+        RenderTargetExtent(width: 48, height: 24, scaleFactor: 1)
+      )
+    }
+
+    let replacement = try makeBorrowedTexture(
+      device: device,
+      width: 48,
+      height: 24
+    )
+    #expect(try !isPaintedRed(replacement, device: device))
+    try await session
+      .setMetalBorrowedTextureTarget(borrowedTextureDescriptor(replacement))
+    // A retarget replaces the graphics resource only, so the map takes the
+    // replacement extent from its own resize.
+    _ = try await map.resize(
+      to: MapLogicalExtent(width: 48, height: 24, scaleFactor: 1)
+    )
+    #expect(try await renderUntil("the replacement texture", session: session) {
+      try isPaintedRed(replacement, device: device)
+    })
+    #expect(try map.snapshot().logicalExtent.width == 48)
+    #expect(try map.snapshot().logicalExtent.height == 24)
+    withExtendedLifetime(replacement) {}
+  }
+#endif

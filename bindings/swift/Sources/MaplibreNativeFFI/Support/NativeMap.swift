@@ -4,95 +4,75 @@ enum NativeMap {
   static func create(
     runtime: NativeRuntimeHandle,
     options: UnsafePointer<mln_map_options>
-  ) throws -> NativeMapHandle {
-    try NativeHandleFactory
-      .create(nullDiagnostic: "mln_map_create returned a null map") { outHandle in
-        try checkStatus(mln_map_create(runtime.raw, options, outHandle))
-      }
+  ) throws -> NativeFuture<NativeMapHandle> {
+    try NativeCompletion.start(
+      { mln_map_create(runtime.raw, options, $0) }
+    ) { result in
+      try NativeMapHandle(raw: NativeCompletion.value(result, as: mln_map.self))
+    }
   }
 
-  static func setEventMask(_ map: NativeMapHandle, mask: UInt64) throws {
-    try checkStatus(mln_map_set_event_mask(map.raw, mask))
+  static func release(_ map: NativeMapHandle) throws -> NativeFuture<Void> {
+    try NativeCompletion.startUnit { completion in
+      mln_map_release(map.raw, completion)
+    }
   }
 
-  static func eventMask(_ map: NativeMapHandle) throws -> UInt64 {
-    try NativeMemory.withTemporary(UInt64(0)) { mask in
-      try checkStatus(mln_map_get_event_mask(map.raw, mask))
-    }.value
+  static func snapshot(_ map: NativeMapHandle) throws -> mln_map_snapshot {
+    var snapshot = mln_map_snapshot()
+    snapshot.size = UInt32(MemoryLayout<mln_map_snapshot>.size)
+    try checkStatus(mln_map_snapshot_get(map.raw, &snapshot))
+    return snapshot
   }
 
-  static func debugOptions(_ map: NativeMapHandle) throws -> UInt32 {
-    try NativeMemory.withTemporary(UInt32(0)) { options in
-      try checkStatus(mln_map_get_debug_options(map.raw, options))
-    }.value
-  }
-
-  static func renderingStatsViewEnabled(_ map: NativeMapHandle) throws -> Bool {
-    try NativeMemory.withTemporary(false) { enabled in
-      try checkStatus(mln_map_get_rendering_stats_view_enabled(
-        map.raw,
-        enabled
-      ))
-    }.value
-  }
-
-  static func isFullyLoaded(_ map: NativeMapHandle) throws -> Bool {
-    try NativeMemory.withTemporary(false) { loaded in
-      try checkStatus(mln_map_is_fully_loaded(map.raw, loaded))
-    }.value
-  }
-
-  static func isGestureInProgress(_ map: NativeMapHandle) throws -> Bool {
-    try NativeMemory.withTemporary(false) { inProgress in
-      try checkStatus(mln_map_is_gesture_in_progress(map.raw, inProgress))
-    }.value
-  }
-
-  static func size(_ map: NativeMapHandle) throws
-    -> (width: UInt32, height: UInt32, scaleFactor: Double)
+  static func cameraSnapshot(_ map: NativeMapHandle) throws
+    -> (camera: mln_camera_options, generation: UInt64)
   {
-    var width: UInt32 = 0
-    var height: UInt32 = 0
-    var scaleFactor: Double = 0
-    try checkStatus(mln_map_get_size(map.raw, &width, &height, &scaleFactor))
-    return (width: width, height: height, scaleFactor: scaleFactor)
-  }
-
-  static func viewportOptions(_ map: NativeMapHandle) throws
-    -> mln_map_viewport_options
-  {
-    var options = mln_map_viewport_options_default()
-    try checkStatus(mln_map_get_viewport_options(map.raw, &options))
-    return options
-  }
-
-  static func tileOptions(_ map: NativeMapHandle) throws
-    -> mln_map_tile_options
-  {
-    var options = mln_map_tile_options_default()
-    try checkStatus(mln_map_get_tile_options(map.raw, &options))
-    return options
-  }
-
-  static func camera(_ map: NativeMapHandle) throws -> mln_camera_options {
     var camera = mln_camera_options_default()
-    try checkStatus(mln_map_get_camera(map.raw, &camera))
-    return camera
+    var generation: UInt64 = 0
+    try checkStatus(mln_map_camera_snapshot_get(
+      map.raw,
+      &camera,
+      &generation
+    ))
+    return (camera, generation)
+  }
+
+  static func cameraQuery(
+    _ map: NativeMapHandle
+  ) throws -> NativeFuture<CameraSnapshot> {
+    try NativeCompletion.start(
+      { mln_map_camera_query(map.raw, $0) }
+    ) { result in
+      let value: mln_camera_query_result = try NativeCompletion.value(result)
+      return CameraSnapshot(
+        generation: value.generation,
+        camera: CameraOptions(native: NativeCameraOptionsInput(value.camera))
+      )
+    }
+  }
+
+  static func requestStillImage(
+    _ map: NativeMapHandle
+  ) throws -> NativeFuture<Void> {
+    try NativeCompletion.startUnit {
+      mln_map_request_still_image(map.raw, $0)
+    }
   }
 
   static func cameraForLatLngBounds(
     _ map: NativeMapHandle,
     bounds: NativeLatLngBounds,
     fitOptions: UnsafePointer<mln_camera_fit_options>?
-  ) throws -> mln_camera_options {
-    var camera = mln_camera_options_default()
-    try checkStatus(mln_map_camera_for_lat_lng_bounds(
-      map.raw,
-      bounds.native,
-      fitOptions,
-      &camera
-    ))
-    return camera
+  ) throws -> NativeFuture<CameraOptions> {
+    try camera {
+      mln_map_camera_for_lat_lng_bounds(
+        map.raw,
+        bounds.native,
+        fitOptions,
+        $0
+      )
+    }
   }
 
   static func cameraForLatLngs(
@@ -100,183 +80,148 @@ enum NativeMap {
     coordinates: UnsafePointer<mln_lat_lng>?,
     count: Int,
     fitOptions: UnsafePointer<mln_camera_fit_options>?
-  ) throws -> mln_camera_options {
-    var camera = mln_camera_options_default()
-    try checkStatus(mln_map_camera_for_lat_lngs(
-      map.raw,
-      coordinates,
-      count,
-      fitOptions,
-      &camera
-    ))
-    return camera
+  ) throws -> NativeFuture<CameraOptions> {
+    try camera {
+      mln_map_camera_for_lat_lngs(
+        map.raw,
+        coordinates,
+        count,
+        fitOptions,
+        $0
+      )
+    }
   }
 
   static func cameraForGeometry(
     _ map: NativeMapHandle,
     geometry: mln_buffer_view,
     fitOptions: UnsafePointer<mln_camera_fit_options>?
-  ) throws -> mln_camera_options {
-    var camera = mln_camera_options_default()
-    try checkStatus(mln_map_camera_for_geometry(
-      map.raw,
-      geometry,
-      fitOptions,
-      &camera
-    ))
-    return camera
+  ) throws -> NativeFuture<CameraOptions> {
+    try camera {
+      mln_map_camera_for_geometry(map.raw, geometry, fitOptions, $0)
+    }
+  }
+
+  private static func camera(
+    _ start: (UnsafePointer<mln_completion>) -> mln_status
+  ) throws -> NativeFuture<CameraOptions> {
+    try NativeCompletion.start(start) { result in
+      let value: mln_camera_options = try NativeCompletion.value(result)
+      return CameraOptions(native: NativeCameraOptionsInput(value))
+    }
   }
 
   static func latLngBoundsForCamera(
     _ map: NativeMapHandle,
     camera: UnsafePointer<mln_camera_options>,
     unwrapped: Bool
-  ) throws -> NativeLatLngBounds {
-    let output = try NativeMemory
-      .withTemporary(mln_lat_lng_bounds()) { bounds in
+  ) throws -> NativeFuture<LatLngBounds> {
+    try NativeCompletion.start(
+      { completion in
         if unwrapped {
-          try checkStatus(mln_map_lat_lng_bounds_for_camera_unwrapped(
+          mln_map_lat_lng_bounds_for_camera_unwrapped(
             map.raw,
             camera,
-            bounds
-          ))
+            completion
+          )
         } else {
-          try checkStatus(mln_map_lat_lng_bounds_for_camera(
-            map.raw,
-            camera,
-            bounds
-          ))
+          mln_map_lat_lng_bounds_for_camera(map.raw, camera, completion)
         }
       }
-    return NativeLatLngBounds(output.value)
-  }
-
-  static func bounds(_ map: NativeMapHandle) throws -> mln_bound_options {
-    var bounds = mln_bound_options_default()
-    try checkStatus(mln_map_get_bounds(map.raw, &bounds))
-    return bounds
-  }
-
-  static func freeCameraOptions(_ map: NativeMapHandle) throws
-    -> mln_free_camera_options
-  {
-    var options = mln_free_camera_options_default()
-    try checkStatus(mln_map_get_free_camera_options(map.raw, &options))
-    return options
-  }
-
-  static func projectionMode(_ map: NativeMapHandle) throws
-    -> mln_projection_mode
-  {
-    var mode = mln_projection_mode_default()
-    try checkStatus(mln_map_get_projection_mode(map.raw, &mode))
-    return mode
-  }
-
-  static func pixelForLatLng(_ map: NativeMapHandle,
-                             coordinate: NativeLatLng) throws
-    -> NativeScreenPoint
-  {
-    let output = try NativeMemory.withTemporary(mln_screen_point()) { point in
-      try checkStatus(mln_map_pixel_for_lat_lng(
-        map.raw,
-        coordinate.native,
-        point
-      ))
+    ) { result in
+      let value: mln_lat_lng_bounds = try NativeCompletion.value(result)
+      return LatLngBounds(native: NativeLatLngBounds(value))
     }
-    return NativeScreenPoint(output.value)
   }
 
-  static func latLngForPixel(_ map: NativeMapHandle,
-                             point: NativeScreenPoint) throws -> NativeLatLng
-  {
-    let output = try NativeMemory.withTemporary(mln_lat_lng()) { coordinate in
-      try checkStatus(mln_map_lat_lng_for_pixel(
-        map.raw,
-        point.native,
-        coordinate
-      ))
-    }
-    return NativeLatLng(output.value)
-  }
-
-  static func latLngForPixelUnwrapped(
+  static func pixelForLatLng(
     _ map: NativeMapHandle,
-    point: NativeScreenPoint
-  ) throws -> NativeLatLng {
-    let output = try NativeMemory.withTemporary(mln_lat_lng()) { coordinate in
-      try checkStatus(mln_map_lat_lng_for_pixel_unwrapped(
-        map.raw,
-        point.native,
-        coordinate
-      ))
+    coordinate: NativeLatLng
+  ) throws -> NativeFuture<ScreenPoint> {
+    try NativeCompletion.start(
+      { mln_map_pixel_for_lat_lng(map.raw, coordinate.native, $0) }
+    ) { result in
+      let value: mln_screen_point = try NativeCompletion.value(result)
+      return ScreenPoint(native: NativeScreenPoint(value))
     }
-    return NativeLatLng(output.value)
+  }
+
+  static func latLngForPixel(
+    _ map: NativeMapHandle,
+    point: NativeScreenPoint,
+    unwrapped: Bool
+  ) throws -> NativeFuture<LatLng> {
+    try NativeCompletion.start(
+      { completion in
+        if unwrapped {
+          mln_map_lat_lng_for_pixel_unwrapped(
+            map.raw,
+            point.native,
+            completion
+          )
+        } else {
+          mln_map_lat_lng_for_pixel(map.raw, point.native, completion)
+        }
+      }
+    ) { result in
+      let value: mln_lat_lng = try NativeCompletion.value(result)
+      return LatLng(native: NativeLatLng(value))
+    }
   }
 
   static func pixelsForLatLngs(
     _ map: NativeMapHandle,
     coordinates: [NativeLatLng]
-  ) throws -> [NativeScreenPoint] {
-    let rawCoordinates = coordinates.map(\.native)
-    var rawPoints = [mln_screen_point](
-      repeating: mln_screen_point(),
-      count: rawCoordinates.count
-    )
-    try rawCoordinates.withUnsafeBufferPointer { coordinates in
-      try rawPoints.withUnsafeMutableBufferPointer { points in
-        try checkStatus(mln_map_pixels_for_lat_lngs(
-          map.raw,
-          coordinates.baseAddress,
-          coordinates.count,
-          points.baseAddress
-        ))
+  ) throws -> NativeFuture<[ScreenPoint]> {
+    let raw = coordinates.map(\.native)
+    return try raw.withUnsafeBufferPointer { coordinates in
+      try NativeCompletion.start(
+        {
+          mln_map_pixels_for_lat_lngs(
+            map.raw,
+            coordinates.baseAddress,
+            coordinates.count,
+            $0
+          )
+        }
+      ) { result in
+        try NativeCompletion.values(result, as: mln_screen_point.self).map {
+          ScreenPoint(native: NativeScreenPoint($0))
+        }
       }
     }
-    return rawPoints.map(NativeScreenPoint.init)
   }
 
   static func latLngsForPixels(
     _ map: NativeMapHandle,
-    points: [NativeScreenPoint]
-  ) throws -> [NativeLatLng] {
-    let rawPoints = points.map(\.native)
-    var rawCoordinates = [mln_lat_lng](
-      repeating: mln_lat_lng(),
-      count: rawPoints.count
-    )
-    try rawPoints.withUnsafeBufferPointer { points in
-      try rawCoordinates.withUnsafeMutableBufferPointer { coordinates in
-        try checkStatus(mln_map_lat_lngs_for_pixels(
-          map.raw,
-          points.baseAddress,
-          points.count,
-          coordinates.baseAddress
-        ))
+    points: [NativeScreenPoint],
+    unwrapped: Bool
+  ) throws -> NativeFuture<[LatLng]> {
+    let raw = points.map(\.native)
+    return try raw.withUnsafeBufferPointer { points in
+      try NativeCompletion.start(
+        { completion in
+          if unwrapped {
+            mln_map_lat_lngs_for_pixels_unwrapped(
+              map.raw,
+              points.baseAddress,
+              points.count,
+              completion
+            )
+          } else {
+            mln_map_lat_lngs_for_pixels(
+              map.raw,
+              points.baseAddress,
+              points.count,
+              completion
+            )
+          }
+        }
+      ) { result in
+        try NativeCompletion.values(result, as: mln_lat_lng.self).map {
+          LatLng(native: NativeLatLng($0))
+        }
       }
     }
-    return rawCoordinates.map(NativeLatLng.init)
-  }
-
-  static func latLngsForPixelsUnwrapped(
-    _ map: NativeMapHandle,
-    points: [NativeScreenPoint]
-  ) throws -> [NativeLatLng] {
-    let rawPoints = points.map(\.native)
-    var rawCoordinates = [mln_lat_lng](
-      repeating: mln_lat_lng(),
-      count: rawPoints.count
-    )
-    try rawPoints.withUnsafeBufferPointer { points in
-      try rawCoordinates.withUnsafeMutableBufferPointer { coordinates in
-        try checkStatus(mln_map_lat_lngs_for_pixels_unwrapped(
-          map.raw,
-          points.baseAddress,
-          points.count,
-          coordinates.baseAddress
-        ))
-      }
-    }
-    return rawCoordinates.map(NativeLatLng.init)
   }
 }

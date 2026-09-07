@@ -17,8 +17,8 @@ public class CameraOptions {
   public var padding: EdgeInsets? = null
 
   /**
-   * The screen point that stays fixed while a camera command applies. Input-only: it always reads
-   * back as null from [org.maplibre.nativeffi.map.MapHandle.camera].
+   * The screen point that stays fixed while a camera command applies. Input-only: snapshots omit
+   * this field.
    */
   public var anchor: ScreenPoint? = null
 

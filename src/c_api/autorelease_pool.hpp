@@ -11,10 +11,9 @@ namespace mln::c_api {
 auto run_in_autorelease_pool(void* context, mln_status (*body)(void*))
   -> mln_status;
 
-// A host frame loop that never returns to a run loop has no pool to drain
-// autoreleased objects, and Metal blocks the next frame until an in-flight
-// command buffer is deallocated. Drain one pool per call. Objects that cross
-// the C boundary are retained, not autoreleased.
+// A native worker or host frame loop may run without an autorelease pool.
+// Drain one pool per C entry point or queued runtime submission. Objects that
+// cross the C boundary are retained, not autoreleased.
 template <typename Function>
 auto with_autorelease_pool(Function& function) -> mln_status {
   return run_in_autorelease_pool(&function, [](void* context) -> mln_status {

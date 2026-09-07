@@ -82,84 +82,13 @@ class HandleStateCoreTest {
   }
 
   @Test
-  fun liveChildrenBlockParentCloseUntilReleased() {
-    val state = HandleStateCore("ParentHandle", 0x1234)
-    val child = state.retainChild("ChildHandle")
-    var attempts = 0
-
-    val error =
-      assertFailsWith<InvalidStateException> {
-        state.closeOnce(
-          destroy = {
-            attempts += 1
-            MaplibreStatus.OK.nativeCode
-          }
-        )
-      }
-
-    assertEquals(MaplibreStatus.INVALID_STATE, error.status)
-    assertEquals("ParentHandle has 1 live child handle(s): ChildHandle", error.diagnostic)
-    assertEquals(0, attempts)
-    assertFalse(state.isReleased())
-
-    child.close()
-    child.close()
-
-    state.closeOnce(
-      destroy = {
-        attempts += 1
-        MaplibreStatus.OK.nativeCode
-      }
-    )
-
-    assertEquals(1, attempts)
-    assertTrue(state.isReleased())
-  }
-
-  @Test
-  fun blockedParentCloseNamesEachLiveChildTypeUntilItIsReleased() {
-    val state = HandleStateCore("MapHandle", 0x1234)
-    val session = state.retainChild("RenderSessionHandle")
-    val projection = state.retainChild("MapProjectionHandle")
-    var attempts = 0
-    val destroy = {
-      attempts += 1
-      MaplibreStatus.OK.nativeCode
-    }
-
-    val bothLive = assertFailsWith<InvalidStateException> { state.closeOnce(destroy) }
-    assertEquals(
-      "MapHandle has 2 live child handle(s): MapProjectionHandle, RenderSessionHandle",
-      bothLive.diagnostic,
-    )
-
-    session.close()
-
-    val projectionLive = assertFailsWith<InvalidStateException> { state.closeOnce(destroy) }
-    assertEquals(
-      "MapHandle has 1 live child handle(s): MapProjectionHandle",
-      projectionLive.diagnostic,
-    )
-    assertEquals(0, attempts)
-
-    projection.close()
-    state.closeOnce(destroy)
-
-    assertEquals(1, attempts)
-    assertTrue(state.isReleased())
-  }
-
-  @Test
   fun leakReportReportsOnlyUnreleasedHandles() {
     val reports = mutableListOf<String>()
     val unreleased = HandleStateCore.LeakReport("RuntimeHandle", 0x1234L, reports::add)
 
     unreleased.report()
 
-    assertEquals(
-      listOf("Leaked RuntimeHandle native handle 0x1234; " + "close handles explicitly."),
-      reports,
-    )
+    assertEquals(listOf("Leaked RuntimeHandle native handle 0x1234; close it explicitly."), reports)
 
     val released = HandleStateCore.LeakReport("MapHandle", 0x5678L, reports::add)
     released.markReleased()
@@ -193,7 +122,6 @@ class HandleStateCoreTest {
     assertEquals(7, state.withLive { 7 })
     assertFailsWith<IllegalStateException> { state.withLive { error("boom") } }
 
-    // A block that threw must not leave a use counted, or close would wait forever.
     state.closeOnce(destroy = { MaplibreStatus.OK.nativeCode })
     assertTrue(state.isReleased())
   }

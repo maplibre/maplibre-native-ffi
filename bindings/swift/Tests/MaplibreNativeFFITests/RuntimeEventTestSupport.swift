@@ -3,73 +3,84 @@ import Foundation
 @testable import MaplibreNativeFFI
 import Testing
 
-/// Pumps and drains until an event `isMatch` accepts arrives, and returns it.
-/// Records an issue naming `subject` and returns `nil` when nothing matches
-/// before the deadline.
-func pumpUntilEvent(
+/// Drains until an event `isMatch` accepts arrives, and returns it.
+/// Records an issue naming `subject` and returns `nil` at the deadline.
+func drainUntilEvent(
   _ runtime: RuntimeHandle,
   waitingFor subject: String,
   timeout: TimeInterval = 10,
   where isMatch: (RuntimeEvent) -> Bool
-) throws -> RuntimeEvent? {
+) async throws -> RuntimeEvent? {
   let deadline = Date().addingTimeInterval(timeout)
   while Date() < deadline {
-    try runtime.pump()
-    for event in try runtime.drainEvents().events where isMatch(event) {
+    try await runtime.barrier()
+    for event in try runtime.drainEvents() where isMatch(event) {
       return event
     }
-    Thread.sleep(forTimeInterval: 0.001)
+    try await Task<Never, Never>.sleep(nanoseconds: 1_000_000)
   }
   Issue.record("timed out waiting for \(subject)")
   return nil
 }
 
-/// Pumps and drains until the runtime stops producing events, so a park that
-/// follows is released by whatever the test raises next.
-func pumpUntilQuiet(_ runtime: RuntimeHandle, iterations: Int = 100) throws {
-  for _ in 0 ..< iterations {
-    try runtime.pump()
-    if try runtime.drainEvents().events.isEmpty { return }
+func expectCommandFailure(_ completion: CommandCompletion, status: mln_status) {
+  #expect(completion.disposition == .failed)
+  #expect(completion.rawStatus == status.rawValue)
+  #expect(!completion.diagnostic.isEmpty)
+}
+
+/// Polls until `condition` holds while the runtime's own threads make
+/// progress. Records an issue naming `subject` and returns false at the
+/// deadline.
+func waitUntilTrue(
+  _ subject: String,
+  timeout: TimeInterval = 10,
+  condition: () throws -> Bool
+) async throws -> Bool {
+  let deadline = Date().addingTimeInterval(timeout)
+  while Date() < deadline {
+    if try condition() { return true }
+    try await Task<Never, Never>.sleep(nanoseconds: 1_000_000)
   }
-  Issue.record("the runtime kept producing events while idle")
+  if try condition() { return true }
+  Issue.record("timed out waiting for \(subject)")
+  return false
 }
 
 /// A style with no sources, so a load finishes without reaching the network.
 let emptyStyleJSON = Data(#"{"version":8,"sources":{},"layers":[]}"#.utf8)
 
-private final class CapturedFailure: @unchecked Sendable {
-  private let lock = NSLock()
-  private var failure: NativeStatusFailure?
-
-  func store(_ failure: NativeStatusFailure) {
-    lock.withLock { self.failure = failure }
-  }
-
-  func value() -> NativeStatusFailure? {
-    lock.withLock { failure }
-  }
+/// Waits on `semaphore`. `DispatchSemaphore.wait(timeout:)` is unavailable
+/// from an async context, so a test that has to block calls this from a
+/// detached task or another thread.
+func waitForSemaphore(
+  _ semaphore: DispatchSemaphore,
+  timeout: DispatchTime
+) -> DispatchTimeoutResult {
+  semaphore.wait(timeout: timeout)
 }
 
-/// Runs `body` on another thread and returns the native failure it threw.
-///
-/// The public handle types are deliberately not `Sendable`, so a test reaches
-/// the C API's owner-thread rule through the native handle a handle lends out.
-func failureFromAnotherThread(
-  _ body: @escaping @Sendable () throws -> Void
-) -> NativeStatusFailure? {
-  let captured = CapturedFailure()
-  let thread = Thread {
-    do {
-      try body()
-    } catch let failure as NativeStatusFailure {
-      captured.store(failure)
-    } catch {}
+/// A lock-guarded box for a value a test writes from a callback thread and
+/// reads from the test's own.
+final class LockedBox<Value>: @unchecked Sendable {
+  private let lock = NSLock()
+  private var stored: Value
+
+  init(_ initial: Value) {
+    stored = initial
   }
-  thread.start()
-  while !thread.isFinished {
-    usleep(1000)
+
+  var value: Value {
+    lock.withLock { stored }
   }
-  return captured.value()
+
+  func update(_ body: (inout Value) -> Void) {
+    lock.withLock { body(&stored) }
+  }
+
+  func read<Result>(_ body: (Value) -> Result) -> Result {
+    lock.withLock { body(stored) }
+  }
 }
 
 /// Builds one raw event record. Every field defaults to what the C API writes
@@ -80,7 +91,7 @@ func rawRuntimeEvent(
   source: UInt64 = 1,
   code: Int32 = 0,
   payloadType: UInt32 = MLN_RUNTIME_EVENT_PAYLOAD_NONE.rawValue,
-  messageOffset: UInt32 = 0,
+  messageOffset: UInt64 = 0,
   messageSize: UInt32 = 0
 ) -> mln_runtime_event {
   var event = mln_runtime_event()
@@ -98,11 +109,11 @@ func rawRuntimeEvent(
 /// and reports where each message starts.
 func packMessageArena(
   _ messages: [String]
-) -> (bytes: [UInt8], offsets: [UInt32]) {
+) -> (bytes: [UInt8], offsets: [UInt64]) {
   var bytes: [UInt8] = []
-  var offsets: [UInt32] = []
+  var offsets: [UInt64] = []
   for message in messages {
-    offsets.append(UInt32(bytes.count))
+    offsets.append(UInt64(bytes.count))
     bytes.append(contentsOf: Array(message.utf8))
     bytes.append(0)
   }
@@ -111,7 +122,7 @@ func packMessageArena(
 
 /// One batch a test built over storage it owns.
 struct SynthesizedEventBatch {
-  let batch: mln_runtime_event_batch
+  let batch: mln_runtime_event_batch_view
   /// The event records, for a test that overwrites them after a decode.
   let records: UnsafeMutableRawBufferPointer
   /// The message arena, for the same reason.
@@ -126,15 +137,14 @@ func withSynthesizedEventBatch<Result>(
   events: [mln_runtime_event],
   stride: Int = MemoryLayout<mln_runtime_event>.size,
   messages: [UInt8] = [],
-  remainingCount: Int = 0,
   payloadWindows: [Int: [UInt8]] = [:],
   _ body: (SynthesizedEventBatch) throws -> Result
 ) throws -> Result {
   let payloadOffset = try #require(
     MemoryLayout<mln_runtime_event>.offset(of: \.payload)
   )
-  // The C API lends an array of event records, so the storage behind one has to
-  // carry the record alignment; a `UInt64` element buffer does. An empty
+  // The view borrows an array of event records, so the storage behind one has
+  // to carry the record alignment; a `UInt64` element buffer does. An empty
   // allocation has no base address, and the C API spells an empty array or
   // arena as a null pointer, so one spare element keeps both in one code path.
   var recordStorage = [UInt64](
@@ -157,7 +167,8 @@ func withSynthesizedEventBatch<Result>(
         }
       }
 
-      var batch = mln_runtime_event_batch_default()
+      var batch = mln_runtime_event_batch_view()
+      batch.size = UInt32(MemoryLayout<mln_runtime_event_batch_view>.size)
       batch.event_size = UInt32(stride)
       batch.events = events.isEmpty
         ? nil
@@ -169,7 +180,6 @@ func withSynthesizedEventBatch<Result>(
         : UnsafeRawPointer(#require(arena.baseAddress))
         .assumingMemoryBound(to: CChar.self)
       batch.messages_size = messages.count
-      batch.remaining_count = remainingCount
       return try body(SynthesizedEventBatch(
         batch: batch,
         records: records,

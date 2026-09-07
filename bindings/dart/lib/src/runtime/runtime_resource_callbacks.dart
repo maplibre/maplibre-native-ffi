@@ -189,25 +189,32 @@ int _resourceRouteFlags(ResourceProviderRoute route) {
 }
 
 final class _ResourceProviderCallbackState extends RetainedCallbackState {
-  _ResourceProviderCallbackState(ResourceProvider provider) {
+  _ResourceProviderCallbackState(ResourceProvider provider)
+    : _callback = provider.callback {
     for (final route in provider.routes) {
       _checkNativeCString(route.url);
     }
-    callback =
-        NativeCallable<
-          raw.mln_adapter_queued_resource_request_listenerFunction
-        >.listener((Pointer<Void> request) {
-          if (request == nullptr) {
-            close();
-            return;
-          }
-          final ran = runUpcall(
-            () => _invokeQueuedResourceProvider(provider.callback, request),
-          );
-          if (!ran) {
-            _dropQueuedResourceProviderRequest(request);
-          }
-        });
+    listener = NativeCallable<raw.mln_wake_callbackFunction>.listener((
+      Pointer<Void> _,
+    ) {
+      runUpcall(drain);
+    });
+    final outQueue = calloc<Uint64>();
+    final wake = calloc<raw.mln_wake>();
+    try {
+      wake.ref.size = sizeOf<raw.mln_wake>();
+      wake.ref.callback = listener.nativeFunction;
+      wake.ref.user_data = nullptr;
+      wake.ref.release_user_data = nullptr;
+      _check(raw.mln_adapter_resource_request_queue_create(wake, outQueue));
+      queue = outQueue.value;
+    } catch (_) {
+      listener.close();
+      rethrow;
+    } finally {
+      calloc.free(wake);
+      calloc.free(outQueue);
+    }
     pointer = calloc<raw.mln_adapter_queued_resource_provider>();
     pointer.ref.route_count = provider.routes.length;
     pointer.ref.routes = provider.routes.isEmpty
@@ -222,26 +229,45 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
       pointer.ref.routes[index].flags = _resourceRouteFlags(route);
       pointer.ref.routes[index].url = _nativeOwnedCString(route.url);
     }
-    pointer.ref.listener = callback.nativeFunction;
+    pointer.ref.queue = queue;
   }
 
+  final ResourceProviderCallback _callback;
+  late final NativeCallable<raw.mln_wake_callbackFunction> listener;
+  late final int queue;
   late final Pointer<raw.mln_adapter_queued_resource_provider> pointer;
-  late final NativeCallable<
-    raw.mln_adapter_queued_resource_request_listenerFunction
-  >
-  callback;
-  var _retirementQueued = false;
 
-  void retire() {
-    if (_retirementQueued) {
-      return;
-    }
-    _retirementQueued = true;
-    raw.mln_adapter_queued_resource_provider_retire(pointer);
+  void drain() {
+    withNativeArena((arena) {
+      final outRequest =
+          arena<Pointer<raw.mln_adapter_queued_resource_request>>();
+      while (true) {
+        // The acquire requires the null handle on entry, and the pointer is
+        // reused across iterations.
+        outRequest.value = nullptr;
+        _check(
+          raw.mln_adapter_resource_request_queue_acquire(queue, outRequest),
+        );
+        final request = outRequest.value.cast<Void>();
+        if (request == nullptr) {
+          return;
+        }
+        final ran = runUpcall(
+          () => _invokeQueuedResourceProvider(_callback, request),
+        );
+        if (!ran) {
+          _dropQueuedResourceProviderRequest(request);
+        }
+      }
+    });
   }
+
+  void retire() => closeSynchronously();
 
   @override
   void closeResources() {
+    drain();
+    raw.mln_adapter_resource_request_queue_close(queue);
     final routes = pointer.ref.routes;
     for (var index = 0; index < pointer.ref.route_count; index += 1) {
       calloc.free(routes[index].url);
@@ -250,29 +276,16 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
       calloc.free(routes);
     }
     calloc.free(pointer);
-    callback.close();
+    listener.close();
   }
 }
 
 void _dropQueuedResourceProviderRequest(Pointer<Void> rawRequest) {
   try {
-    final request = rawRequest
-        .cast<raw.mln_adapter_queued_resource_request>()
-        .ref;
-    final handle = ResourceRequestHandle._(
-      NativeResourceRequest(request.handle),
+    _failQueuedRequest(
+      rawRequest,
+      'Dart resource provider callback was retired',
     );
-    try {
-      handle.complete(
-        ResourceResponse(
-          status: ResourceResponseStatus.error,
-          errorReason: ResourceErrorReason.other,
-          errorMessage: 'Dart resource provider callback was retired',
-        ),
-      );
-    } catch (_) {
-      handle.close();
-    }
   } finally {
     _c.adapterResourceProviderRequestDestroy(rawRequest);
   }
@@ -292,20 +305,31 @@ void _invokeQueuedResourceProvider(
     try {
       callback(_copyResourceRequest(request), handle);
     } catch (_) {
-      try {
-        handle.complete(
-          ResourceResponse(
-            status: ResourceResponseStatus.error,
-            errorReason: ResourceErrorReason.other,
-            errorMessage: 'Dart resource provider callback threw',
-          ),
-        );
-      } catch (_) {
-        handle.close();
-      }
+      _failQueuedRequest(rawRequest, 'Dart resource provider callback threw');
     }
   } finally {
     _c.adapterResourceProviderRequestDestroy(rawRequest);
+  }
+}
+
+/// Completes the request in [rawRequest] with an error, and releases it
+/// instead when that completion is itself rejected.
+void _failQueuedRequest(Pointer<Void> rawRequest, String errorMessage) {
+  final handle = ResourceRequestHandle._(
+    NativeResourceRequest(
+      rawRequest.cast<raw.mln_adapter_queued_resource_request>().ref.handle,
+    ),
+  );
+  try {
+    handle.complete(
+      ResourceResponse(
+        status: ResourceResponseStatus.error,
+        errorReason: ResourceErrorReason.other,
+        errorMessage: errorMessage,
+      ),
+    );
+  } catch (_) {
+    handle.close();
   }
 }
 

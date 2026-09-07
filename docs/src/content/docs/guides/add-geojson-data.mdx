@@ -63,6 +63,7 @@ report an invalid-argument status when the data is prepared.
 
 <Code code={region(geojsonDataset, "inline-data")} lang="c" title="geojson-dataset.c" />
 
-A URL source parses and tiles on worker threads after the fetch. [Update
+A URL source parses and tiles on worker threads after the fetch. A host that
+renders on update draws the new features after tiling finishes. [Update
 data](/maplibre-native-ffi/guides/update-data/) covers replacing inline data as
 it changes.

@@ -23,7 +23,8 @@ public final class AndroidNativeBridge {
       @Cast("const mln_buffer_view*") Pointer imageId,
       @Cast("const mln_premultiplied_rgba8_image*") Pointer image,
       @Cast("const uint8_t*") byte[] pixels,
-      @Cast("const mln_style_image_options*") Pointer options);
+      @Cast("const mln_style_image_options*") Pointer options,
+      @Cast("const mln_completion*") Pointer completion);
 
   @Name("mln_android_add_image_source_image")
   public static native @Cast("mln_status") int addImageSourceImage(
@@ -32,12 +33,14 @@ public final class AndroidNativeBridge {
       @Cast("const mln_lat_lng*") Pointer coordinates,
       @Cast("size_t") long coordinateCount,
       @Cast("const mln_premultiplied_rgba8_image*") Pointer image,
-      @Cast("const uint8_t*") byte[] pixels);
+      @Cast("const uint8_t*") byte[] pixels,
+      @Cast("const mln_completion*") Pointer completion);
 
   @Name("mln_android_set_image_source_image")
   public static native @Cast("mln_status") int setImageSourceImage(
       @Cast("mln_map") long map,
       @Cast("const mln_buffer_view*") Pointer sourceId,
       @Cast("const mln_premultiplied_rgba8_image*") Pointer image,
-      @Cast("const uint8_t*") byte[] pixels);
+      @Cast("const uint8_t*") byte[] pixels,
+      @Cast("const mln_completion*") Pointer completion);
 }

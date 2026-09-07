@@ -12,6 +12,22 @@
 
 #include "unity.h"
 
+static const char empty_style_json[] =
+  "{\"version\":8,\"sources\":{},\"layers\":[]}";
+static const char background_style_json[] =
+  "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background\",\"type\":"
+  "\"background\",\"paint\":{\"background-color\":\"#102030\"}}]}";
+static const char red_background_style_json[] =
+  "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"bg\","
+  "\"type\":\"background\",\"paint\":{\"background-color\":\"#ff0000\"}}]}";
+
+const mln_buffer_view mln_test_empty_style_json =
+  MLN_BUFFER_LITERAL(empty_style_json);
+const mln_buffer_view mln_test_background_style_json =
+  MLN_BUFFER_LITERAL(background_style_json);
+const mln_buffer_view mln_test_red_background_style_json =
+  MLN_BUFFER_LITERAL(red_background_style_json);
+
 #if defined(_WIN32)
 #include <windows.h>
 #else
@@ -42,6 +58,29 @@ EM_JS(
       id : id,
     };
   }
+);
+EM_JS(
+  void*, mln_test_register_transferred_offscreen_canvas,
+  (const char* name, int width, int height), {
+    const id = UTF8ToString(name);
+    const selector = "#" + id;
+    const canvas = new OffscreenCanvas(width, height);
+    const canvasSharedPtr = _malloc(12);
+    HEAP32[canvasSharedPtr >> 2] = width;
+    HEAP32[canvasSharedPtr + 4 >> 2] = height;
+    HEAPU32[canvasSharedPtr + 8 >> 2] = 0;
+    Module["GL"].offscreenCanvases[selector] = {
+      canvas : canvas,
+      offscreenCanvas : canvas,
+      canvasSharedPtr : canvasSharedPtr,
+      id : id,
+    };
+    return canvasSharedPtr;
+  }
+);
+EM_JS(
+  void, mln_test_unregister_transferred_offscreen_canvas, (const char* name),
+  { delete Module["GL"].offscreenCanvases["#" + UTF8ToString(name)]; }
 );
 EM_JS(void, mln_test_unregister_offscreen_canvas, (const char* name), {
   delete Module["GL"].offscreenCanvases[UTF8ToString(name)];
@@ -86,6 +125,7 @@ typedef struct tracked_session {
 } tracked_session;
 
 static MLN_FFI_TEST_THREAD_LOCAL mln_runtime tracked_runtime;
+static MLN_FFI_TEST_THREAD_LOCAL mln_event_batch compatibility_batch_handle;
 static MLN_FFI_TEST_THREAD_LOCAL mln_map
   tracked_maps[MLN_FFI_TEST_TRACKED_CAPACITY];
 static MLN_FFI_TEST_THREAD_LOCAL size_t tracked_map_count;
@@ -132,7 +172,8 @@ static void reserve_session_slot(void) {
 
 static void track_session(const mln_test_render_fixture* fixture) {
   tracked_sessions[tracked_session_count] = (tracked_session){
-    .session = fixture->session, .backend_state = fixture->backend_state
+    .session = fixture->session,
+    .backend_state = fixture->backend_state,
   };
   tracked_session_count += 1;
 }
@@ -147,29 +188,148 @@ static void untrack_session(mln_render_session session) {
   }
 }
 
+mln_status mln_test_runtime_close(mln_runtime runtime) {
+  mln_test_completion teardown = mln_test_completion_default(0);
+  const mln_status status = mln_runtime_release(runtime, &teardown.descriptor);
+  if (status != MLN_STATUS_OK) {
+    // A rejected submission leaves user_data caller-owned, so release it here
+    // before destroy waits for the release marker.
+    mln_test_completion_reject(&teardown);
+    mln_test_completion_destroy(&teardown);
+    return status;
+  }
+  // Waiting keeps process exit ordered after native teardown, which otherwise
+  // races MapLibre's process-wide singletons in short-lived hosts.
+  const bool completed = mln_test_completion_wait(&teardown, -1);
+  const mln_status teardown_status = mln_test_completion_status(&teardown);
+  mln_test_completion_destroy(&teardown);
+  if (!completed) {
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  return teardown_status;
+}
+
 mln_runtime mln_test_create_runtime(void) {
   mln_runtime runtime = MLN_HANDLE_NULL;
-  const mln_runtime_options options = mln_runtime_options_default();
-  const mln_status status = mln_runtime_create(&options, &runtime);
-  if (status == MLN_STATUS_INVALID_STATE) {
-    TEST_FAIL_MESSAGE(
-      "This thread already owns a live runtime, so an earlier test leaked one. "
-      "Look for the first failing test above and destroy the runtime it "
-      "created."
-    );
-  }
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, status);
+  mln_runtime_options options = mln_runtime_options_default();
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_create(&options, &runtime));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
   tracked_runtime = runtime;
   return runtime;
+}
+
+mln_status mln_test_map_create_status(
+  mln_runtime runtime, const mln_map_options* options, mln_map* out_map
+) {
+  mln_test_completion completion =
+    mln_test_completion_default(sizeof(*out_map));
+  mln_status status = mln_map_create(runtime, options, &completion.descriptor);
+  if (status != MLN_STATUS_OK) {
+    completion.descriptor.release_user_data(completion.descriptor.user_data);
+    mln_test_completion_destroy(&completion);
+    return status;
+  }
+  if (!mln_test_completion_wait(&completion, -1)) {
+    status = MLN_STATUS_NATIVE_ERROR;
+  } else {
+    status = mln_test_completion_status(&completion);
+    if (
+      status == MLN_STATUS_OK &&
+      !mln_test_completion_copy_value(&completion, out_map, sizeof(*out_map))
+    ) {
+      status = MLN_STATUS_NATIVE_ERROR;
+    }
+  }
+  mln_test_completion_destroy(&completion);
+  return status;
+}
+
+mln_status mln_test_map_close(mln_map map) {
+  mln_test_completion teardown = mln_test_completion_default(0);
+  const mln_status status = mln_map_release(map, &teardown.descriptor);
+  if (status != MLN_STATUS_OK) {
+    mln_test_completion_reject(&teardown);
+    mln_test_completion_destroy(&teardown);
+    return status;
+  }
+  const bool completed = mln_test_completion_wait(&teardown, -1);
+  const mln_status teardown_status = mln_test_completion_status(&teardown);
+  mln_test_completion_destroy(&teardown);
+  return completed ? teardown_status : MLN_STATUS_NATIVE_ERROR;
+}
+
+mln_status mln_test_map_get_event_mask(mln_map map, uint64_t* out_mask) {
+  if (out_mask == NULL) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
+  const mln_status status = mln_map_snapshot_get(map, &snapshot);
+  if (status == MLN_STATUS_OK) {
+    *out_mask = snapshot.event_mask;
+  }
+  return status;
+}
+
+mln_status mln_test_map_get_camera(
+  mln_map map, mln_camera_options* out_camera
+) {
+  if (out_camera == NULL) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  uint64_t generation = 0;
+  return mln_map_camera_snapshot_get(map, out_camera, &generation);
+}
+
+static void discard_completion(
+  void* user_data, const mln_completion_result* result
+) {
+  (void)user_data;
+  (void)result;
+}
+
+mln_completion mln_test_discard_completion(void) {
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = discard_completion,
+  };
+  return completion;
+}
+
+mln_status mln_test_map_request_repaint(mln_map map) {
+  const mln_completion completion = mln_test_discard_completion();
+  return mln_map_request_repaint(map, &completion);
+}
+
+mln_status mln_test_map_set_event_mask(mln_map map, uint64_t mask) {
+  const mln_completion completion = mln_test_discard_completion();
+  return mln_map_set_event_mask(map, mask, &completion);
+}
+
+mln_status mln_test_map_set_style_json(mln_map map, mln_buffer_view json) {
+  const mln_completion completion = mln_test_discard_completion();
+  return mln_map_set_style_json(map, json, &completion);
+}
+
+mln_status mln_test_map_set_style_url(mln_map map, const char* url) {
+  const mln_completion completion = mln_test_discard_completion();
+  return mln_map_set_style_url(map, url, &completion);
 }
 
 mln_map mln_test_create_map_with_options(
   mln_runtime runtime, const mln_map_options* options
 ) {
   mln_map map = MLN_HANDLE_NULL;
+  mln_test_completion completion = mln_test_completion_default(sizeof(map));
   reserve_map_slot();
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_create(runtime, options, &map));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_create(runtime, options, &completion.descriptor)
+  );
+  TEST_ASSERT_TRUE(mln_test_completion_wait(&completion, -1));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_status(&completion));
+  TEST_ASSERT_TRUE(
+    mln_test_completion_copy_value(&completion, &map, sizeof(map))
+  );
+  mln_test_completion_destroy(&completion);
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
   track_map(map);
   return map;
@@ -177,22 +337,42 @@ mln_map mln_test_create_map_with_options(
 
 mln_map mln_test_create_map(mln_runtime runtime) {
   mln_map_options options = mln_map_options_default();
-  options.width = 512;
-  options.height = 512;
+  options.initial_extent.width = 64;
+  options.initial_extent.height = 64;
   return mln_test_create_map_with_options(runtime, &options);
 }
 
-// Untracking happens only after the destroy succeeds, so a handle whose destroy
-// is rejected for now stays tracked for teardown to reclaim.
 void mln_test_destroy_runtime(mln_runtime runtime) {
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_destroy(runtime));
+  mln_event_batch_release(compatibility_batch_handle);
+  compatibility_batch_handle = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_close(runtime));
   if (tracked_runtime == runtime) {
     tracked_runtime = MLN_HANDLE_NULL;
   }
 }
 
+mln_status mln_test_runtime_barrier(mln_runtime runtime) {
+  mln_test_completion completion = mln_test_completion_default(0);
+  mln_status status = mln_runtime_barrier(runtime, &completion.descriptor);
+  if (status != MLN_STATUS_OK) {
+    completion.descriptor.release_user_data(completion.descriptor.user_data);
+    mln_test_completion_destroy(&completion);
+    return status;
+  }
+  if (!mln_test_completion_wait(&completion, -1)) {
+    status = MLN_STATUS_NATIVE_ERROR;
+  } else {
+    status = mln_test_completion_status(&completion);
+  }
+  mln_test_completion_destroy(&completion);
+  return status;
+}
+
 void mln_test_destroy_map(mln_map map) {
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_destroy(map));
+  mln_event_batch_release(compatibility_batch_handle);
+  compatibility_batch_handle = MLN_HANDLE_NULL;
+  const mln_completion release = mln_test_discard_completion();
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_release(map, &release));
   untrack_map(map);
 }
 
@@ -335,6 +515,40 @@ void mln_test_thread_join(mln_test_thread* thread) {
   pthread_join(thread->handle, NULL);
 #endif
   free(thread);
+}
+
+static void count_wake(void* user_data) {
+  atomic_fetch_add((atomic_uint*)user_data, 1U);
+}
+
+mln_status mln_test_render_fixture_finish_operation(
+  const mln_test_render_fixture* fixture, mln_test_completion* completion
+) {
+  if (
+    fixture == NULL || fixture->session == MLN_HANDLE_NULL || completion == NULL
+  ) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  bool completed = false;
+  for (unsigned int attempt = 0; attempt < 10000 && !completed; attempt += 1) {
+    if (fixture->driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
+      size_t serviced = 0;
+      const mln_status service_status = mln_render_session_service_driver_work(
+        fixture->session, SIZE_MAX, &serviced
+      );
+      if (service_status != MLN_STATUS_OK) {
+        return service_status;
+      }
+    }
+    completed = mln_test_completion_poll(completion);
+    if (!completed) {
+      mln_test_sleep_millisecond();
+    }
+  }
+  if (!completed) {
+    return MLN_STATUS_NOT_READY;
+  }
+  return mln_test_completion_status(completion);
 }
 
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
@@ -493,12 +707,10 @@ static bool create_backend_state(void** out_state, void* out_context) {
 // EGL_DEFAULT_DISPLAY, so the display is shared with everything else in the
 // process, and terminating it retires EGL objects the C API still holds. A
 // display stays initialized for the process either way, so leaving it is free.
-mln_test_fixture_result mln_test_dedicated_egl_surface_create(
-  mln_map map, mln_test_render_fixture* fixture
-) {
+static egl_state* create_dedicated_egl_state(void) {
   egl_state* state = calloc(1, sizeof(egl_state));
   if (state == NULL) {
-    return MLN_TEST_FIXTURE_UNAVAILABLE;
+    return NULL;
   }
   state->display = get_egl_display();
   if (
@@ -506,7 +718,7 @@ mln_test_fixture_result mln_test_dedicated_egl_surface_create(
     eglInitialize(state->display, NULL, NULL) == EGL_FALSE
   ) {
     free(state);
-    return MLN_TEST_FIXTURE_UNAVAILABLE;
+    return NULL;
   }
   const EGLint config_attributes[] = {
     EGL_SURFACE_TYPE,
@@ -535,6 +747,16 @@ mln_test_fixture_result mln_test_dedicated_egl_surface_create(
     config_count == 0 || state->config == NULL
   ) {
     free(state);
+    return NULL;
+  }
+  return state;
+}
+
+mln_test_fixture_result mln_test_dedicated_egl_surface_create(
+  mln_map map, mln_test_render_fixture* fixture
+) {
+  egl_state* state = create_dedicated_egl_state();
+  if (state == NULL) {
     return MLN_TEST_FIXTURE_UNAVAILABLE;
   }
   const EGLint surface_attributes[] = {EGL_WIDTH, 64, EGL_HEIGHT, 64, EGL_NONE};
@@ -572,14 +794,36 @@ mln_test_fixture_result mln_test_dedicated_egl_surface_create(
   };
   descriptor.surface = state->surface;
 
-  mln_render_session session = 0;
-  if (mln_opengl_surface_attach(map, &descriptor, &session) != MLN_STATUS_OK) {
+  fixture->driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
+  fixture->backend_state = state;
+  mln_render_session_attach_options options =
+    mln_render_session_attach_options_default();
+  options.driver = fixture->driver;
+  mln_test_completion attach = mln_test_completion_default(0);
+  const mln_status attach_status = mln_opengl_surface_attach(
+    map, &descriptor, &options, &fixture->session, &attach.descriptor
+  );
+  if (
+    attach_status != MLN_STATUS_OK ||
+    mln_test_render_fixture_finish_operation(fixture, &attach) != MLN_STATUS_OK
+  ) {
+    if (attach_status != MLN_STATUS_OK) {
+      attach.descriptor.release_user_data(attach.descriptor.user_data);
+    }
+    mln_test_completion_destroy(&attach);
+    if (fixture->session != MLN_HANDLE_NULL) {
+      mln_render_abandon_result abandoned = {
+        .size = sizeof(mln_render_abandon_result)
+      };
+      (void)mln_render_session_abandon(fixture->session, &abandoned);
+      (void)mln_render_session_destroy(fixture->session);
+    }
     eglDestroySurface(state->display, state->surface);
     free(state);
+    *fixture = (mln_test_render_fixture){0};
     return MLN_TEST_FIXTURE_ATTACH_FAILED;
   }
-  fixture->session = session;
-  fixture->backend_state = state;
+  mln_test_completion_destroy(&attach);
   return MLN_TEST_FIXTURE_OK;
 }
 
@@ -588,7 +832,17 @@ void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture) {
     return;
   }
   if (fixture->session != 0) {
-    mln_render_session_destroy(fixture->session);
+    mln_test_completion detach = mln_test_completion_default(0);
+    if (
+      mln_render_session_detach(fixture->session, &detach.descriptor) ==
+      MLN_STATUS_OK
+    ) {
+      (void)mln_test_render_fixture_finish_operation(fixture, &detach);
+    } else {
+      detach.descriptor.release_user_data(detach.descriptor.user_data);
+    }
+    mln_test_completion_destroy(&detach);
+    (void)mln_render_session_destroy(fixture->session);
     fixture->session = 0;
   }
   egl_state* state = fixture->backend_state;
@@ -601,6 +855,92 @@ void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture) {
 
 bool mln_test_egl_context_is_current(void) {
   return eglGetCurrentContext() != EGL_NO_CONTEXT;
+}
+
+mln_test_fixture_result mln_test_dedicated_egl_texture_create(
+  mln_map map, mln_test_render_fixture* fixture
+) {
+  egl_state* state = create_dedicated_egl_state();
+  if (state == NULL) {
+    return MLN_TEST_FIXTURE_UNAVAILABLE;
+  }
+  mln_opengl_owned_texture_descriptor descriptor =
+    mln_opengl_owned_texture_descriptor_default();
+  descriptor.extent.width = 64;
+  descriptor.extent.height = 64;
+  descriptor.context = (mln_opengl_context_descriptor){
+    .size = sizeof(mln_opengl_context_descriptor),
+    .platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL,
+    .ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED,
+    .data = {
+      .egl = {
+        .size = sizeof(mln_egl_context_descriptor),
+        .display = state->display,
+        .config = state->config,
+        .share_context = NULL,
+        .client_api = MLN_OPENGL_CLIENT_API_GLES,
+        .get_proc_address = NULL,
+      }
+    },
+  };
+  fixture->driver = MLN_RENDER_DRIVER_CORE_WORKER;
+  fixture->backend_state = state;
+  mln_render_session_attach_options options =
+    mln_render_session_attach_options_default();
+  options.driver = fixture->driver;
+  options.requested_texture_ring_depth = 3;
+  mln_test_completion attach = mln_test_completion_default(0);
+  const mln_status attach_status = mln_opengl_owned_texture_attach(
+    map, &descriptor, &options, &fixture->session, &attach.descriptor
+  );
+  const mln_status finish_status =
+    attach_status == MLN_STATUS_OK
+      ? mln_test_render_fixture_finish_operation(fixture, &attach)
+      : attach_status;
+  if (attach_status != MLN_STATUS_OK) {
+    attach.descriptor.release_user_data(attach.descriptor.user_data);
+  }
+  mln_test_completion_destroy(&attach);
+  if (finish_status != MLN_STATUS_OK) {
+    if (fixture->session != MLN_HANDLE_NULL) {
+      mln_render_abandon_result abandoned = {
+        .size = sizeof(mln_render_abandon_result)
+      };
+      (void)mln_render_session_abandon(fixture->session, &abandoned);
+      (void)mln_render_session_destroy(fixture->session);
+    }
+    free(state);
+    *fixture = (mln_test_render_fixture){0};
+    return MLN_TEST_FIXTURE_ATTACH_FAILED;
+  }
+  return MLN_TEST_FIXTURE_OK;
+}
+
+void mln_test_dedicated_egl_texture_destroy(mln_test_render_fixture* fixture) {
+  if (fixture == NULL) {
+    return;
+  }
+  if (fixture->session != MLN_HANDLE_NULL) {
+    mln_test_completion detach = mln_test_completion_default(0);
+    mln_status detach_status =
+      mln_render_session_detach(fixture->session, &detach.descriptor);
+    if (detach_status == MLN_STATUS_OK) {
+      detach_status =
+        mln_test_render_fixture_finish_operation(fixture, &detach);
+    } else {
+      detach.descriptor.release_user_data(detach.descriptor.user_data);
+    }
+    mln_test_completion_destroy(&detach);
+    if (detach_status != MLN_STATUS_OK) {
+      mln_render_abandon_result abandoned = {
+        .size = sizeof(mln_render_abandon_result)
+      };
+      (void)mln_render_session_abandon(fixture->session, &abandoned);
+    }
+    (void)mln_render_session_destroy(fixture->session);
+  }
+  free(fixture->backend_state);
+  *fixture = (mln_test_render_fixture){0};
 }
 
 static void destroy_backend_state(void* opaque_state) {
@@ -764,16 +1104,36 @@ static void destroy_backend_state(void* opaque_state) { (void)opaque_state; }
 typedef struct webgl_state {
   EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
   char id[32];
+  void* canvas_shared_ptr;
 } webgl_state;
 
 static atomic_uint webgl_canvas_counter;
+static _Thread_local webgl_state thread_webgl_state;
 
 // The fixture creates a real WebGL2 context and hands it over, the way a
 // browser host would.
 static bool create_backend_state(void** out_state, void* out_context) {
-  webgl_state* state = calloc(1, sizeof(*state));
-  if (state == NULL) {
-    return false;
+  webgl_state* state = &thread_webgl_state;
+  if (state->context > 0) {
+    if (
+      emscripten_webgl_make_context_current(state->context) !=
+      EMSCRIPTEN_RESULT_SUCCESS
+    ) {
+      return false;
+    }
+    *(mln_opengl_context_descriptor*)out_context =
+      (mln_opengl_context_descriptor){
+        .size = sizeof(mln_opengl_context_descriptor),
+        .platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL,
+        .data = {
+          .webgl = {
+            .size = sizeof(mln_webgl_context_descriptor),
+            .context = state->context,
+          }
+        },
+      };
+    *out_state = state;
+    return true;
   }
 
   EmscriptenWebGLContextAttributes attributes;
@@ -804,7 +1164,7 @@ static bool create_backend_state(void** out_state, void* out_context) {
       (long)state->context
     );
     mln_test_unregister_offscreen_canvas(state->id);
-    free(state);
+    *state = (webgl_state){0};
     return false;
   }
   const EMSCRIPTEN_RESULT current_result =
@@ -816,7 +1176,7 @@ static bool create_backend_state(void** out_state, void* out_context) {
     );
     emscripten_webgl_destroy_context(state->context);
     mln_test_unregister_offscreen_canvas(state->id);
-    free(state);
+    *state = (webgl_state){0};
     return false;
   }
 
@@ -836,13 +1196,16 @@ static bool create_backend_state(void** out_state, void* out_context) {
 }
 
 static void destroy_backend_state(void* opaque_state) {
+  // WebGL contexts are expensive and browsers cap their live count. Sequential
+  // fixtures on one test thread share one host-owned context; the thread-level
+  // cleanup releases it after the suite or foreign thread exits. A transferred
+  // canvas has no host-owned context and is released with its fixture.
   webgl_state* state = opaque_state;
-  if (state == NULL) {
-    return;
+  if (state != NULL && state != &thread_webgl_state) {
+    mln_test_unregister_transferred_offscreen_canvas(state->id);
+    free(state->canvas_shared_ptr);
+    free(state);
   }
-  emscripten_webgl_destroy_context(state->context);
-  mln_test_unregister_offscreen_canvas(state->id);
-  free(state);
 }
 
 #elif defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_WGL)
@@ -1144,6 +1507,18 @@ void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture) {
 }
 
 bool mln_test_egl_context_is_current(void) { return false; }
+
+mln_test_fixture_result mln_test_dedicated_egl_texture_create(
+  mln_map map, mln_test_render_fixture* fixture
+) {
+  (void)map;
+  (void)fixture;
+  return MLN_TEST_FIXTURE_UNAVAILABLE;
+}
+
+void mln_test_dedicated_egl_texture_destroy(mln_test_render_fixture* fixture) {
+  (void)fixture;
+}
 #endif
 
 #if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
@@ -1187,10 +1562,19 @@ void mln_test_release_thread_gpu_resources(void) {
 #endif
 }
 
+#elif defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_WEBGL)
+
+void mln_test_release_thread_gpu_resources(void) {
+  if (thread_webgl_state.context > 0) {
+    emscripten_webgl_destroy_context(thread_webgl_state.context);
+    mln_test_unregister_offscreen_canvas(thread_webgl_state.id);
+  }
+  thread_webgl_state = (webgl_state){0};
+}
+
 #else
 
 void mln_test_release_thread_gpu_resources(void) {}
-
 #endif
 
 bool mln_test_render_fixture_create(
@@ -1201,7 +1585,11 @@ bool mln_test_render_fixture_create(
   }
   reserve_session_slot();
   *fixture = (mln_test_render_fixture){0};
+  mln_render_session_attach_options options =
+    mln_render_session_attach_options_default();
+  options.requested_texture_ring_depth = 2;
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
+  fixture->driver = MLN_RENDER_DRIVER_CORE_WORKER;
   mln_metal_context_descriptor context = {0};
   if (!create_backend_state(&fixture->backend_state, &context)) {
     return false;
@@ -1209,6 +1597,7 @@ bool mln_test_render_fixture_create(
   mln_metal_owned_texture_descriptor descriptor =
     mln_metal_owned_texture_descriptor_default();
 #elif defined(MLN_FFI_TEST_BACKEND_OPENGL)
+  fixture->driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
   mln_opengl_context_descriptor context = {0};
   if (!create_backend_state(&fixture->backend_state, &context)) {
     return false;
@@ -1216,6 +1605,7 @@ bool mln_test_render_fixture_create(
   mln_opengl_owned_texture_descriptor descriptor =
     mln_opengl_owned_texture_descriptor_default();
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  fixture->driver = MLN_RENDER_DRIVER_CORE_WORKER;
   mln_vulkan_context_descriptor context = {0};
   if (!create_backend_state(&fixture->backend_state, &context)) {
     return false;
@@ -1223,6 +1613,7 @@ bool mln_test_render_fixture_create(
   mln_vulkan_owned_texture_descriptor descriptor =
     mln_vulkan_owned_texture_descriptor_default();
 #elif defined(MLN_FFI_TEST_BACKEND_WEBGPU)
+  fixture->driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
   mln_webgpu_context_descriptor context = {0};
   if (!create_backend_state(&fixture->backend_state, &context)) {
     return false;
@@ -1230,29 +1621,200 @@ bool mln_test_render_fixture_create(
   mln_webgpu_owned_texture_descriptor descriptor =
     mln_webgpu_owned_texture_descriptor_default();
 #endif
+  options.driver = fixture->driver;
+  options.frame_wake = (mln_wake){
+    .size = sizeof(mln_wake),
+    .callback = count_wake,
+    .user_data = &fixture->frame_wakes
+  };
+  options.driver_work_wake = (mln_wake){
+    .size = sizeof(mln_wake),
+    .callback = count_wake,
+    .user_data = &fixture->driver_wakes
+  };
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
   descriptor.context = context;
+  mln_test_completion completion = mln_test_completion_default(0);
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  const mln_status status =
-    mln_metal_owned_texture_attach(map, &descriptor, &fixture->session);
+  const mln_status status = mln_metal_owned_texture_attach(
+    map, &descriptor, &options, &fixture->session, &completion.descriptor
+  );
 #elif defined(MLN_FFI_TEST_BACKEND_OPENGL)
-  const mln_status status =
-    mln_opengl_owned_texture_attach(map, &descriptor, &fixture->session);
+  const mln_status status = mln_opengl_owned_texture_attach(
+    map, &descriptor, &options, &fixture->session, &completion.descriptor
+  );
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  const mln_status status =
-    mln_vulkan_owned_texture_attach(map, &descriptor, &fixture->session);
+  const mln_status status = mln_vulkan_owned_texture_attach(
+    map, &descriptor, &options, &fixture->session, &completion.descriptor
+  );
 #elif defined(MLN_FFI_TEST_BACKEND_WEBGPU)
-  const mln_status status =
-    mln_webgpu_owned_texture_attach(map, &descriptor, &fixture->session);
+  const mln_status status = mln_webgpu_owned_texture_attach(
+    map, &descriptor, &options, &fixture->session, &completion.descriptor
+  );
 #endif
-  if (status != MLN_STATUS_OK || fixture->session == MLN_HANDLE_NULL) {
+  if (status == MLN_STATUS_OK && fixture->session != MLN_HANDLE_NULL) {
+    mln_render_session_snapshot attaching = {
+      .size = sizeof(mln_render_session_snapshot)
+    };
+    fixture->observed_attaching =
+      mln_render_session_get_snapshot(fixture->session, &attaching) ==
+        MLN_STATUS_OK &&
+      attaching.state == MLN_RENDER_SESSION_STATE_ATTACHING;
+    if (fixture->driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
+      fixture->observed_driver_ready = atomic_load(&fixture->driver_wakes) != 0;
+    }
+  }
+  const mln_status finish_status =
+    status == MLN_STATUS_OK && fixture->session != MLN_HANDLE_NULL
+      ? mln_test_render_fixture_finish_operation(fixture, &completion)
+      : MLN_STATUS_INVALID_STATE;
+  if (
+    status != MLN_STATUS_OK || fixture->session == MLN_HANDLE_NULL ||
+    finish_status != MLN_STATUS_OK
+  ) {
+    if (status != MLN_STATUS_OK) {
+      completion.descriptor.release_user_data(completion.descriptor.user_data);
+    }
+    mln_test_completion_destroy(&completion);
+    if (fixture->session != MLN_HANDLE_NULL) {
+      mln_render_abandon_result abandoned = {
+        .size = sizeof(mln_render_abandon_result)
+      };
+      (void)mln_render_session_abandon(fixture->session, &abandoned);
+      (void)mln_render_session_destroy(fixture->session);
+    }
     destroy_backend_state(fixture->backend_state);
     *fixture = (mln_test_render_fixture){0};
     return false;
   }
+  mln_test_completion_destroy(&completion);
   track_session(fixture);
   return true;
+}
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_WEBGL)
+
+bool mln_test_transferred_webgl_surface_create(
+  mln_map map, mln_test_render_fixture* fixture
+) {
+  if (map == MLN_HANDLE_NULL || fixture == NULL) {
+    return false;
+  }
+  reserve_session_slot();
+  *fixture = (mln_test_render_fixture){0};
+  fixture->driver = MLN_RENDER_DRIVER_CORE_WORKER;
+  webgl_state* state = calloc(1, sizeof(*state));
+  if (state == NULL) {
+    return false;
+  }
+  const unsigned int serial = atomic_fetch_add(&webgl_canvas_counter, 1U) + 1U;
+  (void)snprintf(state->id, sizeof(state->id), "mln-transfer-%u", serial);
+  state->canvas_shared_ptr =
+    mln_test_register_transferred_offscreen_canvas(state->id, 64, 64);
+  fixture->backend_state = state;
+
+  char target[sizeof(state->id) + 1];
+  (void)snprintf(target, sizeof(target), "#%s", state->id);
+  mln_opengl_surface_descriptor descriptor =
+    mln_opengl_surface_descriptor_default();
+  descriptor.extent.width = 64;
+  descriptor.extent.height = 64;
+  descriptor.context.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
+  descriptor.context.ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
+  descriptor.context.data.webgl = (mln_webgl_context_descriptor){
+    .size = sizeof(mln_webgl_context_descriptor),
+    .kind = MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS,
+    .canvas_selector = mln_test_buffer_view(target, strlen(target)),
+  };
+  mln_render_session_attach_options options =
+    mln_render_session_attach_options_default();
+  options.driver = fixture->driver;
+  options.frame_wake = (mln_wake){
+    .size = sizeof(mln_wake),
+    .callback = count_wake,
+    .user_data = &fixture->frame_wakes
+  };
+  options.driver_work_wake = (mln_wake){
+    .size = sizeof(mln_wake),
+    .callback = count_wake,
+    .user_data = &fixture->driver_wakes
+  };
+  mln_test_completion completion = mln_test_completion_default(0);
+  const mln_status status = mln_opengl_surface_attach(
+    map, &descriptor, &options, &fixture->session, &completion.descriptor
+  );
+  const mln_status finish_status =
+    status == MLN_STATUS_OK && fixture->session != MLN_HANDLE_NULL
+      ? mln_test_render_fixture_finish_operation(fixture, &completion)
+      : MLN_STATUS_INVALID_STATE;
+  if (
+    status != MLN_STATUS_OK || finish_status != MLN_STATUS_OK ||
+    fixture->session == MLN_HANDLE_NULL
+  ) {
+    if (status != MLN_STATUS_OK) {
+      completion.descriptor.release_user_data(completion.descriptor.user_data);
+    }
+    fprintf(
+      stderr,
+      "transferred WebGL attach failed: submit=%d finish=%d diagnostic=%s\n",
+      status, finish_status, mln_test_completion_diagnostic(&completion)
+    );
+    mln_test_completion_destroy(&completion);
+    if (fixture->session != MLN_HANDLE_NULL) {
+      mln_render_abandon_result abandoned = {
+        .size = sizeof(mln_render_abandon_result)
+      };
+      (void)mln_render_session_abandon(fixture->session, &abandoned);
+      (void)mln_render_session_destroy(fixture->session);
+    }
+    destroy_backend_state(fixture->backend_state);
+    *fixture = (mln_test_render_fixture){0};
+    return false;
+  }
+  mln_test_completion_destroy(&completion);
+  track_session(fixture);
+  return true;
+}
+
+#endif
+
+mln_test_event_batch mln_test_event_batch_default(void) {
+  mln_event_batch_release(compatibility_batch_handle);
+  compatibility_batch_handle = MLN_HANDLE_NULL;
+  return (mln_test_event_batch){.size = sizeof(mln_test_event_batch)};
+}
+
+mln_status mln_test_drain_events(
+  mln_runtime runtime, mln_test_event_batch* out_batch
+) {
+  if (out_batch == NULL || out_batch->size < sizeof(mln_test_event_batch)) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  mln_event_batch_release(compatibility_batch_handle);
+  compatibility_batch_handle = MLN_HANDLE_NULL;
+  mln_event_batch batch = MLN_HANDLE_NULL;
+  mln_status status = mln_runtime_drain_events(runtime, &batch);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  mln_runtime_event_batch_view view = {
+    .size = sizeof(mln_runtime_event_batch_view)
+  };
+  status = mln_event_batch_get(batch, &view);
+  if (status != MLN_STATUS_OK) {
+    mln_event_batch_release(batch);
+    return status;
+  }
+  compatibility_batch_handle = batch;
+  *out_batch = (mln_test_event_batch){
+    .size = sizeof(mln_test_event_batch),
+    .event_size = view.event_size,
+    .events = view.events,
+    .event_count = view.event_count,
+    .messages = view.messages,
+    .messages_size = view.messages_size,
+  };
+  return MLN_STATUS_OK;
 }
 
 size_t mln_test_drain_all(mln_runtime runtime) {
@@ -1262,8 +1824,8 @@ size_t mln_test_drain_all(mln_runtime runtime) {
 size_t mln_test_drain_counting(mln_runtime runtime, uint32_t type) {
   size_t total = 0;
   for (;;) {
-    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
-    if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+    mln_test_event_batch batch = mln_test_event_batch_default();
+    if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
       return total;
     }
     if (batch.event_count == 0) {
@@ -1287,8 +1849,8 @@ bool mln_test_drain_find(
 ) {
   bool found = false;
   for (;;) {
-    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
-    if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+    mln_test_event_batch batch = mln_test_event_batch_default();
+    if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
       return found;
     }
     if (batch.event_count == 0) {
@@ -1322,31 +1884,88 @@ bool mln_test_drain_find(
   }
 }
 
-bool mln_test_pump_until(mln_runtime runtime, atomic_bool* flag) {
-  for (unsigned int attempt = 0; attempt < 500; attempt += 1) {
-    if (atomic_load(flag)) {
-      return true;
+// Bounded so a stalled worker fails a named test instead of running out the
+// CTest timeout with nothing to point at.
+enum { mln_test_wait_deadline_milliseconds = 30000 };
+
+bool mln_test_wait_for_flag(const atomic_bool* flag) {
+  const uint64_t deadline =
+    mln_test_monotonic_milliseconds() + mln_test_wait_deadline_milliseconds;
+  while (!atomic_load(flag)) {
+    if (mln_test_monotonic_milliseconds() > deadline) {
+      return atomic_load(flag);
     }
-    // A short park rather than zero: this waits on another thread's flag, so
-    // spinning would burn the whole loop budget before that thread ran.
-    if (mln_runtime_pump(runtime, 2, -1) != MLN_STATUS_OK) {
-      return false;
+    mln_test_sleep_millisecond();
+  }
+  return true;
+}
+
+void mln_test_barrier_until_count(
+  mln_runtime runtime, const atomic_size_t* counter, size_t target,
+  const char* what
+) {
+  const uint64_t deadline =
+    mln_test_monotonic_milliseconds() + mln_test_wait_deadline_milliseconds;
+  while (atomic_load(counter) < target) {
+    if (mln_test_monotonic_milliseconds() > deadline) {
+      TEST_FAIL_MESSAGE(what);
     }
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  }
+}
+
+void mln_test_load_style_and_wait(
+  mln_runtime runtime, mln_map map, mln_buffer_view json
+) {
+  mln_test_completion applied = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_json(map, json, &applied.descriptor)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&applied));
+  // MapLibre parses an inline document and notifies its observer inside the
+  // command, so the events the load produces are queued once it commits. The
+  // barrier only orders this thread behind the runtime worker's own follow-up
+  // work.
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+}
+
+bool mln_test_wait_until(mln_runtime runtime, atomic_bool* flag) {
+  const uint64_t deadline =
+    mln_test_monotonic_milliseconds() + mln_test_wait_deadline_milliseconds;
+  while (!atomic_load(flag)) {
     // Drain so the queue does not grow without bound while we wait.
     mln_test_drain_all(runtime);
     if (atomic_load(flag)) {
       return true;
     }
+    if (mln_test_monotonic_milliseconds() > deadline) {
+      return false;
+    }
     mln_test_sleep_millisecond();
   }
-  return atomic_load(flag);
+  return true;
 }
 
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
+  mln_event_batch_release(compatibility_batch_handle);
+  compatibility_batch_handle = MLN_HANDLE_NULL;
   if (fixture == NULL) {
     return;
   }
   if (fixture->session != MLN_HANDLE_NULL) {
+    mln_test_completion detach = mln_test_completion_default(0);
+    const mln_status detach_status =
+      mln_render_session_detach(fixture->session, &detach.descriptor);
+    if (detach_status == MLN_STATUS_OK) {
+      TEST_ASSERT_EQUAL_INT(
+        MLN_STATUS_OK,
+        mln_test_render_fixture_finish_operation(fixture, &detach)
+      );
+    } else {
+      detach.descriptor.release_user_data(detach.descriptor.user_data);
+      TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_STATE, detach_status);
+    }
+    mln_test_completion_destroy(&detach);
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_render_session_destroy(fixture->session)
     );
@@ -1357,6 +1976,8 @@ void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
 }
 
 bool mln_test_reclaim_thread_resources(void) {
+  mln_event_batch_release(compatibility_batch_handle);
+  compatibility_batch_handle = MLN_HANDLE_NULL;
   bool reclaimed = false;
   // Render session before map before runtime: the C API keeps a map with a live
   // session and a runtime with live maps alive on purpose.
@@ -1364,18 +1985,22 @@ bool mln_test_reclaim_thread_resources(void) {
     tracked_session_count -= 1;
     const tracked_session entry = tracked_sessions[tracked_session_count];
     if (entry.session != MLN_HANDLE_NULL) {
-      mln_render_session_destroy(entry.session);
+      mln_render_abandon_result abandoned = {
+        .size = sizeof(mln_render_abandon_result)
+      };
+      (void)mln_render_session_abandon(entry.session, &abandoned);
+      (void)mln_render_session_destroy(entry.session);
     }
     destroy_backend_state(entry.backend_state);
     reclaimed = true;
   }
   while (tracked_map_count > 0) {
     tracked_map_count -= 1;
-    mln_map_destroy(tracked_maps[tracked_map_count]);
+    (void)mln_test_map_close(tracked_maps[tracked_map_count]);
     reclaimed = true;
   }
   if (tracked_runtime != MLN_HANDLE_NULL) {
-    mln_runtime_destroy(tracked_runtime);
+    (void)mln_test_runtime_close(tracked_runtime);
     tracked_runtime = MLN_HANDLE_NULL;
     reclaimed = true;
   }

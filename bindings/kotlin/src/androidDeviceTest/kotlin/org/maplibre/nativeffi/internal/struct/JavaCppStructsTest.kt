@@ -23,7 +23,6 @@ import org.maplibre.nativeffi.map.TileOptions
 import org.maplibre.nativeffi.map.ViewportMode
 import org.maplibre.nativeffi.map.ViewportOptions
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
-import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.render.EglContextDescriptor
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
@@ -104,35 +103,6 @@ class JavaCppStructsTest {
   }
 
   @Test
-  fun featureStateSelectorEmbedsStringViewsByValue() {
-    val minimal = JavaCppStructs.featureStateSelectorSnapshot(FeatureStateSelector("point"))
-    assertEquals("point", minimal.sourceId)
-    assertEquals(0, minimal.fields)
-    assertEquals(null, minimal.sourceLayerId)
-    assertEquals(null, minimal.featureId)
-    assertEquals(null, minimal.stateKey)
-
-    val full =
-      JavaCppStructs.featureStateSelectorSnapshot(
-        FeatureStateSelector("point").apply {
-          sourceLayerId = "layer"
-          featureId = "feature-1"
-          stateKey = "hover"
-        }
-      )
-    assertEquals("point", full.sourceId)
-    assertEquals("layer", full.sourceLayerId)
-    assertEquals("feature-1", full.featureId)
-    assertEquals("hover", full.stateKey)
-    assertNotEquals(0, full.fields)
-  }
-
-  @Test
-  fun ownedBufferIsDestroyedAfterCopyFailure() {
-    assertEquals(1, JavaCppStructs.ownedBufferCleanupAfterCopyFailure())
-  }
-
-  @Test
   fun offlineDefinitionsAndUnknownRuntimePayloadsCopyOwnedData() {
     val definition =
       OfflineRegionDefinition.TilePyramid(
@@ -153,7 +123,6 @@ class JavaCppStructsTest {
       JavaCppStructs.unknownRuntimePayload(999, byteArrayOf(1, 2, 3)) as RuntimeEventPayload.Unknown
     assertEquals(999, payload.rawPayloadType)
     assertContentEquals(byteArrayOf(1, 2, 3), payload.payloadBytes)
-    assertEquals(1, JavaCppStructs.offlineRegionListCleanupAfterCopyFailure())
   }
 
   @Test
@@ -176,7 +145,6 @@ class JavaCppStructsTest {
       JavaCppStructs.textureImageInfoSnapshot(2, 3, 8, -1)
     }
     assertFailsWith<IllegalArgumentException> { JavaCppStructs.styleImageInfoSnapshot(-1) }
-    assertEquals(1, JavaCppStructs.styleStringListCleanupAfterCopyFailure())
     val source = JavaCppStructs.sourceInfoSnapshot(999, true)
     assertEquals(999, source.type.nativeValue)
     assertTrue(source.volatileSource)

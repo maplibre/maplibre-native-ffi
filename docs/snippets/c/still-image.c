@@ -2,153 +2,230 @@
 // static mode and the session owns its texture.
 
 #include <maplibre_native_c.h>
+#include <stdatomic.h>
 #include <stdlib.h>
-#include <time.h>
+#include <string.h>
 
-typedef enum still_image_state {
-  STILL_IMAGE_PENDING,
-  STILL_IMAGE_FINISHED,
-  STILL_IMAGE_FAILED,
-} still_image_state;
+typedef struct still_image_job {
+  mln_runtime runtime;
+  mln_map map;
+  mln_render_session session;
+  const char* style_url;
+  void* egl_display;
+  void* egl_config;
+  uint32_t width;
+  uint32_t height;
+  atomic_bool frames_ready;
+  atomic_bool attach_ready;
+  atomic_bool still_image_ready;
+  bool requested;
+  bool frame_pending;
+  bool rendered;
+  bool reading;
+  mln_status status;
+  uint8_t* pixels;
+  mln_texture_image_info image_info;
+  void (*schedule)(void* user_data);
+  void (*finished)(void* user_data, const struct still_image_job* job);
+  void* user_data;
+} still_image_job;
 
-static mln_render_session attach_owned_texture(
-  mln_map map, const mln_opengl_context_descriptor* context, uint32_t width,
-  uint32_t height
+static void schedule_job(still_image_job* job) {
+  job->schedule(job->user_data);
+}
+
+static void attach_finished(
+  void* user_data, const mln_completion_result* result
 ) {
+  still_image_job* job = user_data;
+  job->status = result->status;
+  atomic_store_explicit(&job->attach_ready, true, memory_order_release);
+  schedule_job(job);
+}
+
+static void still_image_finished(
+  void* user_data, const mln_completion_result* result
+) {
+  still_image_job* job = user_data;
+  job->status = result->status;
+  atomic_store_explicit(&job->still_image_ready, true, memory_order_release);
+  schedule_job(job);
+}
+
+// The style command's own result is not read: a style failure arrives as a
+// runtime event, and the still-image completion reports the rendering outcome.
+static void ignore_completion(
+  void* user_data, const mln_completion_result* result
+) {
+  (void)user_data;
+  (void)result;
+}
+
+static void frames_ready(void* user_data) {
+  still_image_job* job = user_data;
+  atomic_store_explicit(&job->frames_ready, true, memory_order_release);
+  schedule_job(job);
+}
+
+static mln_status attach_owned_texture(still_image_job* job) {
   // #region attach
   mln_opengl_owned_texture_descriptor descriptor =
     mln_opengl_owned_texture_descriptor_default();
-  descriptor.extent.width = width;
-  descriptor.extent.height = height;
+  descriptor.extent.width = job->width;
+  descriptor.extent.height = job->height;
   descriptor.extent.scale_factor = 1.0;
-  descriptor.context = *context;
-
-  mln_render_session session = MLN_HANDLE_NULL;
-  const mln_status status =
-    mln_opengl_owned_texture_attach(map, &descriptor, &session);
-  // #endregion attach
-
-  return status == MLN_STATUS_OK ? session : MLN_HANDLE_NULL;
-}
-
-static still_image_state drain_still_image_events(
-  mln_runtime runtime, mln_map map
-) {
-  still_image_state state = STILL_IMAGE_PENDING;
-
-  mln_runtime_event_batch batch = mln_runtime_event_batch_default();
-  if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
-    return STILL_IMAGE_FAILED;
-  }
-
-  for (size_t index = 0; index < batch.event_count; index++) {
-    const char* bytes = (const char*)batch.events + index * batch.event_size;
-    const mln_runtime_event* event = (const mln_runtime_event*)bytes;
-    if (event->source != map) continue;
-    if (event->type == MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED) {
-      state = STILL_IMAGE_FINISHED;
-    } else if (
-      event->type == MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED ||
-      event->type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED
-    ) {
-      return STILL_IMAGE_FAILED;
-    }
-  }
-
-  return state;
-}
-
-static bool await_still_image(
-  mln_runtime runtime, mln_map map, mln_render_session session
-) {
-  bool finished = false;
-  bool rendered = false;
-  const time_t deadline = time(NULL) + 30;
-
-  // #region await
-  while (!(finished && rendered) && time(NULL) < deadline) {
-    mln_runtime_pump(runtime, 10, -1);
-    const still_image_state state = drain_still_image_events(runtime, map);
-    if (state == STILL_IMAGE_FAILED) return false;
-    if (state == STILL_IMAGE_FINISHED) finished = true;
-    mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
-    bool needs_repaint = false;
-    if (
-      mln_render_session_render_update(session, &result, &needs_repaint) ==
-      MLN_STATUS_OK
-    ) {
-      rendered = rendered || result == MLN_RENDER_RESULT_RENDERED;
-    }
-  }
-  // #endregion await
-
-  return finished && rendered;
-}
-
-static uint8_t* read_pixels(
-  mln_render_session session, mln_texture_image_info* out_info
-) {
-  // #region read
-  // A null buffer with a capacity of 0 is a size probe that fills info.
-  mln_texture_image_info info = mln_texture_image_info_default();
-  mln_texture_read_premultiplied_rgba8(session, NULL, 0, &info);
-
-  uint8_t* pixels = malloc(info.byte_length);
-  if (pixels == NULL) return NULL;
-
-  const mln_status status = mln_texture_read_premultiplied_rgba8(
-    session, pixels, info.byte_length, &info
+  descriptor.context.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
+  descriptor.context.ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
+  descriptor.context.data.egl.display = job->egl_display;
+  descriptor.context.data.egl.config = job->egl_config;
+  descriptor.context.data.egl.client_api = MLN_OPENGL_CLIENT_API_GLES;
+  mln_render_session_attach_options options =
+    mln_render_session_attach_options_default();
+  options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
+  options.requested_texture_ring_depth = 1;
+  options.frame_wake = (mln_wake){
+    .size = sizeof(mln_wake),
+    .callback = frames_ready,
+    .user_data = job,
+  };
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = attach_finished,
+    .user_data = job,
+  };
+  return mln_opengl_owned_texture_attach(
+    job->map, &descriptor, &options, &job->session, &completion
   );
-  // #endregion read
-
-  if (status != MLN_STATUS_OK) {
-    free(pixels);
-    return NULL;
-  }
-
-  *out_info = info;
-  return pixels;
+  // #endregion attach
 }
 
-// Returns premultiplied RGBA8 pixels that the host frees, and fills out_info
-// with their width, height, and row stride.
-uint8_t* render_still_image(
-  mln_runtime runtime, const char* style_url, uint32_t width, uint32_t height,
-  const mln_opengl_context_descriptor* context, mln_texture_image_info* out_info
-) {
+static void map_created(void* user_data, const mln_completion_result* result) {
+  still_image_job* job = user_data;
+  if (result->status != MLN_STATUS_OK || result->value_count != 1) {
+    job->status = result->status;
+    job->finished(job->user_data, job);
+    return;
+  }
+  job->map = *(const mln_map*)result->value;
+  job->status = attach_owned_texture(job);
+  if (job->status != MLN_STATUS_OK) job->finished(job->user_data, job);
+}
+
+mln_status start_still_image(still_image_job* job) {
   // #region create
   mln_map_options options = mln_map_options_default();
-  options.width = width;
-  options.height = height;
-  options.scale_factor = 1.0;
+  options.initial_extent = (mln_logical_extent){
+    .width = job->width, .height = job->height, .scale_factor = 1.0
+  };
   options.map_mode = MLN_MAP_MODE_STATIC;
-
-  mln_map map = MLN_HANDLE_NULL;
-  if (mln_map_create(runtime, &options, &map) != MLN_STATUS_OK) return NULL;
-
-  // A render session draws the map's latest update whatever the subscription
-  // selects.
-  mln_map_set_event_mask(
-    map, MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED |
-           MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED |
-           MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED
-  );
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = map_created,
+    .user_data = job,
+  };
+  return mln_map_create(job->runtime, &options, &completion);
   // #endregion create
+}
 
-  uint8_t* pixels = NULL;
-  const mln_render_session session =
-    attach_owned_texture(map, context, width, height);
+static void readback_finished(
+  void* user_data, const mln_completion_result* result
+) {
+  // #region read
+  still_image_job* job = user_data;
+  job->status = result->status;
+  if (result->status == MLN_STATUS_OK && result->value_count == 1) {
+    const mln_texture_readback_result* readback = result->value;
+    job->pixels = malloc(readback->data.size);
+    if (job->pixels == NULL) {
+      job->status = MLN_STATUS_NATIVE_ERROR;
+    } else {
+      memcpy(job->pixels, readback->data.data, readback->data.size);
+      job->image_info = readback->info;
+    }
+  }
+  job->finished(job->user_data, job);
+  // #endregion read
+}
 
-  if (
-    session != MLN_HANDLE_NULL &&
-    mln_map_set_style_url(map, style_url) == MLN_STATUS_OK &&
-    mln_map_request_still_image(map) == MLN_STATUS_OK &&
-    await_still_image(runtime, map, session)
-  ) {
-    pixels = read_pixels(session, out_info);
+static void request_frame(still_image_job* job) {
+  mln_frame_demand demand = mln_frame_demand_default();
+  demand.token = 1;
+  job->status = mln_render_session_request_frame(job->session, &demand);
+  job->frame_pending = job->status == MLN_STATUS_OK;
+}
+
+void advance_still_image(still_image_job* job) {
+  // Both flags stay set once raised, so a turn that arrives early simply runs
+  // again when the next wake or completion schedules one.
+  const bool attached =
+    atomic_load_explicit(&job->attach_ready, memory_order_acquire);
+  const bool imaged =
+    atomic_load_explicit(&job->still_image_ready, memory_order_acquire);
+  if ((attached || imaged) && job->status != MLN_STATUS_OK) {
+    job->finished(job->user_data, job);
+    return;
+  }
+  if (attached && !job->requested) {
+    job->requested = true;
+    const mln_completion style = {
+      .size = sizeof(mln_completion),
+      .callback = ignore_completion,
+    };
+    job->status = mln_map_set_style_url(job->map, job->style_url, &style);
+    if (job->status == MLN_STATUS_OK) {
+      const mln_completion still = {
+        .size = sizeof(mln_completion),
+        .callback = still_image_finished,
+        .user_data = job,
+      };
+      job->status = mln_map_request_still_image(job->map, &still);
+    }
+    if (job->status != MLN_STATUS_OK) {
+      job->finished(job->user_data, job);
+      return;
+    }
+    request_frame(job);
   }
 
-  if (session != MLN_HANDLE_NULL) mln_render_session_destroy(session);
-  mln_map_destroy(map);
-  return pixels;
+  // #region drain-result
+  if (
+    atomic_exchange_explicit(&job->frames_ready, false, memory_order_acq_rel)
+  ) {
+    mln_render_frame_batch batch = MLN_HANDLE_NULL;
+    if (
+      mln_render_session_drain_frame_results(job->session, &batch) ==
+      MLN_STATUS_OK
+    ) {
+      size_t count = 0;
+      (void)mln_render_frame_batch_count(batch, &count);
+      for (size_t index = 0; index < count; ++index) {
+        mln_render_frame_result frame = {.size = sizeof(frame)};
+        if (
+          mln_render_frame_batch_get(batch, index, &frame) == MLN_STATUS_OK &&
+          frame.token == 1
+        ) {
+          job->frame_pending = false;
+          job->rendered = frame.disposition == MLN_RENDER_RESULT_RENDERED;
+        }
+      }
+      mln_render_frame_batch_release(batch);
+    }
+  }
+  if (job->requested && !job->rendered && !job->frame_pending) {
+    request_frame(job);
+  }
+  // #endregion drain-result
+
+  // #region start-readback
+  if (job->rendered && imaged && !job->reading) {
+    job->reading = true;
+    const mln_completion readback = {
+      .size = sizeof(mln_completion),
+      .callback = readback_finished,
+      .user_data = job,
+    };
+    job->status = mln_texture_read_premultiplied_rgba8(job->session, &readback);
+    if (job->status != MLN_STATUS_OK) job->finished(job->user_data, job);
+  }
+  // #endregion start-readback
 }

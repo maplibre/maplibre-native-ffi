@@ -5,10 +5,10 @@ namespace Maplibre.NativeFfi.Internal.C
     internal static unsafe partial class NativeMethods
     {
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_projection_create([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("mln_map_projection *")] MlnMapProjection* out_projection);
+        public static extern mln_status mln_map_projection_create([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_projection_destroy([NativeTypeName("mln_map_projection")] MlnMapProjection projection);
+        public static extern mln_status mln_map_projection_close([NativeTypeName("mln_map_projection")] MlnMapProjection projection);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_projection_get_camera([NativeTypeName("mln_map_projection")] MlnMapProjection projection, mln_camera_options* out_camera);

@@ -10,11 +10,11 @@ package org.maplibre.nativeffi.style
  * [org.maplibre.nativeffi.map.MapHandle.setGeoJsonSourceData] rejects data whose baked-in options
  * differ from the source's.
  *
- * Creation touches no runtime or map and is callable from any thread, so a host prepares data on a
- * worker thread or coroutine dispatcher and installs it on the map owner thread. The prepared data
- * is immutable and safe to share across threads. Install calls borrow the handle, so one prepared
- * value may be installed on any number of sources and closed at any time afterward; closing never
- * invalidates a source the data was installed on.
+ * Creation touches no runtime or map and is callable from any thread, so a host can prepare data on
+ * a worker thread or coroutine dispatcher while map work continues. The prepared data is immutable
+ * and safe to share across threads. Install calls borrow the handle, so one prepared value may be
+ * installed on any number of sources and closed at any time afterward; closing never invalidates a
+ * source the data was installed on.
  */
 public expect class GeoJsonSourceDataHandle : AutoCloseable {
   public val isClosed: Boolean

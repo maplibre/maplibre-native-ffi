@@ -58,7 +58,7 @@ impl ApplicationHandler for Shell {
         // TODO(map-example-spec): Replace fixed timer with a display-paced host
         // loop.
         event_loop.set_control_flow(ControlFlow::WaitUntil(
-            Instant::now() + Duration::from_millis(4),
+            Instant::now() + Duration::from_millis(16),
         ));
     }
 

@@ -10,6 +10,8 @@ import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.c.mln_resource_transform
 import org.maplibre.nativeffi.internal.c.mln_resource_transform_callback
 import org.maplibre.nativeffi.internal.c.mln_resource_transform_response
+import org.maplibre.nativeffi.internal.c.mln_runtime_callback_release
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.resource.ResourceKind
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
@@ -18,8 +20,8 @@ import org.maplibre.nativeffi.resource.ResourceTransformRequest
 /** Owns runtime-scoped JVM FFM resource transform callback state. */
 internal class ResourceTransformState(private val callback: ResourceTransformCallback) :
   AutoCloseable {
-  private val arena = Arena.ofShared()
-  private val gate = CallbackGate("resource transform callbacks") { arena.close() }
+  private val arena = Arena.ofAuto()
+  private val gate = CallbackGate("resource transform callbacks") {}
   private val stub: MemorySegment
   private val descriptor: MemorySegment
 
@@ -43,6 +45,19 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
     mln_resource_transform.size(descriptor, mln_resource_transform.sizeof().toInt())
     mln_resource_transform.callback(descriptor, stub)
     mln_resource_transform.user_data(descriptor, MemorySegment.NULL)
+    val releaseMethod =
+      MethodHandles.lookup()
+        .findVirtual(
+          ResourceTransformState::class.java,
+          "release",
+          MethodType.methodType(Void.TYPE, MemorySegment::class.java),
+        )
+        .bindTo(this)
+    mln_resource_transform.release_user_data(
+      descriptor,
+      Linker.nativeLinker()
+        .upcallStub(releaseMethod, mln_runtime_callback_release.descriptor(), arena),
+    )
   }
 
   fun descriptor(): MemorySegment = descriptor
@@ -79,11 +94,15 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
     }
   }
 
-  fun checkCanClose() = gate.checkCanClose()
-
   fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
 
   override fun close() = gate.close()
+
+  @Suppress("UNUSED_PARAMETER")
+  fun release(userData: MemorySegment) {
+    HandleLeakCleaner.releaseNativeCallbackRoot(this)
+    close()
+  }
 
   private fun copyCString(address: MemorySegment): String {
     if (address == MemorySegment.NULL) {

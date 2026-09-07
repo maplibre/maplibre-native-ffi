@@ -16,6 +16,7 @@ struct NativeRuntimeOptionsInput: Equatable {
   }
 
   func withNativeOptions<Result>(
+    eventWake: mln_wake,
     _ body: (UnsafePointer<mln_runtime_options>) throws -> Result
   ) throws -> Result {
     try NativeString.withOptionalCString(assetPath) { assetPath in
@@ -24,6 +25,7 @@ struct NativeRuntimeOptionsInput: Equatable {
         options.asset_path = assetPath
         options.cache_path = cachePath
         options.event_mask = eventMask
+        options.event_wake = eventWake
         return try withUnsafePointer(to: &options, body)
       }
     }
@@ -156,22 +158,6 @@ struct NativeOfflineRegionTileCountLimitEvent: Equatable {
   }
 }
 
-struct NativeOfflineOperationCompletedEvent: Equatable {
-  let operationId: UInt64
-  let operationKind: UInt32
-  let resultKind: UInt32
-  let resultStatus: Int32
-  let found: Bool
-
-  init(_ raw: mln_runtime_event_offline_operation_completed) {
-    operationId = raw.operation_id
-    operationKind = raw.operation_kind
-    resultKind = raw.result_kind
-    resultStatus = raw.result_status
-    found = raw.found
-  }
-}
-
 enum NativeRuntimeEventPayload: Equatable {
   case none
   case renderFrame(NativeRenderFrameEvent)
@@ -180,7 +166,6 @@ enum NativeRuntimeEventPayload: Equatable {
   case offlineRegionStatus(NativeOfflineRegionStatusEvent)
   case offlineRegionResponseError(NativeOfflineRegionResponseErrorEvent)
   case offlineRegionTileCountLimit(NativeOfflineRegionTileCountLimitEvent)
-  case offlineOperationCompleted(NativeOfflineOperationCompletedEvent)
   case cameraTransitionFinished(NativeCameraTransitionFinishedEvent)
   /// A payload kind this binding does not name, carrying the payload union's
   /// fixed byte window copied out of the batch.
@@ -196,18 +181,15 @@ struct NativeRuntimeEvent: Equatable {
   let payload: NativeRuntimeEventPayload
 }
 
-/// One drained batch of runtime events, copied out of the arena the C API lends
-/// until the next drain.
+/// One drained batch of runtime events copied from an owned native batch.
 struct NativeRuntimeEventBatch: Equatable {
   let events: [NativeRuntimeEvent]
-  let remainingCount: Int
 
-  init(copying raw: mln_runtime_event_batch) throws {
+  init(copying raw: mln_runtime_event_batch_view) throws {
     events = try Self.copyEvents(raw)
-    remainingCount = raw.remaining_count
   }
 
-  private static func copyEvents(_ raw: mln_runtime_event_batch) throws
+  private static func copyEvents(_ raw: mln_runtime_event_batch_view) throws
     -> [NativeRuntimeEvent]
   {
     guard raw.event_count > 0 else { return [] }
@@ -288,12 +270,6 @@ struct NativeRuntimeEventBatch: Equatable {
       return .offlineRegionTileCountLimit(
         NativeOfflineRegionTileCountLimitEvent(
           raw.payload.offline_region_tile_count_limit
-        )
-      )
-    case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED.rawValue:
-      return .offlineOperationCompleted(
-        NativeOfflineOperationCompletedEvent(
-          raw.payload.offline_operation_completed
         )
       )
     case MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED.rawValue:

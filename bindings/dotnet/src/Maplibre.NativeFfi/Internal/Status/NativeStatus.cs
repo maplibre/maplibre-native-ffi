@@ -24,6 +24,14 @@ internal static unsafe class NativeStatus
         throw CreateException(rawStatus, CaptureDiagnostic());
     }
 
+    internal static void Check(int rawStatus, string diagnostic)
+    {
+        if (rawStatus != (int)MaplibreStatus.Ok)
+        {
+            throw CreateException(rawStatus, diagnostic);
+        }
+    }
+
     private static MaplibreException CreateException(int rawStatus, string diagnostic)
     {
         var status = StatusFromRaw(rawStatus);
@@ -70,7 +78,7 @@ internal static unsafe class NativeStatus
         return new RestoreDiagnosticProvider(previous);
     }
 
-    private static MaplibreStatus StatusFromRaw(int rawStatus) =>
+    internal static MaplibreStatus StatusFromRaw(int rawStatus) =>
         rawStatus switch
         {
             0 => MaplibreStatus.Ok,
@@ -79,6 +87,11 @@ internal static unsafe class NativeStatus
             -3 => MaplibreStatus.WrongThread,
             -4 => MaplibreStatus.Unsupported,
             -5 => MaplibreStatus.NativeError,
+            -6 => MaplibreStatus.Cancelled,
+            -7 => MaplibreStatus.Busy,
+            -8 => MaplibreStatus.TargetLost,
+            -9 => MaplibreStatus.NotReady,
+            -10 => MaplibreStatus.NotFound,
             _ => MaplibreStatus.Unknown,
         };
 

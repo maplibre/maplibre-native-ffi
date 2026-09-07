@@ -7,18 +7,12 @@ import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.cValue
-import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.toCValues
-import org.maplibre.nativeffi.internal.c.mln_buffer_destroy
-import org.maplibre.nativeffi.internal.c.mln_buffer_get
 import org.maplibre.nativeffi.internal.c.mln_buffer_view
-import org.maplibre.nativeffi.internal.lifecycle.NativeOwnedBuffer
-import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.memory.toCSize
-import org.maplibre.nativeffi.internal.status.Status
 
 /** Materializes byte-array views and copies owned C buffers. */
 @OptIn(ExperimentalForeignApi::class)
@@ -39,19 +33,6 @@ internal object ByteStructs {
     native.data = bytePointer(value, scope)
     native.size = value.size.toCSize()
   }
-
-  fun ownedBuffer(buffer: NativeOwnedBuffer): ByteArray =
-    try {
-      memScoped {
-        val view = alloc<mln_buffer_view>()
-        Status.check(mln_buffer_get(buffer.rawHandleValue, view.ptr))
-        val size = checkedInt(view.size.toULong())
-        if (size == 0) ByteArray(0)
-        else view.data!!.reinterpret<kotlinx.cinterop.ByteVar>().readBytes(size)
-      }
-    } finally {
-      mln_buffer_destroy(buffer.rawHandleValue)
-    }
 
   fun copyBufferView(value: mln_buffer_view): ByteArray {
     val size = checkedInt(value.size.toULong())

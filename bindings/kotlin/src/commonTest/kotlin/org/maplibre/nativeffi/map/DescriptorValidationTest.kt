@@ -11,7 +11,6 @@ import org.maplibre.nativeffi.error.UnsupportedFeatureException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.render.MetalContextDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
-import org.maplibre.nativeffi.render.NativeBuffer
 import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.RenderBackend
@@ -23,10 +22,11 @@ import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.WglContextDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class DescriptorValidationTest {
   @Test
-  fun signedCarriersRejectNegativeUnsignedValues() {
+  fun signedCarriersRejectNegativeUnsignedValues(): Unit = runSuspendTest {
     assertFailsWith<InvalidArgumentException> {
       MapOptions().apply {
         width = -1
@@ -34,7 +34,6 @@ class DescriptorValidationTest {
       }
     }
     assertFailsWith<InvalidArgumentException> { TileOptions().prefetchZoomDelta = -1 }
-    assertFailsWith<InvalidArgumentException> { NativeBuffer.allocate(-1) }
     val nullPointer = NativePointer.NULL_POINTER
     assertFailsWith<InvalidArgumentException> { RenderTargetExtent(-1, 1, 1.0) }
     assertFailsWith<InvalidArgumentException> { RenderTargetExtent(1, 1, 1.0).width = -1 }
@@ -53,15 +52,15 @@ class DescriptorValidationTest {
   }
 
   @Test
-  fun mapAndProjectionInputsPropagateNativeCoordinateValidation() {
+  fun mapAndProjectionInputsPropagateNativeCoordinateValidation(): Unit = runSuspendTest {
     val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map = MapHandle.create(runtime, mapOptions())
+    val map = MapHandle.create(runtime, mapOptions()).await()
     var projection: MapProjectionHandle? = null
     try {
       val invalidCoordinate = LatLng(Double.NaN, 0.0)
-      assertInvalidCoordinateDiagnostic { map.pixelForLatLng(invalidCoordinate) }
-      projection = map.createProjection()
-      assertInvalidCoordinateDiagnostic { projection.pixelForLatLng(invalidCoordinate) }
+      val createdProjection = map.createProjection().await()
+      projection = createdProjection
+      assertInvalidCoordinateDiagnostic { createdProjection.pixelForLatLng(invalidCoordinate) }
       assertInvalidCoordinateDiagnostic { Maplibre.projectedMetersForLatLng(invalidCoordinate) }
     } finally {
       projection?.close()
@@ -71,11 +70,11 @@ class DescriptorValidationTest {
   }
 
   @Test
-  fun unsupportedRenderBackendsRejectAttachBeforeSessionCreation() {
+  fun unsupportedRenderBackendsRejectAttachBeforeSessionCreation(): Unit = runSuspendTest {
     val supported = Maplibre.supportedRenderBackends()
     assertTrue(supported.isNotEmpty())
     val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map = MapHandle.create(runtime, mapOptions())
+    val map = MapHandle.create(runtime, mapOptions()).await()
     try {
       val pointer = NativePointer.ofAddress(0x10L)
       val extent = RenderTargetExtent(256, 256, 1.0)
@@ -127,7 +126,7 @@ class DescriptorValidationTest {
       height = 128
     }
 
-  private fun assertInvalidCoordinateDiagnostic(block: () -> Unit) {
+  private suspend fun assertInvalidCoordinateDiagnostic(block: suspend () -> Unit) {
     val error = assertFailsWith<InvalidArgumentException> { block() }
     assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
     assertTrue(error.diagnostic.contains("latitude must be finite"))

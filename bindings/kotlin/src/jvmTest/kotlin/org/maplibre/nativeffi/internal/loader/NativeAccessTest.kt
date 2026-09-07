@@ -12,10 +12,11 @@ import org.maplibre.nativeffi.resource.ResourceResponse
 import org.maplibre.nativeffi.resource.ResourceResponseStatus
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class NativeAccessTest {
   @Test
-  fun abiVersionMismatchReportsActualAndExpectedVersions() {
+  fun abiVersionMismatchReportsActualAndExpectedVersions(): Unit = runSuspendTest {
     val error =
       assertFailsWith<AbiVersionMismatchException> {
         NativeAccess.checkAbiVersion(NativeAccess.EXPECTED_C_ABI_VERSION + 1)
@@ -26,7 +27,7 @@ class NativeAccessTest {
   }
 
   @Test
-  fun nativeAccessFailureIsWrappedWithJvmFlagGuidance() {
+  fun nativeAccessFailureIsWrappedWithJvmFlagGuidance(): Unit = runSuspendTest {
     val error =
       assertFailsWith<IllegalStateException> {
         NativeAccess.checkNativeAccessAndAbi { throw IllegalCallerException("native access") }
@@ -36,7 +37,7 @@ class NativeAccessTest {
   }
 
   @Test
-  fun missingSymbolFailureIsWrappedAsUnsatisfiedLinkError() {
+  fun missingSymbolFailureIsWrappedAsUnsatisfiedLinkError(): Unit = runSuspendTest {
     val error =
       assertFailsWith<UnsatisfiedLinkError> {
         NativeAccess.checkNativeAccessAndAbi { throw NoSuchElementException("mln_c_version") }
@@ -46,7 +47,7 @@ class NativeAccessTest {
   }
 
   @Test
-  fun resourceResponseRejectsEmbeddedNulWithBindingInvalidArgument() {
+  fun resourceResponseRejectsEmbeddedNulWithBindingInvalidArgument(): Unit = runSuspendTest {
     NativeAccess.ensureLoaded()
     val response =
       ResourceResponse(ResourceResponseStatus.ERROR).apply {
@@ -63,7 +64,7 @@ class NativeAccessTest {
   }
 
   @Test
-  fun resourceResponseRejectsUnknownErrorReasonWithBindingInvalidArgument() {
+  fun resourceResponseRejectsUnknownErrorReasonWithBindingInvalidArgument(): Unit = runSuspendTest {
     NativeAccess.ensureLoaded()
     val response =
       ResourceResponse(ResourceResponseStatus.ERROR).apply {
@@ -79,7 +80,7 @@ class NativeAccessTest {
   }
 
   @Test
-  fun runtimeOptionsRejectEmbeddedNulWithBindingInvalidArgument() {
+  fun runtimeOptionsRejectEmbeddedNulWithBindingInvalidArgument(): Unit = runSuspendTest {
     val error =
       assertFailsWith<InvalidArgumentException> {
         RuntimeHandle.create(

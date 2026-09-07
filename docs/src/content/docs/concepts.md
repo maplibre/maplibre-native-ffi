@@ -12,21 +12,30 @@ Events and bindings connect those objects to host code.
 
 ## Runtime
 
-The runtime owns scheduler state and event storage for one owner thread. The
-host creates the runtime on the thread that will pump it. Runtime work and
-events flow through that thread.
+The runtime owns one native scheduler thread and its event storage. Runtime
+creation starts that thread, which keeps MapLibre Native's run loop active until
+native teardown finishes after runtime release.
 
-Each owner thread has at most one live runtime. Pumping advances MapLibre Native
-and collects completed work.
+Any host thread can submit runtime and map work. A submission wakes the native
+run loop, and the runtime's own thread carries the work forward. One runtime may
+own multiple maps; their commands, queries, barriers, and release work share one
+ordered submission stream.
 
-The host sets the pace. A display-paced host pumps once per frame. A host with a
-dedicated pump thread parks that thread until the runtime has work. Other host
-threads wake it through a wake source.
+Use a runtime barrier when later work must wait for every preceding submission
+to reach a terminal disposition. The runtime's direct event wake callback tells
+the host when its event queue is ready to drain.
 
 ## Map
 
 A map belongs to a runtime. It owns style documents, sources, layers, images,
 camera state, feature state, observer events, and render invalidation.
+
+Releasing a map consumes its public handle synchronously; the release accepts a
+completion that runs after native retirement. That completion runs after earlier
+map work is terminal and map-owned callback state has been destroyed. Backend
+worker and graphics resource cleanup can continue after that completion. Await
+it when later host work depends on cleanup; a runtime release also remains
+ordered after it.
 
 A map is independent of a render target. The host can create, configure, query,
 and observe a map before the first frame.
@@ -36,10 +45,23 @@ aligned with the style specification across every layer type. Typed entry points
 cover behavior beyond construction, such as source-type validation and per-frame
 property updates.
 
+Map mutations are commands. A command copies its input before returning
+acceptance and later invokes one completion with its terminal disposition.
+Ordered queries and lifecycle transitions use typed completions. Bindings expose
+one-shot work through their normal future, promise, task, suspension, or
+explicit async idiom.
+
+Published snapshots provide synchronous copies of state needed by UI and display
+threads. Snapshot reads never call into mutable MapLibre map state. Each
+committed command completion reports the snapshot generation that its commit
+published, so a host can fence a snapshot read on it.
+
 ## Render session
 
 A render session renders one map to one render target. A map carries at most one
-live render session.
+live render session. Feature state belongs to the map; a session pushes the
+map's store into its renderer on the next render update, and the session's
+queries read the last frame the session drew.
 
 Render targets come in three kinds:
 
@@ -63,29 +85,58 @@ Vulkan, so a macOS host loads an EGL implementation such as ANGLE for the OpenGL
 backend, or MoltenVK for the Vulkan backend. That implementation brings the
 headers to build against.
 
-The thread that attaches a render session becomes its owner thread for the
-session's lifetime. The attaching thread can differ from the map's owner thread.
-A host therefore attaches on the thread that owns its graphics context and draws
-frames, while another thread pumps the runtime and map. A session call from any
-other thread reports an owner-thread status.
+Execution placement is fixed when attachment starts. A core-worker session owns
+a native serial graphics worker. A caller-graphics-thread session stores typed
+work until the host services it where the graphics context is usable. The target
+decides which drivers it accepts:
+
+| Render target                                               | Driver                 |
+| ----------------------------------------------------------- | ---------------------- |
+| Metal surface or texture                                    | either                 |
+| Vulkan surface or texture                                   | either                 |
+| OpenGL surface on WGL, EGL, or an existing WebGL context    | caller graphics thread |
+| OpenGL surface on a transferred `OffscreenCanvas`           | core worker            |
+| OpenGL owned texture on a shared WGL, EGL, or WebGL context | caller graphics thread |
+| OpenGL owned texture on a private EGL context               | core worker            |
+| OpenGL borrowed texture                                     | caller graphics thread |
+| WebGPU surface or texture                                   | caller graphics thread |
+
+Session control is separate from graphics execution. Any host thread may request
+a frame, read a snapshot, start an asynchronous call, abandon a target, or
+destroy a detached session. The first successful caller-driver service fixes its
+graphics thread identity. Later service calls and thread-current backend
+accessors remain affine to that thread. The host services ready work even while
+presentation callbacks are paused.
+
+A frame demand carries a host token, an optional timeout, and a coalescing
+boundary. Every accepted demand produces one terminal result. Result records
+identify the token and the map-update, extent, and frame generations that the
+driver used. A direct frame-result wake callback remains armed until the host
+drains all frame results, so coalesced wakeups do not lose results.
+
+Host-acquirable owned texture targets negotiate a ring of one to three slots.
+Acquiring a frame leases one slot and returns producer-completion
+synchronization. Releasing the frame supplies consumer-completion
+synchronization when the host submitted GPU reads. The driver reuses the slot
+only after the host released the handle and those reads completed. A private
+OpenGL owned texture target fixes its ring depth at one and exposes CPU readback
+instead of frame acquisition.
 
 ### OpenGL context ownership
 
 OpenGL binds a context to a thread, so an OpenGL render target names how the
-session and the host divide the thread's context.
+session and the host divide driver-thread context and graphics-object ownership.
 
-A shared session leaves the thread as it found it. Each render makes the
-session's context current and restores whatever was current before, and that
-context joins the host share group, so the host draws its own graphics on the
-same thread and samples session textures from its own context. Texture targets
-and WebGL work this way.
+A shared session leaves the thread as it found it. Each driver-service call
+makes the session's context current and restores whatever was current before,
+and that context joins the host share group. Host-acquirable texture targets and
+existing WebGL contexts use this mode.
 
-A dedicated session owns the thread's context. It creates a context of its own
-from the display or device the host already presents through, joins no share
-group, and keeps that context current between renders. Choose it for a surface
-target on a thread that exists to draw one map, such as an Android host
-rendering into a `SurfaceView`. The host then builds no context of its own, and
-each frame saves and restores nothing.
+A dedicated session owns its driver thread's context. It creates a context from
+the supplied display or device, joins no host share group, and keeps that
+context current between renders. A surface target can use a caller thread that
+exists to draw one map, such as an Android host rendering into a `SurfaceView`.
+A private EGL owned texture target uses a core worker and exposes CPU readback.
 
 ## Events
 
@@ -96,32 +147,32 @@ events from the runtime.
 Events report map lifecycle, rendering progress, resource activity, diagnostics,
 and asynchronous failures.
 
-Rendering observer events reach the runtime queue through the map's run loop. A
-pump after the render call makes those events available to drain.
+Rendering observer events reach the runtime queue asynchronously. The runtime's
+direct event wake callback reports that the queue is ready to drain.
 
 Each map and each runtime carries a subscription: the set of event types it
 queues. Default options select every event type the library reports, and a host
 narrows a subscription by naming the types it reads. An unselected event is
-never built, never queued, and never raises the wake flag that releases a parked
-pump.
+never built, never queued, and never invokes the event wake callback.
 
-One drain reports a batch: every queued event in order, plus the message text
-that those events carry. Copy any value you keep, because the next drain for
-that runtime replaces the batch.
+One drain transfers the queued event records and their message storage into an
+owned batch. A batch remains readable across later drains and runtime close.
+Copy values that must outlive the batch, then release it.
 
-Queued events belong to their source. Destroying a map discards that map's
-queued events immediately. Read any state that teardown needs synchronously
-while the map is live.
+Releasing a map or disabling offline-region observation prevents future events
+from that source and leaves queued events unchanged. Each queued event keeps a
+copied source ID that remains meaningful after the source handle closes.
 
 ## Failures
 
-Status-returning calls report synchronous failures. Each binding surfaces them
-in its own idiom: an exception, a result type, or an error return. Examples
-include a call from the wrong thread and an invalid argument.
+The status returned by an immediate call reports validation or inspection
+failure. The status returned by a one-shot submission reports whether native
+code accepted and copied it. Its completion reports an asynchronous application
+failure and a borrowed diagnostic that the binding copies before returning.
 
-Events report asynchronous failures, such as a style load, resource request, or
-still-image request that failed. Drain events in addition to checking call
-results.
+Each binding surfaces these channels in its own idiom: an exception, a result
+type, an asynchronous result, or an event stream. Render-driver calls continue
+to report their graphics-thread failures directly.
 
 ## Language bindings
 

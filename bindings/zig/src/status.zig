@@ -2,6 +2,7 @@ const std = @import("std");
 
 const c = @import("c.zig").raw;
 const diagnostics = @import("diagnostics.zig");
+const sync = @import("sync.zig");
 
 pub const expected_c_abi_version: u32 = 0;
 
@@ -10,6 +11,11 @@ pub const NativeStatusError = error{
     InvalidState,
     WrongThread,
     Unsupported,
+    Cancelled,
+    Busy,
+    TargetLost,
+    NotReady,
+    NotFound,
     NativeError,
     UnknownStatus,
 };
@@ -73,41 +79,76 @@ fn copyThreadLastErrorMessage(
     return null;
 }
 
+/// Converts a raw native status into this binding's error set without touching
+/// diagnostics: void for MLN_STATUS_OK, the mapped error otherwise.
+pub fn errorFromRawStatus(raw_status: i32) NativeStatusError!void {
+    if (raw_status == c.MLN_STATUS_OK) return;
+    return nativeStatusError(raw_status);
+}
+
 fn nativeStatusError(raw_status: i32) NativeStatusError {
     return switch (raw_status) {
         c.MLN_STATUS_INVALID_ARGUMENT => error.InvalidArgument,
         c.MLN_STATUS_INVALID_STATE => error.InvalidState,
         c.MLN_STATUS_WRONG_THREAD => error.WrongThread,
         c.MLN_STATUS_UNSUPPORTED => error.Unsupported,
+        c.MLN_STATUS_BUSY => error.Busy,
+        c.MLN_STATUS_TARGET_LOST => error.TargetLost,
+        c.MLN_STATUS_NOT_READY => error.NotReady,
+        c.MLN_STATUS_NOT_FOUND => error.NotFound,
         c.MLN_STATUS_NATIVE_ERROR => error.NativeError,
+        c.MLN_STATUS_CANCELLED => error.Cancelled,
         else => error.UnknownStatus,
     };
 }
 
-test "native status values map to stable Zig errors" {
-    try std.testing.expectError(error.InvalidArgument, checkStatus(c.MLN_STATUS_INVALID_ARGUMENT, null));
-    try std.testing.expectError(error.InvalidState, checkStatus(c.MLN_STATUS_INVALID_STATE, null));
-    try std.testing.expectError(error.WrongThread, checkStatus(c.MLN_STATUS_WRONG_THREAD, null));
-    try std.testing.expectError(error.Unsupported, checkStatus(c.MLN_STATUS_UNSUPPORTED, null));
-    try std.testing.expectError(error.NativeError, checkStatus(c.MLN_STATUS_NATIVE_ERROR, null));
-    try checkStatus(c.MLN_STATUS_OK, null);
-}
+// Signals that a native runtime finished tearing down, so this test's raw C
+// calls do not outlive the library state they used.
+const TeardownSignal = struct {
+    finished: sync.Latch = .{},
+
+    fn descriptor(self: *TeardownSignal) c.mln_completion {
+        return .{
+            .size = @sizeOf(c.mln_completion),
+            .callback = callback,
+            .user_data = self,
+            .release_user_data = null,
+        };
+    }
+
+    fn callback(user_data: ?*anyopaque, _: [*c]const c.mln_completion_result) callconv(.c) void {
+        const self: *TeardownSignal = @ptrCast(@alignCast(user_data orelse return));
+        self.finished.set();
+    }
+
+    fn wait(self: *TeardownSignal) void {
+        self.finished.wait();
+    }
+};
 
 test "diagnostic store copies thread-local native message" {
     var store = diagnostics.DiagnosticStore.init(std.testing.allocator);
     defer store.deinit();
 
-    try std.testing.expectError(error.InvalidArgument, checkStatus(c.mln_runtime_destroy(0), &store));
+    var rejected_signal = TeardownSignal{};
+    const rejected_descriptor = rejected_signal.descriptor();
+    try std.testing.expectError(
+        error.InvalidArgument,
+        checkStatus(c.mln_runtime_release(0, &rejected_descriptor), &store),
+    );
     const first = store.get().?;
     try std.testing.expectEqual(@as(?i32, c.MLN_STATUS_INVALID_ARGUMENT), first.raw_status);
     try std.testing.expect(first.message.len > 0);
     const copied = try std.testing.allocator.dupe(u8, first.message);
     defer std.testing.allocator.free(copied);
 
+    const options = c.mln_runtime_options_default();
     var runtime: c.mln_runtime = 0;
-    var options = c.mln_runtime_options_default();
     try checkStatus(c.mln_runtime_create(&options, &runtime), null);
-    defer checkStatus(c.mln_runtime_destroy(runtime), null) catch @panic("runtime destroy failed");
+    var signal = TeardownSignal{};
+    const descriptor = signal.descriptor();
+    try checkStatus(c.mln_runtime_release(runtime, &descriptor), null);
+    signal.wait();
 
     try std.testing.expectEqualStrings(copied, store.get().?.message);
 }

@@ -10,9 +10,10 @@ import { region } from "../../../snippets";
 
 import liveUpdates from "../../../../snippets/c/geojson-live-updates.c?raw";
 
-A GeoJSON source accepts prepared inline data or a new URL. Both updates
-replace the whole dataset. A host that tracks individual features keeps its own
-collection and publishes the collection after each change.
+A GeoJSON source accepts prepared inline data or a new URL. Both commands
+replace the whole dataset in runtime submission order. A host that tracks
+individual features keeps its own collection and publishes the collection after
+each change.
 
 Initialize the source with an empty feature collection. Every later update uses
 the same source ID, preserving the layers that draw it.
@@ -33,18 +34,18 @@ reports an invalid-argument status.
 
 <Code code={region(liveUpdates, "prepare")} lang="c" title="geojson-live-updates.c" />
 
-The install runs on the map's owner thread and swaps the prepared index into
-the source, which is cheap at any data size. Destroy the prepared handle after
-the install, or keep it to install the same data on other matching sources.
+The install is a command that swaps the prepared index into the source, which
+is cheap at any data size. Destroy the prepared handle after the install, or
+keep it to install the same data on other matching sources.
 MapLibre copies what it keeps, so the serialization buffer is free for reuse
 once preparation returns.
 
 <Code code={region(liveUpdates, "publish")} lang="c" title="geojson-live-updates.c" />
 
-A host with a worker thread prepares there and installs from the owner thread,
-so a large dataset never blocks the pump. When a feed delivers faster than the
-display refreshes, collect the messages that arrive between frames and publish
-once per frame.
+A host with a worker thread prepares there and installs from any thread, so a
+large dataset never blocks the thread that publishes it. When a feed delivers
+faster than the display refreshes, collect the messages that arrive between
+frames and publish once per frame.
 
 ## Synchronous tiling
 
@@ -54,9 +55,8 @@ does not extend the current frame. Use this default for most feeds.
 
 Set the synchronous-tiling option when the next frame must include the update.
 Examples include a simulation that advances with rendering and a still image
-captured immediately after an update. Tile slicing then runs during the render
-call on the render session's owner thread, which extends that frame by the
-slicing work.
+captured immediately after an update. Tiling then runs on native worker threads.
+A large dataset can delay the render update that publishes the new tiles.
 
 The option chosen when adding the source is the baseline, and a runtime
 override raises it temporarily. Enable the override around a burst of

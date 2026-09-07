@@ -7,8 +7,10 @@
 #define MAPLIBRE_NATIVE_C_PROJECTION_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "base.h"
+#include "completion.h"
 #include "map.h"
 
 #ifdef __cplusplus
@@ -16,56 +18,61 @@ extern "C" {
 #endif
 
 /**
- * Creates a standalone projection helper from the current map transform.
+ * Starts creation of a standalone projection from the map's ordered transform
+ * state.
  *
- * The helper owns projection and camera transform state only. It does not own
- * style, resources, render targets, or runtime events. Use it to convert
- * coordinates or compute camera fitting without changing the source map.
+ * The completion borrows an independent projection handle that copies the
+ * map's transform state after every earlier map command. A binding takes
+ * ownership of that handle before the callback returns. The projection remains
+ * usable after its source map and runtime close. This function may be called
+ * from any thread.
  *
- * Creation snapshots the map's transform. Later map camera or projection
- * changes do not update the helper. Every later projection call is synchronous,
- * runs on the calling thread, and is internally serialized. The helper may be
- * used from any thread.
+ * Every later projection call is synchronous, runs on the calling thread, and
+ * is internally serialized. A projection never observes map changes made after
+ * its creation.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_projection is
- *   null, or *out_projection is not null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
+ * - MLN_STATUS_OK when the creation is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NATIVE_ERROR when the projection fails to construct on the map
+ *   worker.
  */
 MLN_API mln_status mln_map_projection_create(
-  mln_map map, mln_map_projection* out_projection
+  mln_map map, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Destroys a standalone projection helper.
+ * Closes a standalone projection.
  *
- * Destruction retires the handle and waits for projection calls already in
- * progress before it destroys the helper. This function may be called from any
- * thread.
+ * The close retires the handle, waits for projection calls already running on
+ * other threads, and destroys the projection before it returns. A later call
+ * with the retired handle returns MLN_STATUS_INVALID_ARGUMENT. This function
+ * may be called from any thread.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live.
+ * - MLN_STATUS_OK when the projection was closed by this call.
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is null or already retired.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_map_projection_destroy(mln_map_projection projection) MLN_NOEXCEPT;
+mln_map_projection_close(mln_map_projection projection) MLN_NOEXCEPT;
 
 /**
- * Copies the current camera snapshot from a standalone projection helper.
+ * Copies the projection camera into out_camera.
  *
- * On success, *out_camera is overwritten. MapLibre Native reports no anchor in
- * a camera snapshot, so out_camera->fields leaves MLN_CAMERA_OPTION_ANCHOR
- * clear; anchor is input-only, as documented on mln_camera_options. This
- * function may be called from any thread.
+ * out_camera->size must be at least sizeof(mln_camera_options). The result
+ * observes every earlier projection setter. This function may be called from
+ * any thread.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live, out_camera
- *   is null, or out_camera->size is too small.
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live, or
+ *   out_camera is null or undersized.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_projection_get_camera(
@@ -73,15 +80,17 @@ MLN_API mln_status mln_map_projection_get_camera(
 ) MLN_NOEXCEPT;
 
 /**
- * Applies camera fields to a standalone projection helper.
+ * Applies a camera update to a standalone projection.
  *
- * Only fields indicated by camera->fields affect the helper. This function may
- * be called from any thread.
+ * Only fields selected by camera->fields affect the projection. The update is
+ * applied before this function returns, so a later read or conversion observes
+ * it. The map's camera is unaffected. This function may be called from any
+ * thread.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live, camera is
- *   null, camera->size is too small, or camera->fields contains unknown bits.
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live, or camera
+ *   is null, undersized, or carries an invalid field.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_projection_set_camera(
@@ -89,18 +98,16 @@ MLN_API mln_status mln_map_projection_set_camera(
 ) MLN_NOEXCEPT;
 
 /**
- * Updates a projection helper camera so coordinates are visible within padding.
+ * Applies a camera fit for geographic coordinates.
  *
- * The coordinates array is borrowed for the duration of this call and is not
- * retained. Use mln_map_projection_get_camera() after this call to read the
- * computed camera. This function may be called from any thread.
+ * The fitted camera is applied before this function returns, so a later read
+ * or conversion observes it. This function may be called from any thread.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live,
- *   coordinates is null, coordinate_count is 0, padding contains negative or
- *   non-finite values, or any coordinate contains invalid latitude or longitude
- *   values.
+ *   coordinates is null, coordinate_count is zero, a coordinate is out of
+ *   range, or padding is not finite.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_projection_set_visible_coordinates(
@@ -109,19 +116,18 @@ MLN_API mln_status mln_map_projection_set_visible_coordinates(
 ) MLN_NOEXCEPT;
 
 /**
- * Updates a projection helper camera so geometry coordinates are visible.
+ * Applies a camera fit for GeoJSON Geometry bytes.
  *
- * The UTF-8 GeoJSON Geometry bytes are borrowed for this call and are not
- * retained. Use
- * mln_map_projection_get_camera() after this call to read the computed camera.
  * Empty geometry objects and geometry collections with no coordinates are
- * invalid for camera fitting. This function may be called from any thread.
+ * invalid. The fitted camera is applied before this function returns, so a
+ * later read or conversion observes it. This function may be called from any
+ * thread.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live, geometry
- *   is empty or invalid, padding contains negative or non-finite values, or the
- *   geometry contains no coordinates.
+ *   is not a GeoJSON Geometry or carries no coordinate, or padding is not
+ *   finite.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_projection_set_visible_geometry(
@@ -130,15 +136,16 @@ MLN_API mln_status mln_map_projection_set_visible_geometry(
 ) MLN_NOEXCEPT;
 
 /**
- * Converts a geographic world coordinate using a standalone projection helper.
+ * Converts a geographic coordinate to a screen point.
  *
- * The output point uses logical map pixels with an origin at the top-left of
- * the helper viewport. This function may be called from any thread.
+ * The output uses logical map pixels with an origin at the top-left of the
+ * projection viewport. The result observes every earlier projection setter.
+ * This function may be called from any thread.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live, out_point
- *   is null, or coordinate contains invalid latitude or longitude values.
+ *   is null, or coordinate is out of range.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_projection_pixel_for_lat_lng(
@@ -147,16 +154,17 @@ MLN_API mln_status mln_map_projection_pixel_for_lat_lng(
 ) MLN_NOEXCEPT;
 
 /**
- * Converts a screen point using a standalone projection helper.
+ * Converts a screen point to a geographic coordinate.
  *
- * The input point uses logical map pixels with an origin at the top-left of the
- * helper viewport. The output longitude is wrapped to the range from -180 to
- * 180 degrees. This function may be called from any thread.
+ * The input uses logical map pixels with an origin at the top-left of the
+ * projection viewport. The output longitude is wrapped to -180 to 180. The
+ * result observes every earlier projection setter. This function may be called
+ * from any thread.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live,
- *   out_coordinate is null, or point contains non-finite values.
+ *   out_coordinate is null, or point is not finite.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_projection_lat_lng_for_pixel(
@@ -165,13 +173,12 @@ MLN_API mln_status mln_map_projection_lat_lng_for_pixel(
 ) MLN_NOEXCEPT;
 
 /**
- * Converts a screen point to an unwrapped geographic world coordinate using a
- * standalone projection helper.
+ * Converts a screen point to an unwrapped geographic coordinate.
  *
- * The input point uses logical map pixels with an origin at the top-left of the
- * helper viewport. The output longitude preserves the visible world copy and
- * may fall outside the range from -180 to 180 degrees. This function may be
- * called from any thread.
+ * The input uses logical map pixels with an origin at the top-left of the
+ * projection viewport. The output longitude preserves the visible world copy
+ * and may fall outside -180 to 180. The result observes every earlier
+ * projection setter. This function may be called from any thread.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

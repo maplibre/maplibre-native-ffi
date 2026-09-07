@@ -1,13 +1,13 @@
 package org.maplibre.nativeffi.internal.callback
 
-import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.AtomicReference
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.log.LogEvent
@@ -15,10 +15,13 @@ import org.maplibre.nativeffi.log.LogRecord
 import org.maplibre.nativeffi.log.LogSeverity
 
 /** Owns process-global Android JNI logging callback state. */
-@OptIn(ExperimentalAtomicApi::class)
-internal class LogCallbackState private constructor(private val callback: LogCallback) :
-  AutoCloseable {
-  private val gate = CallbackGate("log callbacks")
+internal class LogCallbackState(private val callback: LogCallback) : AutoCloseable {
+  private val token = TOKENS.getAndIncrement()
+  private val gate = CallbackGate("log callbacks") { STATES.remove(token) }
+
+  init {
+    STATES[token] = this
+  }
 
   fun invoke(rawSeverity: Int, rawEvent: Int, code: Long, message: BytePointer?): Int {
     val lease = gate.enter() ?: return 0
@@ -38,81 +41,37 @@ internal class LogCallbackState private constructor(private val callback: LogCal
     }
   }
 
-  fun checkCanClose() = gate.checkCanClose()
+  override fun close() = gate.close()
 
   fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
 
-  override fun close() = gate.close()
-
   internal companion object {
-    private val updateLock = AtomicInt(0)
-    private val current = AtomicReference<LogCallbackState?>(null)
-
     fun set(callback: LogCallback) {
       NativeAccess.ensureLoaded()
-      replace(callback) {
-        Status.check(MaplibreNativeC.mln_log_set_callback(NATIVE_CALLBACK, null))
-      }
-    }
-
-    internal fun setForTesting(callback: LogCallback, register: (LogCallbackState) -> Unit = {}) {
-      replace(callback, register)
-    }
-
-    private fun replace(callback: LogCallback, register: (LogCallbackState) -> Unit) {
       val replacement = LogCallbackState(callback)
-      var previous: LogCallbackState? = null
+      HandleLeakCleaner.retainNativeCallbackRoot(replacement)
       try {
-        withUpdateLock {
-          current.load()?.checkCanClose()
-          // Publish before native install. The shared thunk dispatches through `current`, so
-          // installing first would deliver logs to the previous callback until exchange.
-          previous = current.exchange(replacement)
-          try {
-            register(replacement)
-          } catch (error: Throwable) {
-            current.store(previous)
-            previous = null
-            throw error
-          }
-        }
+        Status.check(
+          MaplibreNativeC.mln_log_set_callback(
+            NATIVE_CALLBACK,
+            JavaCppSupport.addressPointer(replacement.token),
+            NATIVE_RELEASE,
+          )
+        )
       } catch (error: Throwable) {
-        closeAndSuppress(error, replacement)
+        HandleLeakCleaner.releaseNativeCallbackRoot(replacement)
+        replacement.close()
         throw error
       }
-      closeQuietly(previous)
     }
 
     fun clear() {
       NativeAccess.ensureLoaded()
-      var previous: LogCallbackState? = null
-      withUpdateLock {
-        current.load()?.checkCanClose()
-        Status.check(MaplibreNativeC.mln_log_clear_callback())
-        previous = current.exchange(null)
-      }
-      closeQuietly(previous)
+      Status.check(MaplibreNativeC.mln_log_clear_callback())
     }
 
-    fun currentForTesting(): LogCallbackState? = current.load()
-
-    internal fun clearForTesting() {
-      closeQuietly(current.exchange(null))
-    }
-
-    private fun closeQuietly(state: LogCallbackState?) {
-      try {
-        state?.close()
-      } catch (_: RuntimeException) {}
-    }
-
-    private fun closeAndSuppress(error: Throwable, state: LogCallbackState?) {
-      try {
-        state?.close()
-      } catch (cleanup: Throwable) {
-        error.addSuppressed(cleanup)
-      }
-    }
+    private val TOKENS = AtomicLong(1)
+    private val STATES = ConcurrentHashMap<Long, LogCallbackState>()
 
     /**
      * One process-wide thunk. JavaCPP's FunctionPointer pool is ten slots per generated class, so
@@ -126,18 +85,17 @@ internal class LogCallbackState private constructor(private val callback: LogCal
           event: Int,
           code: Long,
           message: BytePointer?,
-        ): Int = current.load()?.invoke(severity, event, code, message) ?: 0
+        ): Int = STATES[userData?.address() ?: 0L]?.invoke(severity, event, code, message) ?: 0
       }
 
-    private inline fun <R> withUpdateLock(block: () -> R): R {
-      while (!updateLock.compareAndSet(0, 1)) {
-        // Spin briefly; log callback registration is process-global and infrequent.
+    /** One process-wide release thunk; per-state thunks would exhaust the same pool. */
+    private val NATIVE_RELEASE =
+      object : MaplibreNativeC.mln_log_callback_release() {
+        override fun call(userData: Pointer?) {
+          val state = STATES[userData?.address() ?: 0L] ?: return
+          HandleLeakCleaner.releaseNativeCallbackRoot(state)
+          state.close()
+        }
       }
-      try {
-        return block()
-      } finally {
-        updateLock.store(0)
-      }
-    }
   }
 }

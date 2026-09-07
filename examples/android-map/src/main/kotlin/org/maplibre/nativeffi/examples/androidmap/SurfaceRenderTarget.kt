@@ -1,58 +1,106 @@
 package org.maplibre.nativeffi.examples.androidmap
 
+import android.util.Log
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.map.MapSize
+import org.maplibre.nativeffi.render.FrameDemand
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
-import org.maplibre.nativeffi.render.RenderResult
+import org.maplibre.nativeffi.render.RenderDriver
+import org.maplibre.nativeffi.render.RenderFrameResult
+import org.maplibre.nativeffi.render.RenderSessionAttachOptions
+import org.maplibre.nativeffi.render.RenderSessionAttachment
 import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 
-/**
- * The native-surface render target. The thread that attaches a session owns it for the session's
- * lifetime, so every method here runs on the UI thread, where the host surface lives.
- */
+/** A caller-driver native surface serviced on the UI graphics thread. */
 internal class SurfaceRenderTarget private constructor(private val session: RenderSessionHandle) :
   AutoCloseable {
-  fun renderUpdate(): Boolean = session.renderUpdate().result == RenderResult.RENDERED
+  /**
+   * Submits one Choreographer-paced demand and reports the frame the driver produced for it, or
+   * null when it produced none.
+   */
+  fun renderUpdate(): RenderFrameResult? {
+    session.requestFrame(FrameDemand(present = true))
+    session.serviceDriverWork()
+    return session.drainFrameResults().lastOrNull()
+  }
 
   /**
-   * Follows the host viewport and the surface [graphics] presents through now, keeping the session
-   * and its renderer.
+   * Applies target changes through the native typed driver mailbox.
    *
-   * The OpenGL path carries a resize and a surface replacement through one call, because the
-   * surface is made current on the next render and may name a replacement for one the platform
-   * already destroyed. A Vulkan session destroys its swapchain before taking a new surface, which
-   * needs the outgoing surface to still be valid, so only a resize reaches it here.
+   * A session resize carries the map's extent itself. An EGL surface handover replaces only the
+   * graphics resource, so that path submits the map resize alongside it.
    */
-  fun resize(graphics: GraphicsContext, viewport: Viewport) {
+  fun resize(map: MapHandle, graphics: GraphicsContext, viewport: Viewport) {
     when (graphics) {
-      is EglGraphicsContext ->
-        session.setOpenGLSurfaceTarget(
-          OpenGLSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
+      is EglGraphicsContext -> {
+        complete(
+          session.setOpenGLSurfaceTarget(
+            OpenGLSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
+          )
         )
-      is VulkanGraphicsContext ->
-        session.resize(viewport.logicalWidth, viewport.logicalHeight, viewport.scaleFactor)
+        map.resize(MapSize(viewport.logicalWidth, viewport.logicalHeight, viewport.scaleFactor))
+      }
+      is VulkanGraphicsContext -> complete(session.resize(viewport.extent))
       else -> error("Unsupported graphics context: ${graphics::class.java.name}")
     }
   }
 
+  /**
+   * Releases the session. Detach services driver work, which needs the graphics context current, so
+   * a platform callback that arrives after the surface is gone falls back to abandoning it.
+   */
   override fun close() {
+    try {
+      complete(session.detach())
+    } catch (error: RuntimeException) {
+      Log.w(TAG, "detaching the render session failed; abandoning it instead", error)
+      runCatching { session.abandon() }
+    }
     session.close()
   }
 
+  private fun complete(completed: Deferred<Unit>) {
+    while (!completed.isCompleted) session.serviceDriverWork()
+    runBlocking { completed.await() }
+  }
+
   companion object {
-    fun attach(map: MapHandle, graphics: GraphicsContext, viewport: Viewport): SurfaceRenderTarget =
-      when (graphics) {
-        is EglGraphicsContext -> {
-          val descriptor =
-            OpenGLSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
-          SurfaceRenderTarget(map.attachOpenGLSurface(descriptor))
+    private const val TAG = "MapLibreAndroidMap"
+
+    private val callerDriver =
+      RenderSessionAttachOptions(driver = RenderDriver.CALLER_GRAPHICS_THREAD)
+
+    fun attach(map: MapHandle, graphics: GraphicsContext, viewport: Viewport): SurfaceRenderTarget {
+      val attachment =
+        when (graphics) {
+          is EglGraphicsContext -> {
+            val descriptor =
+              OpenGLSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
+            map.attachOpenGLSurface(descriptor, callerDriver)
+          }
+          is VulkanGraphicsContext -> {
+            val descriptor =
+              VulkanSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfaceHandle)
+            map.attachVulkanSurface(descriptor, callerDriver)
+          }
+          else -> error("Unsupported graphics context: ${graphics::class.java.name}")
         }
-        is VulkanGraphicsContext -> {
-          val descriptor =
-            VulkanSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfaceHandle)
-          SurfaceRenderTarget(map.attachVulkanSurface(descriptor))
-        }
-        else -> error("Unsupported graphics context: ${graphics::class.java.name}")
+      return fromAttachment(attachment)
+    }
+
+    private fun fromAttachment(attachment: RenderSessionAttachment): SurfaceRenderTarget {
+      val target = SurfaceRenderTarget(attachment.session)
+      try {
+        target.complete(attachment.completed)
+        return target
+      } catch (error: Throwable) {
+        runCatching { attachment.session.abandon() }
+        runCatching { attachment.session.close() }
+        throw error
       }
+    }
   }
 }

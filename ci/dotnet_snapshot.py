@@ -125,7 +125,10 @@ def pack(
 
 def package(args: argparse.Namespace) -> None:
     args.output.mkdir(parents=True, exist_ok=True)
-    pack(MANAGED_PROJECT, args.output, args.version)
+    # The mise tasks keep every dotnet output under build/, so packing does the
+    # same rather than writing bin/ trees into the source projects.
+    base_output = ROOT / "build" / "dotnet" / "package"
+    pack(MANAGED_PROJECT, args.output, args.version, BaseOutputPath=f"{base_output}/")
 
     with tempfile.TemporaryDirectory() as temporary:
         staging = pathlib.Path(temporary)
@@ -143,6 +146,7 @@ def package(args: argparse.Namespace) -> None:
                 args.version,
                 RenderBackend=backend,
                 NativeAssetsDir=assets,
+                BaseOutputPath=f"{base_output}/",
             )
 
 
@@ -166,14 +170,18 @@ def smoke_musl(args: argparse.Namespace) -> None:
         shutil.rmtree(work)
     packages.mkdir(parents=True)
 
+    base_output = ROOT / "build" / "dotnet" / args.preset
     copy_runtime_assets(install, assets / rid / "native", args.preset)
-    pack(MANAGED_PROJECT, packages, MUSL_SMOKE_VERSION)
+    pack(
+        MANAGED_PROJECT, packages, MUSL_SMOKE_VERSION, BaseOutputPath=f"{base_output}/"
+    )
     pack(
         RUNTIME_PROJECT,
         packages,
         MUSL_SMOKE_VERSION,
         RenderBackend=backend,
         NativeAssetsDir=assets,
+        BaseOutputPath=f"{base_output}/",
     )
     run(
         "dotnet",
@@ -192,6 +200,7 @@ def smoke_musl(args: argparse.Namespace) -> None:
         "https://api.nuget.org/v3/index.json",
         f"-p:MaplibreNativeFfiPackageVersion={MUSL_SMOKE_VERSION}",
         f"-p:MaplibreNativeFfiRenderBackend={backend}",
+        f"-p:BaseOutputPath={base_output}/",
     )
 
     environment = os.environ.copy()

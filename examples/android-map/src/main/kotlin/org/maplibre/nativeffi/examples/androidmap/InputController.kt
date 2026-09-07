@@ -8,11 +8,8 @@ import kotlin.math.atan2
 import kotlin.math.hypot
 import org.maplibre.nativeffi.geo.ScreenPoint
 
-/**
- * Decodes touch input into camera commands. This runs on the UI thread, which does not own the map,
- * so it only produces commands; the runtime loop applies them on the map's owner thread.
- */
-internal class InputController(context: Context, private val enqueue: (CameraCommand) -> Unit) {
+/** Decodes touch input into camera updates on the UI thread. */
+internal class InputController(context: Context, private val mapState: () -> MapState?) {
   private val density = context.resources.displayMetrics.density.takeIf { it > 0f } ?: 1f
   private val tapGestureDetector = GestureDetector(context, TapListener())
   private val pointerTracker = PointerTracker()
@@ -31,8 +28,8 @@ internal class InputController(context: Context, private val enqueue: (CameraCom
 
     override fun onDoubleTap(event: MotionEvent): Boolean {
       doubleTapActive = true
-      enqueue(CameraCommand.CancelTransitions)
-      enqueue(CameraCommand.ZoomToNextWholeLevel(screenPoint(event.x, event.y)))
+      mapState()?.cancelTransitions()
+      mapState()?.zoomToNextWholeLevel(screenPoint(event.x, event.y))
       return true
     }
 
@@ -57,13 +54,13 @@ internal class InputController(context: Context, private val enqueue: (CameraCom
     fun onTouchEvent(event: MotionEvent) {
       when (event.actionMasked) {
         MotionEvent.ACTION_DOWN -> {
-          enqueue(CameraCommand.CancelTransitions)
-          enqueue(CameraCommand.SetGestureInProgress(true))
+          mapState()?.cancelTransitions()
+          mapState()?.setGestureInProgress(true)
           beginPan(event)
         }
         MotionEvent.ACTION_POINTER_DOWN ->
           if (event.pointerCount == 2) {
-            enqueue(CameraCommand.CancelTransitions)
+            mapState()?.cancelTransitions()
             beginTwoFinger(event)
           }
         MotionEvent.ACTION_MOVE -> {
@@ -107,7 +104,7 @@ internal class InputController(context: Context, private val enqueue: (CameraCom
       lastPrimaryX = x
       lastPrimaryY = y
       if (dx == 0.0 && dy == 0.0) return
-      enqueue(CameraCommand.MoveBy(dx, dy))
+      mapState()?.moveBy(dx, dy)
     }
 
     private fun beginTwoFinger(event: MotionEvent) {
@@ -137,15 +134,15 @@ internal class InputController(context: Context, private val enqueue: (CameraCom
       if (mode == Mode.SCALE_ROTATE) {
         val anchor = screenPoint(current.centroidX, current.centroidY)
         if (scale.isFinite() && abs(scale - 1.0) >= SCALE_EPSILON) {
-          enqueue(CameraCommand.ScaleBy(scale, anchor))
+          mapState()?.scaleBy(scale, anchor)
           changed = true
         }
         if (abs(deltaDegrees) >= ROTATION_EPSILON_DEGREES) {
-          enqueue(CameraCommand.AdjustBearing(-deltaDegrees, anchor))
+          mapState()?.adjustBearing(-deltaDegrees, anchor)
           changed = true
         }
       } else if (mode == Mode.SHOVE && deltaY != 0.0) {
-        enqueue(CameraCommand.AdjustPitch(-deltaY * SHOVE_PITCH_FACTOR))
+        mapState()?.adjustPitch(-deltaY * SHOVE_PITCH_FACTOR)
         changed = true
       }
 
@@ -175,7 +172,7 @@ internal class InputController(context: Context, private val enqueue: (CameraCom
     /** Every path that ends a gesture, including `ACTION_CANCEL`, runs through here. */
     private fun reset() {
       if (mode != Mode.NONE) {
-        enqueue(CameraCommand.SetGestureInProgress(false))
+        mapState()?.setGestureInProgress(false)
       }
       mode = Mode.NONE
       primaryPointerId = MotionEvent.INVALID_POINTER_ID

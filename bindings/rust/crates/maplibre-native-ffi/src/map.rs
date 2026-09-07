@@ -1,67 +1,58 @@
-use std::cell::RefCell;
 use std::fmt;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use maplibre_native_ffi_core as maplibre_core;
-use maplibre_native_ffi_core::ptr::{const_ptr_or_null, mut_ptr_or_null, option_ptr};
-use maplibre_native_ffi_core::values::{
-    empty_lat_lng, empty_lat_lng_bounds as empty_bounds, empty_screen_point, lat_lngs_to_native,
-    screen_points_to_native,
-};
+use maplibre_native_ffi_core::ptr::{const_ptr_or_null, option_ptr};
+use maplibre_native_ffi_core::values::{lat_lngs_to_native, screen_points_to_native};
 use maplibre_native_ffi_sys as sys;
 
-#[cfg(test)]
-use crate::PremultipliedRgba8Image;
 use crate::camera::{
-    AnimationOptionsNativeExt, BoundOptionsNativeExt, CameraFitOptionsNativeExt,
-    CameraOptionsNativeExt, FreeCameraOptionsNativeExt, ProjectionModeNativeExt,
+    BoundOptionsNativeExt, CameraDeltaNativeExt, CameraFitOptionsNativeExt, CameraOptionsNativeExt,
+    CameraUpdateNativeExt, FreeCameraOptionsNativeExt, ProjectionModeNativeExt,
 };
-#[cfg(test)]
-use crate::custom_geometry::CanonicalTileId;
+use crate::completion;
 use crate::events::MapId;
-use crate::handle::{ThreadAffineNativeHandle, closed_handle_error};
+use crate::handle::{ConcurrentNativeHandle, closed_handle_error};
 use crate::options::{MapOptionsNativeExt, MapTileOptionsNativeExt, MapViewportOptionsNativeExt};
 use crate::render::{
     MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalSurfaceDescriptor,
     OpenGLBorrowedTextureDescriptor, OpenGLOwnedTextureDescriptor, OpenGLSurfaceDescriptor,
-    RenderSessionHandle, VulkanBorrowedTextureDescriptor, VulkanOwnedTextureDescriptor,
-    VulkanSurfaceDescriptor, WebGpuBorrowedTextureDescriptor, WebGpuOwnedTextureDescriptor,
-    WebGpuSurfaceDescriptor,
+    RenderSessionAttachOptions, RenderSessionAttachment, RenderSessionHandle,
+    VulkanBorrowedTextureDescriptor, VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
+    WebGpuBorrowedTextureDescriptor, WebGpuOwnedTextureDescriptor, WebGpuSurfaceDescriptor,
 };
 use crate::runtime::{RuntimeHandle, RuntimeState};
 use crate::values::NativeValue;
 use crate::{
-    AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, Error, ErrorKind,
-    FreeCameraOptions, HandleOperationError, LatLng, LatLngBounds, MapDebugOptions, MapOptions,
-    MapProjectionHandle, MapTileOptions, MapViewportOptions, ProjectionMode, Result,
-    RuntimeEventMask, ScreenPoint,
+    BoundOptions, CameraDelta, CameraFitOptions, CameraOptions, CameraSnapshot, CameraUpdate,
+    Error, FreeCameraOptions, HandleOperationError, LatLng, LatLngBounds, MapDebugOptions,
+    MapOptions, MapProjectionHandle, MapTileOptions, MapViewportOptions, NativeFuture,
+    ProjectionMode, Result, RuntimeEventMask, ScreenPoint,
 };
 
 mod style;
 pub use style::{
-    GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind,
-    RasterDemEncoding, SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions,
-    StyleImageTextFit, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo, TileScheme,
-    TileSourceOptions, VectorTileEncoding,
+    GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, SourceInfo,
+    SourceType, StyleImage, StyleImageInfo, StyleImageOptions, StyleImageStretches,
+    StyleImageTextFit, StyleLayerInfo, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo,
+    TileScheme, TileSourceOptions, VectorTileEncoding,
 };
 
 #[derive(Debug)]
 pub(crate) struct MapState {
-    handle: ThreadAffineNativeHandle<sys::mln_map>,
-    runtime: RefCell<Option<Rc<RuntimeState>>>,
+    handle: ConcurrentNativeHandle<sys::mln_map>,
+    runtime: Mutex<Option<Arc<RuntimeState>>>,
     id: MapId,
 }
 
 impl MapState {
-    fn new(native: sys::mln_map, runtime: Rc<RuntimeState>, id: MapId) -> Result<Self> {
-        // SAFETY: native came from successful mln_map_create and is paired with
-        // the matching map destroy function.
-        let handle = unsafe {
-            ThreadAffineNativeHandle::from_handle(native, sys::mln_map_destroy, "mln_map")
-        }?;
+    fn new(native: sys::mln_map, runtime: Arc<RuntimeState>, id: MapId) -> Result<Self> {
+        // SAFETY: native came from a successful typed creation take and map
+        // control state supports calls from any thread.
+        let handle = unsafe { ConcurrentNativeHandle::from_handle(native, "mln_map") }?;
         Ok(Self {
             handle,
-            runtime: RefCell::new(Some(runtime)),
+            runtime: Mutex::new(Some(runtime)),
             id,
         })
     }
@@ -76,27 +67,74 @@ impl MapState {
         self.handle.is_closed()
     }
 
-    fn close(&self) -> Result<()> {
-        // The destroy releases the callback state of this map's custom geometry
-        // sources before it returns.
-        self.handle.close()?;
-        self.runtime.borrow_mut().take();
-        Ok(())
+    fn close(&self) -> Result<NativeFuture<()>> {
+        let teardown = self.handle.close_with(|map| {
+            // SAFETY: map is live and native consumes it only on success. A
+            // rejected release leaves the completion state owned by submit.
+            completion::submit(
+                |completion| unsafe { sys::mln_map_release(map, completion) },
+                completion::unit,
+            )
+        })?;
+        self.runtime
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
+        Ok(teardown.unwrap_or_else(|| completion::ready(())))
     }
 }
 
 impl Drop for MapState {
     fn drop(&mut self) {
-        self.runtime.borrow_mut().take();
-        // A failed destroy, such as one with a render session still attached,
-        // is reported through the leak channel by the handle's own `Drop`.
-        let _ = self.handle.close();
+        if self.close().is_err() {
+            self.handle.leak_for_report();
+        }
     }
 }
 
-/// Owner-thread map handle bound to a retained runtime.
+/// Any-thread map control handle.
+///
+/// An attached render session holds its own reference to this map's native
+/// state, so the map outlives the session even when the host drops its handle
+/// first.
 pub struct MapHandle {
-    pub(crate) inner: Rc<MapState>,
+    pub(crate) inner: Arc<MapState>,
+}
+
+/// Logical map extent in UI pixels and device-pixel scale.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LogicalExtent {
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+}
+
+/// Immutable map state copied from the latest worker publication.
+///
+/// Every committed map command publishes a new generation in its completion,
+/// so a snapshot whose `generation` is at or past that value observes the
+/// commit.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MapSnapshot {
+    pub generation: u64,
+    /// Debug overlay mask committed by [`MapHandle::set_debug_options`].
+    pub debug_options: MapDebugOptions,
+    pub camera: CameraOptions,
+    pub logical_extent: LogicalExtent,
+    pub projection_mode: ProjectionMode,
+    pub viewport: MapViewportOptions,
+    /// True once every requested style and tile resource finished loading.
+    pub fully_loaded: bool,
+    pub rendering_stats_view_enabled: bool,
+    pub repaint_demand: bool,
+    /// True while a gesture opened with [`GesturePhase::Begin`](crate::GesturePhase::Begin)
+    /// is still open.
+    pub gesture_in_progress: bool,
+    pub event_mask: RuntimeEventMask,
+    pub latest_render_update_generation: u64,
+    pub tile: MapTileOptions,
+    pub bounds: BoundOptions,
+    pub free_camera: FreeCameraOptions,
 }
 
 impl fmt::Debug for MapHandle {
@@ -108,23 +146,31 @@ impl fmt::Debug for MapHandle {
 }
 
 impl MapHandle {
-    /// Creates a map with explicit map options on the runtime owner thread.
-    pub fn with_options(runtime: &RuntimeHandle, options: &MapOptions) -> Result<Self> {
+    /// Creates a map on the runtime worker.
+    pub fn with_options(
+        runtime: &RuntimeHandle,
+        options: &MapOptions,
+    ) -> Result<NativeFuture<Self>> {
         let runtime_ptr = runtime.inner.native()?;
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map>::new();
         let raw_options = options.to_native()?;
-
-        // SAFETY: runtime_ptr is a live runtime handle. raw_options is a
-        // materialized map descriptor with size filled by the binding. out is a
-        // valid null-initialized out-pointer owned by this call.
-        maplibre_core::check(unsafe {
-            sys::mln_map_create(runtime_ptr, &raw_options, out.as_mut_ptr())
-        })?;
-        let native = out.get();
-        let id = MapId::new(native.0);
-        let state = Rc::new(MapState::new(native, Rc::clone(&runtime.inner), id)?);
-
-        Ok(Self { inner: state })
+        let runtime_state = Arc::clone(&runtime.inner);
+        crate::completion::submit(
+            // SAFETY: the handle is live and every borrowed argument stays valid for this
+            // synchronous submission.
+            move |completion| unsafe { sys::mln_map_create(runtime_ptr, &raw_options, completion) },
+            move |result| {
+                let native = crate::completion::copy_value::<sys::mln_map>(result)?;
+                if native.0 == 0 {
+                    return Err(Error::invalid_argument(
+                        "map creation returned a null handle",
+                    ));
+                }
+                let id = MapId::new(native.0);
+                Ok(Self {
+                    inner: Arc::new(MapState::new(native, runtime_state, id)?),
+                })
+            },
+        )
     }
 
     /// Returns this map's runtime-local event source identity.
@@ -132,889 +178,775 @@ impl MapHandle {
         self.inner.id
     }
 
-    /// Explicitly destroys the map. A failed destroy leaves the native handle
-    /// live so child handles can keep retaining and closing the map.
+    /// Submits one ordered map command with this map's live handle.
     ///
-    /// Closing discards this map's queued runtime events and its recorded
-    /// loading failure, with no flush and no terminal event. Dropping the
-    /// handle ends the event stream the same way.
-    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
-        if self.inner.is_closed() {
-            return Ok(());
-        }
-        if Rc::strong_count(&self.inner) > 1 {
-            return Err(HandleOperationError::new(
-                Error::new(
-                    ErrorKind::InvalidState,
-                    None,
-                    "MapHandle cannot close while child handles are live",
-                ),
-                self,
-            ));
-        }
+    /// `start` receives the handle and the completion descriptor and calls the
+    /// matching C entry point. Every pointer it passes must stay valid for
+    /// that synchronous call; native copies what it keeps.
+    fn submit_command(
+        &self,
+        start: impl FnOnce(sys::mln_map, *const sys::mln_completion) -> sys::mln_status,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
+        let map = self.inner.native()?;
+        completion::submit_command(|completion| start(map, completion))
+    }
+
+    /// Submits one ordered map query with this map's live handle and converts
+    /// the value its completion carries. `start` has the same contract as in
+    /// [`MapHandle::submit_command`].
+    fn submit_query<T>(
+        &self,
+        start: impl FnOnce(sys::mln_map, *const sys::mln_completion) -> sys::mln_status,
+        convert: impl FnOnce(&sys::mln_completion_result) -> Result<T> + Send + 'static,
+    ) -> Result<NativeFuture<T>>
+    where
+        T: Send + 'static,
+    {
+        let map = self.inner.native()?;
+        completion::submit(|completion| start(map, completion), convert)
+    }
+
+    /// Explicitly releases the map's public handle and reports when native
+    /// retirement finishes.
+    ///
+    /// Native rejects the release while a render session is still attached;
+    /// detach and destroy the session first. Closing an already-closed handle
+    /// resolves immediately.
+    pub fn close(self) -> std::result::Result<NativeFuture<()>, HandleOperationError<Self>> {
         self.inner
             .close()
             .map_err(|error| HandleOperationError::new(error, self))
     }
 
-    /// Requests a repaint for a continuous map.
-    pub fn request_repaint(&self) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is a live map handle owned by this wrapper.
-        maplibre_core::check(unsafe { sys::mln_map_request_repaint(map) })
+    /// Closes this map and waits for retirement when the test target permits a
+    /// synchronous wait.
+    #[cfg(test)]
+    pub(crate) fn close_and_wait(self) {
+        let completion = self
+            .close()
+            .map_err(HandleOperationError::into_error)
+            .expect("native close submission failed");
+        #[cfg(not(target_os = "emscripten"))]
+        completion::blocking(Ok(completion));
+        // Emscripten graphics teardown can require the test's pthread. The
+        // browser runner isolates every integration test in its own process,
+        // which provides the resource boundary without blocking that thread.
+        #[cfg(target_os = "emscripten")]
+        drop(completion);
     }
 
-    /// Requests one still image for a static or tile map.
-    pub fn request_still_image(&self) -> Result<()> {
+    /// Copies the latest immutable map publication.
+    pub fn snapshot(&self) -> Result<MapSnapshot> {
         let map = self.inner.native()?;
-        // SAFETY: map is a live map handle owned by this wrapper.
-        maplibre_core::check(unsafe { sys::mln_map_request_still_image(map) })
+        // SAFETY: every nested constructor takes no arguments and initializes
+        // this ABI version's descriptor.
+        let mut raw = unsafe {
+            sys::mln_map_snapshot {
+                size: std::mem::size_of::<sys::mln_map_snapshot>() as u32,
+                debug_options: 0,
+                generation: 0,
+                camera: sys::mln_camera_options_default(),
+                logical_extent: sys::mln_logical_extent {
+                    width: 0,
+                    height: 0,
+                    scale_factor: 0.0,
+                },
+                projection_mode: sys::mln_projection_mode_default(),
+                viewport: sys::mln_map_viewport_options_default(),
+                fully_loaded: false,
+                rendering_stats_view_enabled: false,
+                repaint_demand: false,
+                gesture_in_progress: false,
+                event_mask: 0,
+                latest_render_update_generation: 0,
+                tile: sys::mln_map_tile_options_default(),
+                bounds: sys::mln_bound_options_default(),
+                free_camera: sys::mln_free_camera_options_default(),
+            }
+        };
+        // SAFETY: map is live and raw is a size-tagged writable descriptor.
+        maplibre_core::check(unsafe { sys::mln_map_snapshot_get(map, &mut raw) })?;
+        Ok(MapSnapshot {
+            generation: raw.generation,
+            debug_options: MapDebugOptions::from_bits_retain(raw.debug_options),
+            camera: CameraOptions::from_native(raw.camera),
+            logical_extent: LogicalExtent {
+                width: raw.logical_extent.width,
+                height: raw.logical_extent.height,
+                scale_factor: raw.logical_extent.scale_factor,
+            },
+            projection_mode: ProjectionMode::from_native(raw.projection_mode),
+            viewport: MapViewportOptions::from_native(raw.viewport),
+            fully_loaded: raw.fully_loaded,
+            rendering_stats_view_enabled: raw.rendering_stats_view_enabled,
+            repaint_demand: raw.repaint_demand,
+            gesture_in_progress: raw.gesture_in_progress,
+            event_mask: RuntimeEventMask::from_bits_retain(raw.event_mask),
+            latest_render_update_generation: raw.latest_render_update_generation,
+            tile: MapTileOptions::from_native(raw.tile),
+            bounds: BoundOptions::from_native(raw.bounds),
+            free_camera: FreeCameraOptions::from_native(raw.free_camera),
+        })
     }
 
-    /// Selects which map-originated event types this map queues.
+    /// Submits the map's logical extent update.
     ///
-    /// A map reads the bits in
-    /// [`RuntimeEventMask::ALL_MAP_EVENTS`](crate::RuntimeEventMask::ALL_MAP_EVENTS),
-    /// so [`RuntimeEventMask::ALL`](crate::RuntimeEventMask::ALL) selects every
-    /// map-originated type. Narrowing gates later events and keeps queued ones.
-    /// A bit outside `ALL` is an invalid-argument error.
-    pub fn set_event_mask(&self, mask: RuntimeEventMask) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is live. The C API validates unknown mask bits.
-        maplibre_core::check(unsafe { sys::mln_map_set_event_mask(map, mask.bits()) })
+    /// `extent.scale_factor` is fixed when the map is created: an extent that
+    /// carries a different scale factor is rejected with an invalid-argument
+    /// error, and only the width and height change. While a render session is
+    /// attached, resize through [`RenderSessionHandle::resize`], which submits
+    /// this command itself; a direct map resize to a different extent leaves
+    /// the session waiting for an update the map never publishes.
+    pub fn resize(&self, extent: LogicalExtent) -> Result<NativeFuture<crate::CommandCompletion>> {
+        let raw = sys::mln_logical_extent {
+            width: extent.width,
+            height: extent.height,
+            scale_factor: extent.scale_factor,
+        };
+        // SAFETY: map is live for this synchronous submission.
+        self.submit_command(move |map, completion| unsafe {
+            sys::mln_map_resize(map, raw, completion)
+        })
     }
 
-    /// Reports which map-originated event types this map queues, starting from
-    /// the mask its creation options selected.
-    pub fn event_mask(&self) -> Result<RuntimeEventMask> {
-        let map = self.inner.native()?;
-        let mut raw = 0;
-        // SAFETY: map is live and out_mask points to writable u64 storage.
-        maplibre_core::check(unsafe { sys::mln_map_get_event_mask(map, &mut raw) })?;
-        Ok(RuntimeEventMask::from_bits_retain(raw))
+    /// Requests a continuous-map repaint and returns its completion future.
+    pub fn request_repaint(&self) -> Result<NativeFuture<crate::CommandCompletion>> {
+        // SAFETY: map is live for this synchronous submission.
+        self.submit_command(move |map, completion| unsafe {
+            sys::mln_map_request_repaint(map, completion)
+        })
     }
 
-    /// Applies MapLibre debug overlay mask bits.
-    pub fn set_debug_options(&self, options: MapDebugOptions) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is live. The C API validates unknown mask bits.
-        maplibre_core::check(unsafe { sys::mln_map_set_debug_options(map, options.bits()) })
+    /// Starts one noncoalescing still-image operation.
+    ///
+    /// The map must be in [`MapMode::Static`](crate::MapMode::Static) or
+    /// [`MapMode::Tile`](crate::MapMode::Tile). A still image already pending
+    /// fails the returned future with an invalid-state error rather than the
+    /// submission.
+    pub fn request_still_image(&self) -> Result<NativeFuture<()>> {
+        // SAFETY: map is live for this synchronous submission.
+        self.submit_query(
+            move |map, completion| unsafe { sys::mln_map_request_still_image(map, completion) },
+            crate::completion::unit,
+        )
     }
 
-    /// Reads MapLibre debug overlay mask bits.
-    pub fn debug_options(&self) -> Result<MapDebugOptions> {
+    /// Copies the latest published camera without entering the runtime queue.
+    pub fn camera_snapshot(&self) -> Result<CameraSnapshot> {
         let map = self.inner.native()?;
-        let mut raw = 0;
-        // SAFETY: map is live and out_options points to writable u32 storage.
-        maplibre_core::check(unsafe { sys::mln_map_get_debug_options(map, &mut raw) })?;
-        Ok(MapDebugOptions::from_bits_retain(raw))
-    }
-
-    /// Enables or disables MapLibre's rendering stats overlay view.
-    pub fn set_rendering_stats_view_enabled(&self, enabled: bool) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is live and enabled is passed by value.
-        maplibre_core::check(unsafe { sys::mln_map_set_rendering_stats_view_enabled(map, enabled) })
-    }
-
-    /// Reads whether MapLibre's rendering stats overlay view is enabled.
-    pub fn rendering_stats_view_enabled(&self) -> Result<bool> {
-        let map = self.inner.native()?;
-        let mut enabled = false;
-        // SAFETY: map is live and out_enabled points to writable bool storage.
+        // SAFETY: the constructor initializes this ABI version's descriptor.
+        let mut camera = unsafe { sys::mln_camera_options_default() };
+        let mut generation = 0;
+        // SAFETY: map is live and both outputs are writable.
         maplibre_core::check(unsafe {
-            sys::mln_map_get_rendering_stats_view_enabled(map, &mut enabled)
+            sys::mln_map_camera_snapshot_get(map, &mut camera, &mut generation)
         })?;
-        Ok(enabled)
+        Ok(CameraSnapshot {
+            generation,
+            camera: CameraOptions::from_native(camera),
+        })
     }
 
-    /// Reads whether MapLibre currently considers the map fully loaded.
-    pub fn is_fully_loaded(&self) -> Result<bool> {
-        let map = self.inner.native()?;
-        let mut loaded = false;
-        // SAFETY: map is live and out_loaded points to writable bool storage.
-        maplibre_core::check(unsafe { sys::mln_map_is_fully_loaded(map, &mut loaded) })?;
-        Ok(loaded)
+    /// Submits one copied atomic camera update.
+    pub fn update_camera(
+        &self,
+        update: &CameraUpdate,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
+        let raw = update.to_native();
+        // SAFETY: map is live and every borrowed argument stays valid for this synchronous
+        // submission.
+        self.submit_command(move |map, completion| unsafe {
+            sys::mln_map_update_camera(map, &raw, completion)
+        })
     }
 
-    /// Dumps map debug logs through MapLibre Native logging.
-    pub fn dump_debug_logs(&self) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is live.
-        maplibre_core::check(unsafe { sys::mln_map_dump_debug_logs(map) })
+    /// Submits one relative camera update.
+    pub fn apply_camera_delta(
+        &self,
+        delta: &CameraDelta,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
+        let raw = delta.to_native();
+        // SAFETY: map is live and every borrowed argument stays valid for this synchronous
+        // submission.
+        self.submit_command(move |map, completion| unsafe {
+            sys::mln_map_apply_camera_delta(map, &raw, completion)
+        })
     }
 
-    /// Reads the map's logical viewport size in UI pixels and its pixel ratio.
-    /// The scale factor is fixed for the lifetime of the map and independent of
-    /// any render target's scale factor.
-    pub fn size(&self) -> Result<(u32, u32, f64)> {
-        let map = self.inner.native()?;
-        let mut width = 0u32;
-        let mut height = 0u32;
-        let mut scale_factor = 0f64;
-        // SAFETY: map is live and all three out pointers reference live locals
-        // for the duration of the call.
-        maplibre_core::check(unsafe {
-            sys::mln_map_get_size(map, &mut width, &mut height, &mut scale_factor)
-        })?;
-        Ok((width, height, scale_factor))
+    /// Starts an ordered camera query.
+    pub fn camera_query(&self) -> Result<NativeFuture<CameraSnapshot>> {
+        // SAFETY: map is live for this synchronous submission.
+        self.submit_query(
+            move |map, completion| unsafe { sys::mln_map_camera_query(map, completion) },
+            |result| {
+                let value = crate::completion::copy_value::<sys::mln_camera_query_result>(result)?;
+                Ok(CameraSnapshot {
+                    generation: value.generation,
+                    camera: CameraOptions::from_native(value.camera),
+                })
+            },
+        )
     }
 
-    /// Reads live viewport and render-transform controls.
-    pub fn viewport_options(&self) -> Result<MapViewportOptions> {
-        let map = self.inner.native()?;
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_map_viewport_options_default() };
-        // SAFETY: map is live and raw has a valid size field for C to fill.
-        maplibre_core::check(unsafe { sys::mln_map_get_viewport_options(map, &mut raw) })?;
-        Ok(MapViewportOptions::from_native(raw))
+    /// Selects which map-originated event types this map queues and returns the
+    /// completion future.
+    pub fn set_event_mask(
+        &self,
+        mask: RuntimeEventMask,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
+        // SAFETY: map is live for this synchronous submission.
+        self.submit_command(move |map, completion| unsafe {
+            sys::mln_map_set_event_mask(map, mask.bits(), completion)
+        })
     }
 
-    /// Applies selected live viewport and render-transform controls.
-    pub fn set_viewport_options(&self, options: &MapViewportOptions) -> Result<()> {
-        let map = self.inner.native()?;
+    /// Submits a debug-overlay command.
+    ///
+    /// The committed mask is visible as [`MapSnapshot::debug_options`].
+    pub fn set_debug_options(
+        &self,
+        options: MapDebugOptions,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
+        // SAFETY: map is live for this synchronous submission.
+        self.submit_command(move |map, completion| unsafe {
+            sys::mln_map_set_debug_options(map, options.bits(), completion)
+        })
+    }
+
+    /// Submits a rendering-stats visibility command.
+    ///
+    /// The committed value is visible as
+    /// [`MapSnapshot::rendering_stats_view_enabled`].
+    pub fn set_rendering_stats_view_enabled(
+        &self,
+        enabled: bool,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
+        // SAFETY: map is live for this synchronous submission.
+        self.submit_command(move |map, completion| unsafe {
+            sys::mln_map_set_rendering_stats_view_enabled(map, enabled, completion)
+        })
+    }
+
+    /// Submits a command that writes this map's debug state through MapLibre
+    /// Native logging.
+    pub fn dump_debug_logs(&self) -> Result<NativeFuture<crate::CommandCompletion>> {
+        // SAFETY: map is live for this synchronous submission.
+        self.submit_command(|map, completion| unsafe {
+            sys::mln_map_dump_debug_logs(map, completion)
+        })
+    }
+
+    /// Submits a command that ends every running camera transition where it
+    /// stands.
+    ///
+    /// A cancelled transition that carried a transition ID reports its end
+    /// through a camera-transition-finished event, the same way a completed
+    /// one does. Cancelling with no transition running commits and changes
+    /// nothing.
+    pub fn cancel_transitions(&self) -> Result<NativeFuture<crate::CommandCompletion>> {
+        // SAFETY: map is live for this synchronous submission.
+        self.submit_command(|map, completion| unsafe {
+            sys::mln_map_cancel_transitions(map, completion)
+        })
+    }
+
+    /// Submits a viewport-options command; the committed options are visible
+    /// as [`MapSnapshot::viewport`].
+    pub fn set_viewport_options(
+        &self,
+        options: &MapViewportOptions,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
         let raw = options.to_native();
-        // SAFETY: map is live and raw is a materialized descriptor valid for
-        // the duration of this call.
-        maplibre_core::check(unsafe { sys::mln_map_set_viewport_options(map, &raw) })
+        // SAFETY: map is live and every borrowed argument stays valid for this synchronous
+        // submission.
+        self.submit_command(move |map, completion| unsafe {
+            sys::mln_map_set_viewport_options(map, &raw, completion)
+        })
     }
 
-    /// Reads tile prefetch and LOD tuning controls.
-    pub fn tile_options(&self) -> Result<MapTileOptions> {
-        let map = self.inner.native()?;
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_map_tile_options_default() };
-        // SAFETY: map is live and raw has a valid size field for C to fill.
-        maplibre_core::check(unsafe { sys::mln_map_get_tile_options(map, &mut raw) })?;
-        Ok(MapTileOptions::from_native(raw))
-    }
-
-    /// Applies selected tile prefetch and LOD tuning controls.
-    pub fn set_tile_options(&self, options: &MapTileOptions) -> Result<()> {
-        let map = self.inner.native()?;
+    /// Submits a tile-options command; the committed options are visible as
+    /// [`MapSnapshot::tile`].
+    pub fn set_tile_options(
+        &self,
+        options: &MapTileOptions,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
         let raw = options.to_native();
-        // SAFETY: map is live and raw is a materialized descriptor valid for
-        // the duration of this call.
-        maplibre_core::check(unsafe { sys::mln_map_set_tile_options(map, &raw) })
+        // SAFETY: map is live and every borrowed argument stays valid for this synchronous
+        // submission.
+        self.submit_command(move |map, completion| unsafe {
+            sys::mln_map_set_tile_options(map, &raw, completion)
+        })
     }
 
-    /// Reads the current camera snapshot.
-    pub fn camera(&self) -> Result<CameraOptions> {
-        let map = self.inner.native()?;
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_camera_options_default() };
-        // SAFETY: map is live and raw has a valid size field for C to fill.
-        maplibre_core::check(unsafe { sys::mln_map_get_camera(map, &mut raw) })?;
-        Ok(CameraOptions::from_native(raw))
-    }
-
-    /// Applies a camera jump command.
-    pub fn jump_to(&self, camera: &CameraOptions) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw = camera.to_native();
-        // SAFETY: map is live and raw is a materialized descriptor valid for
-        // the duration of this call.
-        maplibre_core::check(unsafe { sys::mln_map_jump_to(map, &raw) })
-    }
-
-    /// Applies a camera ease transition command. An absent `animation`, or one
-    /// with no duration, reaches the target before this call returns.
-    pub fn ease_to(
+    /// Submits a camera-constraint command; the committed constraints are
+    /// visible as [`MapSnapshot::bounds`].
+    pub fn set_bounds(
         &self,
-        camera: &CameraOptions,
-        animation: Option<&AnimationOptions>,
-    ) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw_camera = camera.to_native();
-        let raw_animation = animation.map(AnimationOptions::to_native);
-        // SAFETY: map is live and descriptors are valid for this call. A null
-        // animation pointer requests native defaults.
-        maplibre_core::check(unsafe {
-            sys::mln_map_ease_to(map, &raw_camera, option_ptr(raw_animation.as_ref()))
+        options: &BoundOptions,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
+        let raw = options.to_native();
+        // SAFETY: map is live and every borrowed argument stays valid for this synchronous
+        // submission.
+        self.submit_command(move |map, completion| unsafe {
+            sys::mln_map_set_bounds(map, &raw, completion)
         })
     }
 
-    /// Applies a camera fly transition command. Fly animates by default, so the
-    /// camera is still en route when this call returns and advances as the
-    /// runtime is pumped.
-    pub fn fly_to(
+    /// Submits a free-camera command; the committed options are visible as
+    /// [`MapSnapshot::free_camera`].
+    pub fn set_free_camera_options(
         &self,
-        camera: &CameraOptions,
-        animation: Option<&AnimationOptions>,
-    ) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw_camera = camera.to_native();
-        let raw_animation = animation.map(AnimationOptions::to_native);
-        // SAFETY: map is live and descriptors are valid for this call. A null
-        // animation pointer requests native defaults.
-        maplibre_core::check(unsafe {
-            sys::mln_map_fly_to(map, &raw_camera, option_ptr(raw_animation.as_ref()))
+        options: &FreeCameraOptions,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
+        let raw = options.to_native();
+        // SAFETY: map is live and every borrowed argument stays valid for this synchronous
+        // submission.
+        self.submit_command(move |map, completion| unsafe {
+            sys::mln_map_set_free_camera_options(map, &raw, completion)
         })
     }
 
-    /// Applies a screen-space pan command.
-    pub fn move_by(&self, delta_x: f64, delta_y: f64) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is live. The C API validates numeric values.
-        maplibre_core::check(unsafe { sys::mln_map_move_by(map, delta_x, delta_y) })
-    }
-
-    /// Applies an animated screen-space pan command.
-    /// An absent `animation`, or one with no duration, applies the pan
-    /// instantly.
-    pub fn move_by_animated(
+    /// Submits a projection-mode command; the committed mode is visible as
+    /// [`MapSnapshot::projection_mode`].
+    pub fn set_projection_mode(
         &self,
-        delta_x: f64,
-        delta_y: f64,
-        animation: Option<&AnimationOptions>,
-    ) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw_animation = animation.map(AnimationOptions::to_native);
-        // SAFETY: map is live and the optional animation descriptor is valid
-        // for this call. The C API validates numeric values.
-        maplibre_core::check(unsafe {
-            sys::mln_map_move_by_animated(map, delta_x, delta_y, option_ptr(raw_animation.as_ref()))
+        mode: &ProjectionMode,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
+        let raw = mode.to_native();
+        // SAFETY: map is live and every borrowed argument stays valid for this synchronous
+        // submission.
+        self.submit_command(move |map, completion| unsafe {
+            sys::mln_map_set_projection_mode(map, &raw, completion)
         })
     }
 
-    /// Applies a screen-space zoom command.
-    pub fn scale_by(&self, scale: f64, anchor: Option<ScreenPoint>) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw_anchor = anchor.map(ScreenPoint::to_native);
-        // SAFETY: map is live and the optional anchor pointer is valid for this
-        // call. The C API validates numeric values.
-        maplibre_core::check(unsafe {
-            sys::mln_map_scale_by(map, scale, option_ptr(raw_anchor.as_ref()))
-        })
-    }
-
-    /// Applies an animated screen-space zoom command.
-    /// An absent `animation`, or one with no duration, applies the zoom
-    /// instantly.
-    pub fn scale_by_animated(
-        &self,
-        scale: f64,
-        anchor: Option<ScreenPoint>,
-        animation: Option<&AnimationOptions>,
-    ) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw_anchor = anchor.map(ScreenPoint::to_native);
-        let raw_animation = animation.map(AnimationOptions::to_native);
-        // SAFETY: map is live and optional descriptors are valid for this call.
-        // The C API validates numeric values.
-        maplibre_core::check(unsafe {
-            sys::mln_map_scale_by_animated(
-                map,
-                scale,
-                option_ptr(raw_anchor.as_ref()),
-                option_ptr(raw_animation.as_ref()),
-            )
-        })
-    }
-
-    /// Applies a screen-space rotate command.
-    pub fn rotate_by(&self, first: ScreenPoint, second: ScreenPoint) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is live. Points are passed by value and validated by C.
-        maplibre_core::check(unsafe {
-            sys::mln_map_rotate_by(map, first.to_native(), second.to_native())
-        })
-    }
-
-    /// Applies an animated screen-space rotate command.
-    /// An absent `animation`, or one with no duration, applies the rotation
-    /// instantly.
-    pub fn rotate_by_animated(
-        &self,
-        first: ScreenPoint,
-        second: ScreenPoint,
-        animation: Option<&AnimationOptions>,
-    ) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw_animation = animation.map(AnimationOptions::to_native);
-        // SAFETY: map is live and optional animation descriptor is valid for
-        // this call. Points are passed by value and validated by C.
-        maplibre_core::check(unsafe {
-            sys::mln_map_rotate_by_animated(
-                map,
-                first.to_native(),
-                second.to_native(),
-                option_ptr(raw_animation.as_ref()),
-            )
-        })
-    }
-
-    /// Applies a pitch delta command.
-    pub fn pitch_by(&self, pitch: f64) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is live. The C API validates numeric values.
-        maplibre_core::check(unsafe { sys::mln_map_pitch_by(map, pitch) })
-    }
-
-    /// Applies an animated pitch delta command.
-    /// An absent `animation`, or one with no duration, applies the pitch
-    /// instantly.
-    pub fn pitch_by_animated(
-        &self,
-        pitch: f64,
-        animation: Option<&AnimationOptions>,
-    ) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw_animation = animation.map(AnimationOptions::to_native);
-        // SAFETY: map is live and optional animation descriptor is valid for
-        // this call. The C API validates numeric values.
-        maplibre_core::check(unsafe {
-            sys::mln_map_pitch_by_animated(map, pitch, option_ptr(raw_animation.as_ref()))
-        })
-    }
-
-    /// Cancels active camera transitions.
-    pub fn cancel_transitions(&self) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is live.
-        maplibre_core::check(unsafe { sys::mln_map_cancel_transitions(map) })
-    }
-
-    /// Marks whether a host-driven gesture is in progress. The flag stays set
-    /// until the host clears it, so pair every `true` with a `false`.
-    pub fn set_gesture_in_progress(&self, in_progress: bool) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is live and in_progress is passed by value.
-        maplibre_core::check(unsafe { sys::mln_map_set_gesture_in_progress(map, in_progress) })
-    }
-
-    /// Reads whether a host-driven gesture is currently in progress.
-    pub fn is_gesture_in_progress(&self) -> Result<bool> {
-        let map = self.inner.native()?;
-        let mut in_progress = false;
-        // SAFETY: map is live and out_in_progress points to writable bool
-        // storage.
-        maplibre_core::check(unsafe {
-            sys::mln_map_is_gesture_in_progress(map, &mut in_progress)
-        })?;
-        Ok(in_progress)
-    }
-
-    /// Computes a camera that fits geographic bounds in the current viewport.
+    /// Starts a query for the camera that fits `bounds`.
     pub fn camera_for_lat_lng_bounds(
         &self,
         bounds: LatLngBounds,
         fit_options: Option<&CameraFitOptions>,
-    ) -> Result<CameraOptions> {
-        let map = self.inner.native()?;
-        let raw_fit = fit_options.map(CameraFitOptions::to_native);
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw_camera = unsafe { sys::mln_camera_options_default() };
-        // SAFETY: map is live, bounds is passed by value, optional fit options
-        // are valid for this call, and raw_camera is writable.
-        maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_lat_lng_bounds(
-                map,
-                bounds.to_native(),
-                option_ptr(raw_fit.as_ref()),
-                &mut raw_camera,
-            )
-        })?;
-        Ok(CameraOptions::from_native(raw_camera))
+    ) -> Result<NativeFuture<CameraOptions>> {
+        let fit = fit_options.map(CameraFitOptions::to_native);
+        // SAFETY: map is live and every borrowed argument stays valid for this synchronous
+        // submission.
+        self.submit_query(
+            move |map, completion| unsafe {
+                sys::mln_map_camera_for_lat_lng_bounds(
+                    map,
+                    bounds.to_native(),
+                    option_ptr(fit.as_ref()),
+                    completion,
+                )
+            },
+            |result| {
+                Ok(CameraOptions::from_native(crate::completion::copy_value(
+                    result,
+                )?))
+            },
+        )
     }
 
-    /// Computes a camera that fits geographic coordinates in the current viewport.
+    /// Starts a query for the camera that fits every coordinate.
+    ///
+    /// An empty slice is rejected before the call reaches native.
     pub fn camera_for_lat_lngs(
         &self,
         coordinates: &[LatLng],
         fit_options: Option<&CameraFitOptions>,
-    ) -> Result<CameraOptions> {
-        let map = self.inner.native()?;
+    ) -> Result<NativeFuture<CameraOptions>> {
         if coordinates.is_empty() {
             return Err(Error::invalid_argument(
                 "camera_for_lat_lngs requires at least one coordinate",
             ));
         }
-        let raw_coordinates = lat_lngs_to_native(coordinates);
-        let raw_fit = fit_options.map(CameraFitOptions::to_native);
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw_camera = unsafe { sys::mln_camera_options_default() };
-        // SAFETY: map is live, arrays are valid for coordinate_count non-empty
-        // entries, optional fit options are valid, and raw_camera is writable.
-        maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_lat_lngs(
-                map,
-                const_ptr_or_null(&raw_coordinates),
-                raw_coordinates.len(),
-                option_ptr(raw_fit.as_ref()),
-                &mut raw_camera,
-            )
-        })?;
-        Ok(CameraOptions::from_native(raw_camera))
+        let coordinates = lat_lngs_to_native(coordinates);
+        let fit = fit_options.map(CameraFitOptions::to_native);
+        // SAFETY: map is live and every borrowed argument stays valid for this synchronous
+        // submission.
+        self.submit_query(
+            move |map, completion| unsafe {
+                sys::mln_map_camera_for_lat_lngs(
+                    map,
+                    const_ptr_or_null(&coordinates),
+                    coordinates.len(),
+                    option_ptr(fit.as_ref()),
+                    completion,
+                )
+            },
+            |result| {
+                Ok(CameraOptions::from_native(crate::completion::copy_value(
+                    result,
+                )?))
+            },
+        )
     }
 
-    /// Computes a camera that fits a geometry in the current viewport.
+    /// Starts a query for the camera that fits one GeoJSON geometry, whose
+    /// bytes are copied before this returns.
     pub fn camera_for_geometry(
         &self,
         geometry: &[u8],
         fit_options: Option<&CameraFitOptions>,
-    ) -> Result<CameraOptions> {
-        let map = self.inner.native()?;
-        let native_geometry = maplibre_core::string::buffer_view(geometry);
-        let raw_fit = fit_options.map(CameraFitOptions::to_native);
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw_camera = unsafe { sys::mln_camera_options_default() };
-        // SAFETY: map is live, native_geometry owns backing storage for the
-        // duration of this call, optional fit options are valid, and raw_camera
-        // is writable.
-        maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_geometry(
-                map,
-                native_geometry,
-                option_ptr(raw_fit.as_ref()),
-                &mut raw_camera,
-            )
-        })?;
-        Ok(CameraOptions::from_native(raw_camera))
+    ) -> Result<NativeFuture<CameraOptions>> {
+        let fit = fit_options.map(CameraFitOptions::to_native);
+        let geometry = geometry.to_vec();
+        // SAFETY: map is live and every borrowed argument stays valid for this synchronous
+        // submission.
+        self.submit_query(
+            move |map, completion| unsafe {
+                sys::mln_map_camera_for_geometry(
+                    map,
+                    maplibre_core::string::buffer_view(&geometry),
+                    option_ptr(fit.as_ref()),
+                    completion,
+                )
+            },
+            |result| {
+                Ok(CameraOptions::from_native(crate::completion::copy_value(
+                    result,
+                )?))
+            },
+        )
     }
 
-    /// Computes geographic bounds for a camera from two viewport corners.
-    ///
-    /// The box is the hull of the top-left and bottom-right screen corners for
-    /// that camera in the current viewport. When bearing and pitch are zero, the
-    /// box equals the visible area. Those corners are the northwest and
-    /// southeast of the viewport. Longitudes stay in -180 to 180.
-    pub fn lat_lng_bounds_for_camera(&self, camera: &CameraOptions) -> Result<LatLngBounds> {
-        let map = self.inner.native()?;
-        let raw_camera = camera.to_native();
-        let mut raw_bounds = empty_bounds();
-        // SAFETY: map is live, raw_camera is a valid descriptor for this call,
-        // and raw_bounds points to writable storage.
-        maplibre_core::check(unsafe {
-            sys::mln_map_lat_lng_bounds_for_camera(map, &raw_camera, &mut raw_bounds)
-        })?;
-        Ok(LatLngBounds::from_native(raw_bounds))
+    fn bounds_for_camera(
+        &self,
+        camera: &CameraOptions,
+        unwrapped: bool,
+    ) -> Result<NativeFuture<LatLngBounds>> {
+        let camera = camera.to_native();
+        // SAFETY: map is live and every borrowed argument stays valid for this synchronous
+        // submission.
+        self.submit_query(
+            move |map, completion| unsafe {
+                if unwrapped {
+                    sys::mln_map_lat_lng_bounds_for_camera_unwrapped(map, &camera, completion)
+                } else {
+                    sys::mln_map_lat_lng_bounds_for_camera(map, &camera, completion)
+                }
+            },
+            |result| {
+                Ok(LatLngBounds::from_native(crate::completion::copy_value(
+                    result,
+                )?))
+            },
+        )
     }
 
-    /// Computes geographic bounds for a camera from the four viewport corners.
-    ///
-    /// The axis-aligned hull of all four screen corners and the center
-    /// encompasses the projected viewport. Longitudes unwrap onto the shortest
-    /// path through the center. A viewport that crosses the antimeridian reports
-    /// values outside -180 to 180.
+    /// Starts a query for the bounds a camera sees, with each longitude
+    /// wrapped to the range from -180 to 180 degrees.
+    pub fn lat_lng_bounds_for_camera(
+        &self,
+        camera: &CameraOptions,
+    ) -> Result<NativeFuture<LatLngBounds>> {
+        self.bounds_for_camera(camera, false)
+    }
+
+    /// Starts a query for the bounds a camera sees, preserving the visible
+    /// world copy so a longitude may fall outside -180 to 180.
     pub fn lat_lng_bounds_for_camera_unwrapped(
         &self,
         camera: &CameraOptions,
-    ) -> Result<LatLngBounds> {
-        let map = self.inner.native()?;
-        let raw_camera = camera.to_native();
-        let mut raw_bounds = empty_bounds();
-        // SAFETY: map is live, raw_camera is a valid descriptor for this call,
-        // and raw_bounds points to writable storage.
-        maplibre_core::check(unsafe {
-            sys::mln_map_lat_lng_bounds_for_camera_unwrapped(map, &raw_camera, &mut raw_bounds)
-        })?;
-        Ok(LatLngBounds::from_native(raw_bounds))
+    ) -> Result<NativeFuture<LatLngBounds>> {
+        self.bounds_for_camera(camera, true)
     }
 
-    /// Reads map camera constraint options.
-    pub fn bounds(&self) -> Result<BoundOptions> {
-        let map = self.inner.native()?;
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_bound_options_default() };
-        // SAFETY: map is live and raw has a valid size field for C to fill.
-        maplibre_core::check(unsafe { sys::mln_map_get_bounds(map, &mut raw) })?;
-        Ok(BoundOptions::from_native(raw))
+    /// Starts a query converting a geographic coordinate to a screen point.
+    pub fn pixel_for_lat_lng(&self, coordinate: LatLng) -> Result<NativeFuture<ScreenPoint>> {
+        // SAFETY: map is live for this synchronous submission.
+        self.submit_query(
+            move |map, completion| unsafe {
+                sys::mln_map_pixel_for_lat_lng(map, coordinate.to_native(), completion)
+            },
+            |result| {
+                Ok(ScreenPoint::from_native(crate::completion::copy_value(
+                    result,
+                )?))
+            },
+        )
     }
 
-    /// Applies selected map camera constraint options.
-    pub fn set_bounds(&self, options: &BoundOptions) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw = options.to_native();
-        // SAFETY: map is live and raw is a valid descriptor for this call.
-        maplibre_core::check(unsafe { sys::mln_map_set_bounds(map, &raw) })
+    fn coordinate_for_pixel(
+        &self,
+        point: ScreenPoint,
+        unwrapped: bool,
+    ) -> Result<NativeFuture<LatLng>> {
+        // SAFETY: map is live for this synchronous submission.
+        self.submit_query(
+            move |map, completion| unsafe {
+                if unwrapped {
+                    sys::mln_map_lat_lng_for_pixel_unwrapped(map, point.to_native(), completion)
+                } else {
+                    sys::mln_map_lat_lng_for_pixel(map, point.to_native(), completion)
+                }
+            },
+            |result| Ok(LatLng::from_native(crate::completion::copy_value(result)?)),
+        )
     }
 
-    /// Reads the current free camera position and orientation.
-    pub fn free_camera_options(&self) -> Result<FreeCameraOptions> {
-        let map = self.inner.native()?;
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_free_camera_options_default() };
-        // SAFETY: map is live and raw has a valid size field for C to fill.
-        maplibre_core::check(unsafe { sys::mln_map_get_free_camera_options(map, &mut raw) })?;
-        Ok(FreeCameraOptions::from_native(raw))
+    fn coordinates_for_pixels(
+        &self,
+        points: &[ScreenPoint],
+        unwrapped: bool,
+    ) -> Result<NativeFuture<Vec<LatLng>>> {
+        let points = screen_points_to_native(points);
+        // SAFETY: map is live and every borrowed argument stays valid for this synchronous
+        // submission.
+        self.submit_query(
+            move |map, completion| unsafe {
+                if unwrapped {
+                    sys::mln_map_lat_lngs_for_pixels_unwrapped(
+                        map,
+                        const_ptr_or_null(&points),
+                        points.len(),
+                        completion,
+                    )
+                } else {
+                    sys::mln_map_lat_lngs_for_pixels(
+                        map,
+                        const_ptr_or_null(&points),
+                        points.len(),
+                        completion,
+                    )
+                }
+            },
+            |result| {
+                Ok(crate::completion::copy_slice::<sys::mln_lat_lng>(result)?
+                    .into_iter()
+                    .map(LatLng::from_native)
+                    .collect())
+            },
+        )
     }
 
-    /// Applies selected free camera position and orientation fields.
-    pub fn set_free_camera_options(&self, options: &FreeCameraOptions) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw = options.to_native();
-        // SAFETY: map is live and raw is a valid descriptor for this call.
-        maplibre_core::check(unsafe { sys::mln_map_set_free_camera_options(map, &raw) })
-    }
-
-    /// Reads current axonometric rendering options.
-    pub fn projection_mode(&self) -> Result<ProjectionMode> {
-        let map = self.inner.native()?;
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_projection_mode_default() };
-        // SAFETY: map is live and raw has a valid size field for C to fill.
-        maplibre_core::check(unsafe { sys::mln_map_get_projection_mode(map, &mut raw) })?;
-        Ok(ProjectionMode::from_native(raw))
-    }
-
-    /// Applies selected axonometric rendering option fields.
-    pub fn set_projection_mode(&self, mode: &ProjectionMode) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw = mode.to_native();
-        // SAFETY: map is live and raw is a valid descriptor for this call.
-        maplibre_core::check(unsafe { sys::mln_map_set_projection_mode(map, &raw) })
-    }
-
-    /// Converts a geographic world coordinate to a screen point for the current map.
-    pub fn pixel_for_lat_lng(&self, coordinate: LatLng) -> Result<ScreenPoint> {
-        let map = self.inner.native()?;
-        let mut raw_point = empty_screen_point();
-        // SAFETY: map is live, coordinate is passed by value, and raw_point is
-        // writable storage for the output.
-        maplibre_core::check(unsafe {
-            sys::mln_map_pixel_for_lat_lng(map, coordinate.to_native(), &mut raw_point)
-        })?;
-        Ok(ScreenPoint::from_native(raw_point))
-    }
-
-    /// Converts a screen point to a geographic world coordinate for the current map.
+    /// Converts a screen point to a geographic coordinate.
     ///
     /// The longitude is wrapped to the range from -180 to 180 degrees.
-    pub fn lat_lng_for_pixel(&self, point: ScreenPoint) -> Result<LatLng> {
-        let map = self.inner.native()?;
-        let mut raw_coordinate = empty_lat_lng();
-        // SAFETY: map is live, point is passed by value, and raw_coordinate is
-        // writable storage for the output.
-        maplibre_core::check(unsafe {
-            sys::mln_map_lat_lng_for_pixel(map, point.to_native(), &mut raw_coordinate)
-        })?;
-        Ok(LatLng::from_native(raw_coordinate))
+    pub fn lat_lng_for_pixel(&self, point: ScreenPoint) -> Result<NativeFuture<LatLng>> {
+        self.coordinate_for_pixel(point, false)
     }
 
     /// Converts a screen point to an unwrapped geographic coordinate.
     ///
     /// The longitude preserves the visible world copy and may fall outside
     /// -180 to 180.
-    pub fn lat_lng_for_pixel_unwrapped(&self, point: ScreenPoint) -> Result<LatLng> {
-        let map = self.inner.native()?;
-        let mut raw_coordinate = empty_lat_lng();
-        // SAFETY: map is live, point is passed by value, and raw_coordinate is
-        // writable storage for the output.
-        maplibre_core::check(unsafe {
-            sys::mln_map_lat_lng_for_pixel_unwrapped(map, point.to_native(), &mut raw_coordinate)
-        })?;
-        Ok(LatLng::from_native(raw_coordinate))
+    pub fn lat_lng_for_pixel_unwrapped(&self, point: ScreenPoint) -> Result<NativeFuture<LatLng>> {
+        self.coordinate_for_pixel(point, true)
     }
 
-    /// Converts geographic world coordinates to screen points for the current map.
-    pub fn pixels_for_lat_lngs(&self, coordinates: &[LatLng]) -> Result<Vec<ScreenPoint>> {
-        let map = self.inner.native()?;
-        let raw_coordinates = lat_lngs_to_native(coordinates);
-        let mut raw_points = vec![empty_screen_point(); coordinates.len()];
-        // SAFETY: map is live. Input and output arrays are valid for len
-        // entries, or null when len is 0.
-        maplibre_core::check(unsafe {
-            sys::mln_map_pixels_for_lat_lngs(
-                map,
-                const_ptr_or_null(&raw_coordinates),
-                raw_coordinates.len(),
-                mut_ptr_or_null(&mut raw_points),
-            )
-        })?;
-        Ok(raw_points
-            .into_iter()
-            .map(ScreenPoint::from_native)
-            .collect())
+    /// Starts a query converting geographic coordinates to screen points.
+    pub fn pixels_for_lat_lngs(
+        &self,
+        coordinates: &[LatLng],
+    ) -> Result<NativeFuture<Vec<ScreenPoint>>> {
+        let coordinates = lat_lngs_to_native(coordinates);
+        // SAFETY: map is live and every borrowed argument stays valid for this synchronous
+        // submission.
+        self.submit_query(
+            move |map, completion| unsafe {
+                sys::mln_map_pixels_for_lat_lngs(
+                    map,
+                    const_ptr_or_null(&coordinates),
+                    coordinates.len(),
+                    completion,
+                )
+            },
+            |result| {
+                Ok(
+                    crate::completion::copy_slice::<sys::mln_screen_point>(result)?
+                        .into_iter()
+                        .map(ScreenPoint::from_native)
+                        .collect(),
+                )
+            },
+        )
     }
 
-    /// Converts screen points to geographic world coordinates for the current map.
+    /// Converts screen points to geographic coordinates.
     ///
     /// Each longitude is wrapped to the range from -180 to 180 degrees.
-    pub fn lat_lngs_for_pixels(&self, points: &[ScreenPoint]) -> Result<Vec<LatLng>> {
-        let map = self.inner.native()?;
-        let raw_points = screen_points_to_native(points);
-        let mut raw_coordinates = vec![empty_lat_lng(); points.len()];
-        // SAFETY: map is live. Input and output arrays are valid for len
-        // entries, or null when len is 0.
-        maplibre_core::check(unsafe {
-            sys::mln_map_lat_lngs_for_pixels(
-                map,
-                const_ptr_or_null(&raw_points),
-                raw_points.len(),
-                mut_ptr_or_null(&mut raw_coordinates),
-            )
-        })?;
-        Ok(raw_coordinates
-            .into_iter()
-            .map(LatLng::from_native)
-            .collect())
+    pub fn lat_lngs_for_pixels(&self, points: &[ScreenPoint]) -> Result<NativeFuture<Vec<LatLng>>> {
+        self.coordinates_for_pixels(points, false)
     }
 
     /// Converts screen points to unwrapped geographic coordinates.
     ///
     /// Each longitude preserves its visible world copy and may fall outside
     /// -180 to 180.
-    pub fn lat_lngs_for_pixels_unwrapped(&self, points: &[ScreenPoint]) -> Result<Vec<LatLng>> {
-        let map = self.inner.native()?;
-        let raw_points = screen_points_to_native(points);
-        let mut raw_coordinates = vec![empty_lat_lng(); points.len()];
-        // SAFETY: map is live. Input and output arrays are valid for len
-        // entries, or null when len is 0.
-        maplibre_core::check(unsafe {
-            sys::mln_map_lat_lngs_for_pixels_unwrapped(
-                map,
-                const_ptr_or_null(&raw_points),
-                raw_points.len(),
-                mut_ptr_or_null(&mut raw_coordinates),
-            )
-        })?;
-        Ok(raw_coordinates
-            .into_iter()
-            .map(LatLng::from_native)
-            .collect())
+    pub fn lat_lngs_for_pixels_unwrapped(
+        &self,
+        points: &[ScreenPoint],
+    ) -> Result<NativeFuture<Vec<LatLng>>> {
+        self.coordinates_for_pixels(points, true)
     }
 
     /// Creates a standalone projection snapshot from the current map transform.
-    pub fn create_projection(&self) -> Result<MapProjectionHandle> {
+    pub fn create_projection(&self) -> Result<NativeFuture<MapProjectionHandle>> {
         MapProjectionHandle::new(self)
     }
-
-    /// Produces a [`Send`] reference to this map for attaching a render session.
-    /// A render session is owned by the thread that attaches it, which need not
-    /// be the map's owner thread.
-    pub fn attach_ref(&self) -> Result<MapAttachRef> {
-        Ok(MapAttachRef {
-            map: self.inner.native()?,
-        })
-    }
 }
 
-/// A reference to a map for the sole purpose of attaching a render session,
-/// produced by [`MapHandle::attach_ref`]. Attaching is the one map operation
-/// that runs on the render session's thread instead of the map's.
+/// Render-target attachment.
 ///
-/// This is a copied handle value and carries no Rust retention of the map.
-/// Native destroys a map only once no session is attached, and rejects a
-/// reference that outlives its map rather than binding to a later one.
-///
-/// Close the session before the map: dropping a [`MapHandle`] with a session
-/// still attached leaks the native map, reports it through
-/// [`set_leak_reporter`](crate::set_leak_reporter), and leaves the runtime
-/// undestroyable.
-#[derive(Clone, Copy)]
-pub struct MapAttachRef {
-    map: sys::mln_map,
-}
-
-impl fmt::Debug for MapAttachRef {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MapAttachRef").finish()
-    }
-}
-
-impl MapAttachRef {
-    /// The handle of the map this reference names.
-    pub(crate) fn map(&self) -> sys::mln_map {
-        self.map
-    }
-
-    /// Attaches a Metal native surface render target to the map.
-    ///
-    /// The layer and optional device pointers are backend-native handles. They
-    /// must name valid Metal objects for this session and remain usable on the
-    /// owner thread until the session is detached or closed.
+/// Each entry point publishes an attaching session before it returns and
+/// reports the attachment outcome through
+/// [`RenderSessionAttachment::completion`]. A failed attachment still owns its
+/// session, which the host detaches or abandons before destroying it. A
+/// caller-owned texture target grants neither frame acquisition nor readback.
+impl MapHandle {
+    /// Attaches a Metal surface (`CAMetalLayer`) to this map.
     pub fn attach_metal_surface(
         &self,
-        descriptor: &MetalSurfaceDescriptor,
-    ) -> Result<RenderSessionHandle> {
-        let raw = descriptor.to_native();
-        RenderSessionHandle::attach(self, |map, out| {
-            // SAFETY: map is live, raw is a materialized descriptor valid for
-            // this call, and out is a null-initialized out-pointer.
-            unsafe { sys::mln_metal_surface_attach(map, &raw, out) }
+        value: &MetalSurfaceDescriptor,
+        options: RenderSessionAttachOptions,
+    ) -> Result<RenderSessionAttachment> {
+        let raw = value.to_native();
+        // SAFETY: the map is live and the descriptor stays valid for this synchronous submission.
+        RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
+            sys::mln_metal_surface_attach(map, &raw, options, session, operation)
         })
     }
 
-    /// Attaches a Vulkan native surface render target to the map.
-    ///
-    /// Vulkan handles are borrowed. They must remain valid and externally
-    /// synchronized until the session is detached or closed.
+    /// Attaches a Vulkan surface (`VkSurfaceKHR`) to this map.
     pub fn attach_vulkan_surface(
         &self,
-        descriptor: &VulkanSurfaceDescriptor,
-    ) -> Result<RenderSessionHandle> {
-        let raw = descriptor.to_native();
-        RenderSessionHandle::attach(self, |map, out| {
-            // SAFETY: map is live, raw is a materialized descriptor valid for
-            // this call, and out is a null-initialized out-pointer.
-            unsafe { sys::mln_vulkan_surface_attach(map, &raw, out) }
+        value: &VulkanSurfaceDescriptor,
+        options: RenderSessionAttachOptions,
+    ) -> Result<RenderSessionAttachment> {
+        let raw = value.to_native();
+        // SAFETY: the map is live and the descriptor stays valid for this synchronous submission.
+        RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
+            sys::mln_vulkan_surface_attach(map, &raw, options, session, operation)
         })
     }
 
-    /// Attaches a WebGPU native surface render target to the map.
-    ///
-    /// The surface, device, and instance are borrowed. They must stay valid
-    /// until the session detaches or closes.
+    /// Attaches a WebGPU surface to this map.
     pub fn attach_webgpu_surface(
         &self,
-        descriptor: &WebGpuSurfaceDescriptor,
-    ) -> Result<RenderSessionHandle> {
-        let raw = descriptor.to_native();
-        RenderSessionHandle::attach(self, |map, out| {
-            // SAFETY: map is live, raw is a materialized descriptor valid for
-            // this call, and out is a null-initialized out-pointer.
-            unsafe { sys::mln_webgpu_surface_attach(map, &raw, out) }
+        value: &WebGpuSurfaceDescriptor,
+        options: RenderSessionAttachOptions,
+    ) -> Result<RenderSessionAttachment> {
+        let raw = value.to_native();
+        // SAFETY: the map is live and the descriptor stays valid for this synchronous submission.
+        RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
+            sys::mln_webgpu_surface_attach(map, &raw, options, session, operation)
         })
     }
 
-    /// Attaches an OpenGL native surface render target to the map.
-    ///
-    /// OpenGL context provider and surface handles are borrowed. They must
-    /// remain valid and externally synchronized until the session is detached
-    /// or closed.
+    /// Attaches an OpenGL surface to this map.
     pub fn attach_opengl_surface(
         &self,
-        descriptor: &OpenGLSurfaceDescriptor,
-    ) -> Result<RenderSessionHandle> {
-        let raw = descriptor.to_native();
-        RenderSessionHandle::attach(self, |map, out| {
-            // SAFETY: map is live, raw is a materialized descriptor valid for
-            // this call, and out is a null-initialized out-pointer.
-            unsafe { sys::mln_opengl_surface_attach(map, &raw, out) }
+        value: &OpenGLSurfaceDescriptor,
+        options: RenderSessionAttachOptions,
+    ) -> Result<RenderSessionAttachment> {
+        let raw = value.to_native();
+        // SAFETY: the map is live and the descriptor stays valid for this synchronous submission.
+        RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
+            sys::mln_opengl_surface_attach(map, &raw, options, session, operation)
         })
     }
 
-    /// Attaches a Metal session-owned texture render target to the map.
-    ///
-    /// The device pointer must name a valid Metal device that remains usable on
-    /// the owner thread until the session is detached or closed.
+    /// Attaches a session-owned Metal texture ring to this map.
     pub fn attach_metal_owned_texture(
         &self,
-        descriptor: &MetalOwnedTextureDescriptor,
-    ) -> Result<RenderSessionHandle> {
-        let raw = descriptor.to_native();
-        RenderSessionHandle::attach(self, |map, out| {
-            // SAFETY: map is live, raw is a materialized descriptor valid for
-            // this call, and out is a null-initialized out-pointer.
-            unsafe { sys::mln_metal_owned_texture_attach(map, &raw, out) }
+        value: &MetalOwnedTextureDescriptor,
+        options: RenderSessionAttachOptions,
+    ) -> Result<RenderSessionAttachment> {
+        let raw = value.to_native();
+        // SAFETY: the map is live and the descriptor stays valid for this synchronous submission.
+        RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
+            sys::mln_metal_owned_texture_attach(map, &raw, options, session, operation)
         })
     }
 
-    /// Attaches a Metal caller-owned texture render target to the map.
-    ///
-    /// The texture pointer is borrowed. The caller owns the texture, keeps it
-    /// valid until detach or close, and synchronizes use outside this session.
+    /// Attaches a caller-owned Metal texture to this map.
     pub fn attach_metal_borrowed_texture(
         &self,
-        descriptor: &MetalBorrowedTextureDescriptor,
-    ) -> Result<RenderSessionHandle> {
-        let raw = descriptor.to_native();
-        RenderSessionHandle::attach(self, |map, out| {
-            // SAFETY: map is live, raw is a materialized descriptor valid for
-            // this call, and out is a null-initialized out-pointer.
-            unsafe { sys::mln_metal_borrowed_texture_attach(map, &raw, out) }
+        value: &MetalBorrowedTextureDescriptor,
+        options: RenderSessionAttachOptions,
+    ) -> Result<RenderSessionAttachment> {
+        let raw = value.to_native();
+        // SAFETY: the map is live and the descriptor stays valid for this synchronous submission.
+        RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
+            sys::mln_metal_borrowed_texture_attach(map, &raw, options, session, operation)
         })
     }
 
-    /// Attaches a Vulkan session-owned texture render target to the map.
-    ///
-    /// Vulkan device and queue handles are borrowed. They must remain valid and
-    /// externally synchronized until the session is detached or closed.
+    /// Attaches a session-owned Vulkan texture ring to this map.
     pub fn attach_vulkan_owned_texture(
         &self,
-        descriptor: &VulkanOwnedTextureDescriptor,
-    ) -> Result<RenderSessionHandle> {
-        let raw = descriptor.to_native();
-        RenderSessionHandle::attach(self, |map, out| {
-            // SAFETY: map is live, raw is a materialized descriptor valid for
-            // this call, and out is a null-initialized out-pointer.
-            unsafe { sys::mln_vulkan_owned_texture_attach(map, &raw, out) }
+        value: &VulkanOwnedTextureDescriptor,
+        options: RenderSessionAttachOptions,
+    ) -> Result<RenderSessionAttachment> {
+        let raw = value.to_native();
+        // SAFETY: the map is live and the descriptor stays valid for this synchronous submission.
+        RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
+            sys::mln_vulkan_owned_texture_attach(map, &raw, options, session, operation)
         })
     }
 
-    /// Attaches a Vulkan caller-owned texture render target to the map.
-    ///
-    /// Vulkan handles, image, and image view are borrowed. The caller owns the
-    /// image resources, keeps them valid until detach or close, and handles
-    /// queue-family ownership and synchronization outside this session.
+    /// Attaches a caller-owned Vulkan texture to this map.
     pub fn attach_vulkan_borrowed_texture(
         &self,
-        descriptor: &VulkanBorrowedTextureDescriptor,
-    ) -> Result<RenderSessionHandle> {
-        let raw = descriptor.to_native();
-        RenderSessionHandle::attach(self, |map, out| {
-            // SAFETY: map is live, raw is a materialized descriptor valid for
-            // this call, and out is a null-initialized out-pointer.
-            unsafe { sys::mln_vulkan_borrowed_texture_attach(map, &raw, out) }
+        value: &VulkanBorrowedTextureDescriptor,
+        options: RenderSessionAttachOptions,
+    ) -> Result<RenderSessionAttachment> {
+        let raw = value.to_native();
+        // SAFETY: the map is live and the descriptor stays valid for this synchronous submission.
+        RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
+            sys::mln_vulkan_borrowed_texture_attach(map, &raw, options, session, operation)
         })
     }
 
-    /// Attaches a WebGPU session-owned texture render target to the map.
-    ///
-    /// The WebGPU device and queue are borrowed. They must remain valid until
-    /// the session is detached or closed, and the session renders on the thread
-    /// that owns them.
+    /// Attaches a session-owned WebGPU texture ring to this map.
     pub fn attach_webgpu_owned_texture(
         &self,
-        descriptor: &WebGpuOwnedTextureDescriptor,
-    ) -> Result<RenderSessionHandle> {
-        let raw = descriptor.to_native();
-        RenderSessionHandle::attach(self, |map, out| {
-            // SAFETY: map is live, raw is a materialized descriptor valid for
-            // this call, and out is a null-initialized out-pointer.
-            unsafe { sys::mln_webgpu_owned_texture_attach(map, &raw, out) }
+        value: &WebGpuOwnedTextureDescriptor,
+        options: RenderSessionAttachOptions,
+    ) -> Result<RenderSessionAttachment> {
+        let raw = value.to_native();
+        // SAFETY: the map is live and the descriptor stays valid for this synchronous submission.
+        RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
+            sys::mln_webgpu_owned_texture_attach(map, &raw, options, session, operation)
         })
     }
 
-    /// Attaches a WebGPU caller-owned texture render target to the map.
-    ///
-    /// The texture and its view are borrowed. The caller owns them, keeps them
-    /// valid until detach or close, and creates both from the descriptor's
-    /// device.
+    /// Attaches a caller-owned WebGPU texture to this map.
     pub fn attach_webgpu_borrowed_texture(
         &self,
-        descriptor: &WebGpuBorrowedTextureDescriptor,
-    ) -> Result<RenderSessionHandle> {
-        let raw = descriptor.to_native();
-        RenderSessionHandle::attach(self, |map, out| {
-            // SAFETY: map is live, raw is a materialized descriptor valid for
-            // this call, and out is a null-initialized out-pointer.
-            unsafe { sys::mln_webgpu_borrowed_texture_attach(map, &raw, out) }
+        value: &WebGpuBorrowedTextureDescriptor,
+        options: RenderSessionAttachOptions,
+    ) -> Result<RenderSessionAttachment> {
+        let raw = value.to_native();
+        // SAFETY: the map is live and the descriptor stays valid for this synchronous submission.
+        RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
+            sys::mln_webgpu_borrowed_texture_attach(map, &raw, options, session, operation)
         })
     }
 
-    /// Attaches an OpenGL session-owned texture render target to the map.
-    ///
-    /// The context provider handles are borrowed. They must remain valid until
-    /// the session is detached or closed. Host sampling must use a context in
-    /// the same share group while the acquired frame remains open.
+    /// Attaches a session-owned OpenGL texture ring to this map.
     pub fn attach_opengl_owned_texture(
         &self,
-        descriptor: &OpenGLOwnedTextureDescriptor,
-    ) -> Result<RenderSessionHandle> {
-        let raw = descriptor.to_native();
-        RenderSessionHandle::attach(self, |map, out| {
-            // SAFETY: map is live, raw is a materialized descriptor valid for
-            // this call, and out is a null-initialized out-pointer.
-            unsafe { sys::mln_opengl_owned_texture_attach(map, &raw, out) }
+        value: &OpenGLOwnedTextureDescriptor,
+        options: RenderSessionAttachOptions,
+    ) -> Result<RenderSessionAttachment> {
+        let raw = value.to_native();
+        // SAFETY: the map is live and the descriptor stays valid for this synchronous submission.
+        RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
+            sys::mln_opengl_owned_texture_attach(map, &raw, options, session, operation)
         })
     }
 
-    /// Attaches an OpenGL caller-owned texture render target to the map.
-    ///
-    /// The context provider handles and texture object are borrowed. The caller
-    /// owns the texture, keeps it valid until detach or close, and synchronizes
-    /// use outside this session.
+    /// Attaches a caller-owned OpenGL texture to this map.
     pub fn attach_opengl_borrowed_texture(
         &self,
-        descriptor: &OpenGLBorrowedTextureDescriptor,
-    ) -> Result<RenderSessionHandle> {
-        let raw = descriptor.to_native();
-        RenderSessionHandle::attach(self, |map, out| {
-            // SAFETY: map is live, raw is a materialized descriptor valid for
-            // this call, and out is a null-initialized out-pointer.
-            unsafe { sys::mln_opengl_borrowed_texture_attach(map, &raw, out) }
+        value: &OpenGLBorrowedTextureDescriptor,
+        options: RenderSessionAttachOptions,
+    ) -> Result<RenderSessionAttachment> {
+        let raw = value.to_native();
+        // SAFETY: the map is live and the descriptor stays valid for this synchronous submission.
+        RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
+            sys::mln_opengl_borrowed_texture_attach(map, &raw, options, session, operation)
         })
     }
 }

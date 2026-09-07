@@ -24,10 +24,6 @@ test "native pointer uses explicit borrowed constructor" {
     try testing.expectEqual(ptr, native.toPtr());
 }
 
-test "package links the native C library" {
-    try testing.expectEqual(@as(u32, 0), maplibre.cAbiVersion());
-}
-
 test "package validates the supported C ABI version" {
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
     defer diagnostics.deinit();

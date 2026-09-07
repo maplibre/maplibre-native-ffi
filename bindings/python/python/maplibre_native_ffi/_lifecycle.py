@@ -27,8 +27,13 @@ def warn_unclosed(
 class ContextHandleMixin:
     """Provide context-manager behavior for explicit-close handles."""
 
-    def close(self) -> None:
-        """Release this handle."""
+    def close(self) -> object:
+        """Release this handle.
+
+        A handle whose release reports asynchronous teardown returns a future
+        here. Leaving the ``with`` block discards it, so a host that must
+        observe teardown calls ``close`` itself and waits.
+        """
         raise NotImplementedError
 
     def __enter__(self) -> Self:
@@ -70,6 +75,6 @@ class NativeHandleMixin(WarnUnclosedMixin, ContextHandleMixin):
         """Return whether the private native handle has been closed."""
         return bool(self._native.closed)
 
-    def close(self) -> None:
+    def close(self) -> object:
         """Release the private native handle exactly once."""
-        self._native.close()
+        return self._native.close()

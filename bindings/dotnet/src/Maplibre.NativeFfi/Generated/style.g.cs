@@ -69,6 +69,42 @@ namespace Maplibre.NativeFfi.Internal.C
         public float to;
     }
 
+    internal unsafe partial struct mln_style_image_stretches_result
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("uint32_t")]
+        public uint reserved;
+
+        [NativeTypeName("const mln_image_stretch *")]
+        public mln_image_stretch* stretch_x;
+
+        [NativeTypeName("size_t")]
+        public nuint stretch_x_count;
+
+        [NativeTypeName("const mln_image_stretch *")]
+        public mln_image_stretch* stretch_y;
+
+        [NativeTypeName("size_t")]
+        public nuint stretch_y_count;
+    }
+
+    internal unsafe partial struct mln_style_source_tile_urls_result
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("uint32_t")]
+        public uint reserved;
+
+        [NativeTypeName("const mln_buffer_view *")]
+        public mln_buffer_view* tile_urls;
+
+        [NativeTypeName("size_t")]
+        public nuint tile_url_count;
+    }
+
     internal partial struct mln_image_content
     {
         public float left;
@@ -205,6 +241,60 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [NativeTypeName("uint32_t")]
         public uint raster_encoding;
+    }
+
+    internal unsafe partial struct mln_style_source_result
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("uint32_t")]
+        public uint reserved;
+
+        public mln_style_source_info info;
+
+        public mln_buffer_view attribution;
+
+        public mln_buffer_view url;
+
+        [NativeTypeName("const mln_buffer_view *")]
+        public mln_buffer_view* tile_urls;
+
+        [NativeTypeName("size_t")]
+        public nuint tile_url_count;
+    }
+
+    internal partial struct mln_style_layer_info
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("uint32_t")]
+        public uint reserved;
+
+        public mln_buffer_view type;
+
+        public double min_zoom;
+
+        public double max_zoom;
+
+        [NativeTypeName("uint32_t")]
+        public uint visibility;
+    }
+
+    internal partial struct mln_style_layer_result
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("uint32_t")]
+        public uint reserved;
+
+        public mln_style_layer_info info;
+
+        public mln_buffer_view source_id;
+
+        public mln_buffer_view source_layer;
     }
 
     internal partial struct mln_style_tile_source_options
@@ -451,6 +541,31 @@ namespace Maplibre.NativeFfi.Internal.C
         public byte has_text_fit_height;
     }
 
+    internal unsafe partial struct mln_style_image_result
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("uint32_t")]
+        public uint reserved;
+
+        public mln_style_image_info info;
+
+        public mln_buffer_view pixels;
+
+        [NativeTypeName("const mln_image_stretch *")]
+        public mln_image_stretch* stretch_x;
+
+        [NativeTypeName("size_t")]
+        public nuint stretch_x_count;
+
+        [NativeTypeName("const mln_image_stretch *")]
+        public mln_image_stretch* stretch_y;
+
+        [NativeTypeName("size_t")]
+        public nuint stretch_y_count;
+    }
+
     internal partial struct mln_style_transition_options
     {
         [NativeTypeName("uint32_t")]
@@ -494,55 +609,31 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_style_transition_options mln_style_transition_options_default();
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_style_id_list_count([NativeTypeName("mln_style_id_list")] MlnStyleIdList list, [NativeTypeName("size_t *")] nuint* out_count);
+        public static extern mln_status mln_map_add_style_source_json([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view source_json, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_style_id_list_get([NativeTypeName("mln_style_id_list")] MlnStyleIdList list, [NativeTypeName("size_t")] nuint index, mln_buffer_view* out_id);
+        public static extern mln_status mln_map_remove_style_source([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void mln_style_id_list_destroy([NativeTypeName("mln_style_id_list")] MlnStyleIdList list);
+        public static extern mln_status mln_map_get_style_source_info([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_style_string_list_count([NativeTypeName("mln_style_string_list")] MlnStyleStringList list, [NativeTypeName("size_t *")] nuint* out_count);
+        public static extern mln_status mln_map_set_style_source_volatile([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("bool")] byte is_volatile, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_style_string_list_get([NativeTypeName("mln_style_string_list")] MlnStyleStringList list, [NativeTypeName("size_t")] nuint index, mln_buffer_view* out_value);
+        public static extern mln_status mln_map_copy_style_source_attribution([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void mln_style_string_list_destroy([NativeTypeName("mln_style_string_list")] MlnStyleStringList list);
+        public static extern mln_status mln_map_copy_style_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_style_source_json([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view source_json);
+        public static extern mln_status mln_map_get_style_source_tile_urls([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_remove_style_source([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, bool* out_removed);
+        public static extern mln_status mln_map_list_style_source_ids([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_style_source_exists([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, bool* out_exists);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_style_source_type([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("uint32_t *")] uint* out_source_type, bool* out_found);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_style_source_info([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_style_source_info* out_info, bool* out_found);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_style_source_volatile([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("bool")] byte is_volatile);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_copy_style_source_attribution([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("char *")] sbyte* out_attribution, [NativeTypeName("size_t")] nuint attribution_capacity, [NativeTypeName("size_t *")] nuint* out_attribution_size, bool* out_found);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_copy_style_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("char *")] sbyte* out_url, [NativeTypeName("size_t")] nuint url_capacity, [NativeTypeName("size_t *")] nuint* out_url_size, bool* out_found);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_style_source_tile_urls([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("mln_style_string_list *")] MlnStyleStringList* out_tile_urls, bool* out_found);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_list_style_source_ids([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("mln_style_id_list *")] MlnStyleIdList* out_source_ids);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_geojson_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view url, [NativeTypeName("const mln_geojson_source_options *")] mln_geojson_source_options* options);
+        public static extern mln_status mln_map_add_geojson_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view url, [NativeTypeName("const mln_geojson_source_options *")] mln_geojson_source_options* options, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_geojson_source_data_create(mln_buffer_view data, [NativeTypeName("const mln_geojson_source_options *")] mln_geojson_source_options* options, [NativeTypeName("mln_geojson_source_data *")] MlnGeoJsonSourceData* out_data);
@@ -551,192 +642,177 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern void mln_geojson_source_data_destroy([NativeTypeName("mln_geojson_source_data")] MlnGeoJsonSourceData data);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_geojson_source_data([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("mln_geojson_source_data")] MlnGeoJsonSourceData data);
+        public static extern mln_status mln_map_add_geojson_source_data([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("mln_geojson_source_data")] MlnGeoJsonSourceData data, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_geojson_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view url);
+        public static extern mln_status mln_map_set_geojson_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view url, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_geojson_source_data([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("mln_geojson_source_data")] MlnGeoJsonSourceData data);
+        public static extern mln_status mln_map_set_geojson_source_data([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("mln_geojson_source_data")] MlnGeoJsonSourceData data, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_geojson_source_synchronous_tiling([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("bool")] byte enabled);
+        public static extern mln_status mln_map_set_geojson_source_synchronous_tiling([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("bool")] byte enabled, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_vector_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view url, [NativeTypeName("const mln_style_tile_source_options *")] mln_style_tile_source_options* options);
+        public static extern mln_status mln_map_add_vector_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view url, [NativeTypeName("const mln_style_tile_source_options *")] mln_style_tile_source_options* options, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_vector_source_tiles([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_buffer_view *")] mln_buffer_view* tiles, [NativeTypeName("size_t")] nuint tile_count, [NativeTypeName("const mln_style_tile_source_options *")] mln_style_tile_source_options* options);
+        public static extern mln_status mln_map_add_vector_source_tiles([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_buffer_view *")] mln_buffer_view* tiles, [NativeTypeName("size_t")] nuint tile_count, [NativeTypeName("const mln_style_tile_source_options *")] mln_style_tile_source_options* options, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_raster_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view url, [NativeTypeName("const mln_style_tile_source_options *")] mln_style_tile_source_options* options);
+        public static extern mln_status mln_map_add_raster_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view url, [NativeTypeName("const mln_style_tile_source_options *")] mln_style_tile_source_options* options, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_raster_source_tiles([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_buffer_view *")] mln_buffer_view* tiles, [NativeTypeName("size_t")] nuint tile_count, [NativeTypeName("const mln_style_tile_source_options *")] mln_style_tile_source_options* options);
+        public static extern mln_status mln_map_add_raster_source_tiles([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_buffer_view *")] mln_buffer_view* tiles, [NativeTypeName("size_t")] nuint tile_count, [NativeTypeName("const mln_style_tile_source_options *")] mln_style_tile_source_options* options, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_raster_dem_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view url, [NativeTypeName("const mln_style_tile_source_options *")] mln_style_tile_source_options* options);
+        public static extern mln_status mln_map_add_raster_dem_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view url, [NativeTypeName("const mln_style_tile_source_options *")] mln_style_tile_source_options* options, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_raster_dem_source_tiles([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_buffer_view *")] mln_buffer_view* tiles, [NativeTypeName("size_t")] nuint tile_count, [NativeTypeName("const mln_style_tile_source_options *")] mln_style_tile_source_options* options);
+        public static extern mln_status mln_map_add_raster_dem_source_tiles([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_buffer_view *")] mln_buffer_view* tiles, [NativeTypeName("size_t")] nuint tile_count, [NativeTypeName("const mln_style_tile_source_options *")] mln_style_tile_source_options* options, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_custom_geometry_source([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_custom_geometry_source_options *")] mln_custom_geometry_source_options* options);
+        public static extern mln_status mln_map_add_custom_geometry_source([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_custom_geometry_source_options *")] mln_custom_geometry_source_options* options, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_custom_geometry_source_tile_data([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data);
+        public static extern mln_status mln_map_set_custom_geometry_source_tile_data([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_invalidate_custom_geometry_source_tile([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_canonical_tile_id tile_id);
+        public static extern mln_status mln_map_invalidate_custom_geometry_source_tile([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_invalidate_custom_geometry_source_region([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_lat_lng_bounds bounds);
+        public static extern mln_status mln_map_invalidate_custom_geometry_source_region([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_lat_lng_bounds bounds, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_custom_mvt_vector_source([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_custom_mvt_vector_source_options *")] mln_custom_mvt_vector_source_options* options);
+        public static extern mln_status mln_map_add_custom_mvt_vector_source([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_custom_mvt_vector_source_options *")] mln_custom_mvt_vector_source_options* options, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_custom_mvt_vector_source_tile_data([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data);
+        public static extern mln_status mln_map_set_custom_mvt_vector_source_tile_data([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_custom_mvt_vector_source_tile_error([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view message);
+        public static extern mln_status mln_map_set_custom_mvt_vector_source_tile_error([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view message, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_invalidate_custom_mvt_vector_source_tile([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_canonical_tile_id tile_id);
+        public static extern mln_status mln_map_invalidate_custom_mvt_vector_source_tile([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_style_image([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view image_id, [NativeTypeName("const mln_premultiplied_rgba8_image *")] mln_premultiplied_rgba8_image* image, [NativeTypeName("const mln_style_image_options *")] mln_style_image_options* options);
+        public static extern mln_status mln_map_set_style_image([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view image_id, [NativeTypeName("const mln_premultiplied_rgba8_image *")] mln_premultiplied_rgba8_image* image, [NativeTypeName("const mln_style_image_options *")] mln_style_image_options* options, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_remove_style_image([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view image_id, bool* out_removed);
+        public static extern mln_status mln_map_remove_style_image([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view image_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_style_image_exists([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view image_id, bool* out_exists);
+        public static extern mln_status mln_map_get_style_image_info([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view image_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_style_image_info([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view image_id, mln_style_image_info* out_info, bool* out_found);
+        public static extern mln_status mln_map_copy_style_image_premultiplied_rgba8([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view image_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_copy_style_image_premultiplied_rgba8([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view image_id, [NativeTypeName("uint8_t *")] byte* out_pixels, [NativeTypeName("size_t")] nuint pixel_capacity, [NativeTypeName("size_t *")] nuint* out_byte_length, bool* out_found);
+        public static extern mln_status mln_map_copy_style_image_stretches([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view image_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_copy_style_image_stretches([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view image_id, mln_image_stretch* out_stretch_x, [NativeTypeName("size_t")] nuint stretch_x_capacity, [NativeTypeName("size_t *")] nuint* out_stretch_x_count, mln_image_stretch* out_stretch_y, [NativeTypeName("size_t")] nuint stretch_y_capacity, [NativeTypeName("size_t *")] nuint* out_stretch_y_count, bool* out_found);
+        public static extern mln_status mln_map_add_image_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_lat_lng *")] mln_lat_lng* coordinates, [NativeTypeName("size_t")] nuint coordinate_count, mln_buffer_view url, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_image_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_lat_lng *")] mln_lat_lng* coordinates, [NativeTypeName("size_t")] nuint coordinate_count, mln_buffer_view url);
+        public static extern mln_status mln_map_add_image_source_image([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_lat_lng *")] mln_lat_lng* coordinates, [NativeTypeName("size_t")] nuint coordinate_count, [NativeTypeName("const mln_premultiplied_rgba8_image *")] mln_premultiplied_rgba8_image* image, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_image_source_image([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_lat_lng *")] mln_lat_lng* coordinates, [NativeTypeName("size_t")] nuint coordinate_count, [NativeTypeName("const mln_premultiplied_rgba8_image *")] mln_premultiplied_rgba8_image* image);
+        public static extern mln_status mln_map_set_image_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view url, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_image_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view url);
+        public static extern mln_status mln_map_set_image_source_image([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_premultiplied_rgba8_image *")] mln_premultiplied_rgba8_image* image, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_image_source_image([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_premultiplied_rgba8_image *")] mln_premultiplied_rgba8_image* image);
+        public static extern mln_status mln_map_set_image_source_coordinates([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_lat_lng *")] mln_lat_lng* coordinates, [NativeTypeName("size_t")] nuint coordinate_count, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_image_source_coordinates([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_lat_lng *")] mln_lat_lng* coordinates, [NativeTypeName("size_t")] nuint coordinate_count);
+        public static extern mln_status mln_map_get_image_source_coordinates([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_image_source_coordinates([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_lat_lng* out_coordinates, [NativeTypeName("size_t")] nuint coordinate_capacity, [NativeTypeName("size_t *")] nuint* out_coordinate_count, bool* out_found);
+        public static extern mln_status mln_map_add_hillshade_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_hillshade_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id);
+        public static extern mln_status mln_map_add_color_relief_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_color_relief_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id);
+        public static extern mln_status mln_map_add_location_indicator_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_location_indicator_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view before_layer_id);
+        public static extern mln_status mln_map_set_location_indicator_location([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_location_indicator_location([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude);
+        public static extern mln_status mln_map_set_location_indicator_bearing([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, double bearing, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_location_indicator_bearing([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, double bearing);
+        public static extern mln_status mln_map_set_location_indicator_accuracy_radius([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, double radius, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_location_indicator_accuracy_radius([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, double radius);
+        public static extern mln_status mln_map_set_location_indicator_image_name([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("uint32_t")] uint image_kind, mln_buffer_view image_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_location_indicator_image_name([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("uint32_t")] uint image_kind, mln_buffer_view image_id);
+        public static extern mln_status mln_map_add_style_layer_json([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_json, mln_buffer_view before_layer_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_style_layer_json([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_json, mln_buffer_view before_layer_id);
+        public static extern mln_status mln_map_remove_style_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_remove_style_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, bool* out_removed);
+        public static extern mln_status mln_map_get_style_layer_info([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_style_layer_exists([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, bool* out_exists);
+        public static extern mln_status mln_map_list_style_layer_ids([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_style_layer_type([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view* out_layer_type, bool* out_found);
+        public static extern mln_status mln_map_move_style_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_list_style_layer_ids([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("mln_style_id_list *")] MlnStyleIdList* out_layer_ids);
+        public static extern mln_status mln_map_get_style_layer_json([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_move_style_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view before_layer_id);
+        public static extern mln_status mln_map_set_style_light_json([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view light_json, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_style_layer_json([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("mln_buffer *")] MlnBuffer* out_layer, bool* out_found);
+        public static extern mln_status mln_map_set_style_light_property([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view property_name, mln_buffer_view value, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_style_light_json([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view light_json);
+        public static extern mln_status mln_map_get_style_light_property([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view property_name, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_style_light_property([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view property_name, mln_buffer_view value);
+        public static extern mln_status mln_map_set_style_transition_options([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_style_transition_options *")] mln_style_transition_options* options, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_style_light_property([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view property_name, [NativeTypeName("mln_buffer *")] MlnBuffer* out_value);
+        public static extern mln_status mln_map_get_style_transition_options([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_style_transition_options([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_style_transition_options *")] mln_style_transition_options* options);
+        public static extern mln_status mln_map_set_layer_property([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view property_name, mln_buffer_view value, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_style_transition_options([NativeTypeName("mln_map")] MlnMap map, mln_style_transition_options* out_options);
+        public static extern mln_status mln_map_get_layer_property([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view property_name, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_layer_property([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view property_name, mln_buffer_view value);
+        public static extern mln_status mln_map_set_layer_filter([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("const mln_buffer_view *")] mln_buffer_view* filter, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_layer_property([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view property_name, [NativeTypeName("mln_buffer *")] MlnBuffer* out_value);
+        public static extern mln_status mln_map_get_layer_filter([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_layer_filter([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("const mln_buffer_view *")] mln_buffer_view* filter);
+        public static extern mln_status mln_map_set_layer_source_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view source_layer, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_layer_filter([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("mln_buffer *")] MlnBuffer* out_filter);
+        public static extern mln_status mln_map_copy_layer_source_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_layer_source_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view source_layer);
+        public static extern mln_status mln_map_set_layer_source_id([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view source_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_copy_layer_source_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("char *")] sbyte* out_source_layer, [NativeTypeName("size_t")] nuint source_layer_capacity, [NativeTypeName("size_t *")] nuint* out_source_layer_size);
+        public static extern mln_status mln_map_copy_layer_source_id([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_layer_source_id([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view source_id);
+        public static extern mln_status mln_map_set_layer_min_zoom([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, double min_zoom, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_copy_layer_source_id([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("char *")] sbyte* out_source_id, [NativeTypeName("size_t")] nuint source_id_capacity, [NativeTypeName("size_t *")] nuint* out_source_id_size);
+        public static extern mln_status mln_map_set_layer_max_zoom([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, double max_zoom, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_layer_min_zoom([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, double min_zoom);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_layer_min_zoom([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, double* out_min_zoom);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_layer_max_zoom([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, double max_zoom);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_layer_max_zoom([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, double* out_max_zoom);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_layer_visibility([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("uint32_t")] uint visibility);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_layer_visibility([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("uint32_t *")] uint* out_visibility);
+        public static extern mln_status mln_map_set_layer_visibility([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("uint32_t")] uint visibility, [NativeTypeName("const mln_completion *")] mln_completion* completion);
     }
 }

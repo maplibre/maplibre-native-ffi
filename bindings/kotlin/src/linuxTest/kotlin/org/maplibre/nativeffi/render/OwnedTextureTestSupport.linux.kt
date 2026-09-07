@@ -58,9 +58,9 @@ private class LinuxEglOwnedTextureSession(
   private val config: COpaquePointer,
   private val surface: COpaquePointer,
   private val context: COpaquePointer,
-  override val session: RenderSessionHandle,
+  override val attachment: RenderSessionAttachment,
 ) : OwnedTextureTestSession {
-  override fun attachAnotherOwnedTexture(width: Int, height: Int): RenderSessionHandle {
+  override fun attachAnotherOwnedTexture(width: Int, height: Int): RenderSessionAttachment {
     val descriptor =
       EglContextDescriptor(
         NativePointer.ofAddress(display.toLong()),
@@ -71,32 +71,19 @@ private class LinuxEglOwnedTextureSession(
     return session
       .map()
       .attachOpenGLOwnedTexture(
-        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor)
+        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor),
+        OWNED_TEXTURE_ATTACH_OPTIONS,
       )
   }
 
-  override fun acquireFrame(): OwnedTextureTestFrame {
-    val handle = session.acquireOpenGLOwnedTextureFrame()
-    val frame = handle.frame()
-    return object : OwnedTextureTestFrame {
-      override val width: Int
-        get() = frame.width()
-
-      override val height: Int
-        get() = frame.height()
-
-      override val isClosed: Boolean
-        get() = handle.isClosed
-
-      override fun close() {
-        handle.close()
-      }
-    }
+  override fun frameSize(frame: AcquiredFrameHandle): OwnedTextureFrameSize {
+    val texture = frame.openGLTexture()
+    return OwnedTextureFrameSize(texture.width(), texture.height())
   }
 
   override fun close() {
     try {
-      session.close()
+      session.abandonAndClose()
     } finally {
       releaseEgl(display, surface, context)
     }
@@ -129,11 +116,12 @@ private fun createEglSession(map: MapHandle, width: Int, height: Int): OwnedText
         NativePointer.ofAddress(liveContext.toLong()),
         NativePointer.NULL_POINTER,
       )
-    val session =
+    val attachment =
       map.attachOpenGLOwnedTexture(
-        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor)
+        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor),
+        OWNED_TEXTURE_ATTACH_OPTIONS,
       )
-    return LinuxEglOwnedTextureSession(display, config, liveSurface, liveContext, session)
+    return LinuxEglOwnedTextureSession(display, config, liveSurface, liveContext, attachment)
   } catch (error: Throwable) {
     releaseEgl(display, surface, context)
     throw error

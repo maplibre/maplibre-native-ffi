@@ -37,15 +37,6 @@ public sealed interface RuntimeEventPayload {
   public data class OfflineRegionTileCountLimit(public val regionId: Long, public val limit: Long) :
     RuntimeEventPayload
 
-  public data class OfflineOperationCompleted(
-    /** Native `uint64_t` operation id preserved as a [Long] bit pattern. */
-    public val operationId: Long,
-    public val operationKind: OfflineOperationKind,
-    public val resultKind: OfflineOperationResultKind,
-    public val resultStatus: Int,
-    public val found: Boolean,
-  ) : RuntimeEventPayload
-
   /**
    * Reports that a camera transition released the camera.
    *

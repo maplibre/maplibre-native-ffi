@@ -19,6 +19,7 @@
 #include <mln/vulkan/renderable_resource.hpp>
 #include <mln/vulkan/renderer_backend.hpp>
 #include <mln/vulkan/texture2d.hpp>
+
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
@@ -62,25 +63,6 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     create_render_pass(
       vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal
     );
-    create_framebuffers();
-  }
-
-  // Rebuilds everything sized with the texture and keeps the render pass. mbgl
-  // keys its pipeline cache on the render pass handle, so destroying the pass
-  // strands every cached pipeline and lets a recycled handle hit a pipeline
-  // built for a different pass. Attachment formats and layouts do not vary with
-  // size.
-  void resize_sampled(vk::Extent2D sampled_extent) {
-    backend.getDevice()->waitIdle(backend.getDispatcher());
-    swapchainFramebuffers.clear();
-    swapchainImageViews.clear();
-    swapchainImages.clear();
-    colorAllocations.clear();
-    readTexture.reset();
-
-    init_sampled_color(sampled_extent);
-    create_color_image_views();
-    initDepthStencil();
     create_framebuffers();
   }
 
@@ -177,9 +159,9 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     colorFormat = vk::Format::eR8G8B8A8Unorm;
     extent = sampled_extent;
 
-    const auto image_usage = vk::ImageUsageFlagBits::eColorAttachment |
-                             vk::ImageUsageFlagBits::eSampled |
-                             vk::ImageUsageFlagBits::eTransferSrc;
+    const auto image_usage =
+      vk::ImageUsageFlags{vk::ImageUsageFlagBits::eColorAttachment} |
+      vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferSrc;
     auto image_create_info =
       vk::ImageCreateInfo()
         .setImageType(vk::ImageType::e2D)
@@ -295,11 +277,15 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
         .setSrcSubpass(VK_SUBPASS_EXTERNAL)
         .setDstSubpass(0)
         .setSrcStageMask(
-          vk::PipelineStageFlagBits::eEarlyFragmentTests |
+          vk::PipelineStageFlags{
+            vk::PipelineStageFlagBits::eEarlyFragmentTests
+          } |
           vk::PipelineStageFlagBits::eLateFragmentTests
         )
         .setDstStageMask(
-          vk::PipelineStageFlagBits::eEarlyFragmentTests |
+          vk::PipelineStageFlags{
+            vk::PipelineStageFlagBits::eEarlyFragmentTests
+          } |
           vk::PipelineStageFlagBits::eLateFragmentTests
         )
         .setSrcAccessMask({})
@@ -387,11 +373,13 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
 };
 
 VulkanTextureBackend::VulkanTextureBackend(
-  const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size
+  const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size,
+  std::size_t ring_depth
 )
     : mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
       mln::gfx::HeadlessBackend(size),
-      descriptor_(descriptor) {
+      descriptor_(descriptor),
+      ring_(ring_depth) {
   initSharedDevice();
 }
 
@@ -402,13 +390,15 @@ VulkanTextureBackend::VulkanTextureBackend(
       mln::gfx::HeadlessBackend(size),
       descriptor_(owned_descriptor_from_borrowed(descriptor)),
       borrowed_descriptor_(descriptor),
-      uses_borrowed_texture_(true) {
+      uses_borrowed_texture_(true),
+      ring_(0) {
   initSharedDevice();
 }
 
 VulkanTextureBackend::~VulkanTextureBackend() {
   auto guard = mln::gfx::BackendScope{*this};
   resource.reset();
+  ring_.clear();
   getThreadPool().runRenderJobs(true);
 }
 
@@ -428,6 +418,9 @@ void VulkanTextureBackend::initSharedDevice() {
 auto VulkanTextureBackend::getDefaultRenderable() -> mln::gfx::Renderable& {
   if (!resource) {
     resource = std::make_unique<VulkanTextureRenderableResource>(*this);
+    // Recorded with the resource it describes, so a slot that keeps an older
+    // resource keeps the size that resource was built for.
+    ring_.record_size(size);
   }
   return *this;
 }
@@ -449,15 +442,11 @@ void VulkanTextureBackend::set_borrowed_target(
 ) {
   const auto new_size =
     mln::Size{descriptor.physical_width, descriptor.physical_height};
-  // Nothing is built yet, so the lazy path already takes the new image.
   if (!resource) {
     borrowed_descriptor_ = descriptor;
     setSize(new_size);
     return;
   }
-  // The resource first, then this backend's own view of the target, so a
-  // framebuffer that fails to build cannot leave the backend naming an image it
-  // does not render into.
   getResource<VulkanTextureRenderableResource>().set_borrowed(
     descriptor, new_size.width, new_size.height
   );
@@ -465,18 +454,10 @@ void VulkanTextureBackend::set_borrowed_target(
   size = new_size;
 }
 
-void VulkanTextureBackend::resize(mln::Size new_size) {
-  // Nothing is built yet, so the lazy path already produces the new size. A
-  // borrowed texture is sized by its owner and never reaches here; the session
-  // rejects resizing one.
-  if (!resource || uses_borrowed_texture_) {
-    setSize(new_size);
-    return;
-  }
+void VulkanTextureBackend::set_ring_size(mln::Size new_size) {
+  // Slots keep their old resources until the ring selects a released slot for
+  // rendering at the new extent.
   size = new_size;
-  getResource<VulkanTextureRenderableResource>().resize_sampled(
-    vk::Extent2D{new_size.width, new_size.height}
-  );
 }
 
 auto VulkanTextureBackend::readStillImage() -> mln::PremultipliedImage {
@@ -598,6 +579,7 @@ void VulkanTextureBackend::prepareRenderResources() {
 }
 
 auto VulkanTextureBackend::frame_resources() -> VulkanTextureFrameResources {
+  prepareRenderResources();
   auto& rendered = getResource<VulkanTextureRenderableResource>();
   return VulkanTextureFrameResources{
     .image = rendered.image(),
@@ -605,6 +587,10 @@ auto VulkanTextureBackend::frame_resources() -> VulkanTextureFrameResources {
     .device = device.get(),
     .format = rendered.format(),
   };
+}
+
+auto VulkanTextureBackend::select_slot(std::size_t slot) -> bool {
+  return ring_.select(slot, size, resource);
 }
 
 void VulkanTextureBackend::initInstance() {

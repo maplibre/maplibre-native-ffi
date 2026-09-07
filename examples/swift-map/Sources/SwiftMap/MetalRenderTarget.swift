@@ -41,9 +41,9 @@ final class MetalGraphicsContext {
   }
 }
 
-/// The render session and its mode-specific resources. Attach records the
-/// calling thread as the session's owner, so every call here runs on the render
-/// loop thread that owns the Metal objects.
+/// The render session and its mode-specific resources. The host cadence
+/// services driver work on the graphics thread that owns the Metal objects.
+/// Every operation remains isolated to the main actor.
 @MainActor
 enum MetalRenderTarget {
   case ownedTexture(
@@ -53,33 +53,34 @@ enum MetalRenderTarget {
   case borrowedTexture(
     session: RenderSessionHandle,
     compositor: MetalTextureCompositor,
-    texture: MetalBorrowedTexture
+    texture: MetalBorrowedTexture,
+    map: MapHandle
   )
   case nativeSurface(session: RenderSessionHandle)
 
-  /// Attaches a session against the map the runtime loop published.
+  /// Attaches a session against the map owned by the view.
   static func attach(
     mode: RenderTargetMode,
-    attachRef: MapAttachRef,
+    map: MapHandle,
     graphics: MetalGraphicsContext,
     viewport: Viewport
-  ) throws -> MetalRenderTarget {
+  ) async throws -> MetalRenderTarget {
     switch mode {
     case .ownedTexture:
-      return try attachOwnedTexture(
-        attachRef: attachRef,
+      return try await attachOwnedTexture(
+        map: map,
         graphics: graphics,
         viewport: viewport
       )
     case .borrowedTexture:
-      return try attachBorrowedTexture(
-        attachRef: attachRef,
+      return try await attachBorrowedTexture(
+        map: map,
         graphics: graphics,
         viewport: viewport
       )
     case .nativeSurface:
-      return try attachNativeSurface(
-        attachRef: attachRef,
+      return try await attachNativeSurface(
+        map: map,
         graphics: graphics,
         viewport: viewport
       )
@@ -91,160 +92,193 @@ enum MetalRenderTarget {
   mutating func resize(
     graphics: MetalGraphicsContext,
     viewport: Viewport
-  ) throws {
+  ) async throws {
     switch self {
     case let .ownedTexture(session, compositor):
+      try await session.resize(viewport.extent)
       compositor.resize(viewport)
-      try session.resize(
-        width: viewport.logicalWidth,
-        height: viewport.logicalHeight,
-        scaleFactor: viewport.scaleFactor
-      )
-    case let .borrowedTexture(session, compositor, _):
+    case let .borrowedTexture(session, compositor, _, map):
       let replacement = try MetalBorrowedTexture(
         graphics: graphics,
         viewport: viewport
       )
-      do {
-        try session
-          .setMetalBorrowedTextureTarget(MetalBorrowedTextureDescriptor(
-            extent: viewport.extent,
-            physicalWidth: viewport.physicalWidth,
-            physicalHeight: viewport.physicalHeight,
-            texture: replacement.pointer
-          ))
-      } catch {
-        // The session may hold either texture, and both are released as this
-        // scope unwinds, so detach first.
-        try? session.detach()
-        throw error
-      }
-      compositor.resize(viewport)
-      self = .borrowedTexture(
-        session: session,
-        compositor: compositor,
-        texture: replacement
+      try await session.setMetalBorrowedTextureTarget(
+        MetalBorrowedTextureDescriptor(
+          extent: viewport.extent,
+          physicalWidth: viewport.physicalWidth,
+          physicalHeight: viewport.physicalHeight,
+          texture: replacement.pointer
+        )
       )
-    case let .nativeSurface(session):
-      try session.resize(
+      compositor.resize(viewport)
+      // A handover replaces only the graphics resource, so the map still needs
+      // the new extent.
+      _ = try await map.resize(to: MapLogicalExtent(
         width: viewport.logicalWidth,
         height: viewport.logicalHeight,
         scaleFactor: viewport.scaleFactor
+      ))
+      self = .borrowedTexture(
+        session: session,
+        compositor: compositor,
+        texture: replacement,
+        map: map
       )
+    case let .nativeSurface(session):
+      try await session.resize(viewport.extent)
     }
   }
 
-  /// Renders the latest map update, reporting whether a frame was presented.
-  /// For a few iterations after attach or resize the session reports a pending
-  /// size, because the map applies a new logical size on the runtime loop's
-  /// next pump.
-  func renderUpdate() throws -> Bool {
+  /// Services caller-driver work, submits one host-paced frame demand, and
+  /// reports whether the render loop may rest. It reports false when no frame
+  /// reached the screen and when the map asked for another frame while this one
+  /// rendered, so the loop demands one more.
+  func renderFrame() async throws -> Bool {
+    let session: RenderSessionHandle
+    switch self {
+    case let .ownedTexture(value, _),
+         let .borrowedTexture(value, _, _, _),
+         let .nativeSurface(value):
+      session = value
+    }
+    try session.requestFrame(FrameDemand(options: [.ifNeeded, .present]))
+    try session.serviceDriverWork()
+    guard let result = try session.drainFrameResults().last,
+          result.result == .rendered
+    else { return false }
+
     switch self {
     case let .ownedTexture(session, compositor):
-      guard try session.renderUpdate().result == .rendered else {
-        return false
-      }
-      let frame = try session.acquireMetalOwnedTextureFrame()
-      var presented = false
-      var firstError: Error?
+      // An empty ring keeps the previously composited frame on screen.
+      guard let frame = try session.acquireFrame() else { return false }
       do {
-        presented = try compositor.draw(frame: frame)
+        let presented = try compositor.draw(frame: frame)
+        try frame.release()
+        return presented && !result.needsRepaint
       } catch {
-        firstError = error
+        try? frame.release()
+        throw error
       }
-      do {
-        try frame.close()
-      } catch {
-        firstError = firstError ?? error
-      }
-      if let firstError {
-        throw firstError
-      }
-      return presented
-    case let .borrowedTexture(session, compositor, texture):
-      guard try session.renderUpdate().result == .rendered else {
-        return false
-      }
-      return try compositor.draw(texture: texture.texture)
-    case let .nativeSurface(session):
-      return try session.renderUpdate().result == .rendered
+    case let .borrowedTexture(_, compositor, texture, _):
+      return try compositor.draw(texture: texture.texture) && !result
+        .needsRepaint
+    case .nativeSurface:
+      return !result.needsRepaint
     }
   }
 
-  func finishFrame() throws {
-    // Metal surface and texture paths need no per-iteration host upkeep here.
-  }
-
-  func close() throws {
+  func close() async throws {
+    let session: RenderSessionHandle
     switch self {
-    case let .ownedTexture(session, _):
+    case let .ownedTexture(value, _),
+         let .borrowedTexture(value, _, _, _),
+         let .nativeSurface(value):
+      session = value
+    }
+    do {
+      try await session.detach()
       try session.close()
-    case let .borrowedTexture(session, _, _):
-      try session.close()
-    case let .nativeSurface(session):
-      try session.close()
+    } catch {
+      _ = try? session.abandon()
+      try? session.close()
+      throw error
     }
   }
 
   private static func attachOwnedTexture(
-    attachRef: MapAttachRef,
+    map: MapHandle,
     graphics: MetalGraphicsContext,
     viewport: Viewport
-  ) throws -> MetalRenderTarget {
-    let session =
-      try attachRef.attachMetalOwnedTexture(MetalOwnedTextureDescriptor(
+  ) async throws -> MetalRenderTarget {
+    let attachment = try map.attachMetalOwnedTexture(
+      MetalOwnedTextureDescriptor(
         extent: viewport.extent,
         context: graphics.contextDescriptor
-      ))
+      ),
+      options: .init(
+        driver: .callerGraphicsThread,
+        requestedTextureRingDepth: 3
+      )
+    )
+    let session = try await finishAttachment(attachment)
     do {
       let compositor = try MetalTextureCompositor(graphics: graphics)
       return .ownedTexture(session: session, compositor: compositor)
     } catch {
+      try? await session.detach()
       try? session.close()
       throw error
     }
   }
 
   private static func attachBorrowedTexture(
-    attachRef: MapAttachRef,
+    map: MapHandle,
     graphics: MetalGraphicsContext,
     viewport: Viewport
-  ) throws -> MetalRenderTarget {
+  ) async throws -> MetalRenderTarget {
     let texture = try MetalBorrowedTexture(
       graphics: graphics,
       viewport: viewport
     )
-    let session = try attachRef
-      .attachMetalBorrowedTexture(MetalBorrowedTextureDescriptor(
+    let attachment = try map.attachMetalBorrowedTexture(
+      MetalBorrowedTextureDescriptor(
         extent: viewport.extent,
         physicalWidth: viewport.physicalWidth,
         physicalHeight: viewport.physicalHeight,
         texture: texture.pointer
-      ))
+      ),
+      options: .init(driver: .callerGraphicsThread)
+    )
+    let session = try await finishAttachment(attachment)
     do {
       let compositor = try MetalTextureCompositor(graphics: graphics)
       return .borrowedTexture(
         session: session,
         compositor: compositor,
-        texture: texture
+        texture: texture,
+        map: map
       )
     } catch {
+      try? await session.detach()
       try? session.close()
       throw error
     }
   }
 
   private static func attachNativeSurface(
-    attachRef: MapAttachRef,
+    map: MapHandle,
     graphics: MetalGraphicsContext,
     viewport: Viewport
-  ) throws -> MetalRenderTarget {
-    let session = try attachRef.attachMetalSurface(MetalSurfaceDescriptor(
-      extent: viewport.extent,
-      context: graphics.contextDescriptor,
-      layer: graphics.layerPointer
-    ))
-    return .nativeSurface(session: session)
+  ) async throws -> MetalRenderTarget {
+    let attachment = try map.attachMetalSurface(
+      MetalSurfaceDescriptor(
+        extent: viewport.extent,
+        context: graphics.contextDescriptor,
+        layer: graphics.layerPointer
+      ),
+      options: .init(driver: .callerGraphicsThread)
+    )
+    return try .nativeSurface(session: await finishAttachment(attachment))
+  }
+
+  private static func finishAttachment(
+    _ attachment: RenderSessionAttachment
+  ) async throws -> RenderSessionHandle {
+    let session = attachment.session
+    do {
+      try session.setDriverWorkReadyHandler { [weak session] in
+        Task { @MainActor in
+          _ = try? session?.serviceDriverWork(maxWork: 0)
+        }
+      }
+      try session.serviceDriverWork(maxWork: 0)
+      try await attachment.completion.value
+      return session
+    } catch {
+      _ = try? session.abandon()
+      try? session.close()
+      throw error
+    }
   }
 }
 
@@ -274,12 +308,15 @@ final class MetalTextureCompositor {
     )
   }
 
-  func draw(frame: MetalOwnedTextureFrameHandle) throws -> Bool {
+  func draw(frame: AcquiredFrameHandle) throws -> Bool {
+    let synchronization = try frame.producerSynchronization()
     var presented = false
-    try frame.withBackendPointers { view in
-      let address = try view.texture.addressBitPattern
-      let texture = try metalTexture(address: address)
-      presented = try draw(texture: texture)
+    try frame.withMetalTexture { value in
+      let texture = try metalTexture(address: value.texture.addressBitPattern)
+      presented = try draw(
+        texture: texture,
+        producerSynchronization: synchronization
+      )
     }
     return presented
   }
@@ -287,7 +324,10 @@ final class MetalTextureCompositor {
   /// Samples the texture into the layer's next drawable, reporting whether the
   /// frame was presented. An occluded window or an empty drawable pool yields
   /// no drawable, which is reported as false rather than failing the frame.
-  func draw(texture: any MTLTexture) throws -> Bool {
+  func draw(
+    texture: any MTLTexture,
+    producerSynchronization: GPUSynchronization = .cpuComplete
+  ) throws -> Bool {
     guard let drawable = layer.nextDrawable() else { return false }
     let passDescriptor = MTLRenderPassDescriptor()
     guard let colorAttachment = passDescriptor.colorAttachments[0] else {
@@ -306,6 +346,15 @@ final class MetalTextureCompositor {
     guard let commandBuffer = queue.makeCommandBuffer() else {
       throw metalError("Metal command buffer creation failed")
     }
+    switch producerSynchronization {
+    case .cpuComplete:
+      break
+    case let .metalSharedEvent(pointer, value):
+      let event = try metalSharedEvent(address: pointer.addressBitPattern)
+      commandBuffer.encodeWaitForEvent(event, value: value)
+    default:
+      throw metalError("Metal frame returned incompatible GPU synchronization")
+    }
     guard let encoder = commandBuffer.makeRenderCommandEncoder(
       descriptor: passDescriptor
     ) else {
@@ -317,6 +366,9 @@ final class MetalTextureCompositor {
     encoder.endEncoding()
     commandBuffer.present(drawable)
     commandBuffer.commit()
+    // CPU-complete frame release is valid only after the compositor finishes
+    // sampling the session-owned texture.
+    commandBuffer.waitUntilCompleted()
     return true
   }
 
@@ -378,6 +430,19 @@ private func metalTexture(address: UInt) throws -> any MTLTexture {
     )
   }
   return texture
+}
+
+private func metalSharedEvent(address: UInt) throws -> any MTLSharedEvent {
+  guard let pointer = UnsafeRawPointer(bitPattern: address) else {
+    throw metalError("Metal frame has a null shared event")
+  }
+  let object = Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue()
+  guard let event = object as? any MTLSharedEvent else {
+    throw metalError(
+      "Metal frame pointer did not contain an MTLSharedEvent"
+    )
+  }
+  return event
 }
 
 private func nativePointer(_ object: AnyObject) -> NativePointer {

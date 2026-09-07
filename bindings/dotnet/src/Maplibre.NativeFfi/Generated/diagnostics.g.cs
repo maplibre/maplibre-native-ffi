@@ -7,9 +7,5 @@ namespace Maplibre.NativeFfi.Internal.C
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("const char *")]
         public static extern sbyte* mln_thread_last_error_message();
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        [return: NativeTypeName("uint64_t")]
-        public static extern ulong mln_thread_token();
     }
 }

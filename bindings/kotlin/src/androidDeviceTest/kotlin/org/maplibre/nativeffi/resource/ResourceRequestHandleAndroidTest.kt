@@ -13,10 +13,11 @@ import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class ResourceRequestHandleAndroidTest {
   @Test
-  fun unreachableProviderOwnedHandleReleasesNativeRequest() {
+  fun unreachableProviderOwnedHandleReleasesNativeRequest(): Unit = runSuspendTest {
     val released = CountDownLatch(1)
 
     registerUnreachableProviderOwnedHandle(released)
@@ -25,7 +26,7 @@ class ResourceRequestHandleAndroidTest {
   }
 
   @Test
-  fun completionFailureIsTerminalAndCopiesDiagnosticBeforeReleaseCleanup() {
+  fun completionFailureIsTerminalAndCopiesDiagnosticBeforeReleaseCleanup(): Unit = runSuspendTest {
     val releases = AtomicInteger(0)
     val handle =
       ResourceRequestHandle(
@@ -33,7 +34,7 @@ class ResourceRequestHandleAndroidTest {
         completer = { _, _ -> MaplibreNativeC.mln_network_status_set(999_999) },
         releaser = {
           releases.incrementAndGet()
-          MaplibreNativeC.mln_runtime_destroy(0L)
+          MaplibreNativeC.mln_runtime_release(0L, null)
         },
       )
     assertEquals(
@@ -46,7 +47,8 @@ class ResourceRequestHandleAndroidTest {
         handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
       }
     assertTrue(failure.diagnostic.contains("network status"))
-    assertFalse(failure.diagnostic.contains("runtime"))
+    // The releaser's own failing call must not overwrite the copied diagnostic.
+    assertFalse(failure.diagnostic.contains("completion"))
     assertEquals(1, releases.get())
     assertFailsWith<InvalidStateException> {
       handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
@@ -54,35 +56,38 @@ class ResourceRequestHandleAndroidTest {
   }
 
   @Test
-  fun concurrentCloseDefersReleaseUntilCompletionAndCancellationUsesInjectedCheck() {
-    val entered = CountDownLatch(1)
-    val continueCompletion = CountDownLatch(1)
-    val releases = AtomicInteger(0)
-    val handle =
-      ResourceRequestHandle(
-        1L,
-        completer = { _, _ ->
-          entered.countDown()
-          continueCompletion.await(5, TimeUnit.SECONDS)
-          MaplibreStatus.OK.nativeCode
-        },
-        cancellationChecker = { true },
-        releaser = { releases.incrementAndGet() },
+  fun concurrentCloseDefersReleaseUntilCompletionAndCancellationUsesInjectedCheck(): Unit =
+    runSuspendTest {
+      val entered = CountDownLatch(1)
+      val continueCompletion = CountDownLatch(1)
+      val releases = AtomicInteger(0)
+      val handle =
+        ResourceRequestHandle(
+          1L,
+          completer = { _, _ ->
+            entered.countDown()
+            continueCompletion.await(5, TimeUnit.SECONDS)
+            MaplibreStatus.OK.nativeCode
+          },
+          cancellationChecker = { true },
+          releaser = { releases.incrementAndGet() },
+        )
+      assertEquals(
+        ResourceProviderDecision.HANDLE.nativeValue,
+        handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
       )
-    assertEquals(
-      ResourceProviderDecision.HANDLE.nativeValue,
-      handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
-    )
-    assertTrue(handle.isCancelled())
-    val completion = thread { handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT)) }
-    assertTrue(entered.await(5, TimeUnit.SECONDS))
-    handle.close()
-    assertEquals(0, releases.get())
-    continueCompletion.countDown()
-    completion.join()
-    assertEquals(1, releases.get())
-    assertFailsWith<InvalidStateException> { handle.isCancelled() }
-  }
+      assertTrue(handle.isCancelled())
+      val completion = thread {
+        handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
+      }
+      assertTrue(entered.await(5, TimeUnit.SECONDS))
+      handle.close()
+      assertEquals(0, releases.get())
+      continueCompletion.countDown()
+      completion.join()
+      assertEquals(1, releases.get())
+      assertFailsWith<InvalidStateException> { handle.isCancelled() }
+    }
 
   private fun registerUnreachableProviderOwnedHandle(released: CountDownLatch) {
     val handle = ResourceRequestHandle(1L, releaser = { released.countDown() })
