@@ -18,7 +18,6 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -85,6 +84,7 @@
 #include "geojson/geojson.hpp"
 #include "geojson/geojson_source_data.hpp"
 #include "handles/handle_table.hpp"
+#include "handles/owner_thread.hpp"
 #include "map/feature_state.hpp"
 #include "maplibre_native_c.h"
 #include "runtime/runtime.hpp"
@@ -3243,7 +3243,7 @@ namespace mln::core {
 
 struct MapObject {
   mln_runtime runtime = MLN_HANDLE_NULL;
-  std::thread::id owner_thread;
+  OwnerThreadToken owner_thread = kNoOwnerThread;
   uint32_t map_mode = MLN_MAP_MODE_CONTINUOUS;
   double scale_factor = default_scale_factor;
   bool still_image_request_pending = false;
@@ -3361,7 +3361,7 @@ auto validate_map_locked(mln_map map, MapObject*& out_map) -> mln_status {
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (out_map->owner_thread != std::this_thread::get_id()) {
+  if (out_map->owner_thread != current_owner_thread()) {
     set_thread_error("map call must be made on its owner thread");
     return MLN_STATUS_WRONG_THREAD;
   }
@@ -3707,7 +3707,7 @@ auto create_map(
   // already resolves.
   const auto handle = handle_table<MapObject>().insert(owned_map);
   owned_map->runtime = runtime;
-  owned_map->owner_thread = std::this_thread::get_id();
+  owned_map->owner_thread = current_owner_thread();
   owned_map->map_mode = effective.map_mode;
   owned_map->scale_factor = effective.scale_factor;
   owned_map->event_state = std::move(event_state);

@@ -9,7 +9,6 @@
 #include <mutex>
 #include <optional>
 #include <string>
-#include <thread>
 #include <unordered_set>
 #include <vector>
 
@@ -22,6 +21,7 @@
 #include <mln/util/size.hpp>
 
 #include "diagnostics/diagnostics.hpp"
+#include "handles/owner_thread.hpp"
 #include "map/feature_state.hpp"
 #include "maplibre_native_c.h"
 #include "render/discard_present.hpp"
@@ -480,7 +480,7 @@ struct mln_render_session_object {
   mln_map map = MLN_HANDLE_NULL;
   // The thread that attached the session, fixed for its lifetime. Set before
   // the session is registered.
-  std::thread::id owner_thread;
+  mln::core::OwnerThreadToken owner_thread = mln::core::kNoOwnerThread;
   uint32_t width = 0;
   uint32_t height = 0;
   uint32_t physical_width = 0;

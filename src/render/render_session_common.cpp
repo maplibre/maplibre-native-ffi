@@ -9,7 +9,6 @@
 #include <optional>
 #include <span>
 #include <string>
-#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -951,7 +950,7 @@ auto validate_render_session(
   if (out_session == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (out_session->owner_thread != std::this_thread::get_id()) {
+  if (out_session->owner_thread != current_owner_thread()) {
     set_thread_error(
       "render session call must be made on the thread that attached it"
     );
@@ -997,7 +996,7 @@ auto attach_render_session(
 
   // The attaching thread owns the session for its whole lifetime, and need not
   // be the map's thread.
-  session->owner_thread = std::this_thread::get_id();
+  session->owner_thread = current_owner_thread();
 
   const auto map = session->map;
   auto* handle = session.get();

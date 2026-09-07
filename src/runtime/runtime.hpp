@@ -12,7 +12,6 @@
 #include <optional>
 #include <shared_mutex>
 #include <string>
-#include <thread>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -21,6 +20,7 @@
 #include <mln/util/run_loop.hpp>
 
 #include "handles/handle_table.hpp"
+#include "handles/owner_thread.hpp"
 #include "maplibre_native_c.h"
 
 namespace mln {
@@ -179,7 +179,10 @@ struct RuntimeObject {
   mln_runtime self = MLN_HANDLE_NULL;
   // The token this runtime hands to mbgl as its opaque platform context.
   void* platform_context = nullptr;
-  std::thread::id owner_thread;
+  OwnerThreadToken owner_thread = kNoOwnerThread;
+  // Set once, by the owner thread's exit, when the runtime outlived it. Read
+  // by validation on any thread, so it is atomic rather than table-guarded.
+  std::atomic<bool> owner_thread_exited{false};
   std::unique_ptr<mln::util::RunLoop> run_loop;
   std::string asset_path;
   std::string cache_path;

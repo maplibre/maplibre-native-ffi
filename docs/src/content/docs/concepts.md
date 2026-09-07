@@ -16,8 +16,8 @@ The runtime owns scheduler state and event storage for one owner thread. The
 host creates the runtime on the thread that will pump it. Runtime work and
 events flow through that thread.
 
-Each owner thread has at most one live runtime. Pumping advances MapLibre Native
-and collects completed work.
+Each owner thread has at most one live runtime, and destroys it before the
+thread exits. Pumping advances MapLibre Native and collects completed work.
 
 The host sets the pace. A display-paced host pumps once per frame. A host with a
 dedicated pump thread parks that thread until the runtime has work. Other host
