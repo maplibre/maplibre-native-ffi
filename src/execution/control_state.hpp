@@ -11,8 +11,8 @@
 
 namespace mln::core {
 
-// Coordinates handle lookup, committed submissions, child reservations, and
-// close. Registry locks are never held while waiting for a submission or child.
+// Coordinates handle lookup, committed submissions, live children, and close.
+// Registry locks are never held while waiting for a submission or child.
 class ControlState {
  public:
   [[nodiscard]] auto acquire() -> bool {
@@ -41,36 +41,19 @@ class ControlState {
       try {
         drained();
       } catch (...) {
+        // A drained callback cannot reopen a handle that finished closing.
       }
     }
   }
 
-  [[nodiscard]] auto reserve_child() -> bool {
+  [[nodiscard]] auto retain_child() -> bool {
     const std::scoped_lock lock(mutex_);
     if (closing_) {
       set_thread_error("handle is closing");
       return false;
     }
-    ++child_reservations_;
-    return true;
-  }
-
-  auto commit_child() noexcept -> void {
-    const std::scoped_lock lock(mutex_);
-    if (child_reservations_ > 0) {
-      --child_reservations_;
-    }
     ++children_;
-  }
-
-  auto abandon_child_reservation() noexcept -> void {
-    {
-      const std::scoped_lock lock(mutex_);
-      if (child_reservations_ > 0) {
-        --child_reservations_;
-      }
-    }
-    condition_.notify_all();
+    return true;
   }
 
   auto release_child() noexcept -> void {
@@ -89,7 +72,9 @@ class ControlState {
       set_thread_error("handle is already closing");
       return MLN_STATUS_INVALID_STATE;
     }
-    if (children_ != 0 || child_reservations_ != 0) {
+    // A child being created counts here from acceptance, so it is pending
+    // rather than live until its handle exists.
+    if (children_ != 0) {
       set_thread_error("handle still owns live or pending children");
       return MLN_STATUS_INVALID_STATE;
     }
@@ -119,6 +104,7 @@ class ControlState {
       try {
         callback();
       } catch (...) {
+        // A drained callback cannot reopen a handle that finished closing.
       }
     }
   }
@@ -140,7 +126,6 @@ class ControlState {
   std::condition_variable condition_;
   std::size_t submissions_ = 0;
   std::size_t children_ = 0;
-  std::size_t child_reservations_ = 0;
   bool closing_ = false;
   std::function<void()> drained_;
 };

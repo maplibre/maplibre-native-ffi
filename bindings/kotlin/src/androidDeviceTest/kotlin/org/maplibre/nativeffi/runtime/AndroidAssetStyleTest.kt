@@ -12,6 +12,7 @@ import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
+import org.maplibre.nativeffi.sleepMillis
 
 class AndroidAssetStyleTest {
   @Test
@@ -65,14 +66,12 @@ class AndroidAssetStyleTest {
             repeat(2_000) {
               runtime.barrier().await()
               val failed =
-                runtime.drainEvents().events.filter {
-                  it.type == RuntimeEventType.MAP_LOADING_FAILED
-                }
+                runtime.drainEvents().filter { it.type == RuntimeEventType.MAP_LOADING_FAILED }
               if (failed.isNotEmpty()) {
                 fail(failed.joinToString { it.message })
               }
               sourceErrors.poll()?.let { fail(it) }
-              waitForAsyncTestWork()
+              sleepMillis(1)
             }
           }
       }
@@ -104,13 +103,13 @@ class AndroidAssetStyleTest {
     repeat(10_000) {
       runtime.barrier().await()
       if (
-        runtime.drainEvents().events.any {
+        runtime.drainEvents().any {
           it.type == RuntimeEventType.MAP_STYLE_LOADED && it.mapSource == map
         }
       ) {
         return true
       }
-      waitForAsyncTestWork()
+      sleepMillis(1)
     }
     return false
   }

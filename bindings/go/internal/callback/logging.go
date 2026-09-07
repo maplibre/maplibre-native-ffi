@@ -14,8 +14,20 @@ import "C"
 import (
 	"runtime/cgo"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 )
+
+// liveLogCallbacks counts the log callback states this package holds a cgo
+// handle for. LogCallbackLiveCountForTest reads it.
+var liveLogCallbacks atomic.Int64
+
+// LogCallbackLiveCountForTest reports how many log callback states are still
+// alive, which is how a test observes that the C API's release callback freed
+// one.
+func LogCallbackLiveCountForTest() int64 {
+	return liveLogCallbacks.Load()
+}
 
 // LogCallback is the internal shape for process-global log callbacks.
 type LogCallback func(severity uint32, event uint32, code int64, message string) bool
@@ -29,12 +41,16 @@ type LogCallbackState struct {
 func newLogCallbackState(callback LogCallback) *LogCallbackState {
 	state := &LogCallbackState{callback: callback}
 	state.handle = cgo.NewHandle(state)
+	liveLogCallbacks.Add(1)
 	return state
 }
 
 func (state *LogCallbackState) Release() {
 	if state != nil {
-		state.once.Do(state.handle.Delete)
+		state.once.Do(func() {
+			state.handle.Delete()
+			liveLogCallbacks.Add(-1)
+		})
 	}
 }
 

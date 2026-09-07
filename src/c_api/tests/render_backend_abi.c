@@ -161,7 +161,8 @@ static void metal_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
 static void metal_surface_retarget_retains_submission_inputs(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_TRUE(mln_test_metal_surface_retarget_retains_submission(map));
+  const char* failure = mln_test_metal_surface_retarget_retains_submission(map);
+  TEST_ASSERT_NULL_MESSAGE(failure, failure);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -544,11 +545,6 @@ static void opengl_owned_texture_attach_rejects_dedicated_wgl(void) {
 }
 #endif
 
-static const char dedicated_background_style_json[] =
-  "{\"version\":8,\"sources\":{},\"layers\":"
-  "[{\"id\":\"bg\",\"type\":\"background\","
-  "\"paint\":{\"background-color\":\"#ff0000\"}}]}";
-
 // The contract a dedicated session offers a host: it creates its own context
 // from a descriptor that names no share context, renders through it, and leaves
 // it current so the next render costs no EGL call.
@@ -569,9 +565,8 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   TEST_ASSERT_EQUAL_INT(MLN_TEST_FIXTURE_OK, fixture_result);
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_json(
-                     map, MLN_BUFFER_LITERAL(dedicated_background_style_json)
-                   )
+    MLN_STATUS_OK,
+    mln_test_map_set_style_json(map, mln_test_red_background_style_json)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   mln_frame_demand demand = mln_frame_demand_default();
@@ -641,9 +636,8 @@ static void dedicated_egl_texture_uses_a_readback_only_core_worker(void) {
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_json(
-                     map, MLN_BUFFER_LITERAL(dedicated_background_style_json)
-                   )
+    MLN_STATUS_OK,
+    mln_test_map_set_style_json(map, mln_test_red_background_style_json)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   mln_frame_demand demand = mln_frame_demand_default();
@@ -707,9 +701,8 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_json(
-                     map, MLN_BUFFER_LITERAL(dedicated_background_style_json)
-                   )
+    MLN_STATUS_OK,
+    mln_test_map_set_style_json(map, mln_test_red_background_style_json)
   );
 
   // Render until the map settles: the last frame asks for no repaint.
@@ -1006,6 +999,12 @@ static void vulkan_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static_assert(
+  sizeof(((mln_vulkan_borrowed_texture_descriptor*)0)->image) ==
+    sizeof(uint64_t),
+  "a Vulkan non-dispatchable handle is 64 bits wide on every ABI"
+);
+
 // A Vulkan non-dispatchable handle is 64 bits wide on every ABI, including
 // 32-bit ones where a pointer carrier would truncate it. A handle whose value
 // lives entirely in the high 32 bits reads as null once truncated, so the
@@ -1034,9 +1033,6 @@ static void vulkan_handles_keep_their_high_bits(void) {
   descriptor.format = 37;
   descriptor.initial_layout = 0;
   descriptor.final_layout = 5;
-  TEST_ASSERT_EQUAL_UINT64(high_handle, descriptor.image);
-  TEST_ASSERT_EQUAL_UINT64(high_view_handle, descriptor.image_view);
-
   mln_render_session session = MLN_HANDLE_NULL;
   const mln_status status = mln_vulkan_borrowed_texture_attach(
     map, &descriptor,

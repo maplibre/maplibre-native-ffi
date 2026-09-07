@@ -21,25 +21,9 @@ func TestStyleImageBorrowsPixelsAcrossGC(t *testing.T) {
 }
 
 func TestNinePatchStyleImageRoundTripsStretchContentAndTextFit(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(): %v", err)
 	}
 
@@ -82,6 +66,15 @@ func TestNinePatchStyleImageRoundTripsStretchContentAndTextFit(t *testing.T) {
 		t.Fatalf("stretchY = %v, want [{0 1} {1 2}]", stretchY)
 	}
 
+	// The narrow copy reports the same intervals the aggregate carries.
+	stretches, found, err := takeOptionalStyleOperationForTest(m.StyleImageStretches("patch"))
+	if err != nil || !found || !equalStretches(stretches.X, stretchX) || !equalStretches(stretches.Y, stretchY) {
+		t.Fatalf("StyleImageStretches(patch) = (%+v, %v, %v), want %v and %v", stretches, found, err, stretchX, stretchY)
+	}
+	if _, found, err := takeOptionalStyleOperationForTest(m.StyleImageStretches("missing")); err != nil || found {
+		t.Fatalf("StyleImageStretches(missing) = (%v, %v), want (false, nil)", found, err)
+	}
+
 	if _, found, err = takeOptionalStyleOperationForTest(m.StyleImage("missing")); err != nil || found {
 		t.Fatalf("StyleImage(missing) = (%v, %v), want (false, nil)", found, err)
 	}
@@ -117,25 +110,9 @@ func TestStyleImageOptionsCloneKeepsStretchPresence(t *testing.T) {
 }
 
 func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	pixels := []byte{255, 0, 0, 255}
@@ -155,40 +132,32 @@ func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
 	}
 	copied := styleImage.Pixels
 	if !found || len(copied) != 4 || copied[0] != 255 || copied[1] != 0 || copied[2] != 0 || copied[3] != 255 {
-		t.Fatalf("StyleImagePremultipliedRGBA8(marker) = (%v, %v), want original copied pixels", copied, found)
+		t.Fatalf("StyleImage(marker) pixels = (%v, %v), want original copied pixels", copied, found)
+	}
+	// The narrow copy reports the same pixels the aggregate carries.
+	copiedPixels, found, err := takeOptionalStyleOperationForTest(m.StyleImagePremultipliedRGBA8("marker"))
+	if err != nil || !found || len(copiedPixels) != 4 || copiedPixels[0] != 255 || copiedPixels[3] != 255 {
+		t.Fatalf("StyleImagePremultipliedRGBA8(marker) = (%v, %v, %v), want original copied pixels", copiedPixels, found, err)
 	}
 	completion, err := m.RemoveStyleImage("marker")
-	requireCommandCommitted(t, runtime, completion, err)
+	requireCommandCommitted(t, completion, err)
 	if _, found, err := takeOptionalStyleOperationForTest(m.StyleImage("marker")); err != nil || found {
 		t.Fatalf("StyleImageInfo(marker) after removal = (%v, %v), want (false, nil)", found, err)
 	}
+	if _, found, err := takeOptionalStyleOperationForTest(m.StyleImagePremultipliedRGBA8("marker")); err != nil || found {
+		t.Fatalf("StyleImagePremultipliedRGBA8(marker) after removal = (%v, %v), want (false, nil)", found, err)
+	}
 	completion, err = m.RemoveStyleImage("marker")
-	requireCommandFailedWith(t, runtime, completion, err, ErrNotFound)
+	requireCommandFailedWith(t, completion, err, ErrNotFound)
 	if _, err := m.SetStyleImage("bad-marker", PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4}, StyleImageOptions{}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetStyleImage(empty pixels) error = %v, want ErrInvalidArgument", err)
 	}
 }
 
 func TestImageSourceCopiesPixelsAndCoordinates(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	coordinates := []LatLng{

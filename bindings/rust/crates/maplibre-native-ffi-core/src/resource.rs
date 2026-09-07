@@ -250,12 +250,13 @@ pub type ResourceProviderCallbackFn = unsafe extern "C" fn(
 pub fn resource_provider_descriptor(
     callback: Option<ResourceProviderCallbackFn>,
     user_data: *mut c_void,
+    release_user_data: sys::mln_runtime_callback_release,
 ) -> sys::mln_resource_provider {
     sys::mln_resource_provider {
         size: std::mem::size_of::<sys::mln_resource_provider>() as u32,
         callback,
         user_data,
-        release_user_data: None,
+        release_user_data,
     }
 }
 
@@ -269,12 +270,13 @@ pub type ResourceTransformCallbackFn = unsafe extern "C" fn(
 pub fn resource_transform_descriptor(
     callback: Option<ResourceTransformCallbackFn>,
     user_data: *mut c_void,
+    release_user_data: sys::mln_runtime_callback_release,
 ) -> sys::mln_resource_transform {
     sys::mln_resource_transform {
         size: std::mem::size_of::<sys::mln_resource_transform>() as u32,
         callback,
         user_data,
-        release_user_data: None,
+        release_user_data,
     }
 }
 
@@ -288,12 +290,13 @@ pub type HttpHeaderTransformCallbackFn = unsafe extern "C" fn(
 pub fn http_header_transform_descriptor(
     callback: Option<HttpHeaderTransformCallbackFn>,
     user_data: *mut c_void,
+    release_user_data: sys::mln_runtime_callback_release,
 ) -> sys::mln_http_header_transform {
     sys::mln_http_header_transform {
         size: std::mem::size_of::<sys::mln_http_header_transform>() as u32,
         callback,
         user_data,
-        release_user_data: None,
+        release_user_data,
     }
 }
 

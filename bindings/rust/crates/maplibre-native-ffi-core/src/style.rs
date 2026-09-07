@@ -440,19 +440,6 @@ pub struct StyleLayerInfo {
     pub source_layer: Option<String>,
 }
 
-pub fn empty_style_layer_info() -> sys::mln_style_layer_info {
-    sys::mln_style_layer_info {
-        size: std::mem::size_of::<sys::mln_style_layer_info>() as u32,
-        fields: 0,
-        type_: buffer_view(&[]),
-        min_zoom: 0.0,
-        max_zoom: 0.0,
-        visibility: sys::MLN_STYLE_LAYER_VISIBILITY_VISIBLE,
-        source_id_size: 0,
-        source_layer_size: 0,
-    }
-}
-
 /// Converts a filled native layer-info struct plus separately copied strings.
 ///
 /// # Safety
@@ -759,64 +746,6 @@ impl StyleImageOptionsNativeExt for StyleImageOptions {
     fn to_native(&self) -> NativeStyleImageOptions {
         style_image_options_to_native(self)
     }
-}
-
-/// Copies an owned native style ID list into owned Rust strings.
-///
-/// # Safety
-///
-/// `ptr` must point to a live `mln_style_id_list` handle owned by the caller
-/// and returned by the matching C API. This function takes ownership of that
-/// handle and releases it before returning, including on copy errors.
-pub unsafe fn copy_style_id_list(handle: sys::mln_style_id_list) -> crate::Result<Vec<String>> {
-    // SAFETY: handle is an owned style ID list returned by the C API and released by the guard.
-    let list = unsafe { crate::handle::style_id_list(handle) }?;
-    let mut count = 0;
-    // SAFETY: list is live and count points to writable storage.
-    crate::check(unsafe { sys::mln_style_id_list_count(list.handle(), &mut count) })?;
-
-    let mut ids = Vec::with_capacity(count);
-    for index in 0..count {
-        let mut view = sys::mln_buffer_view {
-            data: ptr::null(),
-            size: 0,
-        };
-        // SAFETY: list is live, index is less than count, and view points to writable storage.
-        crate::check(unsafe { sys::mln_style_id_list_get(list.handle(), index, &mut view) })?;
-        // SAFETY: The C API returns a view into list-owned storage that remains valid here.
-        ids.push(unsafe { crate::string::copy_string_view(view) }?);
-    }
-    Ok(ids)
-}
-
-/// Copies an owned native style string list into owned Rust strings.
-///
-/// # Safety
-///
-/// `handle` must be a live `mln_style_string_list` owned by the caller and
-/// returned by the matching C API. This function takes ownership of the handle
-/// and releases it before returning, including on copy errors.
-pub unsafe fn copy_style_string_list(
-    handle: sys::mln_style_string_list,
-) -> crate::Result<Vec<String>> {
-    // SAFETY: handle is an owned string list returned by C and released by the guard.
-    let list = unsafe { crate::handle::style_string_list(handle) }?;
-    let mut count = 0;
-    // SAFETY: list is live and count points to writable storage.
-    crate::check(unsafe { sys::mln_style_string_list_count(list.handle(), &mut count) })?;
-
-    let mut values = Vec::with_capacity(count);
-    for index in 0..count {
-        let mut view = sys::mln_buffer_view {
-            data: ptr::null(),
-            size: 0,
-        };
-        // SAFETY: list is live, index is in range, and view is writable.
-        crate::check(unsafe { sys::mln_style_string_list_get(list.handle(), index, &mut view) })?;
-        // SAFETY: The borrowed view remains valid until the list guard drops.
-        values.push(unsafe { crate::string::copy_string_view(view) }?);
-    }
-    Ok(values)
 }
 
 #[cfg(test)]

@@ -10,7 +10,7 @@ import kotlin.jvm.JvmInline
  * event type that a mask leaves out is never built or queued, so it neither reaches a batch nor
  * invokes the runtime's event wake.
  *
- * [org.maplibre.nativeffi.map.MapHandle.eventMask] reads the [ALL_MAP_EVENTS] bits and
+ * [org.maplibre.nativeffi.map.MapHandle.setEventMask] reads the [ALL_MAP_EVENTS] bits and
  * [RuntimeHandle.eventMask] reads the [ALL_RUNTIME_EVENTS] bits, so both accept [ALL]. A bit
  * outside [ALL] fails both setters with [org.maplibre.nativeffi.error.InvalidArgumentException].
  */

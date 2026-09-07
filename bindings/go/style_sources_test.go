@@ -2,19 +2,16 @@ package maplibre
 
 import (
 	"errors"
+	"slices"
 	"testing"
 )
 
-func takeStyleOperationForTest[T any](future *Future[T], err error) (T, error) {
-	return awaitForTest(future, err)
-}
-
 func takeOptionalStyleOperationForTest[T any](future *Future[StyleOptional[T]], err error) (T, bool, error) {
-	result, err := takeStyleOperationForTest(future, err)
+	result, err := awaitForTest(future, err)
 	return result.Value, result.Found, err
 }
 
-func awaitCommandCompletionForTest(t *testing.T, _ *RuntimeHandle, future *Future[CommandCompletion], err error) CommandCompletion {
+func awaitCommandCompletionForTest(t *testing.T, future *Future[CommandCompletion], err error) CommandCompletion {
 	t.Helper()
 	result, err := awaitForTest(future, err)
 	if err != nil {
@@ -23,7 +20,7 @@ func awaitCommandCompletionForTest(t *testing.T, _ *RuntimeHandle, future *Futur
 	return result
 }
 
-func requireStyleCommandFailed(t *testing.T, _ *RuntimeHandle, future *Future[CommandCompletion], err error) {
+func requireStyleCommandFailed(t *testing.T, future *Future[CommandCompletion], err error) {
 	t.Helper()
 	completion, completionErr := awaitForTest(future, err)
 	if completionErr != nil {
@@ -36,9 +33,9 @@ func requireStyleCommandFailed(t *testing.T, _ *RuntimeHandle, future *Future[Co
 
 // requireCommandCommitted waits for completion's terminal event and returns the
 // map snapshot generation the commit published.
-func requireCommandCommitted(t *testing.T, runtime *RuntimeHandle, future *Future[CommandCompletion], err error) uint64 {
+func requireCommandCommitted(t *testing.T, future *Future[CommandCompletion], err error) uint64 {
 	t.Helper()
-	finished := awaitCommandCompletionForTest(t, runtime, future, err)
+	finished := awaitCommandCompletionForTest(t, future, err)
 	if finished.Disposition != CommandDispositionCommitted {
 		t.Fatalf("command disposition = %v, want committed", finished.Disposition)
 	}
@@ -50,7 +47,7 @@ func requireCommandCommitted(t *testing.T, runtime *RuntimeHandle, future *Futur
 
 // requireCommandFailedWith waits for completion's terminal event and asserts it
 // failed with the given binding error.
-func requireCommandFailedWith(t *testing.T, _ *RuntimeHandle, future *Future[CommandCompletion], err, want error) {
+func requireCommandFailedWith(t *testing.T, future *Future[CommandCompletion], err, want error) {
 	t.Helper()
 	completion, completionErr := awaitForTest(future, err)
 	if completionErr != nil {
@@ -66,28 +63,12 @@ func requireCommandFailedWith(t *testing.T, _ *RuntimeHandle, future *Future[Com
 }
 
 func TestStyleSourceMetadataForMissingSources(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
-	ids, err := takeStyleOperationForTest(m.StyleSourceIDs())
+	ids, err := awaitForTest(m.StyleSourceIDs())
 	if err != nil {
 		t.Fatalf("StyleSourceIDs(): %v", err)
 	}
@@ -107,34 +88,18 @@ func TestStyleSourceMetadataForMissingSources(t *testing.T) {
 		t.Fatalf("StyleSourceInfo(missing) attribution = %v, want absent", info.Attribution)
 	}
 	completion, err := m.RemoveStyleSource("missing")
-	requireCommandFailedWith(t, runtime, completion, err, ErrNotFound)
+	requireCommandFailedWith(t, completion, err, ErrNotFound)
 	if _, _, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("")); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("StyleSourceInfo(empty) error = %v, want ErrInvalidArgument", err)
 	}
 	volatileCompletion, err := m.SetStyleSourceVolatile("missing", true)
-	requireCommandFailedWith(t, runtime, volatileCompletion, err, ErrNotFound)
+	requireCommandFailedWith(t, volatileCompletion, err, ErrNotFound)
 }
 
 func TestStyleSourceVolatilityRoundTripsThroughPublicAPI(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	if _, err := m.AddVectorSourceURL("volatile-source", "https://example.invalid/tiles.json", nil); err != nil {
@@ -153,7 +118,7 @@ func TestStyleSourceVolatilityRoundTripsThroughPublicAPI(t *testing.T) {
 	}
 
 	enabled, err := m.SetStyleSourceVolatile("volatile-source", true)
-	requireCommandCommitted(t, runtime, enabled, err)
+	requireCommandCommitted(t, enabled, err)
 	info, found, err = takeOptionalStyleOperationForTest(m.StyleSourceInfo("volatile-source"))
 	if err != nil {
 		t.Fatalf("StyleSourceInfo(true): %v", err)
@@ -163,7 +128,7 @@ func TestStyleSourceVolatilityRoundTripsThroughPublicAPI(t *testing.T) {
 	}
 
 	disabled, err := m.SetStyleSourceVolatile("volatile-source", false)
-	requireCommandCommitted(t, runtime, disabled, err)
+	requireCommandCommitted(t, disabled, err)
 	info, found, err = takeOptionalStyleOperationForTest(m.StyleSourceInfo("volatile-source"))
 	if err != nil {
 		t.Fatalf("StyleSourceInfo(false): %v", err)
@@ -174,25 +139,9 @@ func TestStyleSourceVolatilityRoundTripsThroughPublicAPI(t *testing.T) {
 }
 
 func TestStyleSourceURLAndTileBindings(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	geoJSONOptions := StyleGeoJSONSourceOptions{}.
@@ -236,31 +185,15 @@ func TestStyleSourceURLAndTileBindings(t *testing.T) {
 		}
 	}
 	completion, err := m.AddVectorSourceTiles("bad-vector", nil, nil)
-	requireStyleCommandFailed(t, runtime, completion, err)
+	requireStyleCommandFailed(t, completion, err)
 	completion, err = m.AddGeoJSONSourceURL("", "asset://fixtures/points.geojson", nil)
-	requireStyleCommandFailed(t, runtime, completion, err)
+	requireStyleCommandFailed(t, completion, err)
 }
 
 func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	minZoom := 0.0
@@ -330,19 +263,38 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 		t.Fatalf("StyleSourceInfo(inline-vector) raster encoding = %v, want absent", info.RasterEncoding)
 	}
 
+	// The narrow copies report the same values the aggregate carries.
+	copiedAttribution, found, err := takeOptionalStyleOperationForTest(m.StyleSourceAttribution("inline-vector"))
+	if err != nil || !found || copiedAttribution != attribution {
+		t.Fatalf("StyleSourceAttribution(inline-vector) = (%q, %v, %v), want %q", copiedAttribution, found, err, attribution)
+	}
+	if _, found, err := takeOptionalStyleOperationForTest(m.StyleSourceURL("inline-vector")); err != nil || found {
+		t.Fatalf("StyleSourceURL(inline-vector) = (%v, %v), want (false, nil) for an inline source", found, err)
+	}
+	if _, found, err := takeOptionalStyleOperationForTest(m.StyleSourceAttribution("missing")); err != nil || found {
+		t.Fatalf("StyleSourceAttribution(missing) = (%v, %v), want (false, nil)", found, err)
+	}
+	copiedTileURLs, err := awaitForTest(m.StyleSourceTileURLs("inline-vector"))
+	if err != nil || !slices.Equal(copiedTileURLs, tileURLs) {
+		t.Fatalf("StyleSourceTileURLs(inline-vector) = (%q, %v), want %q", copiedTileURLs, err, tileURLs)
+	}
+	if missingTileURLs, err := awaitForTest(m.StyleSourceTileURLs("missing")); err != nil || len(missingTileURLs) != 0 {
+		t.Fatalf("StyleSourceTileURLs(missing) = (%q, %v), want an empty list", missingTileURLs, err)
+	}
+
 	layerJSON := []byte(`{"id":"inline-vector-layer","type":"line","source":"inline-vector","source-layer":"lines"}`)
 	layerID, err := m.AddStyleLayerJSON(layerJSON, "")
-	requireCommandCommitted(t, runtime, layerID, err)
+	requireCommandCommitted(t, layerID, err)
 	blockedID, err := m.RemoveStyleSource("inline-vector")
-	requireCommandFailedWith(t, runtime, blockedID, err, ErrInvalidState)
+	requireCommandFailedWith(t, blockedID, err, ErrInvalidState)
 	removeLayerID, err := m.RemoveStyleLayer("inline-vector-layer")
-	requireCommandCommitted(t, runtime, removeLayerID, err)
+	requireCommandCommitted(t, removeLayerID, err)
 	removeID, err := m.RemoveStyleSource("inline-vector")
-	requireCommandCommitted(t, runtime, removeID, err)
+	requireCommandCommitted(t, removeID, err)
 	if _, found, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("inline-vector")); err != nil || found {
 		t.Fatalf("StyleSourceInfo(inline-vector) after removal = (%v, %v), want (false, nil)", found, err)
 	}
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON([]byte(replacement)): %v", err)
 	}
 	if *info.Attribution != attribution || info.TileJSON.TileURLs[1] != tileURLs[1] || *info.TileJSON.Bounds != bounds {
@@ -362,6 +314,16 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 	}
 	if urlInfo.TileJSON != nil || urlInfo.Attribution != nil {
 		t.Fatalf("StyleSourceInfo(url-vector) optional loaded fields = (%v, %v), want absent", urlInfo.TileJSON, urlInfo.Attribution)
+	}
+	copiedURL, found, err := takeOptionalStyleOperationForTest(m.StyleSourceURL("url-vector"))
+	if err != nil || !found || copiedURL != url {
+		t.Fatalf("StyleSourceURL(url-vector) = (%q, %v, %v), want %q", copiedURL, found, err, url)
+	}
+	if _, found, err := takeOptionalStyleOperationForTest(m.StyleSourceURL("missing")); err != nil || found {
+		t.Fatalf("StyleSourceURL(missing) = (%v, %v), want (false, nil)", found, err)
+	}
+	if urlTileURLs, err := awaitForTest(m.StyleSourceTileURLs("url-vector")); err != nil || len(urlTileURLs) != 0 {
+		t.Fatalf("StyleSourceTileURLs(url-vector) = (%q, %v), want an empty list for a URL-backed source", urlTileURLs, err)
 	}
 
 	data, err := NewGeoJSONSourceData([]byte(`{"type":"FeatureCollection","features":[]}`), nil)
@@ -386,25 +348,9 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 }
 
 func TestGeoJSONSourceDataPrepareAndInstall(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	document := []byte(`{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","geometry":{"type":"LineString","coordinates":[[2,1],[4,3]]},"properties":{"name":"before","rank":7}}]}`)
@@ -444,9 +390,9 @@ func TestGeoJSONSourceDataPrepareAndInstall(t *testing.T) {
 		t.Fatalf("NewGeoJSONSourceData(update): %v", err)
 	}
 	completion, err := m.SetGeoJSONSourceData("geojson-data", update)
-	requireCommandCommitted(t, runtime, completion, err)
+	requireCommandCommitted(t, completion, err)
 	completion, err = m.SetGeoJSONSourceData("geojson-data-2", update)
-	requireCommandCommitted(t, runtime, completion, err)
+	requireCommandCommitted(t, completion, err)
 	if err := update.Close(); err != nil {
 		t.Fatalf("update Close(): %v", err)
 	}
@@ -459,7 +405,7 @@ func TestGeoJSONSourceDataPrepareAndInstall(t *testing.T) {
 		t.Fatalf("NewGeoJSONSourceData(mismatched): %v", err)
 	}
 	completion, err = m.SetGeoJSONSourceData("geojson-data", mismatched)
-	requireCommandFailedWith(t, runtime, completion, err, ErrInvalidArgument)
+	requireCommandFailedWith(t, completion, err, ErrInvalidArgument)
 	if err := mismatched.Close(); err != nil {
 		t.Fatalf("mismatched Close(): %v", err)
 	}
@@ -516,25 +462,9 @@ func TestGeoJSONSourceDataRejectsInvalidDocumentsAtPreparation(t *testing.T) {
 }
 
 func TestGeoJSONSourceClusterOptions(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	points := []byte(`{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0,0]},"properties":{"rank":1}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.001,0.001]},"properties":{"rank":2}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.002,0.002]},"properties":{"rank":3}}]}`)
@@ -571,7 +501,7 @@ func TestGeoJSONSourceClusterOptions(t *testing.T) {
 		t.Fatalf("NewGeoJSONSourceData(updated cluster properties): %v", err)
 	}
 	completion, err := m.SetGeoJSONSourceData("cluster-source", update)
-	requireCommandFailedWith(t, runtime, completion, err, ErrInvalidArgument)
+	requireCommandFailedWith(t, completion, err, ErrInvalidArgument)
 	if err := update.Close(); err != nil {
 		t.Fatalf("update Close(): %v", err)
 	}
@@ -609,25 +539,9 @@ func TestGeoJSONSourceClusterOptions(t *testing.T) {
 // Preparation touches no runtime or map, so one goroutine prepares data,
 // another installs it on the map, and a third releases it.
 func TestGeoJSONSourceDataPreparesOnAnotherGoroutine(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 
@@ -645,7 +559,7 @@ func TestGeoJSONSourceDataPreparesOnAnotherGoroutine(t *testing.T) {
 		t.Fatalf("NewGeoJSONSourceData() on a goroutine: %v", result.err)
 	}
 	completion, err := m.AddGeoJSONSourceData("worker-prepared", result.data)
-	requireCommandCommitted(t, runtime, completion, err)
+	requireCommandCommitted(t, completion, err)
 	closed := make(chan error)
 	go func() {
 		closed <- result.data.Close()
@@ -660,25 +574,9 @@ func TestGeoJSONSourceDataPreparesOnAnotherGoroutine(t *testing.T) {
 }
 
 func TestGeoJSONSourceSynchronousTilingOverride(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	data, err := NewGeoJSONSourceData([]byte(`{"type":"FeatureCollection","features":[]}`), nil)
@@ -689,50 +587,36 @@ func TestGeoJSONSourceSynchronousTilingOverride(t *testing.T) {
 		t.Fatalf("AddGeoJSONSourceData(): %v", err)
 	}
 	completion, err := m.SetGeoJSONSourceSynchronousTiling("tracked", true)
-	requireCommandCommitted(t, runtime, completion, err)
+	requireCommandCommitted(t, completion, err)
 	update, err := NewGeoJSONSourceData([]byte(`{"type":"Point","coordinates":[3,4]}`), nil)
 	if err != nil {
 		t.Fatalf("NewGeoJSONSourceData(update): %v", err)
 	}
 	completion, err = m.SetGeoJSONSourceData("tracked", update)
-	requireCommandCommitted(t, runtime, completion, err)
+	requireCommandCommitted(t, completion, err)
 	if err := update.Close(); err != nil {
 		t.Fatalf("update Close(): %v", err)
 	}
 	completion, err = m.SetGeoJSONSourceSynchronousTiling("tracked", false)
-	requireCommandCommitted(t, runtime, completion, err)
+	requireCommandCommitted(t, completion, err)
 	if err := data.Close(); err != nil {
 		t.Fatalf("data Close(): %v", err)
 	}
+	// A missing source is not found, while a source of another type is a type
+	// mismatch the command reports as an invalid argument.
 	completion, err = m.SetGeoJSONSourceSynchronousTiling("missing", true)
-	requireCommandFailedWith(t, runtime, completion, err, ErrInvalidArgument)
+	requireCommandFailedWith(t, completion, err, ErrNotFound)
 	if _, err := m.AddVectorSourceURL("vector", "https://example.invalid/tiles.json", nil); err != nil {
 		t.Fatalf("AddVectorSourceURL(): %v", err)
 	}
 	completion, err = m.SetGeoJSONSourceSynchronousTiling("vector", true)
-	requireCommandFailedWith(t, runtime, completion, err, ErrInvalidArgument)
+	requireCommandFailedWith(t, completion, err, ErrInvalidArgument)
 }
 
 func TestAddStyleSourceJSONCopiesGoBuffer(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	source := []byte(`{"type":"geojson","data":{"type":"FeatureCollection","features":[]},"attribution":"unit-test"}`)
@@ -747,9 +631,6 @@ func TestAddStyleSourceJSONCopiesGoBuffer(t *testing.T) {
 	if !found || info.Type != StyleSourceTypeGeoJSON {
 		t.Fatalf("StyleSourceInfo(go-json-source) type = (%v, %v), want GeoJSON true", info.Type, found)
 	}
-	if info.IDSize != uint64(len("go-json-source")) {
-		t.Fatalf("StyleSourceInfo(go-json-source) = %#v, want copied ID size", info)
-	}
 	completion, err := m.AddStyleSourceJSON("bad-json-source", []byte(`NaN`))
-	requireStyleCommandFailed(t, runtime, completion, err)
+	requireStyleCommandFailed(t, completion, err)
 }

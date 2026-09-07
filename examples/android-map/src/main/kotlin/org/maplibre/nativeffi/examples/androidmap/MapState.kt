@@ -1,6 +1,9 @@
 package org.maplibre.nativeffi.examples.androidmap
 
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.pow
+import kotlin.math.round
+import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraDelta
 import org.maplibre.nativeffi.camera.CameraDeltaKind
@@ -8,18 +11,18 @@ import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.GesturePhase
 import org.maplibre.nativeffi.geo.LatLng
+import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.map.MapSize
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
-import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 
 /** Runtime and map state driven by the core-owned runtime worker. */
-internal class MapState(initialViewport: Viewport, private val requestRender: () -> Unit) :
+internal class MapState(initialViewport: Viewport, private val startLoop: () -> Unit) :
   AutoCloseable {
   private var closed = false
   private val initialCamera =
@@ -39,7 +42,7 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
 
   init {
     try {
-      ownedMap = runSuspend {
+      ownedMap = runBlocking {
         MapHandle.create(
             runtime,
             MapOptions().apply {
@@ -47,9 +50,7 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
               height = initialViewport.logicalHeight
               scaleFactor = initialViewport.scaleFactor
               mapMode = MapMode.CONTINUOUS
-              eventMask =
-                RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE +
-                  RuntimeEventMask.MAP_RENDER_FRAME_FINISHED
+              eventMask = RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE
             },
           )
           .await()
@@ -57,14 +58,16 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
       map.setStyleUrl(STYLE_URL)
       map.updateCamera(CameraUpdate(camera = initialCamera))
     } catch (error: Throwable) {
-      if (::ownedMap.isInitialized) ownedMap.close()
-      runtime.close()
+      runBlocking {
+        if (::ownedMap.isInitialized) ownedMap.close().await()
+        runtime.close().await()
+      }
       throw error
     }
   }
 
   fun cancelTransitions() {
-    map.updateCamera(CameraUpdate())
+    map.cancelTransitions()
     requestRender()
   }
 
@@ -76,18 +79,16 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
   }
 
   fun moveBy(deltaX: Double, deltaY: Double) {
-    map.applyCameraDelta(
-      CameraDelta(offset = org.maplibre.nativeffi.geo.ScreenPoint(deltaX, deltaY))
-    )
+    map.applyCameraDelta(CameraDelta(offset = ScreenPoint(deltaX, deltaY)))
     requestRender()
   }
 
-  fun scaleBy(scale: Double, anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
+  fun scaleBy(scale: Double, anchor: ScreenPoint) {
     map.applyCameraDelta(CameraDelta(kind = CameraDeltaKind.SCALE, amount = scale, anchor = anchor))
     requestRender()
   }
 
-  fun adjustBearing(degrees: Double, anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
+  fun adjustBearing(degrees: Double, anchor: ScreenPoint) {
     map.applyCameraDelta(
       CameraDelta(kind = CameraDeltaKind.BEARING, amount = degrees, anchor = anchor)
     )
@@ -99,11 +100,13 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
     requestRender()
   }
 
-  fun zoomToNextWholeLevel(anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
+  /** Eases to the next whole zoom level, as `round(zoom) + 1`, about [anchor]. */
+  fun zoomToNextWholeLevel(anchor: ScreenPoint) {
+    val zoom = map.cameraSnapshot().camera.zoom ?: 0.0
     map.applyCameraDelta(
       CameraDelta(
         kind = CameraDeltaKind.SCALE,
-        amount = 2.0,
+        amount = 2.0.pow(round(zoom) + 1.0 - zoom),
         anchor = anchor,
         animation = animation(DOUBLE_TAP_DURATION_MS),
       )
@@ -119,6 +122,12 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
     map.requestRepaint()
   }
 
+  /** Marks a frame worth drawing and starts the view's paced loop if it is idle. */
+  fun requestRender() {
+    renderRequest.set()
+    startLoop()
+  }
+
   fun pollEvents() {
     if (drainEvents()) renderRequest.set()
   }
@@ -128,14 +137,9 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
 
   private fun drainEvents(): Boolean {
     var renderUpdateAvailable = false
-    for (event in runtime.drainEvents().events) {
+    for (event in runtime.drainEvents()) {
       if (event.mapSource != map) continue
       if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE) {
-        renderUpdateAvailable = true
-      } else if (
-        event.type == RuntimeEventType.MAP_RENDER_FRAME_FINISHED &&
-          (event.payload as? RuntimeEventPayload.RenderFrame)?.needsRepaint == true
-      ) {
         renderUpdateAvailable = true
       }
     }
@@ -145,10 +149,12 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
   override fun close() {
     if (closed) return
     closed = true
-    try {
-      map.close()
-    } finally {
-      runtime.close()
+    runBlocking {
+      try {
+        map.close().await()
+      } finally {
+        runtime.close().await()
+      }
     }
   }
 

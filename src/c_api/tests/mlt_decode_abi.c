@@ -15,9 +15,6 @@
 #include "test_support.h"
 #include "unity.h"
 
-#define MLN_STRING_LITERAL(text) \
-  ((mln_buffer_view){.data = (text), .size = sizeof(text) - 1})
-
 // The source carries "encoding":"mlt" so the tiles parse as MapLibre Tiles, and
 // a layer references it because a source only loads tiles once one does.
 static const char mlt_style_json[] =
@@ -53,13 +50,20 @@ static uint32_t serve_recorded_tile(
   atomic_fetch_add(&state->served, 1);
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
+// A tile whose encoding the map cannot decode yields no feature however long
+// the test waits, so the render loop below is bounded by its own attempt count.
+// The deadline caps the whole wait on top of that, which keeps the worst case
+// off the product of the two nested loops.
+enum {
+  mlt_render_attempts = 600,
+  mlt_render_deadline_milliseconds = 120000,
+};
+
 static bool wait_for_frame_result(
-  const mln_test_render_fixture* fixture, mln_render_frame_batch* out_batch
+  const mln_test_render_fixture* fixture, mln_render_frame_batch* out_batch,
+  uint64_t deadline
 ) {
-  // This large recorded tile can take several seconds to render on Metal.
-  // Bound the fixture's terminal-result wait without imposing a demand
-  // deadline.
-  for (unsigned int attempt = 0; attempt < 60000; attempt += 1) {
+  while (mln_test_monotonic_milliseconds() <= deadline) {
     if (fixture->driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
       size_t serviced = 0;
       if (
@@ -89,7 +93,7 @@ static bool wait_for_frame_result(
 static size_t query_admin_feature_count(
   mln_runtime runtime, const mln_test_render_fixture* fixture
 ) {
-  const mln_buffer_view source_layers[] = {MLN_STRING_LITERAL("admin")};
+  const mln_buffer_view source_layers[] = {MLN_BUFFER_LITERAL("admin")};
   mln_source_feature_query_options options =
     mln_source_feature_query_options_default();
   options.fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
@@ -97,7 +101,11 @@ static size_t query_admin_feature_count(
   options.source_layer_id_count = 1;
 
   size_t count = 0;
-  for (unsigned int attempt = 0; attempt < 600 && count == 0; attempt += 1) {
+  const uint64_t deadline =
+    mln_test_monotonic_milliseconds() + mlt_render_deadline_milliseconds;
+  for (unsigned int attempt = 0; count == 0 && attempt < mlt_render_attempts &&
+                                 mln_test_monotonic_milliseconds() <= deadline;
+       attempt += 1) {
     TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
     mln_frame_demand demand = mln_frame_demand_default();
     demand.flags = 0;
@@ -109,7 +117,7 @@ static size_t query_admin_feature_count(
     // Waiting for it directly avoids placing query or barrier work behind a
     // frame whose renderer has not been created yet.
     mln_render_frame_batch frame_batch = MLN_HANDLE_NULL;
-    TEST_ASSERT_TRUE(wait_for_frame_result(fixture, &frame_batch));
+    TEST_ASSERT_TRUE(wait_for_frame_result(fixture, &frame_batch, deadline));
     size_t frame_result_count = 0;
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK,
@@ -138,7 +146,7 @@ static size_t query_admin_feature_count(
     mln_test_completion query = mln_test_completion_default(0);
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_render_session_query_source_features(
-                       fixture->session, MLN_STRING_LITERAL("mlt-source"),
+                       fixture->session, MLN_BUFFER_LITERAL("mlt-source"),
                        &options, &query.descriptor
                      )
     );

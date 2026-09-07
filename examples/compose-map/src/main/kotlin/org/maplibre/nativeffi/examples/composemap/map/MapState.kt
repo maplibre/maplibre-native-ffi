@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.examples.composemap.map
 
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraDelta
 import org.maplibre.nativeffi.camera.CameraDeltaKind
@@ -10,12 +11,12 @@ import org.maplibre.nativeffi.camera.CameraUpdateMode
 import org.maplibre.nativeffi.camera.GesturePhase
 import org.maplibre.nativeffi.examples.composemap.surface.SurfaceExtent
 import org.maplibre.nativeffi.geo.LatLng
+import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.map.MapSize
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
-import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
@@ -41,7 +42,7 @@ internal class MapState(initialExtent: SurfaceExtent, private val requestRender:
 
   init {
     try {
-      ownedMap = runSuspend {
+      ownedMap = runBlocking {
         MapHandle.create(
             runtime,
             MapOptions().apply {
@@ -49,9 +50,7 @@ internal class MapState(initialExtent: SurfaceExtent, private val requestRender:
               height = initialExtent.height
               scaleFactor = initialExtent.scaleFactor
               mapMode = MapMode.CONTINUOUS
-              eventMask =
-                RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE +
-                  RuntimeEventMask.MAP_RENDER_FRAME_FINISHED
+              eventMask = RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE
             },
           )
           .await()
@@ -59,14 +58,16 @@ internal class MapState(initialExtent: SurfaceExtent, private val requestRender:
       map.setStyleUrl(STYLE_URL)
       map.updateCamera(CameraUpdate(camera = initialCamera))
     } catch (error: Throwable) {
-      if (::ownedMap.isInitialized) ownedMap.close()
-      runtime.close()
+      runBlocking {
+        if (::ownedMap.isInitialized) ownedMap.close().await()
+        runtime.close().await()
+      }
       throw error
     }
   }
 
   fun cancelTransitions() {
-    map.updateCamera(CameraUpdate())
+    map.cancelTransitions()
   }
 
   fun setGestureInProgress(inProgress: Boolean) {
@@ -76,25 +77,23 @@ internal class MapState(initialExtent: SurfaceExtent, private val requestRender:
   }
 
   fun moveBy(deltaX: Double, deltaY: Double) {
-    map.applyCameraDelta(
-      CameraDelta(offset = org.maplibre.nativeffi.geo.ScreenPoint(deltaX, deltaY))
-    )
+    map.applyCameraDelta(CameraDelta(offset = ScreenPoint(deltaX, deltaY)))
   }
 
   fun moveByAnimated(deltaX: Double, deltaY: Double) {
     map.applyCameraDelta(
       CameraDelta(
-        offset = org.maplibre.nativeffi.geo.ScreenPoint(deltaX, deltaY),
+        offset = ScreenPoint(deltaX, deltaY),
         animation = animation(KEYBOARD_ANIMATION_MS),
       )
     )
   }
 
-  fun scaleBy(scale: Double, anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
+  fun scaleBy(scale: Double, anchor: ScreenPoint) {
     map.applyCameraDelta(CameraDelta(kind = CameraDeltaKind.SCALE, amount = scale, anchor = anchor))
   }
 
-  fun scaleByAnimated(scale: Double, anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
+  fun scaleByAnimated(scale: Double, anchor: ScreenPoint) {
     map.applyCameraDelta(
       CameraDelta(
         kind = CameraDeltaKind.SCALE,
@@ -140,6 +139,10 @@ internal class MapState(initialExtent: SurfaceExtent, private val requestRender:
     )
   }
 
+  /**
+   * Submits the map's extent. Skiko owns the texture this session borrows, so target replacement
+   * carries only the graphics resource and the map resize is the sole extent authority here.
+   */
   fun resize(extent: SurfaceExtent) {
     val size = MapSize(extent.width, extent.height, extent.scaleFactor)
     if (size != currentSize) {
@@ -168,14 +171,9 @@ internal class MapState(initialExtent: SurfaceExtent, private val requestRender:
 
   private fun drainEvents(): Boolean {
     var renderUpdateAvailable = false
-    for (event in runtime.drainEvents().events) {
+    for (event in runtime.drainEvents()) {
       if (event.mapSource != map) continue
       if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE) {
-        renderUpdateAvailable = true
-      } else if (
-        event.type == RuntimeEventType.MAP_RENDER_FRAME_FINISHED &&
-          (event.payload as? RuntimeEventPayload.RenderFrame)?.needsRepaint == true
-      ) {
         renderUpdateAvailable = true
       }
     }
@@ -185,10 +183,12 @@ internal class MapState(initialExtent: SurfaceExtent, private val requestRender:
   override fun close() {
     if (closed) return
     closed = true
-    try {
-      map.close()
-    } finally {
-      runtime.close()
+    runBlocking {
+      try {
+        map.close().await()
+      } finally {
+        runtime.close().await()
+      }
     }
   }
 
@@ -199,7 +199,7 @@ internal class MapState(initialExtent: SurfaceExtent, private val requestRender:
   }
 }
 
-/** A one-bit frame request shared with native wake callbacks. */
+/** One-bit signal that a frame is worth drawing. */
 internal class RenderRequest {
   private val value = AtomicBoolean(true)
 

@@ -125,7 +125,10 @@ def pack(
 
 def package(args: argparse.Namespace) -> None:
     args.output.mkdir(parents=True, exist_ok=True)
-    pack(MANAGED_PROJECT, args.output, args.version)
+    # The mise tasks keep every dotnet output under build/, so packing does the
+    # same rather than writing bin/ trees into the source projects.
+    base_output = ROOT / "build" / "dotnet" / "package"
+    pack(MANAGED_PROJECT, args.output, args.version, BaseOutputPath=f"{base_output}/")
 
     with tempfile.TemporaryDirectory() as temporary:
         staging = pathlib.Path(temporary)
@@ -143,6 +146,7 @@ def package(args: argparse.Namespace) -> None:
                 args.version,
                 RenderBackend=backend,
                 NativeAssetsDir=assets,
+                BaseOutputPath=f"{base_output}/",
             )
 
 
@@ -166,9 +170,6 @@ def smoke_musl(args: argparse.Namespace) -> None:
         shutil.rmtree(work)
     packages.mkdir(parents=True)
 
-    # The mise tasks keep every dotnet output under build/, so the smoke's
-    # pack and publish steps do the same rather than writing bin/ trees into
-    # the source projects.
     base_output = ROOT / "build" / "dotnet" / args.preset
     copy_runtime_assets(install, assets / rid / "native", args.preset)
     pack(

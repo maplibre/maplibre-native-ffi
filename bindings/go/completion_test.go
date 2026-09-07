@@ -1,6 +1,7 @@
 package maplibre
 
 import (
+	"math"
 	"runtime"
 	"runtime/cgo"
 	"testing"
@@ -28,17 +29,20 @@ func TestCompletionBridgeRetainsValueAfterFutureIsDropped(t *testing.T) {
 	future = nil
 	state = nil
 	bridge = nil
+	// Two cycles plus a settle give a finalizer that a single cycle only queued
+	// the chance to run, so the assertion below rejects a value the collector
+	// would have freed.
 	runtime.GC()
+	runtime.GC()
+	time.Sleep(50 * time.Millisecond)
 	select {
 	case <-finalized:
 		t.Fatal("retained value was finalized while native still owned the completion bridge")
 	default:
 	}
 
-	receiver := handle.Value().(completionReceiver)
-	receiver.release()
+	handle.Value().(completionReceiver).release()
 	handle.Delete()
-	receiver = nil
 
 	deadline := time.Now().Add(5 * time.Second)
 	for {
@@ -52,5 +56,29 @@ func TestCompletionBridgeRetainsValueAfterFutureIsDropped(t *testing.T) {
 			}
 			runtime.Gosched()
 		}
+	}
+}
+
+// A host that drops a future without awaiting it abandons only its own view of
+// the work: the command still reaches native and commits.
+func TestAbandonedFutureStillCommitsItsCommand(t *testing.T) {
+	_, m := newRuntimeAndMap(t, nil)
+
+	if _, err := m.JumpTo(CameraOptions{}.WithCenter(LatLng{Latitude: 7, Longitude: 8}).WithZoom(5)); err != nil {
+		t.Fatalf("JumpTo(): %v", err)
+	}
+	// The future above goes out of scope unawaited; the ordered query behind it
+	// observes what the abandoned command committed.
+	camera, err := awaitForTest(m.QueryCamera())
+	if err != nil {
+		t.Fatalf("QueryCamera completion: %v", err)
+	}
+	if camera.Camera.Center == nil ||
+		math.Abs(camera.Camera.Center.Latitude-7) > 1e-9 ||
+		math.Abs(camera.Camera.Center.Longitude-8) > 1e-9 {
+		t.Fatalf("camera center after an abandoned command = %#v, want 7, 8", camera.Camera.Center)
+	}
+	if camera.Camera.Zoom == nil || math.Abs(*camera.Camera.Zoom-5) > 1e-9 {
+		t.Fatalf("camera zoom after an abandoned command = %v, want 5", camera.Camera.Zoom)
 	}
 }

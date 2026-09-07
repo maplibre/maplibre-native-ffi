@@ -12,6 +12,22 @@
 
 #include "unity.h"
 
+static const char empty_style_json[] =
+  "{\"version\":8,\"sources\":{},\"layers\":[]}";
+static const char background_style_json[] =
+  "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background\",\"type\":"
+  "\"background\",\"paint\":{\"background-color\":\"#102030\"}}]}";
+static const char red_background_style_json[] =
+  "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"bg\","
+  "\"type\":\"background\",\"paint\":{\"background-color\":\"#ff0000\"}}]}";
+
+const mln_buffer_view mln_test_empty_style_json =
+  MLN_BUFFER_LITERAL(empty_style_json);
+const mln_buffer_view mln_test_background_style_json =
+  MLN_BUFFER_LITERAL(background_style_json);
+const mln_buffer_view mln_test_red_background_style_json =
+  MLN_BUFFER_LITERAL(red_background_style_json);
+
 #if defined(_WIN32)
 #include <windows.h>
 #else
@@ -172,12 +188,6 @@ static void untrack_session(mln_render_session session) {
   }
 }
 
-mln_status mln_test_runtime_create(
-  const mln_runtime_options* options, mln_runtime* out_runtime
-) {
-  return mln_runtime_create(options, out_runtime);
-}
-
 mln_status mln_test_runtime_close(mln_runtime runtime) {
   mln_test_completion teardown = mln_test_completion_default(0);
   const mln_status status = mln_runtime_release(runtime, &teardown.descriptor);
@@ -303,60 +313,6 @@ mln_status mln_test_map_set_style_json(mln_map map, mln_buffer_view json) {
 mln_status mln_test_map_set_style_url(mln_map map, const char* url) {
   const mln_completion completion = mln_test_discard_completion();
   return mln_map_set_style_url(map, url, &completion);
-}
-
-static mln_status copy_map_buffer_completion(
-  mln_status (*submit)(mln_map, const mln_completion*), mln_map map, char* out,
-  size_t capacity, size_t* out_size
-) {
-  if (out_size == NULL || (out == NULL && capacity != 0)) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  mln_test_completion completion = mln_test_completion_buffer_view();
-  mln_status status = submit(map, &completion.descriptor);
-  if (status != MLN_STATUS_OK) {
-    completion.descriptor.release_user_data(completion.descriptor.user_data);
-    mln_test_completion_destroy(&completion);
-    return status;
-  }
-  mln_buffer_view view = {0};
-  if (!mln_test_completion_wait(&completion, -1)) {
-    status = MLN_STATUS_NATIVE_ERROR;
-  } else {
-    status = mln_test_completion_status(&completion);
-    if (
-      status == MLN_STATUS_OK &&
-      !mln_test_completion_copy_value(&completion, &view, sizeof(view))
-    ) {
-      status = MLN_STATUS_NATIVE_ERROR;
-    }
-  }
-  if (status == MLN_STATUS_OK) {
-    *out_size = view.size;
-    if (capacity < view.size) {
-      status = MLN_STATUS_INVALID_ARGUMENT;
-    } else if (view.size != 0) {
-      memcpy(out, view.data, view.size);
-    }
-  }
-  mln_test_completion_destroy(&completion);
-  return status;
-}
-
-mln_status mln_test_map_copy_loaded_style_json(
-  mln_map map, char* out, size_t capacity, size_t* out_size
-) {
-  return copy_map_buffer_completion(
-    mln_map_loaded_style_json, map, out, capacity, out_size
-  );
-}
-
-mln_status mln_test_map_copy_style_url(
-  mln_map map, char* out, size_t capacity, size_t* out_size
-) {
-  return copy_map_buffer_completion(
-    mln_map_style_url, map, out, capacity, out_size
-  );
 }
 
 mln_map mln_test_create_map_with_options(
@@ -1928,19 +1884,66 @@ bool mln_test_drain_find(
   }
 }
 
-bool mln_test_wait_until(mln_runtime runtime, atomic_bool* flag) {
-  for (unsigned int attempt = 0; attempt < 500; attempt += 1) {
-    if (atomic_load(flag)) {
-      return true;
+// Bounded so a stalled worker fails a named test instead of running out the
+// CTest timeout with nothing to point at.
+enum { mln_test_wait_deadline_milliseconds = 30000 };
+
+bool mln_test_wait_for_flag(const atomic_bool* flag) {
+  const uint64_t deadline =
+    mln_test_monotonic_milliseconds() + mln_test_wait_deadline_milliseconds;
+  while (!atomic_load(flag)) {
+    if (mln_test_monotonic_milliseconds() > deadline) {
+      return atomic_load(flag);
     }
+    mln_test_sleep_millisecond();
+  }
+  return true;
+}
+
+void mln_test_barrier_until_count(
+  mln_runtime runtime, const atomic_size_t* counter, size_t target,
+  const char* what
+) {
+  const uint64_t deadline =
+    mln_test_monotonic_milliseconds() + mln_test_wait_deadline_milliseconds;
+  while (atomic_load(counter) < target) {
+    if (mln_test_monotonic_milliseconds() > deadline) {
+      TEST_FAIL_MESSAGE(what);
+    }
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  }
+}
+
+void mln_test_load_style_and_wait(
+  mln_runtime runtime, mln_map map, mln_buffer_view json
+) {
+  mln_test_completion applied = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_json(map, json, &applied.descriptor)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&applied));
+  // MapLibre parses an inline document and notifies its observer inside the
+  // command, so the events the load produces are queued once it commits. The
+  // barrier only orders this thread behind the runtime worker's own follow-up
+  // work.
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+}
+
+bool mln_test_wait_until(mln_runtime runtime, atomic_bool* flag) {
+  const uint64_t deadline =
+    mln_test_monotonic_milliseconds() + mln_test_wait_deadline_milliseconds;
+  while (!atomic_load(flag)) {
     // Drain so the queue does not grow without bound while we wait.
     mln_test_drain_all(runtime);
     if (atomic_load(flag)) {
       return true;
     }
+    if (mln_test_monotonic_milliseconds() > deadline) {
+      return false;
+    }
     mln_test_sleep_millisecond();
   }
-  return atomic_load(flag);
+  return true;
 }
 
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {

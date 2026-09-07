@@ -146,12 +146,11 @@ impl ResourceProviderState {
     }
 
     pub(crate) fn descriptor(&self) -> sys::mln_resource_provider {
-        let mut descriptor = maplibre_core::resource::resource_provider_descriptor(
+        maplibre_core::resource::resource_provider_descriptor(
             Some(resource_provider_trampoline),
             ptr::from_ref(self).cast_mut().cast::<c_void>(),
-        );
-        descriptor.release_user_data = Some(release_resource_provider_state);
-        descriptor
+            Some(release_resource_provider_state),
+        )
     }
 
     fn invoke(
@@ -228,12 +227,11 @@ impl ResourceTransformState {
     }
 
     pub(crate) fn descriptor(&self) -> sys::mln_resource_transform {
-        let mut descriptor = maplibre_core::resource::resource_transform_descriptor(
+        maplibre_core::resource::resource_transform_descriptor(
             Some(resource_transform_trampoline),
             ptr::from_ref(self).cast_mut().cast::<c_void>(),
-        );
-        descriptor.release_user_data = Some(release_resource_transform_state);
-        descriptor
+            Some(release_resource_transform_state),
+        )
     }
 
     fn invoke(
@@ -330,12 +328,11 @@ impl HttpHeaderTransformState {
     }
 
     pub(crate) fn descriptor(&self) -> sys::mln_http_header_transform {
-        let mut descriptor = maplibre_core::resource::http_header_transform_descriptor(
+        maplibre_core::resource::http_header_transform_descriptor(
             Some(http_header_transform_trampoline),
             ptr::from_ref(self).cast_mut().cast::<c_void>(),
-        );
-        descriptor.release_user_data = Some(release_http_header_transform_state);
-        descriptor
+            Some(release_http_header_transform_state),
+        )
     }
 
     fn invoke(

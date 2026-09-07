@@ -108,11 +108,11 @@ static app_error create_map(map_state* state, viewport initial_viewport) {
 }
 
 static app_error configure_map(map_state* state) {
+  // The render loop re-arms from the frame result's repaint flag, so the map
+  // only has to report updates that arrive between frames.
   mln_status status = mln_map_set_event_mask(
-    state->map,
-    MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE |
-      MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED,
-    &discarded_completion
+    state->map, MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE,
+    map_state_discarded_completion()
   );
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("event mask select failed", status);
@@ -121,7 +121,7 @@ static app_error configure_map(map_state* state) {
 
   status = mln_map_set_style_url(
     state->map, "https://tiles.openfreemap.org/styles/bright",
-    &discarded_completion
+    map_state_discarded_completion()
   );
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("style load failed", status);
@@ -214,8 +214,9 @@ app_error map_state_update_camera(
     update.animation = *animation;
   }
   update.gesture_phase = gesture_phase;
-  const mln_status status =
-    mln_map_update_camera(state->map, &update, &discarded_completion);
+  const mln_status status = mln_map_update_camera(
+    state->map, &update, map_state_discarded_completion()
+  );
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("camera command failed", status);
     return APP_ERROR_CAMERA_COMMAND_FAILED;
@@ -223,24 +224,18 @@ app_error map_state_update_camera(
   return APP_OK;
 }
 
-app_error map_state_resize(map_state* state, viewport value) {
-  const mln_logical_extent extent = {
-    .width = value.logical_width,
-    .height = value.logical_height,
-    .scale_factor = value.scale_factor,
-  };
+app_error map_state_cancel_transitions(map_state* state) {
   const mln_status status =
-    mln_map_resize(state->map, extent, &discarded_completion);
+    mln_map_cancel_transitions(state->map, map_state_discarded_completion());
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("map resize failed", status);
-    return APP_ERROR_MAP_RESIZE_FAILED;
+    diagnostics_log_status("camera transition cancel failed", status);
+    return APP_ERROR_CAMERA_COMMAND_FAILED;
   }
   return APP_OK;
 }
 
-static app_error drain_runtime_events(
-  map_state* state, bool* out_render_update
-) {
+app_error map_state_drain_events(map_state* state, bool* out_render_update) {
+  *out_render_update = false;
   mln_event_batch batch = MLN_HANDLE_NULL;
   mln_status status = mln_runtime_drain_events(state->runtime, &batch);
   if (status != MLN_STATUS_OK) {
@@ -265,19 +260,10 @@ static app_error drain_runtime_events(
     ) {
       continue;
     }
-    if (
-      event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE ||
-      (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED &&
-       event->payload.render_frame.needs_repaint)
-    ) {
+    if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE) {
       *out_render_update = true;
     }
   }
   mln_event_batch_release(batch);
   return APP_OK;
-}
-
-app_error map_state_drain_events(map_state* state, bool* out_render_update) {
-  *out_render_update = false;
-  return drain_runtime_events(state, out_render_update);
 }

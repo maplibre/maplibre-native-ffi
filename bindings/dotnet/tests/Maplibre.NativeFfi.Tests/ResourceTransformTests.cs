@@ -100,13 +100,19 @@ public sealed class ResourceTransformTests
                 return mln_status.MLN_STATUS_INVALID_STATE;
             }
         );
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
-        runtime.SetResourceTransformAsync(request => request.Url + "?first");
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        runtime.SetResourceTransformAsync(
+            request => request.Url + "?first",
+            TestContext.Current.CancellationToken
+        );
 
         failInstall = true;
         Assert.Throws<InvalidStateException>(() =>
             runtime
-                .SetResourceTransformAsync(request => request.Url + "?second")
+                .SetResourceTransformAsync(
+                    request => request.Url + "?second",
+                    TestContext.Current.CancellationToken
+                )
                 .GetAwaiter()
                 .GetResult()
         );
@@ -117,12 +123,26 @@ public sealed class ResourceTransformTests
 
     [BindingSpecTest("BND-140")]
     [Fact]
-    public void CanInstallReplaceAndClearResourceTransform()
+    public async Task InstallReplaceAndClearOfTheResourceTransformEachCommit()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
 
-        runtime.SetResourceTransformAsync(request => request.Url + "?first");
-        runtime.SetResourceTransformAsync(request => request.Url + "?second");
-        runtime.ClearResourceTransformAsync();
+        RuntimeEventTestHelpers.AssertRuntimeCommitted(
+            runtime.SetResourceTransformAsync(
+                request => request.Url + "?first",
+                TestContext.Current.CancellationToken
+            )
+        );
+        RuntimeEventTestHelpers.AssertRuntimeCommitted(
+            runtime.SetResourceTransformAsync(
+                request => request.Url + "?second",
+                TestContext.Current.CancellationToken
+            )
+        );
+        RuntimeEventTestHelpers.AssertRuntimeCommitted(
+            runtime.ClearResourceTransformAsync(TestContext.Current.CancellationToken)
+        );
+
+        await runtime.BarrierAsync(TestContext.Current.CancellationToken);
     }
 }

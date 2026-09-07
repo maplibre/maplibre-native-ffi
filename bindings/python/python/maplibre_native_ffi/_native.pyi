@@ -76,12 +76,10 @@ class _MapHandle:
     def request_still_image(self) -> Future[None]: ...
     def dump_debug_logs(self) -> Future[CommandCompletion]: ...
     def set_event_mask(self, mask: int) -> Future[CommandCompletion]: ...
-    def get_event_mask(self) -> int: ...
     def set_debug_options(self, options: int) -> Future[CommandCompletion]: ...
     def set_rendering_stats_view_enabled(
         self, enabled: bool
     ) -> Future[CommandCompletion]: ...
-    def get_size(self) -> tuple[int, int, float]: ...
     def resize(
         self, width: int, height: int, scale_factor: float
     ) -> Future[CommandCompletion]: ...
@@ -131,20 +129,9 @@ class _MapHandle:
     def copy_style_url(self) -> Future[str]: ...
     def get_camera(self) -> _WireDict: ...
     def get_camera_ordered(self) -> Future[_WireDict]: ...
-    def jump_to(
+    def update_camera(
         self,
-        center: _Point | None,
-        zoom: float | None,
-        bearing: float | None,
-        pitch: float | None,
-        center_altitude: float | None,
-        padding: _Insets | None,
-        anchor: _Point | None,
-        roll: float | None,
-        field_of_view: float | None,
-    ) -> Future[CommandCompletion]: ...
-    def ease_to(
-        self,
+        mode: int,
         center: _Point | None,
         zoom: float | None,
         bearing: float | None,
@@ -155,20 +142,9 @@ class _MapHandle:
         roll: float | None,
         field_of_view: float | None,
         animation: _Animation | None,
+        gesture_phase: int,
     ) -> Future[CommandCompletion]: ...
-    def fly_to(
-        self,
-        center: _Point | None,
-        zoom: float | None,
-        bearing: float | None,
-        pitch: float | None,
-        center_altitude: float | None,
-        padding: _Insets | None,
-        anchor: _Point | None,
-        roll: float | None,
-        field_of_view: float | None,
-        animation: _Animation | None,
-    ) -> Future[CommandCompletion]: ...
+    def cancel_transitions(self) -> Future[CommandCompletion]: ...
     def apply_camera_delta(
         self,
         kind: int,
@@ -351,6 +327,9 @@ class _MapHandle:
     ) -> Future[CommandCompletion]: ...
     def remove_style_source(self, source_id: str) -> Future[CommandCompletion]: ...
     def get_style_source_info(self, source_id: str) -> Future[_WireDict | None]: ...
+    def copy_style_source_url(self, source_id: str) -> Future[str | None]: ...
+    def copy_style_source_attribution(self, source_id: str) -> Future[str | None]: ...
+    def get_style_source_tile_urls(self, source_id: str) -> Future[list[str]]: ...
     def set_style_source_volatile(
         self, source_id: str, is_volatile: bool
     ) -> Future[CommandCompletion]: ...
@@ -447,7 +426,7 @@ class _MapHandle:
     def get_style_image_info(self, image_id: str) -> Future[_WireDict | None]: ...
     def copy_style_image_premultiplied_rgba8(
         self, image_id: str
-    ) -> Future[_WireDict | None]: ...
+    ) -> Future[bytes | None]: ...
     def add_image_source_url(
         self, source_id: str, coordinates: Sequence[_Point], url: str
     ) -> Future[CommandCompletion]: ...
@@ -822,7 +801,7 @@ def create_map(
     map_mode: int | None,
     fast_pfor_enabled: bool | None,
     event_mask: int,
-) -> _MapHandle: ...
+) -> Future[_MapHandle]: ...
 def attach_metal_surface(
     map: _MapHandle,
     width: int,
@@ -832,7 +811,7 @@ def attach_metal_surface(
     layer_address: int,
     driver: int,
     texture_ring_depth: int,
-) -> tuple[_RenderSessionHandle, int]: ...
+) -> tuple[_RenderSessionHandle, Future[None]]: ...
 def attach_vulkan_surface(
     map: _MapHandle,
     width: int,
@@ -848,7 +827,7 @@ def attach_vulkan_surface(
     surface_bits: int,
     driver: int,
     texture_ring_depth: int,
-) -> tuple[_RenderSessionHandle, int]: ...
+) -> tuple[_RenderSessionHandle, Future[None]]: ...
 def attach_metal_owned_texture(
     map: _MapHandle,
     width: int,
@@ -857,7 +836,7 @@ def attach_metal_owned_texture(
     device_address: int,
     driver: int,
     texture_ring_depth: int,
-) -> tuple[_RenderSessionHandle, int]: ...
+) -> tuple[_RenderSessionHandle, Future[None]]: ...
 def attach_metal_borrowed_texture(
     map: _MapHandle,
     width: int,
@@ -868,7 +847,7 @@ def attach_metal_borrowed_texture(
     texture_address: int,
     driver: int,
     texture_ring_depth: int,
-) -> tuple[_RenderSessionHandle, int]: ...
+) -> tuple[_RenderSessionHandle, Future[None]]: ...
 def attach_vulkan_owned_texture(
     map: _MapHandle,
     width: int,
@@ -883,7 +862,7 @@ def attach_vulkan_owned_texture(
     get_device_proc_addr: int,
     driver: int,
     texture_ring_depth: int,
-) -> tuple[_RenderSessionHandle, int]: ...
+) -> tuple[_RenderSessionHandle, Future[None]]: ...
 def attach_vulkan_borrowed_texture(
     map: _MapHandle,
     width: int,
@@ -905,7 +884,7 @@ def attach_vulkan_borrowed_texture(
     final_layout: int,
     driver: int,
     texture_ring_depth: int,
-) -> tuple[_RenderSessionHandle, int]: ...
+) -> tuple[_RenderSessionHandle, Future[None]]: ...
 def attach_webgpu_surface(
     map: _MapHandle,
     width: int,
@@ -918,7 +897,7 @@ def attach_webgpu_surface(
     format: int,
     driver: int,
     texture_ring_depth: int,
-) -> tuple[_RenderSessionHandle, int]: ...
+) -> tuple[_RenderSessionHandle, Future[None]]: ...
 def attach_webgpu_owned_texture(
     map: _MapHandle,
     width: int,
@@ -929,7 +908,7 @@ def attach_webgpu_owned_texture(
     queue_address: int,
     driver: int,
     texture_ring_depth: int,
-) -> tuple[_RenderSessionHandle, int]: ...
+) -> tuple[_RenderSessionHandle, Future[None]]: ...
 def attach_webgpu_borrowed_texture(
     map: _MapHandle,
     width: int,
@@ -945,7 +924,7 @@ def attach_webgpu_borrowed_texture(
     format: int,
     driver: int,
     texture_ring_depth: int,
-) -> tuple[_RenderSessionHandle, int]: ...
+) -> tuple[_RenderSessionHandle, Future[None]]: ...
 def attach_opengl_surface(
     map: _MapHandle,
     width: int,
@@ -961,7 +940,7 @@ def attach_opengl_surface(
     surface_address: int,
     driver: int,
     texture_ring_depth: int,
-) -> tuple[_RenderSessionHandle, int]: ...
+) -> tuple[_RenderSessionHandle, Future[None]]: ...
 def attach_opengl_owned_texture(
     map: _MapHandle,
     width: int,
@@ -976,7 +955,7 @@ def attach_opengl_owned_texture(
     get_proc_address: int,
     driver: int,
     texture_ring_depth: int,
-) -> tuple[_RenderSessionHandle, int]: ...
+) -> tuple[_RenderSessionHandle, Future[None]]: ...
 def attach_opengl_borrowed_texture(
     map: _MapHandle,
     width: int,
@@ -995,4 +974,4 @@ def attach_opengl_borrowed_texture(
     target: int,
     driver: int,
     texture_ring_depth: int,
-) -> tuple[_RenderSessionHandle, int]: ...
+) -> tuple[_RenderSessionHandle, Future[None]]: ...

@@ -61,11 +61,20 @@ public enum RenderSessionCapabilities : uint
     Presentation = 1u << 3,
 }
 
+/// <summary>Frame-demand policy bits.</summary>
 [Flags]
 public enum FrameDemandFlags : uint
 {
     None = 0,
+
+    /// <summary>Render only when a newer map update exists.</summary>
     IfNeeded = 1u << 0,
+
+    /// <summary>
+    /// Present the rendered frame on a target that supports presentation. A presenting target
+    /// whose demand clears this bit still renders and keeps whatever it presented last. Targets
+    /// without presentation ignore it.
+    /// </summary>
     Present = 1u << 1,
 }
 
@@ -499,77 +508,20 @@ public sealed class WebGpuOwnedTextureFrame
         this.format = format;
     }
 
-    public ulong Generation
+    public ulong Generation => Guarded(generation);
+    public uint Width => Guarded(width);
+    public uint Height => Guarded(height);
+    public double ScaleFactor => Guarded(scaleFactor);
+    public ulong FrameId => Guarded(frameId);
+    public NativePointer Texture => Guarded(texture);
+    public NativePointer TextureView => Guarded(textureView);
+    public NativePointer Device => Guarded(device);
+    public uint Format => Guarded(format);
+
+    private T Guarded<T>(T value)
     {
-        get
-        {
-            scope.EnsureActive();
-            return generation;
-        }
-    }
-    public uint Width
-    {
-        get
-        {
-            scope.EnsureActive();
-            return width;
-        }
-    }
-    public uint Height
-    {
-        get
-        {
-            scope.EnsureActive();
-            return height;
-        }
-    }
-    public double ScaleFactor
-    {
-        get
-        {
-            scope.EnsureActive();
-            return scaleFactor;
-        }
-    }
-    public ulong FrameId
-    {
-        get
-        {
-            scope.EnsureActive();
-            return frameId;
-        }
-    }
-    public NativePointer Texture
-    {
-        get
-        {
-            scope.EnsureActive();
-            return texture;
-        }
-    }
-    public NativePointer TextureView
-    {
-        get
-        {
-            scope.EnsureActive();
-            return textureView;
-        }
-    }
-    public NativePointer Device
-    {
-        get
-        {
-            scope.EnsureActive();
-            return device;
-        }
-    }
-    public uint Format
-    {
-        get
-        {
-            scope.EnsureActive();
-            return format;
-        }
+        scope.EnsureActive();
+        return value;
     }
 }
 
@@ -608,69 +560,19 @@ public sealed class MetalOwnedTextureFrame
         this.pixelFormat = pixelFormat;
     }
 
-    public ulong Generation
+    public ulong Generation => Guarded(generation);
+    public uint Width => Guarded(width);
+    public uint Height => Guarded(height);
+    public double ScaleFactor => Guarded(scaleFactor);
+    public ulong FrameId => Guarded(frameId);
+    public NativePointer Texture => Guarded(texture);
+    public NativePointer Device => Guarded(device);
+    public ulong PixelFormat => Guarded(pixelFormat);
+
+    private T Guarded<T>(T value)
     {
-        get
-        {
-            scope.EnsureActive();
-            return generation;
-        }
-    }
-    public uint Width
-    {
-        get
-        {
-            scope.EnsureActive();
-            return width;
-        }
-    }
-    public uint Height
-    {
-        get
-        {
-            scope.EnsureActive();
-            return height;
-        }
-    }
-    public double ScaleFactor
-    {
-        get
-        {
-            scope.EnsureActive();
-            return scaleFactor;
-        }
-    }
-    public ulong FrameId
-    {
-        get
-        {
-            scope.EnsureActive();
-            return frameId;
-        }
-    }
-    public NativePointer Texture
-    {
-        get
-        {
-            scope.EnsureActive();
-            return texture;
-        }
-    }
-    public NativePointer Device
-    {
-        get
-        {
-            scope.EnsureActive();
-            return device;
-        }
-    }
-    public ulong PixelFormat
-    {
-        get
-        {
-            scope.EnsureActive();
-            return pixelFormat;
-        }
+        scope.EnsureActive();
+        return value;
     }
 }
 
@@ -715,85 +617,21 @@ public sealed class VulkanOwnedTextureFrame
         this.layout = layout;
     }
 
-    public ulong Generation
+    public ulong Generation => Guarded(generation);
+    public uint Width => Guarded(width);
+    public uint Height => Guarded(height);
+    public double ScaleFactor => Guarded(scaleFactor);
+    public ulong FrameId => Guarded(frameId);
+    public VulkanHandle Image => Guarded(image);
+    public VulkanHandle ImageView => Guarded(imageView);
+    public NativePointer Device => Guarded(device);
+    public uint Format => Guarded(format);
+    public uint Layout => Guarded(layout);
+
+    private T Guarded<T>(T value)
     {
-        get
-        {
-            scope.EnsureActive();
-            return generation;
-        }
-    }
-    public uint Width
-    {
-        get
-        {
-            scope.EnsureActive();
-            return width;
-        }
-    }
-    public uint Height
-    {
-        get
-        {
-            scope.EnsureActive();
-            return height;
-        }
-    }
-    public double ScaleFactor
-    {
-        get
-        {
-            scope.EnsureActive();
-            return scaleFactor;
-        }
-    }
-    public ulong FrameId
-    {
-        get
-        {
-            scope.EnsureActive();
-            return frameId;
-        }
-    }
-    public VulkanHandle Image
-    {
-        get
-        {
-            scope.EnsureActive();
-            return image;
-        }
-    }
-    public VulkanHandle ImageView
-    {
-        get
-        {
-            scope.EnsureActive();
-            return imageView;
-        }
-    }
-    public NativePointer Device
-    {
-        get
-        {
-            scope.EnsureActive();
-            return device;
-        }
-    }
-    public uint Format
-    {
-        get
-        {
-            scope.EnsureActive();
-            return format;
-        }
-    }
-    public uint Layout
-    {
-        get
-        {
-            scope.EnsureActive();
-            return layout;
-        }
+        scope.EnsureActive();
+        return value;
     }
 }
 
@@ -838,84 +676,20 @@ public sealed class OpenGLOwnedTextureFrame
         this.type = type;
     }
 
-    public ulong Generation
+    public ulong Generation => Guarded(generation);
+    public uint Width => Guarded(width);
+    public uint Height => Guarded(height);
+    public double ScaleFactor => Guarded(scaleFactor);
+    public ulong FrameId => Guarded(frameId);
+    public uint Texture => Guarded(texture);
+    public uint Target => Guarded(target);
+    public uint InternalFormat => Guarded(internalFormat);
+    public uint Format => Guarded(format);
+    public uint Type => Guarded(type);
+
+    private T Guarded<T>(T value)
     {
-        get
-        {
-            scope.EnsureActive();
-            return generation;
-        }
-    }
-    public uint Width
-    {
-        get
-        {
-            scope.EnsureActive();
-            return width;
-        }
-    }
-    public uint Height
-    {
-        get
-        {
-            scope.EnsureActive();
-            return height;
-        }
-    }
-    public double ScaleFactor
-    {
-        get
-        {
-            scope.EnsureActive();
-            return scaleFactor;
-        }
-    }
-    public ulong FrameId
-    {
-        get
-        {
-            scope.EnsureActive();
-            return frameId;
-        }
-    }
-    public uint Texture
-    {
-        get
-        {
-            scope.EnsureActive();
-            return texture;
-        }
-    }
-    public uint Target
-    {
-        get
-        {
-            scope.EnsureActive();
-            return target;
-        }
-    }
-    public uint InternalFormat
-    {
-        get
-        {
-            scope.EnsureActive();
-            return internalFormat;
-        }
-    }
-    public uint Format
-    {
-        get
-        {
-            scope.EnsureActive();
-            return format;
-        }
-    }
-    public uint Type
-    {
-        get
-        {
-            scope.EnsureActive();
-            return type;
-        }
+        scope.EnsureActive();
+        return value;
     }
 }

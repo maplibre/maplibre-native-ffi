@@ -104,6 +104,9 @@ impl Controller {
             _ => return Ok(false),
         }
         if self.dragging() != was_dragging {
+            if self.dragging() {
+                map.cancel_transitions()?;
+            }
             map.set_gesture_in_progress(self.dragging())?;
         }
         Ok(false)

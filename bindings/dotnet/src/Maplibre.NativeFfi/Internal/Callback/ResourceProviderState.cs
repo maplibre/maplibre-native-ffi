@@ -55,14 +55,8 @@ internal sealed unsafe class ResourceProviderState : IDisposable
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
-    private static void Release(void* userData)
-    {
-        try
-        {
-            ((ResourceProviderState?)GCHandle.FromIntPtr((nint)userData).Target)?.Dispose();
-        }
-        catch { }
-    }
+    private static void Release(void* userData) =>
+        CallbackRelease.Dispose<ResourceProviderState>(userData);
 
     private static uint Invoke(
         ResourceProviderState? state,

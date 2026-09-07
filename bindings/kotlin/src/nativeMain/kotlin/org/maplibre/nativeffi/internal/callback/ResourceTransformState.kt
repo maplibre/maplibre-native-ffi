@@ -70,8 +70,6 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
 
   override fun close() = gate.close()
 
-  internal fun checkCanClose() = gate.checkCanClose()
-
   internal fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
 
   private fun closeNative() {

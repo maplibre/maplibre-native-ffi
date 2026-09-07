@@ -27,8 +27,10 @@ typedef enum mln_command_disposition : uint32_t {
  * Borrowed terminal result for one accepted asynchronous submission.
  *
  * The submitting function defines the type behind value and the meaning of
- * value_count. Every pointer remains valid only for the completion callback.
- * A binding copies any result or diagnostic that it keeps.
+ * value_count. A function with no result completes with value null and
+ * value_count zero, as does any failed completion. Every pointer remains valid
+ * only for the completion callback. A binding copies any result or diagnostic
+ * that it keeps.
  *
  * disposition and generation are meaningful for commands. Other one-shot
  * functions set disposition to MLN_COMMAND_DISPOSITION_COMMITTED and

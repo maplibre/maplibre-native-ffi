@@ -14,7 +14,6 @@ public readonly record struct CommandCompletion(
 );
 
 internal unsafe delegate mln_status CompletionSubmit(mln_completion* completion);
-internal unsafe delegate void CompletionAction(mln_completion* completion);
 internal unsafe delegate T CompletionConverter<T>(mln_completion_result* result);
 
 internal static unsafe class NativeCompletion
@@ -54,13 +53,6 @@ internal static unsafe class NativeCompletion
             ),
             true
         );
-
-    internal static Task<CommandCompletion> SubmitCommandChecked(CompletionAction submit) =>
-        SubmitCommand(completion =>
-        {
-            submit(completion);
-            return mln_status.MLN_STATUS_OK;
-        });
 
     internal static Task SubmitUnit(CompletionSubmit submit) => Submit(submit, static _ => true);
 

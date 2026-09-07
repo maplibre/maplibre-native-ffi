@@ -8,9 +8,7 @@ test "diagnostics capture public lifecycle failures and keep copied messages" {
     defer diagnostics.deinit();
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
-    var map_future = try maplibre.MapHandle.create(&runtime, .{});
-    defer map_future.deinit();
-    var map = try map_future.wait(null);
+    var map = try support.createMap(&runtime, .{});
 
     try testing.expectError(error.InvalidState, support.closeRuntime(&runtime));
     const first = diagnostics.get().?;
@@ -19,7 +17,7 @@ test "diagnostics capture public lifecycle failures and keep copied messages" {
     const copied = try testing.allocator.dupe(u8, first.message);
     defer testing.allocator.free(copied);
 
-    try map.close();
+    try support.closeMap(&map);
     try testing.expectEqualStrings(copied, diagnostics.get().?.message);
     try support.closeRuntime(&runtime);
 }

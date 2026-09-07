@@ -2,16 +2,14 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
+import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart'
+    show threadLastErrorMessage;
 import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
     show mapHandleIdForTesting;
-import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
-import 'package:maplibre_native_ffi/src/internal/lifecycle/native_handles.dart';
 import 'package:maplibre_native_ffi/src/internal/status/status.dart';
 import 'package:test/test.dart';
-
-final _c = MaplibreNativeCApi.open();
 
 void _discardCompletion(
   Pointer<Void> _,
@@ -20,15 +18,17 @@ void _discardCompletion(
 
 void _discardCompletionState(Pointer<Void> _) {}
 
-/// Calls the C snapshot accessor with a raw map ID.
-void _mapSnapshotById(NativeMap map) {
+/// Calls the C snapshot accessor with a raw map ID, so a test can replay a
+/// released ID or use one from another isolate. The safe API expresses
+/// neither.
+void _mapSnapshotById(int map) {
   final arena = Arena();
   try {
     final snapshot = arena<raw.mln_map_snapshot>();
     snapshot.ref.size = sizeOf<raw.mln_map_snapshot>();
     checkNativeStatus(
-      raw.mln_map_snapshot_get(map.raw, snapshot),
-      _c.threadLastErrorMessage,
+      raw.mln_map_snapshot_get(map, snapshot),
+      threadLastErrorMessage,
     );
   } finally {
     arena.releaseAll();
@@ -52,7 +52,7 @@ void _runtimeBarrierById(int handle) {
     );
     checkNativeStatus(
       raw.mln_runtime_barrier(handle, completion),
-      _c.threadLastErrorMessage,
+      threadLastErrorMessage,
     );
   } finally {
     arena.releaseAll();
@@ -65,7 +65,7 @@ void main() {
     () async {
       final runtime = RuntimeHandle.create();
       final first = await runtime.createMap();
-      final released = NativeMap(mapHandleIdForTesting(first));
+      final released = mapHandleIdForTesting(first);
       await first.close();
 
       // The released slot is the one the next map takes, so the replayed id
@@ -88,7 +88,7 @@ void main() {
       );
 
       // The live map is unaffected by the replay.
-      _mapSnapshotById(NativeMap(mapHandleIdForTesting(second)));
+      _mapSnapshotById(mapHandleIdForTesting(second));
     },
   );
 

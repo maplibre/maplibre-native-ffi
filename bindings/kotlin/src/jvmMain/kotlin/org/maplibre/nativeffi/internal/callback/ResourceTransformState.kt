@@ -94,8 +94,6 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
     }
   }
 
-  fun checkCanClose() = gate.checkCanClose()
-
   fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
 
   override fun close() = gate.close()

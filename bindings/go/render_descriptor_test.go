@@ -8,11 +8,6 @@ func TestRenderExtentPhysicalSizeRejectsInvalidScale(t *testing.T) {
 	}
 }
 
-func TestFrameBatchCloseIsIdempotent(t *testing.T) {
-	var batch *RenderFrameBatch
-	batch.Close()
-}
-
 // A Vulkan non-dispatchable handle is 64 bits wide on every platform, so the
 // binding must carry one that a pointer-width field would truncate. Both
 // handles below have a bit set above the low 32 bits, and neither survives a

@@ -35,7 +35,11 @@ internal object OpenGLRenderTarget {
         descriptor(context),
         NativePointer.ofAddress(context.surfaceAddress()),
       )
-    return Surface(RenderTarget.completeAttachment(map.attachOpenGLSurface(descriptor)))
+    return Surface(
+      RenderTarget.completeAttachment(
+        map.attachOpenGLSurface(descriptor, RenderTarget.callerDriverOptions)
+      )
+    )
   }
 
   private fun attachOwnedTexture(
@@ -48,7 +52,10 @@ internal object OpenGLRenderTarget {
     var session: RenderSessionHandle? = null
     var compositor: OpenGLTextureCompositor? = null
     try {
-      session = RenderTarget.completeAttachment(map.attachOpenGLOwnedTexture(descriptor))
+      session =
+        RenderTarget.completeAttachment(
+          map.attachOpenGLOwnedTexture(descriptor, RenderTarget.ownedTextureOptions)
+        )
       compositor = OpenGLTextureCompositor(context, viewport)
       return OwnedTexture(session, compositor)
     } catch (error: RuntimeException) {
@@ -70,7 +77,10 @@ internal object OpenGLRenderTarget {
       texture = OpenGLBorrowedTexture(context, viewport)
       session =
         RenderTarget.completeAttachment(
-          map.attachOpenGLBorrowedTexture(borrowedDescriptor(context, viewport, texture))
+          map.attachOpenGLBorrowedTexture(
+            borrowedDescriptor(context, viewport, texture),
+            RenderTarget.callerDriverOptions,
+          )
         )
       compositor = OpenGLTextureCompositor(context, viewport)
       return BorrowedTexture(context, session, compositor, texture)
@@ -117,8 +127,10 @@ internal object OpenGLRenderTarget {
       RenderTarget.completeDriverOperation(session, session.resize(RenderTarget.extent(viewport)))
     }
 
-    override fun renderUpdate(): Boolean =
-      RenderTarget.renderFrame(session)?.disposition == RenderResult.RENDERED
+    override fun renderUpdate(): Boolean {
+      val result = RenderTarget.renderFrame(session) ?: return false
+      return result.disposition == RenderResult.RENDERED && !result.needsRepaint
+    }
 
     override fun close() {
       RenderTarget.closeSession(session)
@@ -135,9 +147,10 @@ internal object OpenGLRenderTarget {
     }
 
     override fun renderUpdate(): Boolean {
-      if (RenderTarget.renderFrame(session)?.disposition != RenderResult.RENDERED) return false
-      val frameHandle =
-        checkNotNull(session.acquireFrame()) { "rendered OpenGL frame was unavailable" }
+      val result = RenderTarget.renderFrame(session) ?: return false
+      if (result.disposition != RenderResult.RENDERED) return false
+      // An empty ring keeps the previously composited frame on screen.
+      val frameHandle = session.acquireFrame() ?: return false
       try {
         val frame = frameHandle.openGLTexture()
         check(frame.width() > 0 && frame.height() > 0) {
@@ -150,7 +163,7 @@ internal object OpenGLRenderTarget {
       } finally {
         frameHandle.release()
       }
-      return true
+      return !result.needsRepaint
     }
 
     override fun close() {
@@ -168,6 +181,8 @@ internal object OpenGLRenderTarget {
     private val compositor: OpenGLTextureCompositor,
     private var texture: OpenGLBorrowedTexture,
   ) : RenderTarget {
+    private var sessionReleased = false
+
     /** Local to the render loop thread: allocate a texture at the new size and hand it over. */
     override fun resize(viewport: Viewport) {
       compositor.resize(viewport)
@@ -181,18 +196,22 @@ internal object OpenGLRenderTarget {
         // A failed handover leaves it unknown which target the session holds, so detach before
         // either is released.
         RenderTarget.detachSuppressed(error, session)
+        sessionReleased = true
         RenderTarget.closeSuppressed(error, replacement)
         throw error
       }
       // Released only once the session has taken the replacement.
       texture.close()
       texture = replacement
+      // A handover replaces only the graphics resource, so the map still needs the new extent.
+      RenderTarget.resizeMap(session.map(), viewport)
     }
 
     override fun renderUpdate(): Boolean {
-      if (RenderTarget.renderFrame(session)?.disposition != RenderResult.RENDERED) return false
+      val result = RenderTarget.renderFrame(session) ?: return false
+      if (result.disposition != RenderResult.RENDERED) return false
       compositor.drawTexture(texture.texture())
-      return true
+      return !result.needsRepaint
     }
 
     override fun close() {
@@ -200,7 +219,7 @@ internal object OpenGLRenderTarget {
         compositor.close()
       } finally {
         try {
-          RenderTarget.closeSession(session)
+          RenderTarget.closeSession(session, sessionReleased)
         } finally {
           texture.close()
         }

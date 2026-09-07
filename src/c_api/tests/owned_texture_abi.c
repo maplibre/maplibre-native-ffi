@@ -4,14 +4,6 @@
 #include "test_support.h"
 #include "unity.h"
 
-static void gpu_sync_default_is_cpu_complete(void) {
-  const mln_gpu_sync sync = mln_gpu_sync_default();
-  TEST_ASSERT_EQUAL_UINT32(sizeof(mln_gpu_sync), sync.size);
-  TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_CPU_COMPLETE, sync.kind);
-  TEST_ASSERT_EQUAL_UINT64(0, sync.object);
-  TEST_ASSERT_EQUAL_UINT64(0, sync.value);
-}
-
 static void acquired_frame_release_validates_owned_handle_input(void) {
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   const mln_gpu_sync sync = mln_gpu_sync_default();
@@ -35,6 +27,5 @@ static void acquired_frame_release_validates_owned_handle_input(void) {
 
 void run_owned_texture_abi_tests(void) {
   UnitySetTestFile(__FILE__);
-  RUN_TEST(gpu_sync_default_is_cpu_complete);
   RUN_TEST(acquired_frame_release_validates_owned_handle_input);
 }

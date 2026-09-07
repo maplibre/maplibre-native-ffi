@@ -139,7 +139,7 @@ final class MapProjectionHandle {
   void close() {
     _state.close(
       (handle) => raw.mln_map_projection_close(handle.raw),
-      _c.threadLastErrorMessage,
+      threadLastErrorMessage,
     );
   }
 }
@@ -256,7 +256,9 @@ final class FrameDemand {
   /// Whether the target presents the rendered frame.
   ///
   /// A target presents only when
-  /// [RenderSessionCapabilities.supportsPresentation] is set.
+  /// [RenderSessionCapabilities.supportsPresentation] is set. A presenting
+  /// target still renders for a demand that clears this, and keeps showing
+  /// whatever it presented last.
   final bool present;
 
   /// Host identity returned with the terminal frame result.
@@ -355,6 +357,57 @@ final class RenderSessionCapabilities {
   bool get supportsPresentation => flags & 8 != 0;
 }
 
+/// Lifecycle state of a render session.
+final class RenderSessionState {
+  const RenderSessionState._(this.rawValue, this.name);
+
+  /// Attachment was accepted and the driver has not published the target yet.
+  static const attaching = RenderSessionState._(1, 'attaching');
+
+  /// The session renders for its map.
+  static const attached = RenderSessionState._(2, 'attached');
+
+  /// Detachment was accepted and graphics teardown has not finished.
+  static const detaching = RenderSessionState._(3, 'detaching');
+
+  /// Graphics teardown finished and the handle awaits its close.
+  static const detached = RenderSessionState._(4, 'detached');
+
+  /// The target was lost and the session cannot render for it again.
+  static const targetLost = RenderSessionState._(5, 'targetLost');
+
+  /// The session was abandoned without calling the graphics driver.
+  static const abandoned = RenderSessionState._(6, 'abandoned');
+
+  /// Returns the state for a native value, or an unknown state for a value
+  /// that this binding does not name.
+  factory RenderSessionState.fromRawValue(int value) => switch (value) {
+    1 => attaching,
+    2 => attached,
+    3 => detaching,
+    4 => detached,
+    5 => targetLost,
+    6 => abandoned,
+    _ => RenderSessionState._(value, 'unknown($value)'),
+  };
+
+  /// The value that the C API reported.
+  final int rawValue;
+
+  /// Diagnostic name of this state.
+  final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RenderSessionState && other.rawValue == rawValue;
+
+  @override
+  int get hashCode => rawValue.hashCode;
+
+  @override
+  String toString() => name;
+}
+
 /// Latest any-thread render-session state and generations.
 final class RenderSessionSnapshot {
   const RenderSessionSnapshot._({
@@ -374,9 +427,8 @@ final class RenderSessionSnapshot {
     required this.pendingChanges,
   });
 
-  /// Lifecycle state: 1 attaching, 2 attached, 3 detaching, 4 detached,
-  /// 5 target lost, and 6 abandoned.
-  final int state;
+  /// Lifecycle state of the session.
+  final RenderSessionState state;
 
   /// Execution placement that this session uses.
   final RenderDriver driver;
@@ -524,7 +576,7 @@ final class RenderSessionAttachment {
 /// for a target kind that the session does not use reports an unsupported
 /// status, and replacing a texture target while a frame is acquired reports an
 /// invalid-state status.
-final class RenderSessionHandle implements Finalizable {
+final class RenderSessionHandle {
   RenderSessionHandle._(this._runtime, NativeRenderSession handle)
     : _state = NativeHandleState(handle, 'RenderSessionHandle');
 
@@ -552,15 +604,6 @@ final class RenderSessionHandle implements Finalizable {
   /// Whether this session has been closed by the Dart binding.
   bool get isClosed => _state.isClosed;
 
-  Future<void> _completeWhileRetained(Future<void> completion) async {
-    final retained = this;
-    try {
-      await completion;
-    } finally {
-      retained.isClosed;
-    }
-  }
-
   NativeRenderSession get _handle => _state.handle;
 
   /// Copies the capabilities that attachment fixed for this session.
@@ -578,13 +621,13 @@ final class RenderSessionHandle implements Finalizable {
   });
 
   /// Copies the latest session state and generations.
-  RenderSessionSnapshot get snapshot => withNativeArena((arena) {
+  RenderSessionSnapshot snapshot() => withNativeArena((arena) {
     final out = arena<raw.mln_render_session_snapshot>()
       ..ref.size = sizeOf<raw.mln_render_session_snapshot>();
     _check(raw.mln_render_session_get_snapshot(_handle.raw, out));
     final value = out.ref;
     return RenderSessionSnapshot._(
-      state: value.state,
+      state: RenderSessionState.fromRawValue(value.state),
       driver: RenderDriver.values.firstWhere(
         (driver) => driver.rawValue == value.driver,
       ),
@@ -618,7 +661,12 @@ final class RenderSessionHandle implements Finalizable {
       final native = arena<raw.mln_frame_demand>()
         ..ref = raw.mln_frame_demand_default();
       native.ref.flags =
-          (demand.renderIfNeeded ? 1 : 0) | (demand.present ? 2 : 0);
+          (demand.renderIfNeeded
+              ? raw.mln_frame_demand_flag.MLN_FRAME_DEMAND_IF_NEEDED.value
+              : 0) |
+          (demand.present
+              ? raw.mln_frame_demand_flag.MLN_FRAME_DEMAND_PRESENT.value
+              : 0);
       native.ref.token = demand.token;
       native.ref.coalescing_boundary = demand.coalescingBoundary;
       native.ref.timeout_ns = demand.timeoutNanoseconds;
@@ -630,13 +678,19 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// The C API hands over a batch whose records stay stable until release, and
   /// this method copies the records into Dart values and releases the batch
-  /// before returning. Draining again after an empty result is valid.
+  /// before returning. An empty queue is not an error: the drain reports a
+  /// not-ready status, which this method returns as an empty list, and
+  /// draining again is valid.
   List<RenderFrameResult> drainFrameResults() {
     return withNativeArena((arena) {
       final outBatch = arena<Uint64>()..value = 0;
-      _check(raw.mln_render_session_drain_frame_results(_handle.raw, outBatch));
+      final status = raw.mln_render_session_drain_frame_results(
+        _handle.raw,
+        outBatch,
+      );
+      if (status == nativeStatusNotReady) return const <RenderFrameResult>[];
+      _check(status);
       final batch = outBatch.value;
-      if (batch == 0) return const <RenderFrameResult>[];
       try {
         final count = arena<Size>();
         _check(raw.mln_render_frame_batch_count(batch, count));
@@ -660,8 +714,10 @@ final class RenderSessionHandle implements Finalizable {
   /// and a later call from another thread reports a wrong-thread status.
   /// Attach, resize, target replacement, queries, readback, maintenance,
   /// barriers, and detach all use this mailbox, so keep servicing it while
-  /// presentation is paused. A core-worker session reports an invalid-state status, because
-  /// its own worker owns execution.
+  /// presentation is paused. A reentrant call from inside driver work reports
+  /// a busy status, a call from another thread reports a wrong-thread status,
+  /// and a core-worker session reports an invalid-state status because its own
+  /// worker owns execution.
   ///
   /// [maxWork] must be zero or positive.
   int serviceDriverWork({int maxWork = 0}) {
@@ -693,8 +749,11 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// A caller-owned texture is sized by its owner, so resizing one reports an
   /// unsupported status: allocate a texture at the new size and hand it over
-  /// with the backend's borrowed-texture target setter. A resize applied while
-  /// a texture frame is acquired fails with an invalid-state status.
+  /// with the backend's borrowed-texture target setter. An extent whose scale
+  /// factor differs from the one the session attached with reports an
+  /// invalid-argument status, and a resize submitted while a texture frame is
+  /// acquired reports an invalid-state status. A resize that a later resize
+  /// replaces still completes successfully, having changed nothing.
   Future<void> resize(RenderTargetExtent extent) => _voidOperation(
     (out) => withNativeArena((arena) {
       final native = arena<raw.mln_render_target_extent>()
@@ -914,7 +973,7 @@ final class RenderSessionHandle implements Finalizable {
   );
 
   Future<Uint8List> _bufferOperation(NativeCompletionStart start) =>
-      _runtime._startValue(
+      startNativeCompletion(
         copyKind: raw
             .mln_adapter_completion_copy_kind
             .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEWS,
@@ -925,7 +984,7 @@ final class RenderSessionHandle implements Finalizable {
       );
 
   Future<List<QueriedFeature>> _queryFeatures(NativeCompletionStart start) =>
-      _runtime._startValue(
+      startNativeCompletion(
         copyKind: raw
             .mln_adapter_completion_copy_kind
             .MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURES,
@@ -951,7 +1010,7 @@ final class RenderSessionHandle implements Finalizable {
   /// session's current generation, so request a frame and let it terminate
   /// after each resize or target replacement. Reading back before that frame
   /// exists reports an invalid-state status.
-  Future<TextureImage> readPremultipliedRgba8() => _runtime._startValue(
+  Future<TextureImage> readPremultipliedRgba8() => startNativeCompletion(
     copyKind: raw
         .mln_adapter_completion_copy_kind
         .MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK,
@@ -967,17 +1026,21 @@ final class RenderSessionHandle implements Finalizable {
     },
   );
 
-  /// Leases the oldest rendered texture-ring slot that no lease already holds.
+  /// Leases the oldest rendered texture-ring slot that no lease already holds,
+  /// or null when no rendered slot is ready.
   ///
   /// The call is nonblocking, and the lease owns its slot until
-  /// [AcquiredFrame.release]. A session whose
+  /// [AcquiredFrame.release]. An empty ring is not an error, so pace
+  /// acquisition with [drainFrameResults] or
+  /// [RenderSessionSnapshot.frameGeneration]. A session whose
   /// [RenderSessionCapabilities.supportsFrameAcquisition] is false reports an
-  /// unsupported status, and a session with no rendered slot ready reports a
-  /// not-ready status, so pace acquisition with [drainFrameResults] or
-  /// [RenderSessionSnapshot.frameGeneration].
-  AcquiredFrame acquireFrame() => withNativeArena((arena) {
+  /// unsupported status, and a session that is not attached reports an
+  /// invalid-state status.
+  AcquiredFrame? acquireFrame() => withNativeArena((arena) {
     final out = arena<Uint64>()..value = 0;
-    _check(raw.mln_render_session_acquire_frame(_handle.raw, out));
+    final status = raw.mln_render_session_acquire_frame(_handle.raw, out);
+    if (status == nativeStatusNotReady) return null;
+    _check(status);
     return AcquiredFrame._(out.value);
   });
 
@@ -986,9 +1049,10 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// Every mailbox operation accepted earlier reaches a terminal result before
   /// teardown runs, so the host's target, device, and borrowed synchronization
-  /// objects stay in use until the returned future completes. A session that
-  /// still holds an acquired frame reports an invalid-state status and stays
-  /// attached, so release every [AcquiredFrame] first.
+  /// objects stay in use until the returned future completes. A demand that is
+  /// still outstanding terminates as [RenderResult.targetNotReady]. A session
+  /// that still holds an acquired frame reports an invalid-state status and
+  /// stays attached, so release every [AcquiredFrame] first.
   Future<void> detach() =>
       _voidOperation((out) => raw.mln_render_session_detach(_handle.raw, out));
 
@@ -999,7 +1063,9 @@ final class RenderSessionHandle implements Finalizable {
   /// the host's graphics objects through quarantined renderer resources, so the
   /// host may destroy its target and device as soon as this returns. Do not
   /// call it from a MapLibre callback. Resources that could not be destroyed
-  /// are reported as quarantined.
+  /// are reported as quarantined. A caller-graphics-thread session reports a
+  /// busy status and changes nothing while a driver call is in flight, so
+  /// abandon it from outside [serviceDriverWork].
   RenderAbandonResult abandon() => withNativeArena((arena) {
     final out = arena<raw.mln_render_abandon_result>()
       ..ref.size = sizeOf<raw.mln_render_abandon_result>();
@@ -1017,14 +1083,14 @@ final class RenderSessionHandle implements Finalizable {
   /// [driverWorkReady].
   ///
   /// Close a session after [detach] completes or after [abandon] returns. The
-  /// call is CPU-only and may run on any isolate, and it waits for a
-  /// core-worker session's worker to stop. A session that is still attached
-  /// reports an invalid-state status, as does a detached session that still
-  /// holds an acquired frame.
+  /// call is CPU-only, may run on any isolate, and may run from one of this
+  /// session's own completions; it waits for a core-worker session's worker to
+  /// stop. A session that is still attached reports an invalid-state status,
+  /// as does a detached session that still holds an acquired frame.
   void close() {
     _state.close(
       (handle) => raw.mln_render_session_destroy(handle.raw),
-      _c.threadLastErrorMessage,
+      threadLastErrorMessage,
     );
     _frameResultsReady.close();
     _driverWorkReady.close();
@@ -1043,9 +1109,6 @@ extension type const ResourceRequestHandle._(NativeResourceRequest _handle) {
     ensureAbiVersion();
     return _handle;
   }
-
-  /// Reports whether MapLibre has cancelled this provider request.
-  bool get isCancelled => cancelled();
 
   /// Reports whether MapLibre has cancelled this provider request.
   bool cancelled() {
@@ -1217,7 +1280,8 @@ final class AcquiredFrame {
     final out = arena<raw.mln_gpu_sync>()
       ..ref.size = sizeOf<raw.mln_gpu_sync>();
     _check(raw.mln_acquired_frame_get_producer_sync(_handle, out));
-    if (out.ref.kind == 2) {
+    if (out.ref.kind ==
+        raw.mln_gpu_sync_kind.MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE.value) {
       return GpuSync.vulkanTimelineSemaphore(
         VulkanHandle(uint64FromNative(out.ref.object)),
         value: out.ref.value,
@@ -1911,11 +1975,7 @@ extension MapRenderAttachments on MapHandle {
           return status;
         }),
       );
-      final session = renderSession!;
-      return RenderSessionAttachment(
-        session,
-        session._completeWhileRetained(completed),
-      );
+      return RenderSessionAttachment(renderSession!, completed);
     } catch (_) {
       frameWake.reject();
       driverWorkWake.reject();

@@ -29,12 +29,17 @@ completes.
 Submit one frame demand with a token that identifies the job. A core-worker
 target needs no host graphics service.
 
-The frame wake schedules a host turn. Drain every queued result in that turn and
-continue until the matching token has a rendered disposition and the still-image
-completion has run. No update and size pending require a newer map update or a
-matching extent generation.
+The frame wake schedules a host turn. Drain every queued result in that turn. No
+update and size pending require a newer map update or a matching extent
+generation, so request another frame until the matching token reports a rendered
+disposition.
 
-<Code code={region(stillImage, "await")} lang="c" title="still-image.c" />
+<Code code={region(stillImage, "drain-result")} lang="c" title="still-image.c" />
+
+Readback needs both the rendered result and the still-image completion, which
+run independently of each other.
+
+<Code code={region(stillImage, "start-readback")} lang="c" title="still-image.c" />
 
 ## Read the pixels
 

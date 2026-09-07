@@ -33,7 +33,7 @@ extends = "ffi:preset"
 # presets run in process.
 run = '''
 case "$usage_preset" in
-  android-*)
+  android-arm64-* | android-x64-*)
     source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
     exec zig build test --build-file ../../build.zig \
       -Doptimize=ReleaseSafe \
@@ -41,6 +41,10 @@ case "$usage_preset" in
       -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
       ${zig_cross_args[@]+"${zig_cross_args[@]}"} \
       --test-timeout 180s --summary all --verbose
+    ;;
+  android-*)
+    echo "The Android emulator runs arm64 and x64 guests; check $usage_preset with //bindings/zig:build and test an android-arm64 or android-x64 preset instead." >&2
+    exit 2
     ;;
   ios-simulator-*)
     source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"

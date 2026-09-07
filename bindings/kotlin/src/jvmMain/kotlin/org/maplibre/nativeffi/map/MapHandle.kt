@@ -1,20 +1,27 @@
 package org.maplibre.nativeffi.map
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraDelta
+import org.maplibre.nativeffi.camera.CameraFitOptions
+import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.CameraSnapshot
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.FreeCameraOptions
+import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
-import org.maplibre.nativeffi.internal.async.mapDeferred
+import org.maplibre.nativeffi.internal.async.mapHandleDeferred
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.NativeMap
+import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
+import org.maplibre.nativeffi.internal.loader.CompletionBridge
 import org.maplibre.nativeffi.internal.loader.NativeAccess
+import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
@@ -40,7 +47,6 @@ import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.LayerInfo
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
-import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleLayerVisibility
@@ -49,14 +55,8 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Owned JVM FFM map handle. */
 public actual class MapHandle
-private constructor(
-  private val runtime: RuntimeHandle,
-  private val handle: NativeMap,
-  cachedEventMask: RuntimeEventMask,
-) {
+private constructor(private val runtime: RuntimeHandle, private val handle: NativeMap) {
   private val core = HandleStateCore("MapHandle", handle.raw)
-  private var cachedEventMask =
-    RuntimeEventMask(cachedEventMask.nativeValue and RuntimeEventMask.ALL_MAP_EVENTS.nativeValue)
 
   init {
     HandleLeakCleaner.register(this, core.leakReport)
@@ -72,34 +72,27 @@ private constructor(
 
   public actual fun runtime(): RuntimeHandle = runtime
 
-  public actual val eventMask: RuntimeEventMask
-    get() = cachedEventMask
-
   public actual fun setEventMask(value: RuntimeEventMask): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    return NativeAccess.setMapEventMask(requireLiveHandle(), value.nativeValue).mapDeferred {
-      cachedEventMask =
-        RuntimeEventMask(value.nativeValue and RuntimeEventMask.ALL_MAP_EVENTS.nativeValue)
-      it
-    }
+    return NativeAccess.setMapEventMask(requireLiveHandle(), value.nativeValue)
   }
 
-  public actual fun setStyleUrl(url: String): Deferred<CommandCompletion> = command {
+  public actual fun setStyleUrl(url: String): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setMapStyleUrl(requireLiveHandle(), url)
+    return NativeAccess.setMapStyleUrl(requireLiveHandle(), url)
   }
 
-  public actual fun setStyleJson(json: ByteArray): Deferred<CommandCompletion> = command {
+  public actual fun setStyleJson(json: ByteArray): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setMapStyleJson(requireLiveHandle(), json)
+    return NativeAccess.setMapStyleJson(requireLiveHandle(), json)
   }
 
   public actual fun setFeatureState(
     selector: FeatureStateSelector,
     value: ByteArray,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setMapFeatureState(requireLiveHandle(), selector, value)
+    return NativeAccess.setMapFeatureState(requireLiveHandle(), selector, value)
   }
 
   public actual fun getFeatureState(selector: FeatureStateSelector): Deferred<ByteArray> {
@@ -109,9 +102,9 @@ private constructor(
 
   public actual fun removeFeatureState(
     selector: FeatureStateSelector
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.removeMapFeatureState(requireLiveHandle(), selector)
+    return NativeAccess.removeMapFeatureState(requireLiveHandle(), selector)
   }
 
   public actual fun loadedStyleJson(): Deferred<ByteArray> {
@@ -127,14 +120,14 @@ private constructor(
   public actual fun addStyleSourceJson(
     sourceId: String,
     sourceJson: ByteArray,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.addStyleSourceJson(requireLiveHandle(), sourceId, sourceJson)
+    return NativeAccess.addStyleSourceJson(requireLiveHandle(), sourceId, sourceJson)
   }
 
-  public actual fun removeStyleSource(sourceId: String): Deferred<CommandCompletion> = command {
+  public actual fun removeStyleSource(sourceId: String): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.removeStyleSource(requireLiveHandle(), sourceId)
+    return NativeAccess.removeStyleSource(requireLiveHandle(), sourceId)
   }
 
   public actual fun styleSourceInfo(sourceId: String): Deferred<SourceInfo?> {
@@ -150,6 +143,21 @@ private constructor(
     return NativeAccess.setStyleSourceVolatile(requireLiveHandle(), sourceId, isVolatile)
   }
 
+  public actual fun styleSourceAttribution(sourceId: String): Deferred<String?> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleSourceAttribution(requireLiveHandle(), sourceId)
+  }
+
+  public actual fun styleSourceUrl(sourceId: String): Deferred<String?> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleSourceUrl(requireLiveHandle(), sourceId)
+  }
+
+  public actual fun styleSourceTileUrls(sourceId: String): Deferred<List<String>> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleSourceTileUrls(requireLiveHandle(), sourceId)
+  }
+
   public actual fun styleSourceIds(): Deferred<List<String>> {
     NativeAccess.ensureLoaded()
     return NativeAccess.styleSourceIds(requireLiveHandle())
@@ -159,17 +167,17 @@ private constructor(
     sourceId: String,
     url: String,
     options: GeoJsonSourceOptions?,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.addGeoJsonSourceUrl(requireLiveHandle(), sourceId, url, options)
+    return NativeAccess.addGeoJsonSourceUrl(requireLiveHandle(), sourceId, url, options)
   }
 
   public actual fun addGeoJsonSourceData(
     sourceId: String,
     data: GeoJsonSourceDataHandle,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    data.withNativeHandle { nativeData ->
+    return data.withNativeHandle { nativeData ->
       NativeAccess.addGeoJsonSourceData(requireLiveHandle(), sourceId, nativeData)
     }
   }
@@ -177,17 +185,17 @@ private constructor(
   public actual fun setGeoJsonSourceUrl(
     sourceId: String,
     url: String,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setGeoJsonSourceUrl(requireLiveHandle(), sourceId, url)
+    return NativeAccess.setGeoJsonSourceUrl(requireLiveHandle(), sourceId, url)
   }
 
   public actual fun setGeoJsonSourceData(
     sourceId: String,
     data: GeoJsonSourceDataHandle,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    data.withNativeHandle { nativeData ->
+    return data.withNativeHandle { nativeData ->
       NativeAccess.setGeoJsonSourceData(requireLiveHandle(), sourceId, nativeData)
     }
   }
@@ -195,9 +203,9 @@ private constructor(
   public actual fun setGeoJsonSourceSynchronousTiling(
     sourceId: String,
     enabled: Boolean,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setGeoJsonSourceSynchronousTiling(requireLiveHandle(), sourceId, enabled)
+    return NativeAccess.setGeoJsonSourceSynchronousTiling(requireLiveHandle(), sourceId, enabled)
   }
 
   public actual fun addCustomGeometrySource(
@@ -205,44 +213,49 @@ private constructor(
     options: CustomGeometrySourceOptions,
   ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    val registry = customGeometrySources
-    val sourceState = CustomGeometrySourceState(options) { registry.remove(sourceId) }
-    lateinit var completed: Deferred<CommandCompletion>
-    registry.install(sourceId, sourceState) {
-      completed =
-        NativeAccess.addCustomGeometrySource(
-          requireLiveHandle(),
-          sourceId,
-          sourceState.descriptor(),
+    return CompletionBridge.command { completion ->
+      // The release callback captures the registry rather than this map, so a map a host leaks
+      // with a live source still reports as leaked.
+      val registry = customGeometrySources
+      val sourceState = CustomGeometrySourceState(options) { registry.remove(sourceId) }
+      registry.install(sourceId, sourceState) {
+        HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
+        Status.check(
+          NativeAccess.addCustomGeometrySource(
+            requireLiveHandle(),
+            sourceId,
+            sourceState.descriptor(),
+            completion,
+          )
         )
-      HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
+      }
+      MaplibreStatus.OK.nativeCode
     }
-    return completed
   }
 
   public actual fun setCustomGeometrySourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
     data: ByteArray,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setCustomGeometrySourceTileData(requireLiveHandle(), sourceId, tileId, data)
+    return NativeAccess.setCustomGeometrySourceTileData(requireLiveHandle(), sourceId, tileId, data)
   }
 
   public actual fun invalidateCustomGeometrySourceTile(
     sourceId: String,
     tileId: CanonicalTileId,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.invalidateCustomGeometrySourceTile(requireLiveHandle(), sourceId, tileId)
+    return NativeAccess.invalidateCustomGeometrySourceTile(requireLiveHandle(), sourceId, tileId)
   }
 
   public actual fun invalidateCustomGeometrySourceRegion(
     sourceId: String,
     bounds: LatLngBounds,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.invalidateCustomGeometrySourceRegion(requireLiveHandle(), sourceId, bounds)
+    return NativeAccess.invalidateCustomGeometrySourceRegion(requireLiveHandle(), sourceId, bounds)
   }
 
   public actual fun addCustomMvtVectorSource(
@@ -250,113 +263,128 @@ private constructor(
     options: CustomMvtVectorSourceOptions,
   ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    val registry = customMvtVectorSources
-    val sourceState = CustomMvtVectorSourceState(options) { registry.remove(sourceId) }
-    lateinit var completed: Deferred<CommandCompletion>
-    registry.install(sourceId, sourceState) {
-      completed =
-        NativeAccess.addCustomMvtVectorSource(
-          requireLiveHandle(),
-          sourceId,
-          sourceState.descriptor(),
+    return CompletionBridge.command { completion ->
+      // The release callback captures the registry rather than this map, so a map a host leaks
+      // with a live source still reports as leaked.
+      val registry = customMvtVectorSources
+      val sourceState = CustomMvtVectorSourceState(options) { registry.remove(sourceId) }
+      registry.install(sourceId, sourceState) {
+        HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
+        Status.check(
+          NativeAccess.addCustomMvtVectorSource(
+            requireLiveHandle(),
+            sourceId,
+            sourceState.descriptor(),
+            completion,
+          )
         )
-      HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
+      }
+      MaplibreStatus.OK.nativeCode
     }
-    return completed
   }
 
   public actual fun setCustomMvtVectorSourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
     data: ByteArray,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setCustomMvtVectorSourceTileData(requireLiveHandle(), sourceId, tileId, data)
+    return NativeAccess.setCustomMvtVectorSourceTileData(
+      requireLiveHandle(),
+      sourceId,
+      tileId,
+      data,
+    )
   }
 
   public actual fun setCustomMvtVectorSourceTileError(
     sourceId: String,
     tileId: CanonicalTileId,
     message: String,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setCustomMvtVectorSourceTileError(requireLiveHandle(), sourceId, tileId, message)
+    return NativeAccess.setCustomMvtVectorSourceTileError(
+      requireLiveHandle(),
+      sourceId,
+      tileId,
+      message,
+    )
   }
 
   public actual fun invalidateCustomMvtVectorSourceTile(
     sourceId: String,
     tileId: CanonicalTileId,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.invalidateCustomMvtVectorSourceTile(requireLiveHandle(), sourceId, tileId)
+    return NativeAccess.invalidateCustomMvtVectorSourceTile(requireLiveHandle(), sourceId, tileId)
   }
 
   public actual fun addVectorSourceUrl(
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.addVectorSourceUrl(requireLiveHandle(), sourceId, url, options)
+    return NativeAccess.addVectorSourceUrl(requireLiveHandle(), sourceId, url, options)
   }
 
   public actual fun addVectorSourceTiles(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.addVectorSourceTiles(requireLiveHandle(), sourceId, tiles, options)
+    return NativeAccess.addVectorSourceTiles(requireLiveHandle(), sourceId, tiles, options)
   }
 
   public actual fun addRasterSourceUrl(
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.addRasterSourceUrl(requireLiveHandle(), sourceId, url, options)
+    return NativeAccess.addRasterSourceUrl(requireLiveHandle(), sourceId, url, options)
   }
 
   public actual fun addRasterSourceTiles(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.addRasterSourceTiles(requireLiveHandle(), sourceId, tiles, options)
+    return NativeAccess.addRasterSourceTiles(requireLiveHandle(), sourceId, tiles, options)
   }
 
   public actual fun addRasterDemSourceUrl(
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.addRasterDemSourceUrl(requireLiveHandle(), sourceId, url, options)
+    return NativeAccess.addRasterDemSourceUrl(requireLiveHandle(), sourceId, url, options)
   }
 
   public actual fun addRasterDemSourceTiles(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.addRasterDemSourceTiles(requireLiveHandle(), sourceId, tiles, options)
+    return NativeAccess.addRasterDemSourceTiles(requireLiveHandle(), sourceId, tiles, options)
   }
 
   public actual fun setStyleImage(
     imageId: String,
     image: PremultipliedRgba8Image,
     options: StyleImageOptions,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setStyleImage(requireLiveHandle(), imageId, image, options)
+    return NativeAccess.setStyleImage(requireLiveHandle(), imageId, image, options)
   }
 
-  public actual fun removeStyleImage(imageId: String): Deferred<CommandCompletion> = command {
+  public actual fun removeStyleImage(imageId: String): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.removeStyleImage(requireLiveHandle(), imageId)
+    return NativeAccess.removeStyleImage(requireLiveHandle(), imageId)
   }
 
   public actual fun styleImageInfo(imageId: String): Deferred<StyleImageInfo?> {
@@ -364,7 +392,7 @@ private constructor(
     return NativeAccess.styleImageInfo(requireLiveHandle(), imageId)
   }
 
-  public actual fun copyStyleImagePremultipliedRgba8(imageId: String): Deferred<StyleImage?> {
+  public actual fun copyStyleImagePremultipliedRgba8(imageId: String): Deferred<ByteArray?> {
     NativeAccess.ensureLoaded()
     return NativeAccess.copyStyleImagePremultipliedRgba8(requireLiveHandle(), imageId)
   }
@@ -373,40 +401,39 @@ private constructor(
     sourceId: String,
     coordinates: List<LatLng>,
     url: String,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.addImageSourceUrl(requireLiveHandle(), sourceId, coordinates, url)
+    return NativeAccess.addImageSourceUrl(requireLiveHandle(), sourceId, coordinates, url)
   }
 
   public actual fun addImageSourceImage(
     sourceId: String,
     coordinates: List<LatLng>,
     image: PremultipliedRgba8Image,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.addImageSourceImage(requireLiveHandle(), sourceId, coordinates, image)
+    return NativeAccess.addImageSourceImage(requireLiveHandle(), sourceId, coordinates, image)
   }
 
-  public actual fun setImageSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
-    command {
-      NativeAccess.ensureLoaded()
-      NativeAccess.setImageSourceUrl(requireLiveHandle(), sourceId, url)
-    }
+  public actual fun setImageSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.setImageSourceUrl(requireLiveHandle(), sourceId, url)
+  }
 
   public actual fun setImageSourceImage(
     sourceId: String,
     image: PremultipliedRgba8Image,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setImageSourceImage(requireLiveHandle(), sourceId, image)
+    return NativeAccess.setImageSourceImage(requireLiveHandle(), sourceId, image)
   }
 
   public actual fun setImageSourceCoordinates(
     sourceId: String,
     coordinates: List<LatLng>,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setImageSourceCoordinates(requireLiveHandle(), sourceId, coordinates)
+    return NativeAccess.setImageSourceCoordinates(requireLiveHandle(), sourceId, coordinates)
   }
 
   public actual fun imageSourceCoordinates(sourceId: String): Deferred<List<LatLng>?> {
@@ -417,74 +444,84 @@ private constructor(
   public actual fun addStyleLayerJson(
     layerJson: ByteArray,
     beforeLayerId: String,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.addStyleLayerJson(requireLiveHandle(), layerJson, beforeLayerId)
+    return NativeAccess.addStyleLayerJson(requireLiveHandle(), layerJson, beforeLayerId)
   }
 
   public actual fun addHillshadeLayer(
     layerId: String,
     sourceId: String,
     beforeLayerId: String,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.addHillshadeLayer(requireLiveHandle(), layerId, sourceId, beforeLayerId)
+    return NativeAccess.addHillshadeLayer(requireLiveHandle(), layerId, sourceId, beforeLayerId)
   }
 
   public actual fun addColorReliefLayer(
     layerId: String,
     sourceId: String,
     beforeLayerId: String,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.addColorReliefLayer(requireLiveHandle(), layerId, sourceId, beforeLayerId)
+    return NativeAccess.addColorReliefLayer(requireLiveHandle(), layerId, sourceId, beforeLayerId)
   }
 
   public actual fun addLocationIndicatorLayer(
     layerId: String,
     beforeLayerId: String,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.addLocationIndicatorLayer(requireLiveHandle(), layerId, beforeLayerId)
+    return NativeAccess.addLocationIndicatorLayer(requireLiveHandle(), layerId, beforeLayerId)
   }
 
   public actual fun setLocationIndicatorLocation(
     layerId: String,
     coordinate: LatLng,
     altitude: Double,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setLocationIndicatorLocation(requireLiveHandle(), layerId, coordinate, altitude)
+    return NativeAccess.setLocationIndicatorLocation(
+      requireLiveHandle(),
+      layerId,
+      coordinate,
+      altitude,
+    )
   }
 
   public actual fun setLocationIndicatorBearing(
     layerId: String,
     bearing: Double,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setLocationIndicatorBearing(requireLiveHandle(), layerId, bearing)
+    return NativeAccess.setLocationIndicatorBearing(requireLiveHandle(), layerId, bearing)
   }
 
   public actual fun setLocationIndicatorAccuracyRadius(
     layerId: String,
     radius: Double,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setLocationIndicatorAccuracyRadius(requireLiveHandle(), layerId, radius)
+    return NativeAccess.setLocationIndicatorAccuracyRadius(requireLiveHandle(), layerId, radius)
   }
 
   public actual fun setLocationIndicatorImageName(
     layerId: String,
     imageKind: LocationIndicatorImageKind,
     imageId: String,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setLocationIndicatorImageName(requireLiveHandle(), layerId, imageKind, imageId)
+    return NativeAccess.setLocationIndicatorImageName(
+      requireLiveHandle(),
+      layerId,
+      imageKind,
+      imageId,
+    )
   }
 
-  public actual fun removeStyleLayer(layerId: String): Deferred<CommandCompletion> = command {
+  public actual fun removeStyleLayer(layerId: String): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.removeStyleLayer(requireLiveHandle(), layerId)
+    return NativeAccess.removeStyleLayer(requireLiveHandle(), layerId)
   }
 
   public actual fun styleLayerInfo(layerId: String): Deferred<LayerInfo?> {
@@ -500,9 +537,9 @@ private constructor(
   public actual fun moveStyleLayer(
     layerId: String,
     beforeLayerId: String,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.moveStyleLayer(requireLiveHandle(), layerId, beforeLayerId)
+    return NativeAccess.moveStyleLayer(requireLiveHandle(), layerId, beforeLayerId)
   }
 
   public actual fun styleLayerJson(layerId: String): Deferred<ByteArray?> {
@@ -510,17 +547,17 @@ private constructor(
     return NativeAccess.styleLayerJson(requireLiveHandle(), layerId)
   }
 
-  public actual fun setStyleLightJson(lightJson: ByteArray): Deferred<CommandCompletion> = command {
+  public actual fun setStyleLightJson(lightJson: ByteArray): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setStyleLightJson(requireLiveHandle(), lightJson)
+    return NativeAccess.setStyleLightJson(requireLiveHandle(), lightJson)
   }
 
   public actual fun setStyleLightProperty(
     propertyName: String,
     value: ByteArray,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setStyleLightProperty(requireLiveHandle(), propertyName, value)
+    return NativeAccess.setStyleLightProperty(requireLiveHandle(), propertyName, value)
   }
 
   public actual fun styleLightProperty(propertyName: String): Deferred<ByteArray?> {
@@ -530,9 +567,9 @@ private constructor(
 
   public actual fun setStyleTransitionOptions(
     options: StyleTransitionOptions
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setStyleTransitionOptions(requireLiveHandle(), options)
+    return NativeAccess.setStyleTransitionOptions(requireLiveHandle(), options)
   }
 
   public actual fun styleTransitionOptions(): Deferred<StyleTransitionOptions> {
@@ -544,9 +581,9 @@ private constructor(
     layerId: String,
     propertyName: String,
     value: ByteArray,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setLayerProperty(requireLiveHandle(), layerId, propertyName, value)
+    return NativeAccess.setLayerProperty(requireLiveHandle(), layerId, propertyName, value)
   }
 
   public actual fun layerProperty(layerId: String, propertyName: String): Deferred<ByteArray?> {
@@ -557,14 +594,14 @@ private constructor(
   public actual fun setLayerFilter(
     layerId: String,
     filter: ByteArray,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setLayerFilter(requireLiveHandle(), layerId, filter)
+    return NativeAccess.setLayerFilter(requireLiveHandle(), layerId, filter)
   }
 
-  public actual fun clearLayerFilter(layerId: String): Deferred<CommandCompletion> = command {
+  public actual fun clearLayerFilter(layerId: String): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.clearLayerFilter(requireLiveHandle(), layerId)
+    return NativeAccess.clearLayerFilter(requireLiveHandle(), layerId)
   }
 
   public actual fun layerFilter(layerId: String): Deferred<ByteArray?> {
@@ -582,9 +619,9 @@ private constructor(
   public actual fun setLayerSourceLayer(
     layerId: String,
     sourceLayer: String,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setLayerSourceLayer(requireLiveHandle(), layerId, sourceLayer)
+    return NativeAccess.setLayerSourceLayer(requireLiveHandle(), layerId, sourceLayer)
   }
 
   public actual fun layerSourceLayer(layerId: String): Deferred<String> {
@@ -595,9 +632,9 @@ private constructor(
   public actual fun setLayerSourceId(
     layerId: String,
     sourceId: String,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setLayerSourceId(requireLiveHandle(), layerId, sourceId)
+    return NativeAccess.setLayerSourceId(requireLiveHandle(), layerId, sourceId)
   }
 
   public actual fun layerSourceId(layerId: String): Deferred<String> {
@@ -605,24 +642,22 @@ private constructor(
     return NativeAccess.layerSourceId(requireLiveHandle(), layerId)
   }
 
-  public actual fun setLayerMinZoom(layerId: String, minZoom: Double): Deferred<CommandCompletion> =
-    command {
-      NativeAccess.ensureLoaded()
-      NativeAccess.setLayerMinZoom(requireLiveHandle(), layerId, minZoom)
-    }
+  public actual fun setLayerMinZoom(layerId: String, minZoom: Double): Deferred<CommandCompletion> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.setLayerMinZoom(requireLiveHandle(), layerId, minZoom)
+  }
 
-  public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double): Deferred<CommandCompletion> =
-    command {
-      NativeAccess.ensureLoaded()
-      NativeAccess.setLayerMaxZoom(requireLiveHandle(), layerId, maxZoom)
-    }
+  public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double): Deferred<CommandCompletion> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.setLayerMaxZoom(requireLiveHandle(), layerId, maxZoom)
+  }
 
   public actual fun setLayerVisibility(
     layerId: String,
     visibility: StyleLayerVisibility,
-  ): Deferred<CommandCompletion> = command {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    NativeAccess.setLayerVisibility(requireLiveHandle(), layerId, visibility.nativeValue)
+    return NativeAccess.setLayerVisibility(requireLiveHandle(), layerId, visibility.nativeValue)
   }
 
   public actual fun requestRepaint(): Deferred<CommandCompletion> {
@@ -670,6 +705,16 @@ private constructor(
     return NativeAccess.setFreeCameraOptions(requireLiveHandle(), options)
   }
 
+  public actual fun setProjectionMode(options: ProjectionModeOptions): Deferred<CommandCompletion> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.setProjectionMode(requireLiveHandle(), options)
+  }
+
+  public actual fun dumpDebugLogs(): Deferred<CommandCompletion> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.dumpDebugLogs(requireLiveHandle())
+  }
+
   public actual fun resize(size: MapSize): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
     return NativeAccess.resizeMap(requireLiveHandle(), size)
@@ -685,12 +730,53 @@ private constructor(
     return NativeAccess.updateCamera(requireLiveHandle(), update)
   }
 
-  public actual fun applyCameraDelta(delta: CameraDelta): Deferred<CommandCompletion> =
-    NativeAccess.applyCameraDelta(requireLiveHandle(), delta)
+  public actual fun applyCameraDelta(delta: CameraDelta): Deferred<CommandCompletion> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.applyCameraDelta(requireLiveHandle(), delta)
+  }
+
+  public actual fun cancelTransitions(): Deferred<CommandCompletion> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.cancelTransitions(requireLiveHandle())
+  }
 
   public actual fun queryCamera(): Deferred<CameraSnapshot> {
     NativeAccess.ensureLoaded()
     return NativeAccess.queryCamera(requireLiveHandle())
+  }
+
+  public actual fun cameraForLatLngBounds(
+    bounds: LatLngBounds,
+    fitOptions: CameraFitOptions?,
+  ): Deferred<CameraOptions> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.cameraForLatLngBounds(requireLiveHandle(), bounds, fitOptions)
+  }
+
+  public actual fun cameraForLatLngs(
+    coordinates: List<LatLng>,
+    fitOptions: CameraFitOptions?,
+  ): Deferred<CameraOptions> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.cameraForLatLngs(requireLiveHandle(), coordinates, fitOptions)
+  }
+
+  public actual fun cameraForGeometry(
+    geometry: ByteArray,
+    fitOptions: CameraFitOptions?,
+  ): Deferred<CameraOptions> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.cameraForGeometry(requireLiveHandle(), geometry, fitOptions)
+  }
+
+  public actual fun latLngBoundsForCamera(camera: CameraOptions): Deferred<LatLngBounds> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.latLngBoundsForCamera(requireLiveHandle(), camera, unwrapped = false)
+  }
+
+  public actual fun latLngBoundsForCameraUnwrapped(camera: CameraOptions): Deferred<LatLngBounds> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.latLngBoundsForCamera(requireLiveHandle(), camera, unwrapped = true)
   }
 
   public actual fun pixelForLatLng(coordinate: LatLng): Deferred<ScreenPoint> {
@@ -727,76 +813,111 @@ private constructor(
     descriptor: MetalOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    RenderSessionHandle.attachMetalOwnedTexture(this, descriptor, options)
+    renderSessionAttachment(
+      NativeAccess.attachMetalOwnedTexture(requireLiveHandle(), descriptor, options)
+    )
 
   public actual fun attachMetalBorrowedTexture(
     descriptor: MetalBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    RenderSessionHandle.attachMetalBorrowedTexture(this, descriptor, options)
+    renderSessionAttachment(
+      NativeAccess.attachMetalBorrowedTexture(requireLiveHandle(), descriptor, options)
+    )
 
   public actual fun attachVulkanOwnedTexture(
     descriptor: VulkanOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    RenderSessionHandle.attachVulkanOwnedTexture(this, descriptor, options)
+    renderSessionAttachment(
+      NativeAccess.attachVulkanOwnedTexture(requireLiveHandle(), descriptor, options)
+    )
 
   public actual fun attachVulkanBorrowedTexture(
     descriptor: VulkanBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    RenderSessionHandle.attachVulkanBorrowedTexture(this, descriptor, options)
+    renderSessionAttachment(
+      NativeAccess.attachVulkanBorrowedTexture(requireLiveHandle(), descriptor, options)
+    )
 
   public actual fun attachOpenGLOwnedTexture(
     descriptor: OpenGLOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    RenderSessionHandle.attachOpenGLOwnedTexture(this, descriptor, options)
+    renderSessionAttachment(
+      NativeAccess.attachOpenGLOwnedTexture(requireLiveHandle(), descriptor, options)
+    )
 
   public actual fun attachOpenGLBorrowedTexture(
     descriptor: OpenGLBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
-    RenderSessionHandle.attachOpenGLBorrowedTexture(this, descriptor, options)
+    renderSessionAttachment(
+      NativeAccess.attachOpenGLBorrowedTexture(requireLiveHandle(), descriptor, options)
+    )
 
   public actual fun attachMetalSurface(
     descriptor: MetalSurfaceDescriptor,
     options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment = RenderSessionHandle.attachMetalSurface(this, descriptor, options)
+  ): RenderSessionAttachment =
+    renderSessionAttachment(
+      NativeAccess.attachMetalSurface(requireLiveHandle(), descriptor, options)
+    )
 
   public actual fun attachVulkanSurface(
     descriptor: VulkanSurfaceDescriptor,
     options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment = RenderSessionHandle.attachVulkanSurface(this, descriptor, options)
+  ): RenderSessionAttachment =
+    renderSessionAttachment(
+      NativeAccess.attachVulkanSurface(requireLiveHandle(), descriptor, options)
+    )
 
   public actual fun attachOpenGLSurface(
     descriptor: OpenGLSurfaceDescriptor,
     options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment = RenderSessionHandle.attachOpenGLSurface(this, descriptor, options)
+  ): RenderSessionAttachment =
+    renderSessionAttachment(
+      NativeAccess.attachOpenGLSurface(requireLiveHandle(), descriptor, options)
+    )
+
+  private fun renderSessionAttachment(
+    native: Pair<NativeRenderSession, Deferred<Unit>>
+  ): RenderSessionAttachment =
+    RenderSessionAttachment(RenderSessionHandle(this, native.first), native.second)
 
   public actual fun createProjection(): Deferred<MapProjectionHandle> {
     NativeAccess.ensureLoaded()
-    return NativeAccess.createMapProjection(requireLiveHandle()).mapDeferred(::MapProjectionHandle)
+    return NativeAccess.createMapProjection(requireLiveHandle())
+      .mapHandleDeferred(MapProjectionHandle::close, ::MapProjectionHandle)
   }
 
   public actual fun close(): Deferred<Unit> {
-    if (!core.beginClose()) return kotlinx.coroutines.CompletableDeferred(Unit)
+    val claim = CompletableDeferred<Unit>()
+    val retirement = core.claimRetirement(claim)
+    if (retirement !== claim) return retirement
     val completed =
       try {
         NativeAccess.releaseMap(handle)
       } catch (error: Throwable) {
         core.abortClose()
+        core.abandonRetirement(claim)
         throw error
       }
     core.completeClose { runtime.unregisterMap(this) }
-    return completed
+    completed.invokeOnCompletion { failure ->
+      if (failure == null) claim.complete(Unit) else claim.completeExceptionally(failure)
+    }
+    return claim
   }
 
   public actual companion object {
     public actual fun create(runtime: RuntimeHandle, options: MapOptions): Deferred<MapHandle> {
       NativeAccess.ensureLoaded()
-      return NativeAccess.createMap(runtime.nativeHandle(), options).mapDeferred { handle ->
-        MapHandle(runtime, handle, options.eventMask).also { runtime.registerMap(it) }
+      return NativeAccess.createMap(runtime.nativeHandle(), options).mapHandleDeferred({ dropped ->
+        dropped.close()
+      }) { handle ->
+        MapHandle(runtime, handle).also { runtime.registerMap(it) }
       }
     }
   }
@@ -812,9 +933,6 @@ private constructor(
     return handle
   }
 }
-
-private inline fun command(call: () -> Deferred<CommandCompletion>): Deferred<CommandCompletion> =
-  call()
 
 private fun releaseCallbackRoot(root: AutoCloseable?) {
   HandleLeakCleaner.releaseNativeCallbackRoot(root)

@@ -64,8 +64,6 @@ internal class LogCallbackState(private val callback: LogCallback) : AutoCloseab
     fun clear() {
       Status.check(mln_log_clear_callback())
     }
-
-    fun createForTesting(callback: LogCallback): LogCallbackState = LogCallbackState(callback)
   }
 }
 

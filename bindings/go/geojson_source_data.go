@@ -31,10 +31,7 @@ type GeoJSONSourceDataHandle struct {
 func NewGeoJSONSourceData(data []byte, options *StyleGeoJSONSourceOptions) (*GeoJSONSourceDataHandle, error) {
 	rawData := newCBufferView(data)
 	defer rawData.free()
-	rawOptions, err := newCStyleGeoJSONSourceOptions(options)
-	if err != nil {
-		return nil, newBindingError(ErrInvalidArgument, err.Error())
-	}
+	rawOptions := newCStyleGeoJSONSourceOptions(options)
 	defer rawOptions.free()
 
 	var prepared nativeGeoJSONSourceData
@@ -73,10 +70,8 @@ func (data *GeoJSONSourceDataHandle) Close() error {
 	if data == nil || data.state == nil {
 		return newBindingError(ErrInvalidArgument, "GeoJSONSourceDataHandle is nil")
 	}
-	return checkNative(func() int32 {
-		return data.state.Close(func(native nativeGeoJSONSourceData) int32 {
-			C.mln_geojson_source_data_destroy(C.mln_geojson_source_data(native))
-			return int32(C.MLN_STATUS_OK)
-		})
+	return data.state.Close(func(native nativeGeoJSONSourceData) error {
+		C.mln_geojson_source_data_destroy(C.mln_geojson_source_data(native))
+		return nil
 	})
 }

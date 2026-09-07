@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
 
+import '../c/maplibre_native_c.dart';
 import '../c/maplibre_native_c.g.dart' as raw;
 import '../memory/memory.dart';
 import '../status/status.dart';
@@ -32,10 +33,10 @@ final class _PendingCompletion<T> implements _PendingCompletionBase {
     try {
       final result = record.ref.result;
       if (!acceptErrorStatus) {
-        checkNativeStatus(
-          result.status,
-          () => copyCompletionDiagnostic(result.diagnostic),
-        );
+        checkNativeStatus(result.status, () {
+          final diagnostic = copyCompletionDiagnostic(result.diagnostic);
+          return diagnostic.isEmpty ? 'native operation failed' : diagnostic;
+        });
       }
       completer.complete(decode(result));
     } catch (error) {
@@ -103,15 +104,18 @@ Future<T> startNativeCompletion<T>({
           userData,
           completion,
         ),
-        () => 'failed to create native completion adapter',
+        threadLastErrorMessage,
       );
       var rejected = false;
       try {
         final status = start(completion);
         if (status != nativeStatusOk) {
+          // The rejection clears the thread-local diagnostic, so read the
+          // submission's message before rejecting.
+          final diagnostic = threadLastErrorMessage();
           raw.mln_adapter_completion_reject(completion);
           rejected = true;
-          checkNativeStatus(status, () => 'native operation was rejected');
+          checkNativeStatus(status, () => diagnostic);
         }
       } catch (_) {
         if (!rejected) raw.mln_adapter_completion_reject(completion);
@@ -126,9 +130,10 @@ Future<T> startNativeCompletion<T>({
   return completer.future;
 }
 
+/// Copies a completion result's diagnostic, which is empty on success.
 String copyCompletionDiagnostic(raw.mln_buffer_view diagnostic) {
   if (diagnostic.size == 0 || diagnostic.data == nullptr) {
-    return 'native operation failed';
+    return '';
   }
   return utf8.decode(
     diagnostic.data.cast<Uint8>().asTypedList(diagnostic.size),

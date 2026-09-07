@@ -90,14 +90,8 @@ internal sealed unsafe class HttpHeaderTransformState : IDisposable
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
-    private static void Release(void* userData)
-    {
-        try
-        {
-            ((HttpHeaderTransformState?)GCHandle.FromIntPtr((nint)userData).Target)?.Dispose();
-        }
-        catch { }
-    }
+    private static void Release(void* userData) =>
+        CallbackRelease.Dispose<HttpHeaderTransformState>(userData);
 
     public void Dispose()
     {

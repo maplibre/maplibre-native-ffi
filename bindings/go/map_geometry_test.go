@@ -16,7 +16,7 @@ func TestMapCameraGeometryAndCoordinateConversions(t *testing.T) {
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
 	defer func() {
-		if err := m.Close(); err != nil {
+		if err := closeMapForTest(m); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
 		if err := closeRuntimeForTest(runtime); err != nil {
@@ -85,7 +85,7 @@ func TestUnwrappedCoordinateConversionsPreserveVisibleWorldCopies(t *testing.T) 
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
 	defer func() {
-		if err := m.Close(); err != nil {
+		if err := closeMapForTest(m); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
 		if err := closeRuntimeForTest(runtime); err != nil {

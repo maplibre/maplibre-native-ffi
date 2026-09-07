@@ -6,33 +6,26 @@ import (
 	"testing"
 )
 
-func TestMapProjectionCameraAndVisibleCoordinates(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(512, 512, 1)))
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMapWithOptions(): %v", err)
-	}
+// newProjectionForTest creates a runtime, a 512 by 512 map, and one projection
+// helper on it, and registers their close.
+func newProjectionForTest(t *testing.T) (*RuntimeHandle, *MapHandle, *MapProjectionHandle) {
+	t.Helper()
+	options := NewMapOptions(512, 512, 1)
+	runtime, m := newRuntimeAndMap(t, &options)
 	projection, err := awaitForTest(m.NewProjection())
 	if err != nil {
-		_ = m.Close()
-		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewProjection(): %v", err)
 	}
-	defer func() {
+	t.Cleanup(func() {
 		if err := projection.Close(); err != nil {
 			t.Errorf("Projection Close(): %v", err)
 		}
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	})
+	return runtime, m, projection
+}
+
+func TestMapProjectionCameraAndVisibleCoordinates(t *testing.T) {
+	_, _, projection := newProjectionForTest(t)
 
 	// A setter is synchronous, so the conversions right after it observe it.
 	before, err := projection.PixelForLatLng(LatLng{Latitude: 2, Longitude: 3})
@@ -75,23 +68,8 @@ func TestMapProjectionCameraAndVisibleCoordinates(t *testing.T) {
 }
 
 func TestMapProjectionObservesEarlierMapCommands(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(512, 512, 1)))
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMapWithOptions(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	options := NewMapOptions(512, 512, 1)
+	_, m := newRuntimeAndMap(t, &options)
 
 	if _, err := m.JumpTo(CameraOptions{}.WithCenter(LatLng{Latitude: 10, Longitude: 20}).WithZoom(3)); err != nil {
 		t.Fatalf("JumpTo(): %v", err)
@@ -117,23 +95,9 @@ func TestMapProjectionObservesEarlierMapCommands(t *testing.T) {
 }
 
 func TestMapProjectionOutlivesMapAndRuntime(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(512, 512, 1)))
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMapWithOptions(): %v", err)
-	}
-	projection, err := awaitForTest(m.NewProjection())
-	if err != nil {
-		_ = m.Close()
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewProjection(): %v", err)
-	}
+	runtime, m, projection := newProjectionForTest(t)
 	coordinate := LatLng{Latitude: 0, Longitude: 0}
-	if err := m.Close(); err != nil {
+	if err := closeMapForTest(m); err != nil {
 		t.Fatalf("Map Close(): %v", err)
 	}
 	if err := closeRuntimeForTest(runtime); err != nil {
@@ -166,24 +130,7 @@ func TestMapProjectionOutlivesMapAndRuntime(t *testing.T) {
 }
 
 func TestMapProjectionCanMigrateAcrossGoroutines(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(512, 512, 1)))
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMapWithOptions(): %v", err)
-	}
-	projection, err := awaitForTest(m.NewProjection())
-	if err != nil {
-		_ = m.Close()
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewProjection(): %v", err)
-	}
-	defer closeRuntimeForTest(runtime)
-	defer m.Close()
-	defer projection.Close()
+	_, _, projection := newProjectionForTest(t)
 
 	// A setter on this goroutine is observed by a conversion on another one.
 	if err := projection.SetCamera(CameraOptions{}.WithCenter(LatLng{Latitude: 5, Longitude: 6}).WithZoom(2)); err != nil {

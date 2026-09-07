@@ -1,5 +1,6 @@
-// Browser runtime workers own continuously running loops. A worker pthread may
-// block on its condition variable while timers and submitted work wake it.
+// Every browser thread that owns a MapLibre run loop runs it continuously. A
+// pthread may block on its condition variable while timers and submitted work
+// wake it, so no loop here depends on returning to the browser event loop.
 //
 // FD watches have no browser equivalent, so addWatch() throws.
 
@@ -71,10 +72,12 @@ void RunLoop::run() {
   }
 }
 
+// One pass for a caller that drives the loop itself. run() is the only driver
+// this platform uses.
 void RunLoop::runOnce() {
   MBGL_VERIFY_THREAD(tid);
   process();
-  static_cast<void>(impl->wake.processRunnables());
+  impl->wake.processRunnables();
 }
 
 void RunLoop::stop() {
@@ -89,9 +92,7 @@ void RunLoop::updateTime() {}
 //
 // One pass runs everything outstanding, so a pass that leaves work behind found
 // it queued while the pass ran. That bound rests on runTask() unlisting
-// whatever it finds; see async_task.cpp. The work runs directly rather than
-// through runOnce(), whose browser timer costs a proxy hop per pass and has no
-// waiter to release.
+// whatever it finds; see async_task.cpp.
 void RunLoop::waitForEmpty(
   [[maybe_unused]] const mln::util::SimpleIdentity tag
 ) {

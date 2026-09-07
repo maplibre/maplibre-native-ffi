@@ -2,7 +2,6 @@ package org.maplibre.nativeffi.internal.javacpp
 
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.map.JavaCppMapStructs
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.map.ProjectionModeOptions
@@ -47,23 +46,6 @@ internal object JavaCppStructs {
   fun renderedQueryGeometryType(value: RenderedQueryGeometry): Int =
     JavaCppRenderStructs.renderedQueryGeometryType(value)
 
-  fun ownedBufferCleanupAfterCopyFailure(): Int {
-    var destroys = 0
-    try {
-      ownedBuffer(
-        1L,
-        getter = { _, bytes ->
-          bytes.size(Long.MAX_VALUE)
-          MaplibreStatus.OK.nativeCode
-        },
-        destroyer = { destroys++ },
-      )
-    } catch (_: ArithmeticException) {
-      return destroys
-    }
-    error("buffer conversion unexpectedly succeeded")
-  }
-
   fun offlineRegionDefinitionRoundTrip(value: OfflineRegionDefinition): OfflineRegionDefinition =
     JavaCppRuntimeStructs.offlineRegionDefinitionRoundTrip(value)
 
@@ -76,9 +58,6 @@ internal object JavaCppStructs {
   fun unknownRuntimePayload(type: Int, bytes: ByteArray): RuntimeEventPayload =
     JavaCppRuntimeStructs.unknownRuntimePayload(type, bytes)
 
-  fun offlineRegionListCleanupAfterCopyFailure(): Int =
-    JavaCppRuntimeStructs.offlineRegionListCleanupAfterCopyFailure()
-
   fun styleImageOptionsSnapshot(
     value: StyleImageOptions
   ): JavaCppMapStructs.StyleImageOptionsSnapshot =
@@ -89,9 +68,6 @@ internal object JavaCppStructs {
 
   fun sourceInfoSnapshot(type: Int, volatileSource: Boolean): SourceInfo =
     JavaCppMapStructs.sourceInfoSnapshot(type, volatileSource)
-
-  fun styleStringListCleanupAfterCopyFailure(): Int =
-    JavaCppMapStructs.styleStringListCleanupAfterCopyFailure()
 
   fun textureImageInfoSnapshot(
     width: Int,

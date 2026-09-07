@@ -65,12 +65,14 @@ public expect class RuntimeHandle {
   public fun clearHttpHeaderTransform(): Deferred<CommandCompletion>
 
   /**
-   * Drains this runtime's queued events into one batch, in queue order.
+   * Drains this runtime's queued events, in queue order, and returns an empty list when none are
+   * queued.
    *
-   * The two subscription masks decide which events reach the queue. Draining copies events that the
-   * runtime worker has already published.
+   * The two subscription masks decide which events reach the queue. Draining copies events the
+   * runtime worker has already published, so the returned events stay readable after later drains
+   * and after the source map or runtime closes.
    */
-  public fun drainEvents(): RuntimeEventBatch
+  public fun drainEvents(): List<RuntimeEvent>
 
   /**
    * Runtime-originated event types that this runtime queues, [RuntimeEventMask.ALL] until a host

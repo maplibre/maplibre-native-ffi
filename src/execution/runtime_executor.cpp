@@ -17,45 +17,59 @@ auto RuntimeExecutor::start(std::function<void()> initialize) -> void {
     startup_error_ = nullptr;
   }
 
-  worker_ = WorkerThread(
-    [this, initialize = std::move(initialize)]() mutable noexcept -> void {
-      try {
-        auto loop = mln::util::RunLoop{mln::util::RunLoop::Type::New};
-        {
-          const std::scoped_lock lock(mutex_);
-          worker_id_ = std::this_thread::get_id();
-          run_loop_ = &loop;
+  try {
+    worker_ = WorkerThread(
+      [this, initialize = std::move(initialize)]() mutable noexcept -> void {
+        try {
+          auto loop = mln::util::RunLoop{mln::util::RunLoop::Type::New};
+          {
+            const std::scoped_lock lock(mutex_);
+            worker_id_ = std::this_thread::get_id();
+            run_loop_ = &loop;
+          }
+          if (initialize) {
+            // Moved into a local, so the initializer and whatever it captures
+            // are released once it has run rather than at thread exit.
+            auto once = std::move(initialize);
+            auto pooled = [&once]() -> mln_status {
+              std::invoke(once);
+              return MLN_STATUS_OK;
+            };
+            static_cast<void>(mln::c_api::with_autorelease_pool(pooled));
+          }
+          {
+            const std::scoped_lock lock(mutex_);
+            starting_ = false;
+          }
+          started_.notify_all();
+          loop.run();
+          {
+            const std::scoped_lock lock(mutex_);
+            run_loop_ = nullptr;
+            worker_id_ = {};
+          }
+        } catch (...) {
+          {
+            const std::scoped_lock lock(mutex_);
+            startup_error_ = std::current_exception();
+            run_loop_ = nullptr;
+            worker_id_ = {};
+            starting_ = false;
+          }
+          started_.notify_all();
         }
-        if (initialize) {
-          auto pooled = [&initialize]() -> mln_status {
-            std::invoke(std::move(initialize));
-            return MLN_STATUS_OK;
-          };
-          static_cast<void>(mln::c_api::with_autorelease_pool(pooled));
-        }
-        {
-          const std::scoped_lock lock(mutex_);
-          starting_ = false;
-        }
-        started_.notify_all();
-        loop.run();
-        {
-          const std::scoped_lock lock(mutex_);
-          run_loop_ = nullptr;
-          worker_id_ = {};
-        }
-      } catch (...) {
-        {
-          const std::scoped_lock lock(mutex_);
-          startup_error_ = std::current_exception();
-          run_loop_ = nullptr;
-          worker_id_ = {};
-          starting_ = false;
-        }
-        started_.notify_all();
       }
+    );
+  } catch (...) {
+    // A thread that never started leaves no startup report behind, so a later
+    // start() must not find this executor half-running.
+    {
+      const std::scoped_lock lock(mutex_);
+      starting_ = false;
+      startup_error_ = nullptr;
     }
-  );
+    throw;
+  }
 
   auto lock = std::unique_lock{mutex_};
   started_.wait(lock, [this]() noexcept -> bool { return !starting_; });

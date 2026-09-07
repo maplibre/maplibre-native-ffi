@@ -73,12 +73,12 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
           nativeExtent.height(),
           nativeExtent.scale_factor(),
         ),
-        value.generation().toULong(),
-        value.map_update_generation().toULong(),
-        value.rendered_update_generation().toULong(),
-        value.extent_generation().toULong(),
-        value.frame_generation().toULong(),
-        value.latest_demand_token().toULong(),
+        value.generation(),
+        value.map_update_generation(),
+        value.rendered_update_generation(),
+        value.extent_generation(),
+        value.frame_generation(),
+        value.latest_demand_token(),
         value.pending_demand_count(),
         value.acquired_frame_count(),
         value.target_ready(),
@@ -95,9 +95,9 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       if (demand.present) flags = flags or MaplibreNativeC.MLN_FRAME_DEMAND_PRESENT
       value
         .flags(flags)
-        .token(demand.token.toLong())
-        .coalescing_boundary(demand.coalescingBoundary.toLong())
-        .timeout_ns(demand.timeoutNanoseconds.toLong())
+        .token(demand.token)
+        .coalescing_boundary(demand.coalescingBoundary)
+        .timeout_ns(demand.timeoutNanoseconds)
       Status.check(MaplibreNativeC.mln_render_session_request_frame(requireLiveHandle(), value))
     }
   }
@@ -106,9 +106,10 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     NativeAccess.ensureLoaded()
     LongPointer(1).use { outBatch ->
       outBatch.put(0, 0L)
-      Status.check(
+      val drained =
         MaplibreNativeC.mln_render_session_drain_frame_results(requireLiveHandle(), outBatch)
-      )
+      if (drained == MaplibreStatus.NOT_READY.nativeCode) return emptyList()
+      Status.check(drained)
       val batch = outBatch.get()
       try {
         org.bytedeco.javacpp.SizeTPointer(1).use { outCount ->
@@ -159,13 +160,13 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     MaplibreNativeC.mln_render_target_extent().use { nativeExtent ->
       nativeExtent.size(nativeExtent.sizeof())
       setExtent(nativeExtent, extent)
-      unit { completion ->
+      CompletionBridge.unit { completion ->
         MaplibreNativeC.mln_render_session_resize(requireLiveHandle(), nativeExtent, completion)
       }
     }
 
   public actual fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor): Deferred<Unit> =
-    unit { completion ->
+    CompletionBridge.unit { completion ->
       MaplibreNativeC.mln_metal_surface_set_target(
         requireLiveHandle(),
         metalSurfaceDescriptor(descriptor),
@@ -174,7 +175,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     }
 
   public actual fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor): Deferred<Unit> =
-    unit { completion ->
+    CompletionBridge.unit { completion ->
       MaplibreNativeC.mln_vulkan_surface_set_target(
         requireLiveHandle(),
         vulkanSurfaceDescriptor(descriptor),
@@ -183,7 +184,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     }
 
   public actual fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor): Deferred<Unit> =
-    unit { completion ->
+    CompletionBridge.unit { completion ->
       MaplibreNativeC.mln_opengl_surface_set_target(
         requireLiveHandle(),
         openglSurfaceDescriptor(descriptor),
@@ -193,7 +194,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
 
   public actual fun setMetalBorrowedTextureTarget(
     descriptor: MetalBorrowedTextureDescriptor
-  ): Deferred<Unit> = unit { completion ->
+  ): Deferred<Unit> = CompletionBridge.unit { completion ->
     MaplibreNativeC.mln_metal_borrowed_texture_set_target(
       requireLiveHandle(),
       metalBorrowedTextureDescriptor(descriptor),
@@ -203,7 +204,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
 
   public actual fun setVulkanBorrowedTextureTarget(
     descriptor: VulkanBorrowedTextureDescriptor
-  ): Deferred<Unit> = unit { completion ->
+  ): Deferred<Unit> = CompletionBridge.unit { completion ->
     MaplibreNativeC.mln_vulkan_borrowed_texture_set_target(
       requireLiveHandle(),
       vulkanBorrowedTextureDescriptor(descriptor),
@@ -213,7 +214,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
 
   public actual fun setOpenGLBorrowedTextureTarget(
     descriptor: OpenGLBorrowedTextureDescriptor
-  ): Deferred<Unit> = unit { completion ->
+  ): Deferred<Unit> = CompletionBridge.unit { completion ->
     MaplibreNativeC.mln_opengl_borrowed_texture_set_target(
       requireLiveHandle(),
       openglBorrowedTextureDescriptor(descriptor),
@@ -221,23 +222,23 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     )
   }
 
-  public actual fun reduceMemoryUse(): Deferred<Unit> = unit {
+  public actual fun reduceMemoryUse(): Deferred<Unit> = CompletionBridge.unit {
     MaplibreNativeC.mln_render_session_reduce_memory_use(requireLiveHandle(), it)
   }
 
-  public actual fun clearData(): Deferred<Unit> = unit {
+  public actual fun clearData(): Deferred<Unit> = CompletionBridge.unit {
     MaplibreNativeC.mln_render_session_clear_data(requireLiveHandle(), it)
   }
 
-  public actual fun dumpDebugLogs(): Deferred<Unit> = unit {
+  public actual fun dumpDebugLogs(): Deferred<Unit> = CompletionBridge.unit {
     MaplibreNativeC.mln_render_session_dump_debug_logs(requireLiveHandle(), it)
   }
 
-  public actual fun barrier(): Deferred<Unit> = unit {
+  public actual fun barrier(): Deferred<Unit> = CompletionBridge.unit {
     MaplibreNativeC.mln_render_session_barrier(requireLiveHandle(), it)
   }
 
-  public actual fun detach(): Deferred<Unit> = unit {
+  public actual fun detach(): Deferred<Unit> = CompletionBridge.unit {
     MaplibreNativeC.mln_render_session_detach(requireLiveHandle(), it)
   }
 
@@ -354,9 +355,6 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     return handleId
   }
 
-  private fun unit(start: (MaplibreNativeC.mln_completion) -> Int): Deferred<Unit> =
-    CompletionBridge.unit(start)
-
   private fun requiredBuffer(result: MaplibreNativeC.mln_completion_result): ByteArray {
     require(result.value_count() == 1L) { "native completion omitted its byte result" }
     val view = MaplibreNativeC.mln_buffer_view(result.value())
@@ -382,9 +380,6 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
         ) -> Int,
     ): RenderSessionAttachment {
       NativeAccess.ensureLoaded()
-      Status.requireArgument(options.requestedTextureRingDepth >= 0) {
-        "requestedTextureRingDepth must be non-negative"
-      }
       MaplibreNativeC.mln_render_session_attach_options_default().use { nativeOptions ->
         nativeOptions
           .driver(options.driver.nativeValue)
@@ -396,14 +391,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
           }
           val sessionId = outSession.get()
           require(sessionId != 0L) { "render session attach returned a null session" }
-          val session = RenderSessionHandle(map, sessionId)
-          return try {
-            RenderSessionAttachment(session, retainSessionUntilComplete(session, completed))
-          } catch (error: Throwable) {
-            runCatching { session.abandon() }
-            runCatching { session.close() }
-            throw error
-          }
+          return RenderSessionAttachment(RenderSessionHandle(map, sessionId), completed)
         }
       }
     }
@@ -567,11 +555,7 @@ internal constructor(
   public actual fun producerSync(): GpuSync = withFrame { frame ->
     MaplibreNativeC.mln_gpu_sync_default().use { value ->
       Status.check(MaplibreNativeC.mln_acquired_frame_get_producer_sync(frame, value))
-      GpuSync(
-        GpuSyncKind.fromNative(value.kind()),
-        value.`object`().toULong(),
-        value.value().toULong(),
-      )
+      GpuSync(GpuSyncKind.fromNative(value.kind()), value.`object`(), value.value())
     }
   }
 
@@ -604,8 +588,8 @@ internal constructor(
     MaplibreNativeC.mln_gpu_sync_default().use { nativeSync ->
       nativeSync
         .kind(consumerCompletion.kind.nativeValue)
-        .`object`(consumerCompletion.objectHandle.toLong())
-        .value(consumerCompletion.value.toLong())
+        .`object`(consumerCompletion.objectHandle)
+        .value(consumerCompletion.value)
       LongPointer(1).use { frame ->
         frame.put(0, frameId)
         try {
@@ -841,25 +825,6 @@ private fun stringView(value: MaplibreNativeC.mln_buffer_view): String {
   return String(bytes, StandardCharsets.UTF_8)
 }
 
-private fun queriedFeatureList(list: Long): List<QueriedFeature> =
-  try {
-    require(list != 0L) { "mln_queried_feature_list returned the null handle" }
-    SizeTPointer(1).use { outCount ->
-      Status.check(MaplibreNativeC.mln_queried_feature_list_count(list, outCount))
-      List(Math.toIntExact(outCount.get())) { index ->
-        MaplibreNativeC.mln_queried_feature().use { outFeature ->
-          outFeature.size(outFeature.sizeof())
-          Status.check(
-            MaplibreNativeC.mln_queried_feature_list_get(list, index.toLong(), outFeature)
-          )
-          queriedFeature(outFeature)
-        }
-      }
-    }
-  } finally {
-    MaplibreNativeC.mln_queried_feature_list_destroy(list)
-  }
-
 private fun queriedFeature(value: MaplibreNativeC.mln_queried_feature): QueriedFeature {
   val fields = value.fields()
   return QueriedFeature(
@@ -1074,10 +1039,10 @@ private class AddressPointer(address: Long) : Pointer(null as Pointer?) {
 private fun frameResult(value: MaplibreNativeC.mln_render_frame_result): RenderFrameResult =
   RenderFrameResult(
     RenderResult.fromNative(value.disposition()),
-    value.token().toULong(),
-    value.map_update_generation().toULong(),
-    value.extent_generation().toULong(),
-    value.frame_generation().toULong(),
+    value.token(),
+    value.map_update_generation(),
+    value.extent_generation(),
+    value.frame_generation(),
     value.needs_repaint(),
   )
 

@@ -24,19 +24,14 @@
 --include-typedef mln_acquired_frame
 --include-typedef mln_adapter_log_queue
 --include-typedef mln_adapter_resource_request_queue
---include-typedef mln_buffer
 --include-typedef mln_event_batch
 --include-typedef mln_map
 --include-typedef mln_map_projection
---include-typedef mln_offline_region_list
---include-typedef mln_offline_region_snapshot
 --include-typedef mln_render_frame_batch
 --include-typedef mln_render_session
 --include-typedef mln_resource_request_handle
 --include-typedef mln_runtime
 --include-struct mln_buffer_view
---include-function mln_buffer_destroy
---include-function mln_buffer_get
 --include-function mln_c_version
 --include-function mln_supported_render_backend_mask
 
@@ -59,6 +54,7 @@
 --include-function mln_map_camera_for_lat_lngs
 --include-function mln_map_camera_query
 --include-function mln_map_camera_snapshot_get
+--include-function mln_map_cancel_transitions
 --include-function mln_map_dump_debug_logs
 --include-function mln_map_lat_lng_bounds_for_camera
 --include-function mln_map_lat_lng_bounds_for_camera_unwrapped
@@ -238,11 +234,6 @@
 --include-function mln_map_set_style_url
 --include-function mln_map_snapshot_get
 --include-function mln_map_style_url
---include-function mln_offline_region_list_count
---include-function mln_offline_region_list_destroy
---include-function mln_offline_region_list_get
---include-function mln_offline_region_snapshot_destroy
---include-function mln_offline_region_snapshot_get
 --include-function mln_runtime_offline_region_create
 --include-function mln_runtime_offline_region_delete
 --include-function mln_runtime_offline_region_get
@@ -282,10 +273,6 @@
 --include-struct mln_screen_box
 --include-struct mln_screen_line_string
 --include-struct mln_source_feature_query_options
---include-function mln_queried_feature_default
---include-function mln_queried_feature_list_count
---include-function mln_queried_feature_list_destroy
---include-function mln_queried_feature_list_get
 --include-function mln_render_session_query_feature_extensions
 --include-function mln_render_session_query_rendered_features
 --include-function mln_render_session_query_source_features
@@ -617,8 +604,6 @@
 --include-constant MLN_STYLE_VECTOR_TILE_ENCODING_MVT
 --include-typedef mln_custom_geometry_source_release_callback
 --include-typedef mln_custom_mvt_vector_source_release_callback
---include-typedef mln_style_id_list
---include-typedef mln_style_string_list
 --include-struct mln_canonical_tile_id
 --include-struct mln_custom_geometry_source_options
 --include-struct mln_custom_mvt_vector_source_options
@@ -709,14 +694,7 @@
 --include-function mln_map_set_style_source_volatile
 --include-function mln_map_set_style_transition_options
 --include-function mln_premultiplied_rgba8_image_default
---include-function mln_style_id_list_count
---include-function mln_style_id_list_destroy
---include-function mln_style_id_list_get
---include-function mln_style_image_info_default
 --include-function mln_style_image_options_default
---include-function mln_style_string_list_count
---include-function mln_style_string_list_destroy
---include-function mln_style_string_list_get
 --include-function mln_style_tile_source_options_default
 --include-function mln_style_transition_options_default
 
@@ -756,7 +734,6 @@
 --include-function mln_acquired_frame_get_metal_texture
 --include-function mln_acquired_frame_get_opengl_texture
 --include-function mln_acquired_frame_get_vulkan_texture
---include-function mln_acquired_frame_get_webgpu_texture
 --include-function mln_metal_borrowed_texture_attach
 --include-function mln_metal_borrowed_texture_descriptor_default
 --include-function mln_metal_borrowed_texture_set_target
@@ -767,7 +744,6 @@
 --include-function mln_opengl_borrowed_texture_set_target
 --include-function mln_opengl_owned_texture_attach
 --include-function mln_opengl_owned_texture_descriptor_default
---include-function mln_texture_image_info_default
 --include-function mln_texture_read_premultiplied_rgba8
 --include-function mln_vulkan_borrowed_texture_attach
 --include-function mln_vulkan_borrowed_texture_descriptor_default

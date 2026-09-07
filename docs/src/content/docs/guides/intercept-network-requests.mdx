@@ -20,9 +20,7 @@ Register each one with an any-thread runtime command.
 
 MapLibre can invoke any of these callbacks concurrently on network and worker
 threads. Protect every value that a callback reads and return quickly because
-the resource request waits. Transfer callback state to the runtime only after a
-registration succeeds; the runtime releases it after its final invocation. A
-transform callback sets a replacement URL. A header transform callback sets
+the resource request waits. A transform callback sets a replacement URL. A header transform callback sets
 header names and values. A provider callback operates only on the request
 handle that it received.
 
@@ -43,8 +41,7 @@ a non-OK status preserves the original request.
 <Code code={region(transformSnippet, "rewrite")} lang="c" title="resource-transform.c" />
 
 Registering a transform replaces the previous transform in runtime submission
-order. The runtime releases the replaced callback state after its final
-invocation.
+order.
 
 <Code code={region(transformSnippet, "install")} lang="c" title="resource-transform.c" />
 

@@ -445,7 +445,7 @@ class HeadlessObserver final : public mln::MapObserver {
   }
 
   // A style load can drop custom geometry sources that the previous style held.
-  // The release callbacks that owes are map state rather than an event, so the
+  // The release callbacks this owes are map state, not an event, so the
   // reconciliation runs whatever the mask selects.
   void onDidFinishLoadingStyle() override {
     // The event is queued before the reconciliation, and the registry is held
@@ -2061,10 +2061,6 @@ class PendingMapResult final {
   mln_map value_ = MLN_HANDLE_NULL;
 };
 
-}  // namespace mln::core
-
-namespace mln::core {
-
 namespace {
 
 class RuntimeMapRetainGuard final {
@@ -2138,11 +2134,6 @@ auto validate_map_live_locked(mln_map map, MapObject*& out_map) -> mln_status {
   return out_map == nullptr ? MLN_STATUS_INVALID_ARGUMENT : MLN_STATUS_OK;
 }
 
-// Same locking contract as validate_map_live_locked().
-auto validate_map_locked(mln_map map, MapObject*& out_map) -> mln_status {
-  return validate_map_live_locked(map, out_map);
-}
-
 auto publish_map_snapshot(MapObject& live) -> uint64_t {
   const auto options = live.map->getMapOptions();
   auto snapshot = mln_map_snapshot{
@@ -2168,7 +2159,7 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
     .fully_loaded = live.map->isFullyLoaded(),
     .rendering_stats_view_enabled = live.map->isRenderingStatsViewEnabled(),
     .repaint_demand = live.frontend->repaint_demand(),
-    .reserved_flags = 0,
+    .gesture_in_progress = live.map->isGestureInProgress(),
     .event_mask = live.event_state->mask.load(std::memory_order_relaxed),
     .latest_render_update_generation =
       live.frontend->latest_update_generation(),
@@ -2335,11 +2326,6 @@ auto validate_map_live(mln_map map, MapObject*& out_map) -> mln_status {
   return validate_map_live_locked(map, out_map);
 }
 
-auto validate_map(mln_map map, MapObject*& out_map) -> mln_status {
-  const std::scoped_lock lock(handle_table<MapObject>().mutex());
-  return validate_map_locked(map, out_map);
-}
-
 namespace {
 
 struct MapSubmissionContext {
@@ -2374,7 +2360,7 @@ auto acquire_map_submission(mln_map map, MapSubmissionContext& out_context)
 }  // namespace
 
 auto submit_map_command(
-  mln_map map, std::function<mln_status()> work,
+  mln_map map, std::function<mln_status(MapObject&)> work,
   const mln_completion* completion
 ) -> mln_status {
   const auto completion_status = validate_completion(completion);
@@ -2384,23 +2370,23 @@ auto submit_map_command(
   if (acquire_status != MLN_STATUS_OK) {
     return acquire_status;
   }
-  auto live = std::move(context.map);
-  auto map_lease = std::move(context.control);
-  auto runtime = std::move(context.runtime);
   auto completion_state = std::make_shared<Completion>(*completion);
   return submit_runtime_command(
-    runtime,
-    [live = std::move(live), map_lease = std::move(map_lease), completion_state,
-     work = std::move(work)](uint64_t) mutable -> void {
+    context.runtime,
+    [live = std::move(context.map), map_lease = std::move(context.control),
+     completion_state, work = std::move(work)](uint64_t) mutable -> void {
       clear_thread_error();
       auto status = MLN_STATUS_NATIVE_ERROR;
       auto message = std::string{};
       auto generation = uint64_t{0};
       try {
-        status = std::invoke(std::move(work));
-        message = thread_last_error_message();
-        // Committed commands republish so snapshot reads observe the commit.
-        if (status == MLN_STATUS_OK) {
+        status = std::invoke(std::move(work), *live);
+        // A diagnostic is the failure's text; completion.h promises the
+        // message is empty on success, so a swallowed one is not attached.
+        if (status != MLN_STATUS_OK) {
+          message = thread_last_error_message();
+        } else {
+          // Committed commands republish so snapshot reads observe the commit.
           generation = publish_map_snapshot(*live);
         }
       } catch (const std::exception& exception) {
@@ -2444,142 +2430,142 @@ auto start_style_operation(
       );
       return;
     }
-    completion_state->resolve([kind, result = std::move(*shared)](
-                                const mln_completion& descriptor
-                              ) {
-      const void* value = nullptr;
-      auto count = std::size_t{0};
-      auto view = mln_buffer_view{};
-      auto views = std::vector<mln_buffer_view>{};
-      auto stretches = mln_style_image_stretches_result{};
-      auto source = mln_style_source_result{};
-      auto layer = mln_style_layer_result{};
-      auto image = mln_style_image_result{};
-      switch (kind) {
-        case StyleOperationKind::SourceInfo:
-          if (result->found) {
-            views.reserve(result->strings.size());
-            for (const auto& string : result->strings) {
-              views.push_back({.data = string.data(), .size = string.size()});
-            }
-            source = {
-              .size = sizeof(mln_style_source_result),
-              .reserved = 0,
-              .info = result->source_info,
-              .attribution =
-                {.data = result->attribution.data(),
-                 .size = result->attribution.size()},
-              .url = {.data = result->url.data(), .size = result->url.size()},
-              .tile_urls = views.data(),
-              .tile_url_count = views.size()
-            };
-            value = &source;
-            count = 1;
-          }
-          break;
-        case StyleOperationKind::LayerInfo:
-          if (result->found) {
-            layer = {
-              .size = sizeof(mln_style_layer_result),
-              .reserved = 0,
-              .info = result->layer_info,
-              .source_id =
-                {.data = result->source_id.data(),
-                 .size = result->source_id.size()},
-              .source_layer = {
-                .data = result->source_layer.data(),
-                .size = result->source_layer.size()
-              }
-            };
-            value = &layer;
-            count = 1;
-          }
-          break;
-        case StyleOperationKind::ImageInfo:
-          if (result->found) {
-            image = {
-              .size = sizeof(mln_style_image_result),
-              .reserved = 0,
-              .info = result->image_info,
-              .pixels =
-                {.data = result->bytes.data(), .size = result->bytes.size()},
-              .stretch_x = result->stretch_x.data(),
-              .stretch_x_count = result->stretch_x.size(),
-              .stretch_y = result->stretch_y.data(),
-              .stretch_y_count = result->stretch_y.size()
-            };
-            value = &image;
-            count = 1;
-          }
-          break;
-        case StyleOperationKind::TransitionOptions:
-          value = &result->transition_options;
-          count = 1;
-          break;
-        case StyleOperationKind::SourceIds:
-        case StyleOperationKind::LayerIds:
+    completion_state->resolve(
+      [kind, result = std::move(*shared)](const mln_completion& descriptor) {
+        const void* value = nullptr;
+        auto count = std::size_t{0};
+        auto view = mln_buffer_view{};
+        auto views = std::vector<mln_buffer_view>{};
+        auto stretches = mln_style_image_stretches_result{};
+        auto source = mln_style_source_result{};
+        auto layer = mln_style_layer_result{};
+        auto image = mln_style_image_result{};
+        const auto fill_views = [&result, &views]() -> void {
           views.reserve(result->strings.size());
           for (const auto& string : result->strings) {
             views.push_back({.data = string.data(), .size = string.size()});
           }
-          value = views.data();
-          count = views.size();
-          break;
-        case StyleOperationKind::SourceTileUrls:
-          if (result->found) {
-            views.reserve(result->strings.size());
-            for (const auto& string : result->strings) {
-              views.push_back({.data = string.data(), .size = string.size()});
+        };
+        const auto bytes_view = [&result]() -> mln_buffer_view {
+          return {.data = result->bytes.data(), .size = result->bytes.size()};
+        };
+        switch (kind) {
+          case StyleOperationKind::SourceInfo:
+            if (result->found) {
+              fill_views();
+              source = {
+                .size = sizeof(mln_style_source_result),
+                .reserved = 0,
+                .info = result->source_info,
+                .attribution =
+                  {.data = result->attribution.data(),
+                   .size = result->attribution.size()},
+                .url = {.data = result->url.data(), .size = result->url.size()},
+                .tile_urls = views.data(),
+                .tile_url_count = views.size()
+              };
+              value = &source;
+              count = 1;
             }
+            break;
+          case StyleOperationKind::LayerInfo:
+            if (result->found) {
+              layer = {
+                .size = sizeof(mln_style_layer_result),
+                .reserved = 0,
+                .info = result->layer_info,
+                .source_id =
+                  {.data = result->source_id.data(),
+                   .size = result->source_id.size()},
+                .source_layer = {
+                  .data = result->source_layer.data(),
+                  .size = result->source_layer.size()
+                }
+              };
+              value = &layer;
+              count = 1;
+            }
+            break;
+          case StyleOperationKind::ImageInfo:
+            if (result->found) {
+              image = {
+                .size = sizeof(mln_style_image_result),
+                .reserved = 0,
+                .info = result->image_info,
+                .pixels =
+                  {.data = result->bytes.data(), .size = result->bytes.size()},
+                .stretch_x = result->stretch_x.data(),
+                .stretch_x_count = result->stretch_x.size(),
+                .stretch_y = result->stretch_y.data(),
+                .stretch_y_count = result->stretch_y.size()
+              };
+              value = &image;
+              count = 1;
+            }
+            break;
+          case StyleOperationKind::TransitionOptions:
+            value = &result->transition_options;
+            count = 1;
+            break;
+          case StyleOperationKind::SourceIds:
+          case StyleOperationKind::LayerIds:
+            fill_views();
             value = views.data();
             count = views.size();
-          }
-          break;
-        case StyleOperationKind::ImageStretches:
-          if (result->found) {
-            stretches = mln_style_image_stretches_result{
-              .size = sizeof(mln_style_image_stretches_result),
-              .reserved = 0,
-              .stretch_x = result->stretch_x.data(),
-              .stretch_x_count = result->stretch_x.size(),
-              .stretch_y = result->stretch_y.data(),
-              .stretch_y_count = result->stretch_y.size(),
-            };
-            value = &stretches;
-            count = 1;
-          }
-          break;
-        case StyleOperationKind::ImageCoordinates:
-          value = result->found ? result->coordinates.data() : nullptr;
-          count = result->found ? result->coordinates.size() : 0;
-          break;
-        case StyleOperationKind::SourceAttribution:
-        case StyleOperationKind::SourceUrl:
-        case StyleOperationKind::LayerJson:
-        case StyleOperationKind::LightProperty:
-        case StyleOperationKind::LayerProperty:
-          if (result->found) {
-            view = {.data = result->bytes.data(), .size = result->bytes.size()};
+            break;
+          case StyleOperationKind::SourceTileUrls:
+            if (result->found) {
+              fill_views();
+              value = views.data();
+              count = views.size();
+            }
+            break;
+          case StyleOperationKind::ImageStretches:
+            if (result->found) {
+              stretches = mln_style_image_stretches_result{
+                .size = sizeof(mln_style_image_stretches_result),
+                .reserved = 0,
+                .stretch_x = result->stretch_x.data(),
+                .stretch_x_count = result->stretch_x.size(),
+                .stretch_y = result->stretch_y.data(),
+                .stretch_y_count = result->stretch_y.size(),
+              };
+              value = &stretches;
+              count = 1;
+            }
+            break;
+          case StyleOperationKind::ImageCoordinates:
+            value = result->found ? result->coordinates.data() : nullptr;
+            count = result->found ? result->coordinates.size() : 0;
+            break;
+          // A missing object completes with no value.
+          case StyleOperationKind::SourceAttribution:
+          case StyleOperationKind::SourceUrl:
+          case StyleOperationKind::LayerJson:
+          case StyleOperationKind::LightProperty:
+          case StyleOperationKind::LayerProperty:
+          case StyleOperationKind::ImagePixels:
+          case StyleOperationKind::LayerFilter:
+            if (result->found) {
+              view = bytes_view();
+              value = &view;
+              count = 1;
+            }
+            break;
+          // These always produce one view, empty when the layer sets none.
+          case StyleOperationKind::LayerSourceLayer:
+          case StyleOperationKind::LayerSourceId:
+            view = bytes_view();
             value = &view;
             count = 1;
-          }
-          break;
-        default:
-          if (
-            result->found || (kind != StyleOperationKind::ImagePixels &&
-                              kind != StyleOperationKind::LayerFilter)
-          ) {
-            view = {.data = result->bytes.data(), .size = result->bytes.size()};
-            value = &view;
-            count = 1;
-          }
-          break;
+            break;
+        }
+        invoke_completion(
+          descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0, {},
+          value, count
+        );
       }
-      invoke_completion(
-        descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0, {},
-        value, count
-      );
-    });
+    );
   };
   auto context = MapSubmissionContext{};
   const auto acquire_status = acquire_map_submission(map, context);
@@ -2587,14 +2573,14 @@ auto start_style_operation(
   auto state = std::make_shared<OperationObject>(std::move(result_callback));
   const auto submission = submit_runtime_operation(
     context.runtime, state,
-    [map = std::move(context.map), control = std::move(context.control), state,
+    [live = std::move(context.map), control = std::move(context.control), state,
      work = std::move(work)]() mutable -> void {
-      static_cast<void>(map);
+      // The control lease is captured so map teardown waits for this work.
       static_cast<void>(control);
       auto result = std::make_shared<StyleOperationResult>();
       clear_thread_error();
       try {
-        const auto status = std::invoke(std::move(work), *result);
+        const auto status = std::invoke(std::move(work), *live, *result);
         state->complete(status, thread_last_error_message(), std::any{result});
       } catch (const std::exception& exception) {
         state->complete(MLN_STATUS_NATIVE_ERROR, exception.what(), result);
@@ -2675,14 +2661,14 @@ auto start_geometry_operation(
   );
   const auto submission = submit_runtime_operation(
     context.runtime, state,
-    [map = std::move(context.map), control = std::move(context.control), state,
+    [live = std::move(context.map), control = std::move(context.control), state,
      work = std::move(work)]() mutable {
-      static_cast<void>(map);
+      // The control lease is captured so map teardown waits for this work.
       static_cast<void>(control);
       auto result = GeometryOperationResult{};
       clear_thread_error();
       try {
-        const auto status = std::invoke(std::move(work), result);
+        const auto status = std::invoke(std::move(work), *live, result);
         state->complete(
           status, thread_last_error_message(), std::any{std::move(result)}
         );
@@ -2726,34 +2712,23 @@ auto with_projection(mln_map_projection projection, Work work) -> mln_status {
   return MLN_STATUS_OK;
 }
 
+class MapTeardownLane;
+auto map_teardown_lane() -> MapTeardownLane&;
+
 }  // namespace
 
-namespace {
-auto ensure_map_teardown_lane() -> void;
-}
-
+// Runs on the runtime worker, after create_map_start() validated the options
+// and reserved the runtime's map slot.
 auto create_map(
-  mln_runtime runtime, const mln_map_options* options, mln_map* out_map
+  mln_runtime runtime, const mln_map_options& effective, mln_map* out_map
 ) -> mln_status {
-  const auto options_status = validate_map_options(options);
-  if (options_status != MLN_STATUS_OK) {
-    return options_status;
-  }
-  if (out_map == nullptr) {
-    set_thread_error("out_map must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (*out_map != MLN_HANDLE_NULL) {
-    set_thread_error("out_map must point to the null handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   RuntimeObject* live_runtime = nullptr;
   const auto runtime_status = validate_runtime(runtime, live_runtime);
   if (runtime_status != MLN_STATUS_OK) {
     return runtime_status;
   }
-  ensure_map_teardown_lane();
+  // Reserves the shared teardown worker before this map creates its own pool.
+  static_cast<void>(map_teardown_lane());
 
   const auto retain_status = retain_runtime_map(runtime);
   if (retain_status != MLN_STATUS_OK) {
@@ -2761,7 +2736,6 @@ auto create_map(
   }
   auto retain_guard = RuntimeMapRetainGuard{runtime};
 
-  const auto effective = options == nullptr ? map_options_default() : *options;
   auto owned_map = std::make_shared<MapObject>();
   // Every allocation this function owns happens before the handle is published,
   // so a throw here cannot leave a registered map the caller has no handle to
@@ -2771,6 +2745,7 @@ auto create_map(
   // Publish the handle first, so the observer and frontend capture an id that
   // already resolves.
   const auto handle = handle_table<MapObject>().insert(owned_map);
+  owned_map->self = handle;
   owned_map->runtime = runtime;
   owned_map->runtime_state = lease_runtime(runtime);
   owned_map->map_mode = effective.map_mode;
@@ -2874,7 +2849,7 @@ auto create_map_start(
       auto status = MLN_STATUS_NATIVE_ERROR;
       auto diagnostic = std::string{};
       try {
-        status = create_map(runtime, &effective, &result);
+        status = create_map(runtime, effective, &result);
       } catch (...) {
         diagnostic = exception_message(std::current_exception());
       }
@@ -2936,19 +2911,23 @@ auto map_resize(
       set_thread_error("extent must be valid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto live = handle_table<MapObject>().lease(map);
-  if (live == nullptr) {
+  auto context = MapSubmissionContext{};
+  const auto acquire_status = acquire_map_submission(map, context);
+  if (acquire_status != MLN_STATUS_OK) {
+    return acquire_status;
+  }
+  // The renderer takes its pixel ratio at map creation and has no setter, so a
+  // resize that reported a different scale would publish a scale nothing uses.
+  if (extent.scale_factor != context.map->logical_extent.scale_factor) {
+    set_thread_error("scale factor is fixed at map creation");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (!live->control.acquire()) {
-    return MLN_STATUS_INVALID_STATE;
-  }
-  auto submission = std::make_shared<ControlLease>(&live->control);
+  auto* const resize_slot = &context.map->latest_resize_submission;
   auto completion_state = std::make_shared<Completion>(*completion);
   const auto status = submit_runtime_command(
-    live->runtime_state,
-    [live, submission = std::move(submission), completion_state,
-     extent](uint64_t sequence) mutable -> void {
+    context.runtime,
+    [live = std::move(context.map), submission = std::move(context.control),
+     completion_state, extent](uint64_t sequence) mutable -> void {
       if (sequence != live->latest_resize_submission.load()) {
         complete_command(
           completion_state, MLN_COMMAND_DISPOSITION_SUPERSEDED, MLN_STATUS_OK
@@ -2956,7 +2935,8 @@ auto map_resize(
         return;
       }
       try {
-        live->logical_extent = extent;
+        live->logical_extent.width = extent.width;
+        live->logical_extent.height = extent.height;
         live->map->setSize(mln::Size{extent.width, extent.height});
         const auto generation = publish_map_snapshot(*live);
         complete_command(
@@ -2971,7 +2951,7 @@ auto map_resize(
         );
       }
     },
-    completion_state, &live->latest_resize_submission
+    completion_state, resize_slot
   );
   return status;
 }
@@ -3026,9 +3006,6 @@ auto map_teardown_lane() -> MapTeardownLane& {
   return *lane;
 }
 
-auto ensure_map_teardown_lane() -> void {
-  static_cast<void>(map_teardown_lane());
-}
 }  // namespace
 
 auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
@@ -3092,15 +3069,17 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
       }
     }
     if (!schedule) return;
-    try {
-      map_teardown_lane().submit([close]() mutable {
-        auto owned = std::move(close->owned_map);
+    // The map's actors and file requests deliver on the runtime's run loop,
+    // so the map is destroyed there, where nothing can still be mid-delivery.
+    // Retiring it before reporting completion keeps it from reaching host
+    // callback state afterwards. Only the frontend's pool shutdown, which can
+    // block and on browser backends needs main-thread service, leaves the
+    // loop, after the public retirement boundary.
+    auto retire = [close]() mutable -> void {
+      auto owned = std::move(close->owned_map);
+      try {
         owned->callback_sources->detach();
         owned->frontend->close_renderer_observer();
-        // Retire the map before reporting completion, so it can no longer
-        // reach host callback state. Browser backends can require main-thread
-        // service while their worker pool shuts down, so that backend cleanup
-        // continues after the public retirement boundary.
         owned->map.reset();
         owned->callback_sources->release_all();
         {
@@ -3112,13 +3091,34 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
         close->operation->complete(
           MLN_STATUS_OK, {}, std::any{std::monostate{}}
         );
+      } catch (...) {
+        close->operation->complete(
+          MLN_STATUS_NATIVE_ERROR, exception_message(std::current_exception()),
+          {}
+        );
+      }
+      try {
+        map_teardown_lane().submit([owned]() mutable {
+          owned->frontend->shutdown_thread_pool();
+          owned.reset();
+        });
+      } catch (...) {
         owned->frontend->shutdown_thread_pool();
-        owned.reset();
-      });
+      }
+    };
+    try {
+      close->owned_map->runtime_state->executor.invoke(retire);
     } catch (...) {
-      close->operation->complete(
-        MLN_STATUS_NATIVE_ERROR, exception_message(std::current_exception()), {}
-      );
+      // A stopped executor delivers nothing any more, so the lane retires the
+      // map without racing the run loop.
+      try {
+        map_teardown_lane().submit(std::move(retire));
+      } catch (...) {
+        close->operation->complete(
+          MLN_STATUS_NATIVE_ERROR, exception_message(std::current_exception()),
+          {}
+        );
+      }
     }
   };
   const auto submit_status = submit_runtime_operation(
@@ -3177,26 +3177,22 @@ auto map_request_repaint(mln_map map, const mln_completion* completion)
   -> mln_status {
   const auto completion_status = validate_completion(completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
-  auto live = handle_table<MapObject>().lease(map);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
+  auto context = MapSubmissionContext{};
+  const auto acquire_status = acquire_map_submission(map, context);
+  if (acquire_status != MLN_STATUS_OK) {
+    return acquire_status;
   }
-  if (!live->control.acquire()) {
+  // The map mode is fixed at creation, so this rejection belongs on the
+  // calling thread rather than in the command body.
+  if (context.map->map_mode != MLN_MAP_MODE_CONTINUOUS) {
+    set_thread_error("map is not in continuous mode");
     return MLN_STATUS_INVALID_STATE;
   }
-  auto submission = std::make_shared<ControlLease>(&live->control);
   auto completion_state = std::make_shared<Completion>(*completion);
   return submit_runtime_command(
-    live->runtime_state,
-    [live, submission = std::move(submission),
+    context.runtime,
+    [live = std::move(context.map), submission = std::move(context.control),
      completion_state](uint64_t) mutable -> void {
-      if (live->map_mode != MLN_MAP_MODE_CONTINUOUS) {
-        complete_command(
-          completion_state, MLN_COMMAND_DISPOSITION_FAILED,
-          MLN_STATUS_INVALID_STATE, 0, "map is not in continuous mode"
-        );
-        return;
-      }
       try {
         live->map->triggerRepaint();
         const auto generation = publish_map_snapshot(*live);
@@ -3221,19 +3217,17 @@ auto map_request_still_image_start(
 ) -> mln_status {
   const auto completion_status = validate_completion(completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
-  auto live = handle_table<MapObject>().lease(map);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
+  auto context = MapSubmissionContext{};
+  const auto acquire_status = acquire_map_submission(map, context);
+  if (acquire_status != MLN_STATUS_OK) {
+    return acquire_status;
   }
-  if (!is_still_map_mode(live->map_mode)) {
+  if (!is_still_map_mode(context.map->map_mode)) {
     set_thread_error("map is not in static or tile mode");
     return MLN_STATUS_INVALID_STATE;
   }
-  if (!live->control.acquire()) {
-    return MLN_STATUS_INVALID_STATE;
-  }
-  auto control_lease = ControlLease{&live->control};
-  auto submission = std::make_shared<ControlLease>(std::move(control_lease));
+  auto live = std::move(context.map);
+  auto submission = std::move(context.control);
   auto submission_released = std::make_shared<std::atomic_bool>(false);
   auto release_submission = [submission,
                              submission_released]() noexcept -> void {
@@ -3248,7 +3242,7 @@ auto map_request_still_image_start(
     }
   );
   const auto submit_status = submit_runtime_operation(
-    live->runtime_state, state,
+    context.runtime, state,
     [map, live = std::move(live), state, release_submission]() mutable -> void {
       if (live->still_image_request_pending) {
         state->complete(
@@ -3293,9 +3287,7 @@ auto map_scale_factor(mln_map map) -> double {
                          : live->logical_extent.scale_factor;
 }
 
-// Returns worker-owned native state. Callers must already run on the runtime
-// worker or use the posting helpers below.
-auto map_native(MapObject* map) -> mln::Map* { return map->map.get(); }
+auto map_native(MapObject& map) -> mln::Map& { return *map.map; }
 
 namespace {
 
@@ -3374,7 +3366,9 @@ auto map_run_render_jobs(mln_map map) -> void {
 }
 
 auto map_quiesce_render_workers(mln_map map) -> void {
-  auto* live = handle_table<MapObject>().try_resolve(map);
+  // The lease holds the object across the blocking wait, so a concurrent
+  // release cannot destroy the frontend under it.
+  const auto live = handle_table<MapObject>().try_lease(map);
   if (live != nullptr) {
     live->frontend->wait_thread_pool();
   }
@@ -3428,41 +3422,31 @@ auto map_detach_render_target_session(mln_map map, void* session)
   return MLN_STATUS_OK;
 }
 
-auto map_set_style_url(mln_map map, const char* url) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
+auto map_set_style_url(MapObject& live, const char* url) -> mln_status {
   if (url == nullptr) {
     set_thread_error("url must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   // Parse failures reported on this stack use runtime-worker state, so no
   // additional lock or queued diagnostic is needed.
-  live->event_state->style_load_failed = false;
-  live->event_state->style_load_failure.clear();
-  live->map->getStyle().loadURL(url);
-  if (live->event_state->style_load_failed) {
-    set_thread_error(live->event_state->style_load_failure.c_str());
+  live.event_state->style_load_failed = false;
+  live.event_state->style_load_failure.clear();
+  live.map->getStyle().loadURL(url);
+  if (live.event_state->style_load_failed) {
+    set_thread_error(live.event_state->style_load_failure.c_str());
     return MLN_STATUS_NATIVE_ERROR;
   }
   return MLN_STATUS_OK;
 }
 
-auto map_set_style_json(mln_map map, mln_buffer_view json) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
+auto map_set_style_json(MapObject& live, mln_buffer_view json) -> mln_status {
   if (!validate_bytes(json, "style JSON")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   try {
-    live->event_state->style_load_failed = false;
-    live->event_state->style_load_failure.clear();
-    live->map->getStyle().loadJSON(
+    live.event_state->style_load_failed = false;
+    live.event_state->style_load_failure.clear();
+    live.map->getStyle().loadJSON(
       std::string{reinterpret_cast<const char*>(json.data), json.size}
     );
   } catch (const std::exception& exception) {
@@ -3471,18 +3455,18 @@ auto map_set_style_json(mln_map map, mln_buffer_view json) -> mln_status {
     set_thread_error(exception.what());
     if (
       event_selected(
-        live->event_state->mask, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED
+        live.event_state->mask, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED
       )
     ) {
       push_runtime_map_event(
-        live->runtime, map, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, 0,
+        live.runtime, live.self, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, 0,
         exception.what()
       );
     }
     return MLN_STATUS_NATIVE_ERROR;
   }
-  if (live->event_state->style_load_failed) {
-    set_thread_error(live->event_state->style_load_failure.c_str());
+  if (live.event_state->style_load_failed) {
+    set_thread_error(live.event_state->style_load_failure.c_str());
     return MLN_STATUS_NATIVE_ERROR;
   }
   return MLN_STATUS_OK;
@@ -3561,13 +3545,9 @@ auto feature_state_string_from_view(mln_buffer_view value) -> std::string {
 }  // namespace
 
 auto map_set_feature_state(
-  mln_map map, const mln_feature_state_selector* selector, mln_buffer_view state
+  MapObject& live, const mln_feature_state_selector* selector,
+  mln_buffer_view state
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto selector_status = validate_feature_state_selector(selector, true);
   if (selector_status != MLN_STATUS_OK) {
     return selector_status;
@@ -3583,12 +3563,12 @@ auto map_set_feature_state(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  live->feature_state.set(
+  live.feature_state.set(
     feature_state_string_from_view(selector->source_id),
     feature_state_source_layer(*selector),
     feature_state_string_from_view(selector->feature_id), *state_object
   );
-  live->map->triggerRepaint();
+  live.map->triggerRepaint();
   return MLN_STATUS_OK;
 }
 
@@ -3614,19 +3594,14 @@ auto map_get_feature_state_start(
 }
 
 auto map_remove_feature_state(
-  mln_map map, const mln_feature_state_selector* selector
+  MapObject& live, const mln_feature_state_selector* selector
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto selector_status = validate_feature_state_selector(selector, false);
   if (selector_status != MLN_STATUS_OK) {
     return selector_status;
   }
 
-  live->feature_state.remove(
+  live.feature_state.remove(
     feature_state_string_from_view(selector->source_id),
     feature_state_source_layer(*selector),
     optional_selector_string(
@@ -3636,7 +3611,7 @@ auto map_remove_feature_state(
       *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
     )
   );
-  live->map->triggerRepaint();
+  live.map->triggerRepaint();
   return MLN_STATUS_OK;
 }
 
@@ -3669,18 +3644,16 @@ auto map_set_event_mask(
       set_thread_error("mask must be valid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto live = handle_table<MapObject>().lease(map);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
+  auto context = MapSubmissionContext{};
+  const auto acquire_status = acquire_map_submission(map, context);
+  if (acquire_status != MLN_STATUS_OK) {
+    return acquire_status;
   }
-  if (!live->control.acquire()) {
-    return MLN_STATUS_INVALID_STATE;
-  }
-  auto submission = std::make_shared<ControlLease>(&live->control);
   auto completion_state = std::make_shared<Completion>(*completion);
   return submit_runtime_command(
-    live->runtime_state,
-    [live, mask, submission = std::move(submission),
+    context.runtime,
+    [live = std::move(context.map), mask,
+     submission = std::move(context.control),
      completion_state](uint64_t) mutable -> void {
       try {
         live->event_state->mask.store(mask, std::memory_order_relaxed);
@@ -3730,15 +3703,14 @@ auto submit_camera_command(
 ) -> mln_status {
   const auto completion_status = validate_completion(completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
-  auto live = handle_table<MapObject>().lease(map);
-  if (live == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
-  if (!live->control.acquire()) return MLN_STATUS_INVALID_STATE;
-  auto submission = std::make_shared<ControlLease>(&live->control);
+  auto context = MapSubmissionContext{};
+  const auto acquire_status = acquire_map_submission(map, context);
+  if (acquire_status != MLN_STATUS_OK) return acquire_status;
   auto completion_state = std::make_shared<Completion>(*completion);
   return submit_runtime_command(
-    live->runtime_state,
-    [map, live, mutation = std::move(mutation),
-     submission = std::move(submission),
+    context.runtime,
+    [map, live = std::move(context.map), mutation = std::move(mutation),
+     submission = std::move(context.control),
      completion_state](uint64_t) mutable -> void {
       try {
         mutation(*live, map);
@@ -3907,12 +3879,23 @@ auto map_apply_camera_delta(
           break;
         }
         case MLN_CAMERA_DELTA_PITCH:
+          // Map::pitchBy() subtracts its argument, so the amount is negated to
+          // give PITCH the same current-plus-amount sense as BEARING.
           live.map->pitchBy(-copied.amount, animation);
           break;
         default:
           break;
       }
     },
+    completion
+  );
+}
+
+auto map_cancel_transitions(mln_map map, const mln_completion* completion)
+  -> mln_status {
+  return submit_camera_command(
+    map,
+    [](MapObject& live, mln_map) -> void { live.map->cancelTransitions(); },
     completion
   );
 }
@@ -3977,116 +3960,86 @@ auto map_camera_query_start(mln_map map, const mln_completion* completion)
   return submit_status;
 }
 
-auto map_set_debug_options(mln_map map, uint32_t options) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
+auto map_set_debug_options(MapObject& live, uint32_t options) -> mln_status {
   const auto options_status = validate_debug_options(options);
   if (options_status != MLN_STATUS_OK) {
     return options_status;
   }
-  live->map->setDebug(to_native_debug_options(options));
+  live.map->setDebug(to_native_debug_options(options));
   return MLN_STATUS_OK;
 }
 
-auto map_set_rendering_stats_view_enabled(mln_map map, bool enabled)
+auto map_set_rendering_stats_view_enabled(MapObject& live, bool enabled)
   -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  live->map->enableRenderingStatsView(enabled);
+  live.map->enableRenderingStatsView(enabled);
   return MLN_STATUS_OK;
 }
 
-auto map_dump_debug_logs(mln_map map) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  live->map->dumpDebugLogs();
+auto map_dump_debug_logs(MapObject& live) -> mln_status {
+  live.map->dumpDebugLogs();
   return MLN_STATUS_OK;
 }
 
 auto map_set_viewport_options(
-  mln_map map, const mln_map_viewport_options* options
+  MapObject& live, const mln_map_viewport_options* options
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto options_status = validate_viewport_options(options);
   if (options_status != MLN_STATUS_OK) {
     return options_status;
   }
 
   if ((options->fields & MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) != 0U) {
-    live->map->setNorthOrientation(
+    live.map->setNorthOrientation(
       to_native_north_orientation(options->north_orientation)
     );
   }
   if ((options->fields & MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE) != 0U) {
-    live->map->setConstrainMode(
+    live.map->setConstrainMode(
       to_native_constrain_mode(options->constrain_mode)
     );
   }
   if ((options->fields & MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE) != 0U) {
-    live->map->setViewportMode(to_native_viewport_mode(options->viewport_mode));
+    live.map->setViewportMode(to_native_viewport_mode(options->viewport_mode));
   }
   if ((options->fields & MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET) != 0U) {
-    live->map->setFrustumOffset(to_native_edge_insets(options->frustum_offset));
+    live.map->setFrustumOffset(to_native_edge_insets(options->frustum_offset));
   }
   return MLN_STATUS_OK;
 }
 
-auto map_set_tile_options(mln_map map, const mln_map_tile_options* options)
+auto map_set_tile_options(MapObject& live, const mln_map_tile_options* options)
   -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto options_status = validate_tile_options(options);
   if (options_status != MLN_STATUS_OK) {
     return options_status;
   }
 
   if ((options->fields & MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0U) {
-    live->map->setPrefetchZoomDelta(
+    live.map->setPrefetchZoomDelta(
       static_cast<uint8_t>(options->prefetch_zoom_delta)
     );
   }
   if ((options->fields & MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS) != 0U) {
-    live->map->setTileLodMinRadius(options->lod_min_radius);
+    live.map->setTileLodMinRadius(options->lod_min_radius);
   }
   if ((options->fields & MLN_MAP_TILE_OPTION_LOD_SCALE) != 0U) {
-    live->map->setTileLodScale(options->lod_scale);
+    live.map->setTileLodScale(options->lod_scale);
   }
   if ((options->fields & MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) != 0U) {
-    live->map->setTileLodPitchThreshold(options->lod_pitch_threshold);
+    live.map->setTileLodPitchThreshold(options->lod_pitch_threshold);
   }
   if ((options->fields & MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT) != 0U) {
-    live->map->setTileLodZoomShift(options->lod_zoom_shift);
+    live.map->setTileLodZoomShift(options->lod_zoom_shift);
   }
   if ((options->fields & MLN_MAP_TILE_OPTION_LOD_MODE) != 0U) {
-    live->map->setTileLodMode(to_native_tile_lod_mode(options->lod_mode));
+    live.map->setTileLodMode(to_native_tile_lod_mode(options->lod_mode));
   }
   return MLN_STATUS_OK;
 }
 
 auto map_pixel_for_lat_lng(
-  mln_map map, mln_lat_lng coordinate, mln_screen_point* out_point
+  MapObject& live, mln_lat_lng coordinate, mln_screen_point* out_point
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (out_point == nullptr) {
     set_thread_error("out_point must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -4097,20 +4050,15 @@ auto map_pixel_for_lat_lng(
   }
 
   *out_point = from_native_screen_point(
-    live->map->pixelForLatLng(to_native_lat_lng(coordinate))
+    live.map->pixelForLatLng(to_native_lat_lng(coordinate))
   );
   return MLN_STATUS_OK;
 }
 
 auto map_lat_lng_for_pixel(
-  mln_map map, mln_screen_point point, mln_lat_lng* out_coordinate,
+  MapObject& live, mln_screen_point point, mln_lat_lng* out_coordinate,
   mln::LatLng::WrapMode wrap_mode
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (out_coordinate == nullptr) {
     set_thread_error("out_coordinate must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -4121,20 +4069,15 @@ auto map_lat_lng_for_pixel(
   }
 
   *out_coordinate = from_native_lat_lng(
-    live->map->latLngForPixel(to_native_screen_point(point), wrap_mode)
+    live.map->latLngForPixel(to_native_screen_point(point), wrap_mode)
   );
   return MLN_STATUS_OK;
 }
 
 auto map_pixels_for_lat_lngs(
-  mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
+  MapObject& live, const mln_lat_lng* coordinates, size_t coordinate_count,
   mln_screen_point* out_points
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (coordinate_count != 0 && out_points == nullptr) {
     set_thread_error(
       "out_points must not be null when coordinate_count is nonzero"
@@ -4152,7 +4095,7 @@ auto map_pixels_for_lat_lngs(
 
   const auto native_coordinates =
     to_native_lat_lngs(coordinates, coordinate_count);
-  const auto pixels = live->map->pixelsForLatLngs(native_coordinates);
+  const auto pixels = live.map->pixelsForLatLngs(native_coordinates);
   auto output = std::span<mln_screen_point>{out_points, pixels.size()};
   auto output_position = output.begin();
   for (const auto& pixel : pixels) {
@@ -4163,14 +4106,9 @@ auto map_pixels_for_lat_lngs(
 }
 
 auto map_lat_lngs_for_pixels(
-  mln_map map, const mln_screen_point* points, size_t point_count,
+  MapObject& live, const mln_screen_point* points, size_t point_count,
   mln_lat_lng* out_coordinates, mln::LatLng::WrapMode wrap_mode
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (point_count != 0 && out_coordinates == nullptr) {
     set_thread_error(
       "out_coordinates must not be null when point_count is nonzero"
@@ -4186,8 +4124,7 @@ auto map_lat_lngs_for_pixels(
   }
 
   const auto native_points = to_native_screen_points(points, point_count);
-  const auto coordinates =
-    live->map->latLngsForPixels(native_points, wrap_mode);
+  const auto coordinates = live.map->latLngsForPixels(native_points, wrap_mode);
   auto output = std::span<mln_lat_lng>{out_coordinates, coordinates.size()};
   auto output_position = output.begin();
   for (const auto& coordinate : coordinates) {
@@ -4205,8 +4142,8 @@ auto map_pixel_for_lat_lng_start(
   }
   return start_geometry_operation(
     map, GeometryOperationKind::PixelForCoordinate,
-    [map, coordinate](GeometryOperationResult& result) {
-      return map_pixel_for_lat_lng(map, coordinate, &result.point);
+    [coordinate](MapObject& live, GeometryOperationResult& result) {
+      return map_pixel_for_lat_lng(live, coordinate, &result.point);
     },
     completion
   );
@@ -4223,8 +4160,8 @@ auto start_coordinate_for_pixel(
     unwrapped ? mln::LatLng::Unwrapped : mln::LatLng::Wrapped;
   return start_geometry_operation(
     map, GeometryOperationKind::CoordinateForPixel,
-    [map, point, wrap_mode](GeometryOperationResult& result) {
-      return map_lat_lng_for_pixel(map, point, &result.coordinate, wrap_mode);
+    [point, wrap_mode](MapObject& live, GeometryOperationResult& result) {
+      return map_lat_lng_for_pixel(live, point, &result.coordinate, wrap_mode);
     },
     completion
   );
@@ -4257,10 +4194,11 @@ auto map_pixels_for_lat_lngs_start(
   }
   return start_geometry_operation(
     map, GeometryOperationKind::PixelsForCoordinates,
-    [map, copied = std::move(copied)](GeometryOperationResult& result) {
+    [copied =
+       std::move(copied)](MapObject& live, GeometryOperationResult& result) {
       result.points.resize(copied.size());
       return map_pixels_for_lat_lngs(
-        map, copied.data(), copied.size(), result.points.data()
+        live, copied.data(), copied.size(), result.points.data()
       );
     },
     completion
@@ -4282,11 +4220,11 @@ auto start_coordinates_for_pixels(
     unwrapped ? mln::LatLng::Unwrapped : mln::LatLng::Wrapped;
   return start_geometry_operation(
     map, GeometryOperationKind::CoordinatesForPixels,
-    [map, copied = std::move(copied),
-     wrap_mode](GeometryOperationResult& result) {
+    [copied = std::move(copied),
+     wrap_mode](MapObject& live, GeometryOperationResult& result) {
       result.coordinates.resize(copied.size());
       return map_lat_lngs_for_pixels(
-        map, copied.data(), copied.size(), result.coordinates.data(), wrap_mode
+        live, copied.data(), copied.size(), result.coordinates.data(), wrap_mode
       );
     },
     completion
@@ -4316,15 +4254,10 @@ auto map_projection_create_start(mln_map map, const mln_completion* completion)
   const auto completion_status = validate_completion(completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
 
-  auto& table = handle_table<MapObject>();
-  const std::scoped_lock lock(table.mutex());
-  auto parent = table.lease_locked(map);
-  if (parent == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto runtime = lease_runtime(parent->runtime);
-  if (runtime == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
+  auto context = MapSubmissionContext{};
+  const auto acquire_status = acquire_map_submission(map, context);
+  if (acquire_status != MLN_STATUS_OK) {
+    return acquire_status;
   }
   auto completion_state = std::make_shared<Completion>(*completion);
   auto state = std::make_shared<OperationObject>([completion_state](
@@ -4349,8 +4282,12 @@ auto map_projection_create_start(mln_map map, const mln_completion* completion)
     const auto handle = handle_table<MapProjectionObject>().insert(*projection);
     complete_value(completion_state, MLN_STATUS_OK, {}, handle);
   });
-  const auto submit_status =
-    submit_runtime_operation(runtime, state, [parent, state]() mutable -> void {
+  const auto submit_status = submit_runtime_operation(
+    context.runtime, state,
+    [parent = std::move(context.map), control = std::move(context.control),
+     state]() mutable -> void {
+      // The control lease is captured so map teardown waits for this work.
+      static_cast<void>(control);
       try {
         auto projection = std::make_shared<MapProjectionObject>();
         projection->projection =
@@ -4362,7 +4299,8 @@ auto map_projection_create_start(mln_map map, const mln_completion* completion)
           {}
         );
       }
-    });
+    }
+  );
   if (submit_status == MLN_STATUS_OK)
     completion_state->accept();
   else
@@ -4581,14 +4519,9 @@ auto validate_camera_output(mln_camera_options* out_camera) -> mln_status {
 }
 
 auto map_camera_for_lat_lng_bounds(
-  mln_map map, mln_lat_lng_bounds bounds,
+  MapObject& live, mln_lat_lng_bounds bounds,
   const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto bounds_status = validate_lat_lng_bounds(bounds);
   if (bounds_status != MLN_STATUS_OK) {
     return bounds_status;
@@ -4602,7 +4535,7 @@ auto map_camera_for_lat_lng_bounds(
     return output_status;
   }
 
-  *out_camera = from_native_camera(live->map->cameraForLatLngBounds(
+  *out_camera = from_native_camera(live.map->cameraForLatLngBounds(
     to_native_lat_lng_bounds(bounds), camera_fit_padding(fit_options),
     camera_fit_bearing(fit_options), camera_fit_pitch(fit_options)
   ));
@@ -4610,14 +4543,9 @@ auto map_camera_for_lat_lng_bounds(
 }
 
 auto map_camera_for_lat_lngs(
-  mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
+  MapObject& live, const mln_lat_lng* coordinates, size_t coordinate_count,
   const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto coordinates_status =
     validate_lat_lng_array(coordinates, coordinate_count, false);
   if (coordinates_status != MLN_STATUS_OK) {
@@ -4632,7 +4560,7 @@ auto map_camera_for_lat_lngs(
     return output_status;
   }
 
-  *out_camera = from_native_camera(live->map->cameraForLatLngs(
+  *out_camera = from_native_camera(live.map->cameraForLatLngs(
     to_native_lat_lngs(coordinates, coordinate_count),
     camera_fit_padding(fit_options), camera_fit_bearing(fit_options),
     camera_fit_pitch(fit_options)
@@ -4641,14 +4569,9 @@ auto map_camera_for_lat_lngs(
 }
 
 auto map_camera_for_geometry(
-  mln_map map, mln_buffer_view geometry,
+  MapObject& live, mln_buffer_view geometry,
   const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   auto native_geometry = to_native_geometry(geometry);
   if (!native_geometry) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -4666,7 +4589,7 @@ auto map_camera_for_geometry(
     return output_status;
   }
 
-  *out_camera = from_native_camera(live->map->cameraForGeometry(
+  *out_camera = from_native_camera(live.map->cameraForGeometry(
     *native_geometry, camera_fit_padding(fit_options),
     camera_fit_bearing(fit_options), camera_fit_pitch(fit_options)
   ));
@@ -4674,13 +4597,9 @@ auto map_camera_for_geometry(
 }
 
 auto map_lat_lng_bounds_for_camera(
-  mln_map map, const mln_camera_options* camera, mln_lat_lng_bounds* out_bounds
+  MapObject& live, const mln_camera_options* camera,
+  mln_lat_lng_bounds* out_bounds
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto camera_status = validate_camera_options(camera);
   if (camera_status != MLN_STATUS_OK) {
     return camera_status;
@@ -4691,19 +4610,15 @@ auto map_lat_lng_bounds_for_camera(
   }
 
   *out_bounds = from_native_lat_lng_bounds(
-    live->map->latLngBoundsForCamera(to_native_camera(*camera))
+    live.map->latLngBoundsForCamera(to_native_camera(*camera))
   );
   return MLN_STATUS_OK;
 }
 
 auto map_lat_lng_bounds_for_camera_unwrapped(
-  mln_map map, const mln_camera_options* camera, mln_lat_lng_bounds* out_bounds
+  MapObject& live, const mln_camera_options* camera,
+  mln_lat_lng_bounds* out_bounds
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto camera_status = validate_camera_options(camera);
   if (camera_status != MLN_STATUS_OK) {
     return camera_status;
@@ -4714,7 +4629,7 @@ auto map_lat_lng_bounds_for_camera_unwrapped(
   }
 
   *out_bounds = from_native_lat_lng_bounds(
-    live->map->latLngBoundsForCameraUnwrapped(to_native_camera(*camera))
+    live.map->latLngBoundsForCameraUnwrapped(to_native_camera(*camera))
   );
   return MLN_STATUS_OK;
 }
@@ -4734,10 +4649,10 @@ auto map_camera_for_lat_lng_bounds_start(
   const auto has_fit = fit_options != nullptr;
   return start_geometry_operation(
     map, GeometryOperationKind::CameraForBounds,
-    [map, bounds, fit, has_fit](GeometryOperationResult& result) {
+    [bounds, fit, has_fit](MapObject& live, GeometryOperationResult& result) {
       result.camera = camera_options_default();
       return map_camera_for_lat_lng_bounds(
-        map, bounds, has_fit ? &fit : nullptr, &result.camera
+        live, bounds, has_fit ? &fit : nullptr, &result.camera
       );
     },
     completion
@@ -4762,11 +4677,11 @@ auto map_camera_for_lat_lngs_start(
   const auto has_fit = fit_options != nullptr;
   return start_geometry_operation(
     map, GeometryOperationKind::CameraForCoordinates,
-    [map, copied = std::move(copied), fit,
-     has_fit](GeometryOperationResult& result) {
+    [copied = std::move(copied), fit,
+     has_fit](MapObject& live, GeometryOperationResult& result) {
       result.camera = camera_options_default();
       return map_camera_for_lat_lngs(
-        map, copied.data(), copied.size(), has_fit ? &fit : nullptr,
+        live, copied.data(), copied.size(), has_fit ? &fit : nullptr,
         &result.camera
       );
     },
@@ -4796,13 +4711,13 @@ auto map_camera_for_geometry_start(
   const auto has_fit = fit_options != nullptr;
   return start_geometry_operation(
     map, GeometryOperationKind::CameraForGeometry,
-    [map, bytes = std::move(bytes), fit,
-     has_fit](GeometryOperationResult& result) -> mln_status {
+    [bytes = std::move(bytes), fit,
+     has_fit](MapObject& live, GeometryOperationResult& result) -> mln_status {
       result.camera = camera_options_default();
       const auto view =
         mln_buffer_view{.data = bytes.data(), .size = bytes.size()};
       return map_camera_for_geometry(
-        map, view, has_fit ? &fit : nullptr, &result.camera
+        live, view, has_fit ? &fit : nullptr, &result.camera
       );
     },
     completion
@@ -4821,12 +4736,12 @@ auto start_bounds_for_camera(
                               : GeometryOperationKind::BoundsForCamera;
   return start_geometry_operation(
     map, kind,
-    [map, copied, unwrapped](GeometryOperationResult& result) {
+    [copied, unwrapped](MapObject& live, GeometryOperationResult& result) {
       return unwrapped
                ? map_lat_lng_bounds_for_camera_unwrapped(
-                   map, &copied, &result.bounds
+                   live, &copied, &result.bounds
                  )
-               : map_lat_lng_bounds_for_camera(map, &copied, &result.bounds);
+               : map_lat_lng_bounds_for_camera(live, &copied, &result.bounds);
     },
     completion
   );
@@ -4846,13 +4761,8 @@ auto map_lat_lng_bounds_for_camera_unwrapped_start(
   return start_bounds_for_camera(map, camera, true, completion);
 }
 
-auto map_set_bounds(mln_map map, const mln_bound_options* options)
+auto map_set_bounds(MapObject& live, const mln_bound_options* options)
   -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto options_status = validate_bound_options(options);
   if (options_status != MLN_STATUS_OK) {
     return options_status;
@@ -4860,24 +4770,19 @@ auto map_set_bounds(mln_map map, const mln_bound_options* options)
 
   // Native setBounds only applies optionals that are set, so this preserves
   // constraints omitted from options->fields.
-  live->map->setBounds(to_native_bound_options(*options));
+  live.map->setBounds(to_native_bound_options(*options));
   return MLN_STATUS_OK;
 }
 
 auto map_set_free_camera_options(
-  mln_map map, const mln_free_camera_options* options
+  MapObject& live, const mln_free_camera_options* options
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto options_status = validate_free_camera_options(options);
   if (options_status != MLN_STATUS_OK) {
     return options_status;
   }
 
-  live->map->setFreeCameraOptions(to_native_free_camera(*options));
+  live.map->setFreeCameraOptions(to_native_free_camera(*options));
   return MLN_STATUS_OK;
 }
 
@@ -4917,13 +4822,8 @@ auto map_set_projection_mode(
   }
   return submit_map_command(
     map,
-    [map, copied = std::move(copied)]() mutable -> mln_status {
-      MapObject* live = nullptr;
-      const auto status = validate_map(map, live);
-      if (status != MLN_STATUS_OK) {
-        return status;
-      }
-      live->map->setProjectionMode(std::move(copied));
+    [copied = std::move(copied)](MapObject& live) mutable -> mln_status {
+      live.map->setProjectionMode(std::move(copied));
       return MLN_STATUS_OK;
     },
     completion

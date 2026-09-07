@@ -13,11 +13,7 @@
 #include "test_support.h"
 #include "unity.h"
 
-static const char background_style_json[] =
-  "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background\",\"type\":"
-  "\"background\",\"paint\":{\"background-color\":\"#102030\"}}]}";
 static const uint64_t unknown_mask_bit = UINT64_C(1) << 63U;
-static const size_t style_barrier_attempts = 200;
 
 // The record layout every binding probes. A host reads a batch as two byte
 // ranges at these offsets, so a change here is an ABI break.
@@ -154,18 +150,6 @@ static const mln_runtime_event* batch_event(
                                     (index * batch->event_size));
 }
 
-// Loads an inline style and waits until its events are queued, so a test that
-// needs a populated queue does not depend on the network.
-static void load_style_and_wait(mln_runtime runtime, mln_map map) {
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL(background_style_json))
-  );
-  for (size_t attempt = 0; attempt < style_barrier_attempts; attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  }
-}
-
 static mln_map_options map_options_with_event_mask(uint64_t mask) {
   mln_map_options options = mln_map_options_default();
   options.event_mask = mask;
@@ -200,7 +184,6 @@ typedef struct foreign_thread_probe {
   mln_status drain_status;
   mln_status runtime_mask_status;
   mln_status map_mask_status;
-  atomic_bool finished;
 } foreign_thread_probe;
 
 static void call_event_api_from_a_foreign_thread(void* argument) {
@@ -212,7 +195,6 @@ static void call_event_api_from_a_foreign_thread(void* argument) {
     mln_runtime_set_event_mask(probe->runtime, MLN_RUNTIME_EVENT_MASK_ALL);
   probe->map_mask_status =
     mln_test_map_set_event_mask(probe->map, MLN_RUNTIME_EVENT_MASK_ALL);
-  atomic_store(&probe->finished, true);
 }
 
 static void event_drain_and_mask_changes_are_any_thread(void) {
@@ -220,7 +202,6 @@ static void event_drain_and_mask_changes_are_any_thread(void) {
   mln_map map = mln_test_create_map(runtime);
 
   foreign_thread_probe probe = {.runtime = runtime, .map = map};
-  atomic_init(&probe.finished, false);
   mln_test_thread* thread =
     mln_test_thread_start(call_event_api_from_a_foreign_thread, &probe);
   mln_test_thread_join(thread);
@@ -284,7 +265,11 @@ static void both_mask_setters_reject_unknown_bits_and_keep_foreign_ones(void) {
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_get_event_mask(runtime, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_test_map_get_event_mask(map, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_snapshot_get(map, NULL)
+  );
+  mln_map_snapshot undersized = {.size = sizeof(mln_map_snapshot) - 1};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_snapshot_get(map, &undersized)
   );
 
   mln_test_destroy_map(map);
@@ -306,7 +291,7 @@ static void a_fresh_map_and_runtime_select_every_event_type(void) {
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, map_mask);
 
-  load_style_and_wait(runtime, map);
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
   TEST_ASSERT_GREATER_THAN_size_t(
     0, mln_test_drain_counting(runtime, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
   );
@@ -321,7 +306,7 @@ static void runtime_options_reject_unknown_flags(void) {
   mln_runtime bad_runtime = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_test_runtime_create(&runtime_options, &bad_runtime)
+    mln_runtime_create(&runtime_options, &bad_runtime)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, bad_runtime);
 }
@@ -336,7 +321,7 @@ static void options_reject_unknown_event_mask_bits(void) {
   mln_runtime bad_runtime = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_test_runtime_create(&runtime_options, &bad_runtime)
+    mln_runtime_create(&runtime_options, &bad_runtime)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, bad_runtime);
 
@@ -377,7 +362,7 @@ static void a_creation_mask_applies_during_construction(void) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_drain_events(runtime, &batch));
   TEST_ASSERT_EQUAL_size_t(0, batch.event_count);
 
-  load_style_and_wait(runtime, map);
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
   TEST_ASSERT_EQUAL_size_t(
     0, mln_test_drain_counting(
          runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
@@ -402,7 +387,7 @@ static void clearing_one_type_leaves_the_others_arriving(void) {
   );
   mln_test_drain_all(runtime);
 
-  load_style_and_wait(runtime, map);
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
   TEST_ASSERT_EQUAL_size_t(
     0, mln_test_drain_counting(
          runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
@@ -449,7 +434,7 @@ static void a_suppressed_producer_leaves_the_queue_empty(void) {
 static void an_owned_batch_remains_stable_across_later_drains(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  load_style_and_wait(runtime, map);
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
 
   mln_event_batch first = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
@@ -489,7 +474,7 @@ static void an_owned_batch_remains_stable_across_later_drains(void) {
 static void queued_events_outlive_the_map_that_produced_them(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  load_style_and_wait(runtime, map);
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
   mln_test_destroy_map(map);
 
   mln_event_batch batch = MLN_HANDLE_NULL;
@@ -570,6 +555,124 @@ static void one_batch_reports_events_in_queue_order(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// A drained batch is an owned handle: releasing it twice is a no-op, releasing
+// the null handle is a no-op, and a released handle names no batch.
+static void a_released_event_batch_names_no_batch(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+
+  mln_event_batch batch = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_drain_events(runtime, &batch)
+  );
+  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
+  mln_event_batch_release(batch);
+  mln_event_batch_release(batch);
+  mln_event_batch_release(MLN_HANDLE_NULL);
+
+  mln_runtime_event_batch_view view = {
+    .size = sizeof(mln_runtime_event_batch_view), .event_count = 99
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_event_batch_get(batch, &view)
+  );
+  TEST_ASSERT_EQUAL_size_t(99, view.event_count);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_event_batch_get(MLN_HANDLE_NULL, &view)
+  );
+  TEST_ASSERT_EQUAL_size_t(99, view.event_count);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// Counts the transition-finished events in one drain and reports the last
+// transition ID it saw.
+static size_t drain_counting_transitions(
+  mln_runtime runtime, uint64_t* out_last_transition_id
+) {
+  size_t found = 0;
+  mln_test_event_batch batch = mln_test_event_batch_default();
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_drain_events(runtime, &batch));
+  for (size_t index = 0; index < batch.event_count; index += 1) {
+    const mln_runtime_event* event = batch_event(&batch, index);
+    if (event->type != MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED) {
+      continue;
+    }
+    found += 1;
+    if (out_last_transition_id != NULL) {
+      *out_last_transition_id =
+        event->payload.camera_transition_finished.transition_id;
+    }
+  }
+  return found;
+}
+
+static void submit_camera_update(
+  mln_map map, uint32_t mode, double zoom, uint64_t transition_id
+) {
+  mln_camera_options camera = mln_camera_options_default();
+  camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  camera.zoom = zoom;
+  mln_animation_options animation = mln_animation_options_default();
+  // Long enough that the transition is still running when the next command
+  // ends it, so every outcome below is the one the test named.
+  animation.fields = MLN_ANIMATION_OPTION_DURATION;
+  animation.duration_ms = 60000;
+  if (transition_id != 0) {
+    animation.fields |= MLN_ANIMATION_OPTION_TRANSITION_ID;
+    animation.transition_id = transition_id;
+  }
+  mln_camera_update update = mln_camera_update_default();
+  update.mode = mode;
+  update.camera = camera;
+  update.animation = animation;
+  mln_test_completion completion = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_update_camera(map, &update, &completion.descriptor)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  mln_test_completion_destroy(&completion);
+}
+
+// A transition ends exactly once, whichever way it ends: replaced by a later
+// transition, cancelled by a jump, or never reported because the caller
+// omitted an ID.
+static void a_transition_reports_one_terminal_outcome(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_drain_all(runtime);
+
+  submit_camera_update(map, MLN_CAMERA_UPDATE_MODE_EASE, 4.0, 11);
+  TEST_ASSERT_EQUAL_size_t(0, drain_counting_transitions(runtime, NULL));
+
+  // The second ease replaces the first, which ends the first and reports its
+  // own ID rather than the superseding one.
+  submit_camera_update(map, MLN_CAMERA_UPDATE_MODE_EASE, 6.0, 12);
+  uint64_t transition_id = 0;
+  TEST_ASSERT_EQUAL_size_t(
+    1, drain_counting_transitions(runtime, &transition_id)
+  );
+  TEST_ASSERT_EQUAL_UINT64(11, transition_id);
+
+  // A jump cancels the running transition, which reports the cancelled ID.
+  submit_camera_update(map, MLN_CAMERA_UPDATE_MODE_JUMP, 8.0, 0);
+  transition_id = 0;
+  TEST_ASSERT_EQUAL_size_t(
+    1, drain_counting_transitions(runtime, &transition_id)
+  );
+  TEST_ASSERT_EQUAL_UINT64(12, transition_id);
+
+  // An ease with no transition ID is silent, and so is the jump that ends it.
+  submit_camera_update(map, MLN_CAMERA_UPDATE_MODE_EASE, 10.0, 0);
+  submit_camera_update(map, MLN_CAMERA_UPDATE_MODE_JUMP, 12.0, 0);
+  TEST_ASSERT_EQUAL_size_t(0, drain_counting_transitions(runtime, NULL));
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // Two text-bearing events in one batch point at distinct arena ranges, and each
 // range holds that event's own bytes.
 static void the_message_arena_carries_one_range_per_event(void) {
@@ -640,5 +743,7 @@ void run_runtime_events_abi_tests(void) {
   RUN_TEST(an_owned_batch_remains_stable_across_later_drains);
   RUN_TEST(queued_events_outlive_the_map_that_produced_them);
   RUN_TEST(one_batch_reports_events_in_queue_order);
+  RUN_TEST(a_transition_reports_one_terminal_outcome);
+  RUN_TEST(a_released_event_batch_names_no_batch);
   RUN_TEST(the_message_arena_carries_one_range_per_event);
 }

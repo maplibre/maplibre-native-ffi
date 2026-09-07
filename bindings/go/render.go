@@ -8,7 +8,6 @@ import "C"
 
 import (
 	"math"
-	"sync"
 	"unsafe"
 
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
@@ -109,8 +108,12 @@ type VulkanHandle uint64
 
 // RenderTargetExtent is a logical render target extent in UI pixels.
 type RenderTargetExtent struct {
-	Width       uint32
-	Height      uint32
+	// Width is the logical width in UI pixels.
+	Width uint32
+	// Height is the logical height in UI pixels.
+	Height uint32
+	// ScaleFactor is the UI-to-device pixel scale. It is fixed when a session
+	// attaches, so RenderSessionHandle.Resize passes the attaching value.
 	ScaleFactor float64
 }
 
@@ -389,38 +392,80 @@ const (
 	RenderSessionAbandoned  RenderSessionState = RenderSessionState(C.MLN_RENDER_SESSION_STATE_ABANDONED)
 )
 
-// RenderSessionSnapshot is an immutable any-goroutine session snapshot.
+// RenderSessionSnapshot is a copy of one session's published state.
 type RenderSessionSnapshot struct {
-	State                                  RenderSessionState
-	RawState                               uint32
-	Driver                                 RenderDriver
-	LatestResult                           RenderResult
-	Extent                                 RenderTargetExtent
-	Generation, MapUpdateGeneration        uint64
-	RenderedUpdateGeneration               uint64
-	ExtentGeneration, FrameGeneration      uint64
-	LatestDemandToken                      uint64
-	PendingDemandCount, AcquiredFrameCount uint32
-	TargetReady, PendingChanges            bool
+	// State is the session lifecycle state this binding version names.
+	State RenderSessionState
+	// RawState is the same value as the C API reported it, so a host can read a
+	// state this binding version does not name.
+	RawState uint32
+	// Driver is the driver kind that services this session's graphics work.
+	Driver RenderDriver
+	// LatestResult is the outcome of the most recent frame.
+	LatestResult RenderResult
+	// Extent is the render target extent the session renders at.
+	Extent RenderTargetExtent
+	// Generation counts published session snapshots.
+	Generation uint64
+	// MapUpdateGeneration is the map generation of the latest render update the
+	// session took.
+	MapUpdateGeneration uint64
+	// RenderedUpdateGeneration is the map generation of the latest update the
+	// session rendered.
+	RenderedUpdateGeneration uint64
+	// ExtentGeneration counts applied extent changes.
+	ExtentGeneration uint64
+	// FrameGeneration counts rendered frames.
+	FrameGeneration uint64
+	// LatestDemandToken is the Token of the most recent accepted demand.
+	LatestDemandToken uint64
+	// PendingDemandCount is how many accepted demands have no terminal result
+	// yet.
+	PendingDemandCount uint32
+	// AcquiredFrameCount is how many texture ring slots are leased.
+	AcquiredFrameCount uint32
+	// TargetReady reports whether the driver owns a usable target.
+	TargetReady bool
+	// PendingChanges reports whether the map or the target changed since the
+	// last rendered frame.
+	PendingChanges bool
 }
 
 // FrameDemandFlag controls one nonblocking frame demand.
 type FrameDemandFlag uint32
 
 const (
+	// FrameDemandIfNeeded renders only when the map or the target changed since
+	// the last frame. A demand without it renders unconditionally.
 	FrameDemandIfNeeded FrameDemandFlag = FrameDemandFlag(C.MLN_FRAME_DEMAND_IF_NEEDED)
-	FrameDemandPresent  FrameDemandFlag = FrameDemandFlag(C.MLN_FRAME_DEMAND_PRESENT)
+	// FrameDemandPresent presents the rendered frame. A demand without it still
+	// renders, and a presenting target keeps whatever it presented last.
+	FrameDemandPresent FrameDemandFlag = FrameDemandFlag(C.MLN_FRAME_DEMAND_PRESENT)
 )
 
-// FrameDemand is copied by RequestFrame.
+// FrameDemand is one nonblocking frame request, copied by RequestFrame.
 type FrameDemand struct {
-	Flags                     FrameDemandFlag
-	Token, CoalescingBoundary uint64
-	TimeoutNS                 uint64
+	// Flags selects the demand's rendering and presentation policy.
+	Flags FrameDemandFlag
+	// Token is the host-chosen identity this demand's terminal result carries.
+	Token uint64
+	// CoalescingBoundary separates demands that must not coalesce: native
+	// coalesces only demands that carry the same boundary.
+	CoalescingBoundary uint64
+	// TimeoutNS bounds how long native waits for the target, 0 for no bound.
+	TimeoutNS uint64
 }
 
+// NewFrameDemand returns the native frame demand defaults: render if needed,
+// nonpresenting, with no token, coalescing boundary, or timeout.
 func NewFrameDemand() FrameDemand {
-	return FrameDemand{Flags: FrameDemandIfNeeded}
+	raw := C.mln_frame_demand_default()
+	return FrameDemand{
+		Flags:              FrameDemandFlag(raw.flags),
+		Token:              uint64(raw.token),
+		CoalescingBoundary: uint64(raw.coalescing_boundary),
+		TimeoutNS:          uint64(raw.timeout_ns),
+	}
 }
 
 func (d FrameDemand) toC() C.mln_frame_demand {
@@ -495,13 +540,13 @@ type GPUSync struct {
 // any goroutine; only ServiceDriverWork and OpenGL frame access require the
 // caller graphics thread.
 type RenderSessionHandle struct {
-	closeMu sync.Mutex
-	state   *handle.State[nativeRenderSession]
-	parent  *MapHandle
+	state *handle.State[nativeRenderSession]
 }
 
-var destroyRenderSessionHandle = func(native nativeRenderSession) int32 {
-	return int32(C.mln_render_session_destroy(C.mln_render_session(native)))
+func destroyRenderSessionHandle(native nativeRenderSession) error {
+	return checkNative(func() int32 {
+		return int32(C.mln_render_session_destroy(C.mln_render_session(native)))
+	})
 }
 
 // RenderAbandonDisposition reports whether graphics resources were quarantined.
@@ -518,18 +563,9 @@ type RenderAbandonResult struct {
 	QuarantinedResourceCount uint32
 }
 
-// RenderFrameBatch owns drained immutable frame-result records.
-type RenderFrameBatch struct {
-	mu     sync.Mutex
-	handle uint64
-	closed bool
-}
-
 // AcquiredFrame leases one owned-texture ring slot. Release consumes the lease.
 type AcquiredFrame struct {
-	mu     sync.Mutex
-	handle uint64
-	closed bool
+	state *handle.State[nativeAcquiredFrame]
 }
 
 // WebGPUOwnedTextureFrameInfo contains backend-native WebGPU frame metadata.
@@ -773,12 +809,4 @@ func (context OpenGLContextDescriptor) toC() C.mln_opengl_context_descriptor {
 		return raw
 	}
 	return raw
-}
-
-func newRenderSessionHandle(parent *MapHandle, session nativeRenderSession) (*RenderSessionHandle, error) {
-	state, err := handle.New(session, "RenderSessionHandle")
-	if err != nil {
-		return nil, newBindingError(ErrInvalidArgument, err.Error())
-	}
-	return &RenderSessionHandle{state: state, parent: parent}, nil
 }

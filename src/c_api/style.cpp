@@ -43,13 +43,17 @@ struct OwnedGeoJSONOptions {
   mln_geojson_source_options value{};
   OwnedView cluster_properties;
 
-  explicit OwnedGeoJSONOptions(const mln_geojson_source_options* options)
+  explicit OwnedGeoJSONOptions(const mln_geojson_source_options* source)
       : value(
-          options == nullptr ? mln::core::geojson_source_options_default()
-                             : *options
+          source == nullptr ? mln::core::geojson_source_options_default()
+                            : *source
         ),
-        cluster_properties(value.cluster_properties) {
-    value.cluster_properties = cluster_properties.view();
+        cluster_properties(value.cluster_properties) {}
+
+  [[nodiscard]] auto options() const -> mln_geojson_source_options {
+    auto copied = value;
+    copied.cluster_properties = cluster_properties.view();
+    return copied;
   }
 };
 
@@ -57,13 +61,17 @@ struct OwnedTileOptions {
   mln_style_tile_source_options value{};
   OwnedView attribution;
 
-  explicit OwnedTileOptions(const mln_style_tile_source_options* options)
+  explicit OwnedTileOptions(const mln_style_tile_source_options* source)
       : value(
-          options == nullptr ? mln::core::style_tile_source_options_default()
-                             : *options
+          source == nullptr ? mln::core::style_tile_source_options_default()
+                            : *source
         ),
-        attribution(value.attribution) {
-    value.attribution = attribution.view();
+        attribution(value.attribution) {}
+
+  [[nodiscard]] auto options() const -> mln_style_tile_source_options {
+    auto copied = value;
+    copied.attribution = attribution.view();
+    return copied;
   }
 };
 
@@ -120,7 +128,6 @@ struct OwnedCallbackSourceOptions {
     pending,
     accepted,
     adopted,
-    rejected,
   };
 
   Options value{};
@@ -142,10 +149,6 @@ struct OwnedCallbackSourceOptions {
   }
 };
 
-using OwnedCustomGeometryOptions =
-  OwnedCallbackSourceOptions<mln_custom_geometry_source_options>;
-using OwnedCustomMvtVectorOptions =
-  OwnedCallbackSourceOptions<mln_custom_mvt_vector_source_options>;
 auto valid_view(mln_buffer_view view, const char* name) -> bool {
   if (view.data == nullptr && view.size != 0) {
     mln::core::set_thread_error(name);
@@ -165,47 +168,54 @@ auto take_buffer(mln_buffer buffer, std::string& out) -> mln_status {
   return status;
 }
 
-auto take_id_list(mln_style_id_list list, std::vector<std::string>& out)
-  -> mln_status {
-  size_t count = 0;
-  auto status = mln::core::style_id_list_count(list, &count);
-  if (status == MLN_STATUS_OK) {
-    out.reserve(count);
-    for (size_t index = 0; index < count; ++index) {
-      mln_buffer_view view{};
-      status = mln::core::style_id_list_get(list, index, &view);
-      if (status != MLN_STATUS_OK) break;
-      const auto* bytes = static_cast<const char*>(view.data);
-      out.emplace_back(bytes == nullptr ? "" : bytes, view.size);
-    }
-  }
-  mln::core::style_id_list_destroy(list);
-  return status;
-}
-
-auto take_string_list(mln_style_string_list list, std::vector<std::string>& out)
-  -> mln_status {
-  size_t count = 0;
-  auto status = mln::core::style_string_list_count(list, &count);
-  if (status == MLN_STATUS_OK) {
-    out.reserve(count);
-    for (size_t index = 0; index < count; ++index) {
-      mln_buffer_view view{};
-      status = mln::core::style_string_list_get(list, index, &view);
-      if (status != MLN_STATUS_OK) break;
-      const auto* bytes = static_cast<const char*>(view.data);
-      out.emplace_back(bytes == nullptr ? "" : bytes, view.size);
-    }
-  }
-  mln::core::style_string_list_destroy(list);
-  return status;
-}
-
 auto command(
-  mln_map map, std::function<mln_status()> work,
+  mln_map map, std::function<mln_status(mln::core::MapObject&)> work,
   const mln_completion* completion
 ) -> mln_status {
   return mln::core::submit_map_command(map, std::move(work), completion);
+}
+
+// Adds one callback-backed source. An accepted command hands user_data to the
+// shared state, which releases it once the last reference drops unless the core
+// call adopted the callbacks into the style. A rejected submission never
+// referenced user_data, so the caller keeps it.
+template <typename Options>
+auto add_callback_source(
+  mln_map map, mln_buffer_view source_id, const Options* options,
+  mln_status (*validate)(const Options*),
+  mln_status (*add)(mln::core::MapObject&, mln_buffer_view, const Options*),
+  const mln_completion* completion
+) -> mln_status {
+  using Owned = OwnedCallbackSourceOptions<Options>;
+  if (
+    !valid_view(source_id, "source_id is invalid") ||
+    validate(options) != MLN_STATUS_OK
+  ) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto id = OwnedView{source_id};
+  auto owned = std::make_shared<Owned>(*options);
+  const auto status = command(
+    map,
+    [id = std::move(id), owned, add](mln::core::MapObject& live) -> mln_status {
+      const auto add_status = add(live, id.view(), &owned->value);
+      if (add_status == MLN_STATUS_OK) {
+        owned->ownership.store(
+          Owned::Ownership::adopted, std::memory_order_release
+        );
+      }
+      return add_status;
+    },
+    completion
+  );
+  if (status == MLN_STATUS_OK) {
+    // The command body may already have run and adopted the callbacks.
+    auto expected = Owned::Ownership::pending;
+    static_cast<void>(owned->ownership.compare_exchange_strong(
+      expected, Owned::Ownership::accepted, std::memory_order_acq_rel
+    ));
+  }
+  return status;
 }
 
 auto operation(
@@ -217,8 +227,8 @@ auto operation(
   );
 }
 
-using TextCopy =
-  std::function<mln_status(mln_map, mln_buffer_view, char*, size_t, size_t*)>;
+using TextCopy = std::function<
+  mln_status(mln::core::MapObject&, mln_buffer_view, std::string&)>;
 
 auto start_text_copy(
   mln_map map, mln_buffer_view id, mln::core::StyleOperationKind kind,
@@ -230,19 +240,9 @@ auto start_text_copy(
   auto owned = OwnedView{id};
   return operation(
     map, kind,
-    [map, owned = std::move(owned),
-     copy =
-       std::move(copy)](mln::core::StyleOperationResult& result) -> mln_status {
-      size_t size = 0;
-      auto status = copy(map, owned.view(), nullptr, 0, &size);
-      if (status != MLN_STATUS_OK) {
-        return status;
-      }
-      auto bytes = std::string(size, '\0');
-      status = copy(map, owned.view(), bytes.data(), bytes.size(), &size);
-      if (status == MLN_STATUS_OK) result.bytes = std::move(bytes);
-      return status;
-    },
+    [owned = std::move(owned), copy = std::move(copy)](
+      mln::core::MapObject& live, mln::core::StyleOperationResult& result
+    ) -> mln_status { return copy(live, owned.view(), result.bytes); },
     completion
   );
 }
@@ -296,8 +296,8 @@ auto mln_map_set_style_url(
     auto owned = std::string{url};
     return command(
       map,
-      [map, owned = std::move(owned)]() -> mln_status {
-        return mln::core::map_set_style_url(map, owned.c_str());
+      [owned = std::move(owned)](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_set_style_url(live, owned.c_str());
       },
       completion
     );
@@ -314,8 +314,8 @@ auto mln_map_set_style_json(
     auto owned = OwnedView{json};
     return command(
       map,
-      [map, owned = std::move(owned)]() -> mln_status {
-        return mln::core::map_set_style_json(map, owned.view());
+      [owned = std::move(owned)](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_set_style_json(live, owned.view());
       },
       completion
     );
@@ -337,46 +337,6 @@ auto mln_map_style_url(mln_map map, const mln_completion* completion) noexcept
   });
 }
 
-auto mln_style_id_list_count(mln_style_id_list list, size_t* out_count) noexcept
-  -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::style_id_list_count(list, out_count);
-  });
-}
-
-auto mln_style_id_list_get(
-  mln_style_id_list list, size_t index, mln_buffer_view* out_id
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::style_id_list_get(list, index, out_id);
-  });
-}
-
-auto mln_style_id_list_destroy(mln_style_id_list list) noexcept -> void {
-  mln::core::style_id_list_destroy(list);
-}
-
-auto mln_style_string_list_count(
-  mln_style_string_list list, size_t* out_count
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::style_string_list_count(list, out_count);
-  });
-}
-
-auto mln_style_string_list_get(
-  mln_style_string_list list, size_t index, mln_buffer_view* out_value
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::style_string_list_get(list, index, out_value);
-  });
-}
-
-auto mln_style_string_list_destroy(mln_style_string_list list) noexcept
-  -> void {
-  mln::core::style_string_list_destroy(list);
-}
-
 auto mln_map_add_style_source_json(
   mln_map map, mln_buffer_view source_id, mln_buffer_view source_json,
   const mln_completion* completion
@@ -392,9 +352,10 @@ auto mln_map_add_style_source_json(
     auto json = OwnedView{source_json};
     return command(
       map,
-      [map, id = std::move(id), json = std::move(json)]() -> mln_status {
+      [id = std::move(id),
+       json = std::move(json)](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_add_style_source_json(
-          map, id.view(), json.view()
+          live, id.view(), json.view()
         );
       },
       completion
@@ -412,8 +373,8 @@ auto mln_map_remove_style_source(
     auto id = OwnedView{source_id};
     return command(
       map,
-      [map, id = std::move(id)]() -> mln_status {
-        return mln::core::map_remove_style_source(map, id.view());
+      [id = std::move(id)](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_remove_style_source(live, id.view());
       },
       completion
     );
@@ -430,39 +391,27 @@ auto mln_map_get_style_source_info(
     auto id = OwnedView{source_id};
     return operation(
       map, mln::core::StyleOperationKind::SourceInfo,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
+      [id = std::move(id)](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
         result.source_info = {};
         result.source_info.size = sizeof(mln_style_source_info);
         auto status = mln::core::map_get_style_source_info(
-          map, id.view(), &result.source_info, &result.found
+          live, id.view(), &result.source_info, &result.found
         );
         if (status != MLN_STATUS_OK || !result.found) return status;
-        auto copy_text = [&](auto copy, std::string& destination) {
-          size_t size = 0;
-          bool found = false;
-          auto copy_status = copy(map, id.view(), nullptr, 0, &size, &found);
-          if (copy_status != MLN_STATUS_OK || !found) return copy_status;
-          destination.resize(size);
-          return copy(
-            map, id.view(), destination.data(), destination.size(), &size,
-            &found
-          );
-        };
-        status = copy_text(
-          mln::core::map_copy_style_source_attribution, result.attribution
+        auto found = false;
+        status = mln::core::map_copy_style_source_attribution(
+          live, id.view(), result.attribution, &found
         );
         if (status != MLN_STATUS_OK) return status;
-        status = copy_text(mln::core::map_copy_style_source_url, result.url);
-        if (status != MLN_STATUS_OK) return status;
-        auto list = mln_style_string_list{MLN_HANDLE_NULL};
-        bool found = false;
-        status = mln::core::map_get_style_source_tile_urls(
-          map, id.view(), &list, &found
+        status = mln::core::map_copy_style_source_url(
+          live, id.view(), result.url, &found
         );
-        return status == MLN_STATUS_OK && found
-                 ? take_string_list(list, result.strings)
-                 : status;
+        if (status != MLN_STATUS_OK) return status;
+        return mln::core::map_get_style_source_tile_urls(
+          live, id.view(), result.strings, &found
+        );
       },
       completion
     );
@@ -478,21 +427,12 @@ auto mln_map_copy_style_source_attribution(
     auto id = OwnedView{source_id};
     return operation(
       map, mln::core::StyleOperationKind::SourceAttribution,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
-        size_t size = 0;
-        auto status = mln::core::map_copy_style_source_attribution(
-          map, id.view(), nullptr, 0, &size, &result.found
+      [id = std::move(id)](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
+        return mln::core::map_copy_style_source_attribution(
+          live, id.view(), result.bytes, &result.found
         );
-        if (status != MLN_STATUS_OK || !result.found) {
-          return status;
-        }
-        auto bytes = std::string(size, '\0');
-        status = mln::core::map_copy_style_source_attribution(
-          map, id.view(), bytes.data(), bytes.size(), &size, &result.found
-        );
-        if (status == MLN_STATUS_OK) result.bytes = std::move(bytes);
-        return status;
       },
       completion
     );
@@ -509,21 +449,12 @@ auto mln_map_copy_style_source_url(
     auto id = OwnedView{source_id};
     return operation(
       map, mln::core::StyleOperationKind::SourceUrl,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
-        size_t size = 0;
-        auto status = mln::core::map_copy_style_source_url(
-          map, id.view(), nullptr, 0, &size, &result.found
+      [id = std::move(id)](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
+        return mln::core::map_copy_style_source_url(
+          live, id.view(), result.bytes, &result.found
         );
-        if (status != MLN_STATUS_OK || !result.found) {
-          return status;
-        }
-        auto bytes = std::string(size, '\0');
-        status = mln::core::map_copy_style_source_url(
-          map, id.view(), bytes.data(), bytes.size(), &size, &result.found
-        );
-        if (status == MLN_STATUS_OK) result.bytes = std::move(bytes);
-        return status;
       },
       completion
     );
@@ -540,15 +471,12 @@ auto mln_map_get_style_source_tile_urls(
     auto id = OwnedView{source_id};
     return operation(
       map, mln::core::StyleOperationKind::SourceTileUrls,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
-        auto list = mln_style_string_list{MLN_HANDLE_NULL};
-        const auto status = mln::core::map_get_style_source_tile_urls(
-          map, id.view(), &list, &result.found
+      [id = std::move(id)](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
+        return mln::core::map_get_style_source_tile_urls(
+          live, id.view(), result.strings, &result.found
         );
-        return status == MLN_STATUS_OK && result.found
-                 ? take_string_list(list, result.strings)
-                 : status;
       },
       completion
     );
@@ -561,11 +489,10 @@ auto mln_map_list_style_source_ids(
   return mln::c_api::status_boundary([&]() -> mln_status {
     return operation(
       map, mln::core::StyleOperationKind::SourceIds,
-      [map](mln::core::StyleOperationResult& result) -> mln_status {
-        auto list = mln_style_id_list{MLN_HANDLE_NULL};
-        const auto status = mln::core::map_list_style_source_ids(map, &list);
-        return status == MLN_STATUS_OK ? take_id_list(list, result.strings)
-                                       : status;
+      [](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
+        return mln::core::map_list_style_source_ids(live, result.strings);
       },
       completion
     );
@@ -591,12 +518,12 @@ auto mln_map_list_style_source_ids(
       auto owned_options = OwnedGeoJSONOptions{options};                      \
       return command(                                                         \
         map,                                                                  \
-        [map, id = std::move(id), input = std::move(owned_input),             \
-         options = std::move(owned_options)]() mutable -> mln_status {        \
-          options.value.cluster_properties =                                  \
-            options.cluster_properties.view();                                \
+        [id = std::move(id), input = std::move(owned_input),                  \
+         options = std::move(owned_options)](mln::core::MapObject& live)      \
+          -> mln_status {                                                     \
+          const auto source_options = options.options();                      \
           return mln::core::CORE(                                             \
-            map, id.view(), input.view(), &options.value                      \
+            live, id.view(), input.view(), &source_options                    \
           );                                                                  \
         },                                                                    \
         completion                                                            \
@@ -604,34 +531,37 @@ auto mln_map_list_style_source_ids(
     });                                                                       \
   }
 
-#define MLN_TILE_URL_COMMAND(NAME, CORE, KIND)                                \
-  auto NAME(                                                                  \
-    mln_map map, mln_buffer_view source_id, mln_buffer_view url,              \
-    const mln_style_tile_source_options* options,                             \
-    const mln_completion* completion                                          \
-  ) noexcept -> mln_status {                                                  \
-    return mln::c_api::status_boundary([&]() -> mln_status {                  \
-      if (                                                                    \
-        !valid_view(source_id, "source_id is invalid") ||                     \
-        !valid_view(url, "url is invalid") ||                                 \
-        mln::core::validate_tile_command_options(options, KIND) !=            \
-          MLN_STATUS_OK                                                       \
-      ) {                                                                     \
-        return MLN_STATUS_INVALID_ARGUMENT;                                   \
-      }                                                                       \
-      auto id = OwnedView{source_id};                                         \
-      auto owned_url = OwnedView{url};                                        \
-      auto owned_options = OwnedTileOptions{options};                         \
-      return command(                                                         \
-        map,                                                                  \
-        [map, id = std::move(id), url = std::move(owned_url),                 \
-         options = std::move(owned_options)]() mutable -> mln_status {        \
-          options.value.attribution = options.attribution.view();             \
-          return mln::core::CORE(map, id.view(), url.view(), &options.value); \
-        },                                                                    \
-        completion                                                            \
-      );                                                                      \
-    });                                                                       \
+#define MLN_TILE_URL_COMMAND(NAME, CORE, KIND)                           \
+  auto NAME(                                                             \
+    mln_map map, mln_buffer_view source_id, mln_buffer_view url,         \
+    const mln_style_tile_source_options* options,                        \
+    const mln_completion* completion                                     \
+  ) noexcept -> mln_status {                                             \
+    return mln::c_api::status_boundary([&]() -> mln_status {             \
+      if (                                                               \
+        !valid_view(source_id, "source_id is invalid") ||                \
+        !valid_view(url, "url is invalid") ||                            \
+        mln::core::validate_tile_command_options(options, KIND) !=       \
+          MLN_STATUS_OK                                                  \
+      ) {                                                                \
+        return MLN_STATUS_INVALID_ARGUMENT;                              \
+      }                                                                  \
+      auto id = OwnedView{source_id};                                    \
+      auto owned_url = OwnedView{url};                                   \
+      auto owned_options = OwnedTileOptions{options};                    \
+      return command(                                                    \
+        map,                                                             \
+        [id = std::move(id), url = std::move(owned_url),                 \
+         options = std::move(owned_options)](mln::core::MapObject& live) \
+          -> mln_status {                                                \
+          const auto source_options = options.options();                 \
+          return mln::core::CORE(                                        \
+            live, id.view(), url.view(), &source_options                 \
+          );                                                             \
+        },                                                               \
+        completion                                                       \
+      );                                                                 \
+    });                                                                  \
   }
 
 #define MLN_TILE_LIST_COMMAND(NAME, CORE, KIND)                           \
@@ -661,16 +591,17 @@ auto mln_map_list_style_source_ids(
       auto owned_options = OwnedTileOptions{options};                     \
       return command(                                                     \
         map,                                                              \
-        [map, id = std::move(id), tiles = std::move(owned_tiles),         \
-         options = std::move(owned_options)]() mutable -> mln_status {    \
+        [id = std::move(id), tiles = std::move(owned_tiles),              \
+         options = std::move(owned_options)](mln::core::MapObject& live)  \
+          -> mln_status {                                                 \
           auto views = std::vector<mln_buffer_view>{};                    \
           views.reserve(tiles.size());                                    \
           for (const auto& tile : tiles) {                                \
             views.push_back(tile.view());                                 \
           }                                                               \
-          options.value.attribution = options.attribution.view();         \
+          const auto source_options = options.options();                  \
           return mln::core::CORE(                                         \
-            map, id.view(), views.data(), views.size(), &options.value    \
+            live, id.view(), views.data(), views.size(), &source_options  \
           );                                                              \
         },                                                                \
         completion                                                        \
@@ -711,12 +642,14 @@ auto mln_map_add_geojson_source_data(
     auto id = OwnedView{source_id};
     return command(
       map,
-      [map, id = std::move(id),
+      [id = std::move(id),
        prepared =
          std::shared_ptr<const mln::core::GeoJsonSourceDataObject>{
            std::move(prepared)
-         }]() -> mln_status {
-        return mln::core::map_add_geojson_source_data(map, id.view(), prepared);
+         }](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_add_geojson_source_data(
+          live, id.view(), prepared
+        );
       },
       completion
     );
@@ -738,9 +671,10 @@ auto mln_map_set_geojson_source_url(
     auto value = OwnedView{url};
     return command(
       map,
-      [map, id = std::move(id), value = std::move(value)]() -> mln_status {
+      [id = std::move(id),
+       value = std::move(value)](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_geojson_source_url(
-          map, id.view(), value.view()
+          live, id.view(), value.view()
         );
       },
       completion
@@ -765,12 +699,14 @@ auto mln_map_set_geojson_source_data(
     auto id = OwnedView{source_id};
     return command(
       map,
-      [map, id = std::move(id),
+      [id = std::move(id),
        prepared =
          std::shared_ptr<const mln::core::GeoJsonSourceDataObject>{
            std::move(prepared)
-         }]() -> mln_status {
-        return mln::core::map_set_geojson_source_data(map, id.view(), prepared);
+         }](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_set_geojson_source_data(
+          live, id.view(), prepared
+        );
       },
       completion
     );
@@ -788,9 +724,9 @@ auto mln_map_set_geojson_source_synchronous_tiling(
     auto id = OwnedView{source_id};
     return command(
       map,
-      [map, id = std::move(id), enabled]() -> mln_status {
+      [id = std::move(id), enabled](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_geojson_source_synchronous_tiling(
-          map, id.view(), enabled
+          live, id.view(), enabled
         );
       },
       completion
@@ -809,9 +745,10 @@ auto mln_map_set_style_source_volatile(
     auto id = OwnedView{source_id};
     return command(
       map,
-      [map, id = std::move(id), is_volatile]() -> mln_status {
+      [id = std::move(id),
+       is_volatile](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_style_source_volatile(
-          map, id.view(), is_volatile
+          live, id.view(), is_volatile
         );
       },
       completion
@@ -844,50 +781,11 @@ auto mln_map_add_custom_geometry_source(
   const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    if (
-      !valid_view(source_id, "source_id is invalid") ||
-      mln::core::validate_custom_geometry_command_options(options) !=
-        MLN_STATUS_OK
-    ) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto id = OwnedView{source_id};
-    auto owned = std::make_shared<OwnedCustomGeometryOptions>(*options);
-    const auto status = command(
-      map,
-      [map, id = std::move(id), owned]() -> mln_status {
-        const auto add_status = mln::core::map_add_custom_geometry_source(
-          map, id.view(), &owned->value
-        );
-        if (add_status == MLN_STATUS_OK) {
-          auto expected = OwnedCustomGeometryOptions::Ownership::pending;
-          if (!owned->ownership.compare_exchange_strong(
-                expected, OwnedCustomGeometryOptions::Ownership::adopted,
-                std::memory_order_acq_rel
-              )) {
-            owned->ownership.store(
-              OwnedCustomGeometryOptions::Ownership::adopted,
-              std::memory_order_release
-            );
-          }
-        }
-        return add_status;
-      },
-      completion
+    return add_callback_source(
+      map, source_id, options,
+      mln::core::validate_custom_geometry_command_options,
+      mln::core::map_add_custom_geometry_source, completion
     );
-    if (status == MLN_STATUS_OK) {
-      auto expected = OwnedCustomGeometryOptions::Ownership::pending;
-      static_cast<void>(owned->ownership.compare_exchange_strong(
-        expected, OwnedCustomGeometryOptions::Ownership::accepted,
-        std::memory_order_acq_rel
-      ));
-    } else {
-      owned->ownership.store(
-        OwnedCustomGeometryOptions::Ownership::rejected,
-        std::memory_order_release
-      );
-    }
-    return status;
   });
 }
 
@@ -900,10 +798,10 @@ auto mln_map_set_custom_geometry_source_tile_data(
     auto owned = OwnedView{data};
     return command(
       map,
-      [map, id = std::move(id), owned = std::move(owned),
-       tile_id]() -> mln_status {
+      [id = std::move(id), owned = std::move(owned),
+       tile_id](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_custom_geometry_source_tile_data(
-          map, id.view(), tile_id, owned.view()
+          live, id.view(), tile_id, owned.view()
         );
       },
       completion
@@ -919,9 +817,9 @@ auto mln_map_invalidate_custom_geometry_source_tile(
     auto id = OwnedView{source_id};
     return command(
       map,
-      [map, id = std::move(id), tile_id]() -> mln_status {
+      [id = std::move(id), tile_id](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_invalidate_custom_geometry_source_tile(
-          map, id.view(), tile_id
+          live, id.view(), tile_id
         );
       },
       completion
@@ -937,9 +835,9 @@ auto mln_map_invalidate_custom_geometry_source_region(
     auto id = OwnedView{source_id};
     return command(
       map,
-      [map, id = std::move(id), bounds]() -> mln_status {
+      [id = std::move(id), bounds](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_invalidate_custom_geometry_source_region(
-          map, id.view(), bounds
+          live, id.view(), bounds
         );
       },
       completion
@@ -953,49 +851,10 @@ auto mln_map_add_custom_mvt_vector_source(
   const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    if (
-      !valid_view(source_id, "source_id is invalid") ||
-      mln::core::validate_custom_mvt_command_options(options) != MLN_STATUS_OK
-    ) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto id = OwnedView{source_id};
-    auto owned = std::make_shared<OwnedCustomMvtVectorOptions>(*options);
-    const auto status = command(
-      map,
-      [map, id = std::move(id), owned]() -> mln_status {
-        const auto add_status = mln::core::map_add_custom_mvt_vector_source(
-          map, id.view(), &owned->value
-        );
-        if (add_status == MLN_STATUS_OK) {
-          auto expected = OwnedCustomMvtVectorOptions::Ownership::pending;
-          if (!owned->ownership.compare_exchange_strong(
-                expected, OwnedCustomMvtVectorOptions::Ownership::adopted,
-                std::memory_order_acq_rel
-              )) {
-            owned->ownership.store(
-              OwnedCustomMvtVectorOptions::Ownership::adopted,
-              std::memory_order_release
-            );
-          }
-        }
-        return add_status;
-      },
-      completion
+    return add_callback_source(
+      map, source_id, options, mln::core::validate_custom_mvt_command_options,
+      mln::core::map_add_custom_mvt_vector_source, completion
     );
-    if (status == MLN_STATUS_OK) {
-      auto expected = OwnedCustomMvtVectorOptions::Ownership::pending;
-      static_cast<void>(owned->ownership.compare_exchange_strong(
-        expected, OwnedCustomMvtVectorOptions::Ownership::accepted,
-        std::memory_order_acq_rel
-      ));
-    } else {
-      owned->ownership.store(
-        OwnedCustomMvtVectorOptions::Ownership::rejected,
-        std::memory_order_release
-      );
-    }
-    return status;
   });
 }
 
@@ -1008,10 +867,10 @@ auto mln_map_set_custom_mvt_vector_source_tile_data(
     auto owned = OwnedView{data};
     return command(
       map,
-      [map, id = std::move(id), owned = std::move(owned),
-       tile_id]() -> mln_status {
+      [id = std::move(id), owned = std::move(owned),
+       tile_id](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_custom_mvt_vector_source_tile_data(
-          map, id.view(), tile_id, owned.view()
+          live, id.view(), tile_id, owned.view()
         );
       },
       completion
@@ -1028,10 +887,10 @@ auto mln_map_set_custom_mvt_vector_source_tile_error(
     auto owned = OwnedView{message};
     return command(
       map,
-      [map, id = std::move(id), owned = std::move(owned),
-       tile_id]() -> mln_status {
+      [id = std::move(id), owned = std::move(owned),
+       tile_id](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_custom_mvt_vector_source_tile_error(
-          map, id.view(), tile_id, owned.view()
+          live, id.view(), tile_id, owned.view()
         );
       },
       completion
@@ -1047,9 +906,9 @@ auto mln_map_invalidate_custom_mvt_vector_source_tile(
     auto id = OwnedView{source_id};
     return command(
       map,
-      [map, id = std::move(id), tile_id]() -> mln_status {
+      [id = std::move(id), tile_id](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_invalidate_custom_mvt_vector_source_tile(
-          map, id.view(), tile_id
+          live, id.view(), tile_id
         );
       },
       completion
@@ -1079,13 +938,14 @@ auto mln_map_set_style_image(
     auto owned_options = OwnedImageOptions{options};
     return command(
       map,
-      [map, id = std::move(id), image = std::move(owned_image),
-       options = std::move(owned_options)]() mutable -> mln_status {
+      [id = std::move(id), image = std::move(owned_image),
+       options = std::move(owned_options)](mln::core::MapObject& live) mutable
+        -> mln_status {
         image.value.pixels = image.pixels.data();
         options.value.stretch_x = options.stretch_x.data();
         options.value.stretch_y = options.stretch_y.data();
         return mln::core::map_set_style_image(
-          map, id.view(), &image.value, &options.value
+          live, id.view(), &image.value, &options.value
         );
       },
       completion
@@ -1103,8 +963,8 @@ auto mln_map_remove_style_image(
     auto id = OwnedView{image_id};
     return command(
       map,
-      [map, id = std::move(id)]() -> mln_status {
-        return mln::core::map_remove_style_image(map, id.view());
+      [id = std::move(id)](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_remove_style_image(live, id.view());
       },
       completion
     );
@@ -1118,36 +978,21 @@ auto mln_map_get_style_image_info(
     auto id = OwnedView{image_id};
     return operation(
       map, mln::core::StyleOperationKind::ImageInfo,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
+      [id = std::move(id)](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
         result.image_info = mln::core::style_image_info_default();
         auto status = mln::core::map_get_style_image_info(
-          map, id.view(), &result.image_info, &result.found
+          live, id.view(), &result.image_info, &result.found
         );
         if (status != MLN_STATUS_OK || !result.found) return status;
-        size_t x = 0;
-        size_t y = 0;
-        bool found = false;
+        auto found = false;
         status = mln::core::map_copy_style_image_stretches(
-          map, id.view(), nullptr, 0, &x, nullptr, 0, &y, &found
+          live, id.view(), result.stretch_x, result.stretch_y, &found
         );
         if (status != MLN_STATUS_OK) return status;
-        result.stretch_x.resize(x);
-        result.stretch_y.resize(y);
-        status = mln::core::map_copy_style_image_stretches(
-          map, id.view(), result.stretch_x.data(), result.stretch_x.size(), &x,
-          result.stretch_y.data(), result.stretch_y.size(), &y, &found
-        );
-        if (status != MLN_STATUS_OK) return status;
-        size_t size = 0;
-        status = mln::core::map_copy_style_image_premultiplied_rgba8(
-          map, id.view(), nullptr, 0, &size, &found
-        );
-        if (status != MLN_STATUS_OK) return status;
-        result.bytes.resize(size);
         return mln::core::map_copy_style_image_premultiplied_rgba8(
-          map, id.view(), reinterpret_cast<uint8_t*>(result.bytes.data()),
-          result.bytes.size(), &size, &found
+          live, id.view(), result.bytes, &found
         );
       },
       completion
@@ -1162,19 +1007,11 @@ auto mln_map_copy_style_image_stretches(
     auto id = OwnedView{image_id};
     return operation(
       map, mln::core::StyleOperationKind::ImageStretches,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
-        size_t x = 0;
-        size_t y = 0;
-        auto status = mln::core::map_copy_style_image_stretches(
-          map, id.view(), nullptr, 0, &x, nullptr, 0, &y, &result.found
-        );
-        if (status != MLN_STATUS_OK || !result.found) return status;
-        result.stretch_x.resize(x);
-        result.stretch_y.resize(y);
+      [id = std::move(id)](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
         return mln::core::map_copy_style_image_stretches(
-          map, id.view(), result.stretch_x.data(), result.stretch_x.size(), &x,
-          result.stretch_y.data(), result.stretch_y.size(), &y, &result.found
+          live, id.view(), result.stretch_x, result.stretch_y, &result.found
         );
       },
       completion
@@ -1189,20 +1026,12 @@ auto mln_map_copy_style_image_premultiplied_rgba8(
     auto id = OwnedView{image_id};
     return operation(
       map, mln::core::StyleOperationKind::ImagePixels,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
-        size_t size = 0;
-        auto status = mln::core::map_copy_style_image_premultiplied_rgba8(
-          map, id.view(), nullptr, 0, &size, &result.found
+      [id = std::move(id)](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
+        return mln::core::map_copy_style_image_premultiplied_rgba8(
+          live, id.view(), result.bytes, &result.found
         );
-        if (status != MLN_STATUS_OK || !result.found) return status;
-        auto bytes = std::string(size, '\0');
-        status = mln::core::map_copy_style_image_premultiplied_rgba8(
-          map, id.view(), reinterpret_cast<uint8_t*>(bytes.data()),
-          bytes.size(), &size, &result.found
-        );
-        if (status == MLN_STATUS_OK) result.bytes = std::move(bytes);
-        return status;
       },
       completion
     );
@@ -1229,10 +1058,10 @@ auto mln_map_add_image_source_url(
       std::vector<mln_lat_lng>(coordinates, coordinates + coordinate_count);
     return command(
       map,
-      [map, id = std::move(id), value = std::move(value),
-       points = std::move(points)]() -> mln_status {
+      [id = std::move(id), value = std::move(value),
+       points = std::move(points)](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_add_image_source_url(
-          map, id.view(), points.data(), points.size(), value.view()
+          live, id.view(), points.data(), points.size(), value.view()
         );
       },
       completion
@@ -1262,11 +1091,12 @@ auto mln_map_add_image_source_image(
       std::vector<mln_lat_lng>(coordinates, coordinates + coordinate_count);
     return command(
       map,
-      [map, id = std::move(id), owned = std::move(owned),
-       points = std::move(points)]() mutable -> mln_status {
+      [id = std::move(id), owned = std::move(owned),
+       points =
+         std::move(points)](mln::core::MapObject& live) mutable -> mln_status {
         owned.value.pixels = owned.pixels.data();
         return mln::core::map_add_image_source_image(
-          map, id.view(), points.data(), points.size(), &owned.value
+          live, id.view(), points.data(), points.size(), &owned.value
         );
       },
       completion
@@ -1289,9 +1119,10 @@ auto mln_map_set_image_source_url(
     auto value = OwnedView{url};
     return command(
       map,
-      [map, id = std::move(id), value = std::move(value)]() -> mln_status {
+      [id = std::move(id),
+       value = std::move(value)](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_image_source_url(
-          map, id.view(), value.view()
+          live, id.view(), value.view()
         );
       },
       completion
@@ -1315,11 +1146,12 @@ auto mln_map_set_image_source_image(
     auto owned = OwnedImage{image};
     return command(
       map,
-      [map, id = std::move(id),
-       owned = std::move(owned)]() mutable -> mln_status {
+      [id = std::move(id),
+       owned =
+         std::move(owned)](mln::core::MapObject& live) mutable -> mln_status {
         owned.value.pixels = owned.pixels.data();
         return mln::core::map_set_image_source_image(
-          map, id.view(), &owned.value
+          live, id.view(), &owned.value
         );
       },
       completion
@@ -1345,9 +1177,10 @@ auto mln_map_set_image_source_coordinates(
       std::vector<mln_lat_lng>(coordinates, coordinates + coordinate_count);
     return command(
       map,
-      [map, id = std::move(id), points = std::move(points)]() -> mln_status {
+      [id = std::move(id),
+       points = std::move(points)](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_image_source_coordinates(
-          map, id.view(), points.data(), points.size()
+          live, id.view(), points.data(), points.size()
         );
       },
       completion
@@ -1362,17 +1195,11 @@ auto mln_map_get_image_source_coordinates(
     auto id = OwnedView{source_id};
     return operation(
       map, mln::core::StyleOperationKind::ImageCoordinates,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
-        size_t count = 0;
-        auto status = mln::core::map_get_image_source_coordinates(
-          map, id.view(), nullptr, 0, &count, &result.found
-        );
-        if (status != MLN_STATUS_OK || !result.found) return status;
-        result.coordinates.resize(count);
+      [id = std::move(id)](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
         return mln::core::map_get_image_source_coordinates(
-          map, id.view(), result.coordinates.data(), result.coordinates.size(),
-          &count, &result.found
+          live, id.view(), result.coordinates, &result.found
         );
       },
       completion
@@ -1380,26 +1207,27 @@ auto mln_map_get_image_source_coordinates(
   });
 }
 
-#define MLN_LAYER_THREE_VIEW_COMMAND(NAME, CORE)                      \
-  auto NAME(                                                          \
-    mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, \
-    mln_buffer_view before_layer_id, const mln_completion* completion \
-  ) noexcept -> mln_status {                                          \
-    return mln::c_api::status_boundary([&]() -> mln_status {          \
-      auto layer = OwnedView{layer_id};                               \
-      auto source = OwnedView{source_id};                             \
-      auto before = OwnedView{before_layer_id};                       \
-      return command(                                                 \
-        map,                                                          \
-        [map, layer = std::move(layer), source = std::move(source),   \
-         before = std::move(before)]() -> mln_status {                \
-          return mln::core::CORE(                                     \
-            map, layer.view(), source.view(), before.view()           \
-          );                                                          \
-        },                                                            \
-        completion                                                    \
-      );                                                              \
-    });                                                               \
+#define MLN_LAYER_THREE_VIEW_COMMAND(NAME, CORE)                          \
+  auto NAME(                                                              \
+    mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,     \
+    mln_buffer_view before_layer_id, const mln_completion* completion     \
+  ) noexcept -> mln_status {                                              \
+    return mln::c_api::status_boundary([&]() -> mln_status {              \
+      auto layer = OwnedView{layer_id};                                   \
+      auto source = OwnedView{source_id};                                 \
+      auto before = OwnedView{before_layer_id};                           \
+      return command(                                                     \
+        map,                                                              \
+        [layer = std::move(layer), source = std::move(source),            \
+         before =                                                         \
+           std::move(before)](mln::core::MapObject& live) -> mln_status { \
+          return mln::core::CORE(                                         \
+            live, layer.view(), source.view(), before.view()              \
+          );                                                              \
+        },                                                                \
+        completion                                                        \
+      );                                                                  \
+    });                                                                   \
   }
 MLN_LAYER_THREE_VIEW_COMMAND(
   mln_map_add_hillshade_layer, map_add_hillshade_layer
@@ -1418,9 +1246,10 @@ auto mln_map_add_location_indicator_layer(
     auto before = OwnedView{before_layer_id};
     return command(
       map,
-      [map, id = std::move(id), before = std::move(before)]() -> mln_status {
+      [id = std::move(id),
+       before = std::move(before)](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_add_location_indicator_layer(
-          map, id.view(), before.view()
+          live, id.view(), before.view()
         );
       },
       completion
@@ -1436,9 +1265,10 @@ auto mln_map_set_location_indicator_location(
     auto id = OwnedView{layer_id};
     return command(
       map,
-      [map, id = std::move(id), coordinate, altitude]() -> mln_status {
+      [id = std::move(id), coordinate,
+       altitude](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_location_indicator_location(
-          map, id.view(), coordinate, altitude
+          live, id.view(), coordinate, altitude
         );
       },
       completion
@@ -1454,9 +1284,9 @@ auto mln_map_set_location_indicator_bearing(
     auto id = OwnedView{layer_id};
     return command(
       map,
-      [map, id = std::move(id), bearing]() -> mln_status {
+      [id = std::move(id), bearing](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_location_indicator_bearing(
-          map, id.view(), bearing
+          live, id.view(), bearing
         );
       },
       completion
@@ -1472,9 +1302,9 @@ auto mln_map_set_location_indicator_accuracy_radius(
     auto id = OwnedView{layer_id};
     return command(
       map,
-      [map, id = std::move(id), radius]() -> mln_status {
+      [id = std::move(id), radius](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_location_indicator_accuracy_radius(
-          map, id.view(), radius
+          live, id.view(), radius
         );
       },
       completion
@@ -1491,10 +1321,10 @@ auto mln_map_set_location_indicator_image_name(
     auto image = OwnedView{image_id};
     return command(
       map,
-      [map, layer = std::move(layer), image = std::move(image),
-       image_kind]() -> mln_status {
+      [layer = std::move(layer), image = std::move(image),
+       image_kind](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_location_indicator_image_name(
-          map, layer.view(), image_kind, image.view()
+          live, layer.view(), image_kind, image.view()
         );
       },
       completion
@@ -1516,10 +1346,10 @@ auto mln_map_add_style_layer_json(
     auto before = OwnedView{before_layer_id};
     return command(
       map,
-      [map, json = std::move(json),
-       before = std::move(before)]() -> mln_status {
+      [json = std::move(json),
+       before = std::move(before)](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_add_style_layer_json(
-          map, json.view(), before.view()
+          live, json.view(), before.view()
         );
       },
       completion
@@ -1537,8 +1367,8 @@ auto mln_map_remove_style_layer(
     auto id = OwnedView{layer_id};
     return command(
       map,
-      [map, id = std::move(id)]() -> mln_status {
-        return mln::core::map_remove_style_layer(map, id.view());
+      [id = std::move(id)](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_remove_style_layer(live, id.view());
       },
       completion
     );
@@ -1555,29 +1385,22 @@ auto mln_map_get_style_layer_info(
     auto id = OwnedView{layer_id};
     return operation(
       map, mln::core::StyleOperationKind::LayerInfo,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
+      [id = std::move(id)](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
         result.layer_info = {};
         result.layer_info.size = sizeof(mln_style_layer_info);
         auto status = mln::core::map_get_style_layer_info(
-          map, id.view(), &result.layer_info, &result.found
+          live, id.view(), &result.layer_info, &result.found
         );
         if (status != MLN_STATUS_OK || !result.found) return status;
-        auto copy = [&](auto function, std::string& destination) {
-          size_t size = 0;
-          auto copy_status = function(map, id.view(), nullptr, 0, &size);
-          if (copy_status != MLN_STATUS_OK) return copy_status;
-          destination.resize(size);
-          return function(
-            map, id.view(), destination.data(), destination.size(), &size
-          );
-        };
-        status = copy(mln::core::map_copy_layer_source_id, result.source_id);
-        return status == MLN_STATUS_OK
-                 ? copy(
-                     mln::core::map_copy_layer_source_layer, result.source_layer
-                   )
-                 : status;
+        status = mln::core::map_copy_layer_source_id(
+          live, id.view(), result.source_id
+        );
+        return status == MLN_STATUS_OK ? mln::core::map_copy_layer_source_layer(
+                                           live, id.view(), result.source_layer
+                                         )
+                                       : status;
       },
       completion
     );
@@ -1590,11 +1413,10 @@ auto mln_map_list_style_layer_ids(
   return mln::c_api::status_boundary([&]() -> mln_status {
     return operation(
       map, mln::core::StyleOperationKind::LayerIds,
-      [map](mln::core::StyleOperationResult& result) -> mln_status {
-        auto list = mln_style_id_list{MLN_HANDLE_NULL};
-        const auto status = mln::core::map_list_style_layer_ids(map, &list);
-        return status == MLN_STATUS_OK ? take_id_list(list, result.strings)
-                                       : status;
+      [](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
+        return mln::core::map_list_style_layer_ids(live, result.strings);
       },
       completion
     );
@@ -1616,8 +1438,9 @@ auto mln_map_move_style_layer(
     auto before = OwnedView{before_layer_id};
     return command(
       map,
-      [map, id = std::move(id), before = std::move(before)]() -> mln_status {
-        return mln::core::map_move_style_layer(map, id.view(), before.view());
+      [id = std::move(id),
+       before = std::move(before)](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_move_style_layer(live, id.view(), before.view());
       },
       completion
     );
@@ -1634,11 +1457,12 @@ auto mln_map_get_style_layer_json(
     auto id = OwnedView{layer_id};
     return operation(
       map, mln::core::StyleOperationKind::LayerJson,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
+      [id = std::move(id)](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
         auto buffer = mln_buffer{MLN_HANDLE_NULL};
         const auto status = mln::core::map_get_style_layer_json(
-          map, id.view(), &buffer, &result.found
+          live, id.view(), &buffer, &result.found
         );
         return status == MLN_STATUS_OK && result.found
                  ? take_buffer(buffer, result.bytes)
@@ -1659,8 +1483,8 @@ auto mln_map_set_style_light_json(
     auto json = OwnedView{light_json};
     return command(
       map,
-      [map, json = std::move(json)]() -> mln_status {
-        return mln::core::map_set_style_light_json(map, json.view());
+      [json = std::move(json)](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_set_style_light_json(live, json.view());
       },
       completion
     );
@@ -1682,9 +1506,10 @@ auto mln_map_set_style_light_property(
     auto json = OwnedView{value};
     return command(
       map,
-      [map, name = std::move(name), json = std::move(json)]() -> mln_status {
+      [name = std::move(name),
+       json = std::move(json)](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_style_light_property(
-          map, name.view(), json.view()
+          live, name.view(), json.view()
         );
       },
       completion
@@ -1702,11 +1527,12 @@ auto mln_map_get_style_light_property(
     auto name = OwnedView{property_name};
     return operation(
       map, mln::core::StyleOperationKind::LightProperty,
-      [map, name = std::move(name)](mln::core::StyleOperationResult& result)
-        -> mln_status {
+      [name = std::move(name)](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
         auto buffer = mln_buffer{MLN_HANDLE_NULL};
         const auto status =
-          mln::core::map_get_style_light_property(map, name.view(), &buffer);
+          mln::core::map_get_style_light_property(live, name.view(), &buffer);
         if (status != MLN_STATUS_OK || buffer == MLN_HANDLE_NULL) return status;
         result.found = true;
         return take_buffer(buffer, result.bytes);
@@ -1729,8 +1555,8 @@ auto mln_map_set_style_transition_options(
     const auto owned = *options;
     return command(
       map,
-      [map, owned]() -> mln_status {
-        return mln::core::map_set_style_transition_options(map, &owned);
+      [owned](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_set_style_transition_options(live, &owned);
       },
       completion
     );
@@ -1743,11 +1569,13 @@ auto mln_map_get_style_transition_options(
   return mln::c_api::status_boundary([&]() -> mln_status {
     return operation(
       map, mln::core::StyleOperationKind::TransitionOptions,
-      [map](mln::core::StyleOperationResult& result) -> mln_status {
+      [](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
         result.transition_options =
           mln::core::style_transition_options_default();
         return mln::core::map_get_style_transition_options(
-          map, &result.transition_options
+          live, &result.transition_options
         );
       },
       completion
@@ -1755,50 +1583,51 @@ auto mln_map_get_style_transition_options(
   });
 }
 
-#define MLN_STYLE_BUFFER_OPERATION(NAME, CORE, KIND)                       \
-  auto NAME(                                                               \
-    mln_map map, mln_buffer_view id, const mln_completion* completion      \
-  ) noexcept -> mln_status {                                               \
-    return mln::c_api::status_boundary([&]() -> mln_status {               \
-      if (!valid_view(id, "style ID is invalid")) {                        \
-        return MLN_STATUS_INVALID_ARGUMENT;                                \
-      }                                                                    \
-      auto owned = OwnedView{id};                                          \
-      return operation(                                                    \
-        map, mln::core::StyleOperationKind::KIND,                          \
-        [map, owned = std::move(owned)](                                   \
-          mln::core::StyleOperationResult& result                          \
-        ) -> mln_status {                                                  \
-          auto buffer = mln_buffer{MLN_HANDLE_NULL};                       \
-          const auto status = mln::core::CORE(map, owned.view(), &buffer); \
-          if (status != MLN_STATUS_OK) return status;                      \
-          if (buffer == MLN_HANDLE_NULL) return MLN_STATUS_OK;             \
-          result.found = true;                                             \
-          return take_buffer(buffer, result.bytes);                        \
-        },                                                                 \
-        completion                                                         \
-      );                                                                   \
-    });                                                                    \
+#define MLN_STYLE_BUFFER_OPERATION(NAME, CORE, KIND)                          \
+  auto NAME(                                                                  \
+    mln_map map, mln_buffer_view id, const mln_completion* completion         \
+  ) noexcept -> mln_status {                                                  \
+    return mln::c_api::status_boundary([&]() -> mln_status {                  \
+      if (!valid_view(id, "style ID is invalid")) {                           \
+        return MLN_STATUS_INVALID_ARGUMENT;                                   \
+      }                                                                       \
+      auto owned = OwnedView{id};                                             \
+      return operation(                                                       \
+        map, mln::core::StyleOperationKind::KIND,                             \
+        [owned = std::move(owned)](                                           \
+          mln::core::MapObject& live, mln::core::StyleOperationResult& result \
+        ) -> mln_status {                                                     \
+          auto buffer = mln_buffer{MLN_HANDLE_NULL};                          \
+          const auto status = mln::core::CORE(live, owned.view(), &buffer);   \
+          if (status != MLN_STATUS_OK) return status;                         \
+          if (buffer == MLN_HANDLE_NULL) return MLN_STATUS_OK;                \
+          result.found = true;                                                \
+          return take_buffer(buffer, result.bytes);                           \
+        },                                                                    \
+        completion                                                            \
+      );                                                                      \
+    });                                                                       \
   }
 
-#define MLN_STYLE_SCALAR_COMMAND(NAME, CORE, TYPE)               \
-  auto NAME(                                                     \
-    mln_map map, mln_buffer_view id, TYPE value,                 \
-    const mln_completion* completion                             \
-  ) noexcept -> mln_status {                                     \
-    return mln::c_api::status_boundary([&]() -> mln_status {     \
-      if (!valid_view(id, "style ID is invalid")) {              \
-        return MLN_STATUS_INVALID_ARGUMENT;                      \
-      }                                                          \
-      auto owned = OwnedView{id};                                \
-      return command(                                            \
-        map,                                                     \
-        [map, owned = std::move(owned), value]() -> mln_status { \
-          return mln::core::CORE(map, owned.view(), value);      \
-        },                                                       \
-        completion                                               \
-      );                                                         \
-    });                                                          \
+#define MLN_STYLE_SCALAR_COMMAND(NAME, CORE, TYPE)           \
+  auto NAME(                                                 \
+    mln_map map, mln_buffer_view id, TYPE value,             \
+    const mln_completion* completion                         \
+  ) noexcept -> mln_status {                                 \
+    return mln::c_api::status_boundary([&]() -> mln_status { \
+      if (!valid_view(id, "style ID is invalid")) {          \
+        return MLN_STATUS_INVALID_ARGUMENT;                  \
+      }                                                      \
+      auto owned = OwnedView{id};                            \
+      return command(                                        \
+        map,                                                 \
+        [owned = std::move(owned),                           \
+         value](mln::core::MapObject& live) -> mln_status {  \
+          return mln::core::CORE(live, owned.view(), value); \
+        },                                                   \
+        completion                                           \
+      );                                                     \
+    });                                                      \
   }
 
 auto mln_map_set_layer_property(
@@ -1818,10 +1647,10 @@ auto mln_map_set_layer_property(
     auto json = OwnedView{value};
     return command(
       map,
-      [map, id = std::move(id), name = std::move(name),
-       json = std::move(json)]() -> mln_status {
+      [id = std::move(id), name = std::move(name),
+       json = std::move(json)](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_layer_property(
-          map, id.view(), name.view(), json.view()
+          live, id.view(), name.view(), json.view()
         );
       },
       completion
@@ -1844,12 +1673,12 @@ auto mln_map_get_layer_property(
     auto name = OwnedView{property_name};
     return operation(
       map, mln::core::StyleOperationKind::LayerProperty,
-      [map, id = std::move(id), name = std::move(name)](
-        mln::core::StyleOperationResult& result
+      [id = std::move(id), name = std::move(name)](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
         auto buffer = mln_buffer{MLN_HANDLE_NULL};
         const auto status = mln::core::map_get_layer_property(
-          map, id.view(), name.view(), &buffer
+          live, id.view(), name.view(), &buffer
         );
         if (status != MLN_STATUS_OK || buffer == MLN_HANDLE_NULL) return status;
         result.found = true;
@@ -1877,13 +1706,14 @@ auto mln_map_set_layer_filter(
                           : std::optional<OwnedView>{OwnedView{*filter}};
     return command(
       map,
-      [map, id = std::move(id),
-       owned_filter = std::move(owned_filter)]() -> mln_status {
+      [id = std::move(id),
+       owned_filter =
+         std::move(owned_filter)](mln::core::MapObject& live) -> mln_status {
         const auto view =
           owned_filter ? std::optional<mln_buffer_view>{owned_filter->view()}
                        : std::nullopt;
         return mln::core::map_set_layer_filter(
-          map, id.view(), view ? &*view : nullptr
+          live, id.view(), view ? &*view : nullptr
         );
       },
       completion
@@ -1904,9 +1734,10 @@ auto mln_map_set_layer_source_layer(
     auto source = OwnedView{source_layer};
     return command(
       map,
-      [map, id = std::move(id), source = std::move(source)]() -> mln_status {
+      [id = std::move(id),
+       source = std::move(source)](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_layer_source_layer(
-          map, id.view(), source.view()
+          live, id.view(), source.view()
         );
       },
       completion
@@ -1923,9 +1754,10 @@ auto mln_map_set_layer_source_id(
     auto source = OwnedView{source_id};
     return command(
       map,
-      [map, id = std::move(id), source = std::move(source)]() -> mln_status {
+      [id = std::move(id),
+       source = std::move(source)](mln::core::MapObject& live) -> mln_status {
         return mln::core::map_set_layer_source_id(
-          map, id.view(), source.view()
+          live, id.view(), source.view()
         );
       },
       completion
@@ -1952,15 +1784,7 @@ auto mln_map_copy_layer_source_layer(
   return mln::c_api::status_boundary([&]() -> mln_status {
     return start_text_copy(
       map, layer_id, mln::core::StyleOperationKind::LayerSourceLayer,
-      [](
-        mln_map value_map, mln_buffer_view id, char* text, size_t capacity,
-        size_t* size
-      ) -> mln_status {
-        return mln::core::map_copy_layer_source_layer(
-          value_map, id, text, capacity, size
-        );
-      },
-      completion
+      mln::core::map_copy_layer_source_layer, completion
     );
   });
 }
@@ -1971,15 +1795,7 @@ auto mln_map_copy_layer_source_id(
   return mln::c_api::status_boundary([&]() -> mln_status {
     return start_text_copy(
       map, layer_id, mln::core::StyleOperationKind::LayerSourceId,
-      [](
-        mln_map value_map, mln_buffer_view id, char* text, size_t capacity,
-        size_t* size
-      ) -> mln_status {
-        return mln::core::map_copy_layer_source_id(
-          value_map, id, text, capacity, size
-        );
-      },
-      completion
+      mln::core::map_copy_layer_source_id, completion
     );
   });
 }

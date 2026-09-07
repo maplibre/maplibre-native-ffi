@@ -733,11 +733,12 @@ argument, so one request handle type covers both the owning and the moved use.
 
 ## Execution
 
-Runtime, map, projection, render-session control, event-batch, and
-frame-result-batch handles are callable from any native thread. The C API owns
-the runtime scheduler and any core-worker graphics thread. A binding MUST NOT
-create an owner thread, expose a pump, or pin a task to a native thread for
-native progress.
+The handles that
+[C API conventions](/maplibre-native-ffi/development/c-conventions/#handles)
+lists as any-thread are callable from any native thread in every binding. The C
+API owns the runtime scheduler and any core-worker graphics thread. A binding
+MUST NOT create an owner thread, expose a pump, or pin a task to a native thread
+for native progress.
 
 Bindings preserve the C execution category:
 
@@ -750,7 +751,9 @@ Bindings preserve the C execution category:
    terminal status, generation, and diagnostic. Submission rejection and bridge
    failures reject the asynchronous value.
 3. Published snapshots return synchronous language-owned copies. A binding MUST
-   NOT relabel an ordered query as a snapshot.
+   NOT relabel an ordered query as a snapshot. The ordered camera query returns
+   the same language-owned camera snapshot type that the published camera
+   snapshot returns, carrying the generation of the commit it observed.
 4. Result-producing completions use the language's future, promise, task,
    suspension, or explicit async idiom. Cooperative and UI executors suspend
    instead of blocking.
@@ -872,11 +875,10 @@ an asynchronous completion.
 
 ### Transferability
 
-Runtime, map, projection, render-session control, event-batch,
-frame-result-batch, and acquired-frame handles are safe to move between native
-threads. A binding may declare them transferable when its wrapper synchronizes
-close, release, and in-flight calls. Backend accessors on acquired frames
-preserve their documented graphics context requirement.
+Those same any-thread handles are safe to move between native threads. A binding
+may declare them transferable when its wrapper synchronizes close, release, and
+in-flight calls. Backend accessors on acquired frames preserve their documented
+graphics context requirement.
 
 Unchecked or unsafe concurrency conformance MUST name the wrapper
 synchronization invariant that makes concurrent use and close sound.
@@ -927,7 +929,7 @@ The public handle exposes:
 
 - immutable negotiated capabilities;
 - any-thread snapshots, frame demand, result drains, resize, barriers,
-  maintenance, feature state, readback, detach, abandon, and destroy;
+  maintenance, readback, detach, abandon, and destroy;
 - driver service and backend accessors with their graphics-thread requirement;
 - target replacement for native surfaces and borrowed textures.
 
@@ -1077,11 +1079,11 @@ that a real native failure would expose.
 | BND-041 | A failed native release preflight leaves the handle live; a later accepted release retires it before returning.                                                                                                                                                              |
 | BND-042 | A parent close rejects a live or pending child, leaves the parent open, and succeeds after the child closes or creation resolves.                                                                                                                                            |
 | BND-043 | A map projection remains usable until explicit close, including after its source map and runtime close.                                                                                                                                                                      |
-| BND-044 | Dropping or cancelling a host wait does not cancel or stall accepted native work, and native teardown preserves every dependency it still needs.                                                                                                                             |
 | BND-045 | A released handle's id, replayed through an internal seam after a new handle of the same kind is created, reports the binding's invalid-argument error naming it stale, and the new handle keeps working.                                                                    |
 | BND-047 | A handle id of one kind passed to another kind's operation through an internal seam reports the binding's invalid-argument error, and the safe public API has no expression of that call.                                                                                    |
 | BND-049 | A runtime, map, or projection handle remains usable when an asynchronous continuation resumes on another native thread.                                                                                                                                                      |
 | BND-050 | Map close exposes a completion that runs after earlier map work and map-owned callback teardown; awaiting it requires no runtime barrier or host polling.                                                                                                                    |
+| BND-051 | Dropping or cancelling a host wait does not cancel or stall accepted native work, and native teardown preserves every dependency it still needs.                                                                                                                             |
 
 ### Input Structs, Values, and Copied Data
 
@@ -1093,7 +1095,7 @@ that a real native failure would expose.
 | BND-063 | Borrowed native strings and buffer views are copied before their native borrow window ends.                                                                                                                |
 | BND-064 | JSON byte inputs accept scalar and nested values and reach native parsing and validation without a binding-owned parse.                                                                                    |
 | BND-065 | GeoJSON byte inputs cover geometry, feature, and feature-collection shapes, including nested geometry and properties.                                                                                      |
-| BND-066 | Native buffer, snapshot, list, and result handles, including style tile-URL lists, are released on success and on copy failure, using fault injection for copy failure.                                    |
+| BND-066 | Native buffer and prepared-GeoJSON handles are released on success and on copy failure, using fault injection for copy failure.                                                                            |
 | BND-067 | Byte transit preserves the complete input length, including non-null-terminated storage, and loaded style documents round-trip byte-for-byte.                                                              |
 | BND-068 | Unknown enum values preserve their raw value, and public input APIs report the C API's status and diagnostic unless the binding owns a stricter pre-C invariant.                                           |
 | BND-069 | Public values and descriptors that accept caller-owned mutable storage remain unchanged after later caller mutation, and accessors do not expose mutable storage that can mutate the stored value.         |
@@ -1102,23 +1104,23 @@ that a real native failure would expose.
 
 ### Runtime and events
 
-| ID      | Test                                                                                                                                                                                                             |
-| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-080 | Native runtime work progresses without a host pump, and a runtime barrier completes after every preceding submission reaches a terminal disposition.                                                             |
-| BND-081 | Map style loading returns the expected copied map event through a drain and identifies the correct public map identity.                                                                                          |
-| BND-082 | Event message and payload data remain valid after the native batch is released because the binding copied them.                                                                                                  |
-| BND-083 | An unknown event or payload domain preserves its raw value, and an unknown payload keeps the bytes that the batch's event stride reports.                                                                        |
-| BND-084 | A completion copies its typed result and diagnostic before native callback storage is released, including inline completion.                                                                                     |
-| BND-085 | Offline region observation returns copied status and error events through the public runtime event model.                                                                                                        |
-| BND-086 | A map-originated event with no provable live public map exposes no public map handle.                                                                                                                            |
-| BND-087 | A binding steps events by the batch's reported event stride.                                                                                                                                                     |
-| BND-088 | A configured event wake resumes an idle receiver without polling; a polling-only binding drains from an existing host cadence.                                                                                   |
-| BND-089 | Releasing a runtime prevents later event-wake callback entries and waits for an in-flight entry before releasing callback state.                                                                                 |
-| BND-090 | One drain reports more than one event and preserves queue order.                                                                                                                                                 |
-| BND-091 | The default subscription delivers every event type; a narrowed one delivers neither the cleared type nor a wake for it; an unknown bit is rejected.                                                              |
-| BND-092 | Two owned batches remain readable independently until release, and the values a binding copied out of them remain readable afterward.                                                                            |
-| BND-093 | Binding-owned cleanup that a style load drives still runs while the map's subscription leaves out the style-loaded type.                                                                                         |
-| BND-094 | Accepted commands resolve once with committed, failed, cancelled, or superseded disposition, status, generation, and copied diagnostic data, without rejecting the asynchronous value or using a correlation ID. |
+| ID      | Test                                                                                                                                                                                   |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-080 | Native runtime work progresses without a host pump, and a runtime barrier completes after every preceding submission reaches a terminal disposition.                                   |
+| BND-081 | Map style loading returns the expected copied map event through a drain and identifies the correct public map identity.                                                                |
+| BND-082 | Event message and payload data remain valid after the native batch is released because the binding copied them.                                                                        |
+| BND-083 | An unknown event or payload domain preserves its raw value, and an unknown payload keeps the bytes that the batch's event stride reports.                                              |
+| BND-084 | A completion copies its typed result and diagnostic before native callback storage is released, including inline completion.                                                           |
+| BND-085 | Offline region observation returns copied status and error events through the public runtime event model.                                                                              |
+| BND-086 | A map-originated event with no provable live public map exposes no public map handle.                                                                                                  |
+| BND-087 | A binding steps events by the batch's reported event stride.                                                                                                                           |
+| BND-088 | A configured event wake resumes an idle receiver without polling; a polling-only binding drains from an existing host cadence.                                                         |
+| BND-089 | Releasing a runtime prevents later event-wake callback entries and waits for an in-flight entry before releasing callback state.                                                       |
+| BND-090 | One drain reports more than one event and preserves queue order.                                                                                                                       |
+| BND-091 | The default subscription delivers every event type; a narrowed one delivers neither the cleared type nor a wake for it; an unknown bit is rejected.                                    |
+| BND-092 | Two owned batches remain readable independently until release, and the values a binding copied out of them remain readable afterward.                                                  |
+| BND-093 | Binding-owned cleanup that a style load drives still runs while the map's subscription leaves out the style-loaded type.                                                               |
+| BND-094 | Accepted commands resolve once with committed, failed, cancelled, or superseded disposition, status, generation, and copied diagnostic data, without rejecting the asynchronous value. |
 
 ### Map, camera, projection, style, and query
 
@@ -1197,12 +1199,15 @@ When the binding routes provider requests through
 | BND-172 | A fallible wrapper releases a natively acquired frame when wrapper construction fails.                                                                                                                                      |
 | BND-173 | Stale acquired-frame handles cannot expose backend handles after slot reuse.                                                                                                                                                |
 | BND-174 | Render-session control, completion submission, snapshot, demand, abandon, and destroy calls work from a thread other than the graphics service thread.                                                                      |
-| BND-175 | A frame-result drain takes every queued record into an independently owned batch, and multiple batches may remain live.                                                                                                     |
-| BND-176 | A barrier waits for preceding render work without requesting a frame.                                                                                                                                                       |
+| BND-175 | `set_target` replaces a host-owned render target through the public render session API and updates the session's extent.                                                                                                    |
+| BND-176 | `set_target` reports unsupported for a target kind the session does not have, covering a session-owned texture and a mismatched surface/texture pairing.                                                                    |
 | BND-177 | An expired positive frame timeout yields deadline missed before graphics work begins.                                                                                                                                       |
 | BND-178 | Normal detach performs graphics destruction through the selected owner and permits any-thread CPU-only destroy afterward.                                                                                                   |
 | BND-179 | Abandon returns busy during a driver call, performs no graphics calls, invalidates accessors, detaches the map, and reports quarantine.                                                                                     |
 | BND-180 | Target loss is preserved in snapshots and does not enter a busy retry loop.                                                                                                                                                 |
+| BND-181 | A frame-result drain takes every queued record into an independently owned batch, and multiple batches may remain live.                                                                                                     |
+| BND-182 | A barrier waits for preceding render work without requesting a frame.                                                                                                                                                       |
+| BND-183 | Resize reports unsupported for a caller-owned texture target, and reports invalid argument for an extent whose scale factor differs from the one the session attached with.                                                 |
 
 ### Conditional tests
 

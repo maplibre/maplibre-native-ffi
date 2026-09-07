@@ -34,6 +34,7 @@ internal object CompletionBridge {
   private class State<T>(
     private val convert: (CPointer<mln_completion_result>) -> T,
     private val acceptErrorStatus: Boolean,
+    private val closeDropped: (T) -> Unit,
   ) : CompletionState {
     val deferred = CompletableDeferred<T>()
 
@@ -42,7 +43,8 @@ internal object CompletionBridge {
       try {
         val status = raw.status
         if (status == MaplibreStatus.OK.nativeCode || acceptErrorStatus) {
-          deferred.complete(convert(result))
+          val value = convert(result)
+          if (!deferred.complete(value)) closeDropped(value)
         } else {
           val message =
             raw.diagnostic.data?.readBytes(raw.diagnostic.size.toInt())?.decodeToString().orEmpty()
@@ -61,15 +63,25 @@ internal object CompletionBridge {
     call: (CPointer<mln_completion>) -> Int,
   ): Deferred<T> = submitInternal(convert, false, false, call)
 
+  /**
+   * Submits a completion that produces an owned handle wrapper, handing the wrapper to
+   * [closeDropped] when the caller cancelled the deferred before the value arrived.
+   */
+  fun <T> submitOwned(
+    convert: (CPointer<mln_completion_result>) -> T,
+    closeDropped: (T) -> Unit,
+    call: (CPointer<mln_completion>) -> Int,
+  ): Deferred<T> = submitInternal(convert, false, false, call, closeDropped)
+
   private fun <T> submitInternal(
     convert: (CPointer<mln_completion_result>) -> T,
     rejectSynchronously: Boolean,
     acceptErrorStatus: Boolean,
     call: (CPointer<mln_completion>) -> Int,
+    closeDropped: (T) -> Unit = {},
   ): Deferred<T> {
-    val state = State(convert, acceptErrorStatus)
+    val state = State(convert, acceptErrorStatus, closeDropped)
     val reference = StableRef.create<CompletionState>(state)
-    var handedOff = false
     try {
       memScoped {
         val completion = alloc<mln_completion>()
@@ -77,13 +89,13 @@ internal object CompletionBridge {
         completion.callback = staticCFunction(::completeNative)
         completion.user_data = reference.asCPointer()
         completion.release_user_data = staticCFunction(::releaseNative)
-        val status = call(completion.ptr)
-        handedOff = status == MaplibreStatus.OK.nativeCode
-        Status.check(status)
+        Status.check(call(completion.ptr))
       }
     } catch (failure: Throwable) {
+      // Only a rejected submission reaches here, and a rejection never hands the reference to
+      // native, so nothing else disposes it.
+      reference.dispose()
       state.deferred.completeExceptionally(failure)
-      if (!handedOff) reference.dispose()
       if (rejectSynchronously) throw failure
     }
     return state.deferred
@@ -95,21 +107,17 @@ internal object CompletionBridge {
     submitInternal({ _ -> }, true, false, call)
 
   fun command(call: (CPointer<mln_completion>) -> Int): Deferred<CommandCompletion> =
-    submitInternal(
-      { result ->
-        CommandCompletion(
-          CommandDisposition.fromNative(result.pointed.disposition.toInt()),
-          result.pointed.generation,
-          MaplibreStatus.fromNative(result.pointed.status),
-          result.pointed.diagnostic.data
-            ?.readBytes(result.pointed.diagnostic.size.toInt())
-            ?.decodeToString()
-            .orEmpty(),
-        )
-      },
-      false,
-      true,
-      call,
+    submitInternal(::commandCompletion, false, true, call)
+
+  private fun commandCompletion(result: CPointer<mln_completion_result>): CommandCompletion =
+    CommandCompletion(
+      CommandDisposition.fromNative(result.pointed.disposition.toInt()),
+      result.pointed.generation.toLong(),
+      MaplibreStatus.fromNative(result.pointed.status),
+      result.pointed.diagnostic.data
+        ?.readBytes(result.pointed.diagnostic.size.toInt())
+        ?.decodeToString()
+        .orEmpty(),
     )
 }
 

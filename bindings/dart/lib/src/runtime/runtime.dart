@@ -136,10 +136,14 @@ final class RuntimeHandle {
   final _maps = <int, WeakReference<MapHandle>>{};
   final _queuedRuntimeEvents = <RuntimeEvent>[];
   final _nativeCallbackReleases = <int, void Function()>{};
-  final _resourceProviderQueues = <int, _ResourceProviderCallbackState>{};
+  Completer<void>? _nativeCallbacksDrained;
 
   void _releaseNativeCallback(Pointer<Void> userData) {
     _nativeCallbackReleases.remove(userData.address)?.call();
+    if (_nativeCallbackReleases.isEmpty) {
+      _nativeCallbacksDrained?.complete();
+      _nativeCallbacksDrained = null;
+    }
   }
 
   void _registerNativeCallback(
@@ -147,10 +151,6 @@ final class RuntimeHandle {
     void Function() release,
   ) {
     _nativeCallbackReleases[userData.address] = release;
-  }
-
-  void _cancelNativeCallback(Pointer<Void> userData) {
-    _nativeCallbackReleases.remove(userData.address)?.call();
   }
 
   Future<CommandCompletion> _startCommand(
@@ -171,21 +171,10 @@ final class RuntimeHandle {
     ),
   );
 
-  Future<T> _startValue<T>({
-    required raw.mln_adapter_completion_copy_kind copyKind,
-    required int elementSize,
-    required NativeCompletionStart start,
-    required NativeCompletionDecoder<T> decode,
-    void Function()? onRejected,
-  }) => startNativeCompletion(
-    copyKind: copyKind,
-    elementSize: elementSize,
-    start: start,
-    decode: decode,
-    onRejected: onRejected,
-  );
-
   /// Creates a runtime.
+  ///
+  /// The calling isolate blocks until the runtime worker has started, so
+  /// create a runtime off a thread that must stay responsive.
   static RuntimeHandle create({
     RuntimeOptions options = const RuntimeOptions(),
   }) {
@@ -195,9 +184,7 @@ final class RuntimeHandle {
       scheduleMicrotask(() {
         final target = runtime;
         if (target != null && !target.isClosed) {
-          target._queuedRuntimeEvents.addAll(
-            target._drainNativeEvents().events,
-          );
+          target._queuedRuntimeEvents.addAll(target._drainNativeEvents());
         }
       });
     });
@@ -241,20 +228,20 @@ final class RuntimeHandle {
   /// Whether this runtime has been closed by the Dart binding.
   bool get isClosed => _state.isClosed;
 
-  /// Drains queued runtime events into one batch of Dart-owned copies.
+  /// Drains queued runtime events into one Dart-owned list.
   ///
   /// Events arrive in queue order. Every field, message, and payload is copied
-  /// before this returns, so a batch stays readable for as long as the host
+  /// before this returns, so the list stays readable for as long as the host
   /// keeps it.
-  RuntimeEventBatch drainEvents() {
+  List<RuntimeEvent> drainEvents() {
     final _ = _handle;
-    _queuedRuntimeEvents.addAll(_drainNativeEvents().events);
-    final events = List<RuntimeEvent>.of(_queuedRuntimeEvents);
+    _queuedRuntimeEvents.addAll(_drainNativeEvents());
+    final events = List<RuntimeEvent>.unmodifiable(_queuedRuntimeEvents);
     _queuedRuntimeEvents.clear();
-    return RuntimeEventBatch._(events: events);
+    return events;
   }
 
-  RuntimeEventBatch _drainNativeEvents() {
+  List<RuntimeEvent> _drainNativeEvents() {
     return withNativeArena((arena) {
       final outBatch = arena<Uint64>()..value = 0;
       _check(raw.mln_runtime_drain_events(_handle.raw, outBatch));
@@ -262,7 +249,7 @@ final class RuntimeHandle {
       view.ref.size = sizeOf<raw.mln_runtime_event_batch_view>();
       try {
         _check(raw.mln_event_batch_get(outBatch.value, view));
-        return RuntimeEventBatch._fromNative(view.ref, this);
+        return _decodeRuntimeEventBatch(view.ref, this);
       } finally {
         raw.mln_event_batch_release(outBatch.value);
       }
@@ -292,6 +279,7 @@ final class RuntimeHandle {
 
   /// Registers exact native-owned URL rewrite rules for network resources.
   ///
+  /// The rules replace any transform this runtime already carries.
   Future<CommandCompletion> setResourceUrlRewriteRules(
     List<ResourceUrlRewriteRule> rules,
   ) {
@@ -312,12 +300,11 @@ final class RuntimeHandle {
           completion,
         );
       }),
-      onRejected: () => _cancelNativeCallback(userData),
+      onRejected: () => _releaseNativeCallback(userData),
     );
   }
 
   /// Clears runtime-scoped URL rewrite rules.
-  ///
   Future<CommandCompletion> clearResourceTransform() => _startCommand(
     (completion) =>
         raw.mln_runtime_clear_resource_transform(_handle.raw, completion),
@@ -325,6 +312,7 @@ final class RuntimeHandle {
 
   /// Registers native-owned HTTP header routes evaluated on network threads.
   ///
+  /// The routes replace any header transform this runtime already carries.
   Future<CommandCompletion> setHttpHeaderTransformRules(
     List<HttpHeaderTransformRule> rules,
   ) {
@@ -345,12 +333,11 @@ final class RuntimeHandle {
           completion,
         );
       }),
-      onRejected: () => _cancelNativeCallback(userData),
+      onRejected: () => _releaseNativeCallback(userData),
     );
   }
 
   /// Clears native-owned HTTP header transform routes.
-  ///
   Future<CommandCompletion> clearHttpHeaderTransform() => _startCommand(
     (completion) =>
         raw.mln_runtime_clear_http_header_transform(_handle.raw, completion),
@@ -358,6 +345,7 @@ final class RuntimeHandle {
 
   /// Registers or replaces exact native-owned response rules.
   ///
+  /// The rules replace any provider this runtime already carries.
   Future<CommandCompletion> setResourceProviderRules(
     List<ResourceProviderRule> rules,
   ) {
@@ -378,20 +366,18 @@ final class RuntimeHandle {
           completion,
         );
       }),
-      onRejected: () => _cancelNativeCallback(userData),
+      onRejected: () => _releaseNativeCallback(userData),
     );
   }
 
   /// Registers or replaces a queued Dart resource provider callback.
   ///
+  /// Requests reach [ResourceProvider.callback] on the isolate that registered
+  /// the provider, one event-loop turn after MapLibre queues them.
   Future<CommandCompletion> setResourceProvider(ResourceProvider provider) {
     final state = _ResourceProviderCallbackState(provider);
-    _resourceProviderQueues[state.queue] = state;
     final userData = state.pointer.cast<Void>();
-    _registerNativeCallback(
-      userData,
-      () => _closeResourceProviderCallback(state),
-    );
+    _registerNativeCallback(userData, state.retire);
     return _startCommand(
       (completion) => withNativeArena((arena) {
         final nativeProvider = arena<raw.mln_resource_provider>();
@@ -407,23 +393,21 @@ final class RuntimeHandle {
           completion,
         );
       }),
-      onRejected: () => _cancelNativeCallback(userData),
+      onRejected: () => _releaseNativeCallback(userData),
     );
   }
 
   /// Clears the runtime-scoped network resource provider.
-  ///
   Future<CommandCompletion> clearResourceProvider() => _startCommand(
     (completion) =>
         raw.mln_runtime_clear_resource_provider(_handle.raw, completion),
   );
 
-  void _closeResourceProviderCallback(_ResourceProviderCallbackState state) {
-    _resourceProviderQueues.remove(state.queue);
-    state.retire();
-  }
-
   /// Starts an ambient cache maintenance operation.
+  ///
+  /// The arguments are validated on the calling isolate, and the operation
+  /// runs on the runtime worker. A database that cannot be opened fails the
+  /// returned future with [NativeErrorException].
   Future<void> runAmbientCacheOperation(AmbientCacheOperation operation) =>
       _startUnit(
         (completion) => raw.mln_runtime_run_ambient_cache_operation(
@@ -436,7 +420,9 @@ final class RuntimeHandle {
   /// Starts a change to this runtime's maximum ambient cache size.
   ///
   /// MapLibre evicts ambient resources to fit the new budget, so lowering it
-  /// discards cached resources. Offline regions are unaffected.
+  /// discards cached resources. Offline regions keep every resource they hold.
+  /// A database that cannot be opened fails the returned future with
+  /// [NativeErrorException].
   Future<void> setMaximumAmbientCacheSize(BigInt size) => _startUnit(
     (completion) => raw.mln_runtime_set_maximum_ambient_cache_size(
       _handle.raw,
@@ -446,11 +432,15 @@ final class RuntimeHandle {
   );
 
   /// Starts creating an offline region.
+  ///
+  /// Every offline call validates its arguments on the calling isolate and
+  /// returns without waiting for the runtime worker. A database that cannot be
+  /// opened fails the returned future with [NativeErrorException].
   Future<OfflineRegionInfo> createOfflineRegion(
     OfflineRegionDefinition definition, {
     Uint8List? metadata,
   }) {
-    return _startOfflineValue(
+    return startNativeCompletion(
       copyKind: raw
           .mln_adapter_completion_copy_kind
           .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGIONS,
@@ -476,9 +466,10 @@ final class RuntimeHandle {
     );
   }
 
-  /// Starts getting an offline region snapshot by ID.
+  /// Starts getting an offline region snapshot by ID, and completes with null
+  /// when no region carries [regionId].
   Future<OfflineRegionInfo?> getOfflineRegion(int regionId) =>
-      _startOfflineValue(
+      startNativeCompletion(
         copyKind: raw
             .mln_adapter_completion_copy_kind
             .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGIONS,
@@ -516,11 +507,14 @@ final class RuntimeHandle {
   );
 
   /// Starts updating opaque offline region metadata.
+  ///
+  /// No region with [regionId] fails the returned future with
+  /// [NotFoundException].
   Future<OfflineRegionInfo> updateOfflineRegionMetadata(
     int regionId,
     Uint8List metadata,
   ) {
-    return _startOfflineValue(
+    return startNativeCompletion(
       copyKind: raw
           .mln_adapter_completion_copy_kind
           .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGIONS,
@@ -542,8 +536,11 @@ final class RuntimeHandle {
   }
 
   /// Starts getting the current offline region status.
+  ///
+  /// No region with [regionId] fails the returned future with
+  /// [NotFoundException].
   Future<OfflineRegionStatus> getOfflineRegionStatus(int regionId) =>
-      _startOfflineValue(
+      startNativeCompletion(
         copyKind: raw
             .mln_adapter_completion_copy_kind
             .MLN_ADAPTER_COMPLETION_COPY_FLAT,
@@ -559,6 +556,9 @@ final class RuntimeHandle {
       );
 
   /// Starts enabling or disabling offline region observation.
+  ///
+  /// No region with [regionId] fails the returned future with
+  /// [NotFoundException].
   Future<void> setOfflineRegionObserved(int regionId, bool observed) =>
       _startUnit(
         (completion) => raw.mln_runtime_offline_region_set_observed(
@@ -570,6 +570,9 @@ final class RuntimeHandle {
       );
 
   /// Starts changing an offline region's download state.
+  ///
+  /// No region with [regionId] fails the returned future with
+  /// [NotFoundException].
   Future<void> setOfflineRegionDownloadState(
     int regionId,
     OfflineRegionDownloadState state,
@@ -583,6 +586,9 @@ final class RuntimeHandle {
   );
 
   /// Starts invalidating cached resources for an offline region.
+  ///
+  /// No region with [regionId] fails the returned future with
+  /// [NotFoundException].
   Future<void> invalidateOfflineRegion(int regionId) => _startUnit(
     (completion) => raw.mln_runtime_offline_region_invalidate(
       _handle.raw,
@@ -592,6 +598,9 @@ final class RuntimeHandle {
   );
 
   /// Starts deleting an offline region.
+  ///
+  /// No region with [regionId] fails the returned future with
+  /// [NotFoundException].
   Future<void> deleteOfflineRegion(int regionId) => _startUnit(
     (completion) => raw.mln_runtime_offline_region_delete(
       _handle.raw,
@@ -600,7 +609,7 @@ final class RuntimeHandle {
     ),
   );
 
-  Future<void> _startUnit(NativeCompletionStart start) => _startValue(
+  Future<void> _startUnit(NativeCompletionStart start) => startNativeCompletion(
     copyKind:
         raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
     elementSize: 0,
@@ -608,21 +617,9 @@ final class RuntimeHandle {
     decode: (_) {},
   );
 
-  Future<T> _startOfflineValue<T>({
-    required raw.mln_adapter_completion_copy_kind copyKind,
-    required int elementSize,
-    required NativeCompletionStart start,
-    required NativeCompletionDecoder<T> decode,
-  }) => _startValue(
-    copyKind: copyKind,
-    elementSize: elementSize,
-    start: start,
-    decode: decode,
-  );
-
   Future<List<OfflineRegionInfo>> _startOfflineRegions(
     NativeCompletionStart start,
-  ) => _startOfflineValue(
+  ) => startNativeCompletion(
     copyKind: raw
         .mln_adapter_completion_copy_kind
         .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGIONS,
@@ -663,45 +660,33 @@ final class RuntimeHandle {
   /// gone, so a host that awaits it may exit the process.
   Future<void> close() async {
     await _state.closeAsync((handle) => _releaseRuntimeHandle(handle.raw));
-    while (_nativeCallbackReleases.isNotEmpty) {
-      await Future<void>.delayed(Duration.zero);
+    if (_nativeCallbackReleases.isNotEmpty) {
+      final drained = _nativeCallbacksDrained ??= Completer<void>();
+      await drained.future;
     }
     await _eventWake.released;
     _callbackReleaseListener.close();
   }
 }
 
-/// One batch of runtime events copied out of the native event arena.
-final class RuntimeEventBatch {
-  RuntimeEventBatch._({required List<RuntimeEvent> events})
-    : events = List.unmodifiable(events);
-
-  factory RuntimeEventBatch._fromNative(
-    raw.mln_runtime_event_batch_view batch,
-    RuntimeHandle runtime,
-  ) {
-    final eventSize = batch.event_size;
-    final events = <RuntimeEvent>[];
-    final first = batch.events.cast<Uint8>();
-    for (var index = 0; index < batch.event_count; index += 1) {
-      // Events are reached by the batch's own stride, because a later C API
-      // version widens the record beyond the size this binding compiled
-      // against.
-      final nativeEvent = (first + index * eventSize)
-          .cast<raw.mln_runtime_event>();
-      final event = RuntimeEvent._fromNative(
-        nativeEvent,
-        eventSize,
-        batch.messages,
-        runtime,
-      );
-      events.add(event);
-    }
-    return RuntimeEventBatch._(events: events);
+/// Copies one batch of runtime events out of the native event arena.
+List<RuntimeEvent> _decodeRuntimeEventBatch(
+  raw.mln_runtime_event_batch_view batch,
+  RuntimeHandle runtime,
+) {
+  final eventSize = batch.event_size;
+  final events = <RuntimeEvent>[];
+  final first = batch.events.cast<Uint8>();
+  for (var index = 0; index < batch.event_count; index += 1) {
+    // Events are reached by the batch's own stride, because a later C API
+    // version widens the record beyond the size this binding compiled against.
+    final nativeEvent = (first + index * eventSize)
+        .cast<raw.mln_runtime_event>();
+    events.add(
+      RuntimeEvent._fromNative(nativeEvent, eventSize, batch.messages, runtime),
+    );
   }
-
-  /// Drained events in queue order.
-  final List<RuntimeEvent> events;
+  return events;
 }
 
 /// Event types a map or a runtime queues, as one bit per [RuntimeEventType].
@@ -854,10 +839,10 @@ final class RuntimeEvent {
 }
 
 /// Decodes a synthesized batch through the production decoder for tests.
-RuntimeEventBatch decodeRuntimeEventBatchForTesting(
+List<RuntimeEvent> decodeRuntimeEventBatchForTesting(
   raw.mln_runtime_event_batch_view batch,
   RuntimeHandle runtime,
-) => RuntimeEventBatch._fromNative(batch, runtime);
+) => _decodeRuntimeEventBatch(batch, runtime);
 
 /// Runtime event type with forward-compatible unknown values.
 final class RuntimeEventType {
@@ -1223,7 +1208,7 @@ sealed class RuntimeEventPayload {
       7 => _offlineRegionTileCountLimitPayload(
         payload.offline_region_tile_count_limit,
       ),
-      8 => _cameraTransitionFinishedPayload(payload.camera_transition_finished),
+      9 => _cameraTransitionFinishedPayload(payload.camera_transition_finished),
       _ => RuntimeEventPayloadUnknown(
         rawPayloadType,
         _copyRuntimePayloadWindow(event, eventSize),
@@ -1599,6 +1584,7 @@ final class MapSnapshot {
     required this.fullyLoaded,
     required this.renderingStatsViewEnabled,
     required this.repaintDemand,
+    required this.gestureInProgress,
     required this.eventMask,
     required this.latestRenderUpdateGeneration,
     required this.tileOptions,
@@ -1632,6 +1618,13 @@ final class MapSnapshot {
 
   /// Whether the map currently requests a repaint.
   final bool repaintDemand;
+
+  /// Whether a gesture is in progress.
+  ///
+  /// [MapHandle.updateCamera] sets the flag with [GesturePhase.begin] or
+  /// [GesturePhase.update] and clears it with [GesturePhase.end] or
+  /// [GesturePhase.cancel].
+  final bool gestureInProgress;
 
   /// Map event types selected in this snapshot.
   final RuntimeEventMask eventMask;
@@ -1699,13 +1692,13 @@ final class GeoJsonSourceDataHandle {
     _state.close((handle) {
       raw.mln_geojson_source_data_destroy(handle.raw);
       return 0;
-    }, _c.threadLastErrorMessage);
+    }, threadLastErrorMessage);
   }
 }
 
 /// Map handle bound to a retained runtime.
 final class MapHandle {
-  MapHandle._(this._runtime, NativeMap handle, this._acceptedEventMask)
+  MapHandle._(this._runtime, NativeMap handle)
     : _state = NativeHandleState(handle, 'MapHandle');
 
   /// Creates a map without blocking the calling isolate.
@@ -1713,7 +1706,7 @@ final class MapHandle {
     RuntimeHandle runtime, {
     MapOptions options = const MapOptions(),
   }) async {
-    final map = await runtime._startValue(
+    return startNativeCompletion(
       copyKind:
           raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
       elementSize: sizeOf<Uint64>(),
@@ -1738,19 +1731,21 @@ final class MapHandle {
           completion,
         );
       }),
-      decode: (result) => MapHandle._(
-        runtime,
-        NativeMap(result.value.cast<Uint64>().value),
-        options.eventMask,
-      ),
+      decode: (result) {
+        final map = MapHandle._(
+          runtime,
+          NativeMap(result.value.cast<Uint64>().value),
+        );
+        // Register before the awaiting turn resumes, so an event decoded from
+        // a drain that races map creation still resolves its source map.
+        runtime._registerMap(map);
+        return map;
+      },
     );
-    runtime._registerMap(map);
-    return map;
   }
 
   final RuntimeHandle _runtime;
   final NativeHandleState<NativeMap> _state;
-  RuntimeEventMask _acceptedEventMask;
 
   /// Callback roots of the custom-geometry sources this map still holds, each
   /// released by the C API's own release callback.
@@ -1782,7 +1777,7 @@ final class MapHandle {
     required int elementSize,
     required NativeCompletionStart start,
     required NativeCompletionDecoder<T> decode,
-  }) => _runtime._startValue(
+  }) => startNativeCompletion(
     copyKind: copyKind,
     elementSize: elementSize,
     start: start,
@@ -1903,17 +1898,16 @@ final class MapHandle {
   }
 
   /// Selects map-originated events.
-  Future<CommandCompletion> setEventMask(RuntimeEventMask mask) {
-    final completion = _startCommand(
-      (completion) =>
-          raw.mln_map_set_event_mask(_handle.raw, mask.value, completion),
-    );
-    _acceptedEventMask = mask;
-    return completion;
-  }
-
-  /// Reports the most recently accepted map event mask.
-  RuntimeEventMask get eventMask => _acceptedEventMask;
+  ///
+  /// The map applies the bits in [RuntimeEventMask.allMapEvents] and ignores
+  /// the other named bits. A bit outside [RuntimeEventMask.all] reports
+  /// invalid argument. [MapSnapshot.eventMask] reports the committed
+  /// selection.
+  Future<CommandCompletion> setEventMask(RuntimeEventMask mask) =>
+      _startCommand(
+        (completion) =>
+            raw.mln_map_set_event_mask(_handle.raw, mask.value, completion),
+      );
 
   /// Copies the latest immutable map snapshot.
   MapSnapshot snapshot() {
@@ -1940,6 +1934,7 @@ final class MapHandle {
         fullyLoaded: value.fully_loaded,
         renderingStatsViewEnabled: value.rendering_stats_view_enabled,
         repaintDemand: value.repaint_demand,
+        gestureInProgress: value.gesture_in_progress,
         eventMask: RuntimeEventMask(value.event_mask),
         latestRenderUpdateGeneration: uint64FromNative(
           value.latest_render_update_generation,
@@ -1954,6 +1949,11 @@ final class MapHandle {
   }
 
   /// Resizes the map.
+  ///
+  /// [MapSize.scaleFactor] is fixed at map creation, so a size that changes it
+  /// reports [MaplibreStatus.invalidArgument]; only width and height may
+  /// change. While a render session is attached, resize through
+  /// [RenderSessionHandle.resize], which submits this command itself.
   Future<CommandCompletion> resize(MapSize size) => _startCommand(
     (completion) => withNativeArena((arena) {
       final extent = arena<raw.mln_logical_extent>();
@@ -1964,12 +1964,20 @@ final class MapHandle {
     }),
   );
 
-  /// Requests a repaint.
+  /// Requests a repaint for a continuous map.
+  ///
+  /// A map in another mode reports [MaplibreStatus.invalidState] before this
+  /// returns.
   Future<CommandCompletion> requestRepaint() => _startCommand(
     (completion) => raw.mln_map_request_repaint(_handle.raw, completion),
   );
 
   /// Requests one still image without blocking the calling isolate.
+  ///
+  /// The map must be in [MapMode.staticMap] or [MapMode.tile]. A second
+  /// request while one is pending fails the returned future with
+  /// [InvalidStateException], and closing the map before the image arrives
+  /// fails it with [CancelledException].
   Future<void> requestStillImage() => _runtime._startUnit(
     (completion) => raw.mln_map_request_still_image(_handle.raw, completion),
   );
@@ -2021,11 +2029,15 @@ final class MapHandle {
   );
 
   /// Submits an atomic camera update.
+  ///
+  /// [gesturePhase] brackets a host gesture. It only maintains
+  /// [MapSnapshot.gestureInProgress]; cancel a running transition with
+  /// [cancelTransitions].
   Future<CommandCompletion> updateCamera(
     CameraOptions camera, {
     CameraUpdateMode mode = CameraUpdateMode.jump,
     AnimationOptions? animation,
-    int gesturePhase = 0,
+    GesturePhase gesturePhase = GesturePhase.none,
   }) {
     return _startCommand(
       (completion) => withNativeArena((arena) {
@@ -2036,11 +2048,22 @@ final class MapHandle {
         if (animation != null) {
           update.ref.animation = _nativeAnimation(animation, arena).ref;
         }
-        update.ref.gesture_phase = gesturePhase;
+        update.ref.gesture_phase = gesturePhase.rawValue;
         return raw.mln_map_update_camera(_handle.raw, update, completion);
       }),
     );
   }
+
+  /// Cancels the camera transitions running when this command commits.
+  ///
+  /// A cancelled transition that carried [AnimationOptions.transitionId]
+  /// reports its end through
+  /// [RuntimeEventType.mapCameraTransitionFinished], the same way a completed
+  /// one does. Cancelling with no transition running commits and changes
+  /// nothing.
+  Future<CommandCompletion> cancelTransitions() => _startCommand(
+    (completion) => raw.mln_map_cancel_transitions(_handle.raw, completion),
+  );
 
   /// Submits one relative camera operation.
   Future<CommandCompletion> applyCameraDelta(CameraDelta delta) {
@@ -2133,9 +2156,6 @@ final class MapHandle {
           );
         }),
       );
-
-  /// Copies axonometric rendering options from the latest map snapshot.
-  ProjectionModeOptions projectionMode() => snapshot().projectionMode;
 
   /// Applies selected axonometric rendering option fields.
   Future<CommandCompletion> setProjectionMode(ProjectionModeOptions mode) =>
@@ -2508,9 +2528,19 @@ final class MapHandle {
     },
   );
 
-  /// Copies one runtime style image as premultiplied RGBA8 pixels.
-  Future<StyleImage?> copyStyleImagePremultipliedRgba8(String imageId) =>
-      _startStyleImage(imageId);
+  /// Copies one runtime style image's tightly packed premultiplied RGBA8
+  /// pixels, or null when no image carries [imageId].
+  Future<Uint8List?> copyStyleImagePremultipliedRgba8(String imageId) =>
+      _startOptionalBuffer(
+        (completion) => withNativeArena((arena) {
+          final nativeId = nativeStringView(imageId, arena);
+          return raw.mln_map_copy_style_image_premultiplied_rgba8(
+            _handle.raw,
+            nativeId.value,
+            completion,
+          );
+        }),
+      );
 
   Future<String> _copyLayerText(
     String layerId,
@@ -2920,9 +2950,10 @@ final class MapHandle {
     String sourceId,
     CustomGeometrySourceOptions options,
   ) {
-    final callbackState = _CustomGeometryCallbackState(
+    late final _CustomGeometryCallbackState callbackState;
+    callbackState = _CustomGeometryCallbackState(
       options,
-      () => _releaseCustomGeometryCallbacks(sourceId),
+      () => _releaseCustomGeometryCallbacks(sourceId, callbackState),
     );
     final future = _runtime._startCommand(
       (completion) => withNativeArena((arena) {
@@ -3017,9 +3048,10 @@ final class MapHandle {
     String sourceId,
     CustomMvtVectorSourceOptions options,
   ) {
-    final callbackState = _CustomMvtVectorCallbackState(
+    late final _CustomMvtVectorCallbackState callbackState;
+    callbackState = _CustomMvtVectorCallbackState(
       options,
-      () => _releaseCustomMvtVectorCallbacks(sourceId),
+      () => _releaseCustomMvtVectorCallbacks(sourceId, callbackState),
     );
     final future = _runtime._startCommand(
       (completion) => withNativeArena((arena) {
@@ -3246,6 +3278,53 @@ final class MapHandle {
     (completion) => raw.mln_map_list_style_source_ids(_handle.raw, completion),
   );
 
+  /// Copies one style source's attribution after prior commands.
+  ///
+  /// The value is null when no style source has [sourceId], and when the
+  /// source carries no attribution.
+  Future<String?> getStyleSourceAttribution(String sourceId) =>
+      _startOptionalString(
+        (completion) => withNativeArena((arena) {
+          final nativeId = nativeStringView(sourceId, arena);
+          return raw.mln_map_copy_style_source_attribution(
+            _handle.raw,
+            nativeId.value,
+            completion,
+          );
+        }),
+      );
+
+  /// Copies one style source's URL after prior commands.
+  ///
+  /// The value is null when no style source has [sourceId], and when the
+  /// source carries inline TileJSON instead of a URL.
+  Future<String?> getStyleSourceUrl(String sourceId) => _startOptionalString(
+    (completion) => withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      return raw.mln_map_copy_style_source_url(
+        _handle.raw,
+        nativeId.value,
+        completion,
+      );
+    }),
+  );
+
+  /// Copies one style source's inline TileJSON tile URLs after prior commands.
+  ///
+  /// The list is empty when no style source has [sourceId], and when the
+  /// source loads its TileJSON from a URL.
+  Future<List<String>> getStyleSourceTileUrls(String sourceId) =>
+      _startStringList(
+        (completion) => withNativeArena((arena) {
+          final nativeId = nativeStringView(sourceId, arena);
+          return raw.mln_map_get_style_source_tile_urls(
+            _handle.raw,
+            nativeId.value,
+            completion,
+          );
+        }),
+      );
+
   Future<List<String>> _startStringList(NativeCompletionStart start) =>
       _startMapValue(
         copyKind: raw
@@ -3260,6 +3339,11 @@ final class MapHandle {
             ),
         ],
       );
+
+  Future<String?> _startOptionalString(NativeCompletionStart start) async {
+    final bytes = await _startOptionalBuffer(start);
+    return bytes == null ? null : utf8.decode(bytes);
+  }
 
   Future<Uint8List?> _startOptionalBuffer(NativeCompletionStart start) =>
       _startMapValue(
@@ -3719,31 +3803,13 @@ final class MapHandle {
       if (result.value_count == 0) return null;
       final value = result.value.cast<raw.mln_style_layer_result>().ref;
       final info = value.info;
-      final hasSourceId =
-          info.fields &
-              raw
-                  .mln_style_layer_info_field
-                  .MLN_STYLE_LAYER_INFO_SOURCE_ID
-                  .value !=
-          0;
-      final hasSourceLayer =
-          info.fields &
-              raw
-                  .mln_style_layer_info_field
-                  .MLN_STYLE_LAYER_INFO_SOURCE_LAYER
-                  .value !=
-          0;
       return LayerInfo(
         type: _copyStringView(info.type) ?? '',
         minZoom: info.min_zoom,
         maxZoom: info.max_zoom,
         visibility: StyleLayerVisibility.fromRawValue(info.visibility),
-        sourceId: hasSourceId
-            ? utf8.decode(_copyBufferView(value.source_id))
-            : null,
-        sourceLayer: hasSourceLayer
-            ? utf8.decode(_copyBufferView(value.source_layer))
-            : null,
+        sourceId: _copyStringView(value.source_id),
+        sourceLayer: _copyStringView(value.source_layer),
       );
     },
   );
@@ -3787,10 +3853,11 @@ final class MapHandle {
     );
   }
 
-  /// Releases this map's public native handle.
+  /// Releases this map's public native handle and waits for native teardown.
   ///
-  /// Callback roots remain alive until native teardown releases every
-  /// custom-geometry source that the map still owns.
+  /// Callback roots remain alive until native teardown releases every custom
+  /// source that the map still owns; a root whose release message has not
+  /// arrived is force-retired here.
   Future<void> close() async {
     final id = _state.handleId;
     await _state.closeAsync((handle) async {
@@ -3803,17 +3870,37 @@ final class MapHandle {
       for (final state in _customGeometryCallbacks.values.toList()) {
         state._retire();
       }
+      for (final state in _customMvtVectorCallbacks.values.toList()) {
+        state._retire();
+      }
       await Future<void>.delayed(Duration.zero);
     });
     _runtime._unregisterMapId(id);
   }
 
-  void _releaseCustomGeometryCallbacks(String sourceId) {
-    _customGeometryCallbacks.remove(sourceId);
+  /// Drops [sourceId]'s custom-geometry callback root once the C API has
+  /// released it.
+  ///
+  /// The lookup is identity-checked, because a source removed and re-added
+  /// under the same ID leaves the older state's release to arrive after the
+  /// newer registration.
+  void _releaseCustomGeometryCallbacks(
+    String sourceId,
+    _CustomGeometryCallbackState state,
+  ) {
+    if (identical(_customGeometryCallbacks[sourceId], state)) {
+      _customGeometryCallbacks.remove(sourceId);
+    }
   }
 
-  /// Drops [sourceId]'s callback root once the C API has released it.
-  void _releaseCustomMvtVectorCallbacks(String sourceId) {
-    _customMvtVectorCallbacks.remove(sourceId);
+  /// Drops [sourceId]'s custom-MVT-vector callback root once the C API has
+  /// released it, identity-checked the same way.
+  void _releaseCustomMvtVectorCallbacks(
+    String sourceId,
+    _CustomMvtVectorCallbackState state,
+  ) {
+    if (identical(_customMvtVectorCallbacks[sourceId], state)) {
+      _customMvtVectorCallbacks.remove(sourceId);
+    }
   }
 }

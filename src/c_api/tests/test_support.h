@@ -15,6 +15,13 @@ extern "C" {
 #define MLN_BUFFER_LITERAL(literal) \
   ((mln_buffer_view){.data = (literal), .size = sizeof(literal) - 1})
 
+// Inline style documents the suite loads so a test never reaches the network.
+// The empty one parses with no layer, the background one paints one opaque
+// layer, and the red one paints a layer a readback can recognize.
+extern const mln_buffer_view mln_test_empty_style_json;
+extern const mln_buffer_view mln_test_background_style_json;
+extern const mln_buffer_view mln_test_red_background_style_json;
+
 static inline mln_buffer_view mln_test_buffer_view(
   const void* data, size_t size
 ) {
@@ -44,16 +51,40 @@ typedef struct mln_test_completion {
   void* state;
 } mln_test_completion;
 
+// Submits a command through `expression` and asserts its terminal status. The
+// macro declares the `completion` the expression must pass, so an expression
+// that names anything else does not compile.
+#define MLN_TEST_AWAIT_COMMAND(expected_status, expression)          \
+  do {                                                               \
+    mln_test_completion completion = mln_test_completion_default(0); \
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, (expression));              \
+    TEST_ASSERT_EQUAL_INT(                                           \
+      (expected_status), mln_test_completion_finish(&completion)     \
+    );                                                               \
+    mln_test_completion_destroy(&completion);                        \
+  } while (false)
+
 mln_test_completion mln_test_completion_default(size_t value_size);
 mln_test_completion mln_test_completion_buffer_view(void);
 mln_test_completion mln_test_completion_readback(void);
 mln_completion mln_test_discard_completion(void);
 void mln_test_completion_destroy(mln_test_completion* completion);
 void mln_test_completion_reject(mln_test_completion* completion);
+// Waits for the completion to be delivered and reports whether it arrived. A
+// negative timeout_ms still stops at a bounded ceiling, so a completion the
+// code under test never settles fails a named test rather than hanging the
+// suite.
 bool mln_test_completion_wait(
   mln_test_completion* completion, int64_t timeout_ms
 );
 mln_status mln_test_completion_finish(mln_test_completion* completion);
+// Waits for the completion, destroys it, and reports its terminal status.
+mln_status mln_test_completion_settle(mln_test_completion* completion);
+// The same, copying value_size bytes of the completion's value into out_value
+// first. Reports MLN_STATUS_NATIVE_ERROR when the copy fails.
+mln_status mln_test_completion_finish_value(
+  mln_test_completion* completion, void* out_value, size_t value_size
+);
 bool mln_test_completion_poll(mln_test_completion* completion);
 mln_status mln_test_completion_status(mln_test_completion* completion);
 uint32_t mln_test_completion_disposition(mln_test_completion* completion);
@@ -63,14 +94,16 @@ size_t mln_test_completion_value_count(mln_test_completion* completion);
 bool mln_test_completion_copy_value(
   mln_test_completion* completion, void* out_value, size_t value_size
 );
-bool mln_test_completion_contract(void);
+// Exercises the completion state machine inside the library and returns the
+// clause that failed, or null when every one held.
+const char* mln_test_completion_contract(void);
 
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-bool mln_test_metal_surface_retarget_retains_submission(mln_map map);
+// Returns the step that failed, or null when the retarget kept the replacement
+// layer alive until the driver ran it.
+const char* mln_test_metal_surface_retarget_retains_submission(mln_map map);
 #endif
 
-mln_status mln_test_runtime_reserve_child(mln_runtime runtime);
-void mln_test_runtime_abandon_child(mln_runtime runtime);
 mln_status mln_test_render_session_blocking_operation_create(
   mln_render_session session, atomic_bool* entered, const atomic_bool* release,
   const mln_completion* completion
@@ -80,9 +113,6 @@ mln_status mln_test_render_session_blocking_operation_create(
 // reclaim handles a test left behind. The matching destroy helpers untrack.
 mln_runtime mln_test_create_runtime(void);
 mln_status mln_test_runtime_barrier(mln_runtime runtime);
-mln_status mln_test_runtime_create(
-  const mln_runtime_options* options, mln_runtime* out_runtime
-);
 mln_status mln_test_runtime_close(mln_runtime runtime);
 mln_map mln_test_create_map(mln_runtime runtime);
 mln_map mln_test_create_map_with_options(
@@ -98,12 +128,6 @@ mln_status mln_test_map_request_repaint(mln_map map);
 mln_status mln_test_map_set_event_mask(mln_map map, uint64_t mask);
 mln_status mln_test_map_set_style_json(mln_map map, mln_buffer_view json);
 mln_status mln_test_map_set_style_url(mln_map map, const char* url);
-mln_status mln_test_map_copy_loaded_style_json(
-  mln_map map, char* out, size_t capacity, size_t* out_size
-);
-mln_status mln_test_map_copy_style_url(
-  mln_map map, char* out, size_t capacity, size_t* out_size
-);
 void mln_test_destroy_runtime(mln_runtime runtime);
 void mln_test_destroy_map(mln_map map);
 void mln_test_sleep_millisecond(void);
@@ -157,6 +181,24 @@ void mln_test_dedicated_egl_texture_destroy(mln_test_render_fixture* fixture);
 // Waits until `flag` is set while draining runtime events. Returns whether the
 // flag was observed before the bounded deadline.
 bool mln_test_wait_until(mln_runtime runtime, atomic_bool* flag);
+
+// The same bounded wait without touching the C API, for a flag written by a
+// callback that runs on a MapLibre thread the caller must not re-enter.
+bool mln_test_wait_for_flag(const atomic_bool* flag);
+
+// Barriers the runtime until `counter` reaches `target`, then fails naming
+// `what` when the bounded deadline expires first.
+void mln_test_barrier_until_count(
+  mln_runtime runtime, const atomic_size_t* counter, size_t target,
+  const char* what
+);
+
+// Applies an inline style and waits for the map to finish loading it, so a test
+// that needs a loaded style depends on neither the network nor a fixed barrier
+// count. Fails the test when the style never loads.
+void mln_test_load_style_and_wait(
+  mln_runtime runtime, mln_map map, mln_buffer_view json
+);
 
 typedef struct mln_test_event_batch {
   uint32_t size;

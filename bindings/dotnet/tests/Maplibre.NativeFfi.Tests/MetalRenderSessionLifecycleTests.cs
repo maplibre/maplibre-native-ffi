@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Render;
@@ -22,27 +23,29 @@ public sealed partial class MetalRenderSessionLifecycleTests
     public async Task CallerDriverAttachmentAndDetachRequireExplicitService()
     {
         Assert.SkipUnless(
-            Maplibre.SupportedRenderBackends().HasFlag(RenderBackend.Metal),
+            OperatingSystem.IsMacOS()
+                && Maplibre.SupportedRenderBackends().HasFlag(RenderBackend.Metal),
             "The selected native preset does not provide Metal."
         );
 
-        Assert.True(OperatingSystem.IsMacOS());
         var device = MetalCreateSystemDefaultDevice();
-        Assert.NotEqual(0, device);
+        if (device == 0)
+        {
+            Assert.Fail("Metal is compiled in but reported no system default device.");
+        }
         try
         {
-            var runtime = RuntimeHandle.Create(new RuntimeOptions());
-            var map = await MapHandle.CreateAsync(
+            using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+            using var map = await MapHandle.CreateAsync(
                 runtime,
                 new MapOptions
                 {
                     Width = 32,
                     Height = 16,
                     ScaleFactor = 1.0,
-                },
-                TestContext.Current.CancellationToken
+                }
             );
-            var session = RenderSessionHandle.AttachMetalOwnedTexture(
+            using var session = RenderSessionHandle.AttachMetalOwnedTexture(
                 map,
                 new MetalOwnedTextureDescriptor
                 {
@@ -57,17 +60,13 @@ public sealed partial class MetalRenderSessionLifecycleTests
 
             Assert.False(session.Attachment.IsCompleted);
             ServiceUntilCompleted(session, session.Attachment);
-            Assert.Equal(RenderSessionState.Attached, session.Snapshot.State);
-            Assert.Equal(RenderDriverKind.CallerGraphicsThread, session.Capabilities.Driver);
+            Assert.Equal(RenderSessionState.Attached, session.GetSnapshot().State);
+            Assert.Equal(RenderDriverKind.CallerGraphicsThread, session.GetCapabilities().Driver);
 
             var detach = session.DetachAsync(TestContext.Current.CancellationToken);
             Assert.False(detach.IsCompleted);
             ServiceUntilCompleted(session, detach);
-            Assert.Equal(RenderSessionState.Detached, session.Snapshot.State);
-
-            session.Close();
-            map.Close();
-            await runtime.CloseAsync();
+            Assert.Equal(RenderSessionState.Detached, session.GetSnapshot().State);
         }
         finally
         {
@@ -78,8 +77,15 @@ public sealed partial class MetalRenderSessionLifecycleTests
     private static void ServiceUntilCompleted(RenderSessionHandle session, Task operation)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        var deadline = Stopwatch.StartNew();
         while (!operation.IsCompleted)
         {
+            if (deadline.Elapsed > TimeSpan.FromSeconds(30))
+            {
+                throw new TimeoutException(
+                    "The caller-driven session never completed its operation."
+                );
+            }
             cancellationToken.ThrowIfCancellationRequested();
             session.ServiceDriverWork(0);
             Thread.Yield();

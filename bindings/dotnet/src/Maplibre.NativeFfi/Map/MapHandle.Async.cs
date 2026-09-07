@@ -9,6 +9,7 @@ namespace Maplibre.NativeFfi.Map;
 
 public sealed unsafe partial class MapHandle
 {
+    /// <summary>Copies style source metadata, or null when no source carries the ID.</summary>
     public Task<SourceInfo?> StyleSourceInfoAsync(
         string sourceId,
         CancellationToken cancellationToken = default
@@ -24,6 +25,7 @@ public sealed unsafe partial class MapHandle
             .WaitAsync(cancellationToken);
     }
 
+    /// <summary>Copies style layer metadata, or null when no layer carries the ID.</summary>
     public Task<LayerInfo?> StyleLayerInfoAsync(
         string layerId,
         CancellationToken cancellationToken = default
@@ -39,6 +41,7 @@ public sealed unsafe partial class MapHandle
             .WaitAsync(cancellationToken);
     }
 
+    /// <summary>Copies a complete runtime style image, or null when no image carries the ID.</summary>
     public Task<StyleImage?> StyleImageAsync(
         string imageId,
         CancellationToken cancellationToken = default
@@ -124,7 +127,6 @@ public sealed unsafe partial class MapHandle
         }
         var value = NativeCompletion.Value<mln_style_layer_result>(completion);
         var info = value.info;
-        var fields = (mln_style_layer_info_field)info.fields;
         return new LayerInfo(
             layerId,
             RuntimeStructs.CopyUtf8((sbyte*)info.type.data, info.type.size),
@@ -132,13 +134,15 @@ public sealed unsafe partial class MapHandle
             info.max_zoom,
             (StyleLayerVisibility)info.visibility,
             info.visibility,
-            fields.HasFlag(mln_style_layer_info_field.MLN_STYLE_LAYER_INFO_SOURCE_ID)
-                ? RuntimeStructs.CopyUtf8((sbyte*)value.source_id.data, value.source_id.size)
-                : null,
-            fields.HasFlag(mln_style_layer_info_field.MLN_STYLE_LAYER_INFO_SOURCE_LAYER)
-                ? RuntimeStructs.CopyUtf8((sbyte*)value.source_layer.data, value.source_layer.size)
-                : null
+            CopyOptionalView(value.source_id),
+            CopyOptionalView(value.source_layer)
         );
+    }
+
+    /// <summary>Copies a borrowed view, reading an empty view as an absent value.</summary>
+    private static string? CopyOptionalView(mln_buffer_view view)
+    {
+        return view.size == 0 ? null : RuntimeStructs.CopyUtf8((sbyte*)view.data, view.size);
     }
 
     private static StyleImage? ReadStyleImage(mln_completion_result* completion)

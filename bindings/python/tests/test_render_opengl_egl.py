@@ -12,11 +12,17 @@ from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
     RED_BACKGROUND_STYLE_JSON,
     RED_PIXEL,
+    assert_abandon_retires_the_session,
     assert_cluster_feature_extensions,
+    assert_frame_demands_report_their_own_tokens,
     assert_geojson_cluster_source,
+    assert_invalid_state,
+    assert_session_maintenance_commands_round_trip,
+    assert_texture_ring_exhaustion_reports_not_ready,
     close_session,
-    finish_attach,
     finish_render_operation,
+    map_extent,
+    read_texture_info,
     release_frame,
     render_until_update,
     request_and_finish_frame,
@@ -84,7 +90,7 @@ class OpenGLOwnedSession:
                 session, attach = map_handle.attach_opengl_owned_texture(
                     context.owned_texture_descriptor(width, height, scale_factor)
                 )
-                finish_attach(session, attach)
+                finish_render_operation(session, attach)
             except BaseException:
                 map_handle.close()
                 raise
@@ -191,27 +197,6 @@ def _egl_borrowed_texture(
         texture.close()
 
 
-def assert_invalid_state(call: Callable[[], object]) -> None:
-    with pytest.raises(mln.InvalidStateError) as raised:
-        call()
-    assert raised.value.status == mln.MaplibreStatus.INVALID_STATE
-
-
-def wait_for_texture_info(
-    fixture: OpenGLOwnedSession,
-    *,
-    iterations: int = 5000,
-) -> render.TextureImageInfo:
-    fixture.map.set_style_json(EMPTY_STYLE_JSON.encode())
-    render_until_update(fixture.runtime, fixture.session)
-    image = finish_render_operation(
-        fixture.session,
-        fixture.session.read_premultiplied_rgba8(),
-        return_result=True,
-    )
-    return image.info
-
-
 def wait_for_opengl_frame(
     fixture: OpenGLOwnedSession,
     predicate: Callable[[render.OpenGLOwnedTextureFrame], bool],
@@ -241,7 +226,7 @@ def test_caller_driver_renders_and_releases_owned_opengl_frame(
 ) -> None:
     opengl_owned_session.map.set_style_json(EMPTY_STYLE_JSON.encode())
     render_until_update(opengl_owned_session.runtime, opengl_owned_session.session)
-    result = opengl_owned_session.session.snapshot.latest_result
+    result = opengl_owned_session.session.snapshot().latest_result
     assert result == render.RenderResult.RENDERED
     frame = opengl_owned_session.session.acquire_opengl_owned_texture_frame()
     assert frame.result.disposition == result
@@ -253,7 +238,11 @@ def test_caller_driver_renders_and_releases_owned_opengl_frame(
 def test_caller_driver_reads_owned_opengl_texture(
     opengl_owned_session: OpenGLOwnedSession,
 ) -> None:
-    info = wait_for_texture_info(opengl_owned_session)
+    info = read_texture_info(
+        opengl_owned_session.runtime,
+        opengl_owned_session.map,
+        opengl_owned_session.session,
+    )
     # Readback metadata describes the attached extent and a row-padded buffer.
     assert info.width == 32
     assert info.height == 16
@@ -263,7 +252,6 @@ def test_caller_driver_reads_owned_opengl_texture(
     image = finish_render_operation(
         opengl_owned_session.session,
         opengl_owned_session.session.read_premultiplied_rgba8(),
-        return_result=True,
     )
     assert image.info == info
     assert len(image.data) == info.byte_length
@@ -272,8 +260,8 @@ def test_caller_driver_reads_owned_opengl_texture(
 def test_owned_opengl_session_is_always_caller_driven(
     opengl_owned_session: OpenGLOwnedSession,
 ) -> None:
-    capabilities = opengl_owned_session.session.capabilities
-    snapshot = opengl_owned_session.session.snapshot
+    capabilities = opengl_owned_session.session.capabilities()
+    snapshot = opengl_owned_session.session.snapshot()
     assert capabilities.driver == render.RenderDriver.CALLER_GRAPHICS_THREAD
     assert capabilities.texture_ring_depth in (1, 2, 3)
     assert snapshot.driver == render.RenderDriver.CALLER_GRAPHICS_THREAD
@@ -324,10 +312,6 @@ def test_frame_demand_without_a_newer_update_reports_no_update(
 
     assert result.needs_repaint is False
     assert not opengl_owned_session.session.closed
-    finish_render_operation(
-        opengl_owned_session.session,
-        opengl_owned_session.session.resize(render.RenderTargetExtent(32, 16, 1.0)),
-    )
 
 
 def test_resize_updates_owned_opengl_texture_frame_extent(
@@ -337,19 +321,18 @@ def test_resize_updates_owned_opengl_texture_frame_extent(
 
     finish_render_operation(
         opengl_owned_session.session,
-        opengl_owned_session.session.resize(render.RenderTargetExtent(16, 8, 2.0)),
+        opengl_owned_session.session.resize(render.RenderTargetExtent(16, 8, 1.0)),
     )
-    # The session-owned texture is sized in device pixels, so a 16x8 logical
-    # extent at scale factor 2 keeps the 32x16 physical ring.
+    # The session-owned texture is sized in device pixels, which at the
+    # session's fixed scale factor of 1 is the logical extent.
     frame = wait_for_opengl_frame(
         opengl_owned_session,
-        lambda info: info.scale_factor == pytest.approx(2.0),
+        lambda info: info.width == 16,
     )
     try:
         info = frame.frame
-        assert info.width == 32
-        assert info.height == 16
-        assert info.scale_factor == pytest.approx(2.0)
+        assert info.height == 8
+        assert info.scale_factor == pytest.approx(1.0)
         assert info.generation >= 1
     finally:
         release_frame(frame)
@@ -359,14 +342,20 @@ def test_map_size_follows_attach_and_session_resize(
     opengl_owned_session: OpenGLOwnedSession,
 ) -> None:
     # Attachment sizes the map from the target rather than from map creation.
-    assert opengl_owned_session.map.get_size() == (32, 16, pytest.approx(1.0))
+    assert map_extent(opengl_owned_session.map) == (32, 16, pytest.approx(1.0))
 
-    # An applied resize updates the map viewport, scale factor included.
+    # An applied resize updates the map viewport.
     finish_render_operation(
         opengl_owned_session.session,
-        opengl_owned_session.session.resize(render.RenderTargetExtent(48, 24, 2.0)),
+        opengl_owned_session.session.resize(render.RenderTargetExtent(48, 24, 1.0)),
     )
-    assert opengl_owned_session.map.get_size() == (48, 24, pytest.approx(2.0))
+    assert map_extent(opengl_owned_session.map) == (48, 24, pytest.approx(1.0))
+
+    # The scale factor is fixed at attachment, so a session resize that changes
+    # it is rejected before any command is submitted.
+    with pytest.raises(mln.InvalidArgumentError):
+        opengl_owned_session.session.resize(render.RenderTargetExtent(48, 24, 2.0))
+    assert map_extent(opengl_owned_session.map) == (48, 24, pytest.approx(1.0))
 
 
 def test_opengl_frame_exposes_its_texture_name_only_while_the_lease_is_live(
@@ -380,8 +369,14 @@ def test_opengl_frame_exposes_its_texture_name_only_while_the_lease_is_live(
     assert info.generation >= 1
     assert info.frame_id >= 0
     assert info.target != 0
+    # The ring reports the texture's own OpenGL formats, which a host needs to
+    # sample or blit it.
+    assert info.internal_format != 0
+    assert info.format != 0
+    assert info.type != 0
 
     texture = frame.texture
+    assert isinstance(texture, render.FrameOpenGLTextureName)
     assert texture.value != 0
 
     release_frame(frame)
@@ -414,14 +409,14 @@ def test_session_close_is_rejected_while_a_frame_lease_is_held(
     session = opengl_owned_session.session
     frame = wait_for_opengl_frame(opengl_owned_session, lambda _: True)
     try:
-        assert session.snapshot.acquired_frame_count == 1
+        assert session.snapshot().acquired_frame_count == 1
         # The host still holds a ring slot, so the session cannot retire.
         assert_invalid_state(session.close)
         assert not session.closed
     finally:
         release_frame(frame)
 
-    assert session.snapshot.acquired_frame_count == 0
+    assert session.snapshot().acquired_frame_count == 0
 
 
 def test_invalid_opengl_surface_attach_reports_native_status() -> None:
@@ -441,79 +436,76 @@ def test_invalid_opengl_surface_attach_reports_native_status() -> None:
 
 
 def test_egl_pbuffer_surface_session_attaches_and_renders() -> None:
-    with _egl_context() as context, _egl_pbuffer_surface(context) as surface:
-        runtime = mln.RuntimeHandle()
-        map_handle = runtime.create_map(
+    with (
+        _egl_context() as context,
+        _egl_pbuffer_surface(context) as surface,
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map(
             mln.MapOptions(width=surface.width, height=surface.height)
-        ).result(timeout=5)
+        ).result(timeout=5) as map_handle,
+    ):
+        session, attach = map_handle.attach_opengl_surface(surface.descriptor())
+        finish_render_operation(session, attach)
         try:
-            session, attach = map_handle.attach_opengl_surface(surface.descriptor())
-            finish_attach(session, attach)
-            try:
-                assert not session.closed
-                assert session.capabilities.driver == (
-                    render.RenderDriver.CALLER_GRAPHICS_THREAD
-                )
-                map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
-                render_until_update(runtime, session)
-            finally:
-                close_session(session)
+            assert not session.closed
+            assert session.capabilities().driver == (
+                render.RenderDriver.CALLER_GRAPHICS_THREAD
+            )
+            map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
+            render_until_update(runtime, session)
         finally:
-            map_handle.close()
-            runtime.close().result(timeout=30)
+            close_session(session)
 
 
 def test_dedicated_egl_surface_renders_and_keeps_its_context_current() -> None:
-    with _egl_context() as context, _egl_pbuffer_surface(context) as surface:
-        runtime = mln.RuntimeHandle()
-        map_handle = runtime.create_map(
+    with (
+        _egl_context() as context,
+        _egl_pbuffer_surface(context) as surface,
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map(
             mln.MapOptions(width=surface.width, height=surface.height)
-        ).result(timeout=5)
+        ).result(timeout=5) as map_handle,
+    ):
+        session, attach = map_handle.attach_opengl_surface(
+            surface.dedicated_descriptor()
+        )
+        finish_render_operation(session, attach)
         try:
-            session, attach = map_handle.attach_opengl_surface(
-                surface.dedicated_descriptor()
-            )
-            finish_attach(session, attach)
-            try:
-                map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode())
-                render_until_update(runtime, session)
+            map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode())
+            render_until_update(runtime, session)
 
-                # A dedicated context belongs to the session, so it stays
-                # current on this thread between renders rather than being
-                # restored to what the session found.
-                assert current_context_address() != 0
-            finally:
-                close_session(session)
-
-            # Detaching hands the thread back with no context current.
-            assert current_context_address() == 0
+            # A dedicated context belongs to the session, so it stays
+            # current on this thread between renders rather than being
+            # restored to what the session found.
+            assert current_context_address() != 0
         finally:
-            map_handle.close()
-            runtime.close().result(timeout=30)
+            close_session(session)
+
+        # Detaching hands the thread back with no context current.
+        assert current_context_address() == 0
 
 
 def test_egl_borrowed_texture_session_close_preserves_caller_resources() -> None:
-    with _egl_context() as context, _egl_borrowed_texture(context) as texture:
-        runtime = mln.RuntimeHandle()
-        map_handle = runtime.create_map(mln.MapOptions(width=32, height=16)).result(
+    with (
+        _egl_context() as context,
+        _egl_borrowed_texture(context) as texture,
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map(mln.MapOptions(width=32, height=16)).result(
             timeout=5
+        ) as map_handle,
+    ):
+        session, attach = map_handle.attach_opengl_borrowed_texture(
+            texture.descriptor()
         )
-        try:
-            session, attach = map_handle.attach_opengl_borrowed_texture(
-                texture.descriptor()
-            )
-            finish_attach(session, attach)
-            map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode())
-            render_until_update(runtime, session)
-            close_session(session)
+        finish_render_operation(session, attach)
+        map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode())
+        render_until_update(runtime, session)
+        close_session(session)
 
-            # The texture is caller-owned, so the session leaves it alive for
-            # the host to read and destroy.
-            assert texture.exists()
-            assert texture.read_rgba()[:4] == RED_PIXEL
-        finally:
-            map_handle.close()
-            runtime.close().result(timeout=30)
+        # The texture is caller-owned, so the session leaves it alive for
+        # the host to read and destroy.
+        assert texture.exists()
+        assert texture.read_rgba()[:4] == RED_PIXEL
 
 
 def test_egl_borrowed_texture_set_target_hands_over_a_replacement() -> None:
@@ -521,35 +513,29 @@ def test_egl_borrowed_texture_set_target_hands_over_a_replacement() -> None:
         _egl_context() as context,
         _egl_borrowed_texture(context) as first,
         _egl_borrowed_texture(context) as second,
-    ):
-        runtime = mln.RuntimeHandle()
-        map_handle = runtime.create_map(mln.MapOptions(width=32, height=16)).result(
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map(mln.MapOptions(width=32, height=16)).result(
             timeout=5
-        )
+        ) as map_handle,
+    ):
+        session, attach = map_handle.attach_opengl_borrowed_texture(first.descriptor())
+        finish_render_operation(session, attach)
         try:
-            session, attach = map_handle.attach_opengl_borrowed_texture(
-                first.descriptor()
+            map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode())
+            render_until_update(runtime, session)
+
+            finish_render_operation(
+                session,
+                session.set_opengl_borrowed_texture_target(second.descriptor()),
             )
-            finish_attach(session, attach)
-            try:
-                map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode())
-                render_until_update(runtime, session)
+            render_until_update(runtime, session)
 
-                finish_render_operation(
-                    session,
-                    session.set_opengl_borrowed_texture_target(second.descriptor()),
-                )
-                render_until_update(runtime, session)
-
-                # Rendering moved to the replacement, and the retired texture
-                # stays the caller's to destroy.
-                assert second.read_rgba()[:4] == RED_PIXEL
-                assert first.exists()
-            finally:
-                close_session(session)
+            # Rendering moved to the replacement, and the retired texture stays
+            # the caller's to destroy.
+            assert second.read_rgba()[:4] == RED_PIXEL
+            assert first.exists()
         finally:
-            map_handle.close()
-            runtime.close().result(timeout=30)
+            close_session(session)
 
 
 def test_cluster_feature_extension_queries_resolve_unsigned_cluster_id_and_limit(
@@ -569,4 +555,74 @@ def test_typed_geojson_source_options_cluster_nearby_points(
         opengl_owned_session.runtime,
         opengl_owned_session.map,
         opengl_owned_session.session,
+    )
+
+
+def test_opengl_frame_demands_report_their_own_tokens(
+    opengl_owned_session: OpenGLOwnedSession,
+) -> None:
+    opengl_owned_session.render_once()
+    assert_frame_demands_report_their_own_tokens(opengl_owned_session.session)
+
+
+def test_opengl_texture_ring_exhaustion_reports_not_ready(
+    opengl_owned_session: OpenGLOwnedSession,
+) -> None:
+    opengl_owned_session.render_once()
+    assert_texture_ring_exhaustion_reports_not_ready(
+        opengl_owned_session.session,
+        opengl_owned_session.session.acquire_opengl_owned_texture_frame,
+    )
+
+
+def test_opengl_session_maintenance_commands_round_trip(
+    opengl_owned_session: OpenGLOwnedSession,
+) -> None:
+    opengl_owned_session.render_once()
+    assert_session_maintenance_commands_round_trip(opengl_owned_session.session)
+
+
+def test_opengl_frame_lease_releases_itself_when_its_scope_ends(
+    opengl_owned_session: OpenGLOwnedSession,
+) -> None:
+    lease = wait_for_opengl_frame(opengl_owned_session, lambda _: True)
+    with lease:
+        assert not lease.closed
+        assert opengl_owned_session.session.snapshot().acquired_frame_count == 1
+    assert lease.closed
+    assert opengl_owned_session.session.snapshot().acquired_frame_count == 0
+
+
+def test_opengl_owned_session_rejects_a_borrowed_texture_target(
+    opengl_owned_session: OpenGLOwnedSession,
+) -> None:
+    opengl_owned_session.render_once()
+
+    # A session-owned ring cannot be handed a caller-owned texture, and the
+    # retarget kind is checked before any host handle is read.
+    with pytest.raises(mln.UnsupportedFeatureError) as raised:
+        opengl_owned_session.session.set_opengl_borrowed_texture_target(
+            render.OpenGLBorrowedTextureDescriptor(
+                extent=render.RenderTargetExtent(32, 16, 1.0),
+                physical_width=32,
+                physical_height=16,
+            )
+        )
+    assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
+
+    # The rejection left the session rendering.
+    assert (
+        request_and_finish_frame(
+            opengl_owned_session.session, token=7001, flags=render.FrameDemandFlag(0)
+        ).disposition
+        == render.RenderResult.RENDERED
+    )
+
+
+def test_opengl_abandon_retires_the_session_and_its_map(
+    opengl_owned_session: OpenGLOwnedSession,
+) -> None:
+    opengl_owned_session.render_once()
+    assert_abandon_retires_the_session(
+        opengl_owned_session.session, opengl_owned_session.map
     )

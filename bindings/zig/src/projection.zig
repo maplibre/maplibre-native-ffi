@@ -42,6 +42,8 @@ pub const MapProjectionHandle = enum(c.mln_map_projection) {
         return completion.submitWithCopyContext(MapProjectionHandle, ?*diagnostics.DiagnosticStore, diagnostic_store, struct {
             fn copyResult(result: *const c.mln_completion_result, store: *?*diagnostics.DiagnosticStore) status.Error!MapProjectionHandle {
                 const projection = try completion.value(c.mln_map_projection)(result);
+                // A projection this binding cannot track has no other closer.
+                errdefer _ = c.mln_map_projection_close(projection);
                 const projection_state = try std.heap.smp_allocator.create(ProjectionState);
                 projection_state.* = .{ .diagnostic_store = store.* };
                 errdefer std.heap.smp_allocator.destroy(projection_state);

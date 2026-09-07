@@ -17,22 +17,6 @@ internal fun mapProjectionHandle(value: ULong): NativeMapProjection =
 internal fun renderSessionHandle(value: ULong): NativeRenderSession =
   NativeRenderSession(value.toLong())
 
-internal fun offlineRegionSnapshotHandle(value: ULong): NativeOfflineRegionSnapshot =
-  NativeOfflineRegionSnapshot(value.toLong())
-
-internal fun offlineRegionListHandle(value: ULong): NativeOfflineRegionList =
-  NativeOfflineRegionList(value.toLong())
-
-internal fun ownedBufferHandle(value: ULong): NativeOwnedBuffer = NativeOwnedBuffer(value.toLong())
-
-internal fun styleIdListHandle(value: ULong): NativeStyleIdList = NativeStyleIdList(value.toLong())
-
-internal fun styleStringListHandle(value: ULong): NativeStyleStringList =
-  NativeStyleStringList(value.toLong())
-
-internal fun queriedFeatureListHandle(value: ULong): NativeQueriedFeatureList =
-  NativeQueriedFeatureList(value.toLong())
-
 internal fun resourceRequestHandle(value: ULong): NativeResourceRequest =
   NativeResourceRequest(value.toLong())
 

@@ -6,7 +6,7 @@ use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_sys as sys;
 
 use crate::completion::{self, CommandCompletion, NativeFuture};
-use crate::events::{OfflineRegionDownloadState, OfflineRegionStatus, RuntimeEventBatch};
+use crate::events::{OfflineRegionDownloadState, OfflineRegionStatus, RuntimeEvent};
 use crate::handle::{ConcurrentNativeHandle, closed_handle_error, out_handle};
 use crate::resource::{HttpHeaderTransformState, ResourceProviderState, ResourceTransformState};
 use crate::{HandleOperationError, ResourceProviderDecision, Result, RuntimeEventMask};
@@ -85,92 +85,104 @@ impl RuntimeState {
         self.install_resource_provider(replacement, descriptor)
     }
 
+    /// Submits one queued-callback registration, handing the boxed callback
+    /// state to native only when native accepts the submission.
+    ///
+    /// `descriptor` points at `state`, so the descriptor must not outlive the
+    /// submission. Native releases accepted state through the descriptor's
+    /// release callback; a rejected submission leaves ownership here.
+    fn install_callback<S, D>(
+        &self,
+        state: Box<S>,
+        descriptor: &D,
+        start: impl FnOnce(sys::mln_runtime, *const D, *const sys::mln_completion) -> sys::mln_status,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let runtime = self.native()?;
+        let state = Box::into_raw(state);
+        let result =
+            completion::submit_command(|completion| start(runtime, descriptor, completion));
+        if result.is_err() {
+            // SAFETY: native retains no callback state after a rejected
+            // submission, so this box is still the sole owner.
+            drop(unsafe { Box::from_raw(state) });
+        }
+        result
+    }
+
     fn install_resource_provider(
         &self,
         replacement: Box<ResourceProviderState>,
         descriptor: sys::mln_resource_provider,
     ) -> Result<NativeFuture<CommandCompletion>> {
-        let runtime = self.native()?;
-        let replacement = Box::into_raw(replacement);
-        // SAFETY: descriptor points to replacement, transferred before native can accept and
-        // release it. A rejected registration leaves ownership with this binding.
-        let result = completion::submit(
-            |completion| unsafe {
-                sys::mln_runtime_set_resource_provider(runtime, &descriptor, completion)
+        self.install_callback(
+            replacement,
+            &descriptor,
+            |runtime, descriptor, completion| {
+                // SAFETY: runtime is live and the descriptor is borrowed for this
+                // synchronous submission.
+                unsafe { sys::mln_runtime_set_resource_provider(runtime, descriptor, completion) }
             },
-            completion::command,
-        );
-        if result.is_err() {
-            // SAFETY: native retains no callback state after rejected submission.
-            drop(unsafe { Box::from_raw(replacement) });
-        }
-        result
+        )
     }
 
     fn clear_resource_provider(&self) -> Result<NativeFuture<CommandCompletion>> {
         let runtime = self.native()?;
-        completion::submit(
-            |completion| unsafe { sys::mln_runtime_clear_resource_provider(runtime, completion) },
-            completion::command,
-        )
+        // SAFETY: runtime is live for this synchronous submission.
+        completion::submit_command(|completion| unsafe {
+            sys::mln_runtime_clear_resource_provider(runtime, completion)
+        })
     }
 
     fn set_resource_transform<F>(&self, callback: F) -> Result<NativeFuture<CommandCompletion>>
     where
         F: Fn(crate::ResourceTransformRequest) -> Option<String> + Send + Sync + 'static,
     {
-        let runtime = self.native()?;
         let replacement = ResourceTransformState::new(callback);
         let descriptor = replacement.descriptor();
-        let replacement = Box::into_raw(replacement);
-        let result = completion::submit(
-            |completion| unsafe {
-                sys::mln_runtime_set_resource_transform(runtime, &descriptor, completion)
+        self.install_callback(
+            replacement,
+            &descriptor,
+            |runtime, descriptor, completion| {
+                // SAFETY: runtime is live and the descriptor is borrowed for this
+                // synchronous submission.
+                unsafe { sys::mln_runtime_set_resource_transform(runtime, descriptor, completion) }
             },
-            completion::command,
-        );
-        if result.is_err() {
-            drop(unsafe { Box::from_raw(replacement) });
-        }
-        result
+        )
     }
 
     fn clear_resource_transform(&self) -> Result<NativeFuture<CommandCompletion>> {
         let runtime = self.native()?;
-        completion::submit(
-            |completion| unsafe { sys::mln_runtime_clear_resource_transform(runtime, completion) },
-            completion::command,
-        )
+        // SAFETY: runtime is live for this synchronous submission.
+        completion::submit_command(|completion| unsafe {
+            sys::mln_runtime_clear_resource_transform(runtime, completion)
+        })
     }
 
     fn set_http_header_transform<F>(&self, callback: F) -> Result<NativeFuture<CommandCompletion>>
     where
         F: Fn(crate::HttpHeaderTransformRequest) -> Vec<crate::HttpHeader> + Send + Sync + 'static,
     {
-        let runtime = self.native()?;
         let replacement = HttpHeaderTransformState::new(callback);
         let descriptor = replacement.descriptor();
-        let replacement = Box::into_raw(replacement);
-        let result = completion::submit(
-            |completion| unsafe {
-                sys::mln_runtime_set_http_header_transform(runtime, &descriptor, completion)
+        self.install_callback(
+            replacement,
+            &descriptor,
+            |runtime, descriptor, completion| {
+                // SAFETY: runtime is live and the descriptor is borrowed for this
+                // synchronous submission.
+                unsafe {
+                    sys::mln_runtime_set_http_header_transform(runtime, descriptor, completion)
+                }
             },
-            completion::command,
-        );
-        if result.is_err() {
-            drop(unsafe { Box::from_raw(replacement) });
-        }
-        result
+        )
     }
 
     fn clear_http_header_transform(&self) -> Result<NativeFuture<CommandCompletion>> {
         let runtime = self.native()?;
-        completion::submit(
-            |completion| unsafe {
-                sys::mln_runtime_clear_http_header_transform(runtime, completion)
-            },
-            completion::command,
-        )
+        // SAFETY: runtime is live for this synchronous submission.
+        completion::submit_command(|completion| unsafe {
+            sys::mln_runtime_clear_http_header_transform(runtime, completion)
+        })
     }
 }
 
@@ -207,32 +219,26 @@ impl RuntimeHandle {
         Self::create_with_native_options_after_abi_validation(&raw_options)
     }
 
+    /// Creates a runtime with an ABI version the caller names, so a test can
+    /// drive the mismatch path that a real library never reports.
     #[cfg(test)]
-    fn create_with_native_options_after_abi_version_check_for_testing(
-        options: *const sys::mln_runtime_options,
-        actual_abi_version: u32,
-    ) -> Result<Self> {
+    fn create_after_abi_version_check_for_testing(actual_abi_version: u32) -> Result<Self> {
         maplibre_core::validate_abi_version_value(actual_abi_version)?;
-        Self::create_with_native_options_after_abi_validation(options)
+        // SAFETY: the constructor takes no arguments and initializes this ABI
+        // version's descriptor.
+        Self::create_with_native_options_after_abi_validation(&unsafe {
+            sys::mln_runtime_options_default()
+        })
     }
 
     fn create_with_native_options_after_abi_validation(
-        options: *const sys::mln_runtime_options,
+        options: &sys::mln_runtime_options,
     ) -> Result<Self> {
-        // SAFETY: A nonnull options pointer comes from the binding's
-        // materialized native options and remains readable for this call.
-        let raw_options = if options.is_null() {
-            unsafe { sys::mln_runtime_options_default() }
-        } else {
-            unsafe { *options }
-        };
         let mut out = maplibre_core::ptr::OutHandle::<sys::mln_runtime>::new();
-        // SAFETY: raw_options remains readable and out is null writable storage.
-        maplibre_core::check(unsafe { sys::mln_runtime_create(&raw_options, out.as_mut_ptr()) })?;
-        out_handle(out, "mln_runtime").and_then(|ptr| {
-            Ok(Self {
-                inner: Arc::new(RuntimeState::new(ptr)?),
-            })
+        // SAFETY: options remains readable and out is null writable storage.
+        maplibre_core::check(unsafe { sys::mln_runtime_create(options, out.as_mut_ptr()) })?;
+        Ok(Self {
+            inner: Arc::new(RuntimeState::new(out_handle(out, "mln_runtime")?)?),
         })
     }
 
@@ -306,12 +312,18 @@ impl RuntimeHandle {
     }
 
     /// Starts an ambient cache maintenance operation for this runtime.
+    ///
+    /// The call validates its arguments and returns without waiting for the
+    /// runtime worker. A database the runtime cannot open fails the future
+    /// with a native error.
     pub fn ambient_cache_operation(
         &self,
         ambient_operation: AmbientCacheOperation,
     ) -> Result<NativeFuture<()>> {
         let runtime = self.inner.native()?;
         completion::submit(
+            // SAFETY: the handle is live and every borrowed argument stays valid for this
+            // synchronous submission.
             |completion| unsafe {
                 sys::mln_runtime_run_ambient_cache_operation(
                     runtime,
@@ -326,10 +338,14 @@ impl RuntimeHandle {
     /// Starts a change to this runtime's maximum ambient cache size.
     ///
     /// MapLibre evicts ambient resources to fit the new budget, so lowering it
-    /// discards cached resources. Offline regions are unaffected.
+    /// discards cached resources. Offline regions are unaffected. Like every
+    /// ambient-cache and offline operation, this returns without waiting for
+    /// the runtime worker, and a database failure reaches the future.
     pub fn set_maximum_ambient_cache_size(&self, size: u64) -> Result<NativeFuture<()>> {
         let runtime = self.inner.native()?;
         completion::submit(
+            // SAFETY: the handle is live and every borrowed argument stays valid for this
+            // synchronous submission.
             |completion| unsafe {
                 sys::mln_runtime_set_maximum_ambient_cache_size(runtime, size, completion)
             },
@@ -363,12 +379,14 @@ impl RuntimeHandle {
     }
 
     /// Starts getting an offline region snapshot by ID.
+    ///
+    /// A missing region is not an error: the future resolves to `None`.
     pub fn offline_region(
         &self,
         region_id: i64,
     ) -> Result<NativeFuture<Option<OfflineRegionInfo>>> {
         let runtime = self.inner.native()?;
-        // SAFETY: runtime is live and operation points to writable storage.
+        // SAFETY: runtime is live for this synchronous submission.
         completion::submit(
             |completion| unsafe {
                 sys::mln_runtime_offline_region_get(runtime, region_id, completion)
@@ -385,7 +403,7 @@ impl RuntimeHandle {
     /// Starts listing offline regions in this runtime's database.
     pub fn offline_regions(&self) -> Result<NativeFuture<Vec<OfflineRegionInfo>>> {
         let runtime = self.inner.native()?;
-        // SAFETY: runtime is live and operation points to writable storage.
+        // SAFETY: runtime is live for this synchronous submission.
         completion::submit(
             |completion| unsafe { sys::mln_runtime_offline_regions_list(runtime, completion) },
             copy_offline_regions,
@@ -399,8 +417,8 @@ impl RuntimeHandle {
     ) -> Result<NativeFuture<Vec<OfflineRegionInfo>>> {
         let runtime = self.inner.native()?;
         let path = maplibre_core::string::c_string(path)?;
-        // SAFETY: runtime is live, path is NUL-terminated and valid for this
-        // call, and operation points to writable storage.
+        // SAFETY: runtime is live and path is NUL-terminated and valid for
+        // this synchronous submission.
         completion::submit(
             |completion| unsafe {
                 sys::mln_runtime_offline_regions_merge_database(runtime, path.as_ptr(), completion)
@@ -410,14 +428,17 @@ impl RuntimeHandle {
     }
 
     /// Starts updating opaque metadata for an offline region.
+    ///
+    /// The future fails with a not-found error when no region carries
+    /// `region_id`.
     pub fn update_offline_region_metadata(
         &self,
         region_id: i64,
         metadata: &[u8],
     ) -> Result<NativeFuture<OfflineRegionInfo>> {
         let runtime = self.inner.native()?;
-        // SAFETY: runtime is live, metadata storage is valid for this call, and
-        // operation points to writable storage.
+        // SAFETY: runtime is live and the metadata bytes stay readable for
+        // this synchronous submission, which copies them.
         completion::submit(
             |completion| unsafe {
                 sys::mln_runtime_offline_region_update_metadata(
@@ -432,13 +453,16 @@ impl RuntimeHandle {
         )
     }
 
-    /// Starts getting the current completed/download status for an offline region.
+    /// Starts getting an offline region's completed and download counts.
+    ///
+    /// The future fails with a not-found error when no region carries
+    /// `region_id`.
     pub fn offline_region_status(
         &self,
         region_id: i64,
     ) -> Result<NativeFuture<OfflineRegionStatus>> {
         let runtime = self.inner.native()?;
-        // SAFETY: runtime is live and operation points to writable storage.
+        // SAFETY: runtime is live for this synchronous submission.
         completion::submit(
             |completion| unsafe {
                 sys::mln_runtime_offline_region_get_status(runtime, region_id, completion)
@@ -452,6 +476,9 @@ impl RuntimeHandle {
     }
 
     /// Starts enabling or disabling runtime events for an offline region.
+    ///
+    /// The future fails with a not-found error when no region carries
+    /// `region_id`.
     pub fn set_offline_region_observed(
         &self,
         region_id: i64,
@@ -459,6 +486,8 @@ impl RuntimeHandle {
     ) -> Result<NativeFuture<()>> {
         let runtime = self.inner.native()?;
         completion::submit(
+            // SAFETY: the handle is live and every borrowed argument stays valid for this
+            // synchronous submission.
             |completion| unsafe {
                 sys::mln_runtime_offline_region_set_observed(
                     runtime, region_id, observed, completion,
@@ -469,6 +498,9 @@ impl RuntimeHandle {
     }
 
     /// Starts setting an offline region's native download state.
+    ///
+    /// The future fails with a not-found error when no region carries
+    /// `region_id`.
     pub fn set_offline_region_download_state(
         &self,
         region_id: i64,
@@ -477,6 +509,8 @@ impl RuntimeHandle {
         let runtime = self.inner.native()?;
         let state = state.raw_for_set()?;
         completion::submit(
+            // SAFETY: the handle is live and every borrowed argument stays valid for this
+            // synchronous submission.
             |completion| unsafe {
                 sys::mln_runtime_offline_region_set_download_state(
                     runtime, region_id, state, completion,
@@ -487,9 +521,14 @@ impl RuntimeHandle {
     }
 
     /// Starts invalidating cached resources for an offline region.
+    ///
+    /// The future fails with a not-found error when no region carries
+    /// `region_id`.
     pub fn invalidate_offline_region(&self, region_id: i64) -> Result<NativeFuture<()>> {
         let runtime = self.inner.native()?;
         completion::submit(
+            // SAFETY: the handle is live and every borrowed argument stays valid for this
+            // synchronous submission.
             |completion| unsafe {
                 sys::mln_runtime_offline_region_invalidate(runtime, region_id, completion)
             },
@@ -498,9 +537,14 @@ impl RuntimeHandle {
     }
 
     /// Starts deleting an offline region.
+    ///
+    /// The future fails with a not-found error when no region carries
+    /// `region_id`.
     pub fn delete_offline_region(&self, region_id: i64) -> Result<NativeFuture<()>> {
         let runtime = self.inner.native()?;
         completion::submit(
+            // SAFETY: the handle is live and every borrowed argument stays valid for this
+            // synchronous submission.
             |completion| unsafe {
                 sys::mln_runtime_offline_region_delete(runtime, region_id, completion)
             },
@@ -513,22 +557,26 @@ impl RuntimeHandle {
     pub fn barrier(&self) -> Result<NativeFuture<()>> {
         let runtime = self.inner.native()?;
         completion::submit(
+            // SAFETY: the handle is live and every borrowed argument stays valid for this
+            // synchronous submission.
             |completion| unsafe { sys::mln_runtime_barrier(runtime, completion) },
             completion::unit,
         )
     }
 
-    /// Drains an owned batch of queued runtime events.
+    /// Takes every queued runtime event in the order native queued them.
     ///
-    /// The returned batch contains the whole queue, remains stable across later
-    /// drains, and releases its native storage when dropped.
-    pub fn drain_events(&self) -> Result<RuntimeEventBatch> {
+    /// The events are copies that outlive later drains, and this call releases
+    /// the native batch before it returns. An empty queue is not an error: it
+    /// returns an empty sequence. An event whose message is not UTF-8 fails the
+    /// whole drain.
+    pub fn drain_events(&self) -> Result<Vec<RuntimeEvent>> {
         let runtime = self.inner.native()?;
         let mut batch = sys::mln_event_batch(0);
         // SAFETY: runtime is live and batch points to a null writable handle.
         maplibre_core::check(unsafe { sys::mln_runtime_drain_events(runtime, &mut batch) })?;
         // SAFETY: A successful drain returns one owned native batch.
-        unsafe { RuntimeEventBatch::new(batch) }
+        unsafe { crate::events::copy_event_batch(batch) }
     }
 
     /// Selects which runtime-originated event types this runtime queues.
@@ -564,9 +612,6 @@ impl RuntimeHandle {
     /// native teardown. Dropping the handle, or the future, starts the same
     /// teardown and discards its completion.
     pub fn close(self) -> std::result::Result<NativeFuture<()>, HandleOperationError<Self>> {
-        if self.inner.is_closed() {
-            return Ok(completion::ready(()));
-        }
         self.inner
             .close()
             .map_err(|error| HandleOperationError::new(error, self))
@@ -791,32 +836,24 @@ mod tests {
         )
     }
 
-    fn wait_for_operation<T>(
-        _runtime: &mut RuntimeHandle,
-        operation: &NativeFuture<T>,
-    ) -> Result<()> {
-        let deadline = Instant::now() + Duration::from_secs(30);
-        loop {
-            if Instant::now() >= deadline {
-                return Err(Error::new(
-                    ErrorKind::InvalidState,
-                    None,
-                    "timed out waiting for native completion",
-                ));
-            }
-            std::thread::sleep(std::time::Duration::from_millis(1));
-            if operation.is_completed()? {
-                let status = operation.terminal_status()?;
-                if status != sys::MLN_STATUS_OK {
-                    return Err(Error::from_status_and_diagnostic(
-                        status,
-                        operation.diagnostic()?,
-                    ));
-                }
-                return Ok(());
-            }
-            std::thread::sleep(Duration::from_millis(1));
+    /// Blocks until one runtime operation completes, reporting a failed
+    /// completion as this crate's error so a test can assert on it.
+    fn wait_for_operation<T>(operation: &NativeFuture<T>) -> Result<()> {
+        if !operation.wait(Duration::from_secs(30))? {
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                None,
+                "timed out waiting for native completion",
+            ));
         }
+        let status = operation.terminal_status()?;
+        if status != sys::MLN_STATUS_OK {
+            return Err(Error::from_status_and_diagnostic(
+                status,
+                operation.diagnostic()?,
+            ));
+        }
+        Ok(())
     }
 
     #[test]
@@ -827,7 +864,7 @@ mod tests {
 
         let mut options = RuntimeOptions::default();
         options.cache_path = Some(cache.to_string_lossy().into_owned());
-        let mut runtime = RuntimeHandle::with_options(&options).unwrap();
+        let runtime = RuntimeHandle::with_options(&options).unwrap();
 
         for operation in [
             AmbientCacheOperation::PackDatabase,
@@ -836,9 +873,8 @@ mod tests {
             AmbientCacheOperation::ResetDatabase,
         ] {
             let operation = runtime.ambient_cache_operation(operation).unwrap();
-            wait_for_operation(&mut runtime, &operation).unwrap();
-            operation.finish().unwrap();
-            operation.release();
+            wait_for_operation(&operation).unwrap();
+            operation.take().unwrap();
         }
 
         runtime.close_and_wait();
@@ -852,14 +888,13 @@ mod tests {
 
         let mut options = RuntimeOptions::default();
         options.cache_path = Some(cache.to_string_lossy().into_owned());
-        let mut runtime = RuntimeHandle::with_options(&options).unwrap();
+        let runtime = RuntimeHandle::with_options(&options).unwrap();
 
         // Raising then lowering the budget exercises the same operation API.
         for size in [8 * 1024 * 1024, 0] {
             let operation = runtime.set_maximum_ambient_cache_size(size).unwrap();
-            wait_for_operation(&mut runtime, &operation).unwrap();
-            operation.finish().unwrap();
-            operation.release();
+            wait_for_operation(&operation).unwrap();
+            operation.take().unwrap();
         }
 
         runtime.close_and_wait();
@@ -877,7 +912,7 @@ mod tests {
 
         runtime.close_and_wait();
         assert!(operation.wait(Duration::from_secs(10)).unwrap());
-        operation.finish().unwrap();
+        operation.take().unwrap();
     }
 
     #[test]
@@ -885,13 +920,12 @@ mod tests {
     fn offline_region_apis_use_real_c_abi() {
         let mut options = RuntimeOptions::default();
         options.cache_path = Some(":memory:".into());
-        let mut runtime = RuntimeHandle::with_options(&options).unwrap();
+        let runtime = RuntimeHandle::with_options(&options).unwrap();
         let definition = test_offline_region_definition("custom://offline-style.json");
 
         let create = runtime.create_offline_region(&definition, b"abc").unwrap();
-        wait_for_operation(&mut runtime, &create).unwrap();
+        wait_for_operation(&create).unwrap();
         let created = create.take().unwrap();
-        create.release();
         assert_eq!(created.definition, definition);
         assert_eq!(created.metadata, b"abc");
 
@@ -906,37 +940,32 @@ mod tests {
         let create_geometry = runtime
             .create_offline_region(&geometry_definition, b"geo")
             .unwrap();
-        wait_for_operation(&mut runtime, &create_geometry).unwrap();
+        wait_for_operation(&create_geometry).unwrap();
         let geometry_region = create_geometry.take().unwrap();
-        create_geometry.release();
         assert_eq!(geometry_region.definition, geometry_definition);
         assert_eq!(geometry_region.metadata, b"geo");
 
         let get = runtime.offline_region(created.id).unwrap();
-        wait_for_operation(&mut runtime, &get).unwrap();
+        wait_for_operation(&get).unwrap();
         let fetched = get.take().unwrap().unwrap();
-        get.release();
         assert_eq!(fetched, created);
 
         let list = runtime.offline_regions().unwrap();
-        wait_for_operation(&mut runtime, &list).unwrap();
+        wait_for_operation(&list).unwrap();
         let listed = list.take().unwrap();
-        list.release();
         assert!(listed.iter().any(|region| region.id == created.id));
 
         let update = runtime
             .update_offline_region_metadata(created.id, b"")
             .unwrap();
-        wait_for_operation(&mut runtime, &update).unwrap();
+        wait_for_operation(&update).unwrap();
         let updated = update.take().unwrap();
-        update.release();
         assert_eq!(updated.id, created.id);
         assert!(updated.metadata.is_empty());
 
         let status_operation = runtime.offline_region_status(created.id).unwrap();
-        wait_for_operation(&mut runtime, &status_operation).unwrap();
+        wait_for_operation(&status_operation).unwrap();
         let status = status_operation.take().unwrap();
-        status_operation.release();
         assert!(matches!(
             status.download_state,
             OfflineRegionDownloadState::Inactive | OfflineRegionDownloadState::Active
@@ -945,9 +974,8 @@ mod tests {
         let set_inactive = runtime
             .set_offline_region_download_state(created.id, OfflineRegionDownloadState::Inactive)
             .unwrap();
-        wait_for_operation(&mut runtime, &set_inactive).unwrap();
-        set_inactive.finish().unwrap();
-        set_inactive.release();
+        wait_for_operation(&set_inactive).unwrap();
+        set_inactive.take().unwrap();
         let error = runtime
             .set_offline_region_download_state(created.id, OfflineRegionDownloadState::Unknown(99))
             .unwrap_err();
@@ -956,36 +984,29 @@ mod tests {
         let observe = runtime
             .set_offline_region_observed(created.id, true)
             .unwrap();
-        wait_for_operation(&mut runtime, &observe).unwrap();
-        observe.finish().unwrap();
-        observe.release();
+        wait_for_operation(&observe).unwrap();
+        observe.take().unwrap();
         let unobserve = runtime
             .set_offline_region_observed(created.id, false)
             .unwrap();
-        wait_for_operation(&mut runtime, &unobserve).unwrap();
-        unobserve.finish().unwrap();
-        unobserve.release();
+        wait_for_operation(&unobserve).unwrap();
+        unobserve.take().unwrap();
         let invalidate = runtime.invalidate_offline_region(created.id).unwrap();
-        wait_for_operation(&mut runtime, &invalidate).unwrap();
-        invalidate.finish().unwrap();
-        invalidate.release();
+        wait_for_operation(&invalidate).unwrap();
+        invalidate.take().unwrap();
         let delete = runtime.delete_offline_region(created.id).unwrap();
-        wait_for_operation(&mut runtime, &delete).unwrap();
-        delete.finish().unwrap();
-        delete.release();
+        wait_for_operation(&delete).unwrap();
+        delete.take().unwrap();
         let delete_geometry = runtime.delete_offline_region(geometry_region.id).unwrap();
-        wait_for_operation(&mut runtime, &delete_geometry).unwrap();
-        delete_geometry.finish().unwrap();
-        delete_geometry.release();
+        wait_for_operation(&delete_geometry).unwrap();
+        delete_geometry.take().unwrap();
 
         let missing_created = runtime.offline_region(created.id).unwrap();
-        wait_for_operation(&mut runtime, &missing_created).unwrap();
+        wait_for_operation(&missing_created).unwrap();
         assert!(missing_created.take().unwrap().is_none());
-        missing_created.release();
         let missing_geometry = runtime.offline_region(geometry_region.id).unwrap();
-        wait_for_operation(&mut runtime, &missing_geometry).unwrap();
+        wait_for_operation(&missing_geometry).unwrap();
         assert!(missing_geometry.take().unwrap().is_none());
-        missing_geometry.release();
 
         runtime.close_and_wait();
     }
@@ -1001,13 +1022,12 @@ mod tests {
         {
             let mut side_options = RuntimeOptions::default();
             side_options.cache_path = Some(side_cache.to_string_lossy().into_owned());
-            let mut side_runtime = RuntimeHandle::with_options(&side_options).unwrap();
+            let side_runtime = RuntimeHandle::with_options(&side_options).unwrap();
             let create = side_runtime
                 .create_offline_region(&definition, b"merge")
                 .unwrap();
-            wait_for_operation(&mut side_runtime, &create).unwrap();
+            wait_for_operation(&create).unwrap();
             create.take().unwrap();
-            create.release();
             side_runtime.close_and_wait();
         }
         let side_database_before = std::fs::read(&side_cache).unwrap();
@@ -1023,13 +1043,12 @@ mod tests {
 
         let mut main_options = RuntimeOptions::default();
         main_options.cache_path = Some(main_cache.to_string_lossy().into_owned());
-        let mut main_runtime = RuntimeHandle::with_options(&main_options).unwrap();
+        let main_runtime = RuntimeHandle::with_options(&main_options).unwrap();
         let merge = main_runtime
             .merge_offline_regions_database(&side_cache.to_string_lossy())
             .unwrap();
-        wait_for_operation(&mut main_runtime, &merge).unwrap();
+        wait_for_operation(&merge).unwrap();
         let merged = merge.take().unwrap();
-        merge.release();
         assert_eq!(merged.len(), 1);
         assert_eq!(merged[0].definition, definition);
         assert_eq!(merged[0].metadata, b"merge");
@@ -1086,15 +1105,15 @@ mod tests {
         options.cache_path = Some(String::new());
         let runtime = RuntimeHandle::with_options(&options).unwrap();
 
-        std::thread::sleep(std::time::Duration::from_millis(1));
+        // The barrier proves the worker ran with these options before close.
+        crate::completion::blocking(runtime.barrier());
         runtime.close_and_wait();
     }
 
     #[test]
     // Spec coverage: BND-001.
     fn runtime_creation_rejects_abi_mismatch_before_storing_handle() {
-        let error = RuntimeHandle::create_with_native_options_after_abi_version_check_for_testing(
-            std::ptr::null(),
+        let error = RuntimeHandle::create_after_abi_version_check_for_testing(
             maplibre_core::EXPECTED_C_ABI_VERSION + 1,
         )
         .unwrap_err();
@@ -1113,18 +1132,21 @@ mod tests {
             .drain_events()
             .unwrap()
             .iter()
-            .any(|event| event.event_type() == event_type)
+            .any(|event| event.event_type == event_type)
     }
 
-    fn wait_for_runtime_event(runtime: &mut RuntimeHandle, event_type: RuntimeEventType) -> bool {
-        for _ in 0..100 {
-            std::thread::sleep(std::time::Duration::from_millis(1));
+    /// Drains until one event of `event_type` arrives or the deadline passes.
+    fn wait_for_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
             if drain_holds_event_type(runtime, event_type) {
                 return true;
             }
-            std::thread::sleep(Duration::from_millis(10));
+            if Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(1));
         }
-        false
     }
 
     fn wait_for_arc_release(value: &Arc<()>) {
@@ -1135,22 +1157,24 @@ mod tests {
         assert_eq!(Arc::strong_count(value), 1);
     }
 
-    fn wait_for_map_loading_failure(runtime: &mut RuntimeHandle) -> RuntimeEvent {
-        for _ in 0..100 {
-            std::thread::sleep(std::time::Duration::from_millis(1));
-            let mut failure = None;
-            for event in runtime.drain_events().unwrap().iter() {
-                if event.event_type() == RuntimeEventType::MapLoadingFailed {
-                    failure = Some(event.to_owned().unwrap());
-                    break;
-                }
-            }
+    /// Drains until the map reports a loading failure.
+    fn wait_for_map_loading_failure(runtime: &RuntimeHandle) -> RuntimeEvent {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let failure = runtime
+                .drain_events()
+                .unwrap()
+                .into_iter()
+                .find(|event| event.event_type == RuntimeEventType::MapLoadingFailed);
             if let Some(failure) = failure {
                 return failure;
             }
-            std::thread::sleep(Duration::from_millis(10));
+            assert!(
+                Instant::now() < deadline,
+                "expected a map loading-failure event"
+            );
+            std::thread::sleep(Duration::from_millis(1));
         }
-        panic!("expected a map loading-failure event");
     }
 
     #[test]
@@ -1158,25 +1182,15 @@ mod tests {
     fn runtime_create_run_drain_and_close() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
 
-        std::thread::sleep(std::time::Duration::from_millis(1));
+        // The barrier fences the empty-queue claim: every submission the
+        // runtime accepted so far has reached a terminal disposition.
+        crate::completion::blocking(runtime.barrier());
         // A fresh runtime with no map queues nothing.
-        let batch = runtime.drain_events().unwrap();
-        assert!(batch.is_empty());
-        assert_eq!(batch.len(), 0);
-        assert_eq!(batch.iter().count(), 0);
-        // A second drain of an empty queue reports the same empty batch.
+        let events = runtime.drain_events().unwrap();
+        assert!(events.is_empty());
+        // A second drain of an empty queue reports the same empty sequence.
         assert!(runtime.drain_events().unwrap().is_empty());
         runtime.close_and_wait();
-    }
-
-    fn wait_for_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
-        for _ in 0..500 {
-            if drain_holds_event_type(runtime, event_type) {
-                return true;
-            }
-            std::thread::sleep(Duration::from_millis(1));
-        }
-        false
     }
 
     #[test]
@@ -1193,6 +1207,42 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-090.
+    fn drained_events_can_be_read_from_another_thread() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let map =
+            crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
+        map.set_style_json(PROVIDER_STYLE_JSON.as_bytes()).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let events = loop {
+            let events = runtime.drain_events().unwrap();
+            if events
+                .iter()
+                .any(|event| event.event_type == RuntimeEventType::MapStyleLoaded)
+            {
+                break events;
+            }
+            assert!(Instant::now() < deadline, "the style never loaded");
+            std::thread::sleep(Duration::from_millis(1));
+        };
+
+        // The drained events own their data, so they may be moved to whichever
+        // thread reads them.
+        let types = std::thread::spawn(move || {
+            events
+                .iter()
+                .map(|event| event.event_type)
+                .collect::<Vec<_>>()
+        })
+        .join()
+        .unwrap();
+        assert!(types.contains(&RuntimeEventType::MapStyleLoaded));
+
+        map.close_and_wait();
+        runtime.close_and_wait();
+    }
+
+    #[test]
     fn runtime_accepts_concurrent_barrier_submissions() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         std::thread::scope(|scope| {
@@ -1201,7 +1251,7 @@ mod tests {
             for operation in [first.join().unwrap(), second.join().unwrap()] {
                 assert!(operation.wait(Duration::from_secs(5)).unwrap());
                 assert_eq!(operation.terminal_status().unwrap(), sys::MLN_STATUS_OK);
-                operation.finish().unwrap();
+                operation.take().unwrap();
             }
         });
         runtime.close_and_wait();
@@ -1341,7 +1391,7 @@ mod tests {
     // Requests a style no file source serves, so the loading-failure event that
     // follows proves the request reached the network file source where the
     // runtime-scoped provider sits.
-    fn load_probe_style(runtime: &mut RuntimeHandle, map: &MapHandle, style_url: &str) {
+    fn load_probe_style(runtime: &RuntimeHandle, map: &MapHandle, style_url: &str) {
         map.set_style_url(style_url).unwrap();
         let event = wait_for_map_loading_failure(runtime);
         assert!(
@@ -1355,7 +1405,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-142 and BND-154.
     fn resource_provider_is_consulted_until_replaced_and_cleared_while_a_map_is_live() {
-        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let map =
             crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
@@ -1367,7 +1417,7 @@ mod tests {
                 ResourceProviderDecision::PassThrough
             })
             .unwrap();
-        load_probe_style(&mut runtime, &map, "jar:file:/packaged/first.json");
+        load_probe_style(&runtime, &map, "jar:file:/packaged/first.json");
         assert!(first_calls.load(Ordering::SeqCst) > 0);
 
         let second_calls = Arc::new(AtomicUsize::new(0));
@@ -1379,7 +1429,7 @@ mod tests {
             })
             .unwrap();
         let first_calls_after_replace = first_calls.load(Ordering::SeqCst);
-        load_probe_style(&mut runtime, &map, "jar:file:/packaged/second.json");
+        load_probe_style(&runtime, &map, "jar:file:/packaged/second.json");
         assert!(second_calls.load(Ordering::SeqCst) > 0);
         assert_eq!(
             first_calls.load(Ordering::SeqCst),
@@ -1388,7 +1438,7 @@ mod tests {
 
         runtime.clear_resource_provider().unwrap();
         let second_calls_after_clear = second_calls.load(Ordering::SeqCst);
-        load_probe_style(&mut runtime, &map, "jar:file:/packaged/third.json");
+        load_probe_style(&runtime, &map, "jar:file:/packaged/third.json");
         assert_eq!(
             first_calls.load(Ordering::SeqCst),
             first_calls_after_replace
@@ -1408,7 +1458,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-143 and BND-150.
     fn resource_provider_completes_style_request_inline_through_c_abi() {
-        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let calls = Arc::new(AtomicUsize::new(0));
         let callback_calls = Arc::clone(&calls);
         runtime
@@ -1431,10 +1481,7 @@ mod tests {
             crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
         map.set_style_url("custom://style.json").unwrap();
 
-        assert!(wait_for_runtime_event(
-            &mut runtime,
-            RuntimeEventType::MapStyleLoaded
-        ));
+        assert!(wait_for_event(&runtime, RuntimeEventType::MapStyleLoaded));
         assert_eq!(calls.load(Ordering::SeqCst), 1);
         map.close_and_wait();
         runtime.close_and_wait();
@@ -1443,7 +1490,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-155.
     fn resource_provider_sees_scheme_alias_and_its_resolved_url() {
-        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let resolved = Arc::new(Mutex::new(None));
         let callback_resolved = Arc::clone(&resolved);
         runtime
@@ -1465,10 +1512,7 @@ mod tests {
             crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
         map.set_style_url("maplibre://maps/style").unwrap();
 
-        assert!(wait_for_runtime_event(
-            &mut runtime,
-            RuntimeEventType::MapStyleLoaded
-        ));
+        assert!(wait_for_event(&runtime, RuntimeEventType::MapStyleLoaded));
         assert_eq!(
             resolved.lock().unwrap().as_deref(),
             Some("https://demotiles.maplibre.org/style.json")
@@ -1480,7 +1524,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-144 and BND-145.
     fn resource_provider_completes_style_request_from_another_thread() {
-        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let (sender, receiver) = std::sync::mpsc::channel();
         runtime
             .set_resource_provider(move |request, handle| {
@@ -1510,10 +1554,7 @@ mod tests {
         .join()
         .unwrap();
 
-        assert!(wait_for_runtime_event(
-            &mut runtime,
-            RuntimeEventType::MapStyleLoaded
-        ));
+        assert!(wait_for_event(&runtime, RuntimeEventType::MapStyleLoaded));
         map.close_and_wait();
         runtime.close_and_wait();
     }
@@ -1631,7 +1672,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-198.
     fn cancel_callback_skips_a_completed_request() {
-        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let cancels = Arc::new(AtomicUsize::new(0));
         let callback_cancels = Arc::clone(&cancels);
         commit_resource_provider(&runtime, move |request, handle| {
@@ -1659,10 +1700,7 @@ mod tests {
             crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
         map.set_style_url("custom://cancel-style.json").unwrap();
         // The response reaches the style before the map goes away.
-        assert!(wait_for_runtime_event(
-            &mut runtime,
-            RuntimeEventType::MapStyleLoaded
-        ));
+        assert!(wait_for_event(&runtime, RuntimeEventType::MapStyleLoaded));
 
         map.close_and_wait();
 
@@ -1716,7 +1754,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-149.
     fn resource_provider_error_response_becomes_copied_loading_failure_event() {
-        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         runtime
             .set_resource_provider(move |request, handle| {
                 if request.requested_url == "custom://broken-style.json" {
@@ -1738,7 +1776,7 @@ mod tests {
         let map_id = map.id();
         map.set_style_url("custom://broken-style.json").unwrap();
 
-        let event = wait_for_map_loading_failure(&mut runtime);
+        let event = wait_for_map_loading_failure(&runtime);
         let copied_message = event.message.clone();
         // The copy stays intact after the drain that ends the batch's window.
         let _ = runtime.drain_events().unwrap();
@@ -1817,24 +1855,17 @@ mod tests {
             crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
         map.set_style_url(&format!("{origin}/__fixture/original-style.json"))
             .unwrap();
-        assert!(wait_for_runtime_event(
-            &mut runtime,
-            RuntimeEventType::MapStyleLoaded
-        ));
+        assert!(wait_for_event(&runtime, RuntimeEventType::MapStyleLoaded));
         // Contains rather than equals: MapLibre adds its own annotation layer to
         // every style it loads.
         let layer_ids = map.style_layer_ids().unwrap();
         assert!(layer_ids.wait(Duration::from_secs(5)).unwrap());
         assert!(layer_ids.take().unwrap().iter().any(|id| id == "rewritten"));
-        layer_ids.release();
 
         runtime.clear_resource_transform().unwrap();
         map.set_style_url(&format!("{origin}/__fixture/original-after-clear.json"))
             .unwrap();
-        assert!(wait_for_runtime_event(
-            &mut runtime,
-            RuntimeEventType::MapStyleLoaded
-        ));
+        assert!(wait_for_event(&runtime, RuntimeEventType::MapStyleLoaded));
         let layer_ids = map.style_layer_ids().unwrap();
         assert!(layer_ids.wait(Duration::from_secs(5)).unwrap());
         assert!(
@@ -1844,7 +1875,6 @@ mod tests {
                 .iter()
                 .any(|id| id == "original-after-clear")
         );
-        layer_ids.release();
 
         map.close_and_wait();
         runtime.close_and_wait();
@@ -1854,7 +1884,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-140.
     fn resource_transform_rewrites_style_url_and_clear_restores_original_url() {
-        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let (base_url, requests, server) = spawn_style_server(2);
         let transform_base_url = base_url.clone();
 
@@ -1877,10 +1907,7 @@ mod tests {
             crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
         map.set_style_url(&format!("{base_url}/original-style.json"))
             .unwrap();
-        assert!(wait_for_runtime_event(
-            &mut runtime,
-            RuntimeEventType::MapStyleLoaded
-        ));
+        assert!(wait_for_event(&runtime, RuntimeEventType::MapStyleLoaded));
         assert_eq!(
             requests.recv_timeout(Duration::from_secs(5)).unwrap(),
             "/rewritten-style.json"
@@ -1889,10 +1916,7 @@ mod tests {
         runtime.clear_resource_transform().unwrap();
         map.set_style_url(&format!("{base_url}/original-after-clear.json"))
             .unwrap();
-        assert!(wait_for_runtime_event(
-            &mut runtime,
-            RuntimeEventType::MapStyleLoaded
-        ));
+        assert!(wait_for_event(&runtime, RuntimeEventType::MapStyleLoaded));
         assert_eq!(
             requests.recv_timeout(Duration::from_secs(5)).unwrap(),
             "/original-after-clear.json"
@@ -1907,7 +1931,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-158 and BND-159.
     fn http_header_transform_reaches_requests_and_clear_stops_it() {
-        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let (base_url, requests, server) = spawn_recording_style_server(2);
         runtime
             .set_http_header_transform(|request| {
@@ -1920,10 +1944,7 @@ mod tests {
             crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
         map.set_style_url(&format!("{base_url}/with-header.json"))
             .unwrap();
-        assert!(wait_for_runtime_event(
-            &mut runtime,
-            RuntimeEventType::MapStyleLoaded
-        ));
+        assert!(wait_for_event(&runtime, RuntimeEventType::MapStyleLoaded));
         let first = requests.recv_timeout(Duration::from_secs(5)).unwrap();
         assert!(
             first
@@ -1934,10 +1955,7 @@ mod tests {
         runtime.clear_http_header_transform().unwrap();
         map.set_style_url(&format!("{base_url}/after-clear.json"))
             .unwrap();
-        assert!(wait_for_runtime_event(
-            &mut runtime,
-            RuntimeEventType::MapStyleLoaded
-        ));
+        assert!(wait_for_event(&runtime, RuntimeEventType::MapStyleLoaded));
         let second = requests.recv_timeout(Duration::from_secs(5)).unwrap();
         assert!(
             !second
@@ -1954,7 +1972,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-158.
     fn http_header_transform_skips_non_http_urls() {
-        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         runtime.set_resource_transform(|_| None).unwrap();
         let calls = Arc::new(AtomicUsize::new(0));
         let callback_calls = Arc::clone(&calls);
@@ -1968,7 +1986,7 @@ mod tests {
             crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
         map.set_style_url("jar:file:/packaged/style.json").unwrap();
-        let _ = wait_for_map_loading_failure(&mut runtime);
+        let _ = wait_for_map_loading_failure(&runtime);
         assert_eq!(calls.load(Ordering::SeqCst), 0);
 
         map.close_and_wait();
@@ -1979,7 +1997,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-159.
     fn http_header_transform_preserves_same_origin_and_strips_cross_origin_redirects() {
-        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let (origin_url, requests, servers) = spawn_redirect_style_servers();
         runtime
             .set_http_header_transform(|_| vec![crate::HttpHeader::new("X-Map-Token", "secret")])
@@ -1989,10 +2007,7 @@ mod tests {
 
         map.set_style_url(&format!("{origin_url}/same-start.json"))
             .unwrap();
-        assert!(wait_for_runtime_event(
-            &mut runtime,
-            RuntimeEventType::MapStyleLoaded
-        ));
+        assert!(wait_for_event(&runtime, RuntimeEventType::MapStyleLoaded));
         assert_eq!(
             requests.recv_timeout(Duration::from_secs(5)).unwrap(),
             ("/same-start.json".to_owned(), true)
@@ -2004,10 +2019,7 @@ mod tests {
 
         map.set_style_url(&format!("{origin_url}/cross-start.json"))
             .unwrap();
-        assert!(wait_for_runtime_event(
-            &mut runtime,
-            RuntimeEventType::MapStyleLoaded
-        ));
+        assert!(wait_for_event(&runtime, RuntimeEventType::MapStyleLoaded));
         assert_eq!(
             requests.recv_timeout(Duration::from_secs(5)).unwrap(),
             ("/cross-start.json".to_owned(), true)
@@ -2124,7 +2136,7 @@ mod tests {
 
     #[test]
     // Spec coverage: BND-081, BND-090, and BND-092.
-    fn a_drain_reports_map_events_in_queue_order_and_copies_outlive_the_batch() {
+    fn a_drain_reports_map_events_in_queue_order_and_copies_outlive_the_drain() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let map =
             crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
@@ -2137,32 +2149,23 @@ mod tests {
         assert_eq!(completion.raw_status, sys::MLN_STATUS_NATIVE_ERROR);
         assert!(!completion.diagnostic.is_empty());
 
-        let batch = runtime.drain_events().unwrap();
-        let types = batch
+        let events = runtime.drain_events().unwrap();
+        let types = events
             .iter()
-            .map(|event| event.event_type())
+            .map(|event| event.event_type)
             .collect::<Vec<_>>();
         assert!(
             !types.is_empty(),
             "a failed style load should queue an event, got {types:?}"
         );
-        let loading_failed = batch
-            .iter()
-            .find(|event| event.event_type() == RuntimeEventType::MapLoadingFailed)
+        let owned = events
+            .into_iter()
+            .find(|event| event.event_type == RuntimeEventType::MapLoadingFailed)
             .expect("a malformed style should queue a loading-failed event");
-        assert_eq!(loading_failed.source(), RuntimeEventSource::Map(map_id));
-        assert!(
-            loading_failed
-                .message()
-                .unwrap()
-                .is_some_and(|message| !message.is_empty())
-        );
-        let owned = loading_failed.to_owned().unwrap();
+        assert_eq!(owned.source, RuntimeEventSource::Map(map_id));
 
-        // A later drain leaves the owned batch readable.
+        // A later drain leaves the copied event readable.
         assert!(runtime.drain_events().unwrap().is_empty());
-        assert_eq!(loading_failed.source(), RuntimeEventSource::Map(map_id));
-        drop(batch);
         assert_eq!(owned.source, RuntimeEventSource::Map(map_id));
         assert_eq!(owned.event_type, RuntimeEventType::MapLoadingFailed);
         assert!(
@@ -2188,7 +2191,6 @@ mod tests {
         assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_STATE));
         let runtime = error.into_handle();
 
-        std::thread::sleep(std::time::Duration::from_millis(1));
         map.close_and_wait();
         runtime.close_and_wait();
     }

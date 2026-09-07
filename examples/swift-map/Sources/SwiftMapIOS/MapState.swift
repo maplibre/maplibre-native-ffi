@@ -63,9 +63,7 @@ final class MapState {
 
     self.runtime = runtime
     self.map = map
-    try await map.setEventMask([
-      .mapRenderUpdateAvailable, .mapRenderFrameFinished,
-    ])
+    try await map.setEventMask([.mapRenderUpdateAvailable])
     _ = try await map.setStyleURL(
       "https://tiles.openfreemap.org/styles/bright"
     )
@@ -110,18 +108,9 @@ final class MapState {
 
   private func drainEvents() throws -> Bool {
     var renderPending = false
-    for event in try runtime.drainEvents().events
-      where map.isSource(of: event)
-    {
-      switch event.type {
-      case .mapRenderUpdateAvailable:
+    for event in try runtime.drainEvents() where map.isSource(of: event) {
+      if event.type == .mapRenderUpdateAvailable {
         renderPending = true
-      case .mapRenderFrameFinished:
-        if case let .renderFrame(frame) = event.payload, frame.needsRepaint {
-          renderPending = true
-        }
-      default:
-        break
       }
     }
     return renderPending
@@ -139,7 +128,7 @@ final class MapState {
   }
 
   func cancelTransitions() async throws {
-    _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions()))
+    _ = try await map.cancelTransitions()
   }
 
   func moveBy(dx: Double, dy: Double) async throws {
@@ -171,13 +160,15 @@ final class MapState {
     ))
   }
 
+  /// Eases to the next whole zoom level, `round(zoom) + 1`, about `anchor`.
   func zoomToNextStep(
     anchor: ScreenPoint,
     animation: AnimationOptions
   ) async throws {
+    let zoom = try map.cameraSnapshot().camera.zoom ?? 0
     _ = try await map.applyCameraDelta(CameraDelta(
       kind: .scale,
-      amount: 2,
+      amount: pow(2.0, (zoom.rounded() + 1) - zoom),
       anchor: anchor,
       animation: animation
     ))

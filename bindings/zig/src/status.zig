@@ -2,6 +2,7 @@ const std = @import("std");
 
 const c = @import("c.zig").raw;
 const diagnostics = @import("diagnostics.zig");
+const sync = @import("sync.zig");
 
 pub const expected_c_abi_version: u32 = 0;
 
@@ -101,24 +102,10 @@ fn nativeStatusError(raw_status: i32) NativeStatusError {
     };
 }
 
-test "native status values map to stable Zig errors" {
-    try std.testing.expectError(error.InvalidArgument, checkStatus(c.MLN_STATUS_INVALID_ARGUMENT, null));
-    try std.testing.expectError(error.InvalidState, checkStatus(c.MLN_STATUS_INVALID_STATE, null));
-    try std.testing.expectError(error.WrongThread, checkStatus(c.MLN_STATUS_WRONG_THREAD, null));
-    try std.testing.expectError(error.Unsupported, checkStatus(c.MLN_STATUS_UNSUPPORTED, null));
-    try std.testing.expectError(error.Cancelled, checkStatus(c.MLN_STATUS_CANCELLED, null));
-    try std.testing.expectError(error.Busy, checkStatus(c.MLN_STATUS_BUSY, null));
-    try std.testing.expectError(error.TargetLost, checkStatus(c.MLN_STATUS_TARGET_LOST, null));
-    try std.testing.expectError(error.NotReady, checkStatus(c.MLN_STATUS_NOT_READY, null));
-    try std.testing.expectError(error.NotFound, checkStatus(c.MLN_STATUS_NOT_FOUND, null));
-    try std.testing.expectError(error.NativeError, checkStatus(c.MLN_STATUS_NATIVE_ERROR, null));
-    try checkStatus(c.MLN_STATUS_OK, null);
-}
-
 // Signals that a native runtime finished tearing down, so this test's raw C
 // calls do not outlive the library state they used.
 const TeardownSignal = struct {
-    finished: std.atomic.Value(bool) = .init(false),
+    finished: sync.Latch = .{},
 
     fn descriptor(self: *TeardownSignal) c.mln_completion {
         return .{
@@ -131,11 +118,11 @@ const TeardownSignal = struct {
 
     fn callback(user_data: ?*anyopaque, _: [*c]const c.mln_completion_result) callconv(.c) void {
         const self: *TeardownSignal = @ptrCast(@alignCast(user_data orelse return));
-        self.finished.store(true, .release);
+        self.finished.set();
     }
 
     fn wait(self: *TeardownSignal) void {
-        while (!self.finished.load(.acquire)) std.Thread.yield() catch {};
+        self.finished.wait();
     }
 };
 

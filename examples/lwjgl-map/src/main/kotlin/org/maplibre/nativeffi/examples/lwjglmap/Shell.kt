@@ -12,6 +12,9 @@ import org.maplibre.nativeffi.render.RenderBackend
 internal object Shell {
   private const val INITIAL_WIDTH = 960
   private const val INITIAL_HEIGHT = 640
+
+  // TODO(map-example-spec): Replace the fixed interval with a display-paced host loop. See Frame
+  // loop.
   private const val IDLE_WAIT_SECONDS = 0.004
 
   fun run(mode: RenderTargetMode, backends: Set<RenderBackend>) {
@@ -50,7 +53,7 @@ internal object Shell {
               viewport.value.log("resized viewport")
               if (!viewport.value.empty()) {
                 graphics.resize(viewport.value)
-                state.resize(viewport.value)
+                // The render target owns the map's extent while a session is attached.
                 target.resize(viewport.value)
                 renderRequest.set()
               }
@@ -59,12 +62,12 @@ internal object Shell {
               glfwWaitEventsTimeout(IDLE_WAIT_SECONDS)
               continue
             }
-            var rendered = false
+            var settled = false
             if (renderRequest.consume()) {
-              rendered = render(target)
-              if (!rendered) renderRequest.set()
+              settled = render(target)
+              if (!settled) renderRequest.set()
             }
-            if (!rendered) glfwWaitEventsTimeout(IDLE_WAIT_SECONDS)
+            if (!settled) glfwWaitEventsTimeout(IDLE_WAIT_SECONDS)
           }
         }
     } finally {

@@ -99,6 +99,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/c_api/projection.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/query.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/style.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/test_hooks.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/network.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/render_session.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/runtime.cpp
@@ -118,6 +119,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/map/map.cpp
       ${PROJECT_SOURCE_DIR}/src/map/style.cpp
       ${PROJECT_SOURCE_DIR}/src/render/render_session_common.cpp
+      ${PROJECT_SOURCE_DIR}/src/render/render_session_query.cpp
       ${PROJECT_SOURCE_DIR}/src/render/surface_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/texture_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/unsupported_sessions.cpp

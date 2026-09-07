@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ._enum import NativeIntEnum, UnknownIntEnum
-from .geo import LatLngBounds
+from .geo import LatLng, LatLngBounds
 from .resource import ResourceErrorReason
 
 
@@ -135,7 +135,7 @@ class OfflineRegionStatusChanged:
         cls, payload: dict[str, object]
     ) -> OfflineRegionStatusChanged:
         return cls(
-            region_id=_payload_int(payload, "region_id"),
+            region_id=payload["region_id"],
             status=OfflineRegionStatus._from_native(payload["status"]),
         )
 
@@ -151,11 +151,9 @@ class OfflineRegionResponseError:
     def _from_runtime_payload(
         cls, payload: dict[str, object]
     ) -> OfflineRegionResponseError:
-        from .resource import ResourceErrorReason
-
         return cls(
-            region_id=_payload_int(payload, "region_id"),
-            reason=ResourceErrorReason(_payload_int(payload, "reason")),
+            region_id=payload["region_id"],
+            reason=ResourceErrorReason(payload["reason"]),
         )
 
 
@@ -171,13 +169,9 @@ class OfflineRegionTileCountLimitExceeded:
         cls, payload: dict[str, object]
     ) -> OfflineRegionTileCountLimitExceeded:
         return cls(
-            region_id=_payload_int(payload, "region_id"),
-            limit=_payload_int(payload, "limit"),
+            region_id=payload["region_id"],
+            limit=payload["limit"],
         )
-
-
-def _adapt_region_result(raw: object) -> OfflineRegionInfo:
-    return OfflineRegionInfo._from_native(raw)
 
 
 def _adapt_optional_region_result(raw: object) -> OfflineRegionInfo | None:
@@ -186,10 +180,6 @@ def _adapt_optional_region_result(raw: object) -> OfflineRegionInfo | None:
 
 def _adapt_region_list_result(raw: object) -> tuple[OfflineRegionInfo, ...]:
     return tuple(OfflineRegionInfo._from_native(region) for region in raw)
-
-
-def _adapt_status_result(raw: object) -> OfflineRegionStatus:
-    return OfflineRegionStatus._from_native(raw)
 
 
 def _definition_from_native_wire(raw: dict[str, object]) -> OfflineRegionDefinition:
@@ -220,18 +210,8 @@ def _definition_from_native_wire(raw: dict[str, object]) -> OfflineRegionDefinit
     raise TypeError(msg)
 
 
-def _lat_lng_from_native_wire(raw: dict[str, object]):
-    from .geo import LatLng
-
+def _lat_lng_from_native_wire(raw: dict[str, object]) -> LatLng:
     return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
-
-
-def _payload_int(payload: dict[str, object], key: str) -> int:
-    value = payload[key]
-    if not isinstance(value, int):
-        msg = f"offline payload {key} must be an int"
-        raise TypeError(msg)
-    return value
 
 
 __all__ = [

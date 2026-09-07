@@ -8,15 +8,14 @@ import (
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
 )
 
-func liveCustomMVTVectorSources(t *testing.T, baseline int64) int64 {
-	t.Helper()
+func liveCustomMVTVectorSources(baseline int64) int64 {
 	return callback.CustomMVTVectorSourceLiveCountForTest() - baseline
 }
 
 func TestCustomMVTVectorSourceDescriptors(t *testing.T) {
 	runtime, m := newRuntimeAndMap(t, nil)
 	baseline := callback.CustomMVTVectorSourceLiveCountForTest()
-	loadStyleAndCollect(t, runtime, m, emptyStyleJSON)
+	loadStyleForTest(t, runtime, m, emptyStyleJSON)
 
 	minZoom := 0.0
 	maxZoom := 2.0
@@ -43,13 +42,13 @@ func TestCustomMVTVectorSourceDescriptors(t *testing.T) {
 	if _, err := m.InvalidateCustomMVTVectorSourceTile("custom-mvt", tileID); err != nil {
 		t.Fatalf("InvalidateCustomMVTVectorSourceTile(): %v", err)
 	}
-	source, err := awaitForTest(m.StyleSourceInfo("custom-mvt"))
-	if err != nil || !source.Found || source.Value.Type != StyleSourceTypeCustomMVTVector {
-		t.Fatalf("StyleSourceInfo(custom-mvt) = (%#v, %v), want a found CustomMVTVector source", source, err)
+	source, found, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("custom-mvt"))
+	if err != nil || !found || source.Type != StyleSourceTypeCustomMVTVector {
+		t.Fatalf("StyleSourceInfo(custom-mvt) = (%#v, %v, %v), want a found CustomMVTVector source", source, found, err)
 	}
 	removeID, err := m.RemoveStyleSource("custom-mvt")
-	requireCommandCommitted(t, runtime, removeID, err)
-	if live := liveCustomMVTVectorSources(t, baseline); live != 0 {
+	requireCommandCommitted(t, removeID, err)
+	if live := liveCustomMVTVectorSources(baseline); live != 0 {
 		t.Fatalf("live callback states after removal = %d, want 0", live)
 	}
 
@@ -63,7 +62,7 @@ func TestCustomMVTVectorSourceDescriptors(t *testing.T) {
 	}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("AddCustomMVTVectorSource(empty ID) error = %v, want ErrInvalidArgument", err)
 	}
-	if live := liveCustomMVTVectorSources(t, baseline); live != 0 {
+	if live := liveCustomMVTVectorSources(baseline); live != 0 {
 		t.Fatalf("live callback states after rejected adds = %d, want 0", live)
 	}
 }
@@ -75,21 +74,21 @@ func TestCustomMVTVectorSourceReleasedWhenStyleLoadDropsIt(t *testing.T) {
 	runtime, m := newRuntimeAndMap(t, &options)
 	baseline := callback.CustomMVTVectorSourceLiveCountForTest()
 
-	loadStyleAndCollect(t, runtime, m, backgroundStyleJSON)
+	loadStyleForTest(t, runtime, m, backgroundStyleJSON)
 	if _, err := m.AddCustomMVTVectorSource("custom-mvt", CustomMVTVectorSourceOptions{
 		FetchTile: func(CanonicalTileID) {},
 	}); err != nil {
 		t.Fatalf("AddCustomMVTVectorSource(): %v", err)
 	}
-	if live := liveCustomMVTVectorSources(t, baseline); live != 1 {
+	if live := liveCustomMVTVectorSources(baseline); live != 1 {
 		t.Fatalf("live callback states after the add = %d, want 1", live)
 	}
-	if got, err := m.EventMask(); err != nil || got != mask {
-		t.Fatalf("EventMask() = (%#x, %v), want %#x", uint64(got), err, uint64(mask))
+	if got := mapEventMaskForTest(t, m); got != mask {
+		t.Fatalf("MapSnapshot.EventMask = %#x, want %#x", uint64(got), uint64(mask))
 	}
 
-	events := loadStyleAndCollect(t, runtime, m, emptyStyleJSON)
-	if live := liveCustomMVTVectorSources(t, baseline); live != 0 {
+	events := loadStyleAndDrain(t, runtime, m, emptyStyleJSON)
+	if live := liveCustomMVTVectorSources(baseline); live != 0 {
 		t.Fatalf("live callback states after the style replacement = %d, want 0", live)
 	}
 	if slices.Contains(eventTypes(events), RuntimeEventMapStyleLoaded) {
@@ -100,7 +99,7 @@ func TestCustomMVTVectorSourceReleasedWhenStyleLoadDropsIt(t *testing.T) {
 func TestCustomMVTVectorSourceReleasedByRemovalAndMapClose(t *testing.T) {
 	runtime, m := newRuntimeAndMap(t, nil)
 	baseline := callback.CustomMVTVectorSourceLiveCountForTest()
-	loadStyleAndCollect(t, runtime, m, backgroundStyleJSON)
+	loadStyleForTest(t, runtime, m, backgroundStyleJSON)
 
 	for _, sourceID := range []string{"removed", "surviving"} {
 		if _, err := m.AddCustomMVTVectorSource(sourceID, CustomMVTVectorSourceOptions{
@@ -110,17 +109,17 @@ func TestCustomMVTVectorSourceReleasedByRemovalAndMapClose(t *testing.T) {
 		}
 	}
 	removeID, err := m.RemoveStyleSource("removed")
-	requireCommandCommitted(t, runtime, removeID, err)
-	if live := liveCustomMVTVectorSources(t, baseline); live != 1 {
+	requireCommandCommitted(t, removeID, err)
+	if live := liveCustomMVTVectorSources(baseline); live != 1 {
 		t.Fatalf("live callback states after the removal = %d, want 1", live)
 	}
 
 	// The map still holds the surviving source, so its teardown frees the state.
-	if err := m.Close(); err != nil {
+	if err := closeMapForTest(m); err != nil {
 		t.Fatalf("Map Close(): %v", err)
 	}
 	waitForRuntimeBarrier(t, runtime)
-	if live := liveCustomMVTVectorSources(t, baseline); live != 0 {
+	if live := liveCustomMVTVectorSources(baseline); live != 0 {
 		t.Fatalf("live callback states after the map close = %d, want 0", live)
 	}
 }

@@ -6,8 +6,7 @@ use std::time::Duration;
 use maplibre_native_ffi::{
     AnimationOptions, CameraDelta, CameraDeltaKind, CameraOptions, CameraUpdate, CameraUpdateMode,
     GesturePhase, LatLng, LogicalExtent, MapHandle, MapMode, MapOptions, RuntimeEventMask,
-    RuntimeEventPayload, RuntimeEventSource, RuntimeEventType, RuntimeHandle, RuntimeOptions,
-    ScreenPoint,
+    RuntimeEventSource, RuntimeEventType, RuntimeHandle, RuntimeOptions, ScreenPoint,
 };
 
 use crate::viewport::Viewport;
@@ -62,6 +61,25 @@ impl MapState {
 
     pub fn map_handle(&self) -> &MapHandle {
         &self.map
+    }
+
+    /// Carries a new logical extent to the map on the paths where the attached
+    /// session cannot: a caller-owned texture the host sizes. Target
+    /// replacement changes only the graphics resource.
+    pub fn resize(&self, viewport: Viewport) -> Result<(), Box<dyn Error>> {
+        self.map.resize(LogicalExtent {
+            width: viewport.logical_width,
+            height: viewport.logical_height,
+            scale_factor: viewport.scale_factor,
+        })?;
+        Ok(())
+    }
+
+    /// Ends any running camera transition, so a starting gesture takes over
+    /// from it rather than fighting it.
+    pub fn cancel_transitions(&self) -> Result<(), Box<dyn Error>> {
+        self.map.cancel_transitions()?;
+        Ok(())
     }
 
     pub fn set_gesture_in_progress(&mut self, in_progress: bool) -> Result<(), Box<dyn Error>> {
@@ -135,37 +153,17 @@ impl MapState {
         Ok(())
     }
 
-    pub fn resize(&mut self, viewport: Viewport) -> Result<(), Box<dyn Error>> {
-        self.map.resize(LogicalExtent {
-            width: viewport.logical_width,
-            height: viewport.logical_height,
-            scale_factor: viewport.scale_factor,
-        })?;
-        Ok(())
-    }
-
     pub fn drain_events(&self) -> maplibre_native_ffi::Result<bool> {
-        let mut render_requested = false;
         let source = RuntimeEventSource::Map(self.map.id());
-        let batch = self.runtime.drain_events()?;
-        for event in batch.iter().filter(|event| event.source() == source) {
-            match event.event_type() {
-                RuntimeEventType::MapRenderUpdateAvailable => render_requested = true,
-                RuntimeEventType::MapRenderFrameFinished => {
-                    if let RuntimeEventPayload::RenderFrame(frame) = event.payload() {
-                        render_requested |= frame.needs_repaint;
-                    }
-                }
-                _ => {}
-            }
-        }
-        Ok(render_requested)
+        Ok(self.runtime.drain_events()?.iter().any(|event| {
+            event.source == source && event.event_type == RuntimeEventType::MapRenderUpdateAvailable
+        }))
     }
 
     pub fn close(self) -> Result<(), Box<dyn Error>> {
         let Self { map, runtime, .. } = self;
         let mut first_error = None;
-        if let Err(error) = map.close() {
+        if let Err(error) = close_map(map) {
             append_optional_error(&mut first_error, format!("map close failed: {error}"));
         }
         if let Err(error) = close_runtime(runtime) {
@@ -178,10 +176,10 @@ impl MapState {
     }
 
     fn configure(&mut self) -> Result<(), Box<dyn Error>> {
-        self.map.set_event_mask(
-            RuntimeEventMask::MAP_RENDER_UPDATE_AVAILABLE
-                | RuntimeEventMask::MAP_RENDER_FRAME_FINISHED,
-        )?;
+        // The render loop re-arms from the frame result's repaint flag, so the
+        // map only has to report updates that arrive between frames.
+        self.map
+            .set_event_mask(RuntimeEventMask::MAP_RENDER_UPDATE_AVAILABLE)?;
         self.map.set_style_url(STYLE_URL)?;
         let mut camera = CameraOptions::default();
         camera.center = Some(LatLng::new(37.7749, -122.4194));
@@ -200,6 +198,19 @@ fn animation(duration_ms: f64) -> AnimationOptions {
     let mut animation = AnimationOptions::default();
     animation.duration_ms = Some(duration_ms);
     animation
+}
+
+/// Closes a map and waits for retirement, so its render resources are gone
+/// before the runtime that owns its worker closes.
+fn close_map(map: MapHandle) -> std::result::Result<(), String> {
+    let teardown = map
+        .close()
+        .map_err(|error| error.into_error().to_string())?;
+    match teardown.wait(Duration::from_secs(30)) {
+        Ok(true) => teardown.take().map_err(|error| error.to_string()),
+        Ok(false) => Err("map teardown timed out".to_owned()),
+        Err(error) => Err(error.to_string()),
+    }
 }
 
 /// Closes a runtime and waits for native teardown, so the process exits after

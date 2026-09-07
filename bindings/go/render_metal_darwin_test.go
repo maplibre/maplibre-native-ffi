@@ -23,7 +23,8 @@ func awaitWithDeadline[T any](t *testing.T, future *Future[T]) T {
 	return value
 }
 
-func awaitRenderedMetalFrame(t *testing.T, session *RenderSessionHandle) RenderFrameResult {
+// awaitRenderedMetalFrame demands frames until one of them renders.
+func awaitRenderedMetalFrame(t *testing.T, session *RenderSessionHandle) {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
@@ -36,25 +37,20 @@ func awaitRenderedMetalFrame(t *testing.T, session *RenderSessionHandle) RenderF
 			t.Fatalf("RequestFrame(): %v", err)
 		}
 		for time.Now().Before(deadline) {
-			batch, err := session.DrainFrameResults()
-			if errors.Is(err, ErrNotReady) {
-				time.Sleep(time.Millisecond)
-				continue
-			}
+			results, err := session.DrainFrameResults()
 			if err != nil {
 				t.Fatalf("DrainFrameResults(): %v", err)
 			}
-			results, err := batch.Results()
-			batch.Close()
-			if err != nil {
-				t.Fatalf("RenderFrameBatch.Results(): %v", err)
+			if len(results) == 0 {
+				time.Sleep(time.Millisecond)
+				continue
 			}
 			for _, result := range results {
 				if result.Token != token {
 					continue
 				}
 				if result.Disposition == RenderResultRendered {
-					return result
+					return
 				}
 				break
 			}
@@ -62,7 +58,65 @@ func awaitRenderedMetalFrame(t *testing.T, session *RenderSessionHandle) RenderF
 		}
 	}
 	t.Fatal("Metal session did not render before the deadline")
-	return RenderFrameResult{}
+}
+
+// newMetalOwnedTextureSession attaches one Metal session-owned texture target
+// with driver, and registers the teardown every path shares. It releases the
+// caller's device reference as soon as the attachment is accepted, so the rest
+// of a test runs on the reference the session retained for itself.
+func newMetalOwnedTextureSession(
+	t *testing.T, driver RenderDriver,
+) (*RuntimeHandle, *MapHandle, *RenderSessionHandle, *Future[struct{}]) {
+	t.Helper()
+	if !SupportedRenderBackends().Has(RenderBackendMetal) {
+		t.Skip("Metal is not the configured render backend")
+	}
+	device := testsupport.DefaultMetalDevice()
+	if device == 0 {
+		t.Fatal("the system default Metal device is unavailable")
+	}
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		testsupport.ReleaseMetalDevice(device)
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	mapFuture, err := runtime.NewMapWithOptions(NewMapOptions(32, 16, 1))
+	if err != nil {
+		testsupport.ReleaseMetalDevice(device)
+		t.Fatalf("NewMapWithOptions(): %v", err)
+	}
+	m := awaitWithDeadline(t, mapFuture)
+
+	options := NewRenderSessionAttachOptions()
+	options.Driver = driver
+	options.RequestedTextureRingDepth = 2
+	session, attach, err := m.AttachMetalOwnedTexture(
+		MetalOwnedTextureDescriptor{
+			Extent:  RenderTargetExtent{Width: 32, Height: 16, ScaleFactor: 1},
+			Context: MetalContextDescriptor{Device: NativePointer(device)},
+		},
+		options,
+	)
+	testsupport.ReleaseMetalDevice(device)
+	if err != nil {
+		t.Fatalf("AttachMetalOwnedTexture(): %v", err)
+	}
+	if session == nil || attach == nil {
+		t.Fatal("AttachMetalOwnedTexture() did not publish both session and completion")
+	}
+
+	// Every handle below tolerates a second close, so this runs after the
+	// explicit teardown a test performs and reclaims what a failure left behind.
+	t.Cleanup(func() {
+		_, _ = session.Abandon()
+		_ = session.Close()
+		_ = closeMapForTest(m)
+		if teardown, err := runtime.Close(); err == nil {
+			awaitWithDeadline(t, teardown)
+		}
+	})
+	return runtime, m, session, attach
 }
 
 func awaitCallerDriverCompletion(t *testing.T, session *RenderSessionHandle, future *Future[struct{}]) {
@@ -84,67 +138,7 @@ func awaitCallerDriverCompletion(t *testing.T, session *RenderSessionHandle, fut
 }
 
 func TestMetalOwnedTextureCompletionLifecycleDarwin(t *testing.T) {
-	if !SupportedRenderBackends().Has(RenderBackendMetal) {
-		t.Skip("Metal is not the configured render backend")
-	}
-	device := testsupport.DefaultMetalDevice()
-	if device == 0 {
-		t.Skip("the system default Metal device is unavailable")
-	}
-	deviceRetained := true
-	defer func() {
-		if deviceRetained {
-			testsupport.ReleaseMetalDevice(device)
-		}
-	}()
-
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	var m *MapHandle
-	var session *RenderSessionHandle
-	defer func() {
-		if session != nil {
-			_, _ = session.Abandon()
-			_ = session.Close()
-		}
-		if m != nil {
-			_ = m.Close()
-		}
-		if runtime != nil {
-			if teardown, err := runtime.Close(); err == nil {
-				awaitWithDeadline(t, teardown)
-			}
-		}
-	}()
-
-	mapFuture, err := runtime.NewMapWithOptions(NewMapOptions(32, 16, 1))
-	if err != nil {
-		t.Fatalf("NewMapWithOptions(): %v", err)
-	}
-	m = awaitWithDeadline(t, mapFuture)
-
-	extent := RenderTargetExtent{Width: 32, Height: 16, ScaleFactor: 1}
-	options := NewRenderSessionAttachOptions()
-	options.RequestedTextureRingDepth = 2
-	session, attach, err := m.AttachMetalOwnedTexture(
-		MetalOwnedTextureDescriptor{
-			Extent:  extent,
-			Context: MetalContextDescriptor{Device: NativePointer(device)},
-		},
-		options,
-	)
-	if err != nil {
-		t.Fatalf("AttachMetalOwnedTexture(): %v", err)
-	}
-	if session == nil || attach == nil {
-		t.Fatal("AttachMetalOwnedTexture() did not publish both session and completion")
-	}
-	// A successful attach has retained its own device reference before return.
-	// Drop the caller's reference while asynchronous attachment is still pending.
-	testsupport.ReleaseMetalDevice(device)
-	deviceRetained = false
+	runtime, m, session, attach := newMetalOwnedTextureSession(t, RenderDriverCoreWorker)
 	awaitWithDeadline(t, attach)
 
 	capabilities, err := session.Capabilities()
@@ -185,6 +179,10 @@ func TestMetalOwnedTextureCompletionLifecycleDarwin(t *testing.T) {
 	if err := frame.Release(GPUSync{Kind: GPUSyncCPUComplete}); err != nil {
 		t.Fatalf("AcquiredFrame.Release(): %v", err)
 	}
+	// The lease is consumed, so the frame no longer reads its texture.
+	if _, err := frame.MetalTexture(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("MetalTexture() after release error = %v, want ErrInvalidArgument", err)
+	}
 
 	readback, err := session.ReadPremultipliedRGBA8()
 	if err != nil {
@@ -205,6 +203,13 @@ func TestMetalOwnedTextureCompletionLifecycleDarwin(t *testing.T) {
 		t.Fatalf("Resize(): %v", err)
 	}
 	awaitWithDeadline(t, resize)
+
+	// The scale factor is fixed at attachment, so only the logical size moves.
+	rescale, err := session.Resize(RenderTargetExtent{Width: 48, Height: 24, ScaleFactor: 2})
+	if rescale != nil || !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("Resize(changed scale factor) = (%v, %v), want nil and ErrInvalidArgument", rescale, err)
+	}
+
 	awaitRenderedMetalFrame(t, session)
 	resizedFrame, err := session.AcquireFrame()
 	if err != nil {
@@ -221,6 +226,15 @@ func TestMetalOwnedTextureCompletionLifecycleDarwin(t *testing.T) {
 		t.Fatalf("resized AcquiredFrame.Release(): %v", err)
 	}
 
+	// A live session holds the map open, and the refusal leaves the handle
+	// usable so the caller can detach and retry.
+	if teardown, err := m.Close(); teardown != nil || !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("MapHandle.Close() with an attached session = (%v, %v), want nil and ErrInvalidState", teardown, err)
+	}
+	if _, err := m.Snapshot(); err != nil {
+		t.Fatalf("Snapshot() after a refused close: %v", err)
+	}
+
 	detach, err := session.Detach()
 	if err != nil {
 		t.Fatalf("Detach(): %v", err)
@@ -229,84 +243,24 @@ func TestMetalOwnedTextureCompletionLifecycleDarwin(t *testing.T) {
 	if err := session.Close(); err != nil {
 		t.Fatalf("RenderSessionHandle.Close(): %v", err)
 	}
-	session = nil
-	if err := m.Close(); err != nil {
+	if err := closeMapForTest(m); err != nil {
 		t.Fatalf("MapHandle.Close(): %v", err)
 	}
-	m = nil
 	teardown, err := runtime.Close()
 	if err != nil {
 		t.Fatalf("RuntimeHandle.Close(): %v", err)
 	}
 	awaitWithDeadline(t, teardown)
-	runtime = nil
 }
 
 func TestMetalCallerDriverServicesPublishedAttachingSessionDarwin(t *testing.T) {
-	if !SupportedRenderBackends().Has(RenderBackendMetal) {
-		t.Skip("Metal is not the configured render backend")
-	}
 	stdruntime.LockOSThread()
 	defer stdruntime.UnlockOSThread()
 
-	device := testsupport.DefaultMetalDevice()
-	if device == 0 {
-		t.Skip("the system default Metal device is unavailable")
-	}
-	deviceRetained := true
-	defer func() {
-		if deviceRetained {
-			testsupport.ReleaseMetalDevice(device)
-		}
-	}()
+	_, m, session, attach := newMetalOwnedTextureSession(t, RenderDriverCallerGraphicsThread)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	var m *MapHandle
-	var session *RenderSessionHandle
-	defer func() {
-		if session != nil {
-			_, _ = session.Abandon()
-			_ = session.Close()
-		}
-		if m != nil {
-			_ = m.Close()
-		}
-		if runtime != nil {
-			if teardown, err := runtime.Close(); err == nil {
-				awaitWithDeadline(t, teardown)
-			}
-		}
-	}()
-
-	mapFuture, err := runtime.NewMapWithOptions(NewMapOptions(32, 16, 1))
-	if err != nil {
-		t.Fatalf("NewMapWithOptions(): %v", err)
-	}
-	m = awaitWithDeadline(t, mapFuture)
-	extent := RenderTargetExtent{Width: 32, Height: 16, ScaleFactor: 1}
-	options := NewRenderSessionAttachOptions()
-	options.Driver = RenderDriverCallerGraphicsThread
-	options.RequestedTextureRingDepth = 2
-	session, attach, err := m.AttachMetalOwnedTexture(
-		MetalOwnedTextureDescriptor{
-			Extent:  extent,
-			Context: MetalContextDescriptor{Device: NativePointer(device)},
-		},
-		options,
-	)
-	if err != nil {
-		t.Fatalf("AttachMetalOwnedTexture(): %v", err)
-	}
-	if session == nil || attach == nil {
-		t.Fatal("AttachMetalOwnedTexture() did not publish both session and completion")
-	}
-	// Caller-driver initialization has not run yet, but acceptance already
-	// retained the device independently of the descriptor owner.
-	testsupport.ReleaseMetalDevice(device)
-	deviceRetained = false
+	// Caller-driver initialization has not run yet, so the published session is
+	// still attaching.
 	select {
 	case <-attach.Done():
 		t.Fatal("caller-driver attach completed before the host serviced its published session")
@@ -337,15 +291,7 @@ func TestMetalCallerDriverServicesPublishedAttachingSessionDarwin(t *testing.T) 
 	if err := session.Close(); err != nil {
 		t.Fatalf("RenderSessionHandle.Close(): %v", err)
 	}
-	session = nil
-	if err := m.Close(); err != nil {
+	if err := closeMapForTest(m); err != nil {
 		t.Fatalf("MapHandle.Close(): %v", err)
 	}
-	m = nil
-	teardown, err := runtime.Close()
-	if err != nil {
-		t.Fatalf("RuntimeHandle.Close(): %v", err)
-	}
-	awaitWithDeadline(t, teardown)
-	runtime = nil
 }

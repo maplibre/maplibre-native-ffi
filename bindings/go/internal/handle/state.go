@@ -7,9 +7,9 @@ import (
 	"sync"
 )
 
-// DestroyFunc releases one owned native handle. A non-OK status leaves the
+// DestroyFunc releases one owned native handle. A non-nil error leaves the
 // handle live so callers can retry after correcting the failure.
-type DestroyFunc[T ~uint64] func(T) int32
+type DestroyFunc[T ~uint64] func(T) error
 
 // State stores close-once state for one owned native handle. The zero handle
 // means closed. The C API leases the native object for each entry point, so
@@ -46,20 +46,20 @@ func (state *State[T]) IsClosed() bool {
 	return state.handle == 0
 }
 
-// Close calls destroy at most once after a successful native release.
-func (state *State[T]) Close(destroy DestroyFunc[T]) int32 {
+// Close calls destroy at most once after a successful native release. Closing
+// an already closed handle is a no-op that reports no error.
+func (state *State[T]) Close(destroy DestroyFunc[T]) error {
 	state.mu.Lock()
 	defer state.mu.Unlock()
 	if state.handle == 0 {
-		return 0
+		return nil
 	}
-	status := destroy(state.handle)
-	if status != 0 {
-		return status
+	if err := destroy(state.handle); err != nil {
+		return err
 	}
 	state.handle = 0
 	runtime.SetFinalizer(state, nil)
-	return 0
+	return nil
 }
 
 func (state *State[T]) reportLeakIfLive() {

@@ -79,6 +79,8 @@ impl MapProjectionHandle {
     pub(crate) fn new(map: &MapHandle) -> Result<NativeFuture<Self>> {
         let map_ptr = map.inner.native()?;
         crate::completion::submit(
+            // SAFETY: the handle is live and every borrowed argument stays valid for this
+            // synchronous submission.
             move |completion| unsafe { sys::mln_map_projection_create(map_ptr, completion) },
             |result| {
                 let native = crate::completion::copy_value::<sys::mln_map_projection>(result)?;
@@ -335,8 +337,7 @@ mod tests {
         map.update_camera(&update).unwrap();
         let barrier = runtime.barrier().unwrap();
         assert!(barrier.wait(std::time::Duration::from_secs(5)).unwrap());
-        barrier.finish().unwrap();
-        barrier.release();
+        barrier.take().unwrap();
         assert_eq!(projection.camera().unwrap(), creation_camera);
 
         std::thread::scope(|scope| {

@@ -6,13 +6,14 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.runtime.runSuspendTest
 import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 
 class CustomGeometrySourceStateTest {
   @Test
   fun callbacksCopyTileIdsContainFailuresAndStopAfterClosureDuringCallback(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
+    runSuspendTest {
       val received = mutableListOf<CanonicalTileId>()
       lateinit var state: CustomGeometrySourceState
       state =

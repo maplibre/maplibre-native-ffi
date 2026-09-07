@@ -115,12 +115,94 @@ import Testing
   }
 }
 
-@Test func setMaximumAmbientCacheSizeReportsCompletion() async throws {
+/// An offline region's whole lifecycle over the runtime's own database, and
+/// the not-found status every mutation reports for an id no region carries.
+@Test func offlineRegionLifecycleReportsNotFoundForAMissingId() async throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
 
   try await runtime.setMaximumAmbientCacheSize(8 << 20)
+  try await runtime.runAmbientCacheOperation(.clear)
+
+  let definition = OfflineRegionDefinition.tilePyramid(
+    styleURL: "asset://style.json",
+    bounds: LatLngBounds(
+      southwest: LatLng(latitude: 0, longitude: 0),
+      northeast: LatLng(latitude: 1, longitude: 1)
+    ),
+    minZoom: 0,
+    maxZoom: 2,
+    pixelRatio: 1,
+    includeIdeographs: false
+  )
+  let created = try await runtime.createOfflineRegion(
+    definition: definition,
+    metadata: Data("first".utf8)
+  )
+  #expect(created.definition == definition)
+  #expect(created.metadata == Data("first".utf8))
+
+  let updated = try await runtime.updateOfflineRegionMetadata(
+    id: created.id,
+    metadata: Data("second".utf8)
+  )
+  #expect(updated.id == created.id)
+  #expect(updated.metadata == Data("second".utf8))
+  #expect(try await runtime.offlineRegion(id: created.id) == updated)
+  #expect(try await runtime.offlineRegions().contains(updated))
+
+  let status = try await runtime.offlineRegionStatus(id: created.id)
+  #expect(status.downloadState == OfflineRegionDownloadState.inactive.rawValue)
+
+  try await runtime.setOfflineRegionObserved(id: created.id, observed: true)
+  try await runtime.invalidateOfflineRegion(id: created.id)
+  try await runtime.deleteOfflineRegion(id: created.id)
+  #expect(try await runtime.offlineRegion(id: created.id) == nil)
+
+  // Every mutation reports the missing region through its completion.
+  let missing = created.id
+  await expectNotFound { try await runtime.updateOfflineRegionMetadata(
+    id: missing, metadata: Data()
+  ) }
+  await expectNotFound {
+    try await runtime.offlineRegionStatus(id: missing)
+  }
+  await expectNotFound {
+    try await runtime.setOfflineRegionObserved(id: missing, observed: false)
+  }
+  await expectNotFound {
+    try await runtime.setOfflineRegionDownloadState(
+      id: missing, state: .inactive
+    )
+  }
+  await expectNotFound {
+    try await runtime.invalidateOfflineRegion(id: missing)
+  }
+  await expectNotFound { try await runtime.deleteOfflineRegion(id: missing) }
+}
+
+private func expectNotFound(
+  _ body: () async throws -> some Any,
+  sourceLocation: SourceLocation = #_sourceLocation
+) async {
+  do {
+    _ = try await body()
+    Issue.record(
+      "a missing region should report not found",
+      sourceLocation: sourceLocation
+    )
+  } catch let error as MaplibreError {
+    #expect(error.kind == .notFound, sourceLocation: sourceLocation)
+    #expect(
+      error.rawStatus == MLN_STATUS_NOT_FOUND.rawValue,
+      sourceLocation: sourceLocation
+    )
+  } catch {
+    Issue.record(
+      "unexpected error: \(error)", sourceLocation: sourceLocation
+    )
+  }
 }
 
 @Test func closedRuntimeRejectsOfflineCallsThroughSwiftHandleState(

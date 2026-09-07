@@ -14,13 +14,7 @@
 #include "test_support.h"
 #include "unity.h"
 
-static const char background_style_json[] =
-  "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background\",\"type\":"
-  "\"background\",\"paint\":{\"background-color\":\"#102030\"}}]}";
-static const char empty_style_json[] =
-  "{\"version\":8,\"sources\":{},\"layers\":[]}";
 static const char source_id[] = "custom-geometry";
-static const size_t style_wait_attempts = 200;
 
 // The counters are written from native threads and read from the test thread,
 // so they are atomic; the barrier polls below provide the ordering.
@@ -47,19 +41,6 @@ static mln_custom_geometry_source_options probe_options(release_probe* probe) {
   return options;
 }
 
-// Loads an inline style and waits for the map to reach a loaded state without
-// reaching the network.
-static void load_style_and_wait(
-  mln_runtime runtime, mln_map map, mln_buffer_view style_json
-) {
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_json(map, style_json)
-  );
-  for (size_t attempt = 0; attempt < style_wait_attempts; attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  }
-}
-
 static mln_map create_map_without_style_events(mln_runtime runtime) {
   mln_map_options options = mln_map_options_default();
   options.initial_extent.width = 256;
@@ -77,7 +58,7 @@ static void a_style_replacement_releases_a_dropped_source_unsubscribed(void) {
   release_probe probe = {0};
   mln_test_completion command = mln_test_completion_default(0);
 
-  load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(background_style_json));
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
   mln_custom_geometry_source_options options = probe_options(&probe);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
@@ -85,12 +66,10 @@ static void a_style_replacement_releases_a_dropped_source_unsubscribed(void) {
       map, MLN_BUFFER_LITERAL(source_id), &options, &command.descriptor
     )
   );
-  TEST_ASSERT_TRUE(mln_test_completion_wait(&command, -1));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_status(&command));
-  mln_test_completion_destroy(&command);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&command));
   TEST_ASSERT_EQUAL_size_t(0, atomic_load(&probe.release_count));
 
-  load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(empty_style_json));
+  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
   TEST_ASSERT_EQUAL_size_t(
     0, mln_test_drain_counting(runtime, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
@@ -108,7 +87,7 @@ static void an_explicit_removal_releases_once(void) {
   release_probe probe = {0};
   mln_test_completion add = mln_test_completion_default(0);
 
-  load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(background_style_json));
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
   mln_custom_geometry_source_options options = probe_options(&probe);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
@@ -116,9 +95,7 @@ static void an_explicit_removal_releases_once(void) {
       map, MLN_BUFFER_LITERAL(source_id), &options, &add.descriptor
     )
   );
-  TEST_ASSERT_TRUE(mln_test_completion_wait(&add, -1));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_status(&add));
-  mln_test_completion_destroy(&add);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&add));
 
   mln_test_completion removal = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
@@ -126,8 +103,7 @@ static void an_explicit_removal_releases_once(void) {
                      map, MLN_BUFFER_LITERAL(source_id), &removal.descriptor
                    )
   );
-  TEST_ASSERT_TRUE(mln_test_completion_wait(&removal, -1));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_status(&removal));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&removal));
   TEST_ASSERT_EQUAL_UINT32(
     MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&removal)
   );
@@ -135,7 +111,7 @@ static void an_explicit_removal_releases_once(void) {
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
 
   // A style load after the removal has nothing left to reconcile.
-  load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(empty_style_json));
+  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
   mln_test_destroy_map(map);
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
   mln_test_destroy_runtime(runtime);
@@ -150,7 +126,7 @@ static void accepted_adds_release_their_callback_state(void) {
   release_probe probe = {0};
   mln_test_completion rejected = mln_test_completion_default(0);
 
-  load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(background_style_json));
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
   mln_custom_geometry_source_options options = probe_options(&probe);
   options.fields = MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
   options.min_zoom = -1;
@@ -171,9 +147,7 @@ static void accepted_adds_release_their_callback_state(void) {
       map, MLN_BUFFER_LITERAL(source_id), &options, &first.descriptor
     )
   );
-  TEST_ASSERT_TRUE(mln_test_completion_wait(&first, -1));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_status(&first));
-  mln_test_completion_destroy(&first);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&first));
   // The duplicate command is accepted, then fails application because the ID
   // already exists. Its callback state is released independently.
   mln_test_completion duplicate = mln_test_completion_default(0);
@@ -183,17 +157,12 @@ static void accepted_adds_release_their_callback_state(void) {
       map, MLN_BUFFER_LITERAL(source_id), &options, &duplicate.descriptor
     )
   );
-  TEST_ASSERT_TRUE(mln_test_completion_wait(&duplicate, -1));
-  TEST_ASSERT_NOT_EQUAL(MLN_STATUS_OK, mln_test_completion_status(&duplicate));
-  mln_test_completion_destroy(&duplicate);
-  // The duplicate's release is not ordered before a single barrier, so poll
-  // barriers until the count lands.
-  for (size_t attempt = 0;
-       attempt < style_wait_attempts && atomic_load(&probe.release_count) < 1;
-       attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  }
-  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
+  TEST_ASSERT_NOT_EQUAL(MLN_STATUS_OK, mln_test_completion_settle(&duplicate));
+  // The duplicate's release is not ordered before a single barrier.
+  mln_test_barrier_until_count(
+    runtime, &probe.release_count, 1,
+    "the duplicate custom geometry source never released its callback state"
+  );
 
   mln_test_destroy_map(map);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));

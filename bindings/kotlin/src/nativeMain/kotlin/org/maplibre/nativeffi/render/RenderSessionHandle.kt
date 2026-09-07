@@ -56,12 +56,12 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         value.extent.height.toInt(),
         value.extent.scale_factor,
       ),
-      value.generation,
-      value.map_update_generation,
-      value.rendered_update_generation,
-      value.extent_generation,
-      value.frame_generation,
-      value.latest_demand_token,
+      value.generation.toLong(),
+      value.map_update_generation.toLong(),
+      value.rendered_update_generation.toLong(),
+      value.extent_generation.toLong(),
+      value.frame_generation.toLong(),
+      value.latest_demand_token.toLong(),
       value.pending_demand_count.toInt(),
       value.acquired_frame_count.toInt(),
       value.target_ready,
@@ -75,16 +75,18 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     value.flags =
       (if (demand.ifNeeded) MLN_FRAME_DEMAND_IF_NEEDED else 0u) or
         (if (demand.present) MLN_FRAME_DEMAND_PRESENT else 0u)
-    value.token = demand.token
-    value.coalescing_boundary = demand.coalescingBoundary
-    value.timeout_ns = demand.timeoutNanoseconds
+    value.token = demand.token.toULong()
+    value.coalescing_boundary = demand.coalescingBoundary.toULong()
+    value.timeout_ns = demand.timeoutNanoseconds.toULong()
     Status.check(mln_render_session_request_frame(id(), value.ptr))
   }
 
   public actual fun drainFrameResults(): List<RenderFrameResult> = memScoped {
     val outBatch = alloc<ULongVar>()
     outBatch.value = 0u
-    Status.check(mln_render_session_drain_frame_results(id(), outBatch.ptr))
+    val drained = mln_render_session_drain_frame_results(id(), outBatch.ptr)
+    if (drained == MLN_STATUS_NOT_READY) return@memScoped emptyList()
+    Status.check(drained)
     val batch = outBatch.value
     try {
       val outCount = alloc<CSizeVar>()
@@ -120,12 +122,12 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
 
   public actual fun resize(extent: RenderTargetExtent): Deferred<Unit> = memScoped {
     val native = extent(extent, this)
-    unit { mln_render_session_resize(id(), native, it) }
+    CompletionBridge.unit { mln_render_session_resize(id(), native, it) }
   }
 
   public actual fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor): Deferred<Unit> =
     memScoped {
-      unit {
+      CompletionBridge.unit {
         mln_metal_surface_set_target(
           id(),
           RenderStructs.metalSurfaceDescriptor(descriptor, this),
@@ -136,7 +138,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
 
   public actual fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor): Deferred<Unit> =
     memScoped {
-      unit {
+      CompletionBridge.unit {
         mln_vulkan_surface_set_target(
           id(),
           RenderStructs.vulkanSurfaceDescriptor(descriptor, this),
@@ -147,7 +149,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
 
   public actual fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor): Deferred<Unit> =
     memScoped {
-      unit {
+      CompletionBridge.unit {
         mln_opengl_surface_set_target(
           id(),
           RenderStructs.openglSurfaceDescriptor(descriptor, this),
@@ -159,7 +161,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
   public actual fun setMetalBorrowedTextureTarget(
     descriptor: MetalBorrowedTextureDescriptor
   ): Deferred<Unit> = memScoped {
-    unit {
+    CompletionBridge.unit {
       mln_metal_borrowed_texture_set_target(
         id(),
         RenderStructs.metalBorrowedTextureDescriptor(descriptor, this),
@@ -171,7 +173,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
   public actual fun setVulkanBorrowedTextureTarget(
     descriptor: VulkanBorrowedTextureDescriptor
   ): Deferred<Unit> = memScoped {
-    unit {
+    CompletionBridge.unit {
       mln_vulkan_borrowed_texture_set_target(
         id(),
         RenderStructs.vulkanBorrowedTextureDescriptor(descriptor, this),
@@ -183,7 +185,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
   public actual fun setOpenGLBorrowedTextureTarget(
     descriptor: OpenGLBorrowedTextureDescriptor
   ): Deferred<Unit> = memScoped {
-    unit {
+    CompletionBridge.unit {
       mln_opengl_borrowed_texture_set_target(
         id(),
         RenderStructs.openglBorrowedTextureDescriptor(descriptor, this),
@@ -192,19 +194,25 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     }
   }
 
-  public actual fun reduceMemoryUse(): Deferred<Unit> = unit {
+  public actual fun reduceMemoryUse(): Deferred<Unit> = CompletionBridge.unit {
     mln_render_session_reduce_memory_use(id(), it)
   }
 
-  public actual fun clearData(): Deferred<Unit> = unit { mln_render_session_clear_data(id(), it) }
+  public actual fun clearData(): Deferred<Unit> = CompletionBridge.unit {
+    mln_render_session_clear_data(id(), it)
+  }
 
-  public actual fun dumpDebugLogs(): Deferred<Unit> = unit {
+  public actual fun dumpDebugLogs(): Deferred<Unit> = CompletionBridge.unit {
     mln_render_session_dump_debug_logs(id(), it)
   }
 
-  public actual fun barrier(): Deferred<Unit> = unit { mln_render_session_barrier(id(), it) }
+  public actual fun barrier(): Deferred<Unit> = CompletionBridge.unit {
+    mln_render_session_barrier(id(), it)
+  }
 
-  public actual fun detach(): Deferred<Unit> = unit { mln_render_session_detach(id(), it) }
+  public actual fun detach(): Deferred<Unit> = CompletionBridge.unit {
+    mln_render_session_detach(id(), it)
+  }
 
   public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
@@ -317,9 +325,6 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
 
   private fun id(): ULong = state.requireLive().rawHandleValue
 
-  private fun unit(start: (CPointer<mln_completion>) -> Int): Deferred<Unit> =
-    CompletionBridge.unit(start)
-
   private fun requiredBuffer(result: CPointer<mln_completion_result>): ByteArray {
     require(result.pointed.value_count.toULong() == 1uL) {
       "native completion omitted its byte result"
@@ -350,13 +355,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
           map,
           session.value.asHandle("mln_render_session", ::renderSessionHandle),
         )
-      try {
-        RenderSessionAttachment(handle, retainSessionUntilComplete(handle, completed))
-      } catch (error: Throwable) {
-        runCatching { handle.abandon() }
-        runCatching { handle.close() }
-        throw error
-      }
+      RenderSessionAttachment(handle, completed)
     }
 
     internal fun attachMetalOwnedTexture(
@@ -527,7 +526,7 @@ internal constructor(
     val v = alloc<mln_gpu_sync>()
     mln_gpu_sync_default().place(v.ptr)
     Status.check(mln_acquired_frame_get_producer_sync(requireFrame(), v.ptr))
-    GpuSync(GpuSyncKind.fromNative(v.kind.toInt()), v.`object`, v.value)
+    GpuSync(GpuSyncKind.fromNative(v.kind.toInt()), v.`object`.toLong(), v.value.toLong())
   }
 
   public actual fun metalTexture(): MetalOwnedTextureFrame = memScoped {
@@ -590,8 +589,8 @@ internal constructor(
     val native = alloc<mln_gpu_sync>()
     mln_gpu_sync_default().place(native.ptr)
     native.kind = consumerCompletion.kind.nativeValue.toUInt()
-    native.`object` = consumerCompletion.objectHandle
-    native.value = consumerCompletion.value
+    native.`object` = consumerCompletion.objectHandle.toULong()
+    native.value = consumerCompletion.value.toULong()
     val holder = alloc<ULongVar>()
     holder.value = frame
     try {
@@ -632,9 +631,9 @@ private fun extent(value: RenderTargetExtent, scope: MemScope): CPointer<mln_ren
 private fun frameResult(value: mln_render_frame_result) =
   RenderFrameResult(
     RenderResult.fromNative(value.disposition),
-    value.token,
-    value.map_update_generation,
-    value.extent_generation,
-    value.frame_generation,
+    value.token.toLong(),
+    value.map_update_generation.toLong(),
+    value.extent_generation.toLong(),
+    value.frame_generation.toLong(),
     value.needs_repaint,
   )

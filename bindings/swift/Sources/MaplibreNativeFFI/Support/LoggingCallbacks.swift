@@ -14,10 +14,6 @@ private final class LogCallbackBox: @unchecked Sendable {
   init(_ callback: @escaping @Sendable (NativeLogRecord) -> Bool) {
     self.callback = callback
   }
-
-  func invoke(_ record: NativeLogRecord) -> Bool {
-    callback(record)
-  }
 }
 
 private func logCallbackTrampoline(
@@ -35,7 +31,7 @@ private func logCallbackTrampoline(
     code: code,
     message: message.map { String(cString: $0) } ?? ""
   )
-  return box.invoke(record) ? 1 : 0
+  return box.callback(record) ? 1 : 0
 }
 
 private func releaseLogCallback(_ userData: UnsafeMutableRawPointer?) {
@@ -62,22 +58,5 @@ enum LoggingCallbackState {
 
   static func clear() throws {
     try checkStatus(mln_log_clear_callback())
-  }
-
-  static func invokeForTesting(
-    _ callback: @escaping @Sendable (NativeLogRecord) -> Bool,
-    record: NativeLogRecord
-  ) -> Bool {
-    let box = Unmanaged.passRetained(LogCallbackBox(callback))
-    defer { box.release() }
-    return record.message.withCString { message in
-      logCallbackTrampoline(
-        userData: box.toOpaque(),
-        severity: record.severity,
-        event: record.event,
-        code: record.code,
-        message: message
-      ) != 0
-    }
   }
 }

@@ -53,7 +53,8 @@ enum MetalRenderTarget {
   case borrowedTexture(
     session: RenderSessionHandle,
     compositor: MetalTextureCompositor,
-    texture: MetalBorrowedTexture
+    texture: MetalBorrowedTexture,
+    map: MapHandle
   )
   case nativeSurface(session: RenderSessionHandle)
 
@@ -96,7 +97,7 @@ enum MetalRenderTarget {
     case let .ownedTexture(session, compositor):
       try await session.resize(viewport.extent)
       compositor.resize(viewport)
-    case let .borrowedTexture(session, compositor, _):
+    case let .borrowedTexture(session, compositor, _, map):
       let replacement = try MetalBorrowedTexture(
         graphics: graphics,
         viewport: viewport
@@ -110,49 +111,59 @@ enum MetalRenderTarget {
         )
       )
       compositor.resize(viewport)
+      // A handover replaces only the graphics resource, so the map still needs
+      // the new extent.
+      _ = try await map.resize(to: MapLogicalExtent(
+        width: viewport.logicalWidth,
+        height: viewport.logicalHeight,
+        scaleFactor: viewport.scaleFactor
+      ))
       self = .borrowedTexture(
         session: session,
         compositor: compositor,
-        texture: replacement
+        texture: replacement,
+        map: map
       )
     case let .nativeSurface(session):
       try await session.resize(viewport.extent)
     }
   }
 
-  /// Services caller-driver work and submits one host-paced frame demand.
+  /// Services caller-driver work, submits one host-paced frame demand, and
+  /// reports whether the render loop may rest. It reports false when no frame
+  /// reached the screen and when the map asked for another frame while this one
+  /// rendered, so the loop demands one more.
   func renderFrame() async throws -> Bool {
     let session: RenderSessionHandle
     switch self {
     case let .ownedTexture(value, _),
-         let .borrowedTexture(value, _, _),
+         let .borrowedTexture(value, _, _, _),
          let .nativeSurface(value):
       session = value
     }
     try session.requestFrame(FrameDemand(options: [.ifNeeded, .present]))
     try session.serviceDriverWork()
-    let results = try session.drainFrameResults()
-    guard let result = results.last else { return false }
-    if !results.contains(where: { $0.result == .rendered }) {
-      return result.result != .sizePending &&
-        result.result != .targetNotReady
-    }
+    guard let result = try session.drainFrameResults().last,
+          result.result == .rendered
+    else { return false }
 
     switch self {
     case let .ownedTexture(session, compositor):
+      // An empty ring keeps the previously composited frame on screen.
       guard let frame = try session.acquireFrame() else { return false }
       do {
         let presented = try compositor.draw(frame: frame)
         try frame.release()
-        return presented
+        return presented && !result.needsRepaint
       } catch {
         try? frame.release()
         throw error
       }
-    case let .borrowedTexture(_, compositor, texture):
-      return try compositor.draw(texture: texture.texture)
+    case let .borrowedTexture(_, compositor, texture, _):
+      return try compositor.draw(texture: texture.texture) && !result
+        .needsRepaint
     case .nativeSurface:
-      return true
+      return !result.needsRepaint
     }
   }
 
@@ -160,7 +171,7 @@ enum MetalRenderTarget {
     let session: RenderSessionHandle
     switch self {
     case let .ownedTexture(value, _),
-         let .borrowedTexture(value, _, _),
+         let .borrowedTexture(value, _, _, _),
          let .nativeSurface(value):
       session = value
     }
@@ -224,7 +235,8 @@ enum MetalRenderTarget {
       return .borrowedTexture(
         session: session,
         compositor: compositor,
-        texture: texture
+        texture: texture,
+        map: map
       )
     } catch {
       try? await session.detach()

@@ -23,7 +23,7 @@ class ImageUploadTest {
           val expected = uploadImage(map, width)
           System.gc()
           val copied = assertNotNull(map.copyStyleImagePremultipliedRgba8("image").await())
-          assertContentEquals(expected, copied.image.pixels)
+          assertContentEquals(expected, copied)
         }
       }
     }

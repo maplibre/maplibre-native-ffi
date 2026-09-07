@@ -8,6 +8,8 @@ import "C"
 import (
 	"runtime"
 	"unsafe"
+
+	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 )
 
 func (m *MapHandle) startRenderAttach(
@@ -25,22 +27,22 @@ func (m *MapHandle) startRenderAttach(
 	if err != nil {
 		return nil, nil, err
 	}
-	if session == 0 {
+	state, err := handle.New(nativeRenderSession(session), "RenderSessionHandle")
+	if err != nil {
 		return nil, nil, newBindingError(ErrInvalidState, "render attach did not return a session")
 	}
 
-	result, err := newRenderSessionHandle(m, nativeRenderSession(session))
-	if err != nil {
-		var abandoned C.mln_render_abandon_result
-		abandoned.size = C.uint32_t(unsafe.Sizeof(abandoned))
-		_ = C.mln_render_session_abandon(session, &abandoned)
-		_ = C.mln_render_session_destroy(session)
-		return nil, nil, err
-	}
+	result := &RenderSessionHandle{state: state}
 	attach.retain(result)
 	return result, attach, nil
 }
 
+// AttachMetalSurface starts attachment of a Metal surface render target. The
+// session is returned in its attaching state, and the returned future completes
+// once the driver owns the target. A session whose attachment failed still
+// needs Detach or Abandon before Close.
+//
+// The session retains the CAMetalLayer for as long as it holds the target.
 func (m *MapHandle) AttachMetalSurface(
 	descriptor MetalSurfaceDescriptor,
 	options RenderSessionAttachOptions,
@@ -54,6 +56,10 @@ func (m *MapHandle) AttachMetalSurface(
 	})
 }
 
+// AttachVulkanSurface starts attachment of a Vulkan surface render target. See
+// AttachMetalSurface for what the session and future report. The borrowed
+// Vulkan context and surface handles stay valid until the session detaches or
+// closes.
 func (m *MapHandle) AttachVulkanSurface(
 	descriptor VulkanSurfaceDescriptor,
 	options RenderSessionAttachOptions,
@@ -67,6 +73,10 @@ func (m *MapHandle) AttachVulkanSurface(
 	})
 }
 
+// AttachOpenGLSurface starts attachment of an OpenGL surface render target. See
+// AttachMetalSurface for what the session and future report. The borrowed
+// context and platform surface handles stay valid until the session detaches or
+// closes.
 func (m *MapHandle) AttachOpenGLSurface(
 	descriptor OpenGLSurfaceDescriptor,
 	options RenderSessionAttachOptions,
@@ -84,6 +94,10 @@ func (m *MapHandle) AttachOpenGLSurface(
 	})
 }
 
+// AttachMetalOwnedTexture starts attachment of a Metal session-owned texture
+// render target. See AttachMetalSurface for what the session and future report.
+// The session allocates the texture ring, so it grants frame acquisition and
+// readback.
 func (m *MapHandle) AttachMetalOwnedTexture(
 	descriptor MetalOwnedTextureDescriptor,
 	options RenderSessionAttachOptions,
@@ -97,6 +111,11 @@ func (m *MapHandle) AttachMetalOwnedTexture(
 	})
 }
 
+// AttachMetalBorrowedTexture starts attachment of a Metal caller-owned texture
+// render target. See AttachMetalSurface for what the session and future report.
+// The caller keeps the texture valid until the next replacement, detach, or
+// close, and synchronizes external use. The session grants neither frame
+// acquisition nor readback.
 func (m *MapHandle) AttachMetalBorrowedTexture(
 	descriptor MetalBorrowedTextureDescriptor,
 	options RenderSessionAttachOptions,
@@ -110,6 +129,9 @@ func (m *MapHandle) AttachMetalBorrowedTexture(
 	})
 }
 
+// AttachVulkanOwnedTexture starts attachment of a Vulkan session-owned texture
+// render target. See AttachMetalOwnedTexture for what a session-owned ring
+// grants.
 func (m *MapHandle) AttachVulkanOwnedTexture(
 	descriptor VulkanOwnedTextureDescriptor,
 	options RenderSessionAttachOptions,
@@ -123,6 +145,10 @@ func (m *MapHandle) AttachVulkanOwnedTexture(
 	})
 }
 
+// AttachVulkanBorrowedTexture starts attachment of a Vulkan caller-owned
+// texture render target. See AttachMetalBorrowedTexture for what a caller-owned
+// target grants. The caller owns image lifetime, queue-family ownership, image
+// layout transitions, and external synchronization around each frame.
 func (m *MapHandle) AttachVulkanBorrowedTexture(
 	descriptor VulkanBorrowedTextureDescriptor,
 	options RenderSessionAttachOptions,
@@ -136,6 +162,9 @@ func (m *MapHandle) AttachVulkanBorrowedTexture(
 	})
 }
 
+// AttachOpenGLOwnedTexture starts attachment of an OpenGL session-owned texture
+// render target. See AttachMetalOwnedTexture for what a session-owned ring
+// grants.
 func (m *MapHandle) AttachOpenGLOwnedTexture(
 	descriptor OpenGLOwnedTextureDescriptor,
 	options RenderSessionAttachOptions,
@@ -153,6 +182,10 @@ func (m *MapHandle) AttachOpenGLOwnedTexture(
 	})
 }
 
+// AttachOpenGLBorrowedTexture starts attachment of an OpenGL caller-owned
+// texture render target. See AttachMetalBorrowedTexture for what a caller-owned
+// target grants. The texture belongs to the context this session attaches with
+// or one in its share group.
 func (m *MapHandle) AttachOpenGLBorrowedTexture(
 	descriptor OpenGLBorrowedTextureDescriptor,
 	options RenderSessionAttachOptions,
@@ -170,6 +203,10 @@ func (m *MapHandle) AttachOpenGLBorrowedTexture(
 	})
 }
 
+// AttachWebGPUSurface starts attachment of a WebGPU surface render target. See
+// AttachMetalSurface for what the session and future report. The session
+// configures the borrowed WGPUSurface for its device and extent, and
+// unconfigures it when the session ends.
 func (m *MapHandle) AttachWebGPUSurface(
 	descriptor WebGPUSurfaceDescriptor,
 	options RenderSessionAttachOptions,
@@ -187,6 +224,9 @@ func (m *MapHandle) AttachWebGPUSurface(
 	})
 }
 
+// AttachWebGPUOwnedTexture starts attachment of a WebGPU session-owned texture
+// render target. See AttachMetalOwnedTexture for what a session-owned ring
+// grants.
 func (m *MapHandle) AttachWebGPUOwnedTexture(
 	descriptor WebGPUOwnedTextureDescriptor,
 	options RenderSessionAttachOptions,
@@ -204,6 +244,9 @@ func (m *MapHandle) AttachWebGPUOwnedTexture(
 	})
 }
 
+// AttachWebGPUBorrowedTexture starts attachment of a WebGPU caller-owned
+// texture render target. See AttachMetalBorrowedTexture for what a caller-owned
+// target grants.
 func (m *MapHandle) AttachWebGPUBorrowedTexture(
 	descriptor WebGPUBorrowedTextureDescriptor,
 	options RenderSessionAttachOptions,
@@ -238,6 +281,8 @@ func (s *RenderSessionHandle) startOperation(
 	return startRenderCompletion(s, start, completionUnit)
 }
 
+// Capabilities returns the driver kind, texture ring depth, and capability
+// flags fixed when this session attached.
 func (s *RenderSessionHandle) Capabilities() (RenderSessionCapabilities, error) {
 	ptr, err := s.ptr()
 	if err != nil {
@@ -258,6 +303,8 @@ func (s *RenderSessionHandle) Capabilities() (RenderSessionCapabilities, error) 
 	}, nil
 }
 
+// Snapshot returns a copy of this session's published state. It is callable
+// from any goroutine.
 func (s *RenderSessionHandle) Snapshot() (RenderSessionSnapshot, error) {
 	ptr, err := s.ptr()
 	if err != nil {
@@ -294,6 +341,13 @@ func (s *RenderSessionHandle) Snapshot() (RenderSessionSnapshot, error) {
 	}, nil
 }
 
+// RequestFrame submits one nonblocking frame demand. Every accepted demand
+// produces one terminal result, which DrainFrameResults reports. A demand that
+// clears FrameDemandPresent still renders, and a presenting target keeps
+// whatever it presented last.
+//
+// It reports ErrInvalidArgument for a flags bit outside FrameDemandFlag and
+// ErrInvalidState when the session is not attached.
 func (s *RenderSessionHandle) RequestFrame(demand FrameDemand) error {
 	ptr, err := s.ptr()
 	if err != nil {
@@ -306,6 +360,14 @@ func (s *RenderSessionHandle) RequestFrame(demand FrameDemand) error {
 	})
 }
 
+// ServiceDriverWork runs up to maxWork queued driver calls on the calling
+// thread and reports how many ran; zero runs every call currently queued. The
+// target context must be current on that thread, and the first successful call
+// fixes the session's graphics-thread identity.
+//
+// It reports ErrWrongThread from any later thread, ErrBusy while another driver
+// call is in flight, and ErrInvalidState for a session its own core worker
+// drives.
 func (s *RenderSessionHandle) ServiceDriverWork(maxWork int) (int, error) {
 	if maxWork < 0 {
 		return 0, newBindingError(ErrInvalidArgument, "max work is negative")
@@ -326,37 +388,31 @@ func (s *RenderSessionHandle) ServiceDriverWork(maxWork int) (int, error) {
 	return int(serviced), err
 }
 
-func (s *RenderSessionHandle) DrainFrameResults() (*RenderFrameBatch, error) {
+// DrainFrameResults copies every queued terminal frame result out of native
+// storage, in queue order, and releases the native batch before returning. An
+// empty queue is not an error: the call reports no results and the caller
+// retries after the next demand.
+func (s *RenderSessionHandle) DrainFrameResults() ([]RenderFrameResult, error) {
 	ptr, err := s.ptr()
 	if err != nil {
 		return nil, err
 	}
 
+	defer s.state.KeepAlive()
+
 	var batch C.mln_render_frame_batch
-	if err := checkNative(func() int32 {
-		return int32(C.mln_render_session_drain_frame_results(
-			C.mln_render_session(ptr),
-			&batch,
-		))
-	}); err != nil {
+	status := int32(C.mln_render_session_drain_frame_results(C.mln_render_session(ptr), &batch))
+	if status == int32(C.MLN_STATUS_NOT_READY) {
+		return nil, nil
+	}
+	if err := checkNative(func() int32 { return status }); err != nil {
 		return nil, err
 	}
-	return &RenderFrameBatch{handle: uint64(batch)}, nil
-}
-
-func (b *RenderFrameBatch) Results() ([]RenderFrameResult, error) {
-	if b == nil {
-		return nil, newBindingError(ErrInvalidArgument, "RenderFrameBatch is nil")
-	}
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.closed {
-		return nil, newBindingError(ErrInvalidArgument, "RenderFrameBatch is closed")
-	}
+	defer C.mln_render_frame_batch_release(batch)
 
 	var count C.size_t
 	if err := checkNative(func() int32 {
-		return int32(C.mln_render_frame_batch_count(C.mln_render_frame_batch(b.handle), &count))
+		return int32(C.mln_render_frame_batch_count(batch, &count))
 	}); err != nil {
 		return nil, err
 	}
@@ -365,11 +421,7 @@ func (b *RenderFrameBatch) Results() ([]RenderFrameResult, error) {
 		var raw C.mln_render_frame_result
 		raw.size = C.uint32_t(unsafe.Sizeof(raw))
 		if err := checkNative(func() int32 {
-			return int32(C.mln_render_frame_batch_get(
-				C.mln_render_frame_batch(b.handle),
-				C.size_t(i),
-				&raw,
-			))
+			return int32(C.mln_render_frame_batch_get(batch, C.size_t(i), &raw))
 		}); err != nil {
 			return nil, err
 		}
@@ -378,25 +430,17 @@ func (b *RenderFrameBatch) Results() ([]RenderFrameResult, error) {
 	return results, nil
 }
 
-func (b *RenderFrameBatch) Close() {
-	if b == nil {
-		return
-	}
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.closed {
-		return
-	}
-	C.mln_render_frame_batch_release(C.mln_render_frame_batch(b.handle))
-	b.closed = true
-	b.handle = 0
-}
-
+// AcquireFrame leases the newest rendered owned-texture ring slot. It reports
+// ErrNotReady when no rendered frame is available, ErrUnsupported when the
+// session grants no frame acquisition, and ErrInvalidState when the session is
+// not attached. Release the returned frame to return the slot to the ring.
 func (s *RenderSessionHandle) AcquireFrame() (*AcquiredFrame, error) {
 	ptr, err := s.ptr()
 	if err != nil {
 		return nil, err
 	}
+
+	defer s.state.KeepAlive()
 
 	var frame C.mln_acquired_frame
 	if err := checkNative(func() int32 {
@@ -404,24 +448,26 @@ func (s *RenderSessionHandle) AcquireFrame() (*AcquiredFrame, error) {
 	}); err != nil {
 		return nil, err
 	}
-	if frame == 0 {
+	state, err := handle.New(nativeAcquiredFrame(frame), "AcquiredFrame")
+	if err != nil {
 		return nil, newBindingError(ErrInvalidState, "frame acquisition did not return a frame")
 	}
-	return &AcquiredFrame{handle: uint64(frame)}, nil
+	return &AcquiredFrame{state: state}, nil
 }
 
 func (f *AcquiredFrame) use(call func(C.mln_acquired_frame) error) error {
-	if f == nil {
+	if f == nil || f.state == nil {
 		return newBindingError(ErrInvalidArgument, "AcquiredFrame is nil")
 	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.closed {
-		return newBindingError(ErrInvalidArgument, "AcquiredFrame is closed")
+	raw, live := f.state.Handle()
+	if !live {
+		return newBindingError(ErrInvalidArgument, "AcquiredFrame is released")
 	}
-	return call(C.mln_acquired_frame(f.handle))
+	defer f.state.KeepAlive()
+	return call(C.mln_acquired_frame(raw))
 }
 
+// Result returns the frame metadata common to every backend.
 func (f *AcquiredFrame) Result() (RenderFrameResult, error) {
 	var result RenderFrameResult
 	err := f.use(func(frame C.mln_acquired_frame) error {
@@ -438,6 +484,8 @@ func (f *AcquiredFrame) Result() (RenderFrameResult, error) {
 	return result, err
 }
 
+// ProducerSync returns the producer work a consumer waits for before it reads
+// this frame's texture.
 func (f *AcquiredFrame) ProducerSync() (GPUSync, error) {
 	var sync GPUSync
 	err := f.use(func(frame C.mln_acquired_frame) error {
@@ -458,31 +506,28 @@ func (f *AcquiredFrame) ProducerSync() (GPUSync, error) {
 	return sync, err
 }
 
+// Release returns this lease to the ring, publishing sync as the consumer work
+// native must wait for. Releasing an already released frame is a no-op.
 func (f *AcquiredFrame) Release(sync GPUSync) error {
-	if f == nil {
+	if f == nil || f.state == nil {
 		return newBindingError(ErrInvalidArgument, "AcquiredFrame is nil")
 	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.closed {
-		return newBindingError(ErrInvalidArgument, "AcquiredFrame is closed")
-	}
-
-	frame := C.mln_acquired_frame(f.handle)
 	rawSync := sync.toC()
-	if err := checkNative(func() int32 {
-		return int32(C.mln_acquired_frame_release(&frame, &rawSync))
-	}); err != nil {
-		return err
-	}
-	if frame != 0 {
-		return newBindingError(ErrInvalidState, "frame release did not consume the frame")
-	}
-	f.closed = true
-	f.handle = 0
-	return nil
+	return f.state.Close(func(native nativeAcquiredFrame) error {
+		frame := C.mln_acquired_frame(native)
+		if err := checkNative(func() int32 {
+			return int32(C.mln_acquired_frame_release(&frame, &rawSync))
+		}); err != nil {
+			return err
+		}
+		if frame != 0 {
+			return newBindingError(ErrInvalidState, "frame release did not consume the frame")
+		}
+		return nil
+	})
 }
 
+// MetalTexture returns this frame's Metal texture metadata.
 func (f *AcquiredFrame) MetalTexture() (MetalOwnedTextureFrameInfo, error) {
 	var info MetalOwnedTextureFrameInfo
 	err := f.use(func(frame C.mln_acquired_frame) error {
@@ -508,6 +553,7 @@ func (f *AcquiredFrame) MetalTexture() (MetalOwnedTextureFrameInfo, error) {
 	return info, err
 }
 
+// VulkanTexture returns this frame's Vulkan image metadata.
 func (f *AcquiredFrame) VulkanTexture() (VulkanOwnedTextureFrameInfo, error) {
 	var info VulkanOwnedTextureFrameInfo
 	err := f.use(func(frame C.mln_acquired_frame) error {
@@ -535,6 +581,7 @@ func (f *AcquiredFrame) VulkanTexture() (VulkanOwnedTextureFrameInfo, error) {
 	return info, err
 }
 
+// OpenGLTexture returns this frame's OpenGL texture metadata.
 func (f *AcquiredFrame) OpenGLTexture() (OpenGLOwnedTextureFrameInfo, error) {
 	var info OpenGLOwnedTextureFrameInfo
 	err := f.use(func(frame C.mln_acquired_frame) error {
@@ -562,6 +609,7 @@ func (f *AcquiredFrame) OpenGLTexture() (OpenGLOwnedTextureFrameInfo, error) {
 	return info, err
 }
 
+// WebGPUTexture returns this frame's WebGPU texture metadata.
 func (f *AcquiredFrame) WebGPUTexture() (WebGPUOwnedTextureFrameInfo, error) {
 	var info WebGPUOwnedTextureFrameInfo
 	err := f.use(func(frame C.mln_acquired_frame) error {
@@ -588,12 +636,20 @@ func (f *AcquiredFrame) WebGPUTexture() (WebGPUOwnedTextureFrameInfo, error) {
 	return info, err
 }
 
-// Resize starts a render target extent update.
+// Resize starts an ordered render target extent update. The completion runs
+// after the driver applies the extent and updates the map viewport, and reports
+// CommandDispositionSuperseded when a later resize replaced this one.
 //
 // The session keeps its renderer across a resize, along with the tile pyramid,
-// glyph and image atlases, and symbol placement. A scale factor change retires
-// the renderer instead, because shaders are compiled for one pixel ratio.
-// Map-owned feature state survives either way.
+// glyph and image atlases, symbol placement, and map-owned feature state.
+// RenderTargetExtent.ScaleFactor is fixed when the session attaches, because
+// the renderer bakes its pixel ratio into compiled shaders: an extent that
+// changes it reports ErrInvalidArgument, and a host that needs another scale
+// factor attaches a new session.
+//
+// A caller-owned texture target reports ErrUnsupported, because its owner sizes
+// it through the matching Set*BorrowedTextureTarget method. An acquired frame
+// reports ErrInvalidState.
 func (s *RenderSessionHandle) Resize(extent RenderTargetExtent) (*Future[struct{}], error) {
 	if err := extent.validate(); err != nil {
 		return nil, err
@@ -604,36 +660,49 @@ func (s *RenderSessionHandle) Resize(extent RenderTargetExtent) (*Future[struct{
 	})
 }
 
+// Barrier starts an ordered operation that completes after every render
+// operation accepted before it has a terminal result. A barrier requests no
+// frame.
 func (s *RenderSessionHandle) Barrier() (*Future[struct{}], error) {
 	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
 		return int32(C.mln_render_session_barrier(session, operation))
 	})
 }
 
+// ReduceMemoryUse starts best-effort release of this session's renderer caches.
 func (s *RenderSessionHandle) ReduceMemoryUse() (*Future[struct{}], error) {
 	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
 		return int32(C.mln_render_session_reduce_memory_use(session, operation))
 	})
 }
 
+// ClearData starts renderer-data clearing.
 func (s *RenderSessionHandle) ClearData() (*Future[struct{}], error) {
 	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
 		return int32(C.mln_render_session_clear_data(session, operation))
 	})
 }
 
+// DumpDebugLogs starts renderer diagnostic-log emission.
 func (s *RenderSessionHandle) DumpDebugLogs() (*Future[struct{}], error) {
 	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
 		return int32(C.mln_render_session_dump_debug_logs(session, operation))
 	})
 }
 
+// Detach starts normal graphics-owner teardown and map detachment. The session
+// stays live and still needs Close, and demands still outstanding report
+// RenderResultTargetNotReady. An acquired frame leaves the session attached and
+// reports ErrInvalidState.
 func (s *RenderSessionHandle) Detach() (*Future[struct{}], error) {
 	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
 		return int32(C.mln_render_session_detach(session, operation))
 	})
 }
 
+// ReadPremultipliedRGBA8 starts a readback of the latest session-owned texture
+// frame. The completed operation yields copied tightly packed premultiplied
+// RGBA8 pixels and their image metadata.
 func (s *RenderSessionHandle) ReadPremultipliedRGBA8() (*Future[TextureReadback], error) {
 	return startRenderCompletion(s, func(session C.mln_render_session, completion *C.mln_completion) int32 {
 		return int32(C.mln_texture_read_premultiplied_rgba8(session, completion))
@@ -674,20 +743,21 @@ func (s *RenderSessionHandle) Abandon() (RenderAbandonResult, error) {
 	}, nil
 }
 
+// Close destroys this session's native handle. A successful close makes later
+// calls no-ops, and a failed close leaves the handle live so callers can retry.
+// Close is callable from one of this session's own completions.
 func (s *RenderSessionHandle) Close() error {
 	if s == nil || s.state == nil {
 		return newBindingError(ErrInvalidArgument, "RenderSessionHandle is nil")
 	}
-	s.closeMu.Lock()
-	defer s.closeMu.Unlock()
-	if err := checkNative(func() int32 {
-		return s.state.Close(destroyRenderSessionHandle)
-	}); err != nil {
-		return err
-	}
-	return nil
+	return s.state.Close(destroyRenderSessionHandle)
 }
 
+// SetOpenGLBorrowedTextureTarget renders this attached texture session into a
+// new caller-owned OpenGL texture. See SetMetalBorrowedTextureTarget for what
+// replacing a target preserves. The replacement belongs to the context this
+// session attached with or one in its share group, and that context is current
+// on the calling thread.
 func (s *RenderSessionHandle) SetOpenGLBorrowedTextureTarget(
 	descriptor OpenGLBorrowedTextureDescriptor,
 ) (*Future[struct{}], error) {
@@ -704,6 +774,10 @@ func (s *RenderSessionHandle) SetOpenGLBorrowedTextureTarget(
 	})
 }
 
+// SetOpenGLSurfaceTarget presents this attached surface session through a new
+// OpenGL surface. See SetMetalSurfaceTarget for what replacing a surface
+// preserves. The new surface is made current on the next frame, so a host may
+// hand over a replacement for one it has already destroyed.
 func (s *RenderSessionHandle) SetOpenGLSurfaceTarget(
 	descriptor OpenGLSurfaceDescriptor,
 ) (*Future[struct{}], error) {
@@ -720,6 +794,14 @@ func (s *RenderSessionHandle) SetOpenGLSurfaceTarget(
 	})
 }
 
+// SetMetalSurfaceTarget presents this attached surface session through a new
+// Metal surface. Replacing the surface in place keeps this session's renderer,
+// and with it the tile pyramid, glyph and image atlases, symbol placement, and
+// feature state.
+//
+// A descriptor whose Context.Device is neither zero nor this session's device
+// reports ErrInvalidArgument and leaves this session rendering into the surface
+// it has. The session assigns the layer its own device and pixel format.
 func (s *RenderSessionHandle) SetMetalSurfaceTarget(
 	descriptor MetalSurfaceDescriptor,
 ) (*Future[struct{}], error) {
@@ -732,6 +814,15 @@ func (s *RenderSessionHandle) SetMetalSurfaceTarget(
 	})
 }
 
+// SetVulkanSurfaceTarget presents this attached surface session through a new
+// Vulkan surface. See SetMetalSurfaceTarget for what replacing a surface
+// preserves.
+//
+// The outgoing VkSurfaceKHR stays valid, because this session holds a swapchain
+// built from it; a host that must release its surface first closes this session
+// and attaches again afterward. The replacement supports the color format and
+// surface transform this session compiled its render pass and shaders for, and
+// reports ErrUnsupported otherwise.
 func (s *RenderSessionHandle) SetVulkanSurfaceTarget(
 	descriptor VulkanSurfaceDescriptor,
 ) (*Future[struct{}], error) {
@@ -744,6 +835,17 @@ func (s *RenderSessionHandle) SetVulkanSurfaceTarget(
 	})
 }
 
+// SetMetalBorrowedTextureTarget renders this attached texture session into a
+// new caller-owned Metal texture. Handing over a replacement keeps this
+// session's renderer, unlike Resize, which reports ErrUnsupported for a
+// caller-owned texture.
+//
+// The replacement belongs to the device this session attached with, which
+// reports ErrInvalidArgument otherwise, and carries the pixel format it
+// attached with, which reports ErrUnsupported otherwise; both leave this
+// session rendering into the texture it has. The caller keeps the replacement
+// valid until the next replacement, detach, or close. This session never
+// retains or releases the outgoing texture.
 func (s *RenderSessionHandle) SetMetalBorrowedTextureTarget(
 	descriptor MetalBorrowedTextureDescriptor,
 ) (*Future[struct{}], error) {
@@ -756,6 +858,11 @@ func (s *RenderSessionHandle) SetMetalBorrowedTextureTarget(
 	})
 }
 
+// SetVulkanBorrowedTextureTarget renders this attached texture session into a
+// new caller-owned Vulkan image. See SetMetalBorrowedTextureTarget for what
+// replacing a target preserves. The replacement carries the format and both
+// layouts this session attached with, because its render pass was built around
+// them.
 func (s *RenderSessionHandle) SetVulkanBorrowedTextureTarget(
 	descriptor VulkanBorrowedTextureDescriptor,
 ) (*Future[struct{}], error) {
@@ -768,6 +875,9 @@ func (s *RenderSessionHandle) SetVulkanBorrowedTextureTarget(
 	})
 }
 
+// SetWebGPUSurfaceTarget presents this attached surface session through a new
+// WebGPU surface. See SetMetalSurfaceTarget for what replacing a surface
+// preserves.
 func (s *RenderSessionHandle) SetWebGPUSurfaceTarget(
 	descriptor WebGPUSurfaceDescriptor,
 ) (*Future[struct{}], error) {
@@ -780,6 +890,9 @@ func (s *RenderSessionHandle) SetWebGPUSurfaceTarget(
 	})
 }
 
+// SetWebGPUBorrowedTextureTarget renders this attached texture session into a
+// new caller-owned WebGPU texture. See SetMetalBorrowedTextureTarget for what
+// replacing a target preserves.
 func (s *RenderSessionHandle) SetWebGPUBorrowedTextureTarget(
 	descriptor WebGPUBorrowedTextureDescriptor,
 ) (*Future[struct{}], error) {

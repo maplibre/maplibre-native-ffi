@@ -10,51 +10,46 @@ const point_collection =
     "\"type\":\"Feature\",\"id\":\"sf\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[-122.4194,37.7749]}," ++
     "\"properties\":{\"name\":\"San Francisco\",\"visible\":true}}]}";
 
-fn expectListContains(list: maplibre.StringList, expected: []const u8) !void {
-    for (list.items) |item| if (std.mem.eql(u8, item, expected)) return;
-    return error.MissingListEntry;
-}
-
 test "prepared GeoJSON data adds and updates sources through public binding" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
     const empty_data = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, empty_collection, null);
     defer empty_data.release();
-    _ = try map.addGeoJsonSourceData(testing.allocator, "empty", empty_data);
+    try support.expectCommitted(try map.addGeoJsonSourceData(testing.allocator, "empty", empty_data));
     try testing.expect(try support.styleSourceExists(&map, "empty"));
     var source_ids = try support.listStyleSourceIds(&map);
     defer source_ids.deinit();
-    try expectListContains(source_ids, "empty");
+    try support.expectListContains(source_ids, "empty");
 
     const point_data = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, point_collection, null);
     defer point_data.release();
-    _ = try map.setGeoJsonSourceData(testing.allocator, "empty", point_data);
-    _ = try map.setGeoJsonSourceUrl(testing.allocator, "empty", "https://example.com/data.geojson");
-    _ = try map.addGeoJsonSourceUrl(testing.allocator, "geo-url", "https://example.com/initial.geojson", .{
+    try support.expectCommitted(try map.setGeoJsonSourceData(testing.allocator, "empty", point_data));
+    try support.expectCommitted(try map.setGeoJsonSourceUrl(testing.allocator, "empty", "https://example.com/data.geojson"));
+    try support.expectCommitted(try map.addGeoJsonSourceUrl(testing.allocator, "geo-url", "https://example.com/initial.geojson", .{
         .min_zoom = 1,
         .max_zoom = 16,
         .tolerance = 0.5,
         .buffer = 0,
         .tile_size = 256,
         .line_metrics = true,
-    });
+    }));
     try testing.expectEqual(maplibre.StyleSourceType.geojson, (try support.styleSourceType(&map, "geo-url")).?);
-    try support.expectCommandError(&runtime, try map.addGeoJsonSourceUrl(testing.allocator, "empty", "https://example.com/again.geojson", null), error.InvalidArgument);
+    try support.expectCommandError(try map.addGeoJsonSourceUrl(testing.allocator, "empty", "https://example.com/again.geojson", null), error.InvalidArgument);
 }
 
 test "prepared GeoJSON data supports nested geometry collections" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
     const collection = "{\"type\":\"GeometryCollection\",\"geometries\":[{\"type\":\"LineString\",\"coordinates\":[[-123,37],[-122,38]]},{\"type\":\"Polygon\",\"coordinates\":[[[-123,37],[-123,38],[-122,38],[-123,37]]]}]}";
     const data = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, collection, null);
     defer data.release();
-    _ = try map.addGeoJsonSourceData(testing.allocator, "collection", data);
+    try support.expectCommitted(try map.addGeoJsonSourceData(testing.allocator, "collection", data));
     try testing.expect(try support.styleSourceExists(&map, "collection"));
 }
 
@@ -67,18 +62,18 @@ test "GeoJSON preparation rejects invalid data and passes explicit-length string
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
     const empty_data = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, empty_collection, null);
     defer empty_data.release();
     // An empty source ID submits, then the command reports the rejection.
     const empty_id = try map.addGeoJsonSourceData(testing.allocator, "", empty_data);
-    try support.expectCommandError(&runtime, empty_id, error.InvalidArgument);
+    try support.expectCommandError(empty_id, error.InvalidArgument);
 
     const embedded_nul_id = "{\"type\":\"Feature\",\"id\":\"bad\\u0000id\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]},\"properties\":{}}";
     const nul_data = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, embedded_nul_id, null);
     defer nul_data.release();
-    _ = try map.addGeoJsonSourceData(testing.allocator, "embedded-nul-id", nul_data);
+    try support.expectCommitted(try map.addGeoJsonSourceData(testing.allocator, "embedded-nul-id", nul_data));
     try testing.expect(try support.styleSourceExists(&map, "embedded-nul-id"));
 }
 
@@ -86,7 +81,7 @@ test "GeoJSON preparation bakes in options and validates clustering" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
     const features = "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]},\"properties\":{\"rank\":1}},{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0.001,0.001]},\"properties\":{\"rank\":2}}]}";
     const cluster_options = maplibre.StyleGeoJsonSourceOptions{
@@ -98,9 +93,9 @@ test "GeoJSON preparation bakes in options and validates clustering" {
     };
     const clustered = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, features, cluster_options);
     defer clustered.release();
-    _ = try map.addGeoJsonSourceData(testing.allocator, "clustered", clustered);
+    try support.expectCommitted(try map.addGeoJsonSourceData(testing.allocator, "clustered", clustered));
     try testing.expect(try support.styleSourceExists(&map, "clustered"));
-    _ = try map.setGeoJsonSourceData(testing.allocator, "clustered", clustered);
+    try support.expectCommitted(try map.setGeoJsonSourceData(testing.allocator, "clustered", clustered));
 
     // Cluster validation happens at preparation, before any map is involved.
     try testing.expectError(error.InvalidArgument, maplibre.GeoJsonSourceDataHandle.create(
@@ -119,14 +114,14 @@ test "GeoJSON preparation bakes in options and validates clustering" {
     const unclustered = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, features, null);
     defer unclustered.release();
     const unclustered_set = try map.setGeoJsonSourceData(testing.allocator, "clustered", unclustered);
-    try support.expectCommandError(&runtime, unclustered_set, error.InvalidArgument);
+    try support.expectCommandError(unclustered_set, error.InvalidArgument);
 
     var reproperty_options = cluster_options;
     reproperty_options.cluster_properties = "{\"total\":[\"max\",[\"get\",\"rank\"]]}";
     const repropertied = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, features, reproperty_options);
     defer repropertied.release();
     const repropertied_set = try map.setGeoJsonSourceData(testing.allocator, "clustered", repropertied);
-    try support.expectCommandError(&runtime, repropertied_set, error.InvalidArgument);
+    try support.expectCommandError(repropertied_set, error.InvalidArgument);
 
     // Aggregations compare by parsed equality, so equivalent JSON with
     // different formatting still matches.
@@ -135,22 +130,19 @@ test "GeoJSON preparation bakes in options and validates clustering" {
     const reformatted = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, features, reformatted_options);
     defer reformatted.release();
     const reformatted_set = try map.setGeoJsonSourceData(testing.allocator, "clustered", reformatted);
-    try testing.expectEqual(
-        try support.waitForCommandDisposition(&runtime, reformatted_set),
-        maplibre.CommandDisposition.committed,
-    );
+    try support.expectCommitted(reformatted_set);
 }
 
 test "prepared GeoJSON data installs on many sources and outlives release" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
     const shared = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, point_collection, null);
-    _ = try map.addGeoJsonSourceData(testing.allocator, "shared-a", shared);
-    _ = try map.addGeoJsonSourceData(testing.allocator, "shared-b", shared);
-    _ = try map.setGeoJsonSourceData(testing.allocator, "shared-a", shared);
+    try support.expectCommitted(try map.addGeoJsonSourceData(testing.allocator, "shared-a", shared));
+    try support.expectCommitted(try map.addGeoJsonSourceData(testing.allocator, "shared-b", shared));
+    try support.expectCommitted(try map.setGeoJsonSourceData(testing.allocator, "shared-a", shared));
 
     // Submitted installs keep their own lease, so a release right after
     // submit never invalidates them, and a second release is a no-op.
@@ -168,7 +160,7 @@ test "GeoJSON preparation runs on a worker thread" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
     const Prepare = struct {
         fn run(out: *(maplibre.Error!maplibre.GeoJsonSourceDataHandle)) void {
@@ -180,7 +172,7 @@ test "GeoJSON preparation runs on a worker thread" {
     thread.join();
     const data = try result;
     defer data.release();
-    _ = try map.addGeoJsonSourceData(testing.allocator, "worker-prepared", data);
+    try support.expectCommitted(try map.addGeoJsonSourceData(testing.allocator, "worker-prepared", data));
     try testing.expect(try support.styleSourceExists(&map, "worker-prepared"));
 }
 
@@ -188,26 +180,20 @@ test "synchronous tiling override applies at runtime" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
     const data = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, point_collection, null);
     defer data.release();
-    _ = try map.addGeoJsonSourceData(testing.allocator, "tracked", data);
+    try support.expectCommitted(try map.addGeoJsonSourceData(testing.allocator, "tracked", data));
 
     const enable_id = try map.setGeoJsonSourceSynchronousTiling(testing.allocator, "tracked", true);
-    try testing.expectEqual(
-        try support.waitForCommandDisposition(&runtime, enable_id),
-        maplibre.CommandDisposition.committed,
-    );
+    try support.expectCommitted(enable_id);
     const set_id = try map.setGeoJsonSourceData(testing.allocator, "tracked", data);
-    try testing.expectEqual(
-        try support.waitForCommandDisposition(&runtime, set_id),
-        maplibre.CommandDisposition.committed,
-    );
-    _ = try map.setGeoJsonSourceSynchronousTiling(testing.allocator, "tracked", false);
+    try support.expectCommitted(set_id);
+    try support.expectCommitted(try map.setGeoJsonSourceSynchronousTiling(testing.allocator, "tracked", false));
 
     // The override rejects a source ID that names nothing, reported by the
     // command since the style is only readable at commit.
     const missing_id = try map.setGeoJsonSourceSynchronousTiling(testing.allocator, "missing", true);
-    try support.expectCommandError(&runtime, missing_id, error.InvalidArgument);
+    try support.expectCommandError(missing_id, error.NotFound);
 }

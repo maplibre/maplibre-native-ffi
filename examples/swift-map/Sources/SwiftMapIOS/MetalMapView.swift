@@ -21,6 +21,7 @@ final class MetalMapView: UIView {
   private var displayLink: CADisplayLink?
   private var frameTask: Task<Void, Never>?
   private var shutdownTask: Task<Void, Never>?
+  private var pendingUpdates: Task<Void, Never>?
   private var currentViewport: Viewport?
   private var renderRequested = true
   private var didLogStartupStatus = false
@@ -58,6 +59,9 @@ final class MetalMapView: UIView {
     nil
   }
 
+  /// Last resort only: a view released without leaving its window abandons the
+  /// session rather than closing it, because deinit cannot await teardown.
+  /// ``didMoveToWindow`` is the ordered path.
   deinit {
     NotificationCenter.default.removeObserver(self)
     MainActor.assumeIsolated {
@@ -72,7 +76,9 @@ final class MetalMapView: UIView {
     if viewVisible {
       refreshAndStartIfNeeded()
     } else {
-      stopHostLoop()
+      // Leaving the window ends this view's map: release the session, then the
+      // map, then the runtime.
+      beginTeardown()
     }
   }
 
@@ -112,6 +118,10 @@ final class MetalMapView: UIView {
     let target = renderTarget
     renderTarget = nil
     let setup = setupTask
+    // A failing update reaches here from inside the update chain, so the chain
+    // is dropped rather than awaited; `isShutDown` stops every queued update
+    // before it touches the map.
+    pendingUpdates = nil
     shutdownTask = Task { @MainActor in
       await setup?.value
       do {
@@ -177,7 +187,10 @@ final class MetalMapView: UIView {
         graphics: graphics,
         viewport: viewport
       )
-      pendingResize = false
+      // The viewport can change while the attach is in flight; the session
+      // was attached at the captured extent, so carry any later change into
+      // the next tick's session resize.
+      pendingResize = currentViewport != viewport
       if !didLogStartupStatus {
         log.info("render target: native-surface")
         log.info(
@@ -271,12 +284,16 @@ final class MetalMapView: UIView {
     graphics.resize(viewport)
     currentViewport = viewport
     pendingResize = renderTarget != nil
-    updateMap { state in
-      try await state.resize(MapLogicalExtent(
-        width: viewport.logicalWidth,
-        height: viewport.logicalHeight,
-        scaleFactor: viewport.scaleFactor
-      ))
+    if !pendingResize {
+      // With no session attached the map is the only extent authority; a live
+      // session carries the extent through its own resize on the next tick.
+      updateMap { state in
+        try await state.resize(MapLogicalExtent(
+          width: viewport.logicalWidth,
+          height: viewport.logicalHeight,
+          scaleFactor: viewport.scaleFactor
+        ))
+      }
     }
     renderRequested = true
     startMapStateIfNeeded(viewport: viewport)
@@ -359,17 +376,24 @@ final class MetalMapView: UIView {
     )
   }
 
+  /// Submits one camera command. Each task awaits the one before it, so a
+  /// gesture-begin submission always reaches the map ahead of the deltas the
+  /// same gesture produces; main-actor isolation alone gives exclusion, not
+  /// order.
   private func updateMap(
     _ update: @escaping @MainActor (MapState) async throws -> Void
   ) {
-    guard !isShutDown, let state = mapState else { return }
+    guard !isShutDown, mapState != nil else { return }
     renderRequested = true
-    Task { @MainActor in
+    let previous = pendingUpdates
+    pendingUpdates = Task { @MainActor in
+      await previous?.value
+      guard !self.isShutDown, let state = self.mapState else { return }
       do {
         try await update(state)
       } catch {
-        showError(error)
-        beginTeardown()
+        self.showError(error)
+        self.beginTeardown()
       }
     }
   }

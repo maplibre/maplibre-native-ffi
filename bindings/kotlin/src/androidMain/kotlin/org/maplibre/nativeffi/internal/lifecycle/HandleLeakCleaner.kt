@@ -1,7 +1,6 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
 import java.util.concurrent.ConcurrentHashMap
-import org.maplibre.nativeffi.render.OwnedTextureFrameHandleCore
 
 /**
  * Reports native handles that become unreachable before explicit release.
@@ -35,20 +34,9 @@ internal object HandleLeakCleaner {
     }
   }
 
-  /** Reports [frameCore] when [handle] becomes unreachable before explicit release. */
-  fun registerFrame(handle: Any, frameCore: OwnedTextureFrameHandleCore) {
-    leakReportActions.register(handle, FrameLeakAction(frameCore))
-  }
-
   private class LeakReportAction(private val leakReport: HandleStateCore.LeakReport) : Runnable {
     override fun run() {
       leakReport.report()
-    }
-  }
-
-  private class FrameLeakAction(private val frameCore: OwnedTextureFrameHandleCore) : Runnable {
-    override fun run() {
-      frameCore.reportLeak()
     }
   }
 }

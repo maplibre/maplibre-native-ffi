@@ -3,36 +3,35 @@ package org.maplibre.nativeffi.map
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class CustomGeometrySourceRegistryTest {
   @Test
-  fun failedReplacementPreservesExistingCallbackState(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      val released = mutableListOf<String>()
-      val registry = registry(released)
-      registry.install("source", State("existing")) {}
+  fun failedReplacementPreservesExistingCallbackState(): Unit = runSuspendTest {
+    val released = mutableListOf<String>()
+    val registry = registry(released)
+    registry.install("source", State("existing")) {}
 
-      assertFailsWith<IllegalStateException> {
-        registry.install("source", State("replacement")) { error("native install failed") }
-      }
-
-      assertEquals(1, registry.size)
-      assertEquals(listOf("replacement"), released)
+    assertFailsWith<IllegalStateException> {
+      registry.install("source", State("replacement")) { error("native install failed") }
     }
+
+    assertEquals(1, registry.size)
+    assertEquals(listOf("replacement"), released)
+  }
 
   @Test
-  fun clearingReleasesEveryRemainingCallbackState(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      val released = mutableListOf<String>()
-      val registry = registry(released)
-      registry.install("first", State("first")) {}
-      registry.install("second", State("second")) {}
+  fun clearingReleasesEveryRemainingCallbackState(): Unit = runSuspendTest {
+    val released = mutableListOf<String>()
+    val registry = registry(released)
+    registry.install("first", State("first")) {}
+    registry.install("second", State("second")) {}
 
-      registry.clear()
+    registry.clear()
 
-      assertEquals(0, registry.size)
-      assertEquals(listOf("first", "second"), released)
-    }
+    assertEquals(0, registry.size)
+    assertEquals(listOf("first", "second"), released)
+  }
 
   private fun registry(released: MutableList<String>): CustomGeometrySourceRegistry<State> =
     CustomGeometrySourceRegistry { state ->

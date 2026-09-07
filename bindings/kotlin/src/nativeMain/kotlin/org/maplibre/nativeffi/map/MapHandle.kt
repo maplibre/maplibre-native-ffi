@@ -13,22 +13,24 @@ import kotlinx.cinterop.readValue
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.value
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraDelta
+import org.maplibre.nativeffi.camera.CameraFitOptions
+import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.CameraSnapshot
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.FreeCameraOptions
+import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.async.CompletionBridge
-import org.maplibre.nativeffi.internal.async.mapDeferred
-import org.maplibre.nativeffi.internal.c.MLN_STYLE_LAYER_INFO_SOURCE_ID
-import org.maplibre.nativeffi.internal.c.MLN_STYLE_LAYER_INFO_SOURCE_LAYER
 import org.maplibre.nativeffi.internal.c.mln_buffer_view
 import org.maplibre.nativeffi.internal.c.mln_camera_delta_default
+import org.maplibre.nativeffi.internal.c.mln_camera_options
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_camera_query_result
 import org.maplibre.nativeffi.internal.c.mln_camera_update_default
@@ -36,6 +38,7 @@ import org.maplibre.nativeffi.internal.c.mln_completion
 import org.maplibre.nativeffi.internal.c.mln_completion_result
 import org.maplibre.nativeffi.internal.c.mln_image_stretch
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
+import org.maplibre.nativeffi.internal.c.mln_lat_lng_bounds
 import org.maplibre.nativeffi.internal.c.mln_logical_extent
 import org.maplibre.nativeffi.internal.c.mln_map_add_color_relief_layer
 import org.maplibre.nativeffi.internal.c.mln_map_add_custom_geometry_source
@@ -55,12 +58,20 @@ import org.maplibre.nativeffi.internal.c.mln_map_add_style_source_json
 import org.maplibre.nativeffi.internal.c.mln_map_add_vector_source_tiles
 import org.maplibre.nativeffi.internal.c.mln_map_add_vector_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_apply_camera_delta
+import org.maplibre.nativeffi.internal.c.mln_map_camera_for_geometry
+import org.maplibre.nativeffi.internal.c.mln_map_camera_for_lat_lng_bounds
+import org.maplibre.nativeffi.internal.c.mln_map_camera_for_lat_lngs
 import org.maplibre.nativeffi.internal.c.mln_map_camera_query
 import org.maplibre.nativeffi.internal.c.mln_map_camera_snapshot_get
+import org.maplibre.nativeffi.internal.c.mln_map_cancel_transitions
 import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_id
 import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_layer
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_premultiplied_rgba8
 import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_stretches
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_attribution
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_create
+import org.maplibre.nativeffi.internal.c.mln_map_dump_debug_logs
 import org.maplibre.nativeffi.internal.c.mln_map_get_feature_state
 import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter
@@ -70,10 +81,13 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_info
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_json
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_light_property
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_info
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_tile_urls
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_region
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_tile
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_mvt_vector_source_tile
+import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_bounds_for_camera
+import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_bounds_for_camera_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_for_pixel
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_for_pixel_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels
@@ -120,6 +134,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_accuracy
 import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_bearing
 import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_image_name
 import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_location
+import org.maplibre.nativeffi.internal.c.mln_map_set_projection_mode
 import org.maplibre.nativeffi.internal.c.mln_map_set_rendering_stats_view_enabled
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_image
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_json
@@ -178,7 +193,6 @@ import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.LayerInfo
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
-import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleLayerVisibility
@@ -188,52 +202,34 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 /** Owned any-thread native map handle. */
 @OptIn(ExperimentalForeignApi::class)
 public actual class MapHandle
-private constructor(
-  private val runtime: RuntimeHandle,
-  handle: NativeMap,
-  cachedEventMask: RuntimeEventMask,
-) {
+private constructor(private val runtime: RuntimeHandle, handle: NativeMap) {
   private val state = HandleState("MapHandle", handle, runtime)
-  private var cachedEventMask =
-    RuntimeEventMask(cachedEventMask.nativeValue and RuntimeEventMask.ALL_MAP_EVENTS.nativeValue)
   private val customGeometrySources =
     CustomGeometrySourceRegistry<CustomGeometrySourceState> { it.close() }
   private val customMvtVectorSources =
     CustomGeometrySourceRegistry<CustomMvtVectorSourceState> { it.close() }
 
-  public actual val eventMask: RuntimeEventMask
-    get() = cachedEventMask
-
   public actual fun setEventMask(value: RuntimeEventMask): Deferred<CommandCompletion> =
     command { completion ->
-        Status.check(
-          mln_map_set_event_mask(
-            state.requireLive().rawHandleValue,
-            value.nativeValue.toULong(),
-            completion,
-          )
-        )
-      }
-      .mapDeferred {
-        cachedEventMask =
-          RuntimeEventMask(value.nativeValue and RuntimeEventMask.ALL_MAP_EVENTS.nativeValue)
-        it
-      }
+      mln_map_set_event_mask(
+        state.requireLive().rawHandleValue,
+        value.nativeValue.toULong(),
+        completion,
+      )
+    }
 
   public actual fun setStyleUrl(url: String): Deferred<CommandCompletion> = command { completion ->
     MemoryUtil.requireValidCString(url)
-    Status.check(mln_map_set_style_url(state.requireLive().rawHandleValue, url, completion))
+    mln_map_set_style_url(state.requireLive().rawHandleValue, url, completion)
   }
 
   public actual fun setStyleJson(json: ByteArray): Deferred<CommandCompletion> =
     command { completion ->
       memScoped {
-        Status.check(
-          mln_map_set_style_json(
-            state.requireLive().rawHandleValue,
-            ByteStructs.bufferView(json, this),
-            completion,
-          )
+        mln_map_set_style_json(
+          state.requireLive().rawHandleValue,
+          ByteStructs.bufferView(json, this),
+          completion,
         )
       }
     }
@@ -243,13 +239,11 @@ private constructor(
     value: ByteArray,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_feature_state(
-          state.requireLive().rawHandleValue,
-          QueryStructs.featureStateSelector(selector, this),
-          ByteStructs.bufferView(value, this),
-          completion,
-        )
+      mln_map_set_feature_state(
+        state.requireLive().rawHandleValue,
+        QueryStructs.featureStateSelector(selector, this),
+        ByteStructs.bufferView(value, this),
+        completion,
       )
     }
   }
@@ -272,12 +266,10 @@ private constructor(
     selector: FeatureStateSelector
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_remove_feature_state(
-          state.requireLive().rawHandleValue,
-          QueryStructs.featureStateSelector(selector, this),
-          completion,
-        )
+      mln_map_remove_feature_state(
+        state.requireLive().rawHandleValue,
+        QueryStructs.featureStateSelector(selector, this),
+        completion,
       )
     }
   }
@@ -299,13 +291,11 @@ private constructor(
     sourceJson: ByteArray,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_add_style_source_json(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          ByteStructs.bufferView(sourceJson, this),
-          completion,
-        )
+      mln_map_add_style_source_json(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        ByteStructs.bufferView(sourceJson, this),
+        completion,
       )
     }
   }
@@ -313,12 +303,10 @@ private constructor(
   public actual fun removeStyleSource(sourceId: String): Deferred<CommandCompletion> =
     command { completion ->
       memScoped {
-        Status.check(
-          mln_map_remove_style_source(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(sourceId, this),
-            completion,
-          )
+        mln_map_remove_style_source(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          completion,
         )
       }
     }
@@ -356,15 +344,52 @@ private constructor(
     isVolatile: Boolean,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_style_source_volatile(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          isVolatile,
-          completion,
-        )
+      mln_map_set_style_source_volatile(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        isVolatile,
+        completion,
       )
     }
+  }
+
+  public actual fun styleSourceAttribution(sourceId: String): Deferred<String?> = memScoped {
+    CompletionBridge.submit(
+      ::optionalTextCompletion,
+      { completion ->
+        mln_map_copy_style_source_attribution(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          completion,
+        )
+      },
+    )
+  }
+
+  public actual fun styleSourceUrl(sourceId: String): Deferred<String?> = memScoped {
+    CompletionBridge.submit(
+      ::optionalTextCompletion,
+      { completion ->
+        mln_map_copy_style_source_url(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          completion,
+        )
+      },
+    )
+  }
+
+  public actual fun styleSourceTileUrls(sourceId: String): Deferred<List<String>> = memScoped {
+    CompletionBridge.submit(
+      ::stringViewsCompletion,
+      { completion ->
+        mln_map_get_style_source_tile_urls(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          completion,
+        )
+      },
+    )
   }
 
   public actual fun styleSourceIds(): Deferred<List<String>> =
@@ -381,14 +406,12 @@ private constructor(
     options: GeoJsonSourceOptions?,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_add_geojson_source_url(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          CoreStructs.stringView(url, this),
-          StyleStructs.geoJsonSourceOptions(options, this),
-          completion,
-        )
+      mln_map_add_geojson_source_url(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        CoreStructs.stringView(url, this),
+        StyleStructs.geoJsonSourceOptions(options, this),
+        completion,
       )
     }
   }
@@ -399,13 +422,11 @@ private constructor(
   ): Deferred<CommandCompletion> = command { completion ->
     data.withNativeHandle { nativeData ->
       memScoped {
-        Status.check(
-          mln_map_add_geojson_source_data(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(sourceId, this),
-            nativeData.rawHandleValue,
-            completion,
-          )
+        mln_map_add_geojson_source_data(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          nativeData.rawHandleValue,
+          completion,
         )
       }
     }
@@ -416,13 +437,11 @@ private constructor(
     url: String,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_geojson_source_url(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          CoreStructs.stringView(url, this),
-          completion,
-        )
+      mln_map_set_geojson_source_url(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        CoreStructs.stringView(url, this),
+        completion,
       )
     }
   }
@@ -433,13 +452,11 @@ private constructor(
   ): Deferred<CommandCompletion> = command { completion ->
     data.withNativeHandle { nativeData ->
       memScoped {
-        Status.check(
-          mln_map_set_geojson_source_data(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(sourceId, this),
-            nativeData.rawHandleValue,
-            completion,
-          )
+        mln_map_set_geojson_source_data(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          nativeData.rawHandleValue,
+          completion,
         )
       }
     }
@@ -450,13 +467,11 @@ private constructor(
     enabled: Boolean,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_geojson_source_synchronous_tiling(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          enabled,
-          completion,
-        )
+      mln_map_set_geojson_source_synchronous_tiling(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        enabled,
+        completion,
       )
     }
   }
@@ -464,25 +479,25 @@ private constructor(
   public actual fun addCustomGeometrySource(
     sourceId: String,
     options: CustomGeometrySourceOptions,
-  ): Deferred<CommandCompletion> =
-    command { completion
-      -> // The release callback captures the registry rather than this map, so a map a
-      // host leaks with a live source still reports as leaked.
-      val registry = customGeometrySources
-      val sourceState = CustomGeometrySourceState(options) { registry.remove(sourceId) }
-      registry.install(sourceId, sourceState) {
-        memScoped {
-          Status.check(
-            mln_map_add_custom_geometry_source(
-              state.requireLive().rawHandleValue,
-              CoreStructs.stringView(sourceId, this),
-              sourceState.descriptor(),
-              completion,
-            )
+  ): Deferred<CommandCompletion> = command { completion ->
+    // The release callback captures the registry rather than this map, so a map a host leaks with
+    // a live source still reports as leaked.
+    val registry = customGeometrySources
+    val sourceState = CustomGeometrySourceState(options) { registry.remove(sourceId) }
+    registry.install(sourceId, sourceState) {
+      memScoped {
+        Status.check(
+          mln_map_add_custom_geometry_source(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            sourceState.descriptor(),
+            completion,
           )
-        }
+        )
       }
     }
+    MaplibreStatus.OK.nativeCode
+  }
 
   public actual fun setCustomGeometrySourceTileData(
     sourceId: String,
@@ -490,14 +505,12 @@ private constructor(
     data: ByteArray,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_custom_geometry_source_tile_data(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          StyleStructs.canonicalTileId(tileId),
-          ByteStructs.bufferView(data, this),
-          completion,
-        )
+      mln_map_set_custom_geometry_source_tile_data(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        StyleStructs.canonicalTileId(tileId),
+        ByteStructs.bufferView(data, this),
+        completion,
       )
     }
   }
@@ -507,13 +520,11 @@ private constructor(
     tileId: CanonicalTileId,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_invalidate_custom_geometry_source_tile(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          StyleStructs.canonicalTileId(tileId),
-          completion,
-        )
+      mln_map_invalidate_custom_geometry_source_tile(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        StyleStructs.canonicalTileId(tileId),
+        completion,
       )
     }
   }
@@ -523,13 +534,11 @@ private constructor(
     bounds: LatLngBounds,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_invalidate_custom_geometry_source_region(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          CoreStructs.latLngBounds(bounds),
-          completion,
-        )
+      mln_map_invalidate_custom_geometry_source_region(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        CoreStructs.latLngBounds(bounds),
+        completion,
       )
     }
   }
@@ -552,6 +561,7 @@ private constructor(
         )
       }
     }
+    MaplibreStatus.OK.nativeCode
   }
 
   public actual fun setCustomMvtVectorSourceTileData(
@@ -560,14 +570,12 @@ private constructor(
     data: ByteArray,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_custom_mvt_vector_source_tile_data(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          StyleStructs.canonicalTileId(tileId),
-          ByteStructs.bufferView(data, this),
-          completion,
-        )
+      mln_map_set_custom_mvt_vector_source_tile_data(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        StyleStructs.canonicalTileId(tileId),
+        ByteStructs.bufferView(data, this),
+        completion,
       )
     }
   }
@@ -578,14 +586,12 @@ private constructor(
     message: String,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_custom_mvt_vector_source_tile_error(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          StyleStructs.canonicalTileId(tileId),
-          CoreStructs.stringView(message, this),
-          completion,
-        )
+      mln_map_set_custom_mvt_vector_source_tile_error(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        StyleStructs.canonicalTileId(tileId),
+        CoreStructs.stringView(message, this),
+        completion,
       )
     }
   }
@@ -595,13 +601,11 @@ private constructor(
     tileId: CanonicalTileId,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_invalidate_custom_mvt_vector_source_tile(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          StyleStructs.canonicalTileId(tileId),
-          completion,
-        )
+      mln_map_invalidate_custom_mvt_vector_source_tile(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        StyleStructs.canonicalTileId(tileId),
+        completion,
       )
     }
   }
@@ -614,14 +618,12 @@ private constructor(
     options: TileSourceOptions?,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_add_vector_source_url(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          CoreStructs.stringView(url, this),
-          StyleStructs.tileSourceOptions(options, this),
-          completion,
-        )
+      mln_map_add_vector_source_url(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        CoreStructs.stringView(url, this),
+        StyleStructs.tileSourceOptions(options, this),
+        completion,
       )
     }
   }
@@ -633,15 +635,13 @@ private constructor(
   ): Deferred<CommandCompletion> = command { completion ->
     val tileSnapshot = tiles.toList()
     memScoped {
-      Status.check(
-        mln_map_add_vector_source_tiles(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          StyleStructs.stringViewArray(tileSnapshot, this),
-          tileSnapshot.size.toCSize(),
-          StyleStructs.tileSourceOptions(options, this),
-          completion,
-        )
+      mln_map_add_vector_source_tiles(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        StyleStructs.stringViewArray(tileSnapshot, this),
+        tileSnapshot.size.toCSize(),
+        StyleStructs.tileSourceOptions(options, this),
+        completion,
       )
     }
   }
@@ -652,14 +652,12 @@ private constructor(
     options: TileSourceOptions?,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_add_raster_source_url(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          CoreStructs.stringView(url, this),
-          StyleStructs.tileSourceOptions(options, this),
-          completion,
-        )
+      mln_map_add_raster_source_url(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        CoreStructs.stringView(url, this),
+        StyleStructs.tileSourceOptions(options, this),
+        completion,
       )
     }
   }
@@ -671,15 +669,13 @@ private constructor(
   ): Deferred<CommandCompletion> = command { completion ->
     val tileSnapshot = tiles.toList()
     memScoped {
-      Status.check(
-        mln_map_add_raster_source_tiles(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          StyleStructs.stringViewArray(tileSnapshot, this),
-          tileSnapshot.size.toCSize(),
-          StyleStructs.tileSourceOptions(options, this),
-          completion,
-        )
+      mln_map_add_raster_source_tiles(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        StyleStructs.stringViewArray(tileSnapshot, this),
+        tileSnapshot.size.toCSize(),
+        StyleStructs.tileSourceOptions(options, this),
+        completion,
       )
     }
   }
@@ -690,14 +686,12 @@ private constructor(
     options: TileSourceOptions?,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_add_raster_dem_source_url(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          CoreStructs.stringView(url, this),
-          StyleStructs.tileSourceOptions(options, this),
-          completion,
-        )
+      mln_map_add_raster_dem_source_url(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        CoreStructs.stringView(url, this),
+        StyleStructs.tileSourceOptions(options, this),
+        completion,
       )
     }
   }
@@ -709,15 +703,13 @@ private constructor(
   ): Deferred<CommandCompletion> = command { completion ->
     val tileSnapshot = tiles.toList()
     memScoped {
-      Status.check(
-        mln_map_add_raster_dem_source_tiles(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          StyleStructs.stringViewArray(tileSnapshot, this),
-          tileSnapshot.size.toCSize(),
-          StyleStructs.tileSourceOptions(options, this),
-          completion,
-        )
+      mln_map_add_raster_dem_source_tiles(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        StyleStructs.stringViewArray(tileSnapshot, this),
+        tileSnapshot.size.toCSize(),
+        StyleStructs.tileSourceOptions(options, this),
+        completion,
       )
     }
   }
@@ -729,14 +721,12 @@ private constructor(
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       StyleStructs.withPremultipliedRgba8Image(image, this) { nativeImage ->
-        Status.check(
-          mln_map_set_style_image(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(imageId, this),
-            nativeImage,
-            StyleStructs.styleImageOptions(options, this),
-            completion,
-          )
+        mln_map_set_style_image(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(imageId, this),
+          nativeImage,
+          StyleStructs.styleImageOptions(options, this),
+          completion,
         )
       }
     }
@@ -745,12 +735,10 @@ private constructor(
   public actual fun removeStyleImage(imageId: String): Deferred<CommandCompletion> =
     command { completion ->
       memScoped {
-        Status.check(
-          mln_map_remove_style_image(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(imageId, this),
-            completion,
-          )
+        mln_map_remove_style_image(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(imageId, this),
+          completion,
         )
       }
     }
@@ -799,28 +787,12 @@ private constructor(
     )
   }
 
-  public actual fun copyStyleImagePremultipliedRgba8(imageId: String): Deferred<StyleImage?> =
+  public actual fun copyStyleImagePremultipliedRgba8(imageId: String): Deferred<ByteArray?> =
     memScoped {
       CompletionBridge.submit(
-        { result ->
-          if (result.pointed.value_count.toULong() == 0uL) null
-          else {
-            val value = result.pointed.value!!.reinterpret<mln_style_image_result>().pointed
-            val info = StyleStructs.styleImageInfo(value.info)
-            StyleImage(
-              PremultipliedRgba8Image(
-                info.width,
-                info.height,
-                info.stride,
-                ByteStructs.copyBufferView(value.pixels),
-              ),
-              info.pixelRatio,
-              info.sdf,
-            )
-          }
-        },
+        ::bufferCompletion,
         { completion ->
-          mln_map_get_style_image_info(
+          mln_map_copy_style_image_premultiplied_rgba8(
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(imageId, this),
             completion,
@@ -836,15 +808,13 @@ private constructor(
   ): Deferred<CommandCompletion> = command { completion ->
     val coordinateSnapshot = coordinates.toList()
     memScoped {
-      Status.check(
-        mln_map_add_image_source_url(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          CoreStructs.latLngArray(coordinateSnapshot, this),
-          coordinateSnapshot.size.toCSize(),
-          CoreStructs.stringView(url, this),
-          completion,
-        )
+      mln_map_add_image_source_url(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        CoreStructs.latLngArray(coordinateSnapshot, this),
+        coordinateSnapshot.size.toCSize(),
+        CoreStructs.stringView(url, this),
+        completion,
       )
     }
   }
@@ -857,15 +827,13 @@ private constructor(
     val coordinateSnapshot = coordinates.toList()
     memScoped {
       StyleStructs.withPremultipliedRgba8Image(image, this) { nativeImage ->
-        Status.check(
-          mln_map_add_image_source_image(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(sourceId, this),
-            CoreStructs.latLngArray(coordinateSnapshot, this),
-            coordinateSnapshot.size.toCSize(),
-            nativeImage,
-            completion,
-          )
+        mln_map_add_image_source_image(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          CoreStructs.latLngArray(coordinateSnapshot, this),
+          coordinateSnapshot.size.toCSize(),
+          nativeImage,
+          completion,
         )
       }
     }
@@ -874,13 +842,11 @@ private constructor(
   public actual fun setImageSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
     command { completion ->
       memScoped {
-        Status.check(
-          mln_map_set_image_source_url(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(sourceId, this),
-            CoreStructs.stringView(url, this),
-            completion,
-          )
+        mln_map_set_image_source_url(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          CoreStructs.stringView(url, this),
+          completion,
         )
       }
     }
@@ -891,13 +857,11 @@ private constructor(
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       StyleStructs.withPremultipliedRgba8Image(image, this) { nativeImage ->
-        Status.check(
-          mln_map_set_image_source_image(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(sourceId, this),
-            nativeImage,
-            completion,
-          )
+        mln_map_set_image_source_image(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          nativeImage,
+          completion,
         )
       }
     }
@@ -909,14 +873,12 @@ private constructor(
   ): Deferred<CommandCompletion> = command { completion ->
     val coordinateSnapshot = coordinates.toList()
     memScoped {
-      Status.check(
-        mln_map_set_image_source_coordinates(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          CoreStructs.latLngArray(coordinateSnapshot, this),
-          coordinateSnapshot.size.toCSize(),
-          completion,
-        )
+      mln_map_set_image_source_coordinates(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(sourceId, this),
+        CoreStructs.latLngArray(coordinateSnapshot, this),
+        coordinateSnapshot.size.toCSize(),
+        completion,
       )
     }
   }
@@ -944,13 +906,11 @@ private constructor(
     beforeLayerId: String,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_add_style_layer_json(
-          state.requireLive().rawHandleValue,
-          ByteStructs.bufferView(layerJson, this),
-          CoreStructs.stringView(beforeLayerId, this),
-          completion,
-        )
+      mln_map_add_style_layer_json(
+        state.requireLive().rawHandleValue,
+        ByteStructs.bufferView(layerJson, this),
+        CoreStructs.stringView(beforeLayerId, this),
+        completion,
       )
     }
   }
@@ -961,14 +921,12 @@ private constructor(
     beforeLayerId: String,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_add_hillshade_layer(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          CoreStructs.stringView(sourceId, this),
-          CoreStructs.stringView(beforeLayerId, this),
-          completion,
-        )
+      mln_map_add_hillshade_layer(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(layerId, this),
+        CoreStructs.stringView(sourceId, this),
+        CoreStructs.stringView(beforeLayerId, this),
+        completion,
       )
     }
   }
@@ -979,14 +937,12 @@ private constructor(
     beforeLayerId: String,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_add_color_relief_layer(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          CoreStructs.stringView(sourceId, this),
-          CoreStructs.stringView(beforeLayerId, this),
-          completion,
-        )
+      mln_map_add_color_relief_layer(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(layerId, this),
+        CoreStructs.stringView(sourceId, this),
+        CoreStructs.stringView(beforeLayerId, this),
+        completion,
       )
     }
   }
@@ -996,13 +952,11 @@ private constructor(
     beforeLayerId: String,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_add_location_indicator_layer(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          CoreStructs.stringView(beforeLayerId, this),
-          completion,
-        )
+      mln_map_add_location_indicator_layer(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(layerId, this),
+        CoreStructs.stringView(beforeLayerId, this),
+        completion,
       )
     }
   }
@@ -1013,14 +967,12 @@ private constructor(
     altitude: Double,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_location_indicator_location(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          CoreStructs.latLng(coordinate),
-          altitude,
-          completion,
-        )
+      mln_map_set_location_indicator_location(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(layerId, this),
+        CoreStructs.latLng(coordinate),
+        altitude,
+        completion,
       )
     }
   }
@@ -1030,13 +982,11 @@ private constructor(
     bearing: Double,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_location_indicator_bearing(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          bearing,
-          completion,
-        )
+      mln_map_set_location_indicator_bearing(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(layerId, this),
+        bearing,
+        completion,
       )
     }
   }
@@ -1046,13 +996,11 @@ private constructor(
     radius: Double,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_location_indicator_accuracy_radius(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          radius,
-          completion,
-        )
+      mln_map_set_location_indicator_accuracy_radius(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(layerId, this),
+        radius,
+        completion,
       )
     }
   }
@@ -1063,14 +1011,12 @@ private constructor(
     imageId: String,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_location_indicator_image_name(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          imageKind.nativeValue.toUInt(),
-          CoreStructs.stringView(imageId, this),
-          completion,
-        )
+      mln_map_set_location_indicator_image_name(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(layerId, this),
+        imageKind.nativeValue.toUInt(),
+        CoreStructs.stringView(imageId, this),
+        completion,
       )
     }
   }
@@ -1078,12 +1024,10 @@ private constructor(
   public actual fun removeStyleLayer(layerId: String): Deferred<CommandCompletion> =
     command { completion ->
       memScoped {
-        Status.check(
-          mln_map_remove_style_layer(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            completion,
-          )
+        mln_map_remove_style_layer(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          completion,
         )
       }
     }
@@ -1095,18 +1039,13 @@ private constructor(
         else {
           val raw = result.pointed.value!!.reinterpret<mln_style_layer_result>().pointed
           val info = raw.info
-          val fields = info.fields
           LayerInfo(
             ByteStructs.copyBufferView(info.type).decodeToString(),
             info.min_zoom,
             info.max_zoom,
             StyleLayerVisibility.fromNative(info.visibility),
-            if ((fields and MLN_STYLE_LAYER_INFO_SOURCE_ID) != 0u)
-              ByteStructs.copyBufferView(raw.source_id).decodeToString()
-            else null,
-            if ((fields and MLN_STYLE_LAYER_INFO_SOURCE_LAYER) != 0u)
-              ByteStructs.copyBufferView(raw.source_layer).decodeToString()
-            else null,
+            optionalStringView(raw.source_id),
+            optionalStringView(raw.source_layer),
           )
         }
       },
@@ -1131,13 +1070,11 @@ private constructor(
     beforeLayerId: String,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_move_style_layer(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          CoreStructs.stringView(beforeLayerId, this),
-          completion,
-        )
+      mln_map_move_style_layer(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(layerId, this),
+        CoreStructs.stringView(beforeLayerId, this),
+        completion,
       )
     }
   }
@@ -1158,12 +1095,10 @@ private constructor(
   public actual fun setStyleLightJson(lightJson: ByteArray): Deferred<CommandCompletion> =
     command { completion ->
       memScoped {
-        Status.check(
-          mln_map_set_style_light_json(
-            state.requireLive().rawHandleValue,
-            ByteStructs.bufferView(lightJson, this),
-            completion,
-          )
+        mln_map_set_style_light_json(
+          state.requireLive().rawHandleValue,
+          ByteStructs.bufferView(lightJson, this),
+          completion,
         )
       }
     }
@@ -1173,13 +1108,11 @@ private constructor(
     value: ByteArray,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_style_light_property(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(propertyName, this),
-          ByteStructs.bufferView(value, this),
-          completion,
-        )
+      mln_map_set_style_light_property(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(propertyName, this),
+        ByteStructs.bufferView(value, this),
+        completion,
       )
     }
   }
@@ -1201,12 +1134,10 @@ private constructor(
     options: StyleTransitionOptions
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_style_transition_options(
-          state.requireLive().rawHandleValue,
-          StyleStructs.styleTransitionOptions(options, this),
-          completion,
-        )
+      mln_map_set_style_transition_options(
+        state.requireLive().rawHandleValue,
+        StyleStructs.styleTransitionOptions(options, this),
+        completion,
       )
     }
   }
@@ -1231,14 +1162,12 @@ private constructor(
     value: ByteArray,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_layer_property(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          CoreStructs.stringView(propertyName, this),
-          ByteStructs.bufferView(value, this),
-          completion,
-        )
+      mln_map_set_layer_property(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(layerId, this),
+        CoreStructs.stringView(propertyName, this),
+        ByteStructs.bufferView(value, this),
+        completion,
       )
     }
   }
@@ -1263,13 +1192,11 @@ private constructor(
     filter: ByteArray,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_layer_filter(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          ByteStructs.bufferViewPointer(filter, this),
-          completion,
-        )
+      mln_map_set_layer_filter(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(layerId, this),
+        ByteStructs.bufferViewPointer(filter, this),
+        completion,
       )
     }
   }
@@ -1277,13 +1204,11 @@ private constructor(
   public actual fun clearLayerFilter(layerId: String): Deferred<CommandCompletion> =
     command { completion ->
       memScoped {
-        Status.check(
-          mln_map_set_layer_filter(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            null,
-            completion,
-          )
+        mln_map_set_layer_filter(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          null,
+          completion,
         )
       }
     }
@@ -1306,13 +1231,11 @@ private constructor(
     sourceLayer: String,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_layer_source_layer(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          CoreStructs.stringView(sourceLayer, this),
-          completion,
-        )
+      mln_map_set_layer_source_layer(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(layerId, this),
+        CoreStructs.stringView(sourceLayer, this),
+        completion,
       )
     }
   }
@@ -1335,13 +1258,11 @@ private constructor(
     sourceId: String,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_layer_source_id(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          CoreStructs.stringView(sourceId, this),
-          completion,
-        )
+      mln_map_set_layer_source_id(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(layerId, this),
+        CoreStructs.stringView(sourceId, this),
+        completion,
       )
     }
   }
@@ -1362,13 +1283,11 @@ private constructor(
   public actual fun setLayerMinZoom(layerId: String, minZoom: Double): Deferred<CommandCompletion> =
     command { completion ->
       memScoped {
-        Status.check(
-          mln_map_set_layer_min_zoom(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            minZoom,
-            completion,
-          )
+        mln_map_set_layer_min_zoom(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          minZoom,
+          completion,
         )
       }
     }
@@ -1376,13 +1295,11 @@ private constructor(
   public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double): Deferred<CommandCompletion> =
     command { completion ->
       memScoped {
-        Status.check(
-          mln_map_set_layer_max_zoom(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            maxZoom,
-            completion,
-          )
+        mln_map_set_layer_max_zoom(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          maxZoom,
+          completion,
         )
       }
     }
@@ -1392,23 +1309,21 @@ private constructor(
     visibility: StyleLayerVisibility,
   ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
-      Status.check(
-        mln_map_set_layer_visibility(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          visibility.nativeValue.toUInt(),
-          completion,
-        )
+      mln_map_set_layer_visibility(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(layerId, this),
+        visibility.nativeValue.toUInt(),
+        completion,
       )
     }
   }
 
   public actual fun requestRepaint(): Deferred<CommandCompletion> = command { completion ->
-    Status.check(mln_map_request_repaint(state.requireLive().rawHandleValue, completion))
+    mln_map_request_repaint(state.requireLive().rawHandleValue, completion)
   }
 
   public actual fun requestStillImage(): Deferred<CommandCompletion> = command { completion ->
-    Status.check(mln_map_request_still_image(state.requireLive().rawHandleValue, completion))
+    mln_map_request_still_image(state.requireLive().rawHandleValue, completion)
   }
 
   public actual fun snapshot(): MapSnapshot = memScoped {
@@ -1426,6 +1341,8 @@ private constructor(
       value.fully_loaded,
       value.rendering_stats_view_enabled,
       value.repaint_demand,
+      value.gesture_in_progress,
+      RuntimeEventMask(value.event_mask.toLong()),
       value.latest_render_update_generation.toLong(),
       MapStructs.tileOptions(value.tile),
       MapStructs.boundOptions(value.bounds),
@@ -1435,59 +1352,49 @@ private constructor(
 
   public actual fun setDebugOptions(options: Set<DebugOption>): Deferred<CommandCompletion> =
     command { completion ->
-      Status.check(
-        mln_map_set_debug_options(
-          state.requireLive().rawHandleValue,
-          MapStructs.debugOptionMask(options),
-          completion,
-        )
+      mln_map_set_debug_options(
+        state.requireLive().rawHandleValue,
+        MapStructs.debugOptionMask(options),
+        completion,
       )
     }
 
   public actual fun setRenderingStatsViewEnabled(enabled: Boolean): Deferred<CommandCompletion> =
     command { completion ->
-      Status.check(
-        mln_map_set_rendering_stats_view_enabled(
-          state.requireLive().rawHandleValue,
-          enabled,
-          completion,
-        )
+      mln_map_set_rendering_stats_view_enabled(
+        state.requireLive().rawHandleValue,
+        enabled,
+        completion,
       )
     }
 
   public actual fun setViewportOptions(options: ViewportOptions): Deferred<CommandCompletion> =
     memScoped {
       command { completion ->
-        Status.check(
-          mln_map_set_viewport_options(
-            state.requireLive().rawHandleValue,
-            MapStructs.viewportOptions(options, this),
-            completion,
-          )
+        mln_map_set_viewport_options(
+          state.requireLive().rawHandleValue,
+          MapStructs.viewportOptions(options, this),
+          completion,
         )
       }
     }
 
   public actual fun setTileOptions(options: TileOptions): Deferred<CommandCompletion> = memScoped {
     command { completion ->
-      Status.check(
-        mln_map_set_tile_options(
-          state.requireLive().rawHandleValue,
-          MapStructs.tileOptions(options, this),
-          completion,
-        )
+      mln_map_set_tile_options(
+        state.requireLive().rawHandleValue,
+        MapStructs.tileOptions(options, this),
+        completion,
       )
     }
   }
 
   public actual fun setBounds(options: BoundOptions): Deferred<CommandCompletion> = memScoped {
     command { completion ->
-      Status.check(
-        mln_map_set_bounds(
-          state.requireLive().rawHandleValue,
-          MapStructs.boundOptions(options, this),
-          completion,
-        )
+      mln_map_set_bounds(
+        state.requireLive().rawHandleValue,
+        MapStructs.boundOptions(options, this),
+        completion,
       )
     }
   }
@@ -1495,15 +1402,28 @@ private constructor(
   public actual fun setFreeCameraOptions(options: FreeCameraOptions): Deferred<CommandCompletion> =
     memScoped {
       command { completion ->
-        Status.check(
-          mln_map_set_free_camera_options(
-            state.requireLive().rawHandleValue,
-            MapStructs.freeCameraOptions(options, this),
-            completion,
-          )
+        mln_map_set_free_camera_options(
+          state.requireLive().rawHandleValue,
+          MapStructs.freeCameraOptions(options, this),
+          completion,
         )
       }
     }
+
+  public actual fun setProjectionMode(options: ProjectionModeOptions): Deferred<CommandCompletion> =
+    memScoped {
+      command { completion ->
+        mln_map_set_projection_mode(
+          state.requireLive().rawHandleValue,
+          MapStructs.projectionModeOptions(options, this),
+          completion,
+        )
+      }
+    }
+
+  public actual fun dumpDebugLogs(): Deferred<CommandCompletion> = command { completion ->
+    mln_map_dump_debug_logs(state.requireLive().rawHandleValue, completion)
+  }
 
   public actual fun resize(size: MapSize): Deferred<CommandCompletion> = memScoped {
     val extent = alloc<mln_logical_extent>()
@@ -1511,9 +1431,7 @@ private constructor(
     extent.height = size.height.toUInt()
     extent.scale_factor = size.scaleFactor
     command { completion ->
-      Status.check(
-        mln_map_resize(state.requireLive().rawHandleValue, extent.readValue(), completion)
-      )
+      mln_map_resize(state.requireLive().rawHandleValue, extent.readValue(), completion)
     }
   }
 
@@ -1529,39 +1447,11 @@ private constructor(
   public actual fun updateCamera(update: CameraUpdate): Deferred<CommandCompletion> = memScoped {
     val nativeUpdate = mln_camera_update_default().getPointer(this)
     nativeUpdate.pointed.mode = update.mode.nativeValue.toUInt()
-    val camera = MapStructs.cameraOptions(update.camera, this).pointed
-    nativeUpdate.pointed.camera.size = camera.size
-    nativeUpdate.pointed.camera.fields = camera.fields
-    nativeUpdate.pointed.camera.latitude = camera.latitude
-    nativeUpdate.pointed.camera.longitude = camera.longitude
-    nativeUpdate.pointed.camera.center_altitude = camera.center_altitude
-    nativeUpdate.pointed.camera.padding.top = camera.padding.top
-    nativeUpdate.pointed.camera.padding.left = camera.padding.left
-    nativeUpdate.pointed.camera.padding.bottom = camera.padding.bottom
-    nativeUpdate.pointed.camera.padding.right = camera.padding.right
-    nativeUpdate.pointed.camera.anchor.x = camera.anchor.x
-    nativeUpdate.pointed.camera.anchor.y = camera.anchor.y
-    nativeUpdate.pointed.camera.zoom = camera.zoom
-    nativeUpdate.pointed.camera.bearing = camera.bearing
-    nativeUpdate.pointed.camera.pitch = camera.pitch
-    nativeUpdate.pointed.camera.roll = camera.roll
-    nativeUpdate.pointed.camera.field_of_view = camera.field_of_view
-    val animation = MapStructs.animationOptions(update.animation, this).pointed
-    nativeUpdate.pointed.animation.size = animation.size
-    nativeUpdate.pointed.animation.fields = animation.fields
-    nativeUpdate.pointed.animation.duration_ms = animation.duration_ms
-    nativeUpdate.pointed.animation.velocity = animation.velocity
-    nativeUpdate.pointed.animation.min_zoom = animation.min_zoom
-    nativeUpdate.pointed.animation.easing.x1 = animation.easing.x1
-    nativeUpdate.pointed.animation.easing.y1 = animation.easing.y1
-    nativeUpdate.pointed.animation.easing.x2 = animation.easing.x2
-    nativeUpdate.pointed.animation.easing.y2 = animation.easing.y2
-    nativeUpdate.pointed.animation.transition_id = animation.transition_id
+    MapStructs.writeCameraOptions(nativeUpdate.pointed.camera, update.camera)
+    MapStructs.writeAnimationOptions(nativeUpdate.pointed.animation, update.animation)
     nativeUpdate.pointed.gesture_phase = update.gesturePhase.nativeValue.toUInt()
     command { completion ->
-      Status.check(
-        mln_map_update_camera(state.requireLive().rawHandleValue, nativeUpdate, completion)
-      )
+      mln_map_update_camera(state.requireLive().rawHandleValue, nativeUpdate, completion)
     }
   }
 
@@ -1576,22 +1466,14 @@ private constructor(
       nativeDelta.pointed.anchor.x = it.x
       nativeDelta.pointed.anchor.y = it.y
     }
-    val animation = MapStructs.animationOptions(delta.animation, this).pointed
-    nativeDelta.pointed.animation.size = animation.size
-    nativeDelta.pointed.animation.fields = animation.fields
-    nativeDelta.pointed.animation.duration_ms = animation.duration_ms
-    nativeDelta.pointed.animation.velocity = animation.velocity
-    nativeDelta.pointed.animation.min_zoom = animation.min_zoom
-    nativeDelta.pointed.animation.easing.x1 = animation.easing.x1
-    nativeDelta.pointed.animation.easing.y1 = animation.easing.y1
-    nativeDelta.pointed.animation.easing.x2 = animation.easing.x2
-    nativeDelta.pointed.animation.easing.y2 = animation.easing.y2
-    nativeDelta.pointed.animation.transition_id = animation.transition_id
+    MapStructs.writeAnimationOptions(nativeDelta.pointed.animation, delta.animation)
     command { completion ->
-      Status.check(
-        mln_map_apply_camera_delta(state.requireLive().rawHandleValue, nativeDelta, completion)
-      )
+      mln_map_apply_camera_delta(state.requireLive().rawHandleValue, nativeDelta, completion)
     }
+  }
+
+  public actual fun cancelTransitions(): Deferred<CommandCompletion> = command { completion ->
+    mln_map_cancel_transitions(state.requireLive().rawHandleValue, completion)
   }
 
   public actual fun queryCamera(): Deferred<CameraSnapshot> =
@@ -1602,6 +1484,90 @@ private constructor(
       },
       { completion -> mln_map_camera_query(state.requireLive().rawHandleValue, completion) },
     )
+
+  public actual fun cameraForLatLngBounds(
+    bounds: LatLngBounds,
+    fitOptions: CameraFitOptions?,
+  ): Deferred<CameraOptions> = memScoped {
+    val nativeBounds = CoreStructs.latLngBounds(bounds)
+    val nativeFitOptions = fitOptions?.let { MapStructs.cameraFitOptions(it, this) }
+    CompletionBridge.submit(
+      ::cameraOptionsCompletion,
+      { completion ->
+        mln_map_camera_for_lat_lng_bounds(
+          state.requireLive().rawHandleValue,
+          nativeBounds,
+          nativeFitOptions,
+          completion,
+        )
+      },
+    )
+  }
+
+  public actual fun cameraForLatLngs(
+    coordinates: List<LatLng>,
+    fitOptions: CameraFitOptions?,
+  ): Deferred<CameraOptions> {
+    val coordinateSnapshot = coordinates.toList()
+    return memScoped {
+      val nativeCoordinates = CoreStructs.latLngArray(coordinateSnapshot, this)
+      val nativeFitOptions = fitOptions?.let { MapStructs.cameraFitOptions(it, this) }
+      CompletionBridge.submit(
+        ::cameraOptionsCompletion,
+        { completion ->
+          mln_map_camera_for_lat_lngs(
+            state.requireLive().rawHandleValue,
+            nativeCoordinates,
+            coordinateSnapshot.size.toCSize(),
+            nativeFitOptions,
+            completion,
+          )
+        },
+      )
+    }
+  }
+
+  public actual fun cameraForGeometry(
+    geometry: ByteArray,
+    fitOptions: CameraFitOptions?,
+  ): Deferred<CameraOptions> = memScoped {
+    val nativeGeometry = ByteStructs.bufferView(geometry, this)
+    val nativeFitOptions = fitOptions?.let { MapStructs.cameraFitOptions(it, this) }
+    CompletionBridge.submit(
+      ::cameraOptionsCompletion,
+      { completion ->
+        mln_map_camera_for_geometry(
+          state.requireLive().rawHandleValue,
+          nativeGeometry,
+          nativeFitOptions,
+          completion,
+        )
+      },
+    )
+  }
+
+  public actual fun latLngBoundsForCamera(camera: CameraOptions): Deferred<LatLngBounds> =
+    latLngBoundsForCamera(camera, unwrapped = false)
+
+  public actual fun latLngBoundsForCameraUnwrapped(camera: CameraOptions): Deferred<LatLngBounds> =
+    latLngBoundsForCamera(camera, unwrapped = true)
+
+  private fun latLngBoundsForCamera(
+    camera: CameraOptions,
+    unwrapped: Boolean,
+  ): Deferred<LatLngBounds> = memScoped {
+    val nativeCamera = MapStructs.cameraOptions(camera, this)
+    CompletionBridge.submit(
+      { result ->
+        CoreStructs.latLngBounds(result.pointed.value!!.reinterpret<mln_lat_lng_bounds>().pointed)
+      },
+      { completion ->
+        val map = state.requireLive().rawHandleValue
+        if (unwrapped) mln_map_lat_lng_bounds_for_camera_unwrapped(map, nativeCamera, completion)
+        else mln_map_lat_lng_bounds_for_camera(map, nativeCamera, completion)
+      },
+    )
+  }
 
   public actual fun pixelForLatLng(coordinate: LatLng): Deferred<ScreenPoint> =
     CompletionBridge.submit(
@@ -1742,7 +1708,7 @@ private constructor(
   ): RenderSessionAttachment = RenderSessionHandle.attachOpenGLSurface(this, descriptor, options)
 
   public actual fun createProjection(): Deferred<MapProjectionHandle> =
-    CompletionBridge.submit(
+    CompletionBridge.submitOwned(
       { result ->
         MapProjectionHandle(
           result.pointed.value!!
@@ -1752,11 +1718,14 @@ private constructor(
             .asHandle("mln_map_projection_create", ::mapProjectionHandle)
         )
       },
+      MapProjectionHandle::close,
       { completion -> mln_map_projection_create(state.requireLive().rawHandleValue, completion) },
     )
 
   public actual fun close(): Deferred<Unit> {
-    if (!state.beginClose()) return kotlinx.coroutines.CompletableDeferred(Unit)
+    val claim = CompletableDeferred<Unit>()
+    val retirement = state.claimRetirement(claim)
+    if (retirement !== claim) return retirement
     val completed =
       try {
         CompletionBridge.unitChecked { completion ->
@@ -1764,10 +1733,14 @@ private constructor(
         }
       } catch (error: Throwable) {
         state.abortClose()
+        state.abandonRetirement(claim)
         throw error
       }
     state.completeClose { runtime.unregisterMap(this) }
-    return completed
+    completed.invokeOnCompletion { failure ->
+      if (failure == null) claim.complete(Unit) else claim.completeExceptionally(failure)
+    }
+    return claim
   }
 
   public actual val isClosed: Boolean
@@ -1782,7 +1755,7 @@ private constructor(
   public actual companion object {
     public actual fun create(runtime: RuntimeHandle, options: MapOptions): Deferred<MapHandle> =
       memScoped {
-        CompletionBridge.submit(
+        CompletionBridge.submitOwned(
           { result ->
             MapHandle(
                 runtime,
@@ -1791,10 +1764,10 @@ private constructor(
                   .pointed
                   .value
                   .asHandle("mln_map_create", ::mapHandle),
-                options.eventMask,
               )
               .also(runtime::registerMap)
           },
+          { dropped -> dropped.close() },
           { completion ->
             mln_map_create(
               runtime.nativeHandle().rawHandleValue,
@@ -1841,6 +1814,19 @@ private fun bufferCompletion(result: CPointer<mln_completion_result>): ByteArray
 }
 
 @OptIn(ExperimentalForeignApi::class)
+private fun cameraOptionsCompletion(result: CPointer<mln_completion_result>): CameraOptions =
+  MapStructs.cameraOptions(result.pointed.value!!.reinterpret<mln_camera_options>().pointed)
+
+@OptIn(ExperimentalForeignApi::class)
+private fun optionalTextCompletion(result: CPointer<mln_completion_result>): String? =
+  bufferCompletion(result)?.decodeToString()
+
+/** Reads one buffer view that reports an absent value as an empty view. */
+@OptIn(ExperimentalForeignApi::class)
+private fun optionalStringView(view: mln_buffer_view): String? =
+  CoreStructs.stringView(view).ifEmpty { null }
+
+@OptIn(ExperimentalForeignApi::class)
 private fun stringViewsCompletion(result: CPointer<mln_completion_result>): List<String> {
   val count = result.pointed.value_count.toULong()
   if (count == 0uL) return emptyList()
@@ -1851,8 +1837,5 @@ private fun stringViewsCompletion(result: CPointer<mln_completion_result>): List
 
 @OptIn(ExperimentalForeignApi::class)
 private inline fun command(
-  crossinline call: (CPointer<mln_completion>) -> Unit
-): Deferred<CommandCompletion> = CompletionBridge.command {
-  call(it)
-  0
-}
+  crossinline call: (CPointer<mln_completion>) -> Int
+): Deferred<CommandCompletion> = CompletionBridge.command { call(it) }

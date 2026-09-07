@@ -22,8 +22,8 @@ other field at its committed value.
 
 ## Choose how the camera moves
 
-One command, `mln_map_update_camera`, applies that camera. Its update mode
-selects the timing, and the three modes differ only in timing.
+One command, `mln_map_update_camera`, applies that camera, and its update mode
+selects the timing.
 
 Jump mode applies the camera immediately. Use it for the first position
 of a session, a position restored from saved state, or a camera that the host
@@ -56,10 +56,9 @@ A camera update takes a destination. Gestures instead provide relative
 input: a drag provides a distance, and a pinch provides a scale factor and a
 screen position. Relative moves apply those values to the current camera.
 
-Set the gesture flag when the interaction starts, and clear it when the
-interaction ends. While the flag is set, a drag across the antimeridian
-continues in the same direction. Cancel a running transition when the gesture
-starts to give the gesture sole control of the camera.
+Submit the begin phase when the interaction starts and the end phase when it
+finishes. While a gesture is open, a drag across the antimeridian continues in
+the same direction, and the map snapshot reports the gesture as in progress.
 
 <Code code={region(gestureSnippet, "bracket")} lang="c" title="camera-gesture.c" />
 
@@ -74,8 +73,10 @@ moves around it.
 
 <Code code={region(gestureSnippet, "pinch")} lang="c" title="camera-gesture.c" />
 
-Clear the flag for both completed and cancelled gestures. The animated variants
-continue the gesture's momentum and take the same animation options as an ease.
+Submit the end phase for a completed gesture and the cancel phase for a
+cancelled one; the cancel phase also stops a running transition. The animated
+variants continue the gesture's momentum and take the same animation options as
+an ease.
 
 <Code code={region(gestureSnippet, "release")} lang="c" title="camera-gesture.c" />
 
@@ -110,3 +111,6 @@ it from the runtime that owns the map, as described in
 The event identifies the transition but has no completion reason. To distinguish
 completion from cancellation, compare the resulting camera with the requested
 camera.
+
+`mln_map_cancel_transitions` stops every transition running when it commits, and
+a cancelled transition reports its end through the same event.

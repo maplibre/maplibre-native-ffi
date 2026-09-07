@@ -55,7 +55,7 @@ internal fun firstFeature(collection: ByteArray): ByteArray? =
 internal fun numberMember(value: ByteArray, key: String): Double? =
   rawMember(value, key)?.decodeToString()?.toDoubleOrNull()
 
-internal fun stringMember(value: ByteArray, key: String): String? {
+private fun stringMember(value: ByteArray, key: String): String? {
   val encoded = rawMember(value, key)?.decodeToString() ?: return null
   if (encoded.length < 2 || encoded.first() != '"' || encoded.last() != '"') return null
   return encoded.substring(1, encoded.lastIndex)

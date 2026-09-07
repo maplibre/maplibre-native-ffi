@@ -15,38 +15,6 @@ const _createLeakToken = raw.mln_adapter_handle_leak_token_create;
 
 const _destroyLeakToken = raw.mln_adapter_handle_leak_token_destroy;
 
-/// Attaches the binding's non-owning native-handle leak diagnostic to [owner].
-final class NativeLeakReporter {
-  /// Creates a live leak report token.
-  NativeLeakReporter(Finalizable owner, String typeName, NativeHandle handle) {
-    final nativeTypeName = typeName.toNativeUtf8().cast<Char>();
-    try {
-      final token = _createLeakToken(nativeTypeName, handle.raw);
-      if (token == nullptr) {
-        return;
-      }
-      _token = token;
-      _leakReporter.attach(owner, token, detach: _detachToken);
-    } finally {
-      calloc.free(nativeTypeName);
-    }
-  }
-
-  final Object _detachToken = Object();
-  Pointer<Void>? _token;
-
-  /// Marks the native lifetime as explicitly released.
-  void close() {
-    final token = _token;
-    if (token == null) {
-      return;
-    }
-    _leakReporter.detach(_detachToken);
-    _destroyLeakToken(token);
-    _token = null;
-  }
-}
-
 /// Close-once state for an owned native handle.
 final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   /// Creates state for a live native handle.
@@ -96,8 +64,9 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
 
   /// Releases the native handle asynchronously exactly once after success.
   ///
-  /// [close] starts before this returns, so a release that rejects on the
-  /// calling turn still leaves this state open for a later attempt.
+  /// [close] starts before this returns, and a release that fails reaches the
+  /// caller as an error on the returned future and leaves this state open for
+  /// a later attempt.
   Future<void> closeAsync(Future<void> Function(H) close) {
     if (_closed) {
       return Future.value();
@@ -107,7 +76,8 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
       return pending;
     }
     // The completer holds the shared future before the release runs, because a
-    // rejected release reports its failure while `close` is still on the stack.
+    // rejected release reports its failure while `close` is still on the
+    // stack.
     final completer = Completer<void>();
     _closeFuture = completer.future;
     _runClose(close).then(

@@ -6,56 +6,54 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class HandleLeakCleanerTest {
   // BND-044. The cleaner reports; explicit close keeps native failures observable.
 
   @Test
-  fun unreachableHandleReportsLeakWithoutExplicitRelease(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      val reports = CopyOnWriteArrayList<String>()
+  fun unreachableHandleReportsLeakWithoutExplicitRelease(): Unit = runSuspendTest {
+    val reports = CopyOnWriteArrayList<String>()
 
-      registerUnreachableHandle(reports)
+    registerUnreachableHandle(reports)
 
-      assertTrue(awaitReport(reports), "expected the cleaner to report the unreachable handle")
-      assertEquals(
-        "Leaked RuntimeHandle native handle 0x1234; close it explicitly.",
-        reports.single(),
-      )
-    }
-
-  @Test
-  fun releasedHandleStaysSilentWhenCollected(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      val reports = CopyOnWriteArrayList<String>()
-      val liveReports = CopyOnWriteArrayList<String>()
-
-      registerReleasedHandle(reports)
-      // A second unreleased registration proves the cleaner ran, so the silence above is a
-      // real result.
-      registerUnreachableHandle(liveReports)
-
-      assertTrue(awaitReport(liveReports), "expected the cleaner to run")
-      assertEquals(emptyList(), reports)
-    }
+    assertTrue(awaitReport(reports), "expected the cleaner to report the unreachable handle")
+    assertEquals(
+      "Leaked RuntimeHandle native handle 0x1234; close it explicitly.",
+      reports.single(),
+    )
+  }
 
   @Test
-  fun blockedLeakReportDoesNotBlockNativeReclamationWorker(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      val reportStarted = CountDownLatch(1)
-      val unblockReport = CountDownLatch(1)
-      val reclaimed = CountDownLatch(1)
+  fun releasedHandleStaysSilentWhenCollected(): Unit = runSuspendTest {
+    val reports = CopyOnWriteArrayList<String>()
+    val liveReports = CopyOnWriteArrayList<String>()
 
-      registerBlockingLeakReport(reportStarted, unblockReport)
-      UnreachableActions.register(Any(), reclaimed::countDown)
+    registerReleasedHandle(reports)
+    // A second unreleased registration proves the cleaner ran, so the silence above is a
+    // real result.
+    registerUnreachableHandle(liveReports)
 
-      try {
-        assertTrue(awaitAction(reportStarted), "expected the leak-report worker to start")
-        assertTrue(awaitAction(reclaimed), "expected native reclamation to use another worker")
-      } finally {
-        unblockReport.countDown()
-      }
+    assertTrue(awaitReport(liveReports), "expected the cleaner to run")
+    assertEquals(emptyList(), reports)
+  }
+
+  @Test
+  fun blockedLeakReportDoesNotBlockNativeReclamationWorker(): Unit = runSuspendTest {
+    val reportStarted = CountDownLatch(1)
+    val unblockReport = CountDownLatch(1)
+    val reclaimed = CountDownLatch(1)
+
+    registerBlockingLeakReport(reportStarted, unblockReport)
+    UnreachableActions.register(Any(), reclaimed::countDown)
+
+    try {
+      assertTrue(awaitAction(reportStarted), "expected the leak-report worker to start")
+      assertTrue(awaitAction(reclaimed), "expected native reclamation to use another worker")
+    } finally {
+      unblockReport.countDown()
     }
+  }
 
   /** Registers a handle that is unreachable once this call returns. */
   private fun registerUnreachableHandle(reports: MutableList<String>) {

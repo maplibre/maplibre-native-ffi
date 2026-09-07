@@ -10,9 +10,10 @@ from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
     RED_BACKGROUND_STYLE_JSON,
     RED_PIXEL,
+    assert_attached_session_shape,
     close_session,
-    finish_attach,
     finish_render_operation,
+    map_extent,
     render_until,
     render_until_update,
     request_and_finish_frame,
@@ -121,16 +122,6 @@ def _is_painted_red(texture: MetalBorrowedTexture) -> bool:
     return texture.read_rgba() == RED_PIXEL * (texture.width * texture.height)
 
 
-def _assert_public_session_shape(session: render.RenderSessionHandle) -> None:
-    assert isinstance(session, render.RenderSessionHandle)
-    assert session.closed is False
-    assert session.snapshot.state == render.RenderSessionState.ATTACHED
-    assert isinstance(session.capabilities, render.RenderSessionCapabilities)
-    assert callable(session.request_frame)
-    assert callable(session.drain_frame_results)
-    assert callable(session.close)
-
-
 def _descriptor_snapshot(
     descriptor: render.MetalBorrowedTextureDescriptor,
 ) -> tuple[object, ...]:
@@ -169,8 +160,8 @@ def test_metal_surface_attach_reports_public_render_session_shape() -> None:
     ):
         session, attach = map_handle.attach_metal_surface(surface.descriptor())
         try:
-            finish_attach(session, attach)
-            _assert_public_session_shape(session)
+            finish_render_operation(session, attach)
+            assert_attached_session_shape(session)
 
             map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
             render_until_update(runtime, session)
@@ -193,8 +184,8 @@ def test_metal_borrowed_texture_attach_reports_public_render_session_shape() -> 
         ):
             session, attach = map_handle.attach_metal_borrowed_texture(descriptor)
             try:
-                finish_attach(session, attach)
-                _assert_public_session_shape(session)
+                finish_render_operation(session, attach)
+                assert_attached_session_shape(session)
 
                 map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
                 render_until_update(runtime, session)
@@ -222,8 +213,8 @@ def test_metal_borrowed_texture_session_close_preserves_caller_resources() -> No
             ).result(timeout=5) as map_handle,
         ):
             session, attach = map_handle.attach_metal_borrowed_texture(descriptor)
-            finish_attach(session, attach)
-            _assert_public_session_shape(session)
+            finish_render_operation(session, attach)
+            assert_attached_session_shape(session)
             close_session(session)
 
         assert _descriptor_snapshot(descriptor) == before_descriptor
@@ -254,7 +245,7 @@ def test_metal_borrowed_texture_set_target_renders_into_the_replacement() -> Non
             ).result(timeout=5) as map_handle,
         ):
             session, attach = map_handle.attach_metal_borrowed_texture(descriptor)
-            finish_attach(session, attach)
+            finish_render_operation(session, attach)
             try:
                 map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode())
                 render_until(
@@ -279,9 +270,10 @@ def test_metal_borrowed_texture_set_target_renders_into_the_replacement() -> Non
                             replacement.descriptor()
                         ),
                     )
-                    map_handle.resize(96, 48, 1.0)
-                    runtime.barrier().result(timeout=5)
-
+                    # A retarget replaces the graphics resource only, and a
+                    # caller-owned texture has no session resize, so the map
+                    # takes the replacement extent from a map resize.
+                    map_handle.resize(96, 48, 1.0).result(timeout=5)
                     # The session kept its renderer and paints the
                     # texture it was handed, at the extent handed with
                     # it, once the map has caught up to that extent.
@@ -291,11 +283,7 @@ def test_metal_borrowed_texture_set_target_renders_into_the_replacement() -> Non
                         lambda: _is_painted_red(replacement),
                         "the replacement texture was never rendered into",
                     )
-                    assert map_handle.get_size() == (
-                        96,
-                        48,
-                        pytest.approx(1.0),
-                    )
+                    assert map_extent(map_handle) == (96, 48, pytest.approx(1.0))
             finally:
                 close_session(session)
 
@@ -317,7 +305,7 @@ def test_metal_surface_set_target_presents_through_a_new_surface() -> None:
         ).result(timeout=5) as map_handle,
     ):
         session, attach = map_handle.attach_metal_surface(surface.descriptor())
-        finish_attach(session, attach)
+        finish_render_operation(session, attach)
         try:
             map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
             render_until_update(runtime, session)
@@ -326,16 +314,18 @@ def test_metal_surface_set_target_presents_through_a_new_surface() -> None:
                 finish_render_operation(
                     session, session.set_metal_surface_target(replacement.descriptor())
                 )
-                map_handle.resize(48, 24, 1.0)
-                runtime.barrier().result(timeout=5)
-
+                # A retarget replaces the graphics resource only, so the map
+                # takes the new extent from the session resize that follows.
+                finish_render_operation(
+                    session, session.resize(replacement.descriptor().extent)
+                )
                 render_until(
                     runtime,
                     session,
-                    lambda: map_handle.get_size() == (48, 24, pytest.approx(1.0)),
+                    lambda: map_extent(map_handle) == (48, 24, pytest.approx(1.0)),
                     "the map never took the replacement surface extent",
                 )
-                assert session.snapshot.state == render.RenderSessionState.ATTACHED
+                assert session.snapshot().state == render.RenderSessionState.ATTACHED
                 assert (
                     request_and_finish_frame(session).disposition
                     == render.RenderResult.RENDERED
@@ -360,7 +350,7 @@ def test_metal_set_target_reports_unsupported_for_another_target_kind() -> None:
         ).result(timeout=5) as map_handle,
     ):
         session, attach = map_handle.attach_metal_borrowed_texture(texture.descriptor())
-        finish_attach(session, attach)
+        finish_render_operation(session, attach)
         try:
             with pytest.raises(mln.UnsupportedFeatureError) as raised:
                 finish_render_operation(
@@ -374,7 +364,7 @@ def test_metal_set_target_reports_unsupported_for_another_target_kind() -> None:
             close_session(session)
 
         session, attach = map_handle.attach_metal_surface(surface.descriptor())
-        finish_attach(session, attach)
+        finish_render_operation(session, attach)
         try:
             with pytest.raises(mln.UnsupportedFeatureError) as raised:
                 finish_render_operation(

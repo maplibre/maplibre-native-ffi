@@ -100,7 +100,6 @@ def wait_for_runtime_event(
     iterations: int = 5000,
 ) -> mln.RuntimeEvent:
     for _ in range(iterations):
-        time.sleep(0.001)
         for event in runtime.drain_events().events:
             if event.event_type == event_type:
                 return event
@@ -108,23 +107,16 @@ def wait_for_runtime_event(
     raise AssertionError(f"runtime event {event_type!r} was not observed")
 
 
-def finish_attach(
+def drain_frame_results(
     session: render.RenderSessionHandle,
-    operation: Future[None],
-    *,
-    iterations: int = 5000,
-) -> None:
-    """Complete attachment through its selected native driver."""
-    if session.snapshot.driver == render.RenderDriver.CALLER_GRAPHICS_THREAD:
-        for _ in range(iterations):
-            session.service_driver_work(16)
-            if operation.done():
-                break
-            time.sleep(0.001)
-    else:
-        operation.result(timeout=5)
-        return
-    operation.result(timeout=0)
+) -> list[render.RenderFrameResult]:
+    """Drain terminal frame results, reading an empty queue as no results."""
+    try:
+        return session.drain_frame_results()
+    except mln.NotReadyError:
+        # An empty queue reports NOT_READY, which is a poll result and not a
+        # failure.
+        return []
 
 
 def request_and_finish_frame(
@@ -134,41 +126,181 @@ def request_and_finish_frame(
     flags: render.FrameDemandFlag = render.FrameDemandFlag.IF_NEEDED,
     iterations: int = 5000,
 ) -> render.RenderFrameResult:
-    """Request one frame and return its owned terminal result.
+    """Request one frame and return the terminal result for its own token.
 
     Clearing ``IF_NEEDED`` renders even when nothing newer is pending, which
     is how a test gets a fresh frame out of a settled style.
     """
     session.request_frame(render.FrameDemand(flags=flags, token=token))
     for _ in range(iterations):
-        if session.snapshot.driver == render.RenderDriver.CALLER_GRAPHICS_THREAD:
+        if session.snapshot().driver == render.RenderDriver.CALLER_GRAPHICS_THREAD:
             session.service_driver_work(16)
-        try:
-            results = session.drain_frame_results()
-        except mln.NotReadyError:
-            results = []
-        if results:
-            return results[-1]
+        for result in drain_frame_results(session):
+            if result.token == token:
+                return result
         time.sleep(0.001)
-    raise AssertionError("frame demand did not produce a terminal result")
+    raise AssertionError(f"frame demand {token} did not produce a terminal result")
 
 
-def finish_render_operation(
+def finish_render_operation[T](
     session: render.RenderSessionHandle,
-    operation: Future[object],
+    operation: Future[T],
     *,
-    return_result: bool = False,
     iterations: int = 5000,
-) -> object:
+) -> T:
     """Complete renderer-affine work through either driver."""
     for _ in range(iterations):
-        if session.snapshot.driver == render.RenderDriver.CALLER_GRAPHICS_THREAD:
+        if session.snapshot().driver == render.RenderDriver.CALLER_GRAPHICS_THREAD:
             session.service_driver_work(16)
         if operation.done():
-            result = operation.result(timeout=0)
-            return result if return_result else None
+            return operation.result(timeout=0)
         time.sleep(0.001)
     raise AssertionError("render operation did not complete")
+
+
+def assert_attached_session_shape(session: render.RenderSessionHandle) -> None:
+    """Assert the public shape an attached session reports to a host."""
+    assert isinstance(session, render.RenderSessionHandle)
+    assert session.closed is False
+    assert session.snapshot().state == render.RenderSessionState.ATTACHED
+    assert isinstance(session.capabilities(), render.RenderSessionCapabilities)
+
+
+def map_extent(map_handle: mln.MapHandle) -> tuple[int, int, float]:
+    """Return the published logical extent of a map."""
+    snapshot = map_handle.snapshot()
+    return snapshot.width, snapshot.height, snapshot.scale_factor
+
+
+def assert_invalid_state(call: Callable[[], object]) -> None:
+    """Assert that a call reports the invalid-state category."""
+    with pytest.raises(mln.InvalidStateError) as raised:
+        call()
+    assert raised.value.status == mln.MaplibreStatus.INVALID_STATE
+
+
+def read_texture_info(
+    runtime: mln.RuntimeHandle,
+    map_handle: mln.MapHandle,
+    session: render.RenderSessionHandle,
+) -> render.TextureImageInfo:
+    """Render one update and return the readback metadata for that frame."""
+    map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
+    render_until_update(runtime, session)
+    image = finish_render_operation(session, session.read_premultiplied_rgba8())
+    return image.info
+
+
+def assert_frame_demands_report_their_own_tokens(
+    session: render.RenderSessionHandle,
+) -> None:
+    """Two outstanding demands report one terminal result each, in order."""
+    first, second = 4001, 4002
+    session.request_frame(
+        render.FrameDemand(flags=render.FrameDemandFlag(0), token=first)
+    )
+    session.request_frame(
+        render.FrameDemand(flags=render.FrameDemandFlag(0), token=second)
+    )
+
+    tokens: list[int] = []
+    for _ in range(5000):
+        if session.snapshot().driver == render.RenderDriver.CALLER_GRAPHICS_THREAD:
+            session.service_driver_work(16)
+        tokens.extend(result.token for result in drain_frame_results(session))
+        if len(tokens) >= 2:
+            break
+        time.sleep(0.001)
+    assert tokens == [first, second]
+
+
+def assert_texture_ring_exhaustion_reports_not_ready(
+    session: render.RenderSessionHandle,
+    acquire: Callable[[], object],
+) -> None:
+    """Acquiring every ring slot leaves the next acquire with nothing to lease."""
+    depth = session.capabilities().texture_ring_depth
+    assert depth >= 1
+    leases: list[object] = []
+    try:
+        for slot in range(depth):
+            for _ in range(5000):
+                request_and_finish_frame(
+                    session, token=5000 + slot, flags=render.FrameDemandFlag(0)
+                )
+                try:
+                    leases.append(acquire())
+                    break
+                except mln.NotReadyError:
+                    time.sleep(0.001)
+            else:
+                raise AssertionError(f"ring slot {slot} never held a frame")
+        assert session.snapshot().acquired_frame_count == depth
+
+        # Every slot is leased out, so the next acquire reports NOT_READY
+        # instead of waiting for one to come back.
+        with pytest.raises(mln.NotReadyError) as raised:
+            acquire()
+        assert raised.value.status == mln.MaplibreStatus.NOT_READY
+
+        # Held leases stay readable while the ring is exhausted.
+        for lease in leases:
+            assert lease.result.disposition == render.RenderResult.RENDERED
+    finally:
+        for lease in leases:
+            lease.release()
+    assert session.snapshot().acquired_frame_count == 0
+
+
+def assert_session_maintenance_commands_round_trip(
+    session: render.RenderSessionHandle,
+) -> None:
+    """Renderer-affine maintenance commands each reach their completion."""
+    for operation in (
+        session.reduce_memory_use(),
+        session.clear_data(),
+        session.dump_debug_logs(),
+        session.barrier(),
+    ):
+        assert finish_render_operation(session, operation) is None
+
+    while drain_frame_results(session):
+        pass
+
+    # A barrier reports earlier accepted work and produces no frame result, so
+    # the drained queue stays empty and reports NOT_READY.
+    finish_render_operation(session, session.barrier())
+    with pytest.raises(mln.NotReadyError) as raised:
+        session.drain_frame_results()
+    assert raised.value.status == mln.MaplibreStatus.NOT_READY
+
+
+def assert_abandon_retires_the_session(
+    session: render.RenderSessionHandle,
+    map_handle: mln.MapHandle,
+) -> None:
+    """Abandonment retires a lost target without any graphics call."""
+    result = session.abandon()
+
+    assert isinstance(result, render.RenderAbandonResult)
+    assert result.disposition in {
+        render.RenderAbandonDisposition.CLEAN,
+        render.RenderAbandonDisposition.QUARANTINED,
+    }
+    assert result.quarantined_resource_count >= 0
+    assert session.snapshot().state == render.RenderSessionState.ABANDONED
+
+    # An abandoned session renders nothing more, and reports that state rather
+    # than reaching a target it no longer has.
+    assert_invalid_state(lambda: session.request_frame(render.FrameDemand()))
+    assert_invalid_state(lambda: session.resize(render.RenderTargetExtent(8, 8, 1.0)))
+
+    # The session still owns CPU-side state until it is destroyed, and the map
+    # retires once it is.
+    session.close()
+    assert session.closed
+    map_handle.close().result(timeout=10)
+    assert map_handle.closed
 
 
 def close_session(session: render.RenderSessionHandle) -> None:
@@ -212,7 +344,6 @@ def render_until(
 ) -> None:
     """Render until `condition` holds, failing with `description`."""
     for _ in range(iterations):
-        time.sleep(0.001)
         runtime.drain_events()
         request_and_finish_frame(session)
         if condition():
@@ -239,25 +370,18 @@ def wait_for_rendered_layer_feature(
     )
     options = query.RenderedFeatureQueryOptions(layer_ids=(layer_id,))
     for _ in range(iterations):
-        # Native execution advances independently; rendering remains host-driven.
-        time.sleep(0.001)
         runtime.drain_events()
         try:
             result = request_and_finish_frame(session)
             if result.disposition != render.RenderResult.RENDERED:
                 continue
             features = finish_render_operation(
-                session,
-                session.query_rendered_features(geometry, options),
-                return_result=True,
+                session, session.query_rendered_features(geometry, options)
             )
         except mln.InvalidStateError:
             features = []
-        assert isinstance(features, list)
         if features:
-            first = features[0]
-            assert isinstance(first, query.QueriedFeature)
-            return first
+            return features[0]
         time.sleep(0.001)
     raise AssertionError(f"rendered feature query for {layer_id} returned no features")
 
@@ -303,9 +427,7 @@ def single_cluster_leaf(
             "leaves",
             json.dumps({"limit": 1, "offset": offset}, separators=(",", ":")).encode(),
         ),
-        return_result=True,
     )
-    assert isinstance(leaves, bytes)
     collection = json.loads(leaves)
     assert len(collection["features"]) == 1
     return collection["features"][0]
@@ -372,9 +494,7 @@ def assert_cluster_feature_extensions(
         session.query_feature_extensions(
             "cluster-source", cluster.feature, "supercluster", "children", None
         ),
-        return_result=True,
     )
-    assert isinstance(children, bytes)
     assert json.loads(children)["features"]
 
     expansion_zoom = finish_render_operation(
@@ -382,9 +502,7 @@ def assert_cluster_feature_extensions(
         session.query_feature_extensions(
             "cluster-source", cluster.feature, "supercluster", "expansion-zoom", None
         ),
-        return_result=True,
     )
-    assert isinstance(expansion_zoom, bytes)
     assert isinstance(json.loads(expansion_zoom), int)
 
     # Native ignores limit and offset arguments of another type and falls back

@@ -14,7 +14,7 @@ func drainUntilEvent(
   let deadline = Date().addingTimeInterval(timeout)
   while Date() < deadline {
     try await runtime.barrier()
-    for event in try runtime.drainEvents().events where isMatch(event) {
+    for event in try runtime.drainEvents() where isMatch(event) {
       return event
     }
     try await Task<Never, Never>.sleep(nanoseconds: 1_000_000)
@@ -23,75 +23,64 @@ func drainUntilEvent(
   return nil
 }
 
-func rawCommandDisposition(_ completion: CommandCompletion) -> UInt32 {
-  switch completion.disposition {
-  case .committed: MLN_COMMAND_DISPOSITION_COMMITTED.rawValue
-  case .superseded: MLN_COMMAND_DISPOSITION_SUPERSEDED.rawValue
-  case .failed: MLN_COMMAND_DISPOSITION_FAILED.rawValue
-  case .cancelled: MLN_COMMAND_DISPOSITION_CANCELLED.rawValue
-  case let .unknown(raw): raw
-  }
-}
-
 func expectCommandFailure(_ completion: CommandCompletion, status: mln_status) {
   #expect(completion.disposition == .failed)
   #expect(completion.rawStatus == status.rawValue)
   #expect(!completion.diagnostic.isEmpty)
 }
 
-func commandDisposition(
-  _ completion: CommandCompletion,
-  runtime: RuntimeHandle
-) async throws -> UInt32? {
-  _ = runtime
-  return rawCommandDisposition(completion)
-}
-
-/// Drains until autonomous execution stops producing events.
-func drainUntilQuiet(
-  _ runtime: RuntimeHandle,
-  iterations: Int = 100
-) async throws {
-  for _ in 0 ..< iterations {
-    try await runtime.barrier()
-    if try runtime.drainEvents().events.isEmpty { return }
+/// Polls until `condition` holds while the runtime's own threads make
+/// progress. Records an issue naming `subject` and returns false at the
+/// deadline.
+func waitUntilTrue(
+  _ subject: String,
+  timeout: TimeInterval = 10,
+  condition: () throws -> Bool
+) async throws -> Bool {
+  let deadline = Date().addingTimeInterval(timeout)
+  while Date() < deadline {
+    if try condition() { return true }
+    try await Task<Never, Never>.sleep(nanoseconds: 1_000_000)
   }
-  Issue.record("the runtime kept producing events while idle")
+  if try condition() { return true }
+  Issue.record("timed out waiting for \(subject)")
+  return false
 }
 
 /// A style with no sources, so a load finishes without reaching the network.
 let emptyStyleJSON = Data(#"{"version":8,"sources":{},"layers":[]}"#.utf8)
 
-private final class CapturedFailure: @unchecked Sendable {
-  private let lock = NSLock()
-  private var failure: NativeStatusFailure?
-
-  func store(_ failure: NativeStatusFailure) {
-    lock.withLock { self.failure = failure }
-  }
-
-  func value() -> NativeStatusFailure? {
-    lock.withLock { failure }
-  }
+/// Waits on `semaphore`. `DispatchSemaphore.wait(timeout:)` is unavailable
+/// from an async context, so a test that has to block calls this from a
+/// detached task or another thread.
+func waitForSemaphore(
+  _ semaphore: DispatchSemaphore,
+  timeout: DispatchTime
+) -> DispatchTimeoutResult {
+  semaphore.wait(timeout: timeout)
 }
 
-/// Runs `body` on another thread and returns the native failure it threw.
-func failureFromAnotherThread(
-  _ body: @escaping @Sendable () throws -> Void
-) -> NativeStatusFailure? {
-  let captured = CapturedFailure()
-  let thread = Thread {
-    do {
-      try body()
-    } catch let failure as NativeStatusFailure {
-      captured.store(failure)
-    } catch {}
+/// A lock-guarded box for a value a test writes from a callback thread and
+/// reads from the test's own.
+final class LockedBox<Value>: @unchecked Sendable {
+  private let lock = NSLock()
+  private var stored: Value
+
+  init(_ initial: Value) {
+    stored = initial
   }
-  thread.start()
-  while !thread.isFinished {
-    usleep(1000)
+
+  var value: Value {
+    lock.withLock { stored }
   }
-  return captured.value()
+
+  func update(_ body: (inout Value) -> Void) {
+    lock.withLock { body(&stored) }
+  }
+
+  func read<Result>(_ body: (Value) -> Result) -> Result {
+    lock.withLock { body(stored) }
+  }
 }
 
 /// Builds one raw event record. Every field defaults to what the C API writes

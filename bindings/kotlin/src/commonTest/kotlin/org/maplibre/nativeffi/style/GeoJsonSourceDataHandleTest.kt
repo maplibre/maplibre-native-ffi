@@ -81,7 +81,10 @@ class GeoJsonSourceDataHandleTest {
 
       GeoJsonSourceDataHandle.create(featureCollection(), baseOptions().copy { buffer = 32 }).use {
         mismatched ->
-        assertCommandFailed(map.setGeoJsonSourceData("places", mismatched).await())
+        assertCommandFailed(
+          map.setGeoJsonSourceData("places", mismatched).await(),
+          MaplibreStatus.INVALID_ARGUMENT,
+        )
       }
 
       // Cluster aggregations are part of the options comparison, so data
@@ -93,7 +96,10 @@ class GeoJsonSourceDataHandleTest {
           },
         )
         .use { mismatched ->
-          assertCommandFailed(map.setGeoJsonSourceData("places", mismatched).await())
+          assertCommandFailed(
+            map.setGeoJsonSourceData("places", mismatched).await(),
+            MaplibreStatus.INVALID_ARGUMENT,
+          )
         }
     }
   }
@@ -109,13 +115,19 @@ class GeoJsonSourceDataHandleTest {
         }
         map.setGeoJsonSourceSynchronousTiling("places", false).await()
       }
-      assertCommandFailed(map.setGeoJsonSourceSynchronousTiling("missing", true).await())
+      assertCommandFailed(
+        map.setGeoJsonSourceSynchronousTiling("missing", true).await(),
+        MaplibreStatus.NOT_FOUND,
+      )
     }
   }
 
-  private fun assertCommandFailed(completion: org.maplibre.nativeffi.runtime.CommandCompletion) {
+  private fun assertCommandFailed(
+    completion: org.maplibre.nativeffi.runtime.CommandCompletion,
+    status: MaplibreStatus,
+  ) {
     assertEquals(CommandDisposition.FAILED, completion.disposition)
-    assertEquals(MaplibreStatus.INVALID_ARGUMENT, completion.status)
+    assertEquals(status, completion.status)
     assertTrue(completion.diagnostic.isNotEmpty())
   }
 

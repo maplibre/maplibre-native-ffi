@@ -72,8 +72,9 @@ typedef void (*mln_log_callback_release)(void* user_data);
 /**
  * Installs a process-global MapLibre Native log callback.
  *
- * Passing a null callback clears the current callback. callback and user_data
- * are stored by reference.
+ * Passing a null callback clears the current registration. When that call also
+ * passes a non-null release_user_data, the C API invokes it on the passed
+ * user_data before returning.
  *
  * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
  * releasing user_data to the C API. The C API invokes release_user_data after

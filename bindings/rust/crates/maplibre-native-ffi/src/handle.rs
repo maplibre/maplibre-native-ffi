@@ -9,11 +9,13 @@ enum ConcurrentHandleState<T> {
     Closed,
 }
 
-static CLOSE_FINISHED: std::sync::Condvar = std::sync::Condvar::new();
-
 #[derive(Debug)]
 pub(crate) struct ConcurrentNativeHandle<T: NativeHandle> {
     state: std::sync::Mutex<ConcurrentHandleState<T>>,
+    /// Signalled when a close attempt leaves `Closing`. It pairs with `state`
+    /// alone: a `Condvar` may only ever be waited on with one mutex, so each
+    /// handle carries its own.
+    close_finished: std::sync::Condvar,
     type_name: &'static str,
 }
 
@@ -32,6 +34,7 @@ impl<T: NativeHandle> ConcurrentNativeHandle<T> {
         }
         Ok(Self {
             state: std::sync::Mutex::new(ConcurrentHandleState::Live(handle)),
+            close_finished: std::sync::Condvar::new(),
             type_name,
         })
     }
@@ -78,11 +81,12 @@ impl<T: NativeHandle> ConcurrentNativeHandle<T> {
                     } else {
                         ConcurrentHandleState::Live(handle)
                     };
-                    CLOSE_FINISHED.notify_all();
+                    self.close_finished.notify_all();
                     return result.map(Some);
                 }
                 ConcurrentHandleState::Closing => {
-                    state = CLOSE_FINISHED
+                    state = self
+                        .close_finished
                         .wait(state)
                         .unwrap_or_else(|poisoned| poisoned.into_inner());
                     drop(state);
@@ -112,6 +116,15 @@ impl<T: NativeHandle> ConcurrentNativeHandle<T> {
             id: handle.to_raw(),
         });
     }
+}
+
+/// Recovers a mutex guard after a panic poisoned the lock. The state these
+/// wrappers guard is a handle or a completion result, which stays consistent
+/// across a panic, so a poisoned lock is not a reason to fail a native call.
+pub(crate) fn lock<T>(mutex: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 pub(crate) fn closed_handle_error(type_name: &'static str) -> Error {

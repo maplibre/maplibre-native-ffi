@@ -9,12 +9,25 @@ public enum class CameraUpdateMode(internal val nativeValue: Int) {
   FLY(2),
 }
 
-/** Gesture boundary carried with one camera update. */
+/**
+ * Gesture boundary carried atomically with one camera update.
+ *
+ * The phase is applied around the camera write and is reported by
+ * [org.maplibre.nativeffi.map.MapSnapshot.gestureInProgress].
+ */
 public enum class GesturePhase(internal val nativeValue: Int) {
+  /** The update carries no gesture boundary and leaves the flag as it is. */
   NONE(0),
+  /**
+   * Marks a gesture as in progress before the camera write. It does not cancel running transitions;
+   * use [org.maplibre.nativeffi.map.MapHandle.cancelTransitions] for that.
+   */
   BEGIN(1),
+  /** Keeps the gesture marked as in progress before the camera write. */
   UPDATE(2),
+  /** Clears the gesture flag after the camera write. */
   END(3),
+  /** Cancels transitions running after the camera write, then clears the gesture flag. */
   CANCEL(4),
 }
 
@@ -31,6 +44,7 @@ public enum class CameraDeltaKind(internal val nativeValue: Int) {
   MOVE(0),
   SCALE(1),
   BEARING(2),
+  /** Adds the amount to the current pitch, the opposite sign of MapLibre Native's `pitchBy()`. */
   PITCH(3),
 }
 

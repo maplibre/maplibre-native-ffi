@@ -52,6 +52,10 @@ public readonly record struct LogicalExtent(uint Width, uint Height, double Scal
 /// the commit.
 /// </remarks>
 /// <param name="FullyLoaded">True once every requested style and tile resource finished loading.</param>
+/// <param name="GestureInProgress">
+/// True while the map is between a gesture-begin and a gesture-end or gesture-cancel camera
+/// update.
+/// </param>
 public readonly record struct MapSnapshot(
     ulong Generation,
     DebugOptions DebugOptions,
@@ -62,6 +66,7 @@ public readonly record struct MapSnapshot(
     bool FullyLoaded,
     bool RenderingStatsViewEnabled,
     bool RepaintDemand,
+    bool GestureInProgress,
     RuntimeEventMask EventMask,
     ulong LatestRenderUpdateGeneration,
     TileOptions Tile,

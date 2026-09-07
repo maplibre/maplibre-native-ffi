@@ -17,22 +17,11 @@ class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
     state.isClosed
   }
 
-  /// Runs `use` after checking that this wrapper still owns the handle.
-  /// Only the box's own liveness failure translates to an invalid-state
-  /// error; a native status thrown inside `use` keeps its own status.
+  /// Runs `use` after checking that this wrapper still owns the handle. The C
+  /// API leases its native object for each entry point, so concurrent release
+  /// does not need a second binding-side active-use lease.
   func withLive<T>(_ use: (Handle) throws -> T) throws -> T {
-    do {
-      return try state.withLive(use)
-    } catch let failure as NativeStatusFailure {
-      if failure.rawStatus == 0 {
-        throw MaplibreError(
-          kind: .invalidState,
-          rawStatus: nil,
-          diagnostic: failure.diagnostic
-        )
-      }
-      throw failure
-    }
+    try use(requireLive())
   }
 
   func requireLive() throws -> Handle {

@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <utility>
@@ -127,7 +126,7 @@ class VulkanTextureSessionBackend final
     return backend_;
   }
 
-  void resize(mln::Size size) override { backend_.resize(size); }
+  void resize(mln::Size size) override { backend_.set_ring_size(size); }
 
   auto set_vulkan_borrowed_target(
     const mln_vulkan_borrowed_texture_descriptor& descriptor
@@ -163,18 +162,21 @@ class VulkanTextureSessionBackend final
                                       : MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto copy_slot_metadata(
-    const mln_render_session_object& texture, std::size_t slot,
-    std::any& out_metadata
+  auto record_frame_metadata(
+    const mln::core::RenderFrameMetadata& frame, std::any& out_metadata
   ) -> mln_status override {
-    const auto resources = backend_.frame_resources(slot);
+    const auto resources = backend_.frame_resources();
+    if (resources.image == VK_NULL_HANDLE) {
+      mln::core::set_thread_error("rendered Vulkan image is not available");
+      return MLN_STATUS_NOT_READY;
+    }
     out_metadata = mln_vulkan_owned_texture_frame{
       .size = sizeof(mln_vulkan_owned_texture_frame),
-      .generation = texture.generation,
-      .width = texture.physical_width,
-      .height = texture.physical_height,
-      .scale_factor = texture.scale_factor,
-      .frame_id = texture.frame_generation,
+      .generation = frame.generation,
+      .width = frame.physical_width,
+      .height = frame.physical_height,
+      .scale_factor = frame.scale_factor,
+      .frame_id = frame.frame_id,
       .image = mln::core::vulkan_handle_to_abi(resources.image),
       .image_view = mln::core::vulkan_handle_to_abi(resources.image_view),
       .device = resources.device,
@@ -222,12 +224,9 @@ auto vulkan_owned_texture_attach_start(
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
   set_session_extent(*session, descriptor->extent);
-  session->texture.api_kind = TextureSessionApi::Vulkan;
   session->texture.mode = TextureSessionMode::Owned;
   const auto copied = *descriptor;
-  const auto ring_depth = std::clamp(
-    options == nullptr ? 1u : options->requested_texture_ring_depth, 1u, 3u
-  );
+  const auto ring_depth = attach_ring_depth(options);
   session->initialize_backend =
     [copied, ring_depth](mln_render_session_object& target) {
       const auto handles_status = validate_vulkan_handles(copied);
@@ -242,7 +241,7 @@ auto vulkan_owned_texture_attach_start(
     };
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),
-    .driver = options == nullptr ? 0u : options->driver,
+    .driver = 0,
     .texture_ring_depth = ring_depth,
     .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
              MLN_RENDER_SESSION_CAPABILITY_READBACK |
@@ -282,7 +281,6 @@ auto vulkan_borrowed_texture_attach_start(
     *session, descriptor->extent, descriptor->physical_width,
     descriptor->physical_height
   );
-  session->texture.api_kind = TextureSessionApi::Vulkan;
   session->texture.mode = TextureSessionMode::Borrowed;
   const auto copied = *descriptor;
   session->initialize_backend = [copied](mln_render_session_object& target) {
@@ -302,9 +300,9 @@ auto vulkan_borrowed_texture_attach_start(
   };
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),
-    .driver = options == nullptr ? 0u : options->driver,
+    .driver = 0,
     .texture_ring_depth = 0,
-    .flags = MLN_RENDER_SESSION_CAPABILITY_READBACK
+    .flags = 0
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
@@ -317,6 +315,12 @@ auto vulkan_borrowed_texture_set_target_start(
   const mln_vulkan_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion
 ) -> mln_status {
+  const auto submission_status = validate_render_session_retarget_submission(
+    session, RetargetTargetKind::BorrowedTexture, completion
+  );
+  if (submission_status != MLN_STATUS_OK) {
+    return submission_status;
+  }
   const auto descriptor_status =
     validate_vulkan_borrowed_texture_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {

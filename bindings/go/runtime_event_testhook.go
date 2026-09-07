@@ -188,8 +188,8 @@ func (batch *runtimeEventBatchForTest) payloadWindow(index int) []byte {
 }
 
 // decodeForTest runs the batch through the same copy path DrainEvents uses.
-func (runtime *RuntimeHandle) decodeForTest(batch *runtimeEventBatchForTest) RuntimeEventBatch {
-	return runtime.copyEventBatch(batch.raw)
+func (runtime *RuntimeHandle) decodeForTest(batch *runtimeEventBatchForTest) []RuntimeEvent {
+	return runtime.copyEvents(batch.raw)
 }
 
 // runtimeEventSizeForTest is this binding's compiled event size, which a layout

@@ -337,41 +337,33 @@ public extension MapHandle {
     try await submitCommand(mln_map_dump_debug_logs)
   }
 
-  /// Returns the map's latest logical viewport extent.
-  func size() throws -> (width: UInt32, height: UInt32, scaleFactor: Double) {
-    let extent = try snapshot().logicalExtent
-    return (extent.width, extent.height, extent.scaleFactor)
-  }
-
   @discardableResult
   func setViewportOptions(
     _ options: MapViewportOptions
   ) async throws -> CommandCompletion {
-    let future = try mapNativeFailure {
+    try await awaitNative {
       try options.nativeInput.withNativeOptions { native in
         try startCommand { mln_map_set_viewport_options($0, native, $1) }
       }
     }
-    return try await mapNativeFailure { try await future.value() }
   }
 
   @discardableResult
   func setTileOptions(
     _ options: MapTileOptions
   ) async throws -> CommandCompletion {
-    let future = try mapNativeFailure {
+    try await awaitNative {
       try options.nativeInput.withNativeOptions { native in
         try startCommand { mln_map_set_tile_options($0, native, $1) }
       }
     }
-    return try await mapNativeFailure { try await future.value() }
   }
 
   func cameraForLatLngBounds(
     _ bounds: LatLngBounds,
     fitOptions: CameraFitOptions? = nil
   ) async throws -> CameraOptions {
-    let future = try mapNativeFailure {
+    try await awaitNative {
       try (fitOptions?.nativeInput ?? NativeCameraFitOptionsInput())
         .withOptionalNativeOptions {
           try NativeMap.cameraForLatLngBounds(
@@ -381,14 +373,13 @@ public extension MapHandle {
           )
         }
     }
-    return try await mapNativeFailure { try await future.value() }
   }
 
   func cameraForLatLngs(
     _ coordinates: [LatLng],
     fitOptions: CameraFitOptions? = nil
   ) async throws -> CameraOptions {
-    let future = try mapNativeFailure {
+    try await awaitNative {
       let native = coordinates.map { $0.nativeInput.native }
       return try native.withUnsafeBufferPointer { coordinates in
         try (fitOptions?.nativeInput ?? NativeCameraFitOptionsInput())
@@ -402,14 +393,13 @@ public extension MapHandle {
           }
       }
     }
-    return try await mapNativeFailure { try await future.value() }
   }
 
   func cameraForGeometry(
     _ geometry: Data,
     fitOptions: CameraFitOptions? = nil
   ) async throws -> CameraOptions {
-    let future = try mapNativeFailure {
+    try await awaitNative {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try (fitOptions?.nativeInput ?? NativeCameraFitOptionsInput())
@@ -421,7 +411,6 @@ public extension MapHandle {
           )
         }
     }
-    return try await mapNativeFailure { try await future.value() }
   }
 
   /// Returns geographic bounds for a camera from the viewport corners.
@@ -429,7 +418,7 @@ public extension MapHandle {
     for camera: CameraOptions,
     unwrapped: Bool = false
   ) async throws -> LatLngBounds {
-    let future = try mapNativeFailure {
+    try await awaitNative {
       try camera.nativeInput.withNativeOptions {
         try NativeMap.latLngBoundsForCamera(
           requireLiveHandle(),
@@ -438,55 +427,46 @@ public extension MapHandle {
         )
       }
     }
-    return try await mapNativeFailure { try await future.value() }
   }
 
   @discardableResult
   func setBounds(_ bounds: BoundOptions) async throws -> CommandCompletion {
-    let future = try mapNativeFailure {
+    try await awaitNative {
       try bounds.nativeInput.withNativeOptions { native in
         try startCommand { mln_map_set_bounds($0, native, $1) }
       }
     }
-    return try await mapNativeFailure { try await future.value() }
   }
 
   @discardableResult
   func setFreeCameraOptions(
     _ options: FreeCameraOptions
   ) async throws -> CommandCompletion {
-    let future = try mapNativeFailure {
+    try await awaitNative {
       try options.nativeInput.withNativeOptions { native in
         try startCommand { mln_map_set_free_camera_options($0, native, $1) }
       }
     }
-    return try await mapNativeFailure { try await future.value() }
-  }
-
-  func projectionMode() throws -> ProjectionMode {
-    try snapshot().projectionMode
   }
 
   @discardableResult
   func setProjectionMode(
     _ mode: ProjectionMode
   ) async throws -> CommandCompletion {
-    let future = try mapNativeFailure {
+    try await awaitNative {
       try mode.nativeInput.withNativeMode { native in
         try startCommand { mln_map_set_projection_mode($0, native, $1) }
       }
     }
-    return try await mapNativeFailure { try await future.value() }
   }
 
   func pixel(for coordinate: LatLng) async throws -> ScreenPoint {
-    let future = try mapNativeFailure {
+    try await awaitNative {
       try NativeMap.pixelForLatLng(
         requireLiveHandle(),
         coordinate: coordinate.nativeInput
       )
     }
-    return try await mapNativeFailure { try await future.value() }
   }
 
   /// Converts a screen point to a geographic coordinate.
@@ -498,24 +478,22 @@ public extension MapHandle {
     for point: ScreenPoint,
     unwrapped: Bool = false
   ) async throws -> LatLng {
-    let future = try mapNativeFailure {
+    try await awaitNative {
       try NativeMap.latLngForPixel(
         requireLiveHandle(),
         point: point.nativeInput,
         unwrapped: unwrapped
       )
     }
-    return try await mapNativeFailure { try await future.value() }
   }
 
   func pixels(for coordinates: [LatLng]) async throws -> [ScreenPoint] {
-    let future = try mapNativeFailure {
+    try await awaitNative {
       try NativeMap.pixelsForLatLngs(
         requireLiveHandle(),
         coordinates: coordinates.map(\.nativeInput)
       )
     }
-    return try await mapNativeFailure { try await future.value() }
   }
 
   /// Converts screen points to geographic coordinates.
@@ -527,13 +505,12 @@ public extension MapHandle {
     for points: [ScreenPoint],
     unwrapped: Bool = false
   ) async throws -> [LatLng] {
-    let future = try mapNativeFailure {
+    try await awaitNative {
       try NativeMap.latLngsForPixels(
         requireLiveHandle(),
         points: points.map(\.nativeInput),
         unwrapped: unwrapped
       )
     }
-    return try await mapNativeFailure { try await future.value() }
   }
 }

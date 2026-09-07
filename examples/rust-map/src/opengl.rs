@@ -10,7 +10,9 @@ use glutin::display::{GetGlDisplay, GlDisplay};
 use glutin::prelude::*;
 use glutin::surface::{Surface, SurfaceAttributesBuilder, WindowSurface};
 use glutin_winit::DisplayBuilder;
-use maplibre_native_ffi::{AcquiredFrameHandle, NativePointer, OpenGLContextDescriptor};
+use maplibre_native_ffi::{
+    AcquiredFrameHandle, NativePointer, OpenGLContextDescriptor, OpenGLFrameTexture,
+};
 use raw_window_handle::HasWindowHandle;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowAttributes};
@@ -190,7 +192,10 @@ impl OpenGLTextureCompositor {
         context: &OpenGLContext,
         frame: &AcquiredFrameHandle,
     ) -> maplibre_native_ffi::Result<()> {
-        let (metadata, texture) = frame.opengl_texture()?;
+        let OpenGLFrameTexture {
+            frame: metadata,
+            texture,
+        } = frame.opengl_texture()?;
         if metadata.width == 0 || metadata.height == 0 {
             return Err(compositor_error("owned OpenGL frame has an empty extent"));
         }

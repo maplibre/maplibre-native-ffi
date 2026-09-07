@@ -25,21 +25,10 @@ case "$1" in
         compiler_prefix=x86_64-linux-android
         ;;
     esac
-    ndk_prebuilt_root="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt"
-    ndk_bin=
-    for host_prebuilt in "$ndk_prebuilt_root"/*; do
-      if [[ -d "$host_prebuilt/bin" ]]; then
-        if [[ -n "$ndk_bin" ]]; then
-          echo "The pinned Android NDK has multiple host prebuilts under $ndk_prebuilt_root." >&2
-          return 2
-        fi
-        ndk_bin="$host_prebuilt/bin"
-      fi
-    done
-    if [[ -z "$ndk_bin" ]]; then
-      echo "The pinned Android NDK has no host prebuilt under $ndk_prebuilt_root." >&2
+    if ! ndk_prebuilt="$("$(dirname "${BASH_SOURCE[0]}")/android-ndk-prebuilt.sh")"; then
       return 2
     fi
+    ndk_bin="$ndk_prebuilt/bin"
     export GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=1
     export CC="$ndk_bin/${compiler_prefix}24-clang"
     export CXX="$ndk_bin/${compiler_prefix}24-clang++"

@@ -623,10 +623,9 @@ private final class NativeCustomMvtVectorSourceCallbackBox: @unchecked Sendable 
 /// API as `user_data`.
 ///
 /// The C API owns the retain once it accepts the source, and gives it back by
-/// invoking the release callback exactly once, on the runtime's native
-/// scheduler thread, when it stops referencing the pointer. A rejected add is
-/// the one case that never
-/// releases, so the caller releases it with ``release()`` there.
+/// invoking the release callback exactly once when it stops referencing the
+/// pointer. A rejected add is the one case that never releases, so the caller
+/// releases it with ``release()`` there.
 struct NativeCustomMvtVectorSourceCallbacks: @unchecked Sendable {
   typealias TileCallback = @Sendable (NativeCanonicalTileID) -> Void
 

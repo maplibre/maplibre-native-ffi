@@ -23,6 +23,33 @@ enum CameraUpdateMode {
   final int rawValue;
 }
 
+/// Gesture boundary carried atomically with a camera update.
+///
+/// The phase is applied around the camera write and is reported by
+/// [MapSnapshot.gestureInProgress].
+enum GesturePhase {
+  /// Carries no gesture boundary and leaves the flag as it is.
+  none(0),
+
+  /// Marks a gesture as in progress before the camera write. It does not
+  /// cancel running transitions; use [MapHandle.cancelTransitions] for that.
+  begin(1),
+
+  /// Keeps the gesture marked as in progress before the camera write.
+  update(2),
+
+  /// Clears the gesture flag after the camera write.
+  end(3),
+
+  /// Cancels the running camera transitions and clears the gesture flag.
+  cancel(4);
+
+  const GesturePhase(this.rawValue);
+
+  /// Native gesture phase value.
+  final int rawValue;
+}
+
 /// Cubic easing curve for animated camera transitions.
 final class UnitBezier {
   /// Creates a cubic unit bezier.
@@ -167,9 +194,17 @@ final class AnimationOptions {
 
 /// Relative camera operation kind.
 enum CameraDeltaKind {
+  /// Pans the camera by [CameraDelta.offset] in logical pixels.
   move(0),
+
+  /// Multiplies the camera scale by [CameraDelta.amount], which is positive.
   scale(1),
+
+  /// Adds [CameraDelta.amount] degrees to the current bearing.
   bearing(2),
+
+  /// Adds [CameraDelta.amount] degrees to the current pitch, so a positive
+  /// amount tilts the camera further from straight down.
   pitch(3);
 
   const CameraDeltaKind(this.rawValue);
@@ -189,10 +224,20 @@ final class CameraDelta {
     this.animation = const AnimationOptions(),
   });
 
+  /// Which relative operation to apply.
   final CameraDeltaKind kind;
+
+  /// Pan distance in logical pixels, read by [CameraDeltaKind.move].
   final ScreenPoint offset;
+
+  /// Scalar read by every kind except [CameraDeltaKind.move].
   final double amount;
+
+  /// Optional viewport anchor held fixed, read by [CameraDeltaKind.scale] and
+  /// [CameraDeltaKind.bearing].
   final ScreenPoint? anchor;
+
+  /// Transition behavior for this operation.
   final AnimationOptions animation;
 
   @override

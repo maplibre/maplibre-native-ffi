@@ -33,230 +33,226 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 @OptIn(ExperimentalForeignApi::class)
 class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   @Test
-  fun textureImageInfoCopiesMetadataAndRejectsOversizedLengths(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      memScoped {
-        val info = alloc<mln_texture_image_info>()
-        info.width = 2U
-        info.height = 3U
-        info.stride = 8U
-        info.byte_length = 24.toCSize()
+  fun textureImageInfoCopiesMetadataAndRejectsOversizedLengths() {
+    memScoped {
+      val info = alloc<mln_texture_image_info>()
+      info.width = 2U
+      info.height = 3U
+      info.stride = 8U
+      info.byte_length = 24.toCSize()
 
-        assertEquals(TextureImageInfo(2, 3, 8, 24), RenderStructs.textureImageInfo(info))
+      assertEquals(TextureImageInfo(2, 3, 8, 24), RenderStructs.textureImageInfo(info))
 
-        if (kotlinx.cinterop.sizeOf<CSizeVar>() == 8L) {
-          info.byte_length = (Long.MAX_VALUE.toULong() + 1UL).toCSize()
-          assertFailsWith<IllegalArgumentException> { RenderStructs.textureImageInfo(info) }
-        }
+      if (kotlinx.cinterop.sizeOf<CSizeVar>() == 8L) {
+        info.byte_length = (Long.MAX_VALUE.toULong() + 1UL).toCSize()
+        assertFailsWith<IllegalArgumentException> { RenderStructs.textureImageInfo(info) }
       }
     }
+  }
 
   @Test
-  fun metalDescriptorsMaterializeOpaquePointersAndExtents(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      memScoped {
-        val extent = RenderTargetExtent(640, 480, 2.0)
-        val owned =
-          RenderStructs.metalOwnedTextureDescriptor(
-              MetalOwnedTextureDescriptor(
-                extent,
-                MetalContextDescriptor(NativePointer.ofAddress(0x10L)),
-              ),
-              this,
-            )
-            .pointed
-        assertEquals(640U, owned.extent.width)
-        assertEquals(2.0, owned.extent.scale_factor)
-        assertFalse(owned.context.device == null)
-
-        val borrowed =
-          RenderStructs.metalBorrowedTextureDescriptor(
-              MetalBorrowedTextureDescriptor(
-                extent,
-                physicalWidth = 65,
-                physicalHeight = 33,
-                texture = NativePointer.ofAddress(0x20L),
-              ),
-              this,
-            )
-            .pointed
-        assertFalse(borrowed.texture == null)
-        assertEquals(65U, borrowed.physical_width)
-        assertEquals(33U, borrowed.physical_height)
-
-        val surface =
-          RenderStructs.metalSurfaceDescriptor(
-              MetalSurfaceDescriptor(
-                extent,
-                MetalContextDescriptor(NativePointer.NULL_POINTER),
-                NativePointer.ofAddress(0x30L),
-              ),
-              this,
-            )
-            .pointed
-        assertFalse(surface.layer == null)
-      }
-    }
-
-  @Test
-  fun vulkanDescriptorsMaterializeContextPointersAndOptionalFinalLayout(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      memScoped {
-        val context =
-          VulkanContextDescriptor(
-            NativePointer.ofAddress(0x10L),
-            NativePointer.ofAddress(0x20L),
-            NativePointer.ofAddress(0x30L),
-            NativePointer.ofAddress(0x40L),
-            7,
-            NativePointer.ofAddress(0x41L),
-            NativePointer.ofAddress(0x42L),
+  fun metalDescriptorsMaterializeOpaquePointersAndExtents() {
+    memScoped {
+      val extent = RenderTargetExtent(640, 480, 2.0)
+      val owned =
+        RenderStructs.metalOwnedTextureDescriptor(
+            MetalOwnedTextureDescriptor(
+              extent,
+              MetalContextDescriptor(NativePointer.ofAddress(0x10L)),
+            ),
+            this,
           )
-        val borrowed =
-          RenderStructs.vulkanBorrowedTextureDescriptor(
-              VulkanBorrowedTextureDescriptor(
-                  RenderTargetExtent(256, 256, 1.0),
-                  65,
-                  33,
-                  context,
-                  VulkanHandle.ofBits(Long.MIN_VALUE),
-                  VulkanHandle.ofBits(-1L),
-                  44,
-                  1,
-                )
-                .apply { finalLayout = 2 },
-              this,
-            )
-            .pointed
-        assertFalse(borrowed.context.instance == null)
-        assertEquals(7U, borrowed.context.graphics_queue_family_index)
-        assertFalse(borrowed.context.get_instance_proc_addr == null)
-        assertFalse(borrowed.context.get_device_proc_addr == null)
-        assertEquals(Long.MIN_VALUE.toULong(), borrowed.image)
-        assertEquals(ULong.MAX_VALUE, borrowed.image_view)
-        assertEquals(44U, borrowed.format)
-        assertEquals(2U, borrowed.final_layout)
+          .pointed
+      assertEquals(640U, owned.extent.width)
+      assertEquals(2.0, owned.extent.scale_factor)
+      assertFalse(owned.context.device == null)
 
-        val surface =
-          RenderStructs.vulkanSurfaceDescriptor(
-              VulkanSurfaceDescriptor(
+      val borrowed =
+        RenderStructs.metalBorrowedTextureDescriptor(
+            MetalBorrowedTextureDescriptor(
+              extent,
+              physicalWidth = 65,
+              physicalHeight = 33,
+              texture = NativePointer.ofAddress(0x20L),
+            ),
+            this,
+          )
+          .pointed
+      assertFalse(borrowed.texture == null)
+      assertEquals(65U, borrowed.physical_width)
+      assertEquals(33U, borrowed.physical_height)
+
+      val surface =
+        RenderStructs.metalSurfaceDescriptor(
+            MetalSurfaceDescriptor(
+              extent,
+              MetalContextDescriptor(NativePointer.NULL_POINTER),
+              NativePointer.ofAddress(0x30L),
+            ),
+            this,
+          )
+          .pointed
+      assertFalse(surface.layer == null)
+    }
+  }
+
+  @Test
+  fun vulkanDescriptorsMaterializeContextPointersAndOptionalFinalLayout() {
+    memScoped {
+      val context =
+        VulkanContextDescriptor(
+          NativePointer.ofAddress(0x10L),
+          NativePointer.ofAddress(0x20L),
+          NativePointer.ofAddress(0x30L),
+          NativePointer.ofAddress(0x40L),
+          7,
+          NativePointer.ofAddress(0x41L),
+          NativePointer.ofAddress(0x42L),
+        )
+      val borrowed =
+        RenderStructs.vulkanBorrowedTextureDescriptor(
+            VulkanBorrowedTextureDescriptor(
                 RenderTargetExtent(256, 256, 1.0),
+                65,
+                33,
                 context,
-                VulkanHandle.ofBits(0x70L),
-              ),
-              this,
-            )
-            .pointed
-        assertEquals(0x70UL, surface.surface)
-      }
+                VulkanHandle.ofBits(Long.MIN_VALUE),
+                VulkanHandle.ofBits(-1L),
+                44,
+                1,
+              )
+              .apply { finalLayout = 2 },
+            this,
+          )
+          .pointed
+      assertFalse(borrowed.context.instance == null)
+      assertEquals(7U, borrowed.context.graphics_queue_family_index)
+      assertFalse(borrowed.context.get_instance_proc_addr == null)
+      assertFalse(borrowed.context.get_device_proc_addr == null)
+      assertEquals(Long.MIN_VALUE.toULong(), borrowed.image)
+      assertEquals(ULong.MAX_VALUE, borrowed.image_view)
+      assertEquals(44U, borrowed.format)
+      assertEquals(2U, borrowed.final_layout)
+
+      val surface =
+        RenderStructs.vulkanSurfaceDescriptor(
+            VulkanSurfaceDescriptor(
+              RenderTargetExtent(256, 256, 1.0),
+              context,
+              VulkanHandle.ofBits(0x70L),
+            ),
+            this,
+          )
+          .pointed
+      assertEquals(0x70UL, surface.surface)
     }
+  }
 
   @Test
-  fun openglDescriptorsMaterializeWglAndEglContexts(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      memScoped {
-        val extent = RenderTargetExtent(320, 240, 1.5)
-        val wglContext =
-          org.maplibre.nativeffi.render.WglContextDescriptor(
-            NativePointer.ofAddress(0x10L),
-            NativePointer.ofAddress(0x20L),
-            NativePointer.ofAddress(0x30L),
-          )
-        val owned =
-          RenderStructs.openglOwnedTextureDescriptor(
-              OpenGLOwnedTextureDescriptor(extent, wglContext),
-              this,
-            )
-            .pointed
-        assertEquals(320U, owned.extent.width)
-        assertFalse(owned.context.data.wgl.device_context == null)
-        assertFalse(owned.context.data.wgl.share_context == null)
-        assertFalse(owned.context.data.wgl.get_proc_address == null)
-
-        val borrowed =
-          RenderStructs.openglBorrowedTextureDescriptor(
-              OpenGLBorrowedTextureDescriptor(
-                extent,
-                physicalWidth = 65,
-                physicalHeight = 33,
-                context = wglContext,
-                texture = 17,
-                target = 3553,
-              ),
-              this,
-            )
-            .pointed
-        assertEquals(17U, borrowed.texture)
-        assertEquals(3553U, borrowed.target)
-        assertEquals(65U, borrowed.physical_width)
-        assertEquals(33U, borrowed.physical_height)
-
-        val eglContext =
-          EglContextDescriptor(
-            NativePointer.ofAddress(0x40L),
-            NativePointer.ofAddress(0x50L),
-            NativePointer.ofAddress(0x60L),
-            NativePointer.ofAddress(0x70L),
-          )
-        val surface =
-          RenderStructs.openglSurfaceDescriptor(
-              OpenGLSurfaceDescriptor(extent, eglContext, NativePointer.ofAddress(0x80L)),
-              this,
-            )
-            .pointed
-        assertFalse(surface.context.data.egl.display == null)
-        assertFalse(surface.context.data.egl.config == null)
-        assertFalse(surface.context.data.egl.share_context == null)
-        assertFalse(surface.context.data.egl.get_proc_address == null)
-        assertFalse(surface.surface == null)
-        assertEquals(OpenGLContextOwnership.SHARED.nativeValue.toUInt(), surface.context.ownership)
-        assertEquals(
-          OpenGLClientApi.UNSPECIFIED.nativeValue.toUInt(),
-          surface.context.data.egl.client_api,
+  fun openglDescriptorsMaterializeWglAndEglContexts() {
+    memScoped {
+      val extent = RenderTargetExtent(320, 240, 1.5)
+      val wglContext =
+        org.maplibre.nativeffi.render.WglContextDescriptor(
+          NativePointer.ofAddress(0x10L),
+          NativePointer.ofAddress(0x20L),
+          NativePointer.ofAddress(0x30L),
         )
-
-        val dedicatedContext =
-          EglContextDescriptor(
-            NativePointer.ofAddress(0x40L),
-            NativePointer.ofAddress(0x50L),
-            NativePointer.NULL_POINTER,
-            NativePointer.ofAddress(0x70L),
-            clientApi = OpenGLClientApi.GLES,
-            ownership = OpenGLContextOwnership.DEDICATED,
+      val owned =
+        RenderStructs.openglOwnedTextureDescriptor(
+            OpenGLOwnedTextureDescriptor(extent, wglContext),
+            this,
           )
-        val dedicatedSurface =
-          RenderStructs.openglSurfaceDescriptor(
-              OpenGLSurfaceDescriptor(extent, dedicatedContext, NativePointer.ofAddress(0x80L)),
-              this,
-            )
-            .pointed
-        assertEquals(
-          OpenGLContextOwnership.DEDICATED.nativeValue.toUInt(),
-          dedicatedSurface.context.ownership,
-        )
-        assertEquals(
-          OpenGLClientApi.GLES.nativeValue.toUInt(),
-          dedicatedSurface.context.data.egl.client_api,
-        )
-        assertNull(dedicatedSurface.context.data.egl.share_context)
+          .pointed
+      assertEquals(320U, owned.extent.width)
+      assertFalse(owned.context.data.wgl.device_context == null)
+      assertFalse(owned.context.data.wgl.share_context == null)
+      assertFalse(owned.context.data.wgl.get_proc_address == null)
 
-        val unknownContext =
-          EglContextDescriptor(
-            NativePointer.ofAddress(0x40L),
-            NativePointer.ofAddress(0x50L),
-            NativePointer.NULL_POINTER,
-            NativePointer.ofAddress(0x70L),
-            clientApi = OpenGLClientApi(97),
-            ownership = OpenGLContextOwnership(98),
+      val borrowed =
+        RenderStructs.openglBorrowedTextureDescriptor(
+            OpenGLBorrowedTextureDescriptor(
+              extent,
+              physicalWidth = 65,
+              physicalHeight = 33,
+              context = wglContext,
+              texture = 17,
+              target = 3553,
+            ),
+            this,
           )
-        val unknownSurface =
-          RenderStructs.openglSurfaceDescriptor(
-              OpenGLSurfaceDescriptor(extent, unknownContext, NativePointer.ofAddress(0x80L)),
-              this,
-            )
-            .pointed
-        assertEquals(98U, unknownSurface.context.ownership)
-        assertEquals(97U, unknownSurface.context.data.egl.client_api)
-      }
+          .pointed
+      assertEquals(17U, borrowed.texture)
+      assertEquals(3553U, borrowed.target)
+      assertEquals(65U, borrowed.physical_width)
+      assertEquals(33U, borrowed.physical_height)
+
+      val eglContext =
+        EglContextDescriptor(
+          NativePointer.ofAddress(0x40L),
+          NativePointer.ofAddress(0x50L),
+          NativePointer.ofAddress(0x60L),
+          NativePointer.ofAddress(0x70L),
+        )
+      val surface =
+        RenderStructs.openglSurfaceDescriptor(
+            OpenGLSurfaceDescriptor(extent, eglContext, NativePointer.ofAddress(0x80L)),
+            this,
+          )
+          .pointed
+      assertFalse(surface.context.data.egl.display == null)
+      assertFalse(surface.context.data.egl.config == null)
+      assertFalse(surface.context.data.egl.share_context == null)
+      assertFalse(surface.context.data.egl.get_proc_address == null)
+      assertFalse(surface.surface == null)
+      assertEquals(OpenGLContextOwnership.SHARED.nativeValue.toUInt(), surface.context.ownership)
+      assertEquals(
+        OpenGLClientApi.UNSPECIFIED.nativeValue.toUInt(),
+        surface.context.data.egl.client_api,
+      )
+
+      val dedicatedContext =
+        EglContextDescriptor(
+          NativePointer.ofAddress(0x40L),
+          NativePointer.ofAddress(0x50L),
+          NativePointer.NULL_POINTER,
+          NativePointer.ofAddress(0x70L),
+          clientApi = OpenGLClientApi.GLES,
+          ownership = OpenGLContextOwnership.DEDICATED,
+        )
+      val dedicatedSurface =
+        RenderStructs.openglSurfaceDescriptor(
+            OpenGLSurfaceDescriptor(extent, dedicatedContext, NativePointer.ofAddress(0x80L)),
+            this,
+          )
+          .pointed
+      assertEquals(
+        OpenGLContextOwnership.DEDICATED.nativeValue.toUInt(),
+        dedicatedSurface.context.ownership,
+      )
+      assertEquals(
+        OpenGLClientApi.GLES.nativeValue.toUInt(),
+        dedicatedSurface.context.data.egl.client_api,
+      )
+      assertNull(dedicatedSurface.context.data.egl.share_context)
+
+      val unknownContext =
+        EglContextDescriptor(
+          NativePointer.ofAddress(0x40L),
+          NativePointer.ofAddress(0x50L),
+          NativePointer.NULL_POINTER,
+          NativePointer.ofAddress(0x70L),
+          clientApi = OpenGLClientApi(97),
+          ownership = OpenGLContextOwnership(98),
+        )
+      val unknownSurface =
+        RenderStructs.openglSurfaceDescriptor(
+            OpenGLSurfaceDescriptor(extent, unknownContext, NativePointer.ofAddress(0x80L)),
+            this,
+          )
+          .pointed
+      assertEquals(98U, unknownSurface.context.ownership)
+      assertEquals(97U, unknownSurface.context.data.egl.client_api)
     }
+  }
 }

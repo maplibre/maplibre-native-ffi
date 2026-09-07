@@ -152,5 +152,5 @@ fi
 python3 "$MISE_MONOREPO_ROOT/ci/native_download_fixture.py" \
   --dart-pointer .dart_tool/maplibre_native_test_snapshot_base_url \
   "$MISE_MONOREPO_ROOT/build/packages/native/dist/maplibre-native-c-$usage_preset.tar.gz" \
-  -- dart test test/isolate_migration_test.dart
+  -- dart test test/native_library_test.dart
 '''

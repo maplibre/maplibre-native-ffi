@@ -238,10 +238,13 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
   late final Pointer<raw.mln_adapter_queued_resource_provider> pointer;
 
   void drain() {
-    while (true) {
+    withNativeArena((arena) {
       final outRequest =
-          calloc<Pointer<raw.mln_adapter_queued_resource_request>>();
-      try {
+          arena<Pointer<raw.mln_adapter_queued_resource_request>>();
+      while (true) {
+        // The acquire requires the null handle on entry, and the pointer is
+        // reused across iterations.
+        outRequest.value = nullptr;
         _check(
           raw.mln_adapter_resource_request_queue_acquire(queue, outRequest),
         );
@@ -255,10 +258,8 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
         if (!ran) {
           _dropQueuedResourceProviderRequest(request);
         }
-      } finally {
-        calloc.free(outRequest);
       }
-    }
+    });
   }
 
   void retire() => closeSynchronously();
@@ -281,23 +282,10 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
 
 void _dropQueuedResourceProviderRequest(Pointer<Void> rawRequest) {
   try {
-    final request = rawRequest
-        .cast<raw.mln_adapter_queued_resource_request>()
-        .ref;
-    final handle = ResourceRequestHandle._(
-      NativeResourceRequest(request.handle),
+    _failQueuedRequest(
+      rawRequest,
+      'Dart resource provider callback was retired',
     );
-    try {
-      handle.complete(
-        ResourceResponse(
-          status: ResourceResponseStatus.error,
-          errorReason: ResourceErrorReason.other,
-          errorMessage: 'Dart resource provider callback was retired',
-        ),
-      );
-    } catch (_) {
-      handle.close();
-    }
   } finally {
     _c.adapterResourceProviderRequestDestroy(rawRequest);
   }
@@ -317,20 +305,31 @@ void _invokeQueuedResourceProvider(
     try {
       callback(_copyResourceRequest(request), handle);
     } catch (_) {
-      try {
-        handle.complete(
-          ResourceResponse(
-            status: ResourceResponseStatus.error,
-            errorReason: ResourceErrorReason.other,
-            errorMessage: 'Dart resource provider callback threw',
-          ),
-        );
-      } catch (_) {
-        handle.close();
-      }
+      _failQueuedRequest(rawRequest, 'Dart resource provider callback threw');
     }
   } finally {
     _c.adapterResourceProviderRequestDestroy(rawRequest);
+  }
+}
+
+/// Completes the request in [rawRequest] with an error, and releases it
+/// instead when that completion is itself rejected.
+void _failQueuedRequest(Pointer<Void> rawRequest, String errorMessage) {
+  final handle = ResourceRequestHandle._(
+    NativeResourceRequest(
+      rawRequest.cast<raw.mln_adapter_queued_resource_request>().ref.handle,
+    ),
+  );
+  try {
+    handle.complete(
+      ResourceResponse(
+        status: ResourceResponseStatus.error,
+        errorReason: ResourceErrorReason.other,
+        errorMessage: errorMessage,
+      ),
+    );
+  } catch (_) {
+    handle.close();
   }
 }
 

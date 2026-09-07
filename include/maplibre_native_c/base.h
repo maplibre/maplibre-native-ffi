@@ -96,8 +96,6 @@ typedef enum mln_render_backend_flag : uint32_t {
 typedef uint64_t mln_runtime;
 typedef uint64_t mln_map;
 typedef uint64_t mln_map_projection;
-typedef uint64_t mln_offline_region_snapshot;
-typedef uint64_t mln_offline_region_list;
 typedef uint64_t mln_buffer;
 typedef uint64_t mln_resource_request_handle;
 typedef uint64_t mln_render_session;

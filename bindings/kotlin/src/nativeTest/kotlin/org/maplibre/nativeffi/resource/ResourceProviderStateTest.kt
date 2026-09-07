@@ -44,353 +44,342 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-141, BND-069.
 
   @Test
-  fun providerCallbackCopiesRequestAndReturnsDecision(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      var copied: ResourceRequest? = null
-      val state =
-        ResourceProviderState(
-          ResourceProviderCallback { request, _ ->
-            copied = request
-            ResourceProviderDecision.PASS_THROUGH
-          }
-        )
-      try {
-        memScoped {
-          val request = alloc<mln_resource_request>()
-          request.requested_url = "maplibre://tiles/2/1/1.pbf".cstr.getPointer(this)
-          request.resolved_url = "https://example.com/tile.pbf".cstr.getPointer(this)
-          request.kind = 900U
-          request.loading_method = 901U
-          request.priority = 902U
-          request.usage = 903U
-          request.storage_policy = 904U
-          request.has_range = true
-          request.range_start = 7UL
-          request.range_end = 11UL
-          request.has_prior_modified = true
-          request.prior_modified_unix_ms = 123L
-          request.has_prior_expires = true
-          request.prior_expires_unix_ms = 456L
-          request.prior_etag = "etag".cstr.getPointer(this)
-          val priorData = allocArray<UByteVar>(3)
-          priorData[0] = 1U
-          priorData[1] = 2U
-          priorData[2] = 3U
-          request.prior_data = priorData
-          request.prior_data_size = 3.toCSize()
-          val fakeHandle = SyntheticHandles.resourceRequest()
-          assertEquals(
-            ResourceProviderDecision.PASS_THROUGH.nativeValue.toUInt(),
-            state.invoke(request.ptr, fakeHandle.rawHandleValue),
-          )
+  fun providerCallbackCopiesRequestAndReturnsDecision() {
+    var copied: ResourceRequest? = null
+    val state =
+      ResourceProviderState(
+        ResourceProviderCallback { request, _ ->
+          copied = request
+          ResourceProviderDecision.PASS_THROUGH
         }
-        assertEquals(ResourceKind(900), copied?.kind)
-        assertEquals(900, copied?.kind?.nativeValue)
-        assertEquals(ResourceLoadingMethod(901), copied?.loadingMethod)
-        assertEquals(901, copied?.loadingMethod?.nativeValue)
-        assertEquals(ResourcePriority(902), copied?.priority)
-        assertEquals(902, copied?.priority?.nativeValue)
-        assertEquals(ResourceUsage(903), copied?.usage)
-        assertEquals(903, copied?.usage?.nativeValue)
-        assertEquals(ResourceStoragePolicy(904), copied?.storagePolicy)
-        assertEquals(904, copied?.storagePolicy?.nativeValue)
-        assertEquals("maplibre://tiles/2/1/1.pbf", copied?.requestedUrl)
-        assertEquals("https://example.com/tile.pbf", copied?.resolvedUrl)
-        assertEquals(ResourceRequest.ByteRange(7, 11), copied?.range)
-        assertEquals(123L, copied?.priorModifiedUnixMs)
-        assertEquals(456L, copied?.priorExpiresUnixMs)
-        assertEquals("etag", copied?.priorEtag)
-        val firstPriorData = copied?.priorData ?: ByteArray(0)
-        assertContentEquals(byteArrayOf(1, 2, 3), firstPriorData)
-        firstPriorData[0] = 9
-        assertContentEquals(byteArrayOf(1, 2, 3), copied?.priorData)
-      } finally {
-        state.close()
+      )
+    try {
+      memScoped {
+        val request = alloc<mln_resource_request>()
+        request.requested_url = "maplibre://tiles/2/1/1.pbf".cstr.getPointer(this)
+        request.resolved_url = "https://example.com/tile.pbf".cstr.getPointer(this)
+        request.kind = 900U
+        request.loading_method = 901U
+        request.priority = 902U
+        request.usage = 903U
+        request.storage_policy = 904U
+        request.has_range = true
+        request.range_start = 7UL
+        request.range_end = 11UL
+        request.has_prior_modified = true
+        request.prior_modified_unix_ms = 123L
+        request.has_prior_expires = true
+        request.prior_expires_unix_ms = 456L
+        request.prior_etag = "etag".cstr.getPointer(this)
+        val priorData = allocArray<UByteVar>(3)
+        priorData[0] = 1U
+        priorData[1] = 2U
+        priorData[2] = 3U
+        request.prior_data = priorData
+        request.prior_data_size = 3.toCSize()
+        val fakeHandle = SyntheticHandles.resourceRequest()
+        assertEquals(
+          ResourceProviderDecision.PASS_THROUGH.nativeValue.toUInt(),
+          state.invoke(request.ptr, fakeHandle.rawHandleValue),
+        )
       }
+      assertEquals(ResourceKind(900), copied?.kind)
+      assertEquals(900, copied?.kind?.nativeValue)
+      assertEquals(ResourceLoadingMethod(901), copied?.loadingMethod)
+      assertEquals(901, copied?.loadingMethod?.nativeValue)
+      assertEquals(ResourcePriority(902), copied?.priority)
+      assertEquals(902, copied?.priority?.nativeValue)
+      assertEquals(ResourceUsage(903), copied?.usage)
+      assertEquals(903, copied?.usage?.nativeValue)
+      assertEquals(ResourceStoragePolicy(904), copied?.storagePolicy)
+      assertEquals(904, copied?.storagePolicy?.nativeValue)
+      assertEquals("maplibre://tiles/2/1/1.pbf", copied?.requestedUrl)
+      assertEquals("https://example.com/tile.pbf", copied?.resolvedUrl)
+      assertEquals(ResourceRequest.ByteRange(7, 11), copied?.range)
+      assertEquals(123L, copied?.priorModifiedUnixMs)
+      assertEquals(456L, copied?.priorExpiresUnixMs)
+      assertEquals("etag", copied?.priorEtag)
+      val firstPriorData = copied?.priorData ?: ByteArray(0)
+      assertContentEquals(byteArrayOf(1, 2, 3), firstPriorData)
+      firstPriorData[0] = 9
+      assertContentEquals(byteArrayOf(1, 2, 3), copied?.priorData)
+    } finally {
+      state.close()
     }
+  }
 
   @Test
-  fun resourceResponseMaterializerSnapshotsOptionalFields(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      memScoped {
-        val response =
-          ResourceResponse(ResourceResponseStatus.OK).apply {
-            bytes = byteArrayOf(1, 2, 3)
-            etag = "abc"
-            modifiedUnixMs = 10L
-            expiresUnixMs = 20L
-            retryAfterUnixMs = 30L
-            mustRevalidate = true
-          }
-        val native = ResourceStructs.resourceResponse(response, this).pointed
-        assertEquals(ResourceResponseStatus.OK.nativeValue.toUInt(), native.status)
-        assertEquals(3UL, native.byte_count.toULong())
-        assertEquals(true, native.must_revalidate)
-        assertEquals(true, native.has_modified)
-        assertEquals(true, native.has_expires)
-        assertEquals(true, native.has_retry_after)
+  fun resourceResponseMaterializerSnapshotsOptionalFields() {
+    memScoped {
+      val response =
+        ResourceResponse(ResourceResponseStatus.OK).apply {
+          bytes = byteArrayOf(1, 2, 3)
+          etag = "abc"
+          modifiedUnixMs = 10L
+          expiresUnixMs = 20L
+          retryAfterUnixMs = 30L
+          mustRevalidate = true
+        }
+      val native = ResourceStructs.resourceResponse(response, this).pointed
+      assertEquals(ResourceResponseStatus.OK.nativeValue.toUInt(), native.status)
+      assertEquals(3UL, native.byte_count.toULong())
+      assertEquals(true, native.must_revalidate)
+      assertEquals(true, native.has_modified)
+      assertEquals(true, native.has_expires)
+      assertEquals(true, native.has_retry_after)
 
-        val bytes = response.bytes
-        bytes[0] = 9
-        assertContentEquals(byteArrayOf(1, 2, 3), response.bytes)
-      }
+      val bytes = response.bytes
+      bytes[0] = 9
+      assertContentEquals(byteArrayOf(1, 2, 3), response.bytes)
     }
+  }
 
   @Test
-  fun resourceResponseMaterializerRejectsEmbeddedNulWithBindingInvalidArgument(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      memScoped {
-        val response =
-          ResourceResponse(ResourceResponseStatus.ERROR).apply {
-            errorReason = ResourceErrorReason.OTHER
-            etag = "bad\u0000etag"
-          }
+  fun resourceResponseMaterializerRejectsEmbeddedNulWithBindingInvalidArgument() {
+    memScoped {
+      val response =
+        ResourceResponse(ResourceResponseStatus.ERROR).apply {
+          errorReason = ResourceErrorReason.OTHER
+          etag = "bad\u0000etag"
+        }
 
-        val error =
-          assertFailsWith<InvalidArgumentException> {
-            ResourceStructs.resourceResponse(response, this)
-          }
+      val error =
+        assertFailsWith<InvalidArgumentException> {
+          ResourceStructs.resourceResponse(response, this)
+        }
 
-        assertEquals("ETag contains embedded NUL", error.diagnostic)
-      }
+      assertEquals("ETag contains embedded NUL", error.diagnostic)
     }
+  }
 
   @Test
-  fun resourceResponseMaterializerRejectsUnknownErrorReasonWithBindingInvalidArgument(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      memScoped {
-        val response =
-          ResourceResponse(ResourceResponseStatus.ERROR).apply {
-            errorReason = ResourceErrorReason(999)
-          }
+  fun resourceResponseMaterializerRejectsUnknownErrorReasonWithBindingInvalidArgument() {
+    memScoped {
+      val response =
+        ResourceResponse(ResourceResponseStatus.ERROR).apply {
+          errorReason = ResourceErrorReason(999)
+        }
 
-        val error =
-          assertFailsWith<InvalidArgumentException> {
-            ResourceStructs.resourceResponse(response, this)
-          }
+      val error =
+        assertFailsWith<InvalidArgumentException> {
+          ResourceStructs.resourceResponse(response, this)
+        }
 
-        assertEquals("Unknown resource error reason cannot be used as input: 999", error.diagnostic)
-      }
+      assertEquals("Unknown resource error reason cannot be used as input: 999", error.diagnostic)
     }
+  }
 
   // BND-142, BND-150, BND-151.
 
   // BND-121, BND-123.
 
   @Test
-  fun hostLanguageFailureTellsNativeNotToPassThrough(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      val state =
-        ResourceProviderState(
-          ResourceProviderCallback { _, _ -> throw IllegalStateException("contained") }
-        )
-      try {
-        memScoped {
-          val request = alloc<mln_resource_request>()
-          request.requested_url = null
-          request.resolved_url = null
-          val fakeHandle = SyntheticHandles.resourceRequest()
-          assertEquals(UInt.MAX_VALUE, state.invoke(request.ptr, fakeHandle.rawHandleValue))
-        }
-      } finally {
-        state.close()
-      }
-    }
-
-  @Test
-  fun closeDuringProviderCallbackCompletesAfterCallbackAndSuppressesLaterUpcalls(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
+  fun hostLanguageFailureTellsNativeNotToPassThrough() {
+    val state =
+      ResourceProviderState(
+        ResourceProviderCallback { _, _ -> throw IllegalStateException("contained") }
+      )
+    try {
       memScoped {
-        var calls = 0
-        lateinit var state: ResourceProviderState
-        state =
-          ResourceProviderState(
-            ResourceProviderCallback { _, _ ->
-              calls += 1
-              state.close()
-              assertFalse(state.isClosedForTesting())
-              ResourceProviderDecision.PASS_THROUGH
-            }
-          )
         val request = alloc<mln_resource_request>()
         request.requested_url = null
         request.resolved_url = null
         val fakeHandle = SyntheticHandles.resourceRequest()
-
-        assertEquals(
-          ResourceProviderDecision.PASS_THROUGH.nativeValue.toUInt(),
-          state.invoke(request.ptr, fakeHandle.rawHandleValue),
-        )
-        assertTrue(state.isClosedForTesting())
         assertEquals(UInt.MAX_VALUE, state.invoke(request.ptr, fakeHandle.rawHandleValue))
-        assertEquals(1, calls)
-        state.close()
       }
+    } finally {
+      state.close()
     }
+  }
+
+  @Test
+  fun closeDuringProviderCallbackCompletesAfterCallbackAndSuppressesLaterUpcalls() {
+    memScoped {
+      var calls = 0
+      lateinit var state: ResourceProviderState
+      state =
+        ResourceProviderState(
+          ResourceProviderCallback { _, _ ->
+            calls += 1
+            state.close()
+            assertFalse(state.isClosedForTesting())
+            ResourceProviderDecision.PASS_THROUGH
+          }
+        )
+      val request = alloc<mln_resource_request>()
+      request.requested_url = null
+      request.resolved_url = null
+      val fakeHandle = SyntheticHandles.resourceRequest()
+
+      assertEquals(
+        ResourceProviderDecision.PASS_THROUGH.nativeValue.toUInt(),
+        state.invoke(request.ptr, fakeHandle.rawHandleValue),
+      )
+      assertTrue(state.isClosedForTesting())
+      assertEquals(UInt.MAX_VALUE, state.invoke(request.ptr, fakeHandle.rawHandleValue))
+      assertEquals(1, calls)
+      state.close()
+    }
+  }
 
   // BND-146, BND-147, BND-148, BND-152, BND-153.
 
   @Test
-  fun completionThatReachesNativeIsTerminalWhenNativeReturnsError(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      memScoped {
-        var completions = 0
-        var releases = 0
-        val fakeHandle = SyntheticHandles.resourceRequest()
-        val handle =
-          ResourceRequestHandle(
-            fakeHandle,
-            completer = { _, _ ->
-              completions++
-              MaplibreStatus.INVALID_STATE.nativeCode
-            },
-            releaser = { releases++ },
-          )
-
-        assertEquals(
-          ResourceProviderDecision.HANDLE.nativeValue.toUInt(),
-          handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
+  fun completionThatReachesNativeIsTerminalWhenNativeReturnsError() {
+    memScoped {
+      var completions = 0
+      var releases = 0
+      val fakeHandle = SyntheticHandles.resourceRequest()
+      val handle =
+        ResourceRequestHandle(
+          fakeHandle,
+          completer = { _, _ ->
+            completions++
+            MaplibreStatus.INVALID_STATE.nativeCode
+          },
+          releaser = { releases++ },
         )
-        val nativeFailure =
-          assertFailsWith<InvalidStateException> {
-            handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
-          }
-        assertEquals(MaplibreStatus.INVALID_STATE.nativeCode, nativeFailure.nativeStatusCode)
-        assertEquals(1, completions)
-        assertEquals(1, releases)
 
+      assertEquals(
+        ResourceProviderDecision.HANDLE.nativeValue.toUInt(),
+        handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
+      )
+      val nativeFailure =
         assertFailsWith<InvalidStateException> {
           handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
         }
-        assertEquals(1, completions)
-        assertEquals(1, releases)
-      }
-    }
+      assertEquals(MaplibreStatus.INVALID_STATE.nativeCode, nativeFailure.nativeStatusCode)
+      assertEquals(1, completions)
+      assertEquals(1, releases)
 
-  @Test
-  fun nativeCompletionFailureKeepsDiagnosticCapturedBeforeReleaseCleanup(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      memScoped {
-        val fakeHandle = SyntheticHandles.resourceRequest()
-        val handle =
-          ResourceRequestHandle(
-            fakeHandle,
-            completer = { _, _ -> mln_network_status_set(999_999U) },
-            releaser = {},
-          )
-
-        assertEquals(
-          ResourceProviderDecision.HANDLE.nativeValue.toUInt(),
-          handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
-        )
-        val nativeFailure =
-          assertFailsWith<InvalidArgumentException> {
-            handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
-          }
-
-        assertTrue(nativeFailure.diagnostic.contains("network status"))
-        assertFalse(nativeFailure.diagnostic.contains("runtime"))
-      }
-    }
-
-  @Test
-  fun closeDuringCompletionWaitsForCompletionBeforeNativeRelease(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      memScoped {
-        var releases = 0
-        val fakeHandle = SyntheticHandles.resourceRequest()
-        lateinit var handle: ResourceRequestHandle
-        handle =
-          ResourceRequestHandle(
-            fakeHandle,
-            completer = { _, _ ->
-              handle.close()
-              assertEquals(0, releases)
-              MaplibreStatus.OK.nativeCode
-            },
-            releaser = { releases++ },
-          )
-
-        assertEquals(
-          ResourceProviderDecision.HANDLE.nativeValue.toUInt(),
-          handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
-        )
+      assertFailsWith<InvalidStateException> {
         handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
-
-        assertEquals(1, releases)
-        handle.close()
-        assertEquals(1, releases)
       }
+      assertEquals(1, completions)
+      assertEquals(1, releases)
     }
+  }
 
   @Test
-  fun concurrentCloseDuringCompletionWaitsForCompletionBeforeNativeRelease(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      memScoped {
-        val phase = AtomicInt(RESOURCE_PHASE_READY)
-        val error = AtomicReference<Throwable?>(null)
-        val releases = AtomicInt(0)
-        val fakeHandle = SyntheticHandles.resourceRequest()
-        val handle =
-          ResourceRequestHandle(
-            fakeHandle,
-            completer = { _, _ ->
-              phase.store(RESOURCE_PHASE_ENTERED)
-              waitForResourcePhase(phase, RESOURCE_PHASE_RELEASE)
-              MaplibreStatus.OK.nativeCode
-            },
-            releaser = { releases.addAndFetch(1) },
-          )
-
-        assertEquals(
-          ResourceProviderDecision.HANDLE.nativeValue.toUInt(),
-          handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
+  fun nativeCompletionFailureKeepsDiagnosticCapturedBeforeReleaseCleanup() {
+    memScoped {
+      val fakeHandle = SyntheticHandles.resourceRequest()
+      val handle =
+        ResourceRequestHandle(
+          fakeHandle,
+          completer = { _, _ -> mln_network_status_set(999_999U) },
+          releaser = {},
         )
 
-        runResourceCompletionOnNativeThread(ConcurrentResourceCompletion(handle, phase, error)) {
-          waitForResourcePhase(phase, RESOURCE_PHASE_ENTERED)
-          handle.close()
-          assertEquals(0, releases.load())
-        }
-
-        error.load()?.let { throw it }
-        assertEquals(1, releases.load())
-        assertFailsWith<InvalidStateException> {
+      assertEquals(
+        ResourceProviderDecision.HANDLE.nativeValue.toUInt(),
+        handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
+      )
+      val nativeFailure =
+        assertFailsWith<InvalidArgumentException> {
           handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
         }
-      }
+
+      assertTrue(nativeFailure.diagnostic.contains("network status"))
+      assertFalse(nativeFailure.diagnostic.contains("runtime"))
     }
+  }
 
   @Test
-  fun closeDuringCancellationCheckWaitsForCheckBeforeNativeRelease(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      memScoped {
-        var releases = 0
-        val fakeHandle = SyntheticHandles.resourceRequest()
-        lateinit var handle: ResourceRequestHandle
-        handle =
-          ResourceRequestHandle(
-            fakeHandle,
-            cancellationChecker = { _, outCancelled ->
-              handle.close()
-              assertEquals(0, releases)
-              outCancelled.pointed.value = false
-              MaplibreStatus.OK.nativeCode
-            },
-            releaser = { releases++ },
-          )
-
-        assertEquals(
-          ResourceProviderDecision.HANDLE.nativeValue.toUInt(),
-          handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
+  fun closeDuringCompletionWaitsForCompletionBeforeNativeRelease() {
+    memScoped {
+      var releases = 0
+      val fakeHandle = SyntheticHandles.resourceRequest()
+      lateinit var handle: ResourceRequestHandle
+      handle =
+        ResourceRequestHandle(
+          fakeHandle,
+          completer = { _, _ ->
+            handle.close()
+            assertEquals(0, releases)
+            MaplibreStatus.OK.nativeCode
+          },
+          releaser = { releases++ },
         )
-        assertEquals(false, handle.isCancelled())
 
-        assertEquals(1, releases)
+      assertEquals(
+        ResourceProviderDecision.HANDLE.nativeValue.toUInt(),
+        handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
+      )
+      handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
+
+      assertEquals(1, releases)
+      handle.close()
+      assertEquals(1, releases)
+    }
+  }
+
+  @Test
+  fun concurrentCloseDuringCompletionWaitsForCompletionBeforeNativeRelease() {
+    memScoped {
+      val phase = AtomicInt(RESOURCE_PHASE_READY)
+      val error = AtomicReference<Throwable?>(null)
+      val releases = AtomicInt(0)
+      val fakeHandle = SyntheticHandles.resourceRequest()
+      val handle =
+        ResourceRequestHandle(
+          fakeHandle,
+          completer = { _, _ ->
+            phase.store(RESOURCE_PHASE_ENTERED)
+            waitForResourcePhase(phase, RESOURCE_PHASE_RELEASE)
+            MaplibreStatus.OK.nativeCode
+          },
+          releaser = { releases.addAndFetch(1) },
+        )
+
+      assertEquals(
+        ResourceProviderDecision.HANDLE.nativeValue.toUInt(),
+        handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
+      )
+
+      runResourceCompletionOnNativeThread(ConcurrentResourceCompletion(handle, phase, error)) {
+        waitForResourcePhase(phase, RESOURCE_PHASE_ENTERED)
         handle.close()
-        assertEquals(1, releases)
+        assertEquals(0, releases.load())
+      }
+
+      error.load()?.let { throw it }
+      assertEquals(1, releases.load())
+      assertFailsWith<InvalidStateException> {
+        handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
       }
     }
+  }
+
+  @Test
+  fun closeDuringCancellationCheckWaitsForCheckBeforeNativeRelease() {
+    memScoped {
+      var releases = 0
+      val fakeHandle = SyntheticHandles.resourceRequest()
+      lateinit var handle: ResourceRequestHandle
+      handle =
+        ResourceRequestHandle(
+          fakeHandle,
+          cancellationChecker = { _, outCancelled ->
+            handle.close()
+            assertEquals(0, releases)
+            outCancelled.pointed.value = false
+            MaplibreStatus.OK.nativeCode
+          },
+          releaser = { releases++ },
+        )
+
+      assertEquals(
+        ResourceProviderDecision.HANDLE.nativeValue.toUInt(),
+        handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
+      )
+      assertEquals(false, handle.isCancelled())
+
+      assertEquals(1, releases)
+      handle.close()
+      assertEquals(1, releases)
+    }
+  }
 }
 
 @OptIn(ExperimentalAtomicApi::class)

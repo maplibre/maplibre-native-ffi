@@ -784,6 +784,12 @@ external int mln_map_camera_snapshot_get(
   ffi.Pointer<ffi.Uint64> out_generation,
 );
 
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_cancel_transitions(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+);
+
 @ffi.Native<
   ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
@@ -1929,44 +1935,6 @@ external int mln_network_status_get(ffi.Pointer<ffi.Uint32> out_status);
 external int mln_network_status_set(int status);
 
 @ffi.Native<
-  ffi.Int32 Function(mln_offline_region_list, ffi.Pointer<ffi.Size>)
->()
-external int mln_offline_region_list_count(
-  int list,
-  ffi.Pointer<ffi.Size> out_count,
-);
-
-@ffi.Native<ffi.Void Function(mln_offline_region_list)>()
-external void mln_offline_region_list_destroy(int list);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_offline_region_list,
-    ffi.Size,
-    ffi.Pointer<mln_offline_region_info>,
-  )
->()
-external int mln_offline_region_list_get(
-  int list,
-  int index,
-  ffi.Pointer<mln_offline_region_info> out_info,
-);
-
-@ffi.Native<ffi.Void Function(mln_offline_region_snapshot)>()
-external void mln_offline_region_snapshot_destroy(int snapshot);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_offline_region_snapshot,
-    ffi.Pointer<mln_offline_region_info>,
-  )
->()
-external int mln_offline_region_snapshot_get(
-  int snapshot,
-  ffi.Pointer<mln_offline_region_info> out_info,
-);
-
-@ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_opengl_borrowed_texture_descriptor>,
@@ -2070,33 +2038,6 @@ external int mln_projected_meters_for_lat_lng(
 
 @ffi.Native<mln_projection_mode Function()>()
 external mln_projection_mode mln_projection_mode_default();
-
-@ffi.Native<mln_queried_feature Function()>()
-external mln_queried_feature mln_queried_feature_default();
-
-@ffi.Native<
-  ffi.Int32 Function(mln_queried_feature_list, ffi.Pointer<ffi.Size>)
->()
-external int mln_queried_feature_list_count(
-  int list,
-  ffi.Pointer<ffi.Size> out_count,
-);
-
-@ffi.Native<ffi.Void Function(mln_queried_feature_list)>()
-external void mln_queried_feature_list_destroy(int list);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_queried_feature_list,
-    ffi.Size,
-    ffi.Pointer<mln_queried_feature>,
-  )
->()
-external int mln_queried_feature_list_get(
-  int list,
-  int index,
-  ffi.Pointer<mln_queried_feature> out_feature,
-);
 
 @ffi.Native<ffi.Int32 Function(mln_render_frame_batch, ffi.Pointer<ffi.Size>)>()
 external int mln_render_frame_batch_count(
@@ -2634,48 +2575,11 @@ external int mln_runtime_set_resource_transform(
 external mln_source_feature_query_options
 mln_source_feature_query_options_default();
 
-@ffi.Native<ffi.Int32 Function(mln_style_id_list, ffi.Pointer<ffi.Size>)>()
-external int mln_style_id_list_count(int list, ffi.Pointer<ffi.Size> out_count);
-
-@ffi.Native<ffi.Void Function(mln_style_id_list)>()
-external void mln_style_id_list_destroy(int list);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_style_id_list, ffi.Size, ffi.Pointer<mln_buffer_view>)
->()
-external int mln_style_id_list_get(
-  int list,
-  int index,
-  ffi.Pointer<mln_buffer_view> out_id,
-);
-
 @ffi.Native<mln_style_image_info Function()>()
 external mln_style_image_info mln_style_image_info_default();
 
 @ffi.Native<mln_style_image_options Function()>()
 external mln_style_image_options mln_style_image_options_default();
-
-@ffi.Native<ffi.Int32 Function(mln_style_string_list, ffi.Pointer<ffi.Size>)>()
-external int mln_style_string_list_count(
-  int list,
-  ffi.Pointer<ffi.Size> out_count,
-);
-
-@ffi.Native<ffi.Void Function(mln_style_string_list)>()
-external void mln_style_string_list_destroy(int list);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_style_string_list,
-    ffi.Size,
-    ffi.Pointer<mln_buffer_view>,
-  )
->()
-external int mln_style_string_list_get(
-  int list,
-  int index,
-  ffi.Pointer<mln_buffer_view> out_value,
-);
 
 @ffi.Native<mln_style_tile_source_options Function()>()
 external mln_style_tile_source_options mln_style_tile_source_options_default();
@@ -2883,12 +2787,6 @@ const int MLN_HANDLE_NULL = 0;
 const int MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL = 0;
 
 final class UnnamedUnion extends ffi.Union {
-  external mln_offline_tile_pyramid_region_definition tile_pyramid;
-
-  external mln_offline_geometry_region_definition geometry;
-}
-
-final class UnnamedUnion$1 extends ffi.Union {
   external mln_wgl_context_descriptor wgl;
 
   external mln_egl_context_descriptor egl;
@@ -2896,12 +2794,18 @@ final class UnnamedUnion$1 extends ffi.Union {
   external mln_webgl_context_descriptor webgl;
 }
 
-final class UnnamedUnion$2 extends ffi.Union {
+final class UnnamedUnion$1 extends ffi.Union {
   external mln_screen_point point;
 
   external mln_screen_box box;
 
   external mln_screen_line_string line_string;
+}
+
+final class UnnamedUnion$2 extends ffi.Union {
+  external mln_offline_tile_pyramid_region_definition tile_pyramid;
+
+  external mln_offline_geometry_region_definition geometry;
 }
 
 typedef mln_acquired_frame = ffi.Uint64;
@@ -4641,8 +4545,8 @@ final class mln_map_snapshot extends ffi.Struct {
   @ffi.Bool()
   external bool repaint_demand;
 
-  @ffi.Uint8()
-  external int reserved_flags;
+  @ffi.Bool()
+  external bool gesture_in_progress;
 
   @ffi.Uint64()
   external int event_mask;
@@ -4925,7 +4829,7 @@ final class mln_offline_region_definition extends ffi.Struct {
   @ffi.Uint32()
   external int type;
 
-  external UnnamedUnion data;
+  external UnnamedUnion$2 data;
 }
 
 enum mln_offline_region_definition_type {
@@ -4979,11 +4883,6 @@ final class mln_offline_region_info extends ffi.Struct {
   @ffi.Size()
   external int metadata_size;
 }
-
-typedef mln_offline_region_list = ffi.Uint64;
-typedef Dartmln_offline_region_list = int;
-typedef mln_offline_region_snapshot = ffi.Uint64;
-typedef Dartmln_offline_region_snapshot = int;
 
 final class mln_offline_region_status extends ffi.Struct {
   @ffi.Uint32()
@@ -5120,7 +5019,7 @@ final class mln_opengl_context_descriptor extends ffi.Struct {
   set ownership(mln_opengl_context_ownership value) =>
       ownershipAsInt = value.value;
 
-  external UnnamedUnion$1 data;
+  external UnnamedUnion data;
 }
 
 enum mln_opengl_context_ownership {
@@ -5795,7 +5694,7 @@ final class mln_rendered_query_geometry extends ffi.Struct {
   @ffi.Uint32()
   external int type;
 
-  external UnnamedUnion$2 data;
+  external UnnamedUnion$1 data;
 }
 
 enum mln_rendered_query_geometry_type {
@@ -6481,7 +6380,7 @@ enum mln_runtime_event_payload_type {
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS(5),
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR(6),
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT(7),
-  MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED(8);
+  MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED(9);
 
   final int value;
   const mln_runtime_event_payload_type(this.value);
@@ -6494,7 +6393,7 @@ enum mln_runtime_event_payload_type {
     5 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS,
     6 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR,
     7 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT,
-    8 => MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
+    9 => MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
     _ => throw ArgumentError(
       'Unknown value for mln_runtime_event_payload_type: $value',
     ),
@@ -6715,9 +6614,6 @@ sealed class mln_status {
   static const MLN_STATUS_NOT_FOUND = -10;
 }
 
-typedef mln_style_id_list = ffi.Uint64;
-typedef Dartmln_style_id_list = int;
-
 final class mln_style_image_info extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -6901,7 +6797,7 @@ final class mln_style_layer_info extends ffi.Struct {
   external int size;
 
   @ffi.Uint32()
-  external int fields;
+  external int reserved;
 
   external mln_buffer_view type;
 
@@ -6913,28 +6809,6 @@ final class mln_style_layer_info extends ffi.Struct {
 
   @ffi.Uint32()
   external int visibility;
-
-  @ffi.Size()
-  external int source_id_size;
-
-  @ffi.Size()
-  external int source_layer_size;
-}
-
-enum mln_style_layer_info_field {
-  MLN_STYLE_LAYER_INFO_SOURCE_ID(1),
-  MLN_STYLE_LAYER_INFO_SOURCE_LAYER(2);
-
-  final int value;
-  const mln_style_layer_info_field(this.value);
-
-  static mln_style_layer_info_field fromValue(int value) => switch (value) {
-    1 => MLN_STYLE_LAYER_INFO_SOURCE_ID,
-    2 => MLN_STYLE_LAYER_INFO_SOURCE_LAYER,
-    _ => throw ArgumentError(
-      'Unknown value for mln_style_layer_info_field: $value',
-    ),
-  };
 }
 
 final class mln_style_layer_result extends ffi.Struct {
@@ -7104,9 +6978,6 @@ enum mln_style_source_type {
     _ => throw ArgumentError('Unknown value for mln_style_source_type: $value'),
   };
 }
-
-typedef mln_style_string_list = ffi.Uint64;
-typedef Dartmln_style_string_list = int;
 
 enum mln_style_tile_scheme {
   MLN_STYLE_TILE_SCHEME_XYZ(0),

@@ -17,6 +17,7 @@ internal object CompletionBridge {
   private class State<T>(
     val convert: (MaplibreNativeC.mln_completion_result) -> T,
     val acceptErrorStatus: Boolean,
+    val closeDropped: (T) -> Unit,
   ) {
     val deferred = CompletableDeferred<T>()
     val token = BytePointer(1L)
@@ -42,13 +43,24 @@ internal object CompletionBridge {
     call: (MaplibreNativeC.mln_completion) -> Int,
   ): Deferred<T> = submitInternal(convert, false, false, call)
 
+  /**
+   * Submits a completion that produces an owned handle wrapper, handing the wrapper to
+   * [closeDropped] when the caller cancelled the deferred before the value arrived.
+   */
+  fun <T> submitOwned(
+    convert: (MaplibreNativeC.mln_completion_result) -> T,
+    closeDropped: (T) -> Unit,
+    call: (MaplibreNativeC.mln_completion) -> Int,
+  ): Deferred<T> = submitInternal(convert, false, false, call, closeDropped)
+
   private fun <T> submitInternal(
     convert: (MaplibreNativeC.mln_completion_result) -> T,
     rejectSynchronously: Boolean,
     acceptErrorStatus: Boolean,
     call: (MaplibreNativeC.mln_completion) -> Int,
+    closeDropped: (T) -> Unit = {},
   ): Deferred<T> {
-    val state = State(convert, acceptErrorStatus)
+    val state = State(convert, acceptErrorStatus, closeDropped)
     states[state.token.address()] = state
     try {
       MaplibreNativeC.mln_completion().use { completion ->
@@ -72,18 +84,18 @@ internal object CompletionBridge {
     submitInternal({ _ -> }, true, false, call)
 
   fun command(call: (MaplibreNativeC.mln_completion) -> Int): Deferred<CommandCompletion> =
-    submitInternal(
-      { result ->
-        CommandCompletion(
-          CommandDisposition.fromNative(result.disposition()),
-          result.generation().toULong(),
-          MaplibreStatus.fromNative(result.status()),
-          diagnostic(result),
-        )
-      },
-      false,
-      true,
-      call,
+    submitInternal(::commandCompletion, false, true, call)
+
+  /** Submits an ordered command and throws instead of deferring a synchronous rejection. */
+  fun commandChecked(call: (MaplibreNativeC.mln_completion) -> Int): Deferred<CommandCompletion> =
+    submitInternal(::commandCompletion, true, true, call)
+
+  private fun commandCompletion(result: MaplibreNativeC.mln_completion_result): CommandCompletion =
+    CommandCompletion(
+      CommandDisposition.fromNative(result.disposition()),
+      result.generation(),
+      MaplibreStatus.fromNative(result.status()),
+      diagnostic(result),
     )
 
   @Suppress("UNCHECKED_CAST")
@@ -92,7 +104,8 @@ internal object CompletionBridge {
     try {
       val status = result.status()
       if (status == MaplibreStatus.OK.nativeCode || state.acceptErrorStatus) {
-        state.deferred.complete(state.convert(result))
+        val value = state.convert(result)
+        if (!state.deferred.complete(value)) state.closeDropped(value)
       } else {
         val message = diagnostic(result)
         state.deferred.completeExceptionally(

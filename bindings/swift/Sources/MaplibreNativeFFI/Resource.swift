@@ -222,7 +222,7 @@ public final class ResourceRequestHandle: @unchecked Sendable {
 
   public func complete(_ response: ResourceResponse) throws {
     if case let .unknown(raw) = response.errorReason {
-      throw NativeStatusFailure.swiftInvalidArgument(
+      throw MaplibreError.invalidArgument(
         "ResourceErrorReason.unknown(\(raw)) cannot be sent back to native"
       )
     }

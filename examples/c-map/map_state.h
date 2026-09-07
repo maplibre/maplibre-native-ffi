@@ -25,7 +25,10 @@ const mln_completion* map_state_discarded_completion(void);
   map_state* state, const mln_camera_options* camera, uint32_t mode,
   const mln_animation_options* animation, uint32_t gesture_phase
 );
-[[nodiscard]] app_error map_state_resize(map_state* state, viewport value);
+
+/// Ends any running camera transition, so a starting gesture takes over from
+/// it rather than fighting it.
+[[nodiscard]] app_error map_state_cancel_transitions(map_state* state);
 
 /// Drains the owned event queue on the render-loop receiver.
 [[nodiscard]] app_error map_state_drain_events(

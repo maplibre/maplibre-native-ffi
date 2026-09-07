@@ -99,8 +99,11 @@ struct NativeFuture<Value: Sendable> {
 
 enum NativeCompletion {
   /// Starts native work synchronously and returns its one-shot async value.
+  ///
+  /// `call` may throw while materializing its arguments; the completion state
+  /// it never reached is released before the error propagates.
   static func start<Value: Sendable>(
-    _ call: (UnsafePointer<mln_completion>) -> mln_status,
+    _ call: (UnsafePointer<mln_completion>) throws -> mln_status,
     acceptErrorStatus: Bool = false,
     convert: @escaping (UnsafePointer<mln_completion_result>) throws -> Value
   ) throws -> NativeFuture<Value> {
@@ -123,7 +126,13 @@ enum NativeCompletion {
       Unmanaged<AnyObject>.fromOpaque(userData).release()
     }
 
-    let status = withUnsafePointer(to: &descriptor, call)
+    let status: mln_status
+    do {
+      status = try withUnsafePointer(to: &descriptor, call)
+    } catch {
+      retained.release()
+      throw error
+    }
     if status != MLN_STATUS_OK {
       retained.release()
       try checkStatus(status)
@@ -131,27 +140,14 @@ enum NativeCompletion {
     return NativeFuture(state: state)
   }
 
-  static func submit<Value: Sendable>(
-    _ call: (UnsafePointer<mln_completion>) -> mln_status,
-    convert: @escaping (UnsafePointer<mln_completion_result>) throws -> Value
-  ) async throws -> Value {
-    try await start(call, convert: convert).value()
-  }
-
   static func startUnit(
-    _ call: (UnsafePointer<mln_completion>) -> mln_status
+    _ call: (UnsafePointer<mln_completion>) throws -> mln_status
   ) throws -> NativeFuture<Void> {
     try start(call) { _ in () }
   }
 
-  static func unit(
-    _ call: (UnsafePointer<mln_completion>) -> mln_status
-  ) async throws {
-    try await startUnit(call).value()
-  }
-
   static func startCommand(
-    _ call: (UnsafePointer<mln_completion>) -> mln_status
+    _ call: (UnsafePointer<mln_completion>) throws -> mln_status
   ) throws -> NativeFuture<CommandCompletion> {
     try start(call, acceptErrorStatus: true) { result in
       try CommandCompletion(
@@ -164,12 +160,6 @@ enum NativeCompletion {
         )
       )
     }
-  }
-
-  static func command(
-    _ call: (UnsafePointer<mln_completion>) -> mln_status
-  ) async throws -> CommandCompletion {
-    try await startCommand(call).value()
   }
 
   static func value<Value>(

@@ -66,25 +66,6 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     create_framebuffers();
   }
 
-  // Rebuilds everything sized with the texture and keeps the render pass. mbgl
-  // keys its pipeline cache on the render pass handle, so destroying the pass
-  // strands every cached pipeline and lets a recycled handle hit a pipeline
-  // built for a different pass. Attachment formats and layouts do not vary with
-  // size.
-  void resize_sampled(vk::Extent2D sampled_extent) {
-    backend.getDevice()->waitIdle(backend.getDispatcher());
-    swapchainFramebuffers.clear();
-    swapchainImageViews.clear();
-    swapchainImages.clear();
-    colorAllocations.clear();
-    readTexture.reset();
-
-    init_sampled_color(sampled_extent);
-    create_color_image_views();
-    initDepthStencil();
-    create_framebuffers();
-  }
-
   // Whether a replacement image can use the render pass this resource already
   // has, which needs the format and both layouts the pass was built around.
   [[nodiscard]] auto matches_borrowed(
@@ -178,9 +159,9 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     colorFormat = vk::Format::eR8G8B8A8Unorm;
     extent = sampled_extent;
 
-    const auto image_usage = vk::ImageUsageFlagBits::eColorAttachment |
-                             vk::ImageUsageFlagBits::eSampled |
-                             vk::ImageUsageFlagBits::eTransferSrc;
+    const auto image_usage =
+      vk::ImageUsageFlags{vk::ImageUsageFlagBits::eColorAttachment} |
+      vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferSrc;
     auto image_create_info =
       vk::ImageCreateInfo()
         .setImageType(vk::ImageType::e2D)
@@ -296,11 +277,15 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
         .setSrcSubpass(VK_SUBPASS_EXTERNAL)
         .setDstSubpass(0)
         .setSrcStageMask(
-          vk::PipelineStageFlagBits::eEarlyFragmentTests |
+          vk::PipelineStageFlags{
+            vk::PipelineStageFlagBits::eEarlyFragmentTests
+          } |
           vk::PipelineStageFlagBits::eLateFragmentTests
         )
         .setDstStageMask(
-          vk::PipelineStageFlagBits::eEarlyFragmentTests |
+          vk::PipelineStageFlags{
+            vk::PipelineStageFlagBits::eEarlyFragmentTests
+          } |
           vk::PipelineStageFlagBits::eLateFragmentTests
         )
         .setSrcAccessMask({})
@@ -394,8 +379,7 @@ VulkanTextureBackend::VulkanTextureBackend(
     : mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
       mln::gfx::HeadlessBackend(size),
       descriptor_(descriptor),
-      slot_resources_(ring_depth),
-      slot_sizes_(ring_depth) {
+      ring_(ring_depth) {
   initSharedDevice();
 }
 
@@ -407,15 +391,14 @@ VulkanTextureBackend::VulkanTextureBackend(
       descriptor_(owned_descriptor_from_borrowed(descriptor)),
       borrowed_descriptor_(descriptor),
       uses_borrowed_texture_(true),
-      slot_resources_(1),
-      slot_sizes_(1) {
+      ring_(0) {
   initSharedDevice();
 }
 
 VulkanTextureBackend::~VulkanTextureBackend() {
   auto guard = mln::gfx::BackendScope{*this};
   resource.reset();
-  slot_resources_.clear();
+  ring_.clear();
   getThreadPool().runRenderJobs(true);
 }
 
@@ -435,7 +418,9 @@ void VulkanTextureBackend::initSharedDevice() {
 auto VulkanTextureBackend::getDefaultRenderable() -> mln::gfx::Renderable& {
   if (!resource) {
     resource = std::make_unique<VulkanTextureRenderableResource>(*this);
-    slot_sizes_[selected_slot_] = size;
+    // Recorded with the resource it describes, so a slot that keeps an older
+    // resource keeps the size that resource was built for.
+    ring_.record_size(size);
   }
   return *this;
 }
@@ -469,9 +454,9 @@ void VulkanTextureBackend::set_borrowed_target(
   size = new_size;
 }
 
-void VulkanTextureBackend::resize(mln::Size new_size) {
-  // Slots keep their old resources until the common ring selects a released
-  // slot for rendering at the new extent.
+void VulkanTextureBackend::set_ring_size(mln::Size new_size) {
+  // Slots keep their old resources until the ring selects a released slot for
+  // rendering at the new extent.
   size = new_size;
 }
 
@@ -593,45 +578,19 @@ void VulkanTextureBackend::prepareRenderResources() {
   }
 }
 
-auto VulkanTextureBackend::frame_resources(std::size_t slot)
-  -> VulkanTextureFrameResources {
-  if (slot >= slot_resources_.size()) {
-    return {};
-  }
-  if (slot == selected_slot_) {
-    prepareRenderResources();
-  } else if (slot_resources_[slot] == nullptr) {
-    const auto previous = selected_slot_;
-    if (!select_slot(slot)) return {};
-    prepareRenderResources();
-    static_cast<void>(select_slot(previous));
-  }
-  auto* rendered = slot == selected_slot_
-                     ? &getResource<VulkanTextureRenderableResource>()
-                     : static_cast<VulkanTextureRenderableResource*>(
-                         slot_resources_[slot].get()
-                       );
+auto VulkanTextureBackend::frame_resources() -> VulkanTextureFrameResources {
+  prepareRenderResources();
+  auto& rendered = getResource<VulkanTextureRenderableResource>();
   return VulkanTextureFrameResources{
-    .image = rendered->image(),
-    .image_view = rendered->image_view(),
+    .image = rendered.image(),
+    .image_view = rendered.image_view(),
     .device = device.get(),
-    .format = rendered->format(),
+    .format = rendered.format(),
   };
 }
 
 auto VulkanTextureBackend::select_slot(std::size_t slot) -> bool {
-  if (slot >= slot_resources_.size()) return false;
-  if (slot == selected_slot_) {
-    if (resource != nullptr && slot_sizes_[slot] != size) resource.reset();
-    return true;
-  }
-  slot_resources_[selected_slot_] = std::move(resource);
-  if (slot_resources_[slot] != nullptr && slot_sizes_[slot] != size) {
-    slot_resources_[slot].reset();
-  }
-  resource = std::move(slot_resources_[slot]);
-  selected_slot_ = slot;
-  return true;
+  return ring_.select(slot, size, resource);
 }
 
 void VulkanTextureBackend::initInstance() {

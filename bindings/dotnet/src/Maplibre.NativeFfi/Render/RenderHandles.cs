@@ -18,8 +18,6 @@ internal unsafe delegate mln_status AttachNative<T>(
 )
     where T : unmanaged;
 
-internal unsafe delegate mln_status StartRenderOperation(mln_completion* completion);
-
 /// <summary>A render session and its asynchronous attachment completion.</summary>
 public sealed unsafe class RenderSessionHandle : IDisposable
 {
@@ -60,49 +58,52 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             )
             .Unwrap();
 
-    public RenderSessionCapabilityInfo Capabilities
+    /// <summary>Whether this wrapper has successfully closed its native handle.</summary>
+    public bool IsClosed => state.IsClosed;
+
+    /// <summary>Reads the driver and capability flags this session attached with.</summary>
+    /// <remarks>
+    /// A borrowed-texture session grants neither frame acquisition nor readback, so its flags are
+    /// empty.
+    /// </remarks>
+    public RenderSessionCapabilityInfo GetCapabilities()
     {
-        get
+        var value = new mln_render_session_capabilities
         {
-            var value = new mln_render_session_capabilities
-            {
-                size = (uint)sizeof(mln_render_session_capabilities),
-            };
-            NativeStatus.Check(NativeMethods.mln_render_session_get_capabilities(Handle, &value));
-            return new(
-                (RenderDriverKind)value.driver,
-                value.texture_ring_depth,
-                (RenderSessionCapabilities)value.flags
-            );
-        }
+            size = (uint)sizeof(mln_render_session_capabilities),
+        };
+        NativeStatus.Check(NativeMethods.mln_render_session_get_capabilities(Handle, &value));
+        return new(
+            (RenderDriverKind)value.driver,
+            value.texture_ring_depth,
+            (RenderSessionCapabilities)value.flags
+        );
     }
 
-    public RenderSessionSnapshot Snapshot
+    /// <summary>Gets a synchronous copy of the session's committed state.</summary>
+    public RenderSessionSnapshot GetSnapshot()
     {
-        get
+        var value = new mln_render_session_snapshot
         {
-            var value = new mln_render_session_snapshot
-            {
-                size = (uint)sizeof(mln_render_session_snapshot),
-            };
-            NativeStatus.Check(NativeMethods.mln_render_session_get_snapshot(Handle, &value));
-            return new(
-                (RenderSessionState)value.state,
-                (RenderDriverKind)value.driver,
-                (RenderResult)value.latest_result,
-                new(value.extent.width, value.extent.height, value.extent.scale_factor),
-                value.generation,
-                value.map_update_generation,
-                value.rendered_update_generation,
-                value.extent_generation,
-                value.frame_generation,
-                value.latest_demand_token,
-                value.pending_demand_count,
-                value.acquired_frame_count,
-                value.target_ready != 0,
-                value.pending_changes != 0
-            );
-        }
+            size = (uint)sizeof(mln_render_session_snapshot),
+        };
+        NativeStatus.Check(NativeMethods.mln_render_session_get_snapshot(Handle, &value));
+        return new(
+            (RenderSessionState)value.state,
+            (RenderDriverKind)value.driver,
+            (RenderResult)value.latest_result,
+            new(value.extent.width, value.extent.height, value.extent.scale_factor),
+            value.generation,
+            value.map_update_generation,
+            value.rendered_update_generation,
+            value.extent_generation,
+            value.frame_generation,
+            value.latest_demand_token,
+            value.pending_demand_count,
+            value.acquired_frame_count,
+            value.target_ready != 0,
+            value.pending_changes != 0
+        );
     }
 
     internal MlnRenderSession Handle => state.Handle;
@@ -266,6 +267,11 @@ public sealed unsafe class RenderSessionHandle : IDisposable
                 NativeMethods.mln_webgpu_borrowed_texture_attach(m, d, o, s, p)
         );
 
+    /// <summary>Demands one frame from the attached target.</summary>
+    /// <remarks>
+    /// A flags bit outside <see cref="FrameDemandFlags" /> is rejected with
+    /// <see cref="Error.MaplibreStatus.InvalidArgument" />.
+    /// </remarks>
     public void RequestFrame(FrameDemand demand)
     {
         var native = NativeMethods.mln_frame_demand_default();
@@ -276,18 +282,39 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_render_session_request_frame(Handle, &native));
     }
 
-    public RenderFrameBatch DrainFrameResults()
+    /// <summary>Drains every queued frame result into one list of copies.</summary>
+    /// <remarks>
+    /// An empty queue is not an error: the native drain reports it as not-ready and this returns
+    /// an empty list. The copies preserve queue order after the owned native batch is released.
+    /// </remarks>
+    public IReadOnlyList<RenderFrameResult> DrainFrameResults()
     {
         MlnRenderFrameBatch batch = default;
-        NativeStatus.Check(NativeMethods.mln_render_session_drain_frame_results(Handle, &batch));
+        var status = NativeMethods.mln_render_session_drain_frame_results(Handle, &batch);
+        if (status == mln_status.MLN_STATUS_NOT_READY)
+        {
+            return [];
+        }
+        NativeStatus.Check(status);
         try
         {
-            return new RenderFrameBatch(batch);
+            nuint count = 0;
+            NativeStatus.Check(NativeMethods.mln_render_frame_batch_count(batch, &count));
+            var results = new RenderFrameResult[checked((int)count)];
+            for (nuint index = 0; index < count; index++)
+            {
+                var value = new mln_render_frame_result
+                {
+                    size = (uint)sizeof(mln_render_frame_result),
+                };
+                NativeStatus.Check(NativeMethods.mln_render_frame_batch_get(batch, index, &value));
+                results[(int)index] = FromNative(value);
+            }
+            return results;
         }
-        catch
+        finally
         {
             NativeMethods.mln_render_frame_batch_release(batch);
-            throw;
         }
     }
 
@@ -458,13 +485,18 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     }
 
     /// <summary>
-    /// Resizes this attached render session. Surface and owned-texture sessions resize in place;
-    /// a borrowed texture target reports an unsupported-feature error, since its owner sizes it —
-    /// hand over a new texture with the backend's set-target method instead. A resize keeps the
-    /// session's renderer along with the tile pyramid, glyph and image atlases, and symbol
-    /// placement. A scale factor change retires the renderer instead, because shaders are compiled
-    /// for one pixel ratio. Map-owned feature state survives either way.
+    /// Resizes this attached render session, and the map behind it.
     /// </summary>
+    /// <remarks>
+    /// Surface and owned-texture sessions resize in place; a borrowed texture target reports an
+    /// unsupported-feature error, since its owner sizes it — hand over a new texture with the
+    /// backend's set-target method instead. A resize keeps the session's renderer along with the
+    /// tile pyramid, glyph and image atlases, and symbol placement, and map-owned feature state.
+    /// The scale factor is fixed when the session attaches: a different one is rejected with
+    /// <see cref="Error.MaplibreStatus.InvalidArgument" />, as is a resize while a texture frame
+    /// is acquired with <see cref="Error.MaplibreStatus.InvalidState" />. A later resize may
+    /// supersede this one, which still completes successfully.
+    /// </remarks>
     public Task ResizeAsync(
         RenderTargetExtent extent,
         CancellationToken cancellationToken = default
@@ -480,45 +512,37 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     }
 
     public Task BarrierAsync(CancellationToken cancellationToken = default) =>
-        StartOperationAsync(
-            operation => NativeMethods.mln_render_session_barrier(Handle, operation),
-            cancellationToken
-        );
+        NativeCompletion
+            .SubmitUnit(completion => NativeMethods.mln_render_session_barrier(Handle, completion))
+            .WaitAsync(cancellationToken);
 
     public Task ReduceMemoryUseAsync(CancellationToken cancellationToken = default) =>
-        StartOperationAsync(
-            operation => NativeMethods.mln_render_session_reduce_memory_use(Handle, operation),
-            cancellationToken
-        );
-
-    public Task ClearDataAsync(CancellationToken cancellationToken = default) =>
-        StartOperationAsync(
-            operation => NativeMethods.mln_render_session_clear_data(Handle, operation),
-            cancellationToken
-        );
-
-    public Task DumpDebugLogsAsync(CancellationToken cancellationToken = default) =>
-        StartOperationAsync(
-            operation => NativeMethods.mln_render_session_dump_debug_logs(Handle, operation),
-            cancellationToken
-        );
-
-    public Task<byte[]> ReadPremultipliedRgba8Async(
-        CancellationToken cancellationToken = default
-    ) =>
         NativeCompletion
-            .Submit(
-                completion =>
-                    NativeMethods.mln_texture_read_premultiplied_rgba8(Handle, completion),
-                static result =>
-                {
-                    var value = NativeCompletion.Value<mln_texture_readback_result>(result);
-                    return ValueStructs.CopyBufferView(value.data);
-                }
+            .SubmitUnit(completion =>
+                NativeMethods.mln_render_session_reduce_memory_use(Handle, completion)
             )
             .WaitAsync(cancellationToken);
 
-    public Task<PremultipliedRgba8Image> ReadImageAsync(
+    public Task ClearDataAsync(CancellationToken cancellationToken = default) =>
+        NativeCompletion
+            .SubmitUnit(completion =>
+                NativeMethods.mln_render_session_clear_data(Handle, completion)
+            )
+            .WaitAsync(cancellationToken);
+
+    public Task DumpDebugLogsAsync(CancellationToken cancellationToken = default) =>
+        NativeCompletion
+            .SubmitUnit(completion =>
+                NativeMethods.mln_render_session_dump_debug_logs(Handle, completion)
+            )
+            .WaitAsync(cancellationToken);
+
+    /// <summary>Reads the last rendered frame back as premultiplied RGBA8 pixels.</summary>
+    /// <remarks>
+    /// The session must carry <see cref="RenderSessionCapabilities.Readback" />; a session over a
+    /// caller-owned texture does not.
+    /// </remarks>
+    public Task<PremultipliedRgba8Image> ReadPremultipliedRgba8Async(
         CancellationToken cancellationToken = default
     ) =>
         NativeCompletion
@@ -627,12 +651,17 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             .WaitAsync(cancellationToken);
     }
 
+    /// <summary>Detaches the session from its render target.</summary>
+    /// <remarks>Still-outstanding frame demands report a target-not-ready result.</remarks>
     public Task DetachAsync(CancellationToken cancellationToken = default) =>
-        StartOperationAsync(
-            operation => NativeMethods.mln_render_session_detach(Handle, operation),
-            cancellationToken
-        );
+        NativeCompletion
+            .SubmitUnit(completion => NativeMethods.mln_render_session_detach(Handle, completion))
+            .WaitAsync(cancellationToken);
 
+    /// <summary>Abandons the session without waiting for its driver.</summary>
+    /// <remarks>
+    /// This reports a busy error and changes nothing while a driver call is in flight.
+    /// </remarks>
     public RenderAbandonResult Abandon()
     {
         var result = new mln_render_abandon_result
@@ -648,8 +677,18 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new((RenderAbandonDisposition)result.disposition, result.quarantined_resource_count);
     }
 
+    /// <summary>Destroys the session's native handle.</summary>
+    /// <remarks>
+    /// Detach or abandon the session first: a still-attached session rejects the destroy. This is
+    /// callable from one of the session's own completions.
+    /// </remarks>
     public void Close() => state.Close();
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// This carries <see cref="Close" />'s detach-or-abandon precondition, and reports a failed
+    /// destroy through the leak reporter instead of throwing.
+    /// </remarks>
     public void Dispose()
     {
         state.TryClose();
@@ -724,11 +763,6 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return selector;
     }
 
-    private Task StartOperationAsync(
-        StartRenderOperation start,
-        CancellationToken cancellationToken
-    ) => NativeCompletion.SubmitUnit(completion => start(completion)).WaitAsync(cancellationToken);
-
     private static byte[] CopyBuffer(mln_completion_result* result) =>
         ValueStructs.CopyBufferView(NativeCompletion.Value<mln_buffer_view>(result));
 
@@ -768,86 +802,6 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             value.frame_generation,
             value.needs_repaint != 0
         );
-}
-
-/// <summary>Owned, stable frame-result records from one level-triggered drain.</summary>
-public sealed unsafe class RenderFrameBatch : IReadOnlyList<RenderFrameResult>, IDisposable
-{
-    private readonly object gate = new();
-    private MlnRenderFrameBatch handle;
-
-    internal RenderFrameBatch(MlnRenderFrameBatch handle)
-    {
-        this.handle = handle;
-        nuint count = 0;
-        NativeStatus.Check(NativeMethods.mln_render_frame_batch_count(handle, &count));
-        if (count > int.MaxValue)
-        {
-            throw new OverflowException("The frame-result batch is too large.");
-        }
-        Count = (int)count;
-    }
-
-    public int Count { get; }
-
-    public RenderFrameResult this[int index]
-    {
-        get
-        {
-            ArgumentOutOfRangeException.ThrowIfNegative(index);
-            if (index >= Count)
-                throw new ArgumentOutOfRangeException(nameof(index));
-            lock (gate)
-            {
-                if (handle.IsNull)
-                    throw new ObjectDisposedException(nameof(RenderFrameBatch));
-                var value = new mln_render_frame_result
-                {
-                    size = (uint)sizeof(mln_render_frame_result),
-                };
-                NativeStatus.Check(
-                    NativeMethods.mln_render_frame_batch_get(handle, (nuint)index, &value)
-                );
-                return RenderSessionHandle.FromNative(value);
-            }
-        }
-    }
-
-    public IEnumerator<RenderFrameResult> GetEnumerator() => new Enumerator(this);
-
-    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() =>
-        GetEnumerator();
-
-    public void Dispose()
-    {
-        lock (gate)
-        {
-            if (handle.IsNull)
-                return;
-            NativeMethods.mln_render_frame_batch_release(handle);
-            handle = default;
-        }
-    }
-
-    private sealed class Enumerator(RenderFrameBatch batch) : IEnumerator<RenderFrameResult>
-    {
-        private int index = -1;
-
-        public RenderFrameResult Current => batch[index];
-        object System.Collections.IEnumerator.Current => Current;
-
-        public bool MoveNext()
-        {
-            if (index + 1 >= batch.Count)
-                return false;
-            index++;
-            return true;
-        }
-
-        public void Reset() => index = -1;
-
-        public void Dispose() { }
-    }
 }
 
 /// <summary>An acquired texture-ring slot whose native accessors remain valid until release.</summary>
@@ -960,26 +914,9 @@ public sealed unsafe class AcquiredFrameHandle : IDisposable
         }
     }
 
-    public void Release(GpuSync? consumerCompletion)
-    {
-        lock (gate)
-        {
-            if (handle.IsNull)
-                throw new ObjectDisposedException(nameof(AcquiredFrameHandle));
-            var sync = NativeMethods.mln_gpu_sync_default();
-            if (consumerCompletion is { } completion)
-            {
-                sync.kind = (uint)completion.Kind;
-                sync.@object = completion.ObjectBits;
-                sync.value = completion.Value;
-            }
-            var frame = handle;
-            NativeStatus.Check(NativeMethods.mln_acquired_frame_release(&frame, &sync));
-            handle = frame;
-            scope.Dispose();
-        }
-        session.FrameReleased(this);
-    }
+    /// <summary>Returns the slot to the texture ring, handing the driver a consumer sync.</summary>
+    public void Release(GpuSync? consumerCompletion) =>
+        ReleaseCore(consumerCompletion, throwIfReleased: true);
 
     internal void InvalidateAccessors()
     {
@@ -987,13 +924,27 @@ public sealed unsafe class AcquiredFrameHandle : IDisposable
             scope.Dispose();
     }
 
-    public void Dispose()
+    /// <inheritdoc />
+    /// <remarks>Releasing an already-released frame is a no-op, unlike <see cref="Release" />.</remarks>
+    public void Dispose() => ReleaseCore(null, throwIfReleased: false);
+
+    private void ReleaseCore(GpuSync? consumerCompletion, bool throwIfReleased)
     {
         lock (gate)
         {
             if (handle.IsNull)
+            {
+                if (throwIfReleased)
+                    throw new ObjectDisposedException(nameof(AcquiredFrameHandle));
                 return;
+            }
             var sync = NativeMethods.mln_gpu_sync_default();
+            if (consumerCompletion is { } completion)
+            {
+                sync.kind = (uint)completion.Kind;
+                sync.@object = completion.ObjectBits;
+                sync.value = completion.Value;
+            }
             var frame = handle;
             NativeStatus.Check(NativeMethods.mln_acquired_frame_release(&frame, &sync));
             handle = frame;

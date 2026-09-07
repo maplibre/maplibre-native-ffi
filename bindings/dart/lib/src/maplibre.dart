@@ -30,9 +30,6 @@ final class _LogCallbackState extends RetainedCallbackState {
       Maplibre._checkStatus(raw.mln_adapter_log_queue_create(wake, outQueue));
       queue = outQueue.value;
     } catch (_) {
-      if (queue != 0) {
-        raw.mln_adapter_log_queue_close(queue);
-      }
       listener.close();
       rethrow;
     } finally {
@@ -57,7 +54,7 @@ final class _LogCallbackState extends RetainedCallbackState {
   late final NativeCallable<raw.mln_wake_callbackFunction> listener;
   late final NativeCallable<raw.mln_log_callback_releaseFunction>
   releaseListener;
-  var queue = 0;
+  late final int queue;
 
   void _drain() {
     withNativeArena((arena) {
@@ -72,11 +69,9 @@ final class _LogCallbackState extends RetainedCallbackState {
           return;
         }
         try {
-          try {
-            _callback(_copyLogRecord(record.ref));
-          } catch (_) {
-            // An exception must not escape into notification delivery.
-          }
+          _callback(_copyLogRecord(record.ref));
+        } catch (_) {
+          // An exception must not escape into notification delivery.
         } finally {
           raw.mln_adapter_log_record_destroy(record.cast<Void>());
         }
@@ -114,7 +109,6 @@ Pointer<raw.mln_adapter_log_callback_state> logCallbackStateForTesting() =>
 final class Maplibre {
   Maplibre._();
 
-  static final MaplibreNativeCApi _c = MaplibreNativeCApi.open();
   static final _logCallbackRoots = <int, _LogCallbackState>{};
   static _LogCallbackState? _logCallbackState;
 
@@ -232,7 +226,7 @@ final class Maplibre {
 
   static void _checkStatus(int status) {
     ensureAbiVersion();
-    checkNativeStatus(status, _c.threadLastErrorMessage);
+    checkNativeStatus(status, threadLastErrorMessage);
   }
 }
 

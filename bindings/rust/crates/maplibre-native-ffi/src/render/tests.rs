@@ -221,6 +221,7 @@ mod macos_egl {
 }
 
 use super::*;
+use crate::test_support::await_runtime_barrier;
 use crate::{
     ErrorKind, GeoJsonSourceOptions, MapHandle, MapOptions, OpenGLContextProviderMask,
     RenderBackendMask, RuntimeHandle, ScreenBox, ScreenPoint,
@@ -236,31 +237,31 @@ assert_impl_all!(AcquiredFrameHandle: Send, Sync);
 
 const FEATURE_STATE_STYLE_JSON: &str = r#"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}}]}}},"layers":[{"id":"circle","type":"circle","source":"point","paint":{"circle-radius":["case",["boolean",["feature-state","hover"],false],10,5]}}]}"#;
 const QUERY_STYLE_JSON: &str = r##"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","geometry":{"type":"Point","coordinates":[-122.4194,37.7749]},"properties":{"kind":"capital","visible":true}}]}}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}},{"id":"point-circle","type":"circle","source":"point","paint":{"circle-color":"#f97316","circle-radius":12}}]}"##;
-#[cfg(mln_webgpu_backend)]
+/// The background color QUERY_STYLE_JSON paints, as premultiplied RGBA8. A
+/// rendered frame of that style holds this color wherever no feature covers it.
 const QUERY_STYLE_BACKGROUND_RGBA: [u8; 4] = [0xd8, 0xf1, 0xff, 0xff];
 const CLUSTER_BASE_STYLE_JSON: &str = r##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#ffffff"}}]}"##;
+/// Blocks until one render-session operation completes, servicing the caller
+/// driver's work queue so a caller-graphics-thread session makes progress.
 fn wait_until_completed<T>(session: &RenderSessionHandle, operation: &NativeFuture<T>) {
     let deadline = Instant::now() + Duration::from_secs(5);
-    while !operation.is_completed().unwrap() {
+    while !operation.is_ready() {
         let _ = session.service_driver_work(64);
         assert!(Instant::now() < deadline, "render operation timed out");
         std::thread::yield_now();
     }
-    maplibre_core::check(operation.terminal_status().unwrap()).unwrap();
 }
 
-fn wait_for_operation(session: &RenderSessionHandle, operation: &NativeFuture<()>) {
-    wait_until_completed(session, operation);
-    operation.finish().unwrap();
+/// Awaits one render-session operation and unwraps its result.
+fn finish<T>(session: &RenderSessionHandle, operation: NativeFuture<T>) -> T {
+    wait_until_completed(session, &operation);
+    operation.take().expect("render operation failed")
 }
 
-fn finish_attachment(attachment: RenderSessionAttachment) -> Result<RenderSessionHandle> {
-    wait_for_operation(&attachment.session, &attachment.completion);
-    Ok(attachment.session)
-}
-
-fn finish_unit(session: &RenderSessionHandle, operation: NativeFuture<()>) {
-    wait_for_operation(session, &operation);
+/// Awaits an attachment and returns the attached session.
+fn finish_attachment(attachment: RenderSessionAttachment) -> RenderSessionHandle {
+    finish(&attachment.session, attachment.completion);
+    attachment.session
 }
 
 fn release_frame(frame: AcquiredFrameHandle) {
@@ -274,43 +275,63 @@ fn caller_attach_options() -> RenderSessionAttachOptions {
     RenderSessionAttachOptions::caller_graphics_thread(2)
 }
 
-fn create_owned_texture_session(
+/// Attaches an owned texture session whose driver is the core worker, so its
+/// attachment resolves without the host servicing driver work. Reports `None`
+/// on a build whose only owned texture target runs on the caller's graphics
+/// thread.
+fn attach_core_worker_owned_texture_session(
     map: &MapHandle,
-    extent: RenderTargetExtent,
-) -> std::result::Result<(OwnedTextureTestContext, RenderSessionHandle), Box<dyn StdError>> {
+    extent: &RenderTargetExtent,
+) -> std::result::Result<
+    Option<(OwnedTextureTestContext, RenderSessionAttachment)>,
+    Box<dyn StdError>,
+> {
     let backends = crate::supported_render_backends();
     if backends.contains(RenderBackendMask::METAL) {
         let context = MetalTestContext::new()?;
-        let session = finish_attachment(map.attach_metal_owned_texture(
-            &MetalOwnedTextureDescriptor::new(extent, context.descriptor()),
+        let attachment = map.attach_metal_owned_texture(
+            &MetalOwnedTextureDescriptor::new(extent.clone(), context.descriptor()),
             RenderSessionAttachOptions::core_worker(2),
-        )?)?;
-        return Ok((OwnedTextureTestContext::Metal(context), session));
-    }
-    #[cfg(mln_webgpu_backend)]
-    if backends.contains(RenderBackendMask::WEBGPU) {
-        let context = WebGpuTestContext::new()?;
-        let session = finish_attachment(map.attach_webgpu_owned_texture(
-            &WebGpuOwnedTextureDescriptor::new(extent, context.descriptor()),
-            caller_attach_options(),
-        )?)?;
-        return Ok((OwnedTextureTestContext::WebGpu(context), session));
+        )?;
+        return Ok(Some((OwnedTextureTestContext::Metal(context), attachment)));
     }
     #[cfg(not(target_os = "emscripten"))]
     if backends.contains(RenderBackendMask::VULKAN) {
         let context = VulkanTestContext::new()?;
-        let session = finish_attachment(map.attach_vulkan_owned_texture(
-            &VulkanOwnedTextureDescriptor::new(extent, context.descriptor()),
+        let attachment = map.attach_vulkan_owned_texture(
+            &VulkanOwnedTextureDescriptor::new(extent.clone(), context.descriptor()),
             RenderSessionAttachOptions::core_worker(2),
-        )?)?;
-        return Ok((OwnedTextureTestContext::Vulkan(Box::new(context)), session));
+        )?;
+        return Ok(Some((
+            OwnedTextureTestContext::Vulkan(Box::new(context)),
+            attachment,
+        )));
+    }
+    Ok(None)
+}
+
+fn create_owned_texture_session(
+    map: &MapHandle,
+    extent: RenderTargetExtent,
+) -> std::result::Result<(OwnedTextureTestContext, RenderSessionHandle), Box<dyn StdError>> {
+    if let Some((context, attachment)) = attach_core_worker_owned_texture_session(map, &extent)? {
+        return Ok((context, finish_attachment(attachment)));
+    }
+    #[cfg(mln_webgpu_backend)]
+    if crate::supported_render_backends().contains(RenderBackendMask::WEBGPU) {
+        let context = WebGpuTestContext::new()?;
+        let session = finish_attachment(map.attach_webgpu_owned_texture(
+            &WebGpuOwnedTextureDescriptor::new(extent, context.descriptor()),
+            caller_attach_options(),
+        )?);
+        return Ok((OwnedTextureTestContext::WebGpu(context), session));
     }
     if has_opengl_test_context_backend() {
         let context = OpenGLTestContext::new(extent.width, extent.height)?;
         let session = finish_attachment(map.attach_opengl_owned_texture(
             &OpenGLOwnedTextureDescriptor::new(extent, context.descriptor()),
             caller_attach_options(),
-        )?)?;
+        )?);
         return Ok((OwnedTextureTestContext::OpenGL(Box::new(context)), session));
     }
     Err("no configured render backend offers an owned texture test session".into())
@@ -373,7 +394,7 @@ fn create_opengl_owned_texture_session(
     let session = finish_attachment(map.attach_opengl_owned_texture(
         &OpenGLOwnedTextureDescriptor::new(extent, context.descriptor()),
         caller_attach_options(),
-    )?)?;
+    )?);
     Ok((context, session))
 }
 
@@ -389,7 +410,7 @@ fn create_opengl_surface_session(
     let session = finish_attachment(map.attach_opengl_surface(
         &OpenGLSurfaceDescriptor::new(extent, context.descriptor(), context.surface()),
         caller_attach_options(),
-    )?)?;
+    )?);
     Ok((context, session))
 }
 
@@ -413,7 +434,7 @@ fn create_opengl_borrowed_texture_session(
             gl_api::TEXTURE_2D,
         ),
         caller_attach_options(),
-    )?)?;
+    )?);
     Ok((texture, session))
 }
 
@@ -437,7 +458,7 @@ fn create_webgpu_borrowed_texture_session(
     let session = finish_attachment(map.attach_webgpu_borrowed_texture(
         &texture.descriptor(extent, &context),
         caller_attach_options(),
-    )?)?;
+    )?);
     Ok((context, texture, session))
 }
 
@@ -479,7 +500,7 @@ impl OwnedTextureTestContext {
                 caller_attach_options(),
             ),
         }?;
-        finish_attachment(attachment)
+        Ok(finish_attachment(attachment))
     }
 
     /// Hands the session a placeholder target of this context's own backend.
@@ -543,67 +564,48 @@ impl OwnedTextureTestContext {
         }
     }
 
-    fn try_acquire_frame_extent(
-        &self,
-        session: &RenderSessionHandle,
-        expected: &RenderTargetExtent,
-    ) -> bool {
-        match self {
+    /// Reads the extent of the newest frame this session published, or an
+    /// error when no frame is available or the backend rejects the accessor.
+    fn try_acquire_frame_extent(&self, session: &RenderSessionHandle) -> Result<(u32, u32, f64)> {
+        let frame = session.acquire_frame()?;
+        let extent = match self {
             Self::Metal(_) => {
-                let Ok(frame) = session.acquire_frame() else {
-                    return false;
-                };
-                let Ok((metadata, _, _)) = frame.metal_texture() else {
-                    return false;
-                };
-                let matches = (metadata.width, metadata.height)
-                    == (expected.width, expected.height)
-                    && metadata.scale_factor == expected.scale_factor;
-                release_frame(frame);
-                matches
+                let texture = frame.metal_texture()?;
+                (
+                    texture.frame.width,
+                    texture.frame.height,
+                    texture.frame.scale_factor,
+                )
             }
             #[cfg(mln_webgpu_backend)]
             Self::WebGpu(_) => {
-                let Ok(frame) = session.acquire_frame() else {
-                    return false;
-                };
-                let Ok((metadata, _, _, _)) = frame.webgpu_texture() else {
-                    return false;
-                };
-                let matches = metadata.width == expected.width
-                    && metadata.height == expected.height
-                    && metadata.scale_factor == expected.scale_factor;
-                release_frame(frame);
-                matches
+                let texture = frame.webgpu_texture()?;
+                (
+                    texture.frame.width,
+                    texture.frame.height,
+                    texture.frame.scale_factor,
+                )
             }
             #[cfg(not(target_os = "emscripten"))]
             Self::Vulkan(_) => {
-                let Ok(frame) = session.acquire_frame() else {
-                    return false;
-                };
-                let Ok((metadata, _, _, _)) = frame.vulkan_texture() else {
-                    return false;
-                };
-                let matches = (metadata.width, metadata.height)
-                    == (expected.width, expected.height)
-                    && metadata.scale_factor == expected.scale_factor;
-                release_frame(frame);
-                matches
+                let texture = frame.vulkan_texture()?;
+                (
+                    texture.frame.width,
+                    texture.frame.height,
+                    texture.frame.scale_factor,
+                )
             }
             Self::OpenGL(_) => {
-                let Ok(frame) = session.acquire_frame() else {
-                    return false;
-                };
-                let Ok((metadata, _)) = frame.opengl_texture() else {
-                    return false;
-                };
-                let matches = (metadata.width, metadata.height)
-                    == (expected.width, expected.height)
-                    && metadata.scale_factor == expected.scale_factor;
-                release_frame(frame);
-                matches
+                let texture = frame.opengl_texture()?;
+                (
+                    texture.frame.width,
+                    texture.frame.height,
+                    texture.frame.scale_factor,
+                )
             }
-        }
+        };
+        release_frame(frame);
+        Ok(extent)
     }
 }
 
@@ -976,9 +978,8 @@ fn load_egl_library() -> std::result::Result<Library, Box<dyn StdError>> {
     #[cfg(target_os = "macos")]
     let library = unsafe { Library::new("libEGL.dylib") };
     #[cfg(not(target_os = "macos"))]
-    let library = unsafe { Library::new("libEGL.so.1") }
-        .or_else(|_| unsafe { Library::new("libEGL.so") })
-        .map_err(|error| format!("failed to load libEGL: {error}"));
+    let library =
+        unsafe { Library::new("libEGL.so.1") }.or_else(|_| unsafe { Library::new("libEGL.so") });
     library.map_err(|error| format!("failed to load libEGL: {error}").into())
 }
 
@@ -2569,13 +2570,6 @@ fn pick_vulkan_physical_device(
     Err("no Vulkan physical device with a graphics queue was found".into())
 }
 
-fn await_runtime_barrier(runtime: &RuntimeHandle) {
-    let operation = runtime.barrier().unwrap();
-    assert!(operation.wait(Duration::from_secs(5)).unwrap());
-    maplibre_core::check(operation.terminal_status().unwrap()).unwrap();
-    operation.finish().unwrap();
-}
-
 fn render_frame(session: &RenderSessionHandle, if_needed: bool) -> RenderFrameResult {
     static NEXT_TOKEN: AtomicUsize = AtomicUsize::new(1);
     let token = NEXT_TOKEN.fetch_add(1, Ordering::Relaxed) as u64;
@@ -2600,12 +2594,7 @@ fn render_frame(session: &RenderSessionHandle, if_needed: bool) -> RenderFrameRe
             }
             Err(error) => panic!("failed to drain frame results: {error}"),
         };
-        if let Some(result) = batch
-            .copy_results()
-            .unwrap()
-            .into_iter()
-            .find(|result| result.token == token)
-        {
+        if let Some(result) = batch.into_iter().find(|result| result.token == token) {
             return result;
         }
         assert!(Instant::now() < deadline, "frame demand timed out");
@@ -2614,21 +2603,19 @@ fn render_frame(session: &RenderSessionHandle, if_needed: bool) -> RenderFrameRe
 }
 
 fn close_session(session: RenderSessionHandle) {
-    finish_unit(&session, session.detach().unwrap());
+    finish(&session, session.detach().unwrap());
     session.destroy().unwrap();
 }
 
 fn take_json(session: &RenderSessionHandle, operation: NativeFuture<Vec<u8>>) -> JsonValue {
-    wait_until_completed(session, &operation);
-    serde_json::from_slice(&operation.take().unwrap()).unwrap()
+    serde_json::from_slice(&finish(session, operation)).unwrap()
 }
 
 fn take_features(
     session: &RenderSessionHandle,
     operation: NativeFuture<Vec<QueriedFeature>>,
 ) -> Vec<QueriedFeature> {
-    wait_until_completed(session, &operation);
-    operation.take().unwrap()
+    finish(session, operation)
 }
 
 fn feature_json(feature: &QueriedFeature) -> JsonValue {
@@ -2636,6 +2623,7 @@ fn feature_json(feature: &QueriedFeature) -> JsonValue {
 }
 
 #[test]
+// Spec coverage: BND-161.
 fn native_pointer_round_trips_address() {
     // SAFETY: The test reconstructs but never dereferences this dummy address.
     let pointer = unsafe { NativePointer::from_address(0x1234) };
@@ -2645,6 +2633,7 @@ fn native_pointer_round_trips_address() {
 }
 
 #[test]
+// Spec coverage: BND-161.
 fn vulkan_timeline_semaphore_keeps_its_full_64_bit_handle() {
     // A Vulkan non-dispatchable handle is 64 bits wide even where a pointer is
     // not, so the high half must survive the trip through the C carrier.
@@ -2669,6 +2658,7 @@ fn vulkan_timeline_semaphore_keeps_its_full_64_bit_handle() {
 }
 
 #[test]
+// Spec coverage: BND-160.
 fn opengl_context_provider_mask_matches_backend_availability() {
     let providers = crate::supported_opengl_context_providers();
     if has_opengl_backend() {
@@ -2683,6 +2673,7 @@ fn opengl_context_provider_mask_matches_backend_availability() {
 }
 
 #[test]
+// Spec coverage: BND-164, BND-165, BND-166, and BND-167.
 fn owned_texture_session_renders_acquires_resizes_and_reads_back() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -2715,7 +2706,14 @@ fn owned_texture_session_renders_acquires_resizes_and_reads_back() {
         rendered = render_frame(&session, false);
         assert_eq!(rendered.disposition, FrameDisposition::Rendered);
     }
-    assert!(context.try_acquire_frame_extent(&session, &initial_extent));
+    assert_eq!(
+        context.try_acquire_frame_extent(&session).unwrap(),
+        (
+            initial_extent.width,
+            initial_extent.height,
+            initial_extent.scale_factor
+        )
+    );
 
     if capabilities.readback {
         let operation = session.read_premultiplied_rgba8().unwrap();
@@ -2727,15 +2725,9 @@ fn owned_texture_session_renders_acquires_resizes_and_reads_back() {
     }
 
     let resized_extent = RenderTargetExtent::new(48, 24, 1.0);
-    finish_unit(&session, session.resize(&resized_extent).unwrap());
-    drop(
-        map.resize(crate::LogicalExtent {
-            width: 48,
-            height: 24,
-            scale_factor: 1.0,
-        })
-        .unwrap(),
-    );
+    // The session resize submits the map's extent command itself, so the test
+    // never resizes the map behind the session's back.
+    finish(&session, session.resize(&resized_extent).unwrap());
     await_runtime_barrier(&runtime);
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
@@ -2752,19 +2744,30 @@ fn owned_texture_session_renders_acquires_resizes_and_reads_back() {
         );
         await_runtime_barrier(&runtime);
     }
-    assert!(context.try_acquire_frame_extent(&session, &resized_extent));
+    assert_eq!(
+        context.try_acquire_frame_extent(&session).unwrap(),
+        (
+            resized_extent.width,
+            resized_extent.height,
+            resized_extent.scale_factor
+        )
+    );
     assert_eq!(session.snapshot().unwrap().extent, resized_extent);
 
+    // An owned-texture session takes no borrowed target: the retarget kind is
+    // checked before the descriptor, synchronously on every backend.
     match context.set_placeholder_borrowed_target(&session, &resized_extent) {
         Ok(operation) => {
-            let deadline = Instant::now() + Duration::from_secs(5);
-            while !operation.is_completed().unwrap() {
-                let _ = session.service_driver_work(64);
-                assert!(Instant::now() < deadline, "target replacement timed out");
-            }
-            assert_ne!(operation.terminal_status().unwrap(), sys::MLN_STATUS_OK);
+            wait_until_completed(&session, &operation);
+            assert_eq!(
+                operation.terminal_status().unwrap(),
+                sys::MLN_STATUS_UNSUPPORTED
+            );
         }
-        Err(error) => assert_ne!(error.raw_status(), Some(sys::MLN_STATUS_OK)),
+        Err(error) => {
+            assert_eq!(error.kind(), ErrorKind::Unsupported);
+            assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_UNSUPPORTED));
+        }
     }
 
     close_session(session);
@@ -2777,6 +2780,7 @@ fn owned_texture_session_renders_acquires_resizes_and_reads_back() {
 }
 
 #[test]
+// Spec coverage: BND-167.
 fn opengl_owned_texture_exposes_backend_metadata() {
     if !has_opengl_test_context_backend() {
         return;
@@ -2797,7 +2801,8 @@ fn opengl_owned_texture_exposes_backend_metadata() {
     );
 
     let frame = session.acquire_frame().unwrap();
-    let (metadata, texture) = frame.opengl_texture().unwrap();
+    let opengl = frame.opengl_texture().unwrap();
+    let (metadata, texture) = (opengl.frame, opengl.texture);
     assert_eq!((metadata.width, metadata.height), (32, 16));
     assert_eq!(metadata.target, gl_api::TEXTURE_2D);
     assert_eq!(metadata.internal_format, gl_api::RGBA8);
@@ -2811,6 +2816,7 @@ fn opengl_owned_texture_exposes_backend_metadata() {
 
 #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 #[test]
+// Spec coverage: BND-162.
 fn dedicated_opengl_surface_keeps_its_context_on_the_graphics_thread() {
     if !has_opengl_backend() {
         return;
@@ -2833,8 +2839,7 @@ fn dedicated_opengl_surface_keeps_its_context_on_the_graphics_thread() {
             caller_attach_options(),
         )
         .unwrap(),
-    )
-    .unwrap();
+    );
     assert!(surface.has_current_context());
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     await_runtime_barrier(&runtime);
@@ -2850,8 +2855,9 @@ fn dedicated_opengl_surface_keeps_its_context_on_the_graphics_thread() {
 }
 
 #[test]
+// Spec coverage: BND-162.
 fn opengl_surface_session_renders_into_the_platform_surface() {
-    if !has_opengl_test_context_backend() || cfg!(target_os = "emscripten") {
+    if !has_opengl_test_context_backend() {
         return;
     }
 
@@ -2872,7 +2878,12 @@ fn opengl_surface_session_renders_into_the_platform_surface() {
     #[cfg(any(target_os = "windows", target_os = "emscripten"))]
     {
         let pixels = _context.read_surface_rgba(32, 16).unwrap();
-        assert!(pixels.iter().any(|byte| *byte != 0));
+        assert!(
+            pixels
+                .chunks_exact(4)
+                .any(|pixel| pixel == QUERY_STYLE_BACKGROUND_RGBA),
+            "the surface never showed the style's background color"
+        );
     }
 
     close_session(session);
@@ -2881,6 +2892,7 @@ fn opengl_surface_session_renders_into_the_platform_surface() {
 }
 
 #[test]
+// Spec coverage: BND-171 and BND-175.
 fn opengl_borrowed_texture_session_replaces_its_target() {
     if !has_opengl_test_context_backend() {
         return;
@@ -2900,7 +2912,14 @@ fn opengl_borrowed_texture_session_replaces_its_target() {
         render_frame(&session, false).disposition,
         FrameDisposition::Rendered
     );
-    assert!(texture.read_rgba().unwrap().iter().any(|byte| *byte != 0));
+    assert!(
+        texture
+            .read_rgba()
+            .unwrap()
+            .chunks_exact(4)
+            .any(|pixel| pixel == QUERY_STYLE_BACKGROUND_RGBA),
+        "the texture never showed the style's background color"
+    );
 
     let replacement = texture.allocate_replacement(48, 24).unwrap();
     let replacement_name = replacement.0.get();
@@ -2915,22 +2934,28 @@ fn opengl_borrowed_texture_session_replaces_its_target() {
             gl_api::TEXTURE_2D,
         ))
         .unwrap();
-    finish_unit(&session, operation);
+    finish(&session, operation);
     texture.adopt(replacement, 48, 24).unwrap();
-    drop(
-        map.resize(crate::LogicalExtent {
-            width: 48,
-            height: 24,
-            scale_factor: 1.0,
-        })
-        .unwrap(),
-    );
+    // A borrowed-texture session rejects resize, so the host hands over a new
+    // texture and resizes the map itself to match it.
+    crate::completion::blocking(map.resize(crate::LogicalExtent {
+        width: 48,
+        height: 24,
+        scale_factor: 1.0,
+    }));
     await_runtime_barrier(&runtime);
     assert_eq!(
         render_frame(&session, false).disposition,
         FrameDisposition::Rendered
     );
-    assert!(texture.read_rgba().unwrap().iter().any(|byte| *byte != 0));
+    assert!(
+        texture
+            .read_rgba()
+            .unwrap()
+            .chunks_exact(4)
+            .any(|pixel| pixel == QUERY_STYLE_BACKGROUND_RGBA),
+        "the texture never showed the style's background color"
+    );
     assert_eq!(session.snapshot().unwrap().extent, replacement_extent);
 
     close_session(session);
@@ -2940,6 +2965,7 @@ fn opengl_borrowed_texture_session_replaces_its_target() {
 
 #[cfg(mln_webgpu_backend)]
 #[test]
+// Spec coverage: BND-162.
 fn webgpu_surface_session_renders_into_the_browser_canvas() {
     if !crate::supported_render_backends().contains(RenderBackendMask::WEBGPU) {
         return;
@@ -2981,6 +3007,7 @@ fn webgpu_surface_session_renders_into_the_browser_canvas() {
 
 #[cfg(mln_webgpu_backend)]
 #[test]
+// Spec coverage: BND-162 and BND-171.
 fn webgpu_borrowed_texture_session_renders_into_a_host_texture() {
     if !crate::supported_render_backends().contains(RenderBackendMask::WEBGPU) {
         return;
@@ -3013,6 +3040,7 @@ fn webgpu_borrowed_texture_session_renders_into_a_host_texture() {
 }
 
 #[test]
+// Spec coverage: BND-105 and BND-106.
 fn feature_state_and_rendered_queries_copy_native_results() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -3153,6 +3181,7 @@ fn feature_state_and_rendered_queries_copy_native_results() {
 }
 
 #[test]
+// Spec coverage: BND-106 and BND-107.
 fn cluster_feature_extensions_copy_values_and_feature_collections() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -3259,7 +3288,8 @@ fn cluster_feature_extensions_copy_values_and_feature_collections() {
 }
 
 #[test]
-fn live_session_blocks_map_close_and_drop_reports_the_leaked_map() {
+// Spec coverage: BND-163 and BND-174.
+fn a_live_session_rejects_map_close_and_keeps_the_map_alive() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
@@ -3275,29 +3305,58 @@ fn live_session_blocks_map_close_and_drop_reports_the_leaked_map() {
         &runtime,
         &MapOptions::new(32, 32, 1.0),
     ));
-    let (_context, session) =
-        create_owned_texture_session(&map, RenderTargetExtent::new(32, 32, 1.0)).unwrap();
+    let extent = RenderTargetExtent::new(32, 32, 1.0);
+    let (context, session) = create_owned_texture_session(&map, extent.clone()).unwrap();
 
     let close_error = map.close().unwrap_err();
     assert_eq!(close_error.kind(), ErrorKind::InvalidState);
+    assert!(
+        close_error.diagnostic().contains("render session"),
+        "close diagnostic did not name the render session: {}",
+        close_error.diagnostic()
+    );
     let map = close_error.into_handle();
-    drop(map);
-    crate::set_leak_reporter(None);
 
-    let reported = leaks.lock().unwrap().clone();
-    assert_eq!(reported.len(), 1);
-    assert_eq!(reported[0].type_name, "mln_map");
-    assert_ne!(reported[0].id, 0);
+    // One map takes one session at a time.
+    let second = context.attach_owned_texture(&map, extent).unwrap_err();
+    assert_eq!(second.kind(), ErrorKind::InvalidState);
+
+    // The session retains the map, so dropping the host's handle first is not
+    // a leak: the map retires when the session releases it.
+    drop(map);
+    assert!(leaks.lock().unwrap().is_empty());
 
     close_session(session);
-    crate::completion::blocking(crate::completion::submit(
-        |completion| unsafe { sys::mln_map_release(sys::mln_map(reported[0].id), completion) },
-        crate::completion::unit,
-    ));
+    crate::set_leak_reporter(None);
+    assert!(leaks.lock().unwrap().is_empty());
     runtime.close_and_wait();
 }
 
 #[test]
+// Spec coverage: BND-178.
+fn map_close_is_accepted_once_its_session_detaches() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(32, 32, 1.0),
+    ));
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 32, 1.0)).unwrap();
+
+    // Detach releases the map's session slot; the session handle itself may
+    // still be live when the map closes.
+    finish(&session, session.detach().unwrap());
+    map.close_and_wait();
+    session.destroy().unwrap();
+    runtime.close_and_wait();
+}
+
+#[test]
+// Spec coverage: BND-170 and BND-181.
 fn sustained_frame_demands_outlast_the_texture_ring_depth() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -3329,6 +3388,7 @@ fn sustained_frame_demands_outlast_the_texture_ring_depth() {
 }
 
 #[test]
+// Spec coverage: BND-174.
 fn cloned_session_controls_can_be_used_from_another_thread() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -3353,6 +3413,7 @@ fn cloned_session_controls_can_be_used_from_another_thread() {
 }
 
 #[test]
+// Spec coverage: BND-166.
 fn texture_readback_before_a_frame_reports_invalid_state() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -3367,8 +3428,13 @@ fn texture_readback_before_a_frame_reports_invalid_state() {
         create_owned_texture_session(&map, RenderTargetExtent::new(16, 16, 1.0)).unwrap();
     if session.capabilities().unwrap().readback {
         let operation = session.read_premultiplied_rgba8().unwrap();
-        while !operation.is_completed().unwrap() {
+        // wait_until_completed asserts a successful outcome, and this readback
+        // is expected to fail, so the wait is spelled out here with its own
+        // deadline.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !operation.is_ready() {
             let _ = session.service_driver_work(64);
+            assert!(Instant::now() < deadline, "readback never completed");
             std::thread::yield_now();
         }
         assert_eq!(
@@ -3379,5 +3445,469 @@ fn texture_readback_before_a_frame_reports_invalid_state() {
 
     close_session(session);
     map.close_and_wait();
+    runtime.close_and_wait();
+}
+
+#[test]
+// Spec coverage: BND-176.
+fn set_target_reports_unsupported_for_a_session_owned_texture() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(64, 64, 1.0),
+    ));
+    let extent = RenderTargetExtent::new(64, 64, 1.0);
+    let (context, session) = create_owned_texture_session(&map, extent.clone()).unwrap();
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
+    await_runtime_barrier(&runtime);
+
+    // The setter names this build's own backend, or "not supported by this
+    // build" would answer in place of the target-kind rejection under test.
+    let error = context
+        .set_placeholder_borrowed_target(&session, &extent)
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Unsupported);
+    assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_UNSUPPORTED));
+
+    // The rejected retarget left the session rendering into its own ring.
+    assert_eq!(
+        render_frame(&session, false).disposition,
+        FrameDisposition::Rendered
+    );
+
+    close_session(session);
+    map.close_and_wait();
+    runtime.close_and_wait();
+}
+
+#[test]
+// Spec coverage: BND-176.
+fn set_target_reports_unsupported_for_a_session_owned_opengl_texture() {
+    // The owned texture fixture above picks one backend per build. OpenGL has
+    // its own fixture, so an OpenGL build covers the same rejection here
+    // rather than skipping it.
+    if !has_opengl_test_context_backend() {
+        return;
+    }
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(64, 64, 1.0),
+    ));
+    let extent = RenderTargetExtent::new(64, 64, 1.0);
+    let (context, session) = create_opengl_owned_texture_session(&map, extent.clone()).unwrap();
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
+    await_runtime_barrier(&runtime);
+
+    let error = session
+        .set_opengl_borrowed_texture_target(&OpenGLBorrowedTextureDescriptor::new(
+            extent,
+            64,
+            64,
+            context.descriptor(),
+            1,
+            gl_api::TEXTURE_2D,
+        ))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Unsupported);
+    assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_UNSUPPORTED));
+
+    assert_eq!(
+        render_frame(&session, false).disposition,
+        FrameDisposition::Rendered
+    );
+
+    close_session(session);
+    map.close_and_wait();
+    runtime.close_and_wait();
+}
+
+#[test]
+// Spec coverage: BND-176.
+fn set_target_reports_unsupported_for_a_target_kind_the_session_does_not_have() {
+    if !has_opengl_test_context_backend() {
+        return;
+    }
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(64, 64, 1.0),
+    ));
+    let extent = RenderTargetExtent::new(64, 64, 1.0);
+    let (texture, session) = create_opengl_borrowed_texture_session(&map, extent.clone()).unwrap();
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
+    await_runtime_barrier(&runtime);
+
+    // A surface descriptor names a target this session does not have. The
+    // kind is checked before the descriptor, so the placeholder address below
+    // is never dereferenced.
+    let error = session
+        .set_opengl_surface_target(&OpenGLSurfaceDescriptor::new(
+            extent,
+            texture.descriptor(),
+            // SAFETY: the rejected call never dereferences this address.
+            unsafe { NativePointer::from_address(0x1) },
+        ))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Unsupported);
+    assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_UNSUPPORTED));
+
+    assert_eq!(
+        render_frame(&session, false).disposition,
+        FrameDisposition::Rendered
+    );
+
+    close_session(session);
+    map.close_and_wait();
+    runtime.close_and_wait();
+}
+
+#[test]
+// Spec coverage: BND-182.
+fn session_maintenance_commands_complete_in_order() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(32, 32, 1.0),
+    ));
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 32, 1.0)).unwrap();
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
+    await_runtime_barrier(&runtime);
+    assert_eq!(
+        render_frame(&session, false).disposition,
+        FrameDisposition::Rendered
+    );
+
+    finish(&session, session.reduce_memory_use().unwrap());
+    finish(&session, session.clear_data().unwrap());
+    finish(&session, session.dump_debug_logs().unwrap());
+    // The barrier resolves only after every submission accepted before it.
+    finish(&session, session.barrier().unwrap());
+
+    // Cleared renderer data rebuilds from the map rather than ending the
+    // session, so the next demand still renders.
+    assert_eq!(
+        render_frame(&session, false).disposition,
+        FrameDisposition::Rendered
+    );
+
+    close_session(session);
+    map.close_and_wait();
+    runtime.close_and_wait();
+}
+
+#[test]
+// Spec coverage: BND-179.
+fn abandoning_a_live_session_retires_it_and_releases_the_map() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(32, 32, 1.0),
+    ));
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 32, 1.0)).unwrap();
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
+    await_runtime_barrier(&runtime);
+    assert_eq!(
+        render_frame(&session, false).disposition,
+        FrameDisposition::Rendered
+    );
+
+    // Abandon reports busy while a driver call is in flight and changes
+    // nothing, so the host retries.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let abandoned = loop {
+        match session.abandon() {
+            Ok(abandoned) => break abandoned,
+            Err(error) if error.kind() == ErrorKind::Busy => {
+                assert!(Instant::now() < deadline, "abandon stayed busy");
+                std::thread::yield_now();
+            }
+            Err(error) => panic!("failed to abandon the session: {error}"),
+        }
+    };
+    assert_eq!(
+        session.snapshot().unwrap().state,
+        RenderSessionLifecycle::Abandoned
+    );
+    if abandoned.quarantined {
+        assert_ne!(abandoned.quarantined_resource_count, 0);
+    }
+
+    // An abandoned session makes no more graphics calls, so later work is
+    // rejected rather than queued.
+    let error = session.request_frame(FrameDemand::default()).unwrap_err();
+    assert!(matches!(
+        error.kind(),
+        ErrorKind::InvalidState | ErrorKind::TargetLost
+    ));
+
+    // Abandoning released the map's session slot, so the map closes.
+    session.destroy().unwrap();
+    map.close_and_wait();
+    runtime.close_and_wait();
+}
+
+#[test]
+// Spec coverage: BND-160.
+fn attaching_a_backend_this_build_lacks_reports_unsupported() {
+    let backends = crate::supported_render_backends();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(32, 32, 1.0),
+    ));
+    let extent = RenderTargetExtent::new(32, 32, 1.0);
+
+    // Every handle below is a placeholder: a build without the backend rejects
+    // the attachment before it reads any of them.
+    // SAFETY: the rejected call never dereferences these addresses.
+    let placeholder = unsafe { NativePointer::from_address(0x1) };
+    // Each preset compiles one backend in, so at least one of these three is
+    // always absent.
+    let error = if !backends.contains(RenderBackendMask::VULKAN) {
+        // SAFETY: as above.
+        let image = unsafe { VulkanHandle::from_bits(0x1) };
+        map.attach_vulkan_surface(
+            &VulkanSurfaceDescriptor::new(
+                extent,
+                VulkanContextDescriptor::new(placeholder, placeholder, placeholder, placeholder, 0),
+                image,
+            ),
+            caller_attach_options(),
+        )
+    } else if !backends.contains(RenderBackendMask::METAL) {
+        map.attach_metal_surface(
+            &MetalSurfaceDescriptor::new(
+                extent,
+                MetalContextDescriptor::new(placeholder),
+                placeholder,
+            ),
+            caller_attach_options(),
+        )
+    } else {
+        assert!(
+            !backends.contains(RenderBackendMask::OPENGL),
+            "no build compiles Vulkan, Metal and OpenGL in at once"
+        );
+        map.attach_opengl_surface(
+            &OpenGLSurfaceDescriptor::new(
+                extent,
+                OpenGLContextDescriptor::Egl(EglContextDescriptor::new(
+                    placeholder,
+                    placeholder,
+                    placeholder,
+                )),
+                placeholder,
+            ),
+            caller_attach_options(),
+        )
+    }
+    .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Unsupported);
+    assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_UNSUPPORTED));
+
+    // A rejected attachment published no session, so the map still closes.
+    map.close_and_wait();
+    runtime.close_and_wait();
+}
+
+#[test]
+// Spec coverage: BND-193 and BND-194.
+fn caller_driver_work_belongs_to_the_thread_that_claimed_it() {
+    if !has_opengl_test_context_backend() {
+        return;
+    }
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(32, 32, 1.0),
+    ));
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
+    await_runtime_barrier(&runtime);
+
+    // The OpenGL context is bound to the thread that made it, so the fixture,
+    // every driver service call, and teardown stay on the spawned thread. Only
+    // the session control handle, which is Send, crosses back.
+    let (attached_sender, attached) = std::sync::mpsc::channel::<RenderSessionHandle>();
+    let (finished_sender, finished) = std::sync::mpsc::channel::<()>();
+    let graphics_map = &map;
+    std::thread::scope(move |scope| {
+        scope.spawn(move || {
+            let (context, session) = create_opengl_owned_texture_session(
+                graphics_map,
+                RenderTargetExtent::new(32, 32, 1.0),
+            )
+            .unwrap();
+            assert_eq!(
+                render_frame(&session, false).disposition,
+                FrameDisposition::Rendered
+            );
+            attached_sender.send(session.clone()).unwrap();
+            finished.recv().unwrap();
+            close_session(session);
+            drop(context);
+        });
+
+        // The graphics thread's first successful service call fixed the driver
+        // thread, so servicing from here is a wrong-thread error.
+        let session = attached.recv().unwrap();
+        let error = session.service_driver_work(64).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::WrongThread);
+        assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_WRONG_THREAD));
+        drop(session);
+        finished_sender.send(()).unwrap();
+    });
+
+    map.close_and_wait();
+    runtime.close_and_wait();
+}
+
+#[test]
+// Spec coverage: BND-044 and BND-048.
+fn dropping_an_attached_session_abandons_it_so_the_map_still_closes() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+
+    let leaks = Arc::new(Mutex::new(Vec::new()));
+    let sink = Arc::clone(&leaks);
+    assert!(!crate::set_leak_reporter(Some(Box::new(move |leak| {
+        sink.lock().unwrap().push(leak);
+    }))));
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(32, 32, 1.0),
+    ));
+    let (context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 32, 1.0)).unwrap();
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
+    await_runtime_barrier(&runtime);
+    assert_eq!(
+        render_frame(&session, false).disposition,
+        FrameDisposition::Rendered
+    );
+
+    // Native rejects destroy on an attached session, so the drop abandons it
+    // first rather than reporting the session as leaked.
+    drop(session);
+    crate::set_leak_reporter(None);
+    assert!(
+        leaks.lock().unwrap().is_empty(),
+        "dropping an attached session reported a leak: {:?}",
+        leaks.lock().unwrap()
+    );
+
+    // The abandoned session released the map's session slot.
+    map.close_and_wait();
+    drop(context);
+    runtime.close_and_wait();
+}
+
+#[test]
+// Spec coverage: BND-044 and BND-048.
+fn dropping_a_session_before_its_attachment_completes_reports_no_leak() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(32, 32, 1.0),
+    ));
+    // Only a core-worker-driven attachment completes without the host
+    // servicing driver work, and dropping the session is what takes the host's
+    // ability to service it away.
+    let Some((context, attachment)) =
+        attach_core_worker_owned_texture_session(&map, &RenderTargetExtent::new(32, 32, 1.0))
+            .unwrap()
+    else {
+        map.close_and_wait();
+        runtime.close_and_wait();
+        return;
+    };
+
+    let leaks = Arc::new(Mutex::new(Vec::new()));
+    let sink = Arc::clone(&leaks);
+    assert!(!crate::set_leak_reporter(Some(Box::new(move |leak| {
+        sink.lock().unwrap().push(leak);
+    }))));
+
+    // The drop races the attachment, so it abandons a session native may still
+    // be attaching. Native owns the session either way, so the completion
+    // resolves and the wrapper reports no leak.
+    let RenderSessionAttachment {
+        session,
+        completion,
+    } = attachment;
+    drop(session);
+    assert!(completion.wait(Duration::from_secs(5)).unwrap());
+    let _ = completion.take();
+
+    crate::set_leak_reporter(None);
+    assert!(
+        leaks.lock().unwrap().is_empty(),
+        "dropping an attaching session reported a leak: {:?}",
+        leaks.lock().unwrap()
+    );
+
+    map.close_and_wait();
+    drop(context);
+    runtime.close_and_wait();
+}
+
+#[test]
+// Spec coverage: BND-044 and BND-048.
+#[cfg(not(target_os = "emscripten"))]
+fn a_failed_attachment_still_owns_the_session_it_published() {
+    // Vulkan is the only backend that validates a handle the submission
+    // accepted on the driver: Metal, OpenGL and WebGPU either reject the
+    // descriptor at submission or cannot fail once they have one.
+    if !crate::supported_render_backends().contains(RenderBackendMask::VULKAN) {
+        return;
+    }
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(32, 32, 1.0),
+    ));
+    let context = VulkanTestContext::new().unwrap();
+    let mut descriptor = context.descriptor();
+    // Submission checks that every handle is non-null; the driver is where the
+    // queue family index is measured against the physical device.
+    descriptor.graphics_queue_family_index = u32::MAX;
+    let attachment = map
+        .attach_vulkan_owned_texture(
+            &VulkanOwnedTextureDescriptor::new(RenderTargetExtent::new(32, 32, 1.0), descriptor),
+            RenderSessionAttachOptions::core_worker(2),
+        )
+        .unwrap();
+
+    assert!(attachment.completion.wait(Duration::from_secs(5)).unwrap());
+    let error = attachment.completion.take().unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+
+    // The failed attachment still published a session, so the host abandons it
+    // before destroying it and the map's session slot comes back.
+    attachment.session.abandon().unwrap();
+    attachment.session.destroy().unwrap();
+    map.close_and_wait();
+    drop(context);
     runtime.close_and_wait();
 }

@@ -146,11 +146,12 @@ auto mln_map_set_feature_state(
       std::string{static_cast<const char*>(state.data), state.size};
     return mln::core::submit_map_command(
       map,
-      [map, owned_selector = std::move(owned_selector),
-       owned_state = std::move(owned_state)]() -> mln_status {
+      [owned_selector = std::move(owned_selector),
+       owned_state =
+         std::move(owned_state)](mln::core::MapObject& live) -> mln_status {
         const auto selector = owned_selector.view();
         return mln::core::map_set_feature_state(
-          map, &selector,
+          live, &selector,
           {.data = owned_state.data(), .size = owned_state.size()}
         );
       },
@@ -181,9 +182,10 @@ auto mln_map_remove_feature_state(
     auto owned_selector = OwnedFeatureStateSelector{*selector};
     return mln::core::submit_map_command(
       map,
-      [map, owned_selector = std::move(owned_selector)]() -> mln_status {
+      [owned_selector =
+         std::move(owned_selector)](mln::core::MapObject& live) -> mln_status {
         const auto selector = owned_selector.view();
-        return mln::core::map_remove_feature_state(map, &selector);
+        return mln::core::map_remove_feature_state(live, &selector);
       },
       completion
     );

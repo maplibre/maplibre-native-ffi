@@ -1,3 +1,11 @@
+// The surface and texture session entry points for the backends this build does
+// not carry.
+//
+// The validation order is part of what a host sees, so it matches the
+// backend-native attach paths step for step: the map, the descriptor, then the
+// extent, and finally the attachment request. Only once all of those pass does
+// the caller hear that the backend is missing.
+
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c.h"
@@ -8,17 +16,24 @@
 namespace mln::core {
 namespace {
 
-auto validate_unsupported_attach(
-  mln_map map, const mln_render_session_attach_options* options,
-  mln_render_session* out_session, const mln_completion* completion
-) -> mln_status {
+auto validate_attach_map(mln_map map) -> mln_status {
   MapObject* live_map = nullptr;
-  const auto map_status = validate_map_live(map, live_map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  return validate_render_session_attach_request(
-    options, out_session, completion
+  return validate_map_live(map, live_map);
+}
+
+auto validate_surface_extent(const mln_render_target_extent& extent)
+  -> mln_status {
+  return validate_physical_size(
+    extent.width, extent.height, extent.scale_factor,
+    "scaled surface dimensions are too large"
+  );
+}
+
+auto validate_owned_texture_extent(const mln_render_target_extent& extent)
+  -> mln_status {
+  return validate_physical_size(
+    extent.width, extent.height, extent.scale_factor,
+    "scaled texture dimensions are too large"
   );
 }
 
@@ -35,22 +50,21 @@ auto metal_surface_attach_start(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
+  if (const auto status = validate_attach_map(map); status != MLN_STATUS_OK)
+    return status;
   if (
     const auto status = validate_metal_surface_descriptor(descriptor);
     status != MLN_STATUS_OK
   )
     return status;
   if (
-    const auto status = validate_physical_size(
-      descriptor->extent.width, descriptor->extent.height,
-      descriptor->extent.scale_factor, "scaled surface dimensions are too large"
-    );
+    const auto status = validate_surface_extent(descriptor->extent);
     status != MLN_STATUS_OK
   )
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, completion);
+      validate_render_session_attach_request(options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -61,22 +75,21 @@ auto metal_owned_texture_attach_start(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
+  if (const auto status = validate_attach_map(map); status != MLN_STATUS_OK)
+    return status;
   if (
     const auto status = validate_metal_owned_texture_descriptor(descriptor);
     status != MLN_STATUS_OK
   )
     return status;
   if (
-    const auto status = validate_physical_size(
-      descriptor->extent.width, descriptor->extent.height,
-      descriptor->extent.scale_factor, "scaled texture dimensions are too large"
-    );
+    const auto status = validate_owned_texture_extent(descriptor->extent);
     status != MLN_STATUS_OK
   )
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, completion);
+      validate_render_session_attach_request(options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -87,6 +100,8 @@ auto metal_borrowed_texture_attach_start(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
+  if (const auto status = validate_attach_map(map); status != MLN_STATUS_OK)
+    return status;
   if (
     const auto status = validate_metal_borrowed_texture_descriptor(descriptor);
     status != MLN_STATUS_OK
@@ -101,7 +116,7 @@ auto metal_borrowed_texture_attach_start(
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, completion);
+      validate_render_session_attach_request(options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -137,22 +152,21 @@ auto vulkan_surface_attach_start(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
+  if (const auto status = validate_attach_map(map); status != MLN_STATUS_OK)
+    return status;
   if (
     const auto status = validate_vulkan_surface_descriptor(descriptor);
     status != MLN_STATUS_OK
   )
     return status;
   if (
-    const auto status = validate_physical_size(
-      descriptor->extent.width, descriptor->extent.height,
-      descriptor->extent.scale_factor, "scaled surface dimensions are too large"
-    );
+    const auto status = validate_surface_extent(descriptor->extent);
     status != MLN_STATUS_OK
   )
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, completion);
+      validate_render_session_attach_request(options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -163,22 +177,21 @@ auto vulkan_owned_texture_attach_start(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
+  if (const auto status = validate_attach_map(map); status != MLN_STATUS_OK)
+    return status;
   if (
     const auto status = validate_vulkan_owned_texture_descriptor(descriptor);
     status != MLN_STATUS_OK
   )
     return status;
   if (
-    const auto status = validate_physical_size(
-      descriptor->extent.width, descriptor->extent.height,
-      descriptor->extent.scale_factor, "scaled texture dimensions are too large"
-    );
+    const auto status = validate_owned_texture_extent(descriptor->extent);
     status != MLN_STATUS_OK
   )
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, completion);
+      validate_render_session_attach_request(options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -189,6 +202,8 @@ auto vulkan_borrowed_texture_attach_start(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
+  if (const auto status = validate_attach_map(map); status != MLN_STATUS_OK)
+    return status;
   if (
     const auto status = validate_vulkan_borrowed_texture_descriptor(descriptor);
     status != MLN_STATUS_OK
@@ -203,7 +218,7 @@ auto vulkan_borrowed_texture_attach_start(
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, completion);
+      validate_render_session_attach_request(options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -239,22 +254,21 @@ auto opengl_surface_attach_start(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
+  if (const auto status = validate_attach_map(map); status != MLN_STATUS_OK)
+    return status;
   if (
     const auto status = validate_opengl_surface_descriptor(descriptor, false);
     status != MLN_STATUS_OK
   )
     return status;
   if (
-    const auto status = validate_physical_size(
-      descriptor->extent.width, descriptor->extent.height,
-      descriptor->extent.scale_factor, "scaled surface dimensions are too large"
-    );
+    const auto status = validate_surface_extent(descriptor->extent);
     status != MLN_STATUS_OK
   )
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, completion);
+      validate_render_session_attach_request(options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -265,6 +279,8 @@ auto opengl_owned_texture_attach_start(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
+  if (const auto status = validate_attach_map(map); status != MLN_STATUS_OK)
+    return status;
   if (
     const auto status =
       validate_opengl_owned_texture_descriptor(descriptor, false);
@@ -272,16 +288,13 @@ auto opengl_owned_texture_attach_start(
   )
     return status;
   if (
-    const auto status = validate_physical_size(
-      descriptor->extent.width, descriptor->extent.height,
-      descriptor->extent.scale_factor, "scaled texture dimensions are too large"
-    );
+    const auto status = validate_owned_texture_extent(descriptor->extent);
     status != MLN_STATUS_OK
   )
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, completion);
+      validate_render_session_attach_request(options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -292,6 +305,8 @@ auto opengl_borrowed_texture_attach_start(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
+  if (const auto status = validate_attach_map(map); status != MLN_STATUS_OK)
+    return status;
   if (
     const auto status =
       validate_opengl_borrowed_texture_descriptor(descriptor, false);
@@ -307,7 +322,7 @@ auto opengl_borrowed_texture_attach_start(
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, completion);
+      validate_render_session_attach_request(options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -344,22 +359,21 @@ auto webgpu_owned_texture_attach_start(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
+  if (const auto status = validate_attach_map(map); status != MLN_STATUS_OK)
+    return status;
   if (
     const auto status = validate_webgpu_owned_texture_descriptor(descriptor);
     status != MLN_STATUS_OK
   )
     return status;
   if (
-    const auto status = validate_physical_size(
-      descriptor->extent.width, descriptor->extent.height,
-      descriptor->extent.scale_factor, "scaled texture dimensions are too large"
-    );
+    const auto status = validate_owned_texture_extent(descriptor->extent);
     status != MLN_STATUS_OK
   )
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, completion);
+      validate_render_session_attach_request(options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -370,6 +384,8 @@ auto webgpu_borrowed_texture_attach_start(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
+  if (const auto status = validate_attach_map(map); status != MLN_STATUS_OK)
+    return status;
   if (
     const auto status = validate_webgpu_borrowed_texture_descriptor(descriptor);
     status != MLN_STATUS_OK
@@ -384,7 +400,7 @@ auto webgpu_borrowed_texture_attach_start(
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, completion);
+      validate_render_session_attach_request(options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -406,22 +422,21 @@ auto webgpu_surface_attach_start(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
+  if (const auto status = validate_attach_map(map); status != MLN_STATUS_OK)
+    return status;
   if (
     const auto status = validate_webgpu_surface_descriptor(descriptor);
     status != MLN_STATUS_OK
   )
     return status;
   if (
-    const auto status = validate_physical_size(
-      descriptor->extent.width, descriptor->extent.height,
-      descriptor->extent.scale_factor, "scaled surface dimensions are too large"
-    );
+    const auto status = validate_surface_extent(descriptor->extent);
     status != MLN_STATUS_OK
   )
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, completion);
+      validate_render_session_attach_request(options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;

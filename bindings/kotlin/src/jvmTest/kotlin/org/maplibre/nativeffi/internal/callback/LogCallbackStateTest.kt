@@ -5,7 +5,6 @@ import java.lang.foreign.MemorySegment
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.log.LogEvent
 import org.maplibre.nativeffi.log.LogRecord
@@ -16,7 +15,7 @@ class LogCallbackStateTest {
   fun callbackCopiesRecordsContainsFailuresAndStopsAfterClose() {
     var copied: LogRecord? = null
     val state =
-      LogCallbackState.createForTesting(
+      LogCallbackState(
         LogCallback { record ->
           copied = record
           true
@@ -39,16 +38,8 @@ class LogCallbackStateTest {
     assertEquals(0, state.invoke(MemorySegment.NULL, 1, 0, 0, MemorySegment.NULL))
     assertTrue(state.isClosedForTesting())
 
-    val throwing = LogCallbackState.createForTesting(LogCallback { error("contained") })
+    val throwing = LogCallbackState(LogCallback { error("contained") })
     assertEquals(0, throwing.invoke(MemorySegment.NULL, 1, 0, 0, MemorySegment.NULL))
     throwing.close()
-  }
-
-  @Test
-  fun nativeRegistrationReplacesAndClearsOwnedState() {
-    Maplibre.setLogCallback(LogCallback { true })
-    Maplibre.setLogCallback(LogCallback { false })
-    Maplibre.clearLogCallback()
-    Maplibre.clearLogCallback()
   }
 }

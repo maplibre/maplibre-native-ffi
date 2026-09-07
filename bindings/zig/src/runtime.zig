@@ -5,6 +5,7 @@ const completion = @import("completion.zig");
 const diagnostics = @import("diagnostics.zig");
 const native_temp = @import("native_temp.zig");
 const status = @import("status.zig");
+const sync = @import("sync.zig");
 const values = @import("values.zig");
 
 const MapRegistration = struct {
@@ -22,7 +23,11 @@ const ResourceProviderState = struct {
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 };
 
+// The native runtime keeps this state as its wake user_data and calls the wake
+// until asynchronous teardown finishes, so the public handle and the native wake
+// each hold a reference and the last one frees it.
 const RuntimeState = struct {
+    refs: std.atomic.Value(usize) = .init(1),
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     registry: ?*RuntimeRegistry,
     active_leases: std.atomic.Value(usize),
@@ -30,6 +35,15 @@ const RuntimeState = struct {
     event_callback: ?WakeCallback = null,
     event_user_data: ?*anyopaque = null,
     wake_lock: std.Io.Mutex = .init,
+
+    fn retain(self: *RuntimeState) void {
+        _ = self.refs.fetchAdd(1, .acq_rel);
+    }
+
+    fn release(self: *RuntimeState) void {
+        if (self.refs.fetchSub(1, .acq_rel) != 1) return;
+        std.heap.smp_allocator.destroy(self);
+    }
 };
 
 pub const RuntimeLease = struct {
@@ -42,7 +56,14 @@ pub const RuntimeLease = struct {
     }
 };
 
-/// Callback that schedules a later event drain on the host receiver.
+/// Schedules a later event drain on the host receiver.
+///
+/// The runtime invokes it on whichever native thread queued the event, and
+/// coalesces: one invocation can stand for several queued events, so the
+/// receiver drains until the batch is empty. The callback signals its receiver
+/// and returns; calling back into this binding from inside it, including
+/// `RuntimeHandle.setEventWakeCallback` and
+/// `RuntimeHandle.clearEventWakeCallback`, deadlocks.
 pub const WakeCallback = *const fn (?*anyopaque) callconv(.c) void;
 
 pub const RegisteredMap = struct {
@@ -66,16 +87,6 @@ var runtime_handle_registry: std.AutoHashMapUnmanaged(c.mln_runtime, *RuntimeSta
 
 var resource_request_registry_lock = std.atomic.Value(bool).init(false);
 var resource_request_registry: std.AutoHashMapUnmanaged(c.mln_resource_request_handle, *ResourceRequestState) = .empty;
-
-var handle_generation_lock: std.atomic.Mutex = .unlocked;
-var handle_generation_counter: u64 = 0;
-var handle_generation_seed: u64 = 0;
-
-const OfflineRegionSnapshotDestroyFn = *const fn (c.mln_offline_region_snapshot) callconv(.c) void;
-const OfflineRegionListDestroyFn = *const fn (c.mln_offline_region_list) callconv(.c) void;
-
-var offline_region_snapshot_destroy_for_testing: OfflineRegionSnapshotDestroyFn = c.mln_offline_region_snapshot_destroy;
-var offline_region_list_destroy_for_testing: OfflineRegionListDestroyFn = c.mln_offline_region_list_destroy;
 
 /// Runtime creation options. A null field takes the C API default.
 pub const RuntimeOptions = struct {
@@ -582,6 +593,19 @@ const RuntimeEventView = struct {
     message: []const u8,
     payload: RuntimeEventPayload,
 
+    fn fromOwned(event: RuntimeEvent) RuntimeEventView {
+        return .{
+            .event_type = event.event_type,
+            .source_type = event.source_type,
+            .source = event.source,
+            .source_id = event.source_id,
+            .payload_type = event.payload_type,
+            .code = event.code,
+            .message = event.message,
+            .payload = event.payload,
+        };
+    }
+
     /// Copies this event into storage the returned value owns.
     fn toOwned(self: RuntimeEventView, allocator: std.mem.Allocator) status.Error!RuntimeEvent {
         const message = try allocator.dupe(u8, self.message);
@@ -624,19 +648,7 @@ pub const RuntimeEvent = struct {
 
     /// Copies this event into storage the returned value owns.
     pub fn clone(self: RuntimeEvent, allocator: std.mem.Allocator) status.Error!RuntimeEvent {
-        const message = try allocator.dupe(u8, self.message);
-        errdefer allocator.free(message);
-        return .{
-            .allocator = allocator,
-            .event_type = self.event_type,
-            .source_type = self.source_type,
-            .source = self.source,
-            .source_id = self.source_id,
-            .payload_type = self.payload_type,
-            .code = self.code,
-            .message = message,
-            .payload = try ownedPayload(allocator, self.payload),
-        };
+        return RuntimeEventView.fromOwned(self).toOwned(allocator);
     }
 
     pub fn deinit(self: *RuntimeEvent) void {
@@ -1115,35 +1127,30 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
     }
 
     pub fn barrier(self: *RuntimeHandle) status.Error!completion.Future(void) {
-        const runtime_lease = try lease(self);
-        defer runtime_lease.release();
-        return completion.submit(void, runtime_lease.diagnostic_store, completion.unit, runtime_lease.native, struct {
-            fn start(native: c.mln_runtime, descriptor: *const c.mln_completion) c.mln_status {
-                return c.mln_runtime_barrier(native, descriptor);
-            }
-        }.start);
+        return submitRuntime(void, self, completion.unit, c.mln_runtime_barrier, .{});
     }
 
+    /// Installs the wake this runtime calls when it queues an event, replacing
+    /// any callback already installed. See `WakeCallback` for the thread,
+    /// coalescing, and reentrancy rules.
     pub fn setEventWakeCallback(
         self: *RuntimeHandle,
         callback: WakeCallback,
         user_data: ?*anyopaque,
     ) status.Error!void {
-        const runtime_lease = try lease(self);
-        defer runtime_lease.release();
-        std.Io.Threaded.mutexLock(&runtime_lease.state.wake_lock);
-        defer std.Io.Threaded.mutexUnlock(&runtime_lease.state.wake_lock);
-        runtime_lease.state.event_callback = callback;
-        runtime_lease.state.event_user_data = user_data;
+        return self.installEventWake(callback, user_data);
     }
 
+    /// Removes the installed wake and returns once no invocation of it is
+    /// running, so the host may free the state the callback reads.
     pub fn clearEventWakeCallback(self: *RuntimeHandle) status.Error!void {
+        return self.installEventWake(null, null);
+    }
+
+    fn installEventWake(self: *RuntimeHandle, callback: ?WakeCallback, user_data: ?*anyopaque) status.Error!void {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        std.Io.Threaded.mutexLock(&runtime_lease.state.wake_lock);
-        defer std.Io.Threaded.mutexUnlock(&runtime_lease.state.wake_lock);
-        runtime_lease.state.event_callback = null;
-        runtime_lease.state.event_user_data = null;
+        setEventWake(runtime_lease.state, callback, user_data);
     }
 
     /// Drains this runtime's queued events into one copied batch.
@@ -1217,32 +1224,16 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         return RuntimeEventMask.fromRaw(raw);
     }
 
+    /// Runs one ambient-cache maintenance operation. The call validates its
+    /// arguments and returns; a database failure reaches the completion.
     pub fn runAmbientCacheOperation(self: *RuntimeHandle, operation: AmbientCacheOperation) status.Error!completion.Future(void) {
-        const runtime_lease = try lease(self);
-        defer runtime_lease.release();
-        const Context = struct { native: c.mln_runtime, operation: u32 };
-        return completion.submit(void, runtime_lease.diagnostic_store, completion.unit, Context{
-            .native = runtime_lease.native,
-            .operation = operation.toRaw(),
-        }, struct {
-            fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
-                return c.mln_runtime_run_ambient_cache_operation(context.native, context.operation, descriptor);
-            }
-        }.start);
+        return submitRuntime(void, self, completion.unit, c.mln_runtime_run_ambient_cache_operation, .{operation.toRaw()});
     }
 
+    /// Caps the ambient cache. The call validates its arguments and returns; a
+    /// database failure reaches the completion.
     pub fn setMaximumAmbientCacheSize(self: *RuntimeHandle, size: u64) status.Error!completion.Future(void) {
-        const runtime_lease = try lease(self);
-        defer runtime_lease.release();
-        const Context = struct { native: c.mln_runtime, size: u64 };
-        return completion.submit(void, runtime_lease.diagnostic_store, completion.unit, Context{
-            .native = runtime_lease.native,
-            .size = size,
-        }, struct {
-            fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
-                return c.mln_runtime_set_maximum_ambient_cache_size(context.native, context.size, descriptor);
-            }
-        }.start);
+        return submitRuntime(void, self, completion.unit, c.mln_runtime_set_maximum_ambient_cache_size, .{size});
     }
 
     pub fn createOfflineRegion(
@@ -1256,52 +1247,21 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         var temp = native_temp.TempStorage.initWithDiagnostics(allocator, runtime_lease.diagnostic_store);
         defer temp.deinit();
         const native_definition = try temp.offlineRegionDefinition(definition);
-        const Context = struct {
-            native: c.mln_runtime,
-            definition: [*c]const c.mln_offline_region_definition,
-            metadata: ?[*]const u8,
-            metadata_size: usize,
-        };
-        return completion.submit(OwnedOfflineRegion, runtime_lease.diagnostic_store, copyCompletedOfflineRegion, Context{
-            .native = runtime_lease.native,
-            .definition = native_definition,
-            .metadata = if (metadata.len == 0) null else metadata.ptr,
-            .metadata_size = metadata.len,
-        }, struct {
-            fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
-                return c.mln_runtime_offline_region_create(
-                    context.native,
-                    context.definition,
-                    context.metadata,
-                    context.metadata_size,
-                    descriptor,
-                );
-            }
-        }.start);
+        return submitRuntime(OwnedOfflineRegion, self, copyCompletedOfflineRegion, c.mln_runtime_offline_region_create, .{
+            native_definition,
+            if (metadata.len == 0) null else metadata.ptr,
+            metadata.len,
+        });
     }
 
+    /// Reads one offline region. A region ID that names nothing completes with
+    /// null rather than a failure.
     pub fn getOfflineRegion(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!completion.Future(?OwnedOfflineRegion) {
-        const runtime_lease = try lease(self);
-        defer runtime_lease.release();
-        const Context = struct { native: c.mln_runtime, region_id: i64 };
-        return completion.submit(?OwnedOfflineRegion, runtime_lease.diagnostic_store, copyCompletedOptionalOfflineRegion, Context{
-            .native = runtime_lease.native,
-            .region_id = region_id,
-        }, struct {
-            fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
-                return c.mln_runtime_offline_region_get(context.native, context.region_id, descriptor);
-            }
-        }.start);
+        return submitRuntime(?OwnedOfflineRegion, self, copyCompletedOptionalOfflineRegion, c.mln_runtime_offline_region_get, .{region_id});
     }
 
     pub fn listOfflineRegions(self: *RuntimeHandle) status.Error!completion.Future(OfflineRegionList) {
-        const runtime_lease = try lease(self);
-        defer runtime_lease.release();
-        return completion.submit(OfflineRegionList, runtime_lease.diagnostic_store, copyCompletedOfflineRegionList, runtime_lease.native, struct {
-            fn start(native: c.mln_runtime, descriptor: *const c.mln_completion) c.mln_status {
-                return c.mln_runtime_offline_regions_list(native, descriptor);
-            }
-        }.start);
+        return submitRuntime(OfflineRegionList, self, copyCompletedOfflineRegionList, c.mln_runtime_offline_regions_list, .{});
     }
 
     pub fn mergeOfflineRegionsDatabase(
@@ -1313,15 +1273,7 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         defer runtime_lease.release();
         const path = try nulTerminated(allocator, side_database_path, runtime_lease.diagnostic_store, "offline merge database path contains embedded NUL");
         defer allocator.free(path);
-        const Context = struct { native: c.mln_runtime, path: [*:0]const u8 };
-        return completion.submit(OfflineRegionList, runtime_lease.diagnostic_store, copyCompletedOfflineRegionList, Context{
-            .native = runtime_lease.native,
-            .path = path.ptr,
-        }, struct {
-            fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
-                return c.mln_runtime_offline_regions_merge_database(context.native, context.path, descriptor);
-            }
-        }.start);
+        return submitRuntime(OfflineRegionList, self, copyCompletedOfflineRegionList, c.mln_runtime_offline_regions_merge_database, .{path.ptr});
     }
 
     pub fn updateOfflineRegionMetadata(
@@ -1329,48 +1281,19 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         region_id: OfflineRegionId,
         metadata: []const u8,
     ) status.Error!completion.Future(OwnedOfflineRegion) {
-        const runtime_lease = try lease(self);
-        defer runtime_lease.release();
-        const Context = struct {
-            native: c.mln_runtime,
-            region_id: i64,
-            metadata: ?[*]const u8,
-            metadata_size: usize,
-        };
-        return completion.submit(OwnedOfflineRegion, runtime_lease.diagnostic_store, copyCompletedOfflineRegion, Context{
-            .native = runtime_lease.native,
-            .region_id = region_id,
-            .metadata = if (metadata.len == 0) null else metadata.ptr,
-            .metadata_size = metadata.len,
-        }, struct {
-            fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
-                return c.mln_runtime_offline_region_update_metadata(
-                    context.native,
-                    context.region_id,
-                    context.metadata,
-                    context.metadata_size,
-                    descriptor,
-                );
-            }
-        }.start);
+        return submitRuntime(OwnedOfflineRegion, self, copyCompletedOfflineRegion, c.mln_runtime_offline_region_update_metadata, .{
+            region_id,
+            if (metadata.len == 0) null else metadata.ptr,
+            metadata.len,
+        });
     }
 
     pub fn getOfflineRegionStatus(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!completion.Future(OfflineRegionStatus) {
-        const runtime_lease = try lease(self);
-        defer runtime_lease.release();
-        const Context = struct { native: c.mln_runtime, region_id: i64 };
-        return completion.submit(OfflineRegionStatus, runtime_lease.diagnostic_store, copyCompletedOfflineRegionStatus, Context{
-            .native = runtime_lease.native,
-            .region_id = region_id,
-        }, struct {
-            fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
-                return c.mln_runtime_offline_region_get_status(context.native, context.region_id, descriptor);
-            }
-        }.start);
+        return submitRuntime(OfflineRegionStatus, self, copyCompletedOfflineRegionStatus, c.mln_runtime_offline_region_get_status, .{region_id});
     }
 
     pub fn setOfflineRegionObserved(self: *RuntimeHandle, region_id: OfflineRegionId, observed: bool) status.Error!completion.Future(void) {
-        return self.offlineRegionUnit(region_id, observed, c.mln_runtime_offline_region_set_observed);
+        return submitRuntime(void, self, completion.unit, c.mln_runtime_offline_region_set_observed, .{ region_id, observed });
     }
 
     pub fn setOfflineRegionDownloadState(
@@ -1378,137 +1301,76 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         region_id: OfflineRegionId,
         download_state: OfflineRegionDownloadState,
     ) status.Error!completion.Future(void) {
-        const runtime_lease = try lease(self);
-        defer runtime_lease.release();
-        const Context = struct { native: c.mln_runtime, region_id: i64, state: u32 };
-        return completion.submit(void, runtime_lease.diagnostic_store, completion.unit, Context{
-            .native = runtime_lease.native,
-            .region_id = region_id,
-            .state = try download_state.toInputRaw(runtime_lease.diagnostic_store),
-        }, struct {
-            fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
-                return c.mln_runtime_offline_region_set_download_state(context.native, context.region_id, context.state, descriptor);
-            }
-        }.start);
+        const raw_state = try download_state.toInputRaw(diagnosticStore(self));
+        return submitRuntime(void, self, completion.unit, c.mln_runtime_offline_region_set_download_state, .{ region_id, raw_state });
     }
 
     pub fn invalidateOfflineRegion(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!completion.Future(void) {
-        return self.offlineRegionUnit(region_id, {}, c.mln_runtime_offline_region_invalidate);
+        return submitRuntime(void, self, completion.unit, c.mln_runtime_offline_region_invalidate, .{region_id});
     }
 
     pub fn deleteOfflineRegion(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!completion.Future(void) {
-        return self.offlineRegionUnit(region_id, {}, c.mln_runtime_offline_region_delete);
-    }
-
-    fn offlineRegionUnit(self: *RuntimeHandle, region_id: OfflineRegionId, argument: anytype, comptime start_fn: anytype) status.Error!completion.Future(void) {
-        const runtime_lease = try lease(self);
-        defer runtime_lease.release();
-        const Context = struct { native: c.mln_runtime, region_id: i64, argument: @TypeOf(argument) };
-        return completion.submit(void, runtime_lease.diagnostic_store, completion.unit, Context{
-            .native = runtime_lease.native,
-            .region_id = region_id,
-            .argument = argument,
-        }, struct {
-            fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
-                if (comptime @TypeOf(context.argument) == bool) {
-                    return start_fn(context.native, context.region_id, context.argument, descriptor);
-                }
-                return start_fn(context.native, context.region_id, descriptor);
-            }
-        }.start);
+        return submitRuntime(void, self, completion.unit, c.mln_runtime_offline_region_delete, .{region_id});
     }
 
     /// Registers, replaces, or clears the runtime-scoped URL transform.
     /// Native retains each accepted callback root until it is no longer
     /// reachable from the runtime.
     pub fn setResourceTransform(self: *RuntimeHandle, transform: ?ResourceTransform) status.Error!completion.Future(completion.CommandCompletion) {
-        const runtime_lease = try lease(self);
-        defer runtime_lease.release();
-        if (transform) |value| {
-            const replacement = try std.heap.smp_allocator.create(ResourceTransform);
-            errdefer std.heap.smp_allocator.destroy(replacement);
-            replacement.* = value;
-            const native_transform = c.mln_resource_transform{
+        const replacement = try ownedCallbackState(ResourceTransform, transform);
+        errdefer if (replacement) |owned| std.heap.smp_allocator.destroy(owned);
+        return submitCallbackRegistration(
+            self,
+            if (replacement) |owned| c.mln_resource_transform{
                 .size = @sizeOf(c.mln_resource_transform),
                 .callback = resourceTransformTrampoline,
-                .user_data = replacement,
+                .user_data = owned,
                 .release_user_data = releaseResourceTransform,
-            };
-            const Context = struct { native: c.mln_runtime, transform: c.mln_resource_transform };
-            return completion.submit(completion.CommandCompletion, runtime_lease.diagnostic_store, completion.command, Context{
-                .native = runtime_lease.native,
-                .transform = native_transform,
-            }, struct {
-                fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
-                    return c.mln_runtime_set_resource_transform(context.native, &context.transform, descriptor);
-                }
-            }.start);
-        }
-        return completion.submit(completion.CommandCompletion, runtime_lease.diagnostic_store, completion.command, runtime_lease.native, struct {
-            fn start(native_runtime: c.mln_runtime, descriptor: *const c.mln_completion) c.mln_status {
-                return c.mln_runtime_clear_resource_transform(native_runtime, descriptor);
-            }
-        }.start);
+            } else null,
+            c.mln_runtime_set_resource_transform,
+            c.mln_runtime_clear_resource_transform,
+        );
     }
 
+    /// Registers, replaces, or clears the runtime-scoped resource provider.
+    /// Native retains each accepted callback root until it is no longer
+    /// reachable from the runtime.
     pub fn setResourceProvider(self: *RuntimeHandle, provider: ?ResourceProvider) status.Error!completion.Future(completion.CommandCompletion) {
-        const runtime_lease = try lease(self);
-        defer runtime_lease.release();
-        if (provider) |value| {
-            const replacement = try std.heap.smp_allocator.create(ResourceProviderState);
-            errdefer std.heap.smp_allocator.destroy(replacement);
-            replacement.* = .{ .provider = value, .diagnostic_store = runtime_lease.diagnostic_store };
-            const native_provider = c.mln_resource_provider{
+        const replacement = try ownedCallbackState(ResourceProviderState, if (provider) |value|
+            ResourceProviderState{ .provider = value, .diagnostic_store = diagnosticStore(self) }
+        else
+            null);
+        errdefer if (replacement) |owned| std.heap.smp_allocator.destroy(owned);
+        return submitCallbackRegistration(
+            self,
+            if (replacement) |owned| c.mln_resource_provider{
                 .size = @sizeOf(c.mln_resource_provider),
                 .callback = resourceProviderTrampoline,
-                .user_data = replacement,
+                .user_data = owned,
                 .release_user_data = releaseResourceProvider,
-            };
-            const Context = struct { native: c.mln_runtime, provider: c.mln_resource_provider };
-            return completion.submit(completion.CommandCompletion, runtime_lease.diagnostic_store, completion.command, Context{
-                .native = runtime_lease.native,
-                .provider = native_provider,
-            }, struct {
-                fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
-                    return c.mln_runtime_set_resource_provider(context.native, &context.provider, descriptor);
-                }
-            }.start);
-        }
-        return completion.submit(completion.CommandCompletion, runtime_lease.diagnostic_store, completion.command, runtime_lease.native, struct {
-            fn start(native_runtime: c.mln_runtime, descriptor: *const c.mln_completion) c.mln_status {
-                return c.mln_runtime_clear_resource_provider(native_runtime, descriptor);
-            }
-        }.start);
+            } else null,
+            c.mln_runtime_set_resource_provider,
+            c.mln_runtime_clear_resource_provider,
+        );
     }
 
+    /// Registers, replaces, or clears the runtime-scoped HTTP header
+    /// transform. Native retains each accepted callback root until it is no
+    /// longer reachable from the runtime.
     pub fn setHttpHeaderTransform(self: *RuntimeHandle, transform: ?HttpHeaderTransform) status.Error!completion.Future(completion.CommandCompletion) {
-        const runtime_lease = try lease(self);
-        defer runtime_lease.release();
-        if (transform) |value| {
-            const replacement = try std.heap.smp_allocator.create(HttpHeaderTransform);
-            errdefer std.heap.smp_allocator.destroy(replacement);
-            replacement.* = value;
-            const native_transform = c.mln_http_header_transform{
+        const replacement = try ownedCallbackState(HttpHeaderTransform, transform);
+        errdefer if (replacement) |owned| std.heap.smp_allocator.destroy(owned);
+        return submitCallbackRegistration(
+            self,
+            if (replacement) |owned| c.mln_http_header_transform{
                 .size = @sizeOf(c.mln_http_header_transform),
                 .callback = httpHeaderTransformTrampoline,
-                .user_data = replacement,
+                .user_data = owned,
                 .release_user_data = releaseHttpHeaderTransform,
-            };
-            const Context = struct { native: c.mln_runtime, transform: c.mln_http_header_transform };
-            return completion.submit(completion.CommandCompletion, runtime_lease.diagnostic_store, completion.command, Context{
-                .native = runtime_lease.native,
-                .transform = native_transform,
-            }, struct {
-                fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
-                    return c.mln_runtime_set_http_header_transform(context.native, &context.transform, descriptor);
-                }
-            }.start);
-        }
-        return completion.submit(completion.CommandCompletion, runtime_lease.diagnostic_store, completion.command, runtime_lease.native, struct {
-            fn start(native_runtime: c.mln_runtime, descriptor: *const c.mln_completion) c.mln_status {
-                return c.mln_runtime_clear_http_header_transform(native_runtime, descriptor);
-            }
-        }.start);
+            } else null,
+            c.mln_runtime_set_http_header_transform,
+            c.mln_runtime_clear_http_header_transform,
+        );
     }
 
     /// Releases the runtime handle and returns the future for its native
@@ -1519,7 +1381,9 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
     /// gone, so a host that waits for it may exit the process without racing
     /// native teardown. A host that outlives its runtimes deinitializes the
     /// future without waiting. Closing an already closed runtime returns a
-    /// future that has already completed.
+    /// future that has already completed. Closing retires the installed wake
+    /// once no invocation of it is running, so the host may free its wake state
+    /// after close returns.
     pub fn close(self: *RuntimeHandle) status.Error!completion.Future(void) {
         const runtime_close = try beginRuntimeClose(self.*) orelse
             return completion.completed(void, {});
@@ -1531,13 +1395,72 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
             cancelRuntimeClose(runtime_close.state);
             return err;
         };
+        // Native teardown keeps calling the wake until it finishes, so the
+        // accepted release retires the host's callback here.
+        setEventWake(runtime_close.state, null, null);
         runtime_close.registry.maps.deinit(std.heap.smp_allocator);
         std.heap.smp_allocator.destroy(runtime_close.registry);
         const runtime_state = finishRuntimeClose(self.*) orelse runtime_close.state;
-        std.heap.smp_allocator.destroy(runtime_state);
+        runtime_state.release();
         return teardown;
     }
 };
+
+fn submitRuntime(
+    comptime T: type,
+    self: *RuntimeHandle,
+    comptime copy: *const fn (*const c.mln_completion_result) status.Error!T,
+    comptime start_fn: anytype,
+    arguments: anytype,
+) status.Error!completion.Future(T) {
+    const runtime_lease = try lease(self);
+    defer runtime_lease.release();
+    const Arguments = @TypeOf(arguments);
+    const Context = struct { native: c.mln_runtime, arguments: Arguments };
+    return completion.submit(T, runtime_lease.diagnostic_store, copy, Context{
+        .native = runtime_lease.native,
+        .arguments = arguments,
+    }, struct {
+        fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
+            return @call(.auto, start_fn, .{context.native} ++ context.arguments ++ .{descriptor});
+        }
+    }.start);
+}
+
+fn ownedCallbackState(comptime State: type, state: ?State) std.mem.Allocator.Error!?*State {
+    const value = state orelse return null;
+    const owned = try std.heap.smp_allocator.create(State);
+    owned.* = value;
+    return owned;
+}
+
+// An accepted registration hands the callback state to native, which releases
+// it through the descriptor's own release callback.
+fn submitCallbackRegistration(
+    self: *RuntimeHandle,
+    native_descriptor: anytype,
+    comptime set_fn: anytype,
+    comptime clear_fn: anytype,
+) status.Error!completion.Future(completion.CommandCompletion) {
+    const runtime_lease = try lease(self);
+    defer runtime_lease.release();
+    if (native_descriptor) |value| {
+        const Context = struct { native: c.mln_runtime, descriptor: @TypeOf(value) };
+        return completion.submit(completion.CommandCompletion, runtime_lease.diagnostic_store, completion.command, Context{
+            .native = runtime_lease.native,
+            .descriptor = value,
+        }, struct {
+            fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
+                return set_fn(context.native, &context.descriptor, descriptor);
+            }
+        }.start);
+    }
+    return completion.submit(completion.CommandCompletion, runtime_lease.diagnostic_store, completion.command, runtime_lease.native, struct {
+        fn start(native_runtime: c.mln_runtime, descriptor: *const c.mln_completion) c.mln_status {
+            return clear_fn(native_runtime, descriptor);
+        }
+    }.start);
+}
 
 /// Test-only teardown that closes a runtime and waits for its native teardown.
 pub fn closeRuntimeForTesting(handle: *RuntimeHandle) status.Error!void {
@@ -1574,7 +1497,7 @@ fn createNative(
         .active_leases = .init(0),
         .closing = false,
     };
-    errdefer std.heap.smp_allocator.destroy(runtime_state);
+    errdefer runtime_state.release();
 
     native_options.event_wake = .{
         .size = @sizeOf(c.mln_wake),
@@ -1584,19 +1507,49 @@ fn createNative(
     };
     var runtime: c.mln_runtime = 0;
     try status.checkStatus(c.mln_runtime_create(native_options, &runtime), diagnostic_store);
+    // The native runtime now holds the wake and releases it during teardown.
+    runtime_state.retain();
+    errdefer releaseUntrackedRuntime(runtime);
     return try registerRuntimeState(runtime, runtime_state);
+}
+
+fn discardCompletion(_: ?*anyopaque, _: [*c]const c.mln_completion_result) callconv(.c) void {}
+
+// Releases a native runtime the binding never registered. Nothing is left to
+// report the teardown to, so the completion discards it.
+fn releaseUntrackedRuntime(runtime: c.mln_runtime) void {
+    const descriptor = c.mln_completion{
+        .size = @sizeOf(c.mln_completion),
+        .callback = discardCompletion,
+        .user_data = null,
+        .release_user_data = null,
+    };
+    _ = c.mln_runtime_release(runtime, &descriptor);
+}
+
+// The trampoline holds wake_lock across the host callback, so taking the lock
+// here is what makes an install or a retirement quiescent.
+fn setEventWake(state: *RuntimeState, callback: ?WakeCallback, user_data: ?*anyopaque) void {
+    std.Io.Threaded.mutexLock(&state.wake_lock);
+    defer std.Io.Threaded.mutexUnlock(&state.wake_lock);
+    state.event_callback = callback;
+    state.event_user_data = user_data;
 }
 
 fn eventWakeTrampoline(user_data: ?*anyopaque) callconv(.c) void {
     const state: *RuntimeState = @ptrCast(@alignCast(user_data orelse return));
     std.Io.Threaded.mutexLock(&state.wake_lock);
-    const callback = state.event_callback;
-    const callback_data = state.event_user_data;
-    std.Io.Threaded.mutexUnlock(&state.wake_lock);
-    if (callback) |wake| wake(callback_data);
+    defer std.Io.Threaded.mutexUnlock(&state.wake_lock);
+    const callback = state.event_callback orelse return;
+    callback(state.event_user_data);
 }
 
-fn eventWakeRelease(_: ?*anyopaque) callconv(.c) void {}
+// The C API runs this after the last wake invocation, which is the point where
+// the native runtime stops reading the state.
+fn eventWakeRelease(user_data: ?*anyopaque) callconv(.c) void {
+    const state: *RuntimeState = @ptrCast(@alignCast(user_data orelse return));
+    state.release();
+}
 
 // Events index by the batch's stride, which a later C API version may widen
 // past this binding's compiled event size, so the fixed prefix is copied out
@@ -1635,14 +1588,6 @@ fn payloadWindow(events: []const u8, event_size: usize, offset: usize) []const u
     const payload_offset = @offsetOf(c.mln_runtime_event, "payload");
     if (event_size <= payload_offset) return "";
     return events[offset + payload_offset ..][0 .. event_size - payload_offset];
-}
-
-fn destroyOfflineRegionSnapshot(snapshot: c.mln_offline_region_snapshot) void {
-    offline_region_snapshot_destroy_for_testing(snapshot);
-}
-
-fn destroyOfflineRegionList(list: c.mln_offline_region_list) void {
-    offline_region_list_destroy_for_testing(list);
 }
 
 // A map handle names one map for the life of the process, so a registration
@@ -1912,40 +1857,6 @@ fn unlockResourceRequestRegistry() void {
     resource_request_registry_lock.store(false, .seq_cst);
 }
 
-pub fn nextHandleGeneration() u64 {
-    while (!handle_generation_lock.tryLock()) {
-        std.Thread.yield() catch {};
-    }
-    defer handle_generation_lock.unlock();
-
-    const seed = handleGenerationSeed();
-    handle_generation_counter +%= 1;
-    const counter = handle_generation_counter;
-    const generation = splitMix64(seed +% counter);
-    if (generation == 0) return 1;
-    return generation;
-}
-
-fn handleGenerationSeed() u64 {
-    if (handle_generation_seed != 0) return handle_generation_seed;
-
-    const candidate = splitMix64(
-        @as(u64, @intFromPtr(&handle_generation_seed)) ^
-            @as(u64, @intFromPtr(&handle_generation_counter)) ^
-            0x9e37_79b9_7f4a_7c15,
-    );
-    const seed = if (candidate == 0) 0x243f_6a88_85a3_08d3 else candidate;
-    handle_generation_seed = seed;
-    return seed;
-}
-
-fn splitMix64(input: u64) u64 {
-    var value = input +% 0x9e37_79b9_7f4a_7c15;
-    value = (value ^ (value >> 30)) *% 0xbf58_476d_1ce4_e5b9;
-    value = (value ^ (value >> 27)) *% 0x94d0_49bb_1331_11eb;
-    return value ^ (value >> 31);
-}
-
 fn resourceRequestFromNative(allocator: std.mem.Allocator, request: *const c.mln_resource_request) std.mem.Allocator.Error!ResourceRequest {
     const requested_url = try allocator.dupe(u8, if (request.requested_url == null) "" else std.mem.span(request.requested_url));
     errdefer allocator.free(requested_url);
@@ -2077,17 +1988,6 @@ fn copyOptionalBytes(allocator: std.mem.Allocator, data: ?[*]const u8, size: usi
     return allocator.dupe(u8, bytes[0..size]);
 }
 
-fn rawStatusError(raw_status: i32) status.NativeStatusError {
-    return switch (raw_status) {
-        c.MLN_STATUS_INVALID_ARGUMENT => error.InvalidArgument,
-        c.MLN_STATUS_INVALID_STATE => error.InvalidState,
-        c.MLN_STATUS_WRONG_THREAD => error.WrongThread,
-        c.MLN_STATUS_UNSUPPORTED => error.Unsupported,
-        c.MLN_STATUS_NATIVE_ERROR => error.NativeError,
-        else => error.UnknownStatus,
-    };
-}
-
 fn renderingStatsFromNative(raw: c.mln_rendering_stats) RenderingStats {
     return .{
         .encoding_time = raw.encoding_time,
@@ -2153,35 +2053,6 @@ fn copyCompletedOfflineRegionList(result: *const c.mln_completion_result) status
 
 fn copyCompletedOfflineRegionStatus(result: *const c.mln_completion_result) status.Error!OfflineRegionStatus {
     return offlineStatusFromNative(try completion.value(c.mln_offline_region_status)(result));
-}
-
-fn copyOfflineRegionSnapshot(
-    allocator: std.mem.Allocator,
-    snapshot: c.mln_offline_region_snapshot,
-) status.Error!OwnedOfflineRegion {
-    var info: c.mln_offline_region_info = undefined;
-    info.size = @sizeOf(c.mln_offline_region_info);
-    try status.checkStatus(c.mln_offline_region_snapshot_get(snapshot, &info), null);
-    return copyOfflineRegionInfo(allocator, info);
-}
-
-fn copyOfflineRegionList(allocator: std.mem.Allocator, list: c.mln_offline_region_list) status.Error!OfflineRegionList {
-    var count: usize = 0;
-    try status.checkStatus(c.mln_offline_region_list_count(list, &count), null);
-    const items = try allocator.alloc(OwnedOfflineRegion, count);
-    var initialized: usize = 0;
-    errdefer {
-        for (items[0..initialized]) |*item| item.deinit();
-        allocator.free(items);
-    }
-    for (items, 0..) |*item, index| {
-        var info: c.mln_offline_region_info = undefined;
-        info.size = @sizeOf(c.mln_offline_region_info);
-        try status.checkStatus(c.mln_offline_region_list_get(list, index, &info), null);
-        item.* = try copyOfflineRegionInfo(allocator, info);
-        initialized += 1;
-    }
-    return .{ .allocator = allocator, .items = items };
 }
 
 fn copyOfflineRegionInfo(allocator: std.mem.Allocator, info: c.mln_offline_region_info) status.Error!OwnedOfflineRegion {
@@ -2292,42 +2163,6 @@ fn nulTerminated(
     return allocator.dupeZ(u8, value);
 }
 
-const offline_style_url_for_testing = "http://example.com/offline-style.json";
-
-var snapshot_destroy_count_for_testing: usize = 0;
-var list_destroy_count_for_testing: usize = 0;
-
-fn countingOfflineRegionSnapshotDestroy(snapshot: c.mln_offline_region_snapshot) callconv(.c) void {
-    snapshot_destroy_count_for_testing += 1;
-    c.mln_offline_region_snapshot_destroy(snapshot);
-}
-
-fn countingOfflineRegionListDestroy(list: c.mln_offline_region_list) callconv(.c) void {
-    list_destroy_count_for_testing += 1;
-    c.mln_offline_region_list_destroy(list);
-}
-
-fn markNotification(user_data: ?*anyopaque) callconv(.c) void {
-    const notified: *std.atomic.Value(bool) = @ptrCast(@alignCast(user_data orelse return));
-    notified.store(true, .seq_cst);
-}
-
-fn tempPathForTesting(allocator: std.mem.Allocator, sub_path: []const u8, filename: []const u8) ![]u8 {
-    return std.fmt.allocPrint(allocator, ".zig-cache/tmp/{s}/{s}", .{ sub_path, filename });
-}
-
-fn offlineTileDefinitionForTesting() OfflineRegionDefinition {
-    return .{ .tile_pyramid = .{
-        .style_url = offline_style_url_for_testing,
-        .bounds = .{
-            .southwest = .{ .latitude = 1.0, .longitude = 2.0 },
-            .northeast = .{ .latitude = 3.0, .longitude = 4.0 },
-        },
-        .min_zoom = 5.0,
-        .max_zoom = 6.0,
-        .pixel_ratio = 2.0,
-    } };
-}
 test "runtime event raw domains preserve unknown values" {
     try std.testing.expect(std.meta.eql(RuntimeEventType.fromRaw(0xfeed), RuntimeEventType{ .unknown = 0xfeed }));
     try std.testing.expect(std.meta.eql(RuntimeEventSourceType.fromRaw(0xbeef), RuntimeEventSourceType{ .unknown = 0xbeef }));

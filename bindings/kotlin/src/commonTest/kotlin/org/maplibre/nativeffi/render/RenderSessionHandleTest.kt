@@ -2,6 +2,8 @@ package org.maplibre.nativeffi.render
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -10,6 +12,7 @@ import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.CameraUpdateMode
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.map.MapMode
@@ -65,19 +68,24 @@ class RenderSessionHandleTest {
       frame.release()
       assertTrue(frame.isReleased)
 
+      // BND-183: the scale factor is fixed at attachment, so only width and height may change.
+      assertFailsWith<InvalidArgumentException> {
+        session.resize(RenderTargetExtent(16, 8, 2.0)).await()
+      }
+
       // Resizing hands the new logical size to the map, so the next frames report
       // SIZE_PENDING until the map publishes an update matching the new target.
-      session.completeOnDriver(session.resize(RenderTargetExtent(16, 8, 2.0)))
+      session.completeOnDriver(session.resize(RenderTargetExtent(16, 8, 1.0)))
       session.renderUntilSettled()
       val resized = session.snapshot().extent
       assertEquals(16, resized.width)
       assertEquals(8, resized.height)
-      assertEquals(2.0, resized.scaleFactor)
+      assertEquals(1.0, resized.scaleFactor)
 
       session.completeOnDriver(session.barrier())
       session.completeOnDriver(session.detach())
       assertEquals(RenderSessionState.DETACHED, session.snapshot().state)
-      assertTrue(!session.isClosed)
+      assertFalse(session.isClosed)
     }
   }
 
@@ -116,6 +124,22 @@ class RenderSessionHandleTest {
   }
 
   @Test
+  fun aSettledMapReportsNoUpdateForAnIfNeededDemand(): Unit = runSuspendTest {
+    withOwnedTextureSession { runtime, map, owned ->
+      val session = owned.session
+      session.completeOnDriver(map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray()))
+      session.completeOnDriver(runtime.barrier())
+      session.renderUntilSettled()
+
+      // The map published nothing after the settled frame, so the session skips the render.
+      assertEquals(RenderResult.NO_UPDATE, session.renderOneFrame(FrameDemand()).disposition)
+      assertEquals(RenderSessionState.ATTACHED, session.snapshot().state)
+
+      session.completeOnDriver(session.detach())
+    }
+  }
+
+  @Test
   fun abandonReportsItsDispositionAndFailsPendingDriverWorkAsTargetLost(): Unit = runSuspendTest {
     withOwnedTextureSession(width = 8, height = 8) { runtime, map, owned ->
       val session = owned.session
@@ -125,10 +149,12 @@ class RenderSessionHandleTest {
 
       val frame = assertNotNull(session.acquireFrame())
       val pending = session.reduceMemoryUse()
+      // An attached session that rendered always leaves its renderer and target behind.
       val abandoned = session.abandon()
+      assertEquals(RenderAbandonDisposition.QUARANTINED, abandoned.disposition)
       assertTrue(
-        abandoned.disposition == RenderAbandonDisposition.CLEAN ||
-          abandoned.disposition == RenderAbandonDisposition.QUARANTINED
+        abandoned.quarantinedResourceCount > 0,
+        "expected quarantined resources, got ${abandoned.quarantinedResourceCount}",
       )
       val failure = runCatching { pending.await() }.exceptionOrNull()
       assertTrue(failure is MaplibreException, "expected a target-lost failure: $failure")

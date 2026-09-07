@@ -71,16 +71,21 @@ public sealed unsafe class RuntimeHandle : IDisposable, IAsyncDisposable
     public bool IsClosed => state.IsClosed;
 
     /// <summary>Installs or replaces the runtime-scoped resource provider callback.</summary>
-    public Task<CommandCompletion> SetResourceProviderAsync(ResourceProviderCallback callback)
+    public Task<CommandCompletion> SetResourceProviderAsync(
+        ResourceProviderCallback callback,
+        CancellationToken cancellationToken = default
+    )
     {
         var replacement = new ResourceProviderState(callback);
         try
         {
-            return NativeCompletion.SubmitCommand(completion =>
-            {
-                var descriptor = replacement.Descriptor;
-                return SetResourceProviderNative(Handle, &descriptor, completion);
-            });
+            return NativeCompletion
+                .SubmitCommand(completion =>
+                {
+                    var descriptor = replacement.Descriptor;
+                    return SetResourceProviderNative(Handle, &descriptor, completion);
+                })
+                .WaitAsync(cancellationToken);
         }
         catch (Exception error)
         {
@@ -90,16 +95,21 @@ public sealed unsafe class RuntimeHandle : IDisposable, IAsyncDisposable
     }
 
     /// <summary>Installs or replaces the runtime-scoped resource transform callback.</summary>
-    public Task<CommandCompletion> SetResourceTransformAsync(ResourceTransformCallback callback)
+    public Task<CommandCompletion> SetResourceTransformAsync(
+        ResourceTransformCallback callback,
+        CancellationToken cancellationToken = default
+    )
     {
         var replacement = new ResourceTransformState(callback);
         try
         {
-            return NativeCompletion.SubmitCommand(completion =>
-            {
-                var descriptor = replacement.Descriptor;
-                return SetResourceTransformNative(Handle, &descriptor, completion);
-            });
+            return NativeCompletion
+                .SubmitCommand(completion =>
+                {
+                    var descriptor = replacement.Descriptor;
+                    return SetResourceTransformNative(Handle, &descriptor, completion);
+                })
+                .WaitAsync(cancellationToken);
         }
         catch (Exception error)
         {
@@ -109,20 +119,25 @@ public sealed unsafe class RuntimeHandle : IDisposable, IAsyncDisposable
     }
 
     /// <summary>Installs or replaces headers added to built-in HTTP requests.</summary>
-    public Task<CommandCompletion> SetHttpHeaderTransformAsync(HttpHeaderTransformCallback callback)
+    public Task<CommandCompletion> SetHttpHeaderTransformAsync(
+        HttpHeaderTransformCallback callback,
+        CancellationToken cancellationToken = default
+    )
     {
         var replacement = new HttpHeaderTransformState(callback);
         try
         {
-            return NativeCompletion.SubmitCommand(completion =>
-            {
-                var descriptor = replacement.Descriptor;
-                return NativeMethods.mln_runtime_set_http_header_transform(
-                    Handle,
-                    &descriptor,
-                    completion
-                );
-            });
+            return NativeCompletion
+                .SubmitCommand(completion =>
+                {
+                    var descriptor = replacement.Descriptor;
+                    return NativeMethods.mln_runtime_set_http_header_transform(
+                        Handle,
+                        &descriptor,
+                        completion
+                    );
+                })
+                .WaitAsync(cancellationToken);
         }
         catch (Exception error)
         {
@@ -162,168 +177,258 @@ public sealed unsafe class RuntimeHandle : IDisposable, IAsyncDisposable
     }
 
     /// <summary>Clears the runtime-scoped resource provider callback.</summary>
-    public Task<CommandCompletion> ClearResourceProviderAsync() =>
-        NativeCompletion.SubmitCommand(completion =>
-            NativeMethods.mln_runtime_clear_resource_provider(Handle, completion)
-        );
+    public Task<CommandCompletion> ClearResourceProviderAsync(
+        CancellationToken cancellationToken = default
+    ) =>
+        NativeCompletion
+            .SubmitCommand(completion =>
+                NativeMethods.mln_runtime_clear_resource_provider(Handle, completion)
+            )
+            .WaitAsync(cancellationToken);
 
     /// <summary>Clears the runtime-scoped resource transform callback.</summary>
-    public Task<CommandCompletion> ClearResourceTransformAsync() =>
-        NativeCompletion.SubmitCommand(completion =>
-            NativeMethods.mln_runtime_clear_resource_transform(Handle, completion)
-        );
+    public Task<CommandCompletion> ClearResourceTransformAsync(
+        CancellationToken cancellationToken = default
+    ) =>
+        NativeCompletion
+            .SubmitCommand(completion =>
+                NativeMethods.mln_runtime_clear_resource_transform(Handle, completion)
+            )
+            .WaitAsync(cancellationToken);
 
     /// <summary>Clears headers added to built-in HTTP requests.</summary>
-    public Task<CommandCompletion> ClearHttpHeaderTransformAsync() =>
-        NativeCompletion.SubmitCommand(completion =>
-            NativeMethods.mln_runtime_clear_http_header_transform(Handle, completion)
-        );
+    public Task<CommandCompletion> ClearHttpHeaderTransformAsync(
+        CancellationToken cancellationToken = default
+    ) =>
+        NativeCompletion
+            .SubmitCommand(completion =>
+                NativeMethods.mln_runtime_clear_http_header_transform(Handle, completion)
+            )
+            .WaitAsync(cancellationToken);
 
     /// <summary>Starts an ambient cache maintenance operation.</summary>
-    public Task RunAmbientCacheOperationAsync(AmbientCacheOperation operation) =>
-        NativeCompletion.SubmitUnit(completion =>
-            NativeMethods.mln_runtime_run_ambient_cache_operation(
-                Handle,
-                (uint)operation,
-                completion
+    /// <remarks>
+    /// The arguments are validated on the calling thread and the operation is accepted without
+    /// waiting for the runtime's worker; a database failure reaches the returned task.
+    /// </remarks>
+    public Task RunAmbientCacheOperationAsync(
+        AmbientCacheOperation operation,
+        CancellationToken cancellationToken = default
+    ) =>
+        NativeCompletion
+            .SubmitUnit(completion =>
+                NativeMethods.mln_runtime_run_ambient_cache_operation(
+                    Handle,
+                    (uint)operation,
+                    completion
+                )
             )
-        );
+            .WaitAsync(cancellationToken);
 
     /// <summary>Starts a change to this runtime's maximum ambient cache size.</summary>
     /// <remarks>
     /// MapLibre evicts ambient resources to fit the new budget, so lowering it discards cached
-    /// resources. Offline regions are unaffected.
+    /// resources. Offline regions are unaffected. Like every offline operation, this is accepted
+    /// without waiting for the runtime's worker, and a database failure reaches the returned task.
     /// </remarks>
-    public Task SetMaximumAmbientCacheSizeAsync(ulong size) =>
-        NativeCompletion.SubmitUnit(completion =>
-            NativeMethods.mln_runtime_set_maximum_ambient_cache_size(Handle, size, completion)
-        );
+    public Task SetMaximumAmbientCacheSizeAsync(
+        ulong size,
+        CancellationToken cancellationToken = default
+    ) =>
+        NativeCompletion
+            .SubmitUnit(completion =>
+                NativeMethods.mln_runtime_set_maximum_ambient_cache_size(Handle, size, completion)
+            )
+            .WaitAsync(cancellationToken);
 
     /// <summary>Starts an offline region creation operation.</summary>
     public Task<OfflineRegionInfo> CreateOfflineRegionAsync(
         OfflineRegionDefinition definition,
-        byte[] metadata
+        byte[] metadata,
+        CancellationToken cancellationToken = default
     )
     {
         ArgumentNullException.ThrowIfNull(metadata);
         using var nativeDefinition = NativeOfflineRegionDefinition.From(definition);
-        return NativeCompletion.Submit(
-            completion =>
-            {
-                var definitionValue = nativeDefinition.Value;
-                fixed (byte* metadataPointer = metadata)
+        return NativeCompletion
+            .Submit(
+                completion =>
                 {
-                    return NativeMethods.mln_runtime_offline_region_create(
-                        Handle,
-                        &definitionValue,
-                        metadata.Length == 0 ? null : metadataPointer,
-                        (nuint)metadata.Length,
-                        completion
-                    );
-                }
-            },
-            ReadOfflineRegion
-        );
+                    var definitionValue = nativeDefinition.Value;
+                    fixed (byte* metadataPointer = metadata)
+                    {
+                        return NativeMethods.mln_runtime_offline_region_create(
+                            Handle,
+                            &definitionValue,
+                            metadata.Length == 0 ? null : metadataPointer,
+                            (nuint)metadata.Length,
+                            completion
+                        );
+                    }
+                },
+                ReadOfflineRegion
+            )
+            .WaitAsync(cancellationToken);
     }
 
     /// <summary>Starts an offline region lookup operation.</summary>
-    public Task<OfflineRegionInfo?> GetOfflineRegionAsync(long id) =>
-        NativeCompletion.Submit(
-            completion => NativeMethods.mln_runtime_offline_region_get(Handle, id, completion),
-            ReadOptionalOfflineRegion
-        );
+    /// <remarks>A missing region is not an error: the task reports null.</remarks>
+    public Task<OfflineRegionInfo?> GetOfflineRegionAsync(
+        long id,
+        CancellationToken cancellationToken = default
+    ) =>
+        NativeCompletion
+            .Submit(
+                completion => NativeMethods.mln_runtime_offline_region_get(Handle, id, completion),
+                ReadOptionalOfflineRegion
+            )
+            .WaitAsync(cancellationToken);
 
     /// <summary>Starts an offline region list operation.</summary>
-    public Task<IReadOnlyList<OfflineRegionInfo>> ListOfflineRegionsAsync() =>
-        NativeCompletion.Submit(
-            completion => NativeMethods.mln_runtime_offline_regions_list(Handle, completion),
-            ReadOfflineRegions
-        );
+    public Task<IReadOnlyList<OfflineRegionInfo>> ListOfflineRegionsAsync(
+        CancellationToken cancellationToken = default
+    ) =>
+        NativeCompletion
+            .Submit(
+                completion => NativeMethods.mln_runtime_offline_regions_list(Handle, completion),
+                ReadOfflineRegions
+            )
+            .WaitAsync(cancellationToken);
 
     /// <summary>Starts an offline region database merge operation.</summary>
-    public Task<IReadOnlyList<OfflineRegionInfo>> MergeOfflineRegionsDatabaseAsync(string path)
+    public Task<IReadOnlyList<OfflineRegionInfo>> MergeOfflineRegionsDatabaseAsync(
+        string path,
+        CancellationToken cancellationToken = default
+    )
     {
         ArgumentNullException.ThrowIfNull(path);
         using var nativePath = NativeUtf8String.FromNullableString(path, nameof(path));
-        return NativeCompletion.Submit(
-            completion =>
-                NativeMethods.mln_runtime_offline_regions_merge_database(
-                    Handle,
-                    nativePath.Pointer,
-                    completion
-                ),
-            ReadOfflineRegions
-        );
+        return NativeCompletion
+            .Submit(
+                completion =>
+                    NativeMethods.mln_runtime_offline_regions_merge_database(
+                        Handle,
+                        nativePath.Pointer,
+                        completion
+                    ),
+                ReadOfflineRegions
+            )
+            .WaitAsync(cancellationToken);
     }
 
     /// <summary>Starts an offline region metadata update operation.</summary>
-    public Task<OfflineRegionInfo> UpdateOfflineRegionMetadataAsync(long id, byte[] metadata)
+    /// <remarks>
+    /// The task reports <see cref="MaplibreStatus.NotFound" /> when no region carries the ID.
+    /// </remarks>
+    public Task<OfflineRegionInfo> UpdateOfflineRegionMetadataAsync(
+        long id,
+        byte[] metadata,
+        CancellationToken cancellationToken = default
+    )
     {
         ArgumentNullException.ThrowIfNull(metadata);
-        return NativeCompletion.Submit(
-            completion =>
-            {
-                fixed (byte* metadataPointer = metadata)
+        return NativeCompletion
+            .Submit(
+                completion =>
                 {
-                    return NativeMethods.mln_runtime_offline_region_update_metadata(
-                        Handle,
-                        id,
-                        metadata.Length == 0 ? null : metadataPointer,
-                        (nuint)metadata.Length,
-                        completion
-                    );
-                }
-            },
-            ReadOfflineRegion
-        );
+                    fixed (byte* metadataPointer = metadata)
+                    {
+                        return NativeMethods.mln_runtime_offline_region_update_metadata(
+                            Handle,
+                            id,
+                            metadata.Length == 0 ? null : metadataPointer,
+                            (nuint)metadata.Length,
+                            completion
+                        );
+                    }
+                },
+                ReadOfflineRegion
+            )
+            .WaitAsync(cancellationToken);
     }
 
     /// <summary>Starts an offline region status lookup operation.</summary>
-    public Task<OfflineRegionStatus> GetOfflineRegionStatusAsync(long id) =>
-        NativeCompletion.Submit(
-            completion =>
-                NativeMethods.mln_runtime_offline_region_get_status(Handle, id, completion),
-            ReadOfflineRegionStatus
-        );
+    /// <remarks>
+    /// The task reports <see cref="MaplibreStatus.NotFound" /> when no region carries the ID.
+    /// </remarks>
+    public Task<OfflineRegionStatus> GetOfflineRegionStatusAsync(
+        long id,
+        CancellationToken cancellationToken = default
+    ) =>
+        NativeCompletion
+            .Submit(
+                completion =>
+                    NativeMethods.mln_runtime_offline_region_get_status(Handle, id, completion),
+                ReadOfflineRegionStatus
+            )
+            .WaitAsync(cancellationToken);
 
     /// <summary>Starts an offline region observed-state update operation.</summary>
-    public Task SetOfflineRegionObservedAsync(long id, bool observed) =>
-        NativeCompletion.SubmitUnit(completion =>
-            NativeMethods.mln_runtime_offline_region_set_observed(
-                Handle,
-                id,
-                observed ? (byte)1 : (byte)0,
-                completion
+    /// <remarks>
+    /// The task reports <see cref="MaplibreStatus.NotFound" /> when no region carries the ID.
+    /// </remarks>
+    public Task SetOfflineRegionObservedAsync(
+        long id,
+        bool observed,
+        CancellationToken cancellationToken = default
+    ) =>
+        NativeCompletion
+            .SubmitUnit(completion =>
+                NativeMethods.mln_runtime_offline_region_set_observed(
+                    Handle,
+                    id,
+                    observed ? (byte)1 : (byte)0,
+                    completion
+                )
             )
-        );
+            .WaitAsync(cancellationToken);
 
     /// <summary>Starts an offline region download-state update operation.</summary>
+    /// <remarks>
+    /// The task reports <see cref="MaplibreStatus.NotFound" /> when no region carries the ID.
+    /// </remarks>
     public Task SetOfflineRegionDownloadStateAsync(
         long id,
-        OfflineRegionDownloadState downloadState
+        OfflineRegionDownloadState downloadState,
+        CancellationToken cancellationToken = default
     )
     {
-        return NativeCompletion.SubmitUnit(completion =>
-            NativeMethods.mln_runtime_offline_region_set_download_state(
-                Handle,
-                id,
-                (uint)downloadState,
-                completion
+        return NativeCompletion
+            .SubmitUnit(completion =>
+                NativeMethods.mln_runtime_offline_region_set_download_state(
+                    Handle,
+                    id,
+                    (uint)downloadState,
+                    completion
+                )
             )
-        );
+            .WaitAsync(cancellationToken);
     }
 
     /// <summary>Starts an offline region invalidation operation.</summary>
-    public Task InvalidateOfflineRegionAsync(long id) =>
-        NativeCompletion.SubmitUnit(completion =>
-            NativeMethods.mln_runtime_offline_region_invalidate(Handle, id, completion)
-        );
+    /// <remarks>
+    /// The task reports <see cref="MaplibreStatus.NotFound" /> when no region carries the ID.
+    /// </remarks>
+    public Task InvalidateOfflineRegionAsync(
+        long id,
+        CancellationToken cancellationToken = default
+    ) =>
+        NativeCompletion
+            .SubmitUnit(completion =>
+                NativeMethods.mln_runtime_offline_region_invalidate(Handle, id, completion)
+            )
+            .WaitAsync(cancellationToken);
 
     /// <summary>Starts an offline region delete operation.</summary>
-    public Task DeleteOfflineRegionAsync(long id) =>
-        NativeCompletion.SubmitUnit(completion =>
-            NativeMethods.mln_runtime_offline_region_delete(Handle, id, completion)
-        );
+    /// <remarks>
+    /// The task reports <see cref="MaplibreStatus.NotFound" /> when no region carries the ID.
+    /// </remarks>
+    public Task DeleteOfflineRegionAsync(long id, CancellationToken cancellationToken = default) =>
+        NativeCompletion
+            .SubmitUnit(completion =>
+                NativeMethods.mln_runtime_offline_region_delete(Handle, id, completion)
+            )
+            .WaitAsync(cancellationToken);
 
     internal void RegisterMap(Map.MapHandle map)
     {
@@ -366,12 +471,13 @@ public sealed unsafe class RuntimeHandle : IDisposable, IAsyncDisposable
         return null;
     }
 
-    /// <summary>Drains every queued runtime event into one batch of copies.</summary>
+    /// <summary>Drains every queued runtime event into one list of copies.</summary>
     /// <remarks>
-    /// The batch reports the events that this runtime and its maps queued under their masks.
-    /// Managed copies preserve queue order after the owned native batch is released.
+    /// The list reports the events that this runtime and its maps queued under their masks, and an
+    /// empty queue drains to an empty list. The copies preserve queue order after the owned native
+    /// batch is released, so they stay readable after the map that produced them is closed.
     /// </remarks>
-    public RuntimeEventBatch DrainEvents()
+    public IReadOnlyList<RuntimeEvent> DrainEvents()
     {
         MlnEventBatch batch = default;
         NativeStatus.Check(NativeMethods.mln_runtime_drain_events(Handle, &batch));
@@ -382,13 +488,10 @@ public sealed unsafe class RuntimeHandle : IDisposable, IAsyncDisposable
                 size = (uint)sizeof(mln_runtime_event_batch_view),
             };
             NativeStatus.Check(NativeMethods.mln_event_batch_get(batch, &view));
-            List<RuntimeEvent> events;
             lock (mapGate)
             {
-                events = RuntimeStructs.ReadBatch(view, this, MapForLocked);
+                return RuntimeStructs.ReadBatch(view, this, MapForLocked);
             }
-
-            return new RuntimeEventBatch(events);
         }
         finally
         {
@@ -417,14 +520,15 @@ public sealed unsafe class RuntimeHandle : IDisposable, IAsyncDisposable
     }
 
     /// <summary>Waits until all previously accepted runtime work reaches a terminal state.</summary>
-    public Task BarrierAsync() =>
-        NativeCompletion.SubmitUnit(completion =>
-            NativeMethods.mln_runtime_barrier(Handle, completion)
-        );
+    public Task BarrierAsync(CancellationToken cancellationToken = default) =>
+        NativeCompletion
+            .SubmitUnit(completion => NativeMethods.mln_runtime_barrier(Handle, completion))
+            .WaitAsync(cancellationToken);
 
     /// <summary>Releases the runtime's public native handle and waits for native teardown.</summary>
     /// <remarks>
-    /// The wait covers this runtime's threads and its released maps' teardown, so a host that
+    /// Close every map first: a runtime with a live or pending child rejects the release and stays
+    /// open. The wait covers this runtime's threads and its released maps' teardown, so a host that
     /// returns from this call may exit the process. Call it from a host thread: a MapLibre callback
     /// that waits here blocks the teardown it waits for. Use <see cref="CloseAsync" /> to release
     /// the handle without blocking.
@@ -433,10 +537,11 @@ public sealed unsafe class RuntimeHandle : IDisposable, IAsyncDisposable
 
     /// <summary>Releases the runtime's public native handle without blocking.</summary>
     /// <remarks>
-    /// The returned task completes after every earlier accepted submission, including released
-    /// maps' teardown, has finished and the runtime's threads and resources are gone. A host that
-    /// awaits it may exit the process. The handle is consumed once this method returns, so a
-    /// rejected release throws before there is a task to await.
+    /// Close every map first: a runtime with a live or pending child rejects the release and stays
+    /// open. The returned task completes after every earlier accepted submission, including
+    /// released maps' teardown, has finished and the runtime's threads and resources are gone. A
+    /// host that awaits it may exit the process. The handle is consumed once this method returns,
+    /// so a rejected release throws before there is a task to await.
     /// </remarks>
     public Task CloseAsync()
     {
@@ -462,14 +567,8 @@ public sealed unsafe class RuntimeHandle : IDisposable, IAsyncDisposable
         return mln_status.MLN_STATUS_OK;
     }
 
-    private static OfflineRegionInfo ReadOfflineRegion(mln_completion_result* result)
-    {
-        if (result->value is null || result->value_count != 1)
-        {
-            throw new InvalidOperationException("Native offline region completion had no value.");
-        }
-        return OfflineStructs.ReadInfo(*(mln_offline_region_info*)result->value);
-    }
+    private static OfflineRegionInfo ReadOfflineRegion(mln_completion_result* result) =>
+        OfflineStructs.ReadInfo(NativeCompletion.Value<mln_offline_region_info>(result));
 
     private static OfflineRegionInfo? ReadOptionalOfflineRegion(mln_completion_result* result) =>
         result->value_count == 0 ? null : ReadOfflineRegion(result);
@@ -478,29 +577,17 @@ public sealed unsafe class RuntimeHandle : IDisposable, IAsyncDisposable
         mln_completion_result* result
     )
     {
-        if (result->value_count != 0 && result->value is null)
+        var values = NativeCompletion.Values<mln_offline_region_info>(result);
+        var regions = new OfflineRegionInfo[values.Length];
+        for (var index = 0; index < values.Length; index++)
         {
-            throw new InvalidOperationException(
-                "Native offline region completion had a null array."
-            );
-        }
-        var regions = new OfflineRegionInfo[checked((int)result->value_count)];
-        var values = (mln_offline_region_info*)result->value;
-        for (nuint index = 0; index < result->value_count; index++)
-        {
-            regions[(int)index] = OfflineStructs.ReadInfo(values[index]);
+            regions[index] = OfflineStructs.ReadInfo(values[index]);
         }
         return regions;
     }
 
-    private static OfflineRegionStatus ReadOfflineRegionStatus(mln_completion_result* result)
-    {
-        if (result->value is null || result->value_count != 1)
-        {
-            throw new InvalidOperationException("Native offline status completion had no value.");
-        }
-        return OfflineStructs.ReadStatus(*(mln_offline_region_status*)result->value);
-    }
+    private static OfflineRegionStatus ReadOfflineRegionStatus(mln_completion_result* result) =>
+        OfflineStructs.ReadStatus(NativeCompletion.Value<mln_offline_region_status>(result));
 
     private static void DisposeAndSuppress(Exception error, IDisposable? disposable)
     {

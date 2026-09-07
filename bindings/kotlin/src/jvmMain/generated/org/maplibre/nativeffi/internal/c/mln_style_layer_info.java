@@ -16,13 +16,11 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  * {@snippet lang=c :
  * struct mln_style_layer_info {
  *     uint32_t size;
- *     uint32_t fields;
+ *     uint32_t reserved;
  *     mln_buffer_view type;
  *     double min_zoom;
  *     double max_zoom;
  *     uint32_t visibility;
- *     size_t source_id_size;
- *     size_t source_layer_size;
  * }
  * }
  */
@@ -34,14 +32,12 @@ public class mln_style_layer_info {
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
         MapLibreNativeC.C_INT.withName("size"),
-        MapLibreNativeC.C_INT.withName("fields"),
+        MapLibreNativeC.C_INT.withName("reserved"),
         mln_buffer_view.layout().withName("type"),
         MapLibreNativeC.C_DOUBLE.withName("min_zoom"),
         MapLibreNativeC.C_DOUBLE.withName("max_zoom"),
         MapLibreNativeC.C_INT.withName("visibility"),
-        MemoryLayout.paddingLayout(4),
-        MapLibreNativeC.C_LONG.withName("source_id_size"),
-        MapLibreNativeC.C_LONG.withName("source_layer_size")
+        MemoryLayout.paddingLayout(4)
     ).withName("mln_style_layer_info");
 
     /**
@@ -95,48 +91,48 @@ public class mln_style_layer_info {
         struct.set(size$LAYOUT, size$OFFSET, fieldValue);
     }
 
-    private static final OfInt fields$LAYOUT = (OfInt)$LAYOUT.select(groupElement("fields"));
+    private static final OfInt reserved$LAYOUT = (OfInt)$LAYOUT.select(groupElement("reserved"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint32_t fields
+     * uint32_t reserved
      * }
      */
-    public static final OfInt fields$layout() {
-        return fields$LAYOUT;
+    public static final OfInt reserved$layout() {
+        return reserved$LAYOUT;
     }
 
-    private static final long fields$OFFSET = $LAYOUT.byteOffset(groupElement("fields"));
+    private static final long reserved$OFFSET = $LAYOUT.byteOffset(groupElement("reserved"));
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint32_t fields
+     * uint32_t reserved
      * }
      */
-    public static final long fields$offset() {
-        return fields$OFFSET;
+    public static final long reserved$offset() {
+        return reserved$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint32_t fields
+     * uint32_t reserved
      * }
      */
-    public static int fields(MemorySegment struct) {
-        return struct.get(fields$LAYOUT, fields$OFFSET);
+    public static int reserved(MemorySegment struct) {
+        return struct.get(reserved$LAYOUT, reserved$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint32_t fields
+     * uint32_t reserved
      * }
      */
-    public static void fields(MemorySegment struct, int fieldValue) {
-        struct.set(fields$LAYOUT, fields$OFFSET, fieldValue);
+    public static void reserved(MemorySegment struct, int fieldValue) {
+        struct.set(reserved$LAYOUT, reserved$OFFSET, fieldValue);
     }
 
     private static final GroupLayout type$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("type"));
@@ -313,94 +309,6 @@ public class mln_style_layer_info {
      */
     public static void visibility(MemorySegment struct, int fieldValue) {
         struct.set(visibility$LAYOUT, visibility$OFFSET, fieldValue);
-    }
-
-    private static final OfLong source_id_size$LAYOUT = (OfLong)$LAYOUT.select(groupElement("source_id_size"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * size_t source_id_size
-     * }
-     */
-    public static final OfLong source_id_size$layout() {
-        return source_id_size$LAYOUT;
-    }
-
-    private static final long source_id_size$OFFSET = $LAYOUT.byteOffset(groupElement("source_id_size"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * size_t source_id_size
-     * }
-     */
-    public static final long source_id_size$offset() {
-        return source_id_size$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * size_t source_id_size
-     * }
-     */
-    public static long source_id_size(MemorySegment struct) {
-        return struct.get(source_id_size$LAYOUT, source_id_size$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * size_t source_id_size
-     * }
-     */
-    public static void source_id_size(MemorySegment struct, long fieldValue) {
-        struct.set(source_id_size$LAYOUT, source_id_size$OFFSET, fieldValue);
-    }
-
-    private static final OfLong source_layer_size$LAYOUT = (OfLong)$LAYOUT.select(groupElement("source_layer_size"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * size_t source_layer_size
-     * }
-     */
-    public static final OfLong source_layer_size$layout() {
-        return source_layer_size$LAYOUT;
-    }
-
-    private static final long source_layer_size$OFFSET = $LAYOUT.byteOffset(groupElement("source_layer_size"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * size_t source_layer_size
-     * }
-     */
-    public static final long source_layer_size$offset() {
-        return source_layer_size$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * size_t source_layer_size
-     * }
-     */
-    public static long source_layer_size(MemorySegment struct) {
-        return struct.get(source_layer_size$LAYOUT, source_layer_size$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * size_t source_layer_size
-     * }
-     */
-    public static void source_layer_size(MemorySegment struct, long fieldValue) {
-        struct.set(source_layer_size$LAYOUT, source_layer_size$OFFSET, fieldValue);
     }
 
     /**

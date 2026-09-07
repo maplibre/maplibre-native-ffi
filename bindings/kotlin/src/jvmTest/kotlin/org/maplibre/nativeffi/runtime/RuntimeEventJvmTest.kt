@@ -11,7 +11,7 @@ import org.maplibre.nativeffi.map.MapOptions
 class RuntimeEventJvmTest {
   @Test
   fun unknownDomainsAndEventsFromReleasedMapsCopyWithoutResurrectingHandles(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
+    runSuspendTest {
       val runtime = RuntimeHandle.create(RuntimeOptions())
       val map =
         MapHandle.create(

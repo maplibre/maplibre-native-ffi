@@ -10,21 +10,11 @@ struct NativeStringError: Error, Equatable {
 }
 
 enum NativeString {
-  static func copyUTF8(data: UnsafeRawPointer?, size: UInt) throws -> String {
-    try copyUTF8(data: data, size: Int(size))
-  }
-
   static func copyUTF8(data: UnsafeRawPointer?, size: Int) throws -> String {
     try copyCUTF8(
       data: data?.assumingMemoryBound(to: CChar.self),
       size: size
     )
-  }
-
-  static func copyUTF8(data: UnsafePointer<CChar>?,
-                       size: UInt) throws -> String
-  {
-    try copyCUTF8(data: data, size: Int(size))
   }
 
   private static func copyCUTF8(data: UnsafePointer<CChar>?,

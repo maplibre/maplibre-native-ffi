@@ -28,7 +28,17 @@ pub const MapState = struct {
             teardown.deinit();
         } else |_| {};
 
-        var map_future = maplibre.MapHandle.create(&runtime, .{ .mode = .continuous }) catch |err| {
+        // Selecting the event mask at creation puts it ahead of the style
+        // load, so the map queues render updates from the first tile response.
+        // The render loop re-arms from the frame result's repaint flag, so the
+        // map only has to report updates that arrive between frames.
+        var map_future = maplibre.MapHandle.create(&runtime, .{
+            .width = viewport.logical_width,
+            .height = viewport.logical_height,
+            .scale_factor = viewport.scale_factor,
+            .mode = .continuous,
+            .event_mask = .{ .map_render_update_available = true },
+        }) catch |err| {
             diagnostics.logError("map create failed", err, diagnostic_store);
             return types.AppError.MapCreateFailed;
         };
@@ -37,14 +47,11 @@ pub const MapState = struct {
             diagnostics.logError("map create failed", err, diagnostic_store);
             return types.AppError.MapCreateFailed;
         };
-        errdefer map.close() catch {};
+        errdefer if (map.close()) |future| {
+            var teardown = future;
+            teardown.deinit();
+        } else |_| {};
 
-        try selectEvents(&map, diagnostic_store);
-        var resize_completion = map.resize(viewport.logical_width, viewport.logical_height, viewport.scale_factor) catch |err| {
-            diagnostics.logError("map resize failed", err, diagnostic_store);
-            return types.AppError.MapCreateFailed;
-        };
-        resize_completion.deinit();
         try loadStyle(allocator, &map, diagnostic_store);
         try setCamera(&map, diagnostic_store);
         return .{
@@ -56,9 +63,13 @@ pub const MapState = struct {
     }
 
     pub fn deinit(self: *MapState) void {
-        self.map.close() catch {};
-        // Awaiting the release completion keeps process exit ordered after
+        // Awaiting both release completions keeps process exit ordered after
         // native teardown.
+        if (self.map.close()) |future| {
+            var teardown = future;
+            _ = teardown.wait(null) catch {};
+            teardown.deinit();
+        } else |_| {}
         if (self.runtime.close()) |future| {
             var teardown = future;
             _ = teardown.wait(null) catch {};
@@ -132,6 +143,27 @@ pub const MapState = struct {
         try self.cameraMutation(self.map.updateCamera(update));
     }
 
+    /// Ends any running camera transition, so a starting gesture takes over
+    /// from it rather than fighting it.
+    pub fn cancelTransitions(self: *MapState) !void {
+        try self.cameraMutation(self.map.cancelTransitions());
+    }
+
+    /// Drains runtime events, reporting whether the map requested another
+    /// frame.
+    pub fn drainEvents(self: *MapState) !bool {
+        const map_id = try self.map.id();
+        var batch = try self.runtime.drainEvents(self.allocator);
+        defer batch.deinit();
+        for (0..batch.len()) |index| {
+            const event = try batch.at(index);
+            if (event.source_type != .map or event.source_id == null or
+                !std.meta.eql(event.source_id.?, map_id)) continue;
+            if (event.event_type == .map_render_update_available) return true;
+        }
+        return false;
+    }
+
     fn cameraMutation(self: *MapState, result: anytype) !void {
         var completion = result catch |err| {
             diagnostics.logError("camera update failed", err, self.diagnostic_store);
@@ -140,43 +172,6 @@ pub const MapState = struct {
         completion.deinit();
     }
 };
-/// Drains runtime events, reporting whether the map requested another frame.
-pub fn drainEvents(self: *MapState) !bool {
-    const map_id = try self.map.id();
-    var render_update_available = false;
-    var batch = try self.runtime.drainEvents(self.allocator);
-    defer batch.deinit();
-    for (0..batch.len()) |index| {
-        const event = try batch.at(index);
-        if (event.source_type != .map or event.source_id == null or
-            !std.meta.eql(event.source_id.?, map_id)) continue;
-        switch (event.event_type) {
-            .map_render_update_available => render_update_available = true,
-            .map_render_frame_finished => switch (event.payload) {
-                .render_frame => |frame| render_update_available = render_update_available or frame.needs_repaint,
-                else => {},
-            },
-            else => {},
-        }
-    }
-    return render_update_available;
-}
-
-/// Selects the two event types that the host drains. This runs before the style
-/// load because the map retains events that were already queued.
-fn selectEvents(
-    map: *maplibre.MapHandle,
-    diagnostic_store: *const maplibre.DiagnosticStore,
-) !void {
-    var completion = map.setEventMask(.{
-        .map_render_update_available = true,
-        .map_render_frame_finished = true,
-    }) catch |err| {
-        diagnostics.logError("event mask select failed", err, diagnostic_store);
-        return types.AppError.EventMaskFailed;
-    };
-    completion.deinit();
-}
 
 fn loadStyle(
     allocator: std.mem.Allocator,

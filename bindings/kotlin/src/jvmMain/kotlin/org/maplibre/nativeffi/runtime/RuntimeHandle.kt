@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.runtime
 
 import java.lang.ref.WeakReference
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.callback.HttpHeaderTransformState
@@ -29,10 +30,9 @@ public actual class RuntimeHandle private constructor(private val handle: Native
     HandleLeakCleaner.register(this, core.leakReport)
   }
 
-  private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
-
-  /** Teardown report of the close that consumed this handle. */
-  @Volatile private var tornDown: Deferred<Unit>? = null
+  // Registration runs on the completion thread that publishes a created map, while draining and
+  // closing run on host threads.
+  private val liveMaps = ConcurrentHashMap<Long, WeakReference<MapHandle>>()
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
@@ -157,10 +157,9 @@ public actual class RuntimeHandle private constructor(private val handle: Native
     return NativeAccess.clearHttpHeaderTransform(requireLiveHandle())
   }
 
-  public actual fun drainEvents(): RuntimeEventBatch {
+  public actual fun drainEvents(): List<RuntimeEvent> {
     NativeAccess.ensureLoaded()
-    val batch = NativeAccess.drainRuntimeEvents(requireLiveHandle())
-    return RuntimeEventBatch(batch.events.map { it.toRuntimeEvent() })
+    return NativeAccess.drainRuntimeEvents(requireLiveHandle()).events.map { it.toRuntimeEvent() }
   }
 
   public actual var eventMask: RuntimeEventMask
@@ -174,17 +173,22 @@ public actual class RuntimeHandle private constructor(private val handle: Native
     }
 
   public actual fun close(): Deferred<Unit> {
-    if (!core.beginClose()) return tornDown ?: CompletableDeferred(Unit)
+    val claim = CompletableDeferred<Unit>()
+    val retirement = core.claimRetirement(claim)
+    if (retirement !== claim) return retirement
     val completed =
       try {
         NativeAccess.releaseRuntime(handle)
       } catch (error: Throwable) {
         core.abortClose()
+        core.abandonRetirement(claim)
         throw error
       }
-    tornDown = completed
     core.completeClose { liveMaps.clear() }
-    return completed
+    completed.invokeOnCompletion { failure ->
+      if (failure == null) claim.complete(Unit) else claim.completeExceptionally(failure)
+    }
+    return claim
   }
 
   public actual companion object {

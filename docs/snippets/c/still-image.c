@@ -16,7 +16,9 @@ typedef struct still_image_job {
   uint32_t width;
   uint32_t height;
   atomic_bool frames_ready;
-  atomic_bool completion_ready;
+  atomic_bool attach_ready;
+  atomic_bool still_image_ready;
+  bool requested;
   bool frame_pending;
   bool rendered;
   bool reading;
@@ -32,16 +34,27 @@ static void schedule_job(still_image_job* job) {
   job->schedule(job->user_data);
 }
 
-static void completion_finished(
+static void attach_finished(
   void* user_data, const mln_completion_result* result
 ) {
   still_image_job* job = user_data;
   job->status = result->status;
-  atomic_store_explicit(&job->completion_ready, true, memory_order_release);
+  atomic_store_explicit(&job->attach_ready, true, memory_order_release);
   schedule_job(job);
 }
 
 static void still_image_finished(
+  void* user_data, const mln_completion_result* result
+) {
+  still_image_job* job = user_data;
+  job->status = result->status;
+  atomic_store_explicit(&job->still_image_ready, true, memory_order_release);
+  schedule_job(job);
+}
+
+// The style command's own result is not read: a style failure arrives as a
+// runtime event, and the still-image completion reports the rendering outcome.
+static void ignore_completion(
   void* user_data, const mln_completion_result* result
 ) {
   (void)user_data;
@@ -77,7 +90,7 @@ static mln_status attach_owned_texture(still_image_job* job) {
   };
   const mln_completion completion = {
     .size = sizeof(mln_completion),
-    .callback = completion_finished,
+    .callback = attach_finished,
     .user_data = job,
   };
   return mln_opengl_owned_texture_attach(
@@ -142,40 +155,39 @@ static void request_frame(still_image_job* job) {
 }
 
 void advance_still_image(still_image_job* job) {
-  if (
-    atomic_load_explicit(&job->completion_ready, memory_order_acquire) &&
-    job->status != MLN_STATUS_OK
-  ) {
+  // Both flags stay set once raised, so a turn that arrives early simply runs
+  // again when the next wake or completion schedules one.
+  const bool attached =
+    atomic_load_explicit(&job->attach_ready, memory_order_acquire);
+  const bool imaged =
+    atomic_load_explicit(&job->still_image_ready, memory_order_acquire);
+  if ((attached || imaged) && job->status != MLN_STATUS_OK) {
     job->finished(job->user_data, job);
     return;
   }
-  if (
-    atomic_exchange_explicit(
-      &job->completion_ready, false, memory_order_acq_rel
-    ) &&
-    job->status == MLN_STATUS_OK && !job->frame_pending && !job->rendered
-  ) {
-    const mln_completion command = {
+  if (attached && !job->requested) {
+    job->requested = true;
+    const mln_completion style = {
       .size = sizeof(mln_completion),
-      .callback = still_image_finished,
-      .user_data = job,
+      .callback = ignore_completion,
     };
-    job->status = mln_map_set_style_url(job->map, job->style_url, &command);
+    job->status = mln_map_set_style_url(job->map, job->style_url, &style);
     if (job->status == MLN_STATUS_OK) {
-      atomic_store_explicit(
-        &job->completion_ready, false, memory_order_release
-      );
       const mln_completion still = {
         .size = sizeof(mln_completion),
-        .callback = completion_finished,
+        .callback = still_image_finished,
         .user_data = job,
       };
       job->status = mln_map_request_still_image(job->map, &still);
     }
-    if (job->status == MLN_STATUS_OK) request_frame(job);
+    if (job->status != MLN_STATUS_OK) {
+      job->finished(job->user_data, job);
+      return;
+    }
+    request_frame(job);
   }
 
-  // #region await
+  // #region drain-result
   if (
     atomic_exchange_explicit(&job->frames_ready, false, memory_order_acq_rel)
   ) {
@@ -199,12 +211,13 @@ void advance_still_image(still_image_job* job) {
       mln_render_frame_batch_release(batch);
     }
   }
-  if (!job->rendered && !job->frame_pending) request_frame(job);
-  if (
-    job->rendered &&
-    atomic_load_explicit(&job->completion_ready, memory_order_acquire) &&
-    !job->reading
-  ) {
+  if (job->requested && !job->rendered && !job->frame_pending) {
+    request_frame(job);
+  }
+  // #endregion drain-result
+
+  // #region start-readback
+  if (job->rendered && imaged && !job->reading) {
     job->reading = true;
     const mln_completion readback = {
       .size = sizeof(mln_completion),
@@ -214,5 +227,5 @@ void advance_still_image(still_image_job* job) {
     job->status = mln_texture_read_premultiplied_rgba8(job->session, &readback);
     if (job->status != MLN_STATUS_OK) job->finished(job->user_data, job);
   }
-  // #endregion await
+  // #endregion start-readback
 }

@@ -96,14 +96,9 @@ pub const LogCallback = struct {
     context: ?*anyopaque = null,
 };
 
-const LogCallbackState = struct {
-    handler: LogHandler,
-    context: ?*anyopaque,
-};
-
 pub fn setLogCallback(callback: LogCallback, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
-    const replacement = try std.heap.smp_allocator.create(LogCallbackState);
-    replacement.* = .{ .handler = callback.handler, .context = callback.context };
+    const replacement = try std.heap.smp_allocator.create(LogCallback);
+    replacement.* = callback;
     errdefer std.heap.smp_allocator.destroy(replacement);
 
     try status.checkStatus(c.mln_log_set_callback(logTrampoline, replacement, releaseLogCallback), diagnostic_store);
@@ -118,7 +113,7 @@ pub fn setAsyncLogSeverityMask(mask: LogSeverityMask, diagnostic_store: ?*diagno
 }
 
 fn logTrampoline(user_data: ?*anyopaque, severity: u32, event: u32, code: i64, message: [*c]const u8) callconv(.c) u32 {
-    const callback_state: *LogCallbackState = @ptrCast(@alignCast(user_data orelse return 0));
+    const callback_state: *LogCallback = @ptrCast(@alignCast(user_data orelse return 0));
     const copied_message = std.heap.smp_allocator.dupe(u8, if (message == null) "" else std.mem.span(message)) catch return 0;
     defer std.heap.smp_allocator.free(copied_message);
 
@@ -131,7 +126,7 @@ fn logTrampoline(user_data: ?*anyopaque, severity: u32, event: u32, code: i64, m
 }
 
 fn releaseLogCallback(user_data: ?*anyopaque) callconv(.c) void {
-    const callback_state: *LogCallbackState = @ptrCast(@alignCast(user_data orelse return));
+    const callback_state: *LogCallback = @ptrCast(@alignCast(user_data orelse return));
     std.heap.smp_allocator.destroy(callback_state);
 }
 

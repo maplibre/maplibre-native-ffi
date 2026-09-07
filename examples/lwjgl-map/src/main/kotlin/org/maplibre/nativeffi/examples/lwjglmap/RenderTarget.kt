@@ -1,7 +1,9 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.map.MapSize
 import org.maplibre.nativeffi.render.FrameDemand
 import org.maplibre.nativeffi.render.RenderDriver
 import org.maplibre.nativeffi.render.RenderFrameResult
@@ -25,9 +27,9 @@ internal interface RenderTarget : AutoCloseable {
   fun resize(viewport: Viewport)
 
   /**
-   * Renders the latest map update, and reports whether a frame reached the screen. It reports true
-   * only for a rendered frame, so the render loop asks for another one when the map has no update
-   * yet, the map has not applied the session's size yet, or the target had no frame to draw into.
+   * Renders the latest map update, and reports whether the render loop may rest. It reports false
+   * when no frame reached the screen and when the map asked for another frame while this one
+   * rendered, so the loop demands one more after its idle wait.
    */
   fun renderUpdate(): Boolean
 
@@ -52,19 +54,28 @@ internal interface RenderTarget : AutoCloseable {
       RenderTargetExtent(viewport.width(), viewport.height(), viewport.scaleFactor())
 
     /**
-     * Detaches a session whose handover failed, before the targets it may hold are released. A
-     * failed handover leaves it unknown which target the session holds.
+     * Releases a session whose handover failed, before the targets it may hold are released. A
+     * failed handover leaves it unknown which target the session holds. A detach that fails falls
+     * back to abandonment, so the caller may close the session afterwards either way.
      */
     fun detachSuppressed(error: RuntimeException, session: RenderSessionHandle) {
       try {
         completeDriverOperation(session, session.detach())
       } catch (cleanupError: Exception) {
         error.addSuppressed(cleanupError)
+        runCatching { session.abandon() }.onFailure(error::addSuppressed)
       }
     }
 
     val callerDriverOptions: RenderSessionAttachOptions =
       RenderSessionAttachOptions(driver = RenderDriver.CALLER_GRAPHICS_THREAD)
+
+    /** A session-owned texture ring deep enough to keep compositing while the map renders. */
+    val ownedTextureOptions: RenderSessionAttachOptions =
+      RenderSessionAttachOptions(
+        driver = RenderDriver.CALLER_GRAPHICS_THREAD,
+        requestedTextureRingDepth = 2,
+      )
 
     fun completeAttachment(attachment: RenderSessionAttachment): RenderSessionHandle {
       try {
@@ -79,17 +90,31 @@ internal interface RenderTarget : AutoCloseable {
 
     fun completeDriverOperation(session: RenderSessionHandle, completed: Deferred<Unit>) {
       while (!completed.isCompleted) session.serviceDriverWork()
-      runSuspend { completed.await() }
+      runBlocking { completed.await() }
     }
 
+    /**
+     * Resizes a map whose session cannot carry the extent itself. A caller-owned texture is sized
+     * by this host, so its handover replaces only the graphics resource.
+     */
+    fun resizeMap(map: MapHandle, viewport: Viewport) {
+      map.resize(MapSize(viewport.width(), viewport.height(), viewport.scaleFactor()))
+    }
+
+    /** Submits one host-paced demand and reports the frame the driver produced for it. */
     fun renderFrame(session: RenderSessionHandle): RenderFrameResult? {
       session.requestFrame(FrameDemand(present = true))
       session.serviceDriverWork()
       return session.drainFrameResults().lastOrNull()
     }
 
-    fun closeSession(session: RenderSessionHandle) {
-      completeDriverOperation(session, session.detach())
+    /**
+     * Closes a session, detaching it first unless a failed handover already released it. Detaching
+     * a released session reports an invalid state, and a close that runs from a `finally` would
+     * replace the handover failure with that.
+     */
+    fun closeSession(session: RenderSessionHandle, released: Boolean = false) {
+      if (!released) completeDriverOperation(session, session.detach())
       session.close()
     }
 

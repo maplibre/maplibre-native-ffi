@@ -7,14 +7,20 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class RuntimeMapLifecycleTests
 {
+    // A descriptor that writes no field takes the native creation defaults, which the map then
+    // publishes.
     [BindingSpecTest("BND-100")]
     [Fact]
     public void DefaultMapOptionsPreserveNativeCreationDefaults()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(runtime, new MapOptions());
 
-        Assert.False(map.IsClosed);
+        var snapshot = map.GetSnapshot();
+        Assert.Equal(new LogicalExtent(256, 256, 1), snapshot.LogicalExtent);
+        Assert.Equal(DebugOptions.None, snapshot.DebugOptions);
+        Assert.False(snapshot.RenderingStatsViewEnabled);
+        Assert.False(snapshot.GestureInProgress);
     }
 
     [BindingSpecTest("BND-100")]
@@ -29,17 +35,25 @@ public sealed class RuntimeMapLifecycleTests
                 .fast_pfor_enabled
         );
 
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
-        using var map = TestHandles.CreateMap(runtime, new MapOptions { FastPforEnabled = true });
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions
+            {
+                Width = 128,
+                Height = 64,
+                FastPforEnabled = true,
+            }
+        );
 
-        Assert.False(map.IsClosed);
+        Assert.Equal(new LogicalExtent(128, 64, 1), map.GetSnapshot().LogicalExtent);
     }
 
     [BindingSpecTest("BND-040", "BND-100")]
     [Fact]
     public void RuntimeAndMapCloseDeterministically()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions { Width = 512, Height = 512 }
@@ -48,8 +62,8 @@ public sealed class RuntimeMapLifecycleTests
         Assert.False(runtime.IsClosed);
         Assert.False(map.IsClosed);
 
-        TestHandles.Close(map);
-        TestHandles.Close(runtime);
+        map.Close();
+        runtime.Close();
 
         Assert.True(map.IsClosed);
         Assert.True(runtime.IsClosed);
@@ -62,11 +76,10 @@ public sealed class RuntimeMapLifecycleTests
         var runtime = RuntimeHandle.Create(new RuntimeOptions());
         var map = await MapHandle.CreateAsync(
             runtime,
-            new MapOptions { Width = 512, Height = 512 },
-            TestContext.Current.CancellationToken
+            new MapOptions { Width = 512, Height = 512 }
         );
 
-        map.SetStyleUrlAsync("unsupported://style.json");
+        _ = map.SetStyleUrlAsync("unsupported://style.json", TestContext.Current.CancellationToken);
         map.Close();
 
         var teardown = runtime.CloseAsync();
@@ -86,7 +99,7 @@ public sealed class RuntimeMapLifecycleTests
         var runtime = RuntimeHandle.Create(new RuntimeOptions());
         await using (runtime)
         {
-            await runtime.BarrierAsync();
+            await runtime.BarrierAsync(TestContext.Current.CancellationToken);
         }
 
         Assert.True(runtime.IsClosed);
@@ -96,13 +109,13 @@ public sealed class RuntimeMapLifecycleTests
     [Fact]
     public void RuntimeCloseFailsWhileMapIsLiveAndCanRetryAfterMapClose()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
 
-        var error = Assert.Throws<InvalidStateException>(() => TestHandles.Close(runtime));
+        var error = Assert.Throws<InvalidStateException>(() => runtime.Close());
 
         Assert.Equal(MaplibreStatus.InvalidState, error.Status);
         Assert.Equal((int)MaplibreStatus.InvalidState, error.RawStatus);
@@ -113,8 +126,8 @@ public sealed class RuntimeMapLifecycleTests
             StringComparison.OrdinalIgnoreCase
         );
 
-        TestHandles.Close(map);
-        TestHandles.Close(runtime);
+        map.Close();
+        runtime.Close();
 
         Assert.True(runtime.IsClosed);
     }
@@ -123,17 +136,15 @@ public sealed class RuntimeMapLifecycleTests
     [Fact]
     public void CommittedCommandIsVisibleInSnapshotsAtOrPastItsGeneration()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
 
         var options = DebugOptions.TileBorders | DebugOptions.ParseStatus;
-        var completion = RuntimeEventTestHelpers.AssertCommandFinishes(
-            runtime,
-            map.SetDebugOptionsAsync(options),
-            MaplibreStatus.Ok
+        var completion = RuntimeEventTestHelpers.AssertCommitted(
+            map.SetDebugOptionsAsync(options, TestContext.Current.CancellationToken)
         );
 
         // The published snapshot fence: a snapshot at or past the commit's generation
@@ -142,24 +153,62 @@ public sealed class RuntimeMapLifecycleTests
         Assert.True(snapshot.Generation >= completion.Generation);
         Assert.Equal(options, snapshot.DebugOptions);
         Assert.False(snapshot.FullyLoaded);
-        map.DumpDebugLogsAsync();
+    }
+
+    [BindingSpecTest("BND-100")]
+    [Fact]
+    public void DumpingDebugLogsCommits()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
+
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.DumpDebugLogsAsync(TestContext.Current.CancellationToken)
+        );
+    }
+
+    // A still image stays pending until a render session produces it, so closing the map with
+    // no session attached retires the request and reports the cancelled status.
+    [BindingSpecTest("BND-041")]
+    [Fact]
+    public async Task AnOutstandingRequestIsCancelledWhenTheMapCloses()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions
+            {
+                Width = 64,
+                Height = 64,
+                MapMode = MapMode.Static,
+            }
+        );
+
+        var stillImage = map.RequestStillImageAsync(TestContext.Current.CancellationToken);
+        Assert.False(stillImage.IsCompleted);
+
+        await map.CloseAsync();
+
+        var error = await Assert.ThrowsAsync<MaplibreException>(() => stillImage);
+        Assert.Equal(MaplibreStatus.Cancelled, error.Status);
     }
 
     [BindingSpecTest("BND-100")]
     [Fact]
     public void RenderingStatsViewEnabledRoundTripsThroughSnapshot()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
 
         Assert.False(map.GetSnapshot().RenderingStatsViewEnabled);
-        RuntimeEventTestHelpers.AssertCommandFinishes(
-            runtime,
-            map.SetRenderingStatsViewEnabledAsync(true),
-            MaplibreStatus.Ok
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.SetRenderingStatsViewEnabledAsync(true, TestContext.Current.CancellationToken)
         );
         Assert.True(map.GetSnapshot().RenderingStatsViewEnabled);
     }
@@ -167,7 +216,7 @@ public sealed class RuntimeMapLifecycleTests
     [Fact]
     public void MapSizeReportsCreationExtentAndPixelRatio()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions
@@ -181,20 +230,19 @@ public sealed class RuntimeMapLifecycleTests
         Assert.Equal(new LogicalExtent(512, 256, 2), map.GetSnapshot().LogicalExtent);
     }
 
-    [BindingSpecTest("BND-190", "BND-191", "BND-192")]
+    [BindingSpecTest("BND-190", "BND-191")]
     [Fact]
     public async Task RuntimeAndMapWorkAcrossManagedThreads()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = await MapHandle.CreateAsync(
             runtime,
-            new MapOptions { Width = 512, Height = 512 },
-            TestContext.Current.CancellationToken
+            new MapOptions { Width = 512, Height = 512 }
         );
 
-        var completion = await Task.Run(map.RequestRepaintAsync);
+        var completion = await Task.Run(() => map.RequestRepaintAsync());
         var snapshot = await Task.Run(map.GetSnapshot);
-        await runtime.BarrierAsync();
+        await runtime.BarrierAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(CommandDisposition.Committed, completion.Disposition);
         Assert.Equal(new LogicalExtent(512, 512, 1), snapshot.LogicalExtent);
@@ -204,14 +252,14 @@ public sealed class RuntimeMapLifecycleTests
     [Fact]
     public void MethodsRejectClosedMapBeforeNativeCall()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 512, Height = 512 });
-        TestHandles.Close(map);
-        TestHandles.Close(runtime);
+        map.Close();
+        runtime.Close();
 
         var error = Assert.Throws<InvalidStateException>(() =>
         {
-            _ = map.RequestRepaintAsync();
+            _ = map.RequestRepaintAsync(TestContext.Current.CancellationToken);
         });
 
         Assert.Equal(MaplibreStatus.InvalidState, error.Status);

@@ -35,7 +35,11 @@ func TestRuntimeBarrierProgressesAutonomously(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	defer closeRuntimeForTest(runtime)
+	defer func() {
+		if err := closeRuntimeForTest(runtime); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
 
 	future, err := runtime.Barrier()
 	if err != nil {
@@ -71,7 +75,7 @@ func TestRuntimeLifecycleMigratesAcrossGoroutines(t *testing.T) {
 		t.Fatalf("NewMap() after goroutine migration: %v", err)
 	}
 	closed := make(chan error, 1)
-	go func() { closed <- m.Close() }()
+	go func() { closed <- closeMapForTest(m) }()
 	if err := <-closed; err != nil {
 		t.Fatalf("Map Close() on another goroutine: %v", err)
 	}

@@ -31,13 +31,6 @@ if (($# == 0)); then
   exit 2
 fi
 test_executables=("$@")
-case "$abi" in
-  arm64-v8a | x86_64) ;;
-  *)
-    echo "Unsupported Android emulator ABI: $abi" >&2
-    exit 2
-    ;;
-esac
 
 serial=emulator-5554
 remote_dir=/data/local/tmp/maplibre-native-ffi

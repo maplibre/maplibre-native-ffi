@@ -71,7 +71,14 @@ typedef struct mln_adapter_completion_record {
   mln_completion_result result;
 } mln_adapter_completion_record;
 
-/** Receives one native-owned completion record on the host listener context. */
+/**
+ * Receives one native-owned completion record on the host listener context.
+ *
+ * The listener runs exactly once for each accepted submission. record is null
+ * when the adapter could not copy the completion result; the listener treats
+ * that as a failed completion and destroys nothing. Otherwise the listener owns
+ * the record and releases it with mln_adapter_completion_record_destroy().
+ */
 typedef void (*mln_adapter_completion_listener)(
   void* user_data, mln_adapter_completion_record* record
 );
@@ -85,6 +92,17 @@ typedef void (*mln_adapter_completion_listener)(
  * The caller passes the descriptor to exactly one asynchronous C API call. If
  * that call rejects the submission, the caller must pass the descriptor to
  * mln_adapter_completion_reject().
+ *
+ * The host owns user_data for the life of the descriptor and frees it after the
+ * listener returns, or after mln_adapter_completion_reject() returns for a
+ * rejected submission. Neither path invokes the listener twice.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when out_completion receives the descriptor.
+ * - MLN_STATUS_INVALID_ARGUMENT when out_completion is null or not zeroed,
+ *   listener is null, or copy_kind is not an
+ *   mln_adapter_completion_copy_kind value.
+ * - MLN_STATUS_NATIVE_ERROR when adapter state could not be allocated.
  */
 MLN_API mln_status mln_adapter_completion_create(
   uint32_t copy_kind, size_t element_size,
@@ -361,6 +379,12 @@ MLN_API void mln_adapter_handle_leak_report(void* token) MLN_NOEXCEPT;
  *
  * out_queue must point to the null handle. The association remains immutable
  * until the queue is closed.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when out_queue receives an owned queue.
+ * - MLN_STATUS_INVALID_ARGUMENT when out_queue is null or does not point to the
+ *   null handle, or the wake descriptor is invalid.
+ * - MLN_STATUS_NATIVE_ERROR when the queue could not be allocated.
  */
 MLN_API mln_status mln_adapter_resource_request_queue_create(
   const mln_wake* wake, mln_adapter_resource_request_queue* out_queue
@@ -372,6 +396,14 @@ MLN_API mln_status mln_adapter_resource_request_queue_create(
  * out_request must point to null. The caller owns a returned record and
  * releases it with mln_adapter_resource_provider_request_destroy(). The queue
  * remains ready until this drain confirms it is empty.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when out_request receives a record or the queue is empty.
+ * - MLN_STATUS_INVALID_ARGUMENT when queue is null or not live, or out_request
+ *   is null or does not point to null.
+ * - MLN_STATUS_INVALID_STATE when the queue is closed or another drain is
+ *   active.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_adapter_resource_request_queue_acquire(
   mln_adapter_resource_request_queue queue,
@@ -394,6 +426,12 @@ MLN_API void mln_adapter_resource_request_queue_close(
  *
  * out_queue must point to the null handle. The association remains immutable
  * until the queue is closed.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when out_queue receives an owned queue.
+ * - MLN_STATUS_INVALID_ARGUMENT when out_queue is null or does not point to the
+ *   null handle, or the wake descriptor is invalid.
+ * - MLN_STATUS_NATIVE_ERROR when the queue could not be allocated.
  */
 MLN_API mln_status mln_adapter_log_queue_create(
   const mln_wake* wake, mln_adapter_log_queue* out_queue
@@ -404,6 +442,14 @@ MLN_API mln_status mln_adapter_log_queue_create(
  *
  * out_record must point to null. The caller owns a returned record and releases
  * it with mln_adapter_log_record_destroy().
+ *
+ * Returns:
+ * - MLN_STATUS_OK when out_record receives a record or the queue is empty.
+ * - MLN_STATUS_INVALID_ARGUMENT when queue is null or not live, or out_record
+ *   is null or does not point to null.
+ * - MLN_STATUS_INVALID_STATE when the queue is closed or another drain is
+ *   active.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_adapter_log_queue_acquire(
   mln_adapter_log_queue queue, mln_adapter_log_record** out_record
@@ -433,6 +479,11 @@ MLN_API uint32_t mln_adapter_log_callback(
 /**
  * Installs state as the process-global log callback, or clears the current
  * callback when state is null.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the registration was installed or cleared.
+ * - MLN_STATUS_INVALID_ARGUMENT when state names a queue that is not live.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_adapter_log_set_callback(
   mln_adapter_log_callback_state* state
@@ -447,6 +498,12 @@ MLN_API void mln_adapter_log_record_destroy(void* record) MLN_NOEXCEPT;
  * The user_data pointer is an mln_adapter_resource_rewrite_rules table. The
  * first matching rule replaces the URL, and a request that matches no rule
  * passes through unchanged.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the URL was rewritten or left unchanged, including for
+ *   null arguments.
+ * - the status of mln_resource_transform_response_set_url() when the copy of a
+ *   replacement URL fails.
  */
 MLN_API mln_status mln_adapter_resource_transform_rewrite_callback(
   void* user_data, uint32_t kind, const char* url,
@@ -457,8 +514,14 @@ MLN_API mln_status mln_adapter_resource_transform_rewrite_callback(
  * The mln_http_header_transform_callback implementation for native rules.
  *
  * The first rule whose kind and transformed URL match supplies all its headers.
- * A request with no matching rule proceeds unchanged. The callback returns the
- * first non-OK status from mln_http_header_transform_response_set().
+ * A request with no matching rule proceeds unchanged.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the matching rule's headers were recorded, or no rule
+ *   matched, including for null arguments.
+ * - MLN_STATUS_INVALID_ARGUMENT when a rule table or header array is null with
+ *   a non-zero count.
+ * - the first non-OK status from mln_http_header_transform_response_set().
  */
 MLN_API mln_status mln_adapter_http_header_transform_callback(
   void* user_data, uint32_t kind, const char* url,
@@ -471,6 +534,12 @@ MLN_API mln_status mln_adapter_http_header_transform_callback(
  * This applies the C API's field-name, UTF-8 field-value, control-byte, and
  * transport-managed-name rules without requiring an active transform callback.
  * A diagnostic for a rejected header never includes its value.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the header is valid.
+ * - MLN_STATUS_INVALID_ARGUMENT when the name or value breaks one of those
+ *   rules.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_adapter_http_header_validate(
   const char* name, const char* value

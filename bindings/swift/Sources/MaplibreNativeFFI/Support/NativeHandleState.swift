@@ -57,13 +57,6 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     }
   }
 
-  /// Runs `use` after checking that this wrapper still owns the handle. The C
-  /// API leases its native object for each entry point, so concurrent release
-  /// does not need a second binding-side active-use lease.
-  func withLive<T>(_ use: (Handle) throws -> T) throws -> T {
-    try use(requireLive())
-  }
-
   func closeOnce(_ destroy: (Handle) throws -> Void) throws {
     let liveHandle: Handle? = try lock.withLock {
       switch state {

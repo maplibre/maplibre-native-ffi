@@ -15,7 +15,6 @@ typedef enum drag_mode : uint8_t {
 } drag_mode;
 
 typedef struct input_result {
-  bool handled;
   bool camera_changed;
   app_error error;
 } input_result;

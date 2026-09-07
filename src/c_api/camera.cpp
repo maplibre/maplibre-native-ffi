@@ -80,6 +80,14 @@ auto mln_map_apply_camera_delta(
   });
 }
 
+auto mln_map_cancel_transitions(
+  mln_map map, const mln_completion* completion
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_cancel_transitions(map, completion);
+  });
+}
+
 auto mln_map_camera_query(
   mln_map map, const mln_completion* completion
 ) noexcept -> mln_status {
@@ -104,7 +112,9 @@ auto mln_map_set_debug_options(
     if (validation != MLN_STATUS_OK) return validation;
     return mln::core::submit_map_command(
       map,
-      [map, options] { return mln::core::map_set_debug_options(map, options); },
+      [options](mln::core::MapObject& live) {
+        return mln::core::map_set_debug_options(live, options);
+      },
       completion
     );
   });
@@ -116,8 +126,8 @@ auto mln_map_set_rendering_stats_view_enabled(
   return mln::c_api::status_boundary([&] {
     return mln::core::submit_map_command(
       map,
-      [map, enabled] {
-        return mln::core::map_set_rendering_stats_view_enabled(map, enabled);
+      [enabled](mln::core::MapObject& live) {
+        return mln::core::map_set_rendering_stats_view_enabled(live, enabled);
       },
       completion
     );
@@ -129,7 +139,11 @@ auto mln_map_dump_debug_logs(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&] {
     return mln::core::submit_map_command(
-      map, [map] { return mln::core::map_dump_debug_logs(map); }, completion
+      map,
+      [](mln::core::MapObject& live) {
+        return mln::core::map_dump_debug_logs(live);
+      },
+      completion
     );
   });
 }
@@ -144,8 +158,8 @@ auto mln_map_set_viewport_options(
     const auto copied = *options;
     return mln::core::submit_map_command(
       map,
-      [map, copied] {
-        return mln::core::map_set_viewport_options(map, &copied);
+      [copied](mln::core::MapObject& live) {
+        return mln::core::map_set_viewport_options(live, &copied);
       },
       completion
     );
@@ -162,7 +176,9 @@ auto mln_map_set_tile_options(
     const auto copied = *options;
     return mln::core::submit_map_command(
       map,
-      [map, copied] { return mln::core::map_set_tile_options(map, &copied); },
+      [copied](mln::core::MapObject& live) {
+        return mln::core::map_set_tile_options(live, &copied);
+      },
       completion
     );
   });
@@ -291,7 +307,10 @@ auto mln_map_set_bounds(
     if (validation != MLN_STATUS_OK) return validation;
     const auto copied = *options;
     return mln::core::submit_map_command(
-      map, [map, copied] { return mln::core::map_set_bounds(map, &copied); },
+      map,
+      [copied](mln::core::MapObject& live) {
+        return mln::core::map_set_bounds(live, &copied);
+      },
       completion
     );
   });
@@ -308,8 +327,8 @@ auto mln_map_set_free_camera_options(
     const auto copied = *options;
     return mln::core::submit_map_command(
       map,
-      [map, copied] {
-        return mln::core::map_set_free_camera_options(map, &copied);
+      [copied](mln::core::MapObject& live) {
+        return mln::core::map_set_free_camera_options(live, &copied);
       },
       completion
     );

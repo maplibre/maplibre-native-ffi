@@ -29,30 +29,6 @@ struct NativeRenderSessionHandle: NativeHandle {
   let raw: UInt64
 }
 
-struct NativeOfflineRegionSnapshotHandle: NativeHandle {
-  let raw: UInt64
-}
-
-struct NativeOfflineRegionListHandle: NativeHandle {
-  let raw: UInt64
-}
-
-struct NativeBufferHandle: NativeHandle {
-  let raw: UInt64
-}
-
-struct NativeStyleIdListHandle: NativeHandle {
-  let raw: UInt64
-}
-
-struct NativeStyleStringListHandle: NativeHandle {
-  let raw: UInt64
-}
-
-struct NativeQueriedFeatureListHandle: NativeHandle {
-  let raw: UInt64
-}
-
 struct NativeGeoJSONSourceDataHandle: NativeHandle {
   let raw: UInt64
 }

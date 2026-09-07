@@ -32,12 +32,11 @@ import org.maplibre.nativeffi.internal.struct.MapStructs
 /**
  * Owned standalone projection snapshot created from a map.
  *
- * Every call is synchronous, runs on the calling thread, is internally serialized, and may be made
- * from any thread. A projection copies the map's transform state at creation and never observes map
- * changes made after that and remains usable after its source map and runtime close.
+ * See the common declaration for the projection's threading and lifetime rules.
  */
 @OptIn(ExperimentalForeignApi::class)
-public actual class MapProjectionHandle internal constructor(handle: NativeMapProjection) {
+public actual class MapProjectionHandle internal constructor(handle: NativeMapProjection) :
+  AutoCloseable {
   private val state = HandleState("MapProjectionHandle", handle)
 
   public actual fun camera(): CameraOptions = memScoped {
@@ -123,15 +122,8 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
     CoreStructs.latLng(outCoordinate)
   }
 
-  public actual fun close() {
-    if (!state.beginClose()) return
-    try {
-      Status.check(mln_map_projection_close(state.handleForClose().rawHandleValue))
-    } catch (error: Throwable) {
-      state.abortClose()
-      throw error
-    }
-    state.completeClose()
+  actual override fun close() {
+    state.closeOnce { handle -> mln_map_projection_close(handle.rawHandleValue) }
   }
 
   public actual val isClosed: Boolean

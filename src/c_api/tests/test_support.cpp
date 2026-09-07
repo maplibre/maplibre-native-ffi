@@ -2,6 +2,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdint>
 #include <cstring>
 #include <mutex>
 #include <string>
@@ -10,9 +11,7 @@
 
 #include "test_support.h"
 
-#include "completion/completion.hpp"
-#include "render/render_session_test_support.hpp"
-#include "runtime/runtime.hpp"
+#include "c_api/test_hooks.hpp"
 
 namespace {
 
@@ -32,6 +31,13 @@ struct CompletionState {
   bool copy_buffer_view = false;
   std::vector<std::byte> nested;
 };
+
+// A completion the executor never settles is a defect in the code under test,
+// so every wait in this file is bounded: the caller reports a failed wait as a
+// named test failure rather than letting the suite run out its CTest timeout.
+constexpr auto completion_wait_limit_milliseconds = std::int64_t{60000};
+constexpr auto completion_wait_limit =
+  std::chrono::milliseconds{completion_wait_limit_milliseconds};
 
 auto state(mln_test_completion* completion) -> CompletionState* {
   return completion == nullptr
@@ -123,7 +129,15 @@ extern "C" void mln_test_completion_destroy(mln_test_completion* completion) {
   if (probe == nullptr) return;
   {
     auto lock = std::unique_lock{probe->mutex};
-    probe->condition.wait(lock, [probe]() { return probe->released; });
+    // Bounded so a completion the library never releases fails the test that
+    // submitted it instead of hanging the suite. The probe is deliberately
+    // leaked in that case: a late release would write through this pointer.
+    if (!probe->condition.wait_for(lock, completion_wait_limit, [probe]() {
+          return probe->released;
+        })) {
+      *completion = {};
+      return;
+    }
   }
   delete probe;
   *completion = {};
@@ -145,8 +159,9 @@ extern "C" bool mln_test_completion_wait(
   if (probe == nullptr) return false;
   auto lock = std::unique_lock{probe->mutex};
   if (timeout_ms < 0) {
-    probe->condition.wait(lock, [probe]() { return probe->completed; });
-    return true;
+    return probe->condition.wait_for(lock, completion_wait_limit, [probe]() {
+      return probe->completed;
+    });
   }
   return probe->condition.wait_for(
     lock, std::chrono::milliseconds{timeout_ms},
@@ -157,10 +172,34 @@ extern "C" bool mln_test_completion_wait(
 extern "C" mln_status mln_test_completion_finish(
   mln_test_completion* completion
 ) {
-  if (!mln_test_completion_wait(completion, -1)) {
+  if (!mln_test_completion_wait(
+        completion, completion_wait_limit_milliseconds
+      )) {
     return MLN_STATUS_INVALID_STATE;
   }
   return mln_test_completion_status(completion);
+}
+
+extern "C" mln_status mln_test_completion_settle(
+  mln_test_completion* completion
+) {
+  const auto status = mln_test_completion_finish(completion);
+  mln_test_completion_destroy(completion);
+  return status;
+}
+
+extern "C" mln_status mln_test_completion_finish_value(
+  mln_test_completion* completion, void* out_value, const size_t value_size
+) {
+  auto status = mln_test_completion_finish(completion);
+  if (
+    status == MLN_STATUS_OK &&
+    !mln_test_completion_copy_value(completion, out_value, value_size)
+  ) {
+    status = MLN_STATUS_NATIVE_ERROR;
+  }
+  mln_test_completion_destroy(completion);
+  return status;
 }
 
 extern "C" bool mln_test_completion_poll(mln_test_completion* completion) {
@@ -226,116 +265,15 @@ extern "C" bool mln_test_completion_copy_value(
   return true;
 }
 
-extern "C" bool mln_test_completion_contract(void) {
-  struct Probe {
-    std::atomic_uint calls = 0;
-    std::atomic_uint releases = 0;
-    std::atomic_int phase = 0;
-    std::atomic_int status = MLN_STATUS_INVALID_STATE;
-  };
-  const auto callback =
-    +[](void* user_data, const mln_completion_result* result) -> void {
-    auto& probe = *static_cast<Probe*>(user_data);
-    auto expected = 0;
-    if (!probe.phase.compare_exchange_strong(expected, 1)) {
-      probe.phase.store(-1);
-    }
-    probe.status.store(result->status);
-    probe.calls.fetch_add(1);
-  };
-  const auto release = +[](void* user_data) -> void {
-    auto& probe = *static_cast<Probe*>(user_data);
-    auto expected = 1;
-    if (!probe.phase.compare_exchange_strong(expected, 2)) {
-      probe.phase.store(-1);
-    }
-    probe.releases.fetch_add(1);
-  };
-  const auto descriptor = [&](Probe& probe) -> mln_completion {
-    return {
-      .size = sizeof(mln_completion),
-      .callback = callback,
-      .user_data = &probe,
-      .release_user_data = release,
-    };
-  };
-
-  auto inline_probe = Probe{};
-  auto inline_completion =
-    std::make_shared<mln::core::Completion>(descriptor(inline_probe));
-  mln::core::complete_value(
-    inline_completion, MLN_STATUS_OK, std::string{}, std::uint32_t{7}
-  );
-  if (inline_probe.calls.load() != 0) return false;
-  inline_completion->accept();
-  inline_completion->resolve([](const mln_completion&) {});
-  if (
-    inline_probe.calls.load() != 1 || inline_probe.releases.load() != 1 ||
-    inline_probe.phase.load() != 2 ||
-    inline_probe.status.load() != MLN_STATUS_OK
-  )
-    return false;
-
-  auto rejected_probe = Probe{};
-  {
-    auto rejected =
-      std::make_shared<mln::core::Completion>(descriptor(rejected_probe));
-    rejected->reject();
-  }
-  if (rejected_probe.calls.load() != 0 || rejected_probe.releases.load() != 0)
-    return false;
-
-  auto abandoned_probe = Probe{};
-  {
-    auto abandoned =
-      std::make_shared<mln::core::Completion>(descriptor(abandoned_probe));
-    abandoned->accept();
-  }
-  if (
-    abandoned_probe.calls.load() != 1 || abandoned_probe.releases.load() != 1 ||
-    abandoned_probe.status.load() != MLN_STATUS_CANCELLED
-  )
-    return false;
-
-  for (auto iteration = 0; iteration < 100; ++iteration) {
-    auto race_probe = Probe{};
-    auto completion =
-      std::make_shared<mln::core::Completion>(descriptor(race_probe));
-    auto accept = std::thread{[completion]() { completion->accept(); }};
-    auto resolve = std::thread{[completion]() {
-      mln::core::complete(completion, MLN_STATUS_OK);
-    }};
-    accept.join();
-    resolve.join();
-    if (
-      race_probe.calls.load() != 1 || race_probe.releases.load() != 1 ||
-      race_probe.phase.load() != 2
-    )
-      return false;
-  }
-  return true;
-}
-
-extern "C" mln_status mln_test_runtime_reserve_child(mln_runtime runtime) {
-  auto live = mln::core::lease_runtime(runtime);
-  if (live == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
-  return live->control.reserve_child() ? MLN_STATUS_OK
-                                       : MLN_STATUS_INVALID_STATE;
-}
-
-extern "C" void mln_test_runtime_abandon_child(mln_runtime runtime) {
-  auto live = mln::core::lease_runtime(runtime);
-  if (live != nullptr) live->control.abandon_child_reservation();
+extern "C" auto mln_test_completion_contract(void) -> const char* {
+  return mln_test_hook_completion_contract();
 }
 
 extern "C" mln_status mln_test_render_session_blocking_operation_create(
   mln_render_session session, atomic_bool* entered, const atomic_bool* release,
   const mln_completion* completion
 ) {
-  if (entered == nullptr || release == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return mln::core::enqueue_blocking_test_render_operation(
+  return mln_test_hook_enqueue_blocking_render_operation(
     session, entered, release, completion
   );
 }

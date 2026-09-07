@@ -54,8 +54,7 @@ class GoldfishStyleReloadTest {
   /** Renders until the still image the map owes this test finishes, then reads its center pixel. */
   private suspend fun captureCenterPixel(map: MapHandle, session: RenderSessionHandle): ByteArray {
     val still = map.requestStillImage()
-    while (!still.isCompleted) session.renderOneFrame()
-    val completion = session.completeOnDriver(still)
+    val completion = session.completeOnDriver(still) { renderOneFrame() }
     check(completion.disposition == CommandDisposition.COMMITTED) {
       "still image failed: ${completion.status} ${completion.diagnostic}"
     }

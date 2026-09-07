@@ -28,8 +28,9 @@ typedef void (*mln_wake_release)(void* user_data);
  * not destroy the object that owns the wake. Native code calls
  * release_user_data after all callback invocations have returned.
  *
- * A zeroed descriptor disables waking. Polling remains valid when the owning
- * API permits an omitted wake.
+ * A descriptor whose callback is null disables waking; size must still be
+ * sizeof(mln_wake), and a disabled wake must not carry release_user_data.
+ * Polling remains valid when the owning API permits an omitted wake.
  */
 typedef struct mln_wake {
   uint32_t size;

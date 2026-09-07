@@ -36,15 +36,6 @@ void wake_frames(void* user_data) {
   mark_ready(receiver, &receiver->frames_ready);
 }
 
-mln_status select_frame_events(mln_map map, const mln_completion* completion) {
-  return mln_map_set_event_mask(
-    map,
-    MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE |
-      MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED,
-    completion
-  );
-}
-
 // #region wants
 static bool wants_a_frame(const mln_runtime_event* event, mln_map map) {
   if (event->source != map) return false;
@@ -111,8 +102,9 @@ void run_one_frame(
       &receiver->driver_ready, false, memory_order_acq_rel
     )
   ) {
+    // Zero services every item the mailbox holds.
     size_t serviced = 0;
-    (void)mln_render_session_service_driver_work(session, 64, &serviced);
+    (void)mln_render_session_service_driver_work(session, 0, &serviced);
   }
   // #endregion service
   if (

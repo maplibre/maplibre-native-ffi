@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 
 import maplibre_native_ffi as mln
@@ -9,11 +9,17 @@ import pytest
 from maplibre_native_ffi import render
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
+    assert_abandon_retires_the_session,
     assert_cluster_feature_extensions,
+    assert_frame_demands_report_their_own_tokens,
     assert_geojson_cluster_source,
+    assert_invalid_state,
+    assert_session_maintenance_commands_round_trip,
+    assert_texture_ring_exhaustion_reports_not_ready,
     close_session,
-    finish_attach,
     finish_render_operation,
+    map_extent,
+    read_texture_info,
     release_frame,
     render_until_update,
     request_and_finish_frame,
@@ -72,7 +78,7 @@ class VulkanOwnedSession:
                 session, attach = map_handle.attach_vulkan_owned_texture(
                     context.owned_texture_descriptor(width, height, scale_factor)
                 )
-                finish_attach(session, attach)
+                finish_render_operation(session, attach)
             except BaseException:
                 map_handle.close()
                 raise
@@ -94,39 +100,17 @@ class VulkanOwnedSession:
 
     def render_once(self) -> None:
         self.map.set_style_json(EMPTY_STYLE_JSON.encode())
-        self.runtime.barrier().result(timeout=5)
         frame = wait_for_vulkan_frame(self, lambda _: True)
         release_frame(frame)
 
 
 @pytest.fixture
-def vulkan_owned_session() -> VulkanOwnedSession:
+def vulkan_owned_session() -> Iterator[VulkanOwnedSession]:
     fixture = VulkanOwnedSession.create()
     try:
         yield fixture
     finally:
         fixture.close()
-
-
-def assert_invalid_state(call: Callable[[], object]) -> None:
-    with pytest.raises(mln.InvalidStateError) as raised:
-        call()
-    assert raised.value.status == mln.MaplibreStatus.INVALID_STATE
-
-
-def wait_for_texture_info(
-    fixture: VulkanOwnedSession,
-    *,
-    iterations: int = 5000,
-) -> render.TextureImageInfo:
-    fixture.map.set_style_json(EMPTY_STYLE_JSON.encode())
-    render_until_update(fixture.runtime, fixture.session)
-    image = finish_render_operation(
-        fixture.session,
-        fixture.session.read_premultiplied_rgba8(),
-        return_result=True,
-    )
-    return image.info
 
 
 def wait_for_vulkan_frame(
@@ -158,7 +142,7 @@ def test_core_worker_renders_and_releases_owned_vulkan_frame(
 ) -> None:
     vulkan_owned_session.map.set_style_json(EMPTY_STYLE_JSON.encode())
     render_until_update(vulkan_owned_session.runtime, vulkan_owned_session.session)
-    result = vulkan_owned_session.session.snapshot.latest_result
+    result = vulkan_owned_session.session.snapshot().latest_result
     assert result == render.RenderResult.RENDERED
     frame = vulkan_owned_session.session.acquire_vulkan_owned_texture_frame()
     assert frame.result.disposition == result
@@ -173,10 +157,13 @@ def test_core_worker_renders_and_releases_owned_vulkan_frame(
     # A rendered frame carries the map's repaint request with its result. A
     # static empty style settles, so the signal clears within a few frames
     # once nothing asks to draw again.
-    for token in range(2, 32):
+    for token in range(2, 200):
         settled = request_and_finish_frame(vulkan_owned_session.session, token=token)
-        assert settled.disposition == render.RenderResult.RENDERED
-        if settled.needs_repaint is False:
+        assert settled.token == token
+        if (
+            settled.disposition == render.RenderResult.RENDERED
+            and settled.needs_repaint is False
+        ):
             break
         time.sleep(0.01)
     else:
@@ -186,7 +173,11 @@ def test_core_worker_renders_and_releases_owned_vulkan_frame(
 def test_core_worker_reads_owned_vulkan_texture(
     vulkan_owned_session: VulkanOwnedSession,
 ) -> None:
-    info = wait_for_texture_info(vulkan_owned_session)
+    info = read_texture_info(
+        vulkan_owned_session.runtime,
+        vulkan_owned_session.map,
+        vulkan_owned_session.session,
+    )
     # Readback metadata describes the attached extent and a row-padded buffer.
     assert info.width == 32
     assert info.height == 16
@@ -196,7 +187,6 @@ def test_core_worker_reads_owned_vulkan_texture(
     image = finish_render_operation(
         vulkan_owned_session.session,
         vulkan_owned_session.session.read_premultiplied_rgba8(),
-        return_result=True,
     )
     assert image.info == info
     assert len(image.data) == info.byte_length
@@ -205,8 +195,8 @@ def test_core_worker_reads_owned_vulkan_texture(
 def test_owned_vulkan_session_reports_core_worker_capabilities(
     vulkan_owned_session: VulkanOwnedSession,
 ) -> None:
-    capabilities = vulkan_owned_session.session.capabilities
-    snapshot = vulkan_owned_session.session.snapshot
+    capabilities = vulkan_owned_session.session.capabilities()
+    snapshot = vulkan_owned_session.session.snapshot()
     assert capabilities.driver == render.RenderDriver.CORE_WORKER
     assert capabilities.texture_ring_depth in (1, 2, 3)
     assert snapshot.driver == render.RenderDriver.CORE_WORKER
@@ -257,10 +247,6 @@ def test_frame_demand_without_a_newer_update_reports_no_update(
 
     assert result.needs_repaint is False
     assert not vulkan_owned_session.session.closed
-    finish_render_operation(
-        vulkan_owned_session.session,
-        vulkan_owned_session.session.resize(render.RenderTargetExtent(32, 16, 1.0)),
-    )
 
 
 def test_resize_updates_owned_vulkan_texture_frame_extent(
@@ -270,19 +256,18 @@ def test_resize_updates_owned_vulkan_texture_frame_extent(
 
     finish_render_operation(
         vulkan_owned_session.session,
-        vulkan_owned_session.session.resize(render.RenderTargetExtent(16, 8, 2.0)),
+        vulkan_owned_session.session.resize(render.RenderTargetExtent(16, 8, 1.0)),
     )
-    # The session-owned texture is sized in device pixels, so a 16x8 logical
-    # extent at scale factor 2 keeps the 32x16 physical ring.
+    # The session-owned texture is sized in device pixels, which at the
+    # session's fixed scale factor of 1 is the logical extent.
     frame = wait_for_vulkan_frame(
         vulkan_owned_session,
-        lambda info: info.scale_factor == pytest.approx(2.0),
+        lambda info: info.width == 16,
     )
     try:
         info = frame.frame
-        assert info.width == 32
-        assert info.height == 16
-        assert info.scale_factor == pytest.approx(2.0)
+        assert info.height == 8
+        assert info.scale_factor == pytest.approx(1.0)
         assert info.generation >= 1
     finally:
         release_frame(frame)
@@ -292,14 +277,20 @@ def test_map_size_follows_attach_and_session_resize(
     vulkan_owned_session: VulkanOwnedSession,
 ) -> None:
     # Attachment sizes the map from the target rather than from map creation.
-    assert vulkan_owned_session.map.get_size() == (32, 16, pytest.approx(1.0))
+    assert map_extent(vulkan_owned_session.map) == (32, 16, pytest.approx(1.0))
 
-    # An applied resize updates the map viewport, scale factor included.
+    # An applied resize updates the map viewport.
     finish_render_operation(
         vulkan_owned_session.session,
-        vulkan_owned_session.session.resize(render.RenderTargetExtent(48, 24, 2.0)),
+        vulkan_owned_session.session.resize(render.RenderTargetExtent(48, 24, 1.0)),
     )
-    assert vulkan_owned_session.map.get_size() == (48, 24, pytest.approx(2.0))
+    assert map_extent(vulkan_owned_session.map) == (48, 24, pytest.approx(1.0))
+
+    # The scale factor is fixed at attachment, so a session resize that changes
+    # it is rejected before any command is submitted.
+    with pytest.raises(mln.InvalidArgumentError):
+        vulkan_owned_session.session.resize(render.RenderTargetExtent(48, 24, 2.0))
+    assert map_extent(vulkan_owned_session.map) == (48, 24, pytest.approx(1.0))
 
 
 def test_vulkan_frame_exposes_backend_handles_only_while_the_lease_is_live(
@@ -363,14 +354,14 @@ def test_session_close_is_rejected_while_a_frame_lease_is_held(
     session = vulkan_owned_session.session
     frame = wait_for_vulkan_frame(vulkan_owned_session, lambda _: True)
     try:
-        assert session.snapshot.acquired_frame_count == 1
+        assert session.snapshot().acquired_frame_count == 1
         # The host still holds a ring slot, so the session cannot retire.
         assert_invalid_state(session.close)
         assert not session.closed
     finally:
         release_frame(frame)
 
-    assert session.snapshot.acquired_frame_count == 0
+    assert session.snapshot().acquired_frame_count == 0
 
 
 def test_vulkan_frame_release_failure_leaves_the_lease_live_for_a_later_release() -> (
@@ -382,15 +373,13 @@ def test_vulkan_frame_release_failure_leaves_the_lease_live_for_a_later_release(
 
         def image_bits(self) -> int:
             if self.closed:
-                raise mln.InvalidStateError(
-                    None, "VulkanOwnedTextureFrameHandle is closed"
-                )
+                raise mln.InvalidStateError("VulkanOwnedTextureFrameHandle is closed")
             return 0x1000
 
         def release(self, kind: int, address: int, value: int) -> None:
             self.release_calls += 1
             if self.release_calls == 1:
-                raise mln.InvalidStateError(None, "frame release failed")
+                raise mln.InvalidStateError("frame release failed")
             self.closed = True
 
     native = FakeNativeFrame()
@@ -429,4 +418,74 @@ def test_typed_geojson_source_options_cluster_nearby_points(
         vulkan_owned_session.runtime,
         vulkan_owned_session.map,
         vulkan_owned_session.session,
+    )
+
+
+def test_vulkan_frame_demands_report_their_own_tokens(
+    vulkan_owned_session: VulkanOwnedSession,
+) -> None:
+    vulkan_owned_session.render_once()
+    assert_frame_demands_report_their_own_tokens(vulkan_owned_session.session)
+
+
+def test_vulkan_texture_ring_exhaustion_reports_not_ready(
+    vulkan_owned_session: VulkanOwnedSession,
+) -> None:
+    vulkan_owned_session.render_once()
+    assert_texture_ring_exhaustion_reports_not_ready(
+        vulkan_owned_session.session,
+        vulkan_owned_session.session.acquire_vulkan_owned_texture_frame,
+    )
+
+
+def test_vulkan_session_maintenance_commands_round_trip(
+    vulkan_owned_session: VulkanOwnedSession,
+) -> None:
+    vulkan_owned_session.render_once()
+    assert_session_maintenance_commands_round_trip(vulkan_owned_session.session)
+
+
+def test_vulkan_frame_lease_releases_itself_when_its_scope_ends(
+    vulkan_owned_session: VulkanOwnedSession,
+) -> None:
+    lease = wait_for_vulkan_frame(vulkan_owned_session, lambda _: True)
+    with lease:
+        assert not lease.closed
+        assert vulkan_owned_session.session.snapshot().acquired_frame_count == 1
+    assert lease.closed
+    assert vulkan_owned_session.session.snapshot().acquired_frame_count == 0
+
+
+def test_vulkan_owned_session_rejects_a_borrowed_texture_target(
+    vulkan_owned_session: VulkanOwnedSession,
+) -> None:
+    vulkan_owned_session.render_once()
+
+    # A session-owned ring cannot be handed a caller-owned texture, and the
+    # retarget kind is checked before any host handle is read.
+    with pytest.raises(mln.UnsupportedFeatureError) as raised:
+        vulkan_owned_session.session.set_vulkan_borrowed_texture_target(
+            render.VulkanBorrowedTextureDescriptor(
+                extent=render.RenderTargetExtent(32, 16, 1.0),
+                physical_width=32,
+                physical_height=16,
+            )
+        )
+    assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
+
+    # The rejection left the session rendering.
+    assert (
+        request_and_finish_frame(
+            vulkan_owned_session.session, token=7001, flags=render.FrameDemandFlag(0)
+        ).disposition
+        == render.RenderResult.RENDERED
+    )
+
+
+def test_vulkan_abandon_retires_the_session_and_its_map(
+    vulkan_owned_session: VulkanOwnedSession,
+) -> None:
+    vulkan_owned_session.render_once()
+    assert_abandon_retires_the_session(
+        vulkan_owned_session.session, vulkan_owned_session.map
     )

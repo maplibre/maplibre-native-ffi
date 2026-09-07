@@ -1,12 +1,10 @@
 const std = @import("std");
 
 pub const AppError = error{
-    InvalidArguments,
     SdlInitFailed,
     WindowCreateFailed,
     RuntimeCreateFailed,
     MapCreateFailed,
-    EventMaskFailed,
     EventDrainFailed,
     TextureAttachFailed,
     StyleLoadFailed,

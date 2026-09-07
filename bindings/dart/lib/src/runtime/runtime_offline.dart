@@ -158,9 +158,7 @@ Pointer<Uint8> _nativeBytes(Uint8List? bytes, Allocator allocator) {
     return nullptr.cast<Uint8>();
   }
   final nativeBytes = allocator<Uint8>(bytes.length);
-  for (var index = 0; index < bytes.length; index += 1) {
-    nativeBytes[index] = bytes[index];
-  }
+  nativeBytes.asTypedList(bytes.length).setAll(0, bytes);
   return nativeBytes;
 }
 

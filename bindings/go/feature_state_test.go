@@ -9,7 +9,7 @@ import (
 // Feature state belongs to the map store, so a set is observed by an ordered
 // get without a render session or a loaded source.
 func TestMapFeatureStateRoundTrip(t *testing.T) {
-	runtime, m := newRuntimeAndMap(t, nil)
+	_, m := newRuntimeAndMap(t, nil)
 
 	featureID := "42"
 	selector := FeatureStateSelector{SourceID: "source", FeatureID: &featureID}
@@ -24,7 +24,7 @@ func TestMapFeatureStateRoundTrip(t *testing.T) {
 	}
 
 	setID, err := m.SetFeatureState(selector, []byte(`{"hover":true}`))
-	requireCommandCommitted(t, runtime, setID, err)
+	requireCommandCommitted(t, setID, err)
 	after, err := awaitForTest(m.FeatureState(selector))
 	if err != nil {
 		t.Fatalf("FeatureState() after set: %v", err)
@@ -40,7 +40,7 @@ func TestMapFeatureStateRoundTrip(t *testing.T) {
 		FeatureID: &featureID,
 		StateKey:  &stateKey,
 	})
-	requireCommandCommitted(t, runtime, removeID, err)
+	requireCommandCommitted(t, removeID, err)
 	cleared, err := awaitForTest(m.FeatureState(selector))
 	if err != nil {
 		t.Fatalf("FeatureState() after remove: %v", err)

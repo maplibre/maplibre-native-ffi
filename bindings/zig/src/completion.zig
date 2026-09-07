@@ -3,6 +3,7 @@ const std = @import("std");
 const c = @import("c.zig").raw;
 const diagnostics = @import("diagnostics.zig");
 const status = @import("status.zig");
+const sync = @import("sync.zig");
 
 pub const CommandDisposition = union(enum) {
     committed,
@@ -33,6 +34,17 @@ pub const CommandCompletion = struct {
     }
 };
 
+/// Releases a terminal value the future copied but never handed out.
+fn disposeOwned(comptime Value: type, owned: *Value) void {
+    switch (@typeInfo(Value)) {
+        .optional => |optional| {
+            if (owned.*) |*inner| disposeOwned(optional.child, inner);
+        },
+        .@"struct" => if (@hasDecl(Value, "deinit")) owned.deinit(),
+        else => {},
+    }
+}
+
 pub fn Future(comptime T: type) type {
     return struct {
         const Self = @This();
@@ -40,6 +52,7 @@ pub fn Future(comptime T: type) type {
 
         const State = struct {
             refs: std.atomic.Value(usize) = .init(2),
+            ready: sync.Latch = .{},
             completed: std.atomic.Value(u32) = .init(0),
             consumed: std.atomic.Value(bool) = .init(false),
             raw_status: i32 = c.MLN_STATUS_OK,
@@ -52,9 +65,17 @@ pub fn Future(comptime T: type) type {
 
             fn release(state: *State) void {
                 if (state.refs.fetchSub(1, .acq_rel) != 1) return;
+                if (!state.consumed.load(.acquire)) {
+                    if (state.value) |*owned| disposeOwned(T, owned);
+                }
                 if (state.diagnostic.len != 0) std.heap.smp_allocator.free(state.diagnostic);
                 if (state.release_copy_context) |release_context| release_context(state.copy_context);
                 std.heap.smp_allocator.destroy(state);
+            }
+
+            fn finish(state: *State) void {
+                state.completed.store(1, .release);
+                state.ready.set();
             }
         };
 
@@ -65,15 +86,24 @@ pub fn Future(comptime T: type) type {
             return state.completed.load(.acquire) != 0;
         }
 
-        /// Returns the copied terminal diagnostic until this future is deinitialized.
+        /// Returns the copied terminal diagnostic until this future is
+        /// deinitialized, and an empty slice before the completion arrives.
         pub fn diagnostic(self: *const Self) status.BindingError![]const u8 {
             const state = self.state orelse return error.ClosedHandle;
+            if (state.completed.load(.acquire) == 0) return &.{};
             return state.diagnostic;
         }
 
+        /// Blocks until the completion arrives and hands out its terminal value.
+        ///
+        /// A future whose value owns a native handle, such as the one
+        /// `MapHandle.create` returns, hands that handle out only here, so a
+        /// host waits on those futures rather than deinitializing them: a
+        /// discarded creation leaves a live map that keeps its runtime open.
+        /// Every other value the future copied is released by `deinit`.
         pub fn wait(self: *Self, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!T {
             const state = self.state orelse return error.ClosedHandle;
-            while (state.completed.load(.acquire) == 0) std.Thread.yield() catch {};
+            state.ready.wait();
             if (state.consumed.swap(true, .acq_rel)) return error.AlreadyCompleted;
             if (state.diagnostic.len != 0) {
                 if (diagnostic_store) |store| try store.set(state.raw_status, state.diagnostic);
@@ -97,23 +127,32 @@ pub fn Future(comptime T: type) type {
                 const bytes = @as([*]const u8, @ptrCast(result.diagnostic.data))[0..result.diagnostic.size];
                 state.diagnostic = std.heap.smp_allocator.dupe(u8, bytes) catch {
                     state.conversion_error = error.OutOfMemory;
-                    state.completed.store(1, .release);
+                    state.finish();
                     return;
                 };
             }
             if (result.status == c.MLN_STATUS_OK or T == CommandCompletion) {
                 state.value = state.copy(result, state.copy_context) catch |err| {
                     state.conversion_error = err;
-                    state.completed.store(1, .release);
+                    state.finish();
                     return;
                 };
             }
-            state.completed.store(1, .release);
+            state.finish();
         }
 
         fn releaseUserData(user_data: ?*anyopaque) callconv(.c) void {
             const state: *State = @ptrCast(@alignCast(user_data orelse return));
             state.release();
+        }
+
+        fn descriptor(state: *State) c.mln_completion {
+            return .{
+                .size = @sizeOf(c.mln_completion),
+                .callback = callback,
+                .user_data = state,
+                .release_user_data = releaseUserData,
+            };
         }
     };
 }
@@ -134,6 +173,7 @@ pub fn completed(comptime T: type, terminal_value: T) std.mem.Allocator.Error!Fu
             }
         }.copyResult,
     };
+    state.ready.set();
     return .{ .state = state };
 }
 
@@ -144,11 +184,16 @@ pub fn submit(
     context: anytype,
     comptime start: anytype,
 ) status.Error!Future(T) {
-    return submitWithCopyContext(T, void, diagnostic_store, struct {
-        fn copyResult(result: *const c.mln_completion_result, _: *void) status.Error!T {
-            return copy(result);
-        }
-    }.copyResult, {}, context, start);
+    const FutureType = Future(T);
+    const state = try std.heap.smp_allocator.create(FutureType.State);
+    state.* = .{
+        .copy = struct {
+            fn copyResult(result: *const c.mln_completion_result, _: ?*anyopaque) status.Error!T {
+                return copy(result);
+            }
+        }.copyResult,
+    };
+    return finishSubmission(T, state, diagnostic_store, context, start);
 }
 
 pub fn submitWithCopyContext(
@@ -182,57 +227,25 @@ pub fn submitWithCopyContext(
             }
         }.release,
     };
+    return finishSubmission(T, state, diagnostic_store, context, start);
+}
+
+fn finishSubmission(
+    comptime T: type,
+    state: *Future(T).State,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+    context: anytype,
+    comptime start: anytype,
+) status.Error!Future(T) {
+    const FutureType = Future(T);
     var future = FutureType{ .state = state };
-    const descriptor = c.mln_completion{
-        .size = @sizeOf(c.mln_completion),
-        .callback = FutureType.callback,
-        .user_data = state,
-        .release_user_data = FutureType.releaseUserData,
-    };
-    status.checkStatus(start(context, &descriptor), diagnostic_store) catch |err| {
+    const completion_descriptor = FutureType.descriptor(state);
+    status.checkStatus(start(context, &completion_descriptor), diagnostic_store) catch |err| {
         state.release();
         future.deinit();
         return err;
     };
     return future;
-}
-
-pub fn Submission(comptime T: type, comptime Output: type) type {
-    return struct { future: Future(T), output: Output };
-}
-
-pub fn submitWithOutput(
-    comptime T: type,
-    comptime Output: type,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-    comptime copy: *const fn (*const c.mln_completion_result) status.Error!T,
-    initial_output: Output,
-    context: anytype,
-    comptime start: anytype,
-) status.Error!Submission(T, Output) {
-    const FutureType = Future(T);
-    const state = try std.heap.smp_allocator.create(FutureType.State);
-    state.* = .{
-        .copy = struct {
-            fn copyResult(result: *const c.mln_completion_result, _: ?*anyopaque) status.Error!T {
-                return copy(result);
-            }
-        }.copyResult,
-    };
-    var future = FutureType{ .state = state };
-    const descriptor = c.mln_completion{
-        .size = @sizeOf(c.mln_completion),
-        .callback = FutureType.callback,
-        .user_data = state,
-        .release_user_data = FutureType.releaseUserData,
-    };
-    var output = initial_output;
-    status.checkStatus(start(context, &output, &descriptor), diagnostic_store) catch |err| {
-        state.release();
-        future.deinit();
-        return err;
-    };
-    return .{ .future = future, .output = output };
 }
 
 pub fn unit(result: *const c.mln_completion_result) status.Error!void {

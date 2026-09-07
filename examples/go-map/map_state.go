@@ -21,8 +21,9 @@ func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
 	}
 	state := &runtimeMapState{runtime: runtimeHandle}
 	mapOptions := maplibre.NewMapOptions(v.logicalWidth, v.logicalHeight, v.scaleFactor)
-	mapOptions.EventMask = maplibre.RuntimeEventMaskMapRenderUpdateAvailable |
-		maplibre.RuntimeEventMaskMapRenderFrameFinished
+	// The render loop re-arms from the frame result's repaint flag, so the map
+	// only has to report updates that arrive between frames.
+	mapOptions.EventMask = maplibre.RuntimeEventMaskMapRenderUpdateAvailable
 	mapFuture, err := runtimeHandle.NewMapWithOptions(mapOptions)
 	if err != nil {
 		_ = state.Close()
@@ -64,22 +65,36 @@ func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
 
 func (state *runtimeMapState) Close() error {
 	var result error
+	// Awaiting both release completions keeps process exit ordered after
+	// native teardown.
 	if state.mapRef != nil {
-		result = errors.Join(result, state.mapRef.Close())
+		teardown, err := state.mapRef.Close()
+		result = errors.Join(result, err)
+		if err == nil {
+			_, waitErr := teardown.Await(context.Background())
+			result = errors.Join(result, waitErr)
+		}
 		state.mapRef = nil
 	}
 	if state.runtime != nil {
 		teardown, err := state.runtime.Close()
 		result = errors.Join(result, err)
 		if err == nil {
-			// Awaiting the release completion keeps process exit ordered
-			// after native teardown.
 			_, waitErr := teardown.Await(context.Background())
 			result = errors.Join(result, waitErr)
 		}
 		state.runtime = nil
 	}
 	return result
+}
+
+// cancelTransitions ends any running camera transition, so a starting gesture
+// takes over from it rather than fighting it.
+func (state *runtimeMapState) cancelTransitions() error {
+	if _, err := state.mapRef.CancelTransitions(); err != nil {
+		return fmt.Errorf("camera transition cancel failed: %w", err)
+	}
+	return nil
 }
 
 func (state *runtimeMapState) setGestureInProgress(inProgress bool) error {
@@ -148,26 +163,19 @@ func animationOptions(durationMS *float64) *maplibre.AnimationOptions {
 }
 
 func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID maplibre.MapID) (bool, error) {
-	renderRequested := false
-	batch, err := runtimeHandle.DrainEvents()
+	events, err := runtimeHandle.DrainEvents()
 	if err != nil {
 		return false, fmt.Errorf("runtime event drain failed: %w", err)
 	}
-	for _, event := range batch.Events {
+	for _, event := range events {
 		if event.Source.Type != maplibre.RuntimeEventSourceMap || event.Source.MapID != mapID {
 			continue
 		}
-		switch event.Type {
-		case maplibre.RuntimeEventMapRenderUpdateAvailable:
-			renderRequested = true
-		case maplibre.RuntimeEventMapRenderFrameFinished:
-			payload, ok := event.Payload.(maplibre.RuntimeEventRenderFramePayload)
-			if ok && payload.NeedsRepaint {
-				renderRequested = true
-			}
+		if event.Type == maplibre.RuntimeEventMapRenderUpdateAvailable {
+			return true, nil
 		}
 	}
-	return renderRequested, nil
+	return false, nil
 }
 
 // renderMapState owns the render target on the SDL render loop thread.
@@ -206,9 +214,16 @@ func (state *renderMapState) finishFrame() error {
 	return state.target.FinishFrame()
 }
 
-func (state *renderMapState) driveFrame() (bool, error) {
+func (state *renderMapState) pollPending() (bool, error) {
 	if state.target == nil {
 		return false, nil
+	}
+	return state.target.PollPending()
+}
+
+func (state *renderMapState) driveFrame() (frameOutcome, error) {
+	if state.target == nil {
+		return frameOutcome{}, nil
 	}
 	return state.target.DriveFrame()
 }

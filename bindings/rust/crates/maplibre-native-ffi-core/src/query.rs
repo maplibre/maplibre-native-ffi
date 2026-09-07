@@ -399,14 +399,19 @@ pub unsafe fn copy_queried_features(
 ) -> crate::Result<Vec<QueriedFeature>> {
     hits.iter()
         .map(|hit| {
+            // SAFETY: the caller promises every view in this hit is readable
+            // for the whole call, and each copy happens inside it.
             let feature = unsafe { crate::string::copy_string_view_bytes(hit.feature) }?;
             let source_id = (hit.fields & sys::MLN_QUERIED_FEATURE_SOURCE_ID != 0)
+                // SAFETY: as above.
                 .then(|| unsafe { crate::string::copy_string_view(hit.source_id) })
                 .transpose()?;
             let source_layer_id = (hit.fields & sys::MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0)
+                // SAFETY: as above.
                 .then(|| unsafe { crate::string::copy_string_view(hit.source_layer_id) })
                 .transpose()?;
             let state = (hit.fields & sys::MLN_QUERIED_FEATURE_STATE != 0)
+                // SAFETY: as above.
                 .then(|| unsafe { crate::string::copy_string_view_bytes(hit.state) })
                 .transpose()?;
             Ok(QueriedFeature {
@@ -417,36 +422,6 @@ pub unsafe fn copy_queried_features(
             })
         })
         .collect()
-}
-
-/// Copies an owned native queried-feature list into owned Rust values.
-///
-/// # Safety
-///
-/// `handle` must be a live `mln_queried_feature_list` owned by the caller and
-/// returned by the matching C API. This function takes ownership of the handle
-/// and releases it before returning, including on copy errors.
-pub unsafe fn copy_queried_feature_list(
-    handle: sys::mln_queried_feature_list,
-) -> crate::Result<Vec<QueriedFeature>> {
-    // SAFETY: handle is an owned queried-feature list returned by C and released
-    // by the guard.
-    let list = unsafe { crate::handle::queried_feature_list(handle) }?;
-    let mut count = 0;
-    // SAFETY: list is live and count points to writable storage.
-    crate::check(unsafe { sys::mln_queried_feature_list_count(list.handle(), &mut count) })?;
-
-    let mut raw_features = Vec::with_capacity(count);
-    for index in 0..count {
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut hit = unsafe { sys::mln_queried_feature_default() };
-        // SAFETY: list is live, index is in range, and hit is writable.
-        crate::check(unsafe { sys::mln_queried_feature_list_get(list.handle(), index, &mut hit) })?;
-        raw_features.push(hit);
-    }
-    // SAFETY: The list guard keeps every borrowed view alive for this call.
-    let features = unsafe { copy_queried_features(&raw_features) }?;
-    Ok(features)
 }
 
 fn const_ptr_or_null<T>(values: &[T]) -> *const T {

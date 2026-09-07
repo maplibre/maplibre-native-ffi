@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.examples.composemap.map
 
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceFrame
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderResult
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderer
@@ -25,6 +26,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
 
   private val renderRequest = RenderRequest()
   private val closed = AtomicBoolean(false)
+  private val mapStateLock = Any()
 
   @Volatile private var surfaceSession: NativeSurfaceSession? = null
   @Volatile private var ownerSession: NativeSurfaceSession? = null
@@ -71,7 +73,11 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     }
     attached.session.requestFrame(FrameDemand())
     attached.session.serviceDriverWork()
-    if (attached.session.drainFrameResults().lastOrNull()?.disposition == RenderResult.RENDERED) {
+    val result = attached.session.drainFrameResults().lastOrNull()
+    if (result?.disposition == RenderResult.RENDERED) {
+      // The result carries the map's own follow-up demand, so an ongoing transition needs no
+      // runtime event round trip.
+      if (result.needsRepaint) requestRender()
       return NativeSurfaceRenderResult.Rendered
     }
     // A newly accepted map or target update may not have reached the render session yet.
@@ -110,53 +116,56 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     surfaceSession?.requestFrame()
   }
 
-  fun pan(deltaX: Double, deltaY: Double) {
-    mapState?.moveBy(deltaX, deltaY)
-    requestRender()
+  fun moveBy(deltaX: Double, deltaY: Double) {
+    updateMap { it.moveBy(deltaX, deltaY) }
   }
 
-  fun zoom(scale: Double, anchorX: Double, anchorY: Double) {
-    mapState?.scaleBy(scale, ScreenPoint(anchorX, anchorY))
-    requestRender()
+  fun scaleBy(scale: Double, anchorX: Double, anchorY: Double) {
+    updateMap { it.scaleBy(scale, ScreenPoint(anchorX, anchorY)) }
   }
 
-  fun animatePan(deltaX: Double, deltaY: Double) {
-    mapState?.moveByAnimated(deltaX, deltaY)
-    requestRender()
+  fun moveByAnimated(deltaX: Double, deltaY: Double) {
+    updateMap { it.moveByAnimated(deltaX, deltaY) }
   }
 
-  fun animateZoom(scale: Double) {
-    mapState?.scaleByAnimated(scale, viewportCenter())
-    requestRender()
+  fun scaleByAnimated(scale: Double) {
+    updateMap { it.scaleByAnimated(scale, viewportCenter()) }
   }
 
-  fun rotateAndPitch(deltaX: Double, deltaY: Double) {
-    mapState?.adjustBearingAndPitch(deltaX * DRAG_ROTATE_FACTOR, deltaY * DRAG_PITCH_FACTOR)
-    requestRender()
+  fun rotateAndPitchBy(deltaX: Double, deltaY: Double) {
+    updateMap { it.adjustBearingAndPitch(deltaX * DRAG_ROTATE_FACTOR, deltaY * DRAG_PITCH_FACTOR) }
   }
 
-  fun animateBearing(deltaDegrees: Double) {
-    mapState?.adjustBearingAnimated(deltaDegrees)
-    requestRender()
+  fun rotateBy(deltaDegrees: Double) {
+    updateMap { it.adjustBearingAnimated(deltaDegrees) }
   }
 
-  fun animatePitch(deltaDegrees: Double) {
-    mapState?.adjustPitchAnimated(deltaDegrees)
-    requestRender()
+  fun pitchBy(deltaDegrees: Double) {
+    updateMap { it.adjustPitchAnimated(deltaDegrees) }
   }
 
   fun resetOrientation() {
-    mapState?.resetOrientation()
-    requestRender()
+    updateMap { it.resetOrientation() }
   }
 
-  fun stopCameraAnimation() {
-    mapState?.cancelTransitions()
-    requestRender()
+  fun cancelTransitions() {
+    updateMap { it.cancelTransitions() }
   }
 
-  fun setGestureActive(inProgress: Boolean) {
-    mapState?.setGestureInProgress(inProgress)
+  fun setGestureInProgress(inProgress: Boolean) {
+    updateMap { it.setGestureInProgress(inProgress) }
+  }
+
+  /**
+   * Submits one camera command against the live map and asks for a frame. The producer thread
+   * closes the map under the same monitor, so a handler on the Compose thread sees a live map or
+   * none at all.
+   */
+  private fun updateMap(action: (MapState) -> Unit) {
+    synchronized(mapStateLock) {
+      val state = mapState ?: return
+      action(state)
+    }
     requestRender()
   }
 
@@ -167,12 +176,11 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     mapState?.let {
       return it
     }
-    return MapState(extent, ::requestRender).also { mapState = it }
+    return MapState(extent, ::requestRender).also { synchronized(mapStateLock) { mapState = it } }
   }
 
   private fun stopMapState() {
-    val stopping = mapState
-    mapState = null
+    val stopping = synchronized(mapStateLock) { mapState.also { mapState = null } }
     stopping?.close()
   }
 
@@ -246,7 +254,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
 
   private fun completeDriverOperation(session: RenderSessionHandle, completed: Deferred<Unit>) {
     while (!completed.isCompleted) session.serviceDriverWork()
-    runSuspend { completed.await() }
+    runBlocking { completed.await() }
   }
 
   private fun viewportCenter(): ScreenPoint {

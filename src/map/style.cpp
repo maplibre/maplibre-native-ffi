@@ -95,26 +95,6 @@
 
 namespace mln::core {
 
-struct StyleIdListObject {
-  std::vector<std::string> ids;
-};
-
-template <>
-struct HandleTraits<StyleIdListObject> {
-  static constexpr auto kind = HandleKind::StyleIdList;
-  static constexpr auto leasable = false;
-};
-
-struct StyleStringListObject {
-  std::vector<std::string> values;
-};
-
-template <>
-struct HandleTraits<StyleStringListObject> {
-  static constexpr auto kind = HandleKind::StyleStringList;
-  static constexpr auto leasable = false;
-};
-
 auto validate_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mln_status;
 auto validate_lat_lng_array(
   const mln_lat_lng* coordinates, size_t coordinate_count, bool allow_empty
@@ -152,10 +132,6 @@ auto string_from_view(mln_buffer_view string) -> std::string {
     return {};
   }
   return std::string{static_cast<const char*>(string.data), string.size};
-}
-
-auto string_view_from_string(const std::string& string) -> mln_buffer_view {
-  return mln_buffer_view{.data = string.data(), .size = string.size()};
 }
 
 auto string_view_from_literal(const char* string) -> mln_buffer_view {
@@ -1316,43 +1292,6 @@ auto from_native_image_source_coordinates(
   return result;
 }
 
-auto create_style_id_list(
-  std::vector<std::string> ids, mln_style_id_list* out_list
-) -> mln_status {
-  if (out_list == nullptr || *out_list != MLN_HANDLE_NULL) {
-    mln::core::set_thread_error(
-      "out_list must not be null and *out_list must be the null handle"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto list = std::make_shared<mln::core::StyleIdListObject>();
-  list->ids = std::move(ids);
-  *out_list = mln::core::handle_table<mln::core::StyleIdListObject>().insert(
-    std::move(list)
-  );
-  return MLN_STATUS_OK;
-}
-
-auto create_style_string_list(
-  std::vector<std::string> values, mln_style_string_list* out_list
-) -> mln_status {
-  if (out_list == nullptr || *out_list != MLN_HANDLE_NULL) {
-    mln::core::set_thread_error(
-      "out_list must not be null and *out_list must be the null handle"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto list = std::make_shared<mln::core::StyleStringListObject>();
-  list->values = std::move(values);
-  *out_list =
-    mln::core::handle_table<mln::core::StyleStringListObject>().insert(
-      std::move(list)
-    );
-  return MLN_STATUS_OK;
-}
-
 auto validate_lat_lng(mln_lat_lng coordinate) -> mln_status {
   if (
     !std::isfinite(coordinate.latitude) || coordinate.latitude < -90.0 ||
@@ -1441,38 +1380,6 @@ auto from_native_lat_lng_bounds(const mln::LatLngBounds& bounds)
   };
 }
 
-auto copy_text(
-  const std::string& text, char* out_text, size_t text_capacity,
-  size_t* out_text_size, const char* capacity_name
-) -> mln_status {
-  if (out_text == nullptr && text_capacity > 0) {
-    set_thread_error(
-      "output buffer must not be null when capacity is non-zero"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_text_size == nullptr) {
-    set_thread_error("output size pointer must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_text_size = text.size();
-  // A null buffer with zero capacity is a size probe, so it succeeds rather
-  // than sharing a status with a missing object.
-  if (out_text == nullptr) {
-    return MLN_STATUS_OK;
-  }
-  if (text_capacity < text.size()) {
-    auto message = std::string{capacity_name} + " is too small";
-    set_thread_error(message.c_str());
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (!text.empty()) {
-    std::copy(text.begin(), text.end(), out_text);
-  }
-  return MLN_STATUS_OK;
-}
-
 using DoubleMilliseconds = std::chrono::duration<double, std::milli>;
 
 auto max_native_duration_ms() -> double {
@@ -1503,10 +1410,6 @@ auto is_native_duration_ms(double milliseconds) -> bool {
   return std::isfinite(milliseconds) && milliseconds >= 0.0 &&
          milliseconds < max_native_duration_ms();
 }
-
-}  // namespace mln::core
-
-namespace mln::core {
 
 auto style_tile_source_options_default() noexcept
   -> mln_style_tile_source_options {
@@ -1692,102 +1595,9 @@ auto validate_image_source_command_coordinates(
   return validate_image_source_coordinates(coordinates, coordinate_count);
 }
 
-auto style_id_list_count(mln_style_id_list list, size_t* out_count)
-  -> mln_status {
-  if (out_count == nullptr) {
-    set_thread_error("out_count must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  // A style ID list carries no thread affinity, so another thread may destroy
-  // it mid-read; the lock spans the read.
-  auto& table = handle_table<StyleIdListObject>();
-  const std::scoped_lock lock(table.mutex());
-  const auto* live_list = table.resolve_locked(list);
-  if (live_list == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_count = live_list->ids.size();
-  return MLN_STATUS_OK;
-}
-
-auto style_id_list_get(
-  mln_style_id_list list, size_t index, mln_buffer_view* out_id
-) -> mln_status {
-  if (out_id == nullptr) {
-    set_thread_error("out_id must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto& table = handle_table<StyleIdListObject>();
-  const std::scoped_lock lock(table.mutex());
-  const auto* live_list = table.resolve_locked(list);
-  if (live_list == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (index >= live_list->ids.size()) {
-    set_thread_error("index is out of range");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_id = string_view_from_string(live_list->ids.at(index));
-  return MLN_STATUS_OK;
-}
-
-auto style_id_list_destroy(mln_style_id_list list) -> void {
-  static_cast<void>(handle_table<StyleIdListObject>().remove(list));
-}
-
-auto style_string_list_count(mln_style_string_list list, size_t* out_count)
-  -> mln_status {
-  if (out_count == nullptr) {
-    set_thread_error("out_count must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto& table = handle_table<StyleStringListObject>();
-  const std::scoped_lock lock(table.mutex());
-  const auto* live_list = table.resolve_locked(list);
-  if (live_list == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_count = live_list->values.size();
-  return MLN_STATUS_OK;
-}
-
-auto style_string_list_get(
-  mln_style_string_list list, size_t index, mln_buffer_view* out_value
-) -> mln_status {
-  if (out_value == nullptr) {
-    set_thread_error("out_value must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto& table = handle_table<StyleStringListObject>();
-  const std::scoped_lock lock(table.mutex());
-  const auto* live_list = table.resolve_locked(list);
-  if (live_list == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (index >= live_list->values.size()) {
-    set_thread_error("index is out of range");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_value = string_view_from_string(live_list->values.at(index));
-  return MLN_STATUS_OK;
-}
-
-auto style_string_list_destroy(mln_style_string_list list) -> void {
-  static_cast<void>(handle_table<StyleStringListObject>().remove(list));
-}
-
 auto map_add_style_source_json(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view source_json
+  MapObject& live, mln_buffer_view source_id, mln_buffer_view source_json
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (!validate_string_view(source_id, "source_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1799,7 +1609,7 @@ auto map_add_style_source_json(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   if (style.getSource(id) != nullptr) {
     set_thread_error("source already exists");
@@ -1820,13 +1630,8 @@ auto map_add_style_source_json(
   return MLN_STATUS_OK;
 }
 
-auto map_remove_style_source(mln_map map, mln_buffer_view source_id)
+auto map_remove_style_source(MapObject& live, mln_buffer_view source_id)
   -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (!validate_string_view(source_id, "source_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1835,7 +1640,7 @@ auto map_remove_style_source(mln_map map, mln_buffer_view source_id)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   if (style.getSource(id) == nullptr) {
     set_thread_error(("no style source has ID " + id).c_str());
@@ -1850,19 +1655,14 @@ auto map_remove_style_source(mln_map map, mln_buffer_view source_id)
   // The detached source is dropped before the release runs, so the style no
   // longer holds the callbacks that read the host's state.
   removed.reset();
-  release_callback_source(*live, id);
+  release_callback_source(live, id);
   return MLN_STATUS_OK;
 }
 
 auto map_get_style_source_info(
-  mln_map map, mln_buffer_view source_id, mln_style_source_info* out_info,
+  MapObject& live, mln_buffer_view source_id, mln_style_source_info* out_info,
   bool* out_found
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (!validate_string_view(source_id, "source_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1880,7 +1680,7 @@ auto map_get_style_source_info(
   }
 
   const auto* source =
-    map_native(live)->getStyle().getSource(string_from_view(source_id));
+    map_native(live).getStyle().getSource(string_from_view(source_id));
   *out_found = source != nullptr;
   *out_info = mln_style_source_info{};
   out_info->size = sizeof(mln_style_source_info);
@@ -1941,14 +1741,9 @@ auto map_get_style_source_info(
 }
 
 auto map_copy_style_source_attribution(
-  mln_map map, mln_buffer_view source_id, char* out_attribution,
-  size_t attribution_capacity, size_t* out_attribution_size, bool* out_found
+  MapObject& live, mln_buffer_view source_id, std::string& out_attribution,
+  bool* out_found
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (!validate_string_view(source_id, "source_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1956,21 +1751,15 @@ auto map_copy_style_source_attribution(
     set_thread_error("source_id must not be empty");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (out_attribution == nullptr && attribution_capacity > 0) {
-    set_thread_error(
-      "out_attribution must not be null when capacity is non-zero"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_attribution_size == nullptr || out_found == nullptr) {
-    set_thread_error("out_attribution_size and out_found must not be null");
+  if (out_found == nullptr) {
+    set_thread_error("out_found must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   const auto* source =
-    map_native(live)->getStyle().getSource(string_from_view(source_id));
+    map_native(live).getStyle().getSource(string_from_view(source_id));
   *out_found = false;
-  *out_attribution_size = 0;
+  out_attribution.clear();
   if (source == nullptr) {
     return MLN_STATUS_OK;
   }
@@ -1980,31 +1769,14 @@ auto map_copy_style_source_attribution(
     return MLN_STATUS_OK;
   }
   *out_found = true;
-  *out_attribution_size = attribution->size();
-  // A null buffer with zero capacity is a size probe, so it reports the length
-  // and succeeds rather than sharing a status with a missing source.
-  if (out_attribution == nullptr) {
-    return MLN_STATUS_OK;
-  }
-  if (attribution_capacity < attribution->size()) {
-    set_thread_error("attribution_capacity is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (!attribution->empty()) {
-    std::copy(attribution->begin(), attribution->end(), out_attribution);
-  }
+  out_attribution = *attribution;
   return MLN_STATUS_OK;
 }
 
 auto map_copy_style_source_url(
-  mln_map map, mln_buffer_view source_id, char* out_url, size_t url_capacity,
-  size_t* out_url_size, bool* out_found
+  MapObject& live, mln_buffer_view source_id, std::string& out_url,
+  bool* out_found
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (!validate_string_view(source_id, "source_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -2012,36 +1784,23 @@ auto map_copy_style_source_url(
     set_thread_error("source_id must not be empty");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (out_url == nullptr && url_capacity > 0) {
-    set_thread_error("out_url must not be null when capacity is non-zero");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_url_size == nullptr || out_found == nullptr) {
-    set_thread_error("out_url_size and out_found must not be null");
+  if (out_found == nullptr) {
+    set_thread_error("out_found must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   const auto* source =
-    map_native(live)->getStyle().getSource(string_from_view(source_id));
+    map_native(live).getStyle().getSource(string_from_view(source_id));
   const auto url = source == nullptr ? std::nullopt : source_url(*source);
   *out_found = url.has_value();
-  if (!url) {
-    *out_url_size = 0;
-    return MLN_STATUS_OK;
-  }
-
-  return copy_text(*url, out_url, url_capacity, out_url_size, "url_capacity");
+  out_url = url.value_or(std::string{});
+  return MLN_STATUS_OK;
 }
 
 auto map_get_style_source_tile_urls(
-  mln_map map, mln_buffer_view source_id, mln_style_string_list* out_tile_urls,
-  bool* out_found
+  MapObject& live, mln_buffer_view source_id,
+  std::vector<std::string>& out_tile_urls, bool* out_found
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (!validate_string_view(source_id, "source_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -2049,57 +1808,41 @@ auto map_get_style_source_tile_urls(
     set_thread_error("source_id must not be empty");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    out_tile_urls == nullptr || *out_tile_urls != MLN_HANDLE_NULL ||
-    out_found == nullptr
-  ) {
-    set_thread_error(
-      "out_tile_urls must not be null, *out_tile_urls must be the null handle, "
-      "and out_found must not be null"
-    );
+  if (out_found == nullptr) {
+    set_thread_error("out_found must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   const auto* source =
-    map_native(live)->getStyle().getSource(string_from_view(source_id));
+    map_native(live).getStyle().getSource(string_from_view(source_id));
   *out_found = source != nullptr;
+  out_tile_urls.clear();
   if (source == nullptr) {
     return MLN_STATUS_OK;
   }
 
-  auto tile_urls = std::vector<std::string>{};
   if (const auto* tile_source = tile_source_from_source(*source)) {
     if (const auto* tileset = inline_tileset(*tile_source)) {
-      tile_urls = tileset->tiles;
+      out_tile_urls = tileset->tiles;
     }
   }
-  return create_style_string_list(std::move(tile_urls), out_tile_urls);
+  return MLN_STATUS_OK;
 }
 
-auto map_list_style_source_ids(mln_map map, mln_style_id_list* out_source_ids)
-  -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
+auto map_list_style_source_ids(
+  MapObject& live, std::vector<std::string>& out_source_ids
+) -> mln_status {
+  out_source_ids.clear();
+  for (const auto* source : map_native(live).getStyle().getSources()) {
+    out_source_ids.push_back(source->getID());
   }
-
-  auto ids = std::vector<std::string>{};
-  for (const auto* source : map_native(live)->getStyle().getSources()) {
-    ids.push_back(source->getID());
-  }
-  return create_style_id_list(std::move(ids), out_source_ids);
+  return MLN_STATUS_OK;
 }
 
 auto map_add_geojson_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
+  MapObject& live, mln_buffer_view source_id, mln_buffer_view url,
   const mln_geojson_source_options* options
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2116,7 +1859,7 @@ auto map_add_geojson_source_url(
     return options_status;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   const auto add_status = validate_source_can_be_added(style, id);
   if (add_status != MLN_STATUS_OK) {
@@ -2137,14 +1880,9 @@ auto map_add_geojson_source_url(
 }
 
 auto map_add_geojson_source_data(
-  mln_map map, mln_buffer_view source_id,
+  MapObject& live, mln_buffer_view source_id,
   const std::shared_ptr<const GeoJsonSourceDataObject>& data
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2155,7 +1893,7 @@ auto map_add_geojson_source_data(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   const auto add_status = validate_source_can_be_added(style, id);
   if (add_status != MLN_STATUS_OK) {
@@ -2169,13 +1907,8 @@ auto map_add_geojson_source_data(
 }
 
 auto map_set_geojson_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url
+  MapObject& live, mln_buffer_view source_id, mln_buffer_view url
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2189,10 +1922,10 @@ auto map_set_geojson_source_url(
   }
 
   auto* source =
-    map_native(live)->getStyle().getSource(string_from_view(source_id));
+    map_native(live).getStyle().getSource(string_from_view(source_id));
   if (source == nullptr) {
     set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
   auto* geojson_source = source->as<mln::style::GeoJSONSource>();
   if (geojson_source == nullptr) {
@@ -2205,14 +1938,9 @@ auto map_set_geojson_source_url(
 }
 
 auto map_set_geojson_source_data(
-  mln_map map, mln_buffer_view source_id,
+  MapObject& live, mln_buffer_view source_id,
   const std::shared_ptr<const GeoJsonSourceDataObject>& data
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2224,10 +1952,10 @@ auto map_set_geojson_source_data(
   }
 
   auto* source =
-    map_native(live)->getStyle().getSource(string_from_view(source_id));
+    map_native(live).getStyle().getSource(string_from_view(source_id));
   if (source == nullptr) {
     set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
   auto* geojson_source = source->as<mln::style::GeoJSONSource>();
   if (geojson_source == nullptr) {
@@ -2250,23 +1978,18 @@ auto map_set_geojson_source_data(
 }
 
 auto map_set_geojson_source_synchronous_tiling(
-  mln_map map, mln_buffer_view source_id, bool enabled
+  MapObject& live, mln_buffer_view source_id, bool enabled
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
   }
 
   auto* source =
-    map_native(live)->getStyle().getSource(string_from_view(source_id));
+    map_native(live).getStyle().getSource(string_from_view(source_id));
   if (source == nullptr) {
     set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
   auto* geojson_source = source->as<mln::style::GeoJSONSource>();
   if (geojson_source == nullptr) {
@@ -2279,20 +2002,15 @@ auto map_set_geojson_source_synchronous_tiling(
 }
 
 auto map_set_style_source_volatile(
-  mln_map map, mln_buffer_view source_id, bool is_volatile
+  MapObject& live, mln_buffer_view source_id, bool is_volatile
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
   }
 
   const auto id = string_from_view(source_id);
-  auto* source = map_native(live)->getStyle().getSource(id);
+  auto* source = map_native(live).getStyle().getSource(id);
   if (source == nullptr) {
     set_thread_error(("no style source has ID " + id).c_str());
     return MLN_STATUS_NOT_FOUND;
@@ -2303,14 +2021,9 @@ auto map_set_style_source_volatile(
 }
 
 auto map_add_vector_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
+  MapObject& live, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2328,7 +2041,7 @@ auto map_add_vector_source_url(
     return options_status;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   const auto add_status = validate_source_can_be_added(style, id);
   if (add_status != MLN_STATUS_OK) {
@@ -2371,14 +2084,9 @@ auto map_add_vector_source_url(
 }
 
 auto map_add_vector_source_tiles(
-  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
+  MapObject& live, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2393,7 +2101,7 @@ auto map_add_vector_source_tiles(
     return options_status;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   const auto add_status = validate_source_can_be_added(style, id);
   if (add_status != MLN_STATUS_OK) {
@@ -2415,14 +2123,9 @@ auto map_add_vector_source_tiles(
 }
 
 auto map_add_raster_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
+  MapObject& live, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2440,7 +2143,7 @@ auto map_add_raster_source_url(
     return options_status;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   const auto add_status = validate_source_can_be_added(style, id);
   if (add_status != MLN_STATUS_OK) {
@@ -2457,14 +2160,9 @@ auto map_add_raster_source_url(
 }
 
 auto map_add_raster_source_tiles(
-  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
+  MapObject& live, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2479,7 +2177,7 @@ auto map_add_raster_source_tiles(
     return options_status;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   const auto add_status = validate_source_can_be_added(style, id);
   if (add_status != MLN_STATUS_OK) {
@@ -2500,14 +2198,9 @@ auto map_add_raster_source_tiles(
 }
 
 auto map_add_raster_dem_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
+  MapObject& live, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2525,7 +2218,7 @@ auto map_add_raster_dem_source_url(
     return options_status;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   const auto add_status = validate_source_can_be_added(style, id);
   if (add_status != MLN_STATUS_OK) {
@@ -2553,14 +2246,9 @@ auto map_add_raster_dem_source_url(
 }
 
 auto map_add_raster_dem_source_tiles(
-  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
+  MapObject& live, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2575,7 +2263,7 @@ auto map_add_raster_dem_source_tiles(
     return options_status;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   const auto add_status = validate_source_can_be_added(style, id);
   if (add_status != MLN_STATUS_OK) {
@@ -2604,14 +2292,9 @@ auto map_add_raster_dem_source_tiles(
 }
 
 auto map_add_custom_geometry_source(
-  mln_map map, mln_buffer_view source_id,
+  MapObject& live, mln_buffer_view source_id,
   const mln_custom_geometry_source_options* options
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2621,7 +2304,7 @@ auto map_add_custom_geometry_source(
     return options_status;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   const auto add_status = validate_source_can_be_added(style, id);
   if (add_status != MLN_STATUS_OK) {
@@ -2635,7 +2318,7 @@ auto map_add_custom_geometry_source(
   // caller still owns user_data. Tracking afterwards would leave a live source
   // whose release never runs.
   track_callback_source(
-    *live, id, CallbackSourceKind::CustomGeometry, effective.release_user_data,
+    live, id, CallbackSourceKind::CustomGeometry, effective.release_user_data,
     effective.user_data
   );
   try {
@@ -2645,11 +2328,11 @@ auto map_add_custom_geometry_source(
       )
     );
   } catch (...) {
-    // Mirrors add()'s own early return: a source with no release callback was
-    // never tracked, so there is nothing to untrack and no entry of another
-    // source's to erase.
+    // Mirrors track_callback_source()'s own early return: a source with no
+    // release callback was never tracked, so there is nothing to untrack and
+    // no entry of another source's to erase.
     if (effective.release_user_data != nullptr) {
-      untrack_callback_source(*live, id);
+      untrack_callback_source(live, id);
     }
     throw;
   }
@@ -2657,14 +2340,9 @@ auto map_add_custom_geometry_source(
 }
 
 auto map_set_custom_geometry_source_tile_data(
-  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
   mln_buffer_view data
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2679,10 +2357,10 @@ auto map_set_custom_geometry_source_tile_data(
   }
 
   auto* source =
-    map_native(live)->getStyle().getSource(string_from_view(source_id));
+    map_native(live).getStyle().getSource(string_from_view(source_id));
   if (source == nullptr) {
     set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
   auto* custom_source = source->as<mln::style::CustomGeometrySource>();
   if (custom_source == nullptr) {
@@ -2694,13 +2372,8 @@ auto map_set_custom_geometry_source_tile_data(
 }
 
 auto map_invalidate_custom_geometry_source_tile(
-  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id
+  MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2711,10 +2384,10 @@ auto map_invalidate_custom_geometry_source_tile(
   }
 
   auto* source =
-    map_native(live)->getStyle().getSource(string_from_view(source_id));
+    map_native(live).getStyle().getSource(string_from_view(source_id));
   if (source == nullptr) {
     set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
   auto* custom_source = source->as<mln::style::CustomGeometrySource>();
   if (custom_source == nullptr) {
@@ -2726,13 +2399,8 @@ auto map_invalidate_custom_geometry_source_tile(
 }
 
 auto map_invalidate_custom_geometry_source_region(
-  mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds
+  MapObject& live, mln_buffer_view source_id, mln_lat_lng_bounds bounds
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2743,10 +2411,10 @@ auto map_invalidate_custom_geometry_source_region(
   }
 
   auto* source =
-    map_native(live)->getStyle().getSource(string_from_view(source_id));
+    map_native(live).getStyle().getSource(string_from_view(source_id));
   if (source == nullptr) {
     set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
   auto* custom_source = source->as<mln::style::CustomGeometrySource>();
   if (custom_source == nullptr) {
@@ -2758,14 +2426,14 @@ auto map_invalidate_custom_geometry_source_region(
 }
 
 auto lookup_custom_mvt_vector_source(
-  MapObject* live, mln_buffer_view source_id,
+  MapObject& live, mln_buffer_view source_id,
   mln::style::CustomVectorSource*& out_source
 ) -> mln_status {
   auto* source =
-    map_native(live)->getStyle().getSource(string_from_view(source_id));
+    map_native(live).getStyle().getSource(string_from_view(source_id));
   if (source == nullptr) {
     set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
   out_source = source->as<mln::style::CustomVectorSource>();
   if (out_source == nullptr) {
@@ -2776,14 +2444,9 @@ auto lookup_custom_mvt_vector_source(
 }
 
 auto map_add_custom_mvt_vector_source(
-  mln_map map, mln_buffer_view source_id,
+  MapObject& live, mln_buffer_view source_id,
   const mln_custom_mvt_vector_source_options* options
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2794,7 +2457,7 @@ auto map_add_custom_mvt_vector_source(
     return options_status;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   const auto add_status = validate_source_can_be_added(style, id);
   if (add_status != MLN_STATUS_OK) {
@@ -2808,7 +2471,7 @@ auto map_add_custom_mvt_vector_source(
   // caller still owns user_data. Tracking afterwards would leave a live source
   // whose release never runs.
   track_callback_source(
-    *live, id, CallbackSourceKind::CustomMvtVector, effective.release_user_data,
+    live, id, CallbackSourceKind::CustomMvtVector, effective.release_user_data,
     effective.user_data
   );
   try {
@@ -2818,11 +2481,11 @@ auto map_add_custom_mvt_vector_source(
       )
     );
   } catch (...) {
-    // Mirrors add()'s own early return: a source with no release callback was
-    // never tracked, so there is nothing to untrack and no entry of another
-    // source's to erase.
+    // Mirrors track_callback_source()'s own early return: a source with no
+    // release callback was never tracked, so there is nothing to untrack and
+    // no entry of another source's to erase.
     if (effective.release_user_data != nullptr) {
-      untrack_callback_source(*live, id);
+      untrack_callback_source(live, id);
     }
     throw;
   }
@@ -2830,14 +2493,9 @@ auto map_add_custom_mvt_vector_source(
 }
 
 auto map_set_custom_mvt_vector_source_tile_data(
-  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
   mln_buffer_view data
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2871,14 +2529,9 @@ auto map_set_custom_mvt_vector_source_tile_data(
 }
 
 auto map_set_custom_mvt_vector_source_tile_error(
-  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
   mln_buffer_view message
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2906,13 +2559,8 @@ auto map_set_custom_mvt_vector_source_tile_error(
 }
 
 auto map_invalidate_custom_mvt_vector_source_tile(
-  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id
+  MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -2933,15 +2581,10 @@ auto map_invalidate_custom_mvt_vector_source_tile(
 }
 
 auto map_set_style_image(
-  mln_map map, mln_buffer_view image_id,
+  MapObject& live, mln_buffer_view image_id,
   const mln_premultiplied_rgba8_image* image,
   const mln_style_image_options* options
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto image_id_status = validate_image_id(image_id);
   if (image_id_status != MLN_STATUS_OK) {
     return image_id_status;
@@ -2990,23 +2633,18 @@ auto map_set_style_image(
     to_native_image_stretches(effective.stretch_y, effective.stretch_y_count),
     content, text_fit_width, text_fit_height
   );
-  map_native(live)->getStyle().addImage(std::move(style_image));
+  map_native(live).getStyle().addImage(std::move(style_image));
   return MLN_STATUS_OK;
 }
 
-auto map_remove_style_image(mln_map map, mln_buffer_view image_id)
+auto map_remove_style_image(MapObject& live, mln_buffer_view image_id)
   -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto image_id_status = validate_image_id(image_id);
   if (image_id_status != MLN_STATUS_OK) {
     return image_id_status;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto id = string_from_view(image_id);
   if (!style.getImage(id).has_value()) {
     set_thread_error(("no style image has ID " + id).c_str());
@@ -3017,14 +2655,9 @@ auto map_remove_style_image(mln_map map, mln_buffer_view image_id)
 }
 
 auto map_get_style_image_info(
-  mln_map map, mln_buffer_view image_id, mln_style_image_info* out_info,
+  MapObject& live, mln_buffer_view image_id, mln_style_image_info* out_info,
   bool* out_found
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto image_id_status = validate_image_id(image_id);
   if (image_id_status != MLN_STATUS_OK) {
     return image_id_status;
@@ -3039,7 +2672,7 @@ auto map_get_style_image_info(
   }
 
   const auto image =
-    map_native(live)->getStyle().getImage(string_from_view(image_id));
+    map_native(live).getStyle().getImage(string_from_view(image_id));
   *out_found = image.has_value();
   *out_info =
     image ? style_image_info_from_native(*image) : style_image_info_default();
@@ -3047,142 +2680,72 @@ auto map_get_style_image_info(
 }
 
 auto map_copy_style_image_stretches(
-  mln_map map, mln_buffer_view image_id, mln_image_stretch* out_stretch_x,
-  size_t stretch_x_capacity, size_t* out_stretch_x_count,
-  mln_image_stretch* out_stretch_y, size_t stretch_y_capacity,
-  size_t* out_stretch_y_count, bool* out_found
+  MapObject& live, mln_buffer_view image_id,
+  std::vector<mln_image_stretch>& out_stretch_x,
+  std::vector<mln_image_stretch>& out_stretch_y, bool* out_found
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto image_id_status = validate_image_id(image_id);
   if (image_id_status != MLN_STATUS_OK) {
     return image_id_status;
   }
-  if (
-    (out_stretch_x == nullptr && stretch_x_capacity > 0) ||
-    (out_stretch_y == nullptr && stretch_y_capacity > 0)
-  ) {
-    set_thread_error(
-      "stretch output arrays must not be null when their capacity is non-zero"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (
-    out_stretch_x_count == nullptr || out_stretch_y_count == nullptr ||
-    out_found == nullptr
-  ) {
-    set_thread_error("stretch output counts and out_found must not be null");
+  if (out_found == nullptr) {
+    set_thread_error("out_found must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   const auto image =
-    map_native(live)->getStyle().getImage(string_from_view(image_id));
+    map_native(live).getStyle().getImage(string_from_view(image_id));
   *out_found = image.has_value();
-  *out_stretch_x_count = 0;
-  *out_stretch_y_count = 0;
+  out_stretch_x.clear();
+  out_stretch_y.clear();
   if (!image) {
     return MLN_STATUS_OK;
   }
 
-  const auto& stretch_x = image->getStretchX();
-  const auto& stretch_y = image->getStretchY();
-  *out_stretch_x_count = stretch_x.size();
-  *out_stretch_y_count = stretch_y.size();
-
-  // A null array with zero capacity is a size probe, so it reports the counts
-  // and succeeds rather than sharing a status with a missing image.
-  for (const auto& [out, capacity, stretches, name] : {
-         std::tuple{
-           out_stretch_x, stretch_x_capacity, &stretch_x, "stretch_x_capacity"
-         },
-         std::tuple{
-           out_stretch_y, stretch_y_capacity, &stretch_y, "stretch_y_capacity"
-         },
+  for (const auto& [stretches, out] : {
+         std::pair{&image->getStretchX(), &out_stretch_x},
+         std::pair{&image->getStretchY(), &out_stretch_y},
        }) {
-    if (out == nullptr) {
-      continue;
-    }
-    if (capacity < stretches->size()) {
-      auto message = std::string{name} + " is too small";
-      set_thread_error(message.c_str());
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-  }
-  for (const auto& [out, stretches] : {
-         std::pair{out_stretch_x, &stretch_x},
-         std::pair{out_stretch_y, &stretch_y},
-       }) {
-    if (out == nullptr) {
-      continue;
-    }
-    for (size_t index = 0; index < stretches->size(); index += 1) {
-      out[index] = mln_image_stretch{
-        .from = (*stretches)[index].first, .to = (*stretches)[index].second
-      };
+    out->reserve(stretches->size());
+    for (const auto& [from, to] : *stretches) {
+      out->push_back(mln_image_stretch{.from = from, .to = to});
     }
   }
   return MLN_STATUS_OK;
 }
 
 auto map_copy_style_image_premultiplied_rgba8(
-  mln_map map, mln_buffer_view image_id, uint8_t* out_pixels,
-  size_t pixel_capacity, size_t* out_byte_length, bool* out_found
+  MapObject& live, mln_buffer_view image_id, std::string& out_pixels,
+  bool* out_found
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto image_id_status = validate_image_id(image_id);
   if (image_id_status != MLN_STATUS_OK) {
     return image_id_status;
   }
-  if (out_pixels == nullptr && pixel_capacity > 0) {
-    set_thread_error("out_pixels must not be null when capacity is non-zero");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_byte_length == nullptr || out_found == nullptr) {
-    set_thread_error("out_byte_length and out_found must not be null");
+  if (out_found == nullptr) {
+    set_thread_error("out_found must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   const auto image =
-    map_native(live)->getStyle().getImage(string_from_view(image_id));
+    map_native(live).getStyle().getImage(string_from_view(image_id));
   *out_found = image.has_value();
-  *out_byte_length = 0;
+  out_pixels.clear();
   if (!image) {
     return MLN_STATUS_OK;
   }
 
   const auto& pixels = image->getImage();
-  *out_byte_length = pixels.bytes();
-  // A null buffer with zero capacity is a size probe, so it reports the length
-  // and succeeds rather than sharing a status with a missing image.
-  if (out_pixels == nullptr) {
-    return MLN_STATUS_OK;
-  }
-  if (pixel_capacity < pixels.bytes()) {
-    set_thread_error("pixel_capacity is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (pixels.bytes() > 0) {
-    std::copy_n(pixels.data.get(), pixels.bytes(), out_pixels);
-  }
+  out_pixels.assign(
+    reinterpret_cast<const char*>(pixels.data.get()), pixels.bytes()
+  );
   return MLN_STATUS_OK;
 }
 
 auto map_add_image_source_url(
-  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
+  MapObject& live, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count, mln_buffer_view url
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -3200,7 +2763,7 @@ auto map_add_image_source_url(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   const auto add_status = validate_source_can_be_added(style, id);
   if (add_status != MLN_STATUS_OK) {
@@ -3216,14 +2779,9 @@ auto map_add_image_source_url(
 }
 
 auto map_add_image_source_image(
-  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
+  MapObject& live, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count, const mln_premultiplied_rgba8_image* image
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -3238,7 +2796,7 @@ auto map_add_image_source_image(
     return image_status;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   const auto add_status = validate_source_can_be_added(style, id);
   if (add_status != MLN_STATUS_OK) {
@@ -3264,13 +2822,8 @@ auto map_add_image_source_image(
 }
 
 auto map_set_image_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url
+  MapObject& live, mln_buffer_view source_id, mln_buffer_view url
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -3284,10 +2837,10 @@ auto map_set_image_source_url(
   }
 
   auto* source =
-    map_native(live)->getStyle().getSource(string_from_view(source_id));
+    map_native(live).getStyle().getSource(string_from_view(source_id));
   if (source == nullptr) {
     set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
   auto* image_source = source->as<mln::style::ImageSource>();
   if (image_source == nullptr) {
@@ -3299,14 +2852,9 @@ auto map_set_image_source_url(
 }
 
 auto map_set_image_source_image(
-  mln_map map, mln_buffer_view source_id,
+  MapObject& live, mln_buffer_view source_id,
   const mln_premultiplied_rgba8_image* image
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -3317,10 +2865,10 @@ auto map_set_image_source_image(
   }
 
   auto* source =
-    map_native(live)->getStyle().getSource(string_from_view(source_id));
+    map_native(live).getStyle().getSource(string_from_view(source_id));
   if (source == nullptr) {
     set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
   auto* image_source = source->as<mln::style::ImageSource>();
   if (image_source == nullptr) {
@@ -3332,14 +2880,9 @@ auto map_set_image_source_image(
 }
 
 auto map_set_image_source_coordinates(
-  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
+  MapObject& live, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
@@ -3351,10 +2894,10 @@ auto map_set_image_source_coordinates(
   }
 
   auto* source =
-    map_native(live)->getStyle().getSource(string_from_view(source_id));
+    map_native(live).getStyle().getSource(string_from_view(source_id));
   if (source == nullptr) {
     set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
   auto* image_source = source->as<mln::style::ImageSource>();
   if (image_source == nullptr) {
@@ -3366,33 +2909,22 @@ auto map_set_image_source_coordinates(
 }
 
 auto map_get_image_source_coordinates(
-  mln_map map, mln_buffer_view source_id, mln_lat_lng* out_coordinates,
-  size_t coordinate_capacity, size_t* out_coordinate_count, bool* out_found
+  MapObject& live, mln_buffer_view source_id,
+  std::vector<mln_lat_lng>& out_coordinates, bool* out_found
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto source_id_status = validate_source_id(source_id);
   if (source_id_status != MLN_STATUS_OK) {
     return source_id_status;
   }
-  if (out_coordinates == nullptr && coordinate_capacity > 0) {
-    set_thread_error(
-      "out_coordinates must not be null when capacity is non-zero"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_coordinate_count == nullptr || out_found == nullptr) {
-    set_thread_error("out_coordinate_count and out_found must not be null");
+  if (out_found == nullptr) {
+    set_thread_error("out_found must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   auto* source =
-    map_native(live)->getStyle().getSource(string_from_view(source_id));
+    map_native(live).getStyle().getSource(string_from_view(source_id));
   *out_found = source != nullptr;
-  *out_coordinate_count = 0;
+  out_coordinates.clear();
   if (source == nullptr) {
     return MLN_STATUS_OK;
   }
@@ -3402,31 +2934,16 @@ auto map_get_image_source_coordinates(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  constexpr auto image_source_coordinate_count = size_t{4};
-  *out_coordinate_count = image_source_coordinate_count;
-  if (out_coordinates == nullptr) {
-    return MLN_STATUS_OK;
-  }
-  if (coordinate_capacity < image_source_coordinate_count) {
-    set_thread_error("coordinate_capacity is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   const auto coordinates =
     from_native_image_source_coordinates(image_source->getCoordinates());
-  auto output = std::span<mln_lat_lng>{out_coordinates, coordinate_capacity};
-  std::ranges::copy(coordinates, output.begin());
+  out_coordinates.assign(coordinates.begin(), coordinates.end());
   return MLN_STATUS_OK;
 }
 
 auto map_add_hillshade_layer(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
+  MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_id,
   mln_buffer_view before_layer_id
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (
     !validate_string_view(layer_id, "layer_id") ||
     !validate_string_view(source_id, "source_id") ||
@@ -3439,7 +2956,7 @@ auto map_add_hillshade_layer(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto layer = string_from_view(layer_id);
   const auto source = string_from_view(source_id);
   if (style.getLayer(layer) != nullptr) {
@@ -3449,7 +2966,7 @@ auto map_add_hillshade_layer(
   auto* source_ptr = style.getSource(source);
   if (source_ptr == nullptr) {
     set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
   if (!source_ptr->is<mln::style::RasterDEMSource>()) {
     set_thread_error("source is not a raster DEM source");
@@ -3461,7 +2978,7 @@ auto map_add_hillshade_layer(
     before = string_from_view(before_layer_id);
     if (style.getLayer(*before) == nullptr) {
       set_thread_error("before_layer_id does not exist");
-      return MLN_STATUS_INVALID_ARGUMENT;
+      return MLN_STATUS_NOT_FOUND;
     }
   }
   style.addLayer(
@@ -3471,14 +2988,9 @@ auto map_add_hillshade_layer(
 }
 
 auto map_add_color_relief_layer(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
+  MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_id,
   mln_buffer_view before_layer_id
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (
     !validate_string_view(layer_id, "layer_id") ||
     !validate_string_view(source_id, "source_id") ||
@@ -3491,7 +3003,7 @@ auto map_add_color_relief_layer(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto layer = string_from_view(layer_id);
   const auto source = string_from_view(source_id);
   if (style.getLayer(layer) != nullptr) {
@@ -3501,7 +3013,7 @@ auto map_add_color_relief_layer(
   auto* source_ptr = style.getSource(source);
   if (source_ptr == nullptr) {
     set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
   if (!source_ptr->is<mln::style::RasterDEMSource>()) {
     set_thread_error("source is not a raster DEM source");
@@ -3513,7 +3025,7 @@ auto map_add_color_relief_layer(
     before = string_from_view(before_layer_id);
     if (style.getLayer(*before) == nullptr) {
       set_thread_error("before_layer_id does not exist");
-      return MLN_STATUS_INVALID_ARGUMENT;
+      return MLN_STATUS_NOT_FOUND;
     }
   }
   style.addLayer(
@@ -3523,13 +3035,8 @@ auto map_add_color_relief_layer(
 }
 
 auto map_add_location_indicator_layer(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id
+  MapObject& live, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (
     !validate_string_view(layer_id, "layer_id") ||
     !validate_string_view(before_layer_id, "before_layer_id")
@@ -3541,7 +3048,7 @@ auto map_add_location_indicator_layer(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto layer = string_from_view(layer_id);
   if (style.getLayer(layer) != nullptr) {
     set_thread_error("layer already exists");
@@ -3552,7 +3059,7 @@ auto map_add_location_indicator_layer(
     before = string_from_view(before_layer_id);
     if (style.getLayer(*before) == nullptr) {
       set_thread_error("before_layer_id does not exist");
-      return MLN_STATUS_INVALID_ARGUMENT;
+      return MLN_STATUS_NOT_FOUND;
     }
   }
   style.addLayer(
@@ -3561,7 +3068,7 @@ auto map_add_location_indicator_layer(
   return MLN_STATUS_OK;
 }
 
-auto validate_location_indicator_layer(MapObject* map, mln_buffer_view layer_id)
+auto validate_location_indicator_layer(MapObject& map, mln_buffer_view layer_id)
   -> mln_status {
   if (!validate_string_view(layer_id, "layer_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3571,10 +3078,10 @@ auto validate_location_indicator_layer(MapObject* map, mln_buffer_view layer_id)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto* layer =
-    map_native(map)->getStyle().getLayer(string_from_view(layer_id));
+    map_native(map).getStyle().getLayer(string_from_view(layer_id));
   if (layer == nullptr) {
     set_thread_error("layer does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
   if (std::strcmp(layer->getTypeInfo()->type, "location-indicator") != 0) {
     set_thread_error("layer is not a location indicator layer");
@@ -3596,13 +3103,9 @@ auto validate_float64_to_float32(double value, const char* name) -> mln_status {
 }
 
 auto map_set_location_indicator_location(
-  mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude
+  MapObject& live, mln_buffer_view layer_id, mln_lat_lng coordinate,
+  double altitude
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto layer_status = validate_location_indicator_layer(live, layer_id);
   if (layer_status != MLN_STATUS_OK) {
     return layer_status;
@@ -3625,19 +3128,14 @@ auto map_set_location_indicator_location(
     }}
   );
   return map_set_layer_property(
-    map, layer_id, string_view_from_literal("location"),
+    live, layer_id, string_view_from_literal("location"),
     buffer_view_from_string(location)
   );
 }
 
 auto map_set_location_indicator_bearing(
-  mln_map map, mln_buffer_view layer_id, double bearing
+  MapObject& live, mln_buffer_view layer_id, double bearing
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto layer_status = validate_location_indicator_layer(live, layer_id);
   if (layer_status != MLN_STATUS_OK) {
     return layer_status;
@@ -3648,19 +3146,14 @@ auto map_set_location_indicator_bearing(
   }
   const auto value = serialize_json_value(mln::Value{bearing});
   return map_set_layer_property(
-    map, layer_id, string_view_from_literal("bearing"),
+    live, layer_id, string_view_from_literal("bearing"),
     buffer_view_from_string(value)
   );
 }
 
 auto map_set_location_indicator_accuracy_radius(
-  mln_map map, mln_buffer_view layer_id, double radius
+  MapObject& live, mln_buffer_view layer_id, double radius
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto layer_status = validate_location_indicator_layer(live, layer_id);
   if (layer_status != MLN_STATUS_OK) {
     return layer_status;
@@ -3675,7 +3168,7 @@ auto map_set_location_indicator_accuracy_radius(
   }
   const auto value = serialize_json_value(mln::Value{radius});
   return map_set_layer_property(
-    map, layer_id, string_view_from_literal("accuracy-radius"),
+    live, layer_id, string_view_from_literal("accuracy-radius"),
     buffer_view_from_string(value)
   );
 }
@@ -3695,14 +3188,9 @@ auto location_indicator_image_property(uint32_t image_kind)
 }
 
 auto map_set_location_indicator_image_name(
-  mln_map map, mln_buffer_view layer_id, uint32_t image_kind,
+  MapObject& live, mln_buffer_view layer_id, uint32_t image_kind,
   mln_buffer_view image_id
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto layer_status = validate_location_indicator_layer(live, layer_id);
   if (layer_status != MLN_STATUS_OK) {
     return layer_status;
@@ -3722,18 +3210,13 @@ auto map_set_location_indicator_image_name(
   const auto value =
     serialize_json_value(mln::Value{string_from_view(image_id)});
   return map_set_layer_property(
-    map, layer_id, *property, buffer_view_from_string(value)
+    live, layer_id, *property, buffer_view_from_string(value)
   );
 }
 
 auto map_add_style_layer_json(
-  mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id
+  MapObject& live, mln_buffer_view layer_json, mln_buffer_view before_layer_id
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (!validate_string_view(before_layer_id, "before_layer_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -3741,13 +3224,13 @@ auto map_add_style_layer_json(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   auto before = std::optional<std::string>{};
   if (before_layer_id.size > 0) {
     before = string_from_view(before_layer_id);
     if (style.getLayer(*before) == nullptr) {
       set_thread_error("before_layer_id does not exist");
-      return MLN_STATUS_INVALID_ARGUMENT;
+      return MLN_STATUS_NOT_FOUND;
     }
   }
 
@@ -3772,20 +3255,15 @@ auto map_add_style_layer_json(
     style.getSource((*layer)->getSourceID()) == nullptr
   ) {
     set_thread_error("layer source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
 
   style.addLayer(std::move(*layer), before);
   return MLN_STATUS_OK;
 }
 
-auto map_remove_style_layer(mln_map map, mln_buffer_view layer_id)
+auto map_remove_style_layer(MapObject& live, mln_buffer_view layer_id)
   -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (!validate_string_view(layer_id, "layer_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -3795,7 +3273,7 @@ auto map_remove_style_layer(mln_map map, mln_buffer_view layer_id)
   }
 
   const auto id = string_from_view(layer_id);
-  auto removed = map_native(live)->getStyle().removeLayer(id);
+  auto removed = map_native(live).getStyle().removeLayer(id);
   if (removed == nullptr) {
     set_thread_error(("no style layer has ID " + id).c_str());
     return MLN_STATUS_NOT_FOUND;
@@ -3804,14 +3282,9 @@ auto map_remove_style_layer(mln_map map, mln_buffer_view layer_id)
 }
 
 auto map_get_style_layer_info(
-  mln_map map, mln_buffer_view layer_id, mln_style_layer_info* out_info,
+  MapObject& live, mln_buffer_view layer_id, mln_style_layer_info* out_info,
   bool* out_found
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (!validate_string_view(layer_id, "layer_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -3829,7 +3302,7 @@ auto map_get_style_layer_info(
   }
 
   const auto* layer =
-    map_native(live)->getStyle().getLayer(string_from_view(layer_id));
+    map_native(live).getStyle().getLayer(string_from_view(layer_id));
   *out_found = layer != nullptr;
   *out_info = mln_style_layer_info{};
   out_info->size = sizeof(mln_style_layer_info);
@@ -3844,43 +3317,22 @@ auto map_get_style_layer_info(
     layer->getVisibility() == mln::style::VisibilityType::None
       ? MLN_STYLE_LAYER_VISIBILITY_NONE
       : MLN_STYLE_LAYER_VISIBILITY_VISIBLE;
+  return MLN_STATUS_OK;
+}
 
-  const auto& source_id = layer->getSourceID();
-  if (!source_id.empty()) {
-    out_info->fields |= MLN_STYLE_LAYER_INFO_SOURCE_ID;
-    out_info->source_id_size = source_id.size();
-  }
-  const auto& source_layer = layer->getSourceLayer();
-  if (!source_layer.empty()) {
-    out_info->fields |= MLN_STYLE_LAYER_INFO_SOURCE_LAYER;
-    out_info->source_layer_size = source_layer.size();
+auto map_list_style_layer_ids(
+  MapObject& live, std::vector<std::string>& out_layer_ids
+) -> mln_status {
+  out_layer_ids.clear();
+  for (const auto* layer : map_native(live).getStyle().getLayers()) {
+    out_layer_ids.push_back(layer->getID());
   }
   return MLN_STATUS_OK;
 }
 
-auto map_list_style_layer_ids(mln_map map, mln_style_id_list* out_layer_ids)
-  -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-
-  auto ids = std::vector<std::string>{};
-  for (const auto* layer : map_native(live)->getStyle().getLayers()) {
-    ids.push_back(layer->getID());
-  }
-  return create_style_id_list(std::move(ids), out_layer_ids);
-}
-
 auto map_move_style_layer(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id
+  MapObject& live, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (
     !validate_string_view(layer_id, "layer_id") ||
     !validate_string_view(before_layer_id, "before_layer_id")
@@ -3892,11 +3344,11 @@ auto map_move_style_layer(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto& style = map_native(live)->getStyle();
+  auto& style = map_native(live).getStyle();
   const auto id = string_from_view(layer_id);
   if (style.getLayer(id) == nullptr) {
     set_thread_error("layer does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
 
   auto before = std::optional<std::string>{};
@@ -3907,7 +3359,7 @@ auto map_move_style_layer(
     }
     if (style.getLayer(*before) == nullptr) {
       set_thread_error("before_layer_id does not exist");
-      return MLN_STATUS_INVALID_ARGUMENT;
+      return MLN_STATUS_NOT_FOUND;
     }
   }
 
@@ -3917,13 +3369,9 @@ auto map_move_style_layer(
 }
 
 auto map_get_style_layer_json(
-  mln_map map, mln_buffer_view layer_id, mln_buffer* out_layer, bool* out_found
+  MapObject& live, mln_buffer_view layer_id, mln_buffer* out_layer,
+  bool* out_found
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (!validate_string_view(layer_id, "layer_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -3943,7 +3391,7 @@ auto map_get_style_layer_json(
   }
 
   const auto* layer =
-    map_native(live)->getStyle().getLayer(string_from_view(layer_id));
+    map_native(live).getStyle().getLayer(string_from_view(layer_id));
   *out_found = layer != nullptr;
   if (layer == nullptr) {
     return MLN_STATUS_OK;
@@ -3951,13 +3399,8 @@ auto map_get_style_layer_json(
   return create_buffer(serialize_json_value(layer->serialize()), out_layer);
 }
 
-auto map_set_style_light_json(mln_map map, mln_buffer_view light_json)
+auto map_set_style_light_json(MapObject& live, mln_buffer_view light_json)
   -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (!validate_bytes(light_json, "style light")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -3971,20 +3414,15 @@ auto map_set_style_light_json(mln_map map, mln_buffer_view light_json)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  map_native(live)->getStyle().setLight(
+  map_native(live).getStyle().setLight(
     std::make_unique<mln::style::Light>(*light)
   );
   return MLN_STATUS_OK;
 }
 
 auto map_set_style_light_property(
-  mln_map map, mln_buffer_view property_name, mln_buffer_view value
+  MapObject& live, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (!validate_string_view(property_name, "property_name")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -3997,7 +3435,7 @@ auto map_set_style_light_property(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto* light = map_native(live)->getStyle().getLight();
+  auto* light = map_native(live).getStyle().getLight();
   if (light == nullptr) {
     set_thread_error("style light does not exist");
     return MLN_STATUS_INVALID_STATE;
@@ -4017,13 +3455,8 @@ auto map_set_style_light_property(
 }
 
 auto map_get_style_light_property(
-  mln_map map, mln_buffer_view property_name, mln_buffer* out_value
+  MapObject& live, mln_buffer_view property_name, mln_buffer* out_value
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (!validate_string_view(property_name, "property_name")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -4038,7 +3471,7 @@ auto map_get_style_light_property(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto* light = map_native(live)->getStyle().getLight();
+  auto* light = map_native(live).getStyle().getLight();
   if (light == nullptr) {
     set_thread_error("style light does not exist");
     return MLN_STATUS_INVALID_STATE;
@@ -4052,13 +3485,8 @@ auto map_get_style_light_property(
 }
 
 auto map_set_style_transition_options(
-  mln_map map, const mln_style_transition_options* options
+  MapObject& live, const mln_style_transition_options* options
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (
     options == nullptr || options->size < sizeof(mln_style_transition_options)
   ) {
@@ -4104,18 +3532,13 @@ auto map_set_style_transition_options(
     native.delay = duration_from_milliseconds(options->delay_ms);
   }
 
-  map_native(live)->getStyle().setTransitionOptions(native);
+  map_native(live).getStyle().setTransitionOptions(native);
   return MLN_STATUS_OK;
 }
 
 auto map_get_style_transition_options(
-  mln_map map, mln_style_transition_options* out_options
+  MapObject& live, mln_style_transition_options* out_options
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (
     out_options == nullptr ||
     out_options->size < sizeof(mln_style_transition_options)
@@ -4124,7 +3547,7 @@ auto map_get_style_transition_options(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const auto native = map_native(live)->getStyle().getTransitionOptions();
+  const auto native = map_native(live).getStyle().getTransitionOptions();
   auto result = style_transition_options_default();
   // MapLibre Native always holds this one, so it always reports as present.
   result.fields |= MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
@@ -4142,14 +3565,9 @@ auto map_get_style_transition_options(
 }
 
 auto map_set_layer_property(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
+  MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
   mln_buffer_view value
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (
     !validate_string_view(layer_id, "layer_id") ||
     !validate_string_view(property_name, "property_name")
@@ -4167,10 +3585,10 @@ auto map_set_layer_property(
   }
 
   auto* layer =
-    map_native(live)->getStyle().getLayer(string_from_view(layer_id));
+    map_native(live).getStyle().getLayer(string_from_view(layer_id));
   if (layer == nullptr) {
     set_thread_error("layer does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
 
   auto error = layer->setProperty(
@@ -4188,14 +3606,9 @@ auto map_set_layer_property(
 }
 
 auto map_get_layer_property(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
+  MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
   mln_buffer* out_value
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (
     !validate_string_view(layer_id, "layer_id") ||
     !validate_string_view(property_name, "property_name")
@@ -4214,10 +3627,10 @@ auto map_get_layer_property(
   }
 
   auto* layer =
-    map_native(live)->getStyle().getLayer(string_from_view(layer_id));
+    map_native(live).getStyle().getLayer(string_from_view(layer_id));
   if (layer == nullptr) {
     set_thread_error("layer does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
 
   const auto property = layer->getProperty(string_from_view(property_name));
@@ -4228,13 +3641,8 @@ auto map_get_layer_property(
 }
 
 auto map_set_layer_filter(
-  mln_map map, mln_buffer_view layer_id, const mln_buffer_view* filter
+  MapObject& live, mln_buffer_view layer_id, const mln_buffer_view* filter
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (!validate_string_view(layer_id, "layer_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -4244,10 +3652,10 @@ auto map_set_layer_filter(
   }
 
   auto* layer =
-    map_native(live)->getStyle().getLayer(string_from_view(layer_id));
+    map_native(live).getStyle().getLayer(string_from_view(layer_id));
   if (layer == nullptr) {
     set_thread_error("layer does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
 
   if (filter == nullptr) {
@@ -4265,13 +3673,8 @@ auto map_set_layer_filter(
 }
 
 auto map_get_layer_filter(
-  mln_map map, mln_buffer_view layer_id, mln_buffer* out_filter
+  MapObject& live, mln_buffer_view layer_id, mln_buffer* out_filter
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (!validate_string_view(layer_id, "layer_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -4287,10 +3690,10 @@ auto map_get_layer_filter(
   }
 
   auto* layer =
-    map_native(live)->getStyle().getLayer(string_from_view(layer_id));
+    map_native(live).getStyle().getLayer(string_from_view(layer_id));
   if (layer == nullptr) {
     set_thread_error("layer does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
 
   const auto filter = layer->getFilter().serialize();
@@ -4303,13 +3706,8 @@ auto map_get_layer_filter(
 namespace {
 
 auto resolve_layer_for_access(
-  mln_map map, mln_buffer_view layer_id, mln::style::Layer*& out_layer
+  MapObject& live, mln_buffer_view layer_id, mln::style::Layer*& out_layer
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (!validate_string_view(layer_id, "layer_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -4319,10 +3717,10 @@ auto resolve_layer_for_access(
   }
 
   auto* layer =
-    map_native(live)->getStyle().getLayer(string_from_view(layer_id));
+    map_native(live).getStyle().getLayer(string_from_view(layer_id));
   if (layer == nullptr) {
     set_thread_error("layer does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return MLN_STATUS_NOT_FOUND;
   }
   out_layer = layer;
   return MLN_STATUS_OK;
@@ -4358,10 +3756,10 @@ auto validate_layer_zoom(double zoom, const char* field) -> bool {
 }  // namespace
 
 auto map_set_layer_source_layer(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer
+  MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_layer
 ) -> mln_status {
   mln::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  const auto status = resolve_layer_for_access(live, layer_id, layer);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -4377,25 +3775,22 @@ auto map_set_layer_source_layer(
 }
 
 auto map_copy_layer_source_layer(
-  mln_map map, mln_buffer_view layer_id, char* out_source_layer,
-  size_t source_layer_capacity, size_t* out_source_layer_size
+  MapObject& live, mln_buffer_view layer_id, std::string& out_source_layer
 ) -> mln_status {
   mln::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  const auto status = resolve_layer_for_access(live, layer_id, layer);
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  return copy_text(
-    layer->getSourceLayer(), out_source_layer, source_layer_capacity,
-    out_source_layer_size, "source_layer_capacity"
-  );
+  out_source_layer = layer->getSourceLayer();
+  return MLN_STATUS_OK;
 }
 
 auto map_set_layer_source_id(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id
+  MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_id
 ) -> mln_status {
   mln::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  const auto status = resolve_layer_for_access(live, layer_id, layer);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -4415,25 +3810,22 @@ auto map_set_layer_source_id(
 }
 
 auto map_copy_layer_source_id(
-  mln_map map, mln_buffer_view layer_id, char* out_source_id,
-  size_t source_id_capacity, size_t* out_source_id_size
+  MapObject& live, mln_buffer_view layer_id, std::string& out_source_id
 ) -> mln_status {
   mln::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  const auto status = resolve_layer_for_access(live, layer_id, layer);
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  return copy_text(
-    layer->getSourceID(), out_source_id, source_id_capacity, out_source_id_size,
-    "source_id_capacity"
-  );
+  out_source_id = layer->getSourceID();
+  return MLN_STATUS_OK;
 }
 
 auto map_set_layer_min_zoom(
-  mln_map map, mln_buffer_view layer_id, double min_zoom
+  MapObject& live, mln_buffer_view layer_id, double min_zoom
 ) -> mln_status {
   mln::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  const auto status = resolve_layer_for_access(live, layer_id, layer);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -4446,10 +3838,10 @@ auto map_set_layer_min_zoom(
 }
 
 auto map_set_layer_max_zoom(
-  mln_map map, mln_buffer_view layer_id, double max_zoom
+  MapObject& live, mln_buffer_view layer_id, double max_zoom
 ) -> mln_status {
   mln::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  const auto status = resolve_layer_for_access(live, layer_id, layer);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -4462,10 +3854,10 @@ auto map_set_layer_max_zoom(
 }
 
 auto map_set_layer_visibility(
-  mln_map map, mln_buffer_view layer_id, uint32_t visibility
+  MapObject& live, mln_buffer_view layer_id, uint32_t visibility
 ) -> mln_status {
   mln::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  const auto status = resolve_layer_for_access(live, layer_id, layer);
   if (status != MLN_STATUS_OK) {
     return status;
   }

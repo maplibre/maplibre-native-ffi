@@ -955,17 +955,6 @@ raw.mln_opengl_context_descriptor _openglContextDescriptorToNative(
       result.data.egl.get_proc_address = Pointer<Void>.fromAddress(
         value.getProcAddress.address,
       );
-    case WebGLContextDescriptor():
-      result.platformAsInt = raw
-          .mln_opengl_context_platform
-          .MLN_OPENGL_CONTEXT_PLATFORM_WEBGL
-          .value;
-      result.data.webgl.size = sizeOf<raw.mln_webgl_context_descriptor>();
-      result.data.webgl.kind = value.isTransferredCanvas ? 1 : 0;
-      result.data.webgl.context = value.context;
-      result.data.webgl.canvas_selector = value.canvasSelector == null
-          ? Struct.create<raw.mln_buffer_view>()
-          : nativeStringView(value.canvasSelector!, arena).value;
   }
   return result;
 }
@@ -1256,5 +1245,5 @@ String? _copyNativeString(Pointer<Void> pointer, int byteLength) {
 
 void _check(int status) {
   ensureAbiVersion();
-  checkNativeStatus(status, _c.threadLastErrorMessage);
+  checkNativeStatus(status, threadLastErrorMessage);
 }

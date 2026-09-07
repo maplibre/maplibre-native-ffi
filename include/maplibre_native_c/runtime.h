@@ -244,7 +244,7 @@ typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 5,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7,
-  MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 8,
+  MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 9,
 } mln_runtime_event_payload_type;
 
 /** Camera change kinds reported by camera will-change and did-change events. */
@@ -590,10 +590,12 @@ typedef struct mln_resource_transform_response {
  * valid until the current resource transform invocation finishes. Empty input
  * clears the replacement URL.
  *
- * Returns MLN_STATUS_INVALID_ARGUMENT when response is null, response->size is
- * too small, url is null with a non-zero size, or url contains embedded NUL.
- * Returns MLN_STATUS_INVALID_STATE when called outside a resource transform
- * callback.
+ * Returns:
+ * - MLN_STATUS_OK when the replacement URL was copied.
+ * - MLN_STATUS_INVALID_ARGUMENT when response is null, response->size is too
+ *   small, url is null with a non-zero size, or url contains embedded NUL.
+ * - MLN_STATUS_INVALID_STATE when called outside a resource transform callback.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_resource_transform_response_set_url(
   mln_resource_transform_response* response, const char* url, size_t url_size
@@ -659,15 +661,19 @@ typedef struct mln_http_header_transform_response {
  * The function copies name and value before returning. A later call using the
  * same case-insensitive name replaces the earlier value.
  *
- * Returns MLN_STATUS_INVALID_ARGUMENT when response is null, response->size is
- * too small, a pointer is null with a non-zero size, name is not a valid HTTP
- * field name, value is not valid UTF-8, value contains a disallowed control
- * byte, or name identifies a header managed by MapLibre or the platform
- * transport. A diagnostic for a rejected header names the header but never
- * includes its value.
- * Returns MLN_STATUS_INVALID_STATE when called outside an active HTTP header
- * transform callback.
- * Returns MLN_STATUS_NATIVE_ERROR when native allocation fails.
+ * A diagnostic for a rejected header names the header but never includes its
+ * value.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the header was recorded.
+ * - MLN_STATUS_INVALID_ARGUMENT when response is null, response->size is too
+ *   small, a pointer is null with a non-zero size, name is not a valid HTTP
+ *   field name, value is not valid UTF-8, value contains a disallowed control
+ *   byte, or name identifies a header managed by MapLibre or the platform
+ *   transport.
+ * - MLN_STATUS_INVALID_STATE when called outside an active HTTP header
+ *   transform callback.
+ * - MLN_STATUS_NATIVE_ERROR when native allocation fails.
  */
 MLN_API mln_status mln_http_header_transform_response_set(
   mln_http_header_transform_response* response, const char* name,
@@ -825,8 +831,18 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
 /**
  * Creates a runtime with a new core-owned worker.
  *
- * The function returns after worker initialization completes. The output must
- * point to the null handle and receives ownership of the runtime on success.
+ * The calling thread blocks until worker initialization completes, so in the
+ * browser it must be a Web Worker rather than the main thread, which cannot
+ * block. The output must point to the null handle and receives ownership of the
+ * runtime on success.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when out_runtime receives an owned runtime.
+ * - MLN_STATUS_INVALID_ARGUMENT when options is null, options->size is too
+ *   small, options->flags or options->event_mask holds unknown bits, the wake
+ *   descriptor is invalid, or out_runtime is null or does not point to the null
+ *   handle.
+ * - MLN_STATUS_NATIVE_ERROR when the worker could not be started.
  */
 MLN_API mln_status mln_runtime_create(
   const mln_runtime_options* options, mln_runtime* out_runtime
@@ -857,7 +873,7 @@ MLN_API mln_status mln_runtime_create(
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, provider is
  *   null, provider->size is too small, callback is null, or completion is
- * invalid.
+ *   invalid.
  * - MLN_STATUS_INVALID_STATE when the runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
@@ -879,7 +895,7 @@ MLN_API mln_status mln_runtime_set_resource_provider(
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
- * is invalid.
+ *   is invalid.
  * - MLN_STATUS_INVALID_STATE when the runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
@@ -1005,7 +1021,7 @@ MLN_API mln_status mln_resource_request_wait_until_retired(
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, transform is
  *   null, transform->size is too small, callback is null, or completion is
- * invalid.
+ *   invalid.
  * - MLN_STATUS_INVALID_STATE when the runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
@@ -1026,7 +1042,7 @@ MLN_API mln_status mln_runtime_set_resource_transform(
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
- * is invalid.
+ *   is invalid.
  * - MLN_STATUS_INVALID_STATE when the runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
@@ -1054,7 +1070,7 @@ MLN_API mln_status mln_runtime_clear_resource_transform(
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, transform is
  *   null, transform->size is too small, callback is null, or completion is
- * invalid.
+ *   invalid.
  * - MLN_STATUS_UNSUPPORTED on OpenHarmony and in the browser, whose HTTP
  *   clients cannot prevent transformed headers from following a cross-origin
  *   redirect. A resource provider serves those requests instead.
@@ -1077,7 +1093,7 @@ MLN_API mln_status mln_runtime_set_http_header_transform(
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
- * is invalid.
+ *   is invalid.
  * - MLN_STATUS_INVALID_STATE when the runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
@@ -1090,7 +1106,18 @@ MLN_API mln_status mln_runtime_clear_http_header_transform(
  *
  * When runtime options omit cache_path, this operates on MapLibre's default
  * in-memory database and its effects are not durable beyond the native database
- * lifetime. The completion reports the terminal status.
+ * lifetime. The completion reports the terminal status and carries no value.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the operation is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, operation is
+ *   not an mln_ambient_cache_operation value, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK when the maintenance operation finished.
+ * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
 MLN_API mln_status mln_runtime_run_ambient_cache_operation(
   mln_runtime runtime, uint32_t operation, const mln_completion* completion
@@ -1105,7 +1132,18 @@ MLN_API mln_status mln_runtime_run_ambient_cache_operation(
  *
  * When runtime options omit cache_path, this operates on MapLibre's default
  * in-memory database and its effects are not durable beyond the native database
- * lifetime. The completion reports the terminal status.
+ * lifetime. The completion reports the terminal status and carries no value.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the operation is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK when the budget was applied.
+ * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
 MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
   mln_runtime runtime, uint64_t size, const mln_completion* completion
@@ -1115,7 +1153,14 @@ MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
  * Starts an ordered runtime barrier.
  *
  * The completion runs after every earlier accepted runtime submission has
- * reached a terminal disposition.
+ * reached a terminal disposition. It carries no value.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the barrier is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
  */
 MLN_API mln_status mln_runtime_barrier(
   mln_runtime runtime, const mln_completion* completion
@@ -1161,20 +1206,31 @@ MLN_API mln_status mln_runtime_release(
  * serialized and each event enters exactly one returned batch.
  *
  * The map and runtime subscription masks suppress unselected events before
- * their payloads, messages, queue records, and wakeups are produced.
+ * their payloads, messages, queue records, and wakeups are produced. A runtime
+ * whose release has begun no longer drains; events it already queued are
+ * discarded with the runtime.
  *
  * Returns:
  * - MLN_STATUS_OK when out_batch receives an owned batch, including an empty
  *   batch.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or out_batch
  *   is null or does not point to the null handle.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_drain_events(
   mln_runtime runtime, mln_event_batch* out_batch
 ) MLN_NOEXCEPT;
 
-/** Borrows the event and message view stored by an owned event batch. */
+/**
+ * Borrows the event and message view stored by an owned event batch.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when out_view receives the borrowed view.
+ * - MLN_STATUS_INVALID_ARGUMENT when batch is null or not live, or out_view is
+ *   null or out_view->size is too small.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
 MLN_API mln_status mln_event_batch_get(
   mln_event_batch batch, mln_runtime_event_batch_view* out_view
 ) MLN_NOEXCEPT;
@@ -1206,6 +1262,7 @@ MLN_API void mln_event_batch_release(mln_event_batch batch) MLN_NOEXCEPT;
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
  *   handle, or mask holds a bit outside MLN_RUNTIME_EVENT_MASK_ALL.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
@@ -1223,6 +1280,7 @@ mln_runtime_set_event_mask(mln_runtime runtime, uint64_t mask) MLN_NOEXCEPT;
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
  *   handle, or out_mask is null.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_get_event_mask(

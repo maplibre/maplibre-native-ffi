@@ -112,7 +112,7 @@ packaging/installer UX.
 | Bearing | `12.0` degrees                                            |
 | Pitch   | `30.0` degrees                                            |
 
-Apply with an immediate `jump_to` on startup.
+Apply the initial camera as one camera update in jump mode on startup.
 
 #### Map and runtime
 
@@ -174,8 +174,8 @@ Examples have one host render loop and one native scheduler thread owned by the
 runtime. The render target chooses one of the driver contracts described in
 [Concepts](/maplibre-native-ffi/concepts/).
 
-- The runtime owns its scheduler thread. Runtime creation starts it, runtime
-  close joins it, and no host code pumps it.
+- The runtime owns its scheduler thread. Runtime creation starts it, and runtime
+  release joins it.
 - A core-worker session owns a native serial graphics worker.
 - A caller-driver session stores typed native work until the render loop
   services it with the graphics context usable.
@@ -201,17 +201,17 @@ Where the host toolkit fixes display-refresh and window callbacks, that thread
 is the render loop thread. Where a graphics API context is thread-current, the
 render loop thread is the only thread that makes it current.
 
-| Example       | Render loop thread                                 |
-| ------------- | -------------------------------------------------- |
-| `c-map`       | process main thread (SDL window, graphics context) |
-| `zig-map`     | process main thread (SDL window, graphics context) |
-| `go-map`      | process main thread (SDL window, graphics context) |
-| `rust-map`    | winit event-loop thread                            |
-| `lwjgl-map`   | GLFW main thread                                   |
-| `dotnet-map`  | GLFW main thread                                   |
-| `swift-map`   | main run loop (`CADisplayLink`, AppKit/UIKit)      |
-| `android-map` | UI thread (`Choreographer`)                        |
-| `compose-map` | native surface bridge's producer thread            |
+| Example       | Render loop thread                                            |
+| ------------- | ------------------------------------------------------------- |
+| `c-map`       | process main thread (SDL window, graphics context)            |
+| `zig-map`     | process main thread (SDL window, graphics context)            |
+| `go-map`      | process main thread (SDL window, graphics context)            |
+| `rust-map`    | winit event-loop thread                                       |
+| `lwjgl-map`   | GLFW main thread                                              |
+| `dotnet-map`  | GLFW main thread                                              |
+| `swift-map`   | main run loop (AppKit timer on macOS, `CADisplayLink` on iOS) |
+| `android-map` | UI thread (`Choreographer`)                                   |
+| `compose-map` | native surface bridge's producer thread                       |
 
 ##### Attaching the render session
 
@@ -274,7 +274,8 @@ rather than branching ad hoc through shared draw code.
 Order MUST be:
 
 1. Parse profile entry configuration and validate the selected mode and driver.
-2. Validate the loaded library's backend and target capabilities.
+2. Read and log the loaded library's supported native render backends, then
+   validate the selected backend and target capabilities.
 3. Create the host presentation surface and graphics resources.
 4. Create the runtime and arrange an event drain through its wake or a host
    polling cadence.
@@ -285,8 +286,8 @@ Order MUST be:
    service through wakes or an independent host polling cadence.
 9. For a caller driver, service work on the graphics thread until the attach
    future resolves.
-10. Read negotiated capabilities.
-11. Print the active mode and driver.
+10. Print the active render-target mode identifier and its
+    [startup status line](#startup-status-lines).
 
 Failure cleanup follows the same detach or abandon path as normal shutdown.
 
@@ -370,6 +371,8 @@ sequenceDiagram
   result into an independently owned batch.
 - The frame result's map-update, extent, and frame generations determine what
   was rendered. Runtime event order MUST NOT be used as a substitute.
+- A rendered result carries the map's own follow-up demand. The render loop MUST
+  re-arm from that flag rather than from the map render-frame-finished event.
 - The example MAY keep presenting the previous completed texture when a newer
   frame exceeds its timeout.
 - Resize, target replacement, queries, readback, barriers, maintenance, and
@@ -432,9 +435,19 @@ map-specific setup.
 #### Resize API
 
 Expose `resize(viewport)` for the active render target, resize API-level
-resources when the graphics context requires it, and submit one map resize
-command with the same logical extent. Map resize is the sole authority for
-logical width, height, and scale factor after creation.
+resources when the graphics context requires it, and start one session resize
+with the new logical extent. While a render session is attached, the session
+resize is the sole authority for logical width and height; scale factor is fixed
+at attachment.
+
+Two paths carry the extent through a map resize instead:
+
+- A caller-owned texture is sized by its owner. A session resize reports
+  unsupported, and the host hands over a replacement.
+- Target replacement changes the graphics resource, and the map keeps the extent
+  it has.
+
+With no session attached, the map resize is the only authority.
 
 ### Render-target modes
 
@@ -478,7 +491,8 @@ table:
 - Attach with the borrowed-texture descriptor referencing host-owned handles.
 - After a rendered result, sample that texture through the compositor path.
 - On resize, allocate a replacement and start the backend target-replacement
-  future. Retain both allocations until its outcome is known.
+  future, then submit a map resize with the same extent. Retain both allocations
+  until the replacement's outcome is known.
 
 #### `native-surface`
 
@@ -487,7 +501,7 @@ table:
 - A rendered result means that the selected driver presented the frame.
 - On resize, start the session resize future and rebuild host presentation.
   Start target replacement when the toolkit supplies a new surface for the same
-  graphics context.
+  graphics context, and submit a map resize with the same extent.
 
 ### Compositor shaders
 
@@ -511,7 +525,8 @@ that pass.
   selected driver.
 - Resize API-level and compositor resources for owned textures and surfaces.
 - For a borrowed texture, allocate a matching host texture and start target
-  replacement instead of resizing the fixed allocation.
+  replacement instead of resizing the fixed allocation. Submit a map resize with
+  the same extent, because target replacement leaves the map's extent unchanged.
 - Retain outgoing and replacement borrowed resources until replacement
   completes. Release the replacement when the future fails. After an ambiguous
   native failure, detach or abandon before releasing either target.
@@ -545,7 +560,7 @@ Profile sections define which host events trigger resize
 - SHOULD register a native log callback during startup and clear it on shutdown.
 - On setup or camera failure, print a short message including the native status
   and diagnostic strings returned by the C API.
-- On startup, emit the items listed in [Startup](#startup) step 8 through the
+- On startup, emit the [startup status lines](#startup-status-lines) through the
   profile logging sink.
 
 ### Graphics API
@@ -653,8 +668,8 @@ flags.
 
 ### Startup logging
 
-On startup, print the items listed in [Startup](#startup) step 8 to stdout, plus
-the control help text from [Input](#input) below.
+On startup, print the [startup status lines](#startup-status-lines) to stdout,
+plus the control help text from [Input](#input) below.
 
 ### Input
 
@@ -689,8 +704,8 @@ Controls:
 | `[`                           | Pitch −`5`° (clamped to `[0, 60]`) with animation.                                                                                                                                 |
 | `0`                           | Animate bearing and pitch to `0` with keyboard animation.                                                                                                                          |
 
-Keyboard animated moves SHOULD use ~`160` ms duration. Pointer drags use
-immediate relative move, absolute jump, and relative pitch operations.
+Keyboard animated moves SHOULD use ~`160` ms duration. Pointer drags apply
+relative camera deltas without animation.
 
 On pointer down that starts a drag, cancel in-flight camera transitions before
 applying deltas, and set the map's gesture-in-progress state. Clear that state
@@ -797,7 +812,7 @@ submits frame demand.
 
 ### Logging
 
-- Emit [Startup](#startup) step 8 items and viewport diagnostics through the
-  platform log sink (for example `OSLog` on Apple platforms or `logcat` on
-  Android).
+- Emit the [startup status lines](#startup-status-lines) and viewport
+  diagnostics through the platform log sink (for example `OSLog` on Apple
+  platforms or `logcat` on Android).
 - Control help is not required on mobile.

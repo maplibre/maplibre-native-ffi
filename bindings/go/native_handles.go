@@ -6,4 +6,5 @@ type (
 	nativeRuntime       uint64
 	nativeMap           uint64
 	nativeRenderSession uint64
+	nativeAcquiredFrame uint64
 )

@@ -12,12 +12,10 @@ import org.maplibre.nativeffi.internal.loader.NativeAccess
 /**
  * Owned JVM FFM standalone projection snapshot.
  *
- * Every call is synchronous, runs on the calling thread, is internally serialized, and may be made
- * from any thread. A projection copies the map's transform state at creation and never observes map
- * changes made after that and remains usable after its source map and runtime close.
+ * See the common declaration for the projection's threading and lifetime rules.
  */
 public actual class MapProjectionHandle
-internal constructor(private val handle: NativeMapProjection) {
+internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
   private val core = HandleStateCore("MapProjectionHandle", handle.raw)
 
   init {
@@ -68,15 +66,8 @@ internal constructor(private val handle: NativeMapProjection) {
   public actual val isClosed: Boolean
     get() = core.isReleased()
 
-  public actual fun close() {
-    if (!core.beginClose()) return
-    try {
-      NativeAccess.closeProjection(handle)
-    } catch (error: Throwable) {
-      core.abortClose()
-      throw error
-    }
-    core.completeClose()
+  actual override fun close() {
+    core.closeOnce(destroy = { NativeAccess.closeProjection(handle) })
   }
 
   private fun <T> withLiveHandle(block: (NativeMapProjection) -> T): T = core.withLive {

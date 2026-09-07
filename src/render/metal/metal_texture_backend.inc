@@ -5,7 +5,8 @@
 
 #include <Metal/MTLDevice.hpp>
 #include <Metal/MTLTexture.hpp>
-#include <vector>
+
+#include "render/render_session_common.hpp"
 
 namespace mln::core {
 
@@ -16,7 +17,7 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
 
  public:
   MetalTextureBackend(
-    MTL::Device* host_device, mln::Size size, std::size_t ring_depth = 1
+    MTL::Device* host_device, mln::Size size, std::size_t ring_depth
   );
   MetalTextureBackend(MTL::Texture* borrowed_texture, mln::Size size);
   MetalTextureBackend(const MetalTextureBackend&) = delete;
@@ -32,8 +33,8 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   void deactivate() override;
   void updateAssumedState() override;
 
+  // The texture of the slot this backend is rendering into.
   auto metal_texture() -> MTL::Texture*;
-  auto metal_texture_at(std::size_t slot) -> MTL::Texture*;
   auto select_slot(std::size_t slot) -> bool;
   void set_ring_size(mln::Size size);
 
@@ -51,9 +52,7 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   // Recorded when this session took borrowed_texture_, which it does not
   // retain and the host may already have released.
   MTL::PixelFormat borrowed_pixel_format_ = MTL::PixelFormatInvalid;
-  std::vector<std::unique_ptr<mln::gfx::RenderableResource>> slot_resources_;
-  std::size_t selected_slot_ = 0;
-  std::vector<mln::Size> slot_sizes_;
+  RenderableSlotRing ring_;
 };
 
 }  // namespace mln::core

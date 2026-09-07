@@ -68,6 +68,8 @@ for entry_name in build-tools cmake emulator licenses platform-tools platforms s
 done
 export ANDROID_HOME="$python_android_home"
 export ANDROID_SDK_ROOT="$python_android_home"
+# The wheel build runs in an isolated environment that resolves its tools from
+# PATH alone, so the pinned cmake goes on PATH by path rather than through mise.
 cmake_bin=$(mise which cmake)
 export PATH="${cmake_bin%/*}:$PATH"
 
@@ -75,6 +77,8 @@ export CIBW_BUILD="cp314-android_$cibw_arch"
 export CIBW_ARCHS_ANDROID="$cibw_arch"
 export CIBW_BUILD_FRONTEND='build[uv]'
 export CIBW_CONFIG_SETTINGS_ANDROID='build-args=--no-default-features'
+# The wheel build names the NDK compiler as CC, and a cross build still
+# compiles build scripts for the machine doing the build.
 host_cc=$(command -v cc)
 export CIBW_ENVIRONMENT_ANDROID="MAPLIBRE_NATIVE_C_INSTALL_DIR=$native_install_dir HOST_CC=$host_cc"
 # The graphics loader comes from Android, so wheel repair leaves it external.

@@ -2,9 +2,9 @@
 //!
 //! glow supports Emscripten in its source, but its manifest declares js-sys and
 //! wasm-bindgen for every `wasm32` target, and those do not build there. The
-//! fixtures need a small set of entry points, which Emscripten links into the
-//! module directly. This module preserves the names and shapes that the shared
-//! fixture call sites use on every target. The surface readback the Windows
+//! fixtures need twelve entry points, which Emscripten links into the module
+//! directly, so this binds them under the names and shapes glow uses and the
+//! call sites stay identical on every target. The surface readback the Windows
 //! fixture performs has no browser counterpart and is absent here.
 
 #![allow(non_snake_case)]

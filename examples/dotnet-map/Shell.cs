@@ -58,14 +58,8 @@ internal static class Shell
                     if (!viewport.IsEmpty)
                     {
                         graphics.Resize(viewport);
+                        // The render target owns the map's extent while a session is attached.
                         target.Resize(viewport);
-                        _ = state.Map.ResizeAsync(
-                            new global::Maplibre.NativeFfi.Map.LogicalExtent(
-                                viewport.LogicalWidth,
-                                viewport.LogicalHeight,
-                                viewport.ScaleFactor
-                            )
-                        );
                         renderRequest.Set();
                     }
                 }

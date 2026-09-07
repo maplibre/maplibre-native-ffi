@@ -95,10 +95,6 @@ func (feature QueriedFeature) Equal(other QueriedFeature) bool {
 		equalOptionalBytes(feature.State, other.State)
 }
 
-func equalOptionalBytes(left []byte, right []byte) bool {
-	return (left == nil) == (right == nil) && bytes.Equal(left, right)
-}
-
 // FeatureStateSelector selects feature state by source, feature, and key.
 type FeatureStateSelector struct {
 	SourceID      string
@@ -193,14 +189,15 @@ func (geometry cRenderedQueryGeometry) free() {
 }
 
 type cRenderedFeatureQueryOptions struct {
-	raw      *C.mln_rendered_feature_query_options
-	layerIDs cStringViewArray
-	filter   cBufferView
+	raw        *C.mln_rendered_feature_query_options
+	layerIDs   cStringViewArray
+	filter     cBufferView
+	filterSlot cBufferViewSlot
 }
 
-func newCRenderedFeatureQueryOptions(options *RenderedFeatureQueryOptions) (*cRenderedFeatureQueryOptions, error) {
+func newCRenderedFeatureQueryOptions(options *RenderedFeatureQueryOptions) *cRenderedFeatureQueryOptions {
 	if options == nil {
-		return nil, nil
+		return nil
 	}
 	raw := &cRenderedFeatureQueryOptions{
 		raw: (*C.mln_rendered_feature_query_options)(C.malloc(C.size_t(unsafe.Sizeof(C.mln_rendered_feature_query_options{})))),
@@ -214,9 +211,10 @@ func newCRenderedFeatureQueryOptions(options *RenderedFeatureQueryOptions) (*cRe
 	}
 	if options.Filter != nil {
 		raw.filter = newCBufferView(options.Filter)
-		raw.raw.filter = raw.filter.ptr()
+		raw.filterSlot = newCBufferViewSlot(raw.filter)
+		raw.raw.filter = raw.filterSlot.ptr()
 	}
-	return raw, nil
+	return raw
 }
 
 func (options *cRenderedFeatureQueryOptions) ptr() *C.mln_rendered_feature_query_options {
@@ -232,20 +230,22 @@ func (options *cRenderedFeatureQueryOptions) free() {
 	}
 	options.layerIDs.free()
 	options.filter.free()
+	options.filterSlot.free()
 	if options.raw != nil {
 		C.free(unsafe.Pointer(options.raw))
 	}
 }
 
 type cSourceFeatureQueryOptions struct {
-	raw      *C.mln_source_feature_query_options
-	layerIDs cStringViewArray
-	filter   cBufferView
+	raw        *C.mln_source_feature_query_options
+	layerIDs   cStringViewArray
+	filter     cBufferView
+	filterSlot cBufferViewSlot
 }
 
-func newCSourceFeatureQueryOptions(options *SourceFeatureQueryOptions) (*cSourceFeatureQueryOptions, error) {
+func newCSourceFeatureQueryOptions(options *SourceFeatureQueryOptions) *cSourceFeatureQueryOptions {
 	if options == nil {
-		return nil, nil
+		return nil
 	}
 	raw := &cSourceFeatureQueryOptions{
 		raw: (*C.mln_source_feature_query_options)(C.malloc(C.size_t(unsafe.Sizeof(C.mln_source_feature_query_options{})))),
@@ -259,9 +259,10 @@ func newCSourceFeatureQueryOptions(options *SourceFeatureQueryOptions) (*cSource
 	}
 	if options.Filter != nil {
 		raw.filter = newCBufferView(options.Filter)
-		raw.raw.filter = raw.filter.ptr()
+		raw.filterSlot = newCBufferViewSlot(raw.filter)
+		raw.raw.filter = raw.filterSlot.ptr()
 	}
-	return raw, nil
+	return raw
 }
 
 func (options *cSourceFeatureQueryOptions) ptr() *C.mln_source_feature_query_options {
@@ -277,24 +278,10 @@ func (options *cSourceFeatureQueryOptions) free() {
 	}
 	options.layerIDs.free()
 	options.filter.free()
+	options.filterSlot.free()
 	if options.raw != nil {
 		C.free(unsafe.Pointer(options.raw))
 	}
-}
-
-func startRenderCompletion[T any](
-	session *RenderSessionHandle,
-	start func(C.mln_render_session, *C.mln_completion) int32,
-	convert func(*C.mln_completion_result) (T, error),
-) (*Future[T], error) {
-	ptr, err := session.ptr()
-	if err != nil {
-		return nil, err
-	}
-	defer session.state.KeepAlive()
-	return startCompletion(func(completion *C.mln_completion) int32 {
-		return start(C.mln_render_session(ptr), completion)
-	}, convert)
 }
 
 // QueryRenderedFeatures starts a query against the latest driver state.
@@ -302,10 +289,7 @@ func startRenderCompletion[T any](
 func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) (*Future[[]QueriedFeature], error) {
 	rawGeometry := newCRenderedQueryGeometry(geometry)
 	defer rawGeometry.free()
-	rawOptions, err := newCRenderedFeatureQueryOptions(options)
-	if err != nil {
-		return nil, newBindingError(ErrInvalidArgument, err.Error())
-	}
+	rawOptions := newCRenderedFeatureQueryOptions(options)
 	defer rawOptions.free()
 	return startRenderCompletion(session, func(s C.mln_render_session, completion *C.mln_completion) int32 {
 		return int32(C.mln_render_session_query_rendered_features(
@@ -322,10 +306,7 @@ func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuery
 func (session *RenderSessionHandle) QuerySourceFeatures(sourceID string, options *SourceFeatureQueryOptions) (*Future[[]QueriedFeature], error) {
 	source := newCStringView(sourceID)
 	defer source.free()
-	rawOptions, err := newCSourceFeatureQueryOptions(options)
-	if err != nil {
-		return nil, newBindingError(ErrInvalidArgument, err.Error())
-	}
+	rawOptions := newCSourceFeatureQueryOptions(options)
 	defer rawOptions.free()
 	return startRenderCompletion(session, func(s C.mln_render_session, completion *C.mln_completion) int32 {
 		return int32(C.mln_render_session_query_source_features(

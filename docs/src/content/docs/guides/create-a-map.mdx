@@ -1,6 +1,6 @@
 ---
 title: Create a map
-description: Create a runtime and map, then close both in order.
+description: Create a runtime and map, then release both in order.
 sidebar:
   order: 1
 ---
@@ -21,8 +21,9 @@ host receiver; the receiver drains and copies the complete queued batch.
 
 <Code code={region(createMap, "runtime")} lang="c" title="create-map.c" />
 
-Runtime creation returns its handle after the scheduler thread is ready. Map
-creation is ordered runtime work. Its one-shot completion reports the map
+Runtime creation returns its handle after the scheduler thread is ready, so the
+creating thread blocks until then. A browser host therefore creates the runtime
+on a Web Worker. Map creation is ordered runtime work. Its one-shot completion reports the map
 handle, or a terminal error, exactly once.
 
 ## Choose the initial map state
@@ -31,23 +32,22 @@ Map options include the initial logical extent, map mode, and FastPFOR decoding.
 The extent contains width, height, and scale factor. It initializes camera and
 projection state before a render target exists.
 
-After creation, resize is the only command that changes width, height, or scale
-factor. The scale factor selects sprites, glyphs, raster tiles, and
-pixel-ratio-dependent renderer state, so send the display density with every
-extent change.
-
-<Code code={region(createMap, "map")} lang="c" title="create-map.c" />
+The scale factor is fixed for the map's life. It selects sprites, glyphs, raster
+tiles, and pixel-ratio-dependent renderer state, so a resize that names a
+different scale factor reports an invalid-argument status. Create a new map when
+the display density changes. After creation, resize is the only command that
+changes width and height.
 
 A continuous map redraws as data arrives and the camera moves. Use this mode for
 an on-screen map. A static map produces one image per request, and a tile map
 produces one image for a single tile.
 
-<Code code={region(createMap, "mode")} lang="c" title="create-map.c" />
+<Code code={region(createMap, "map")} lang="c" title="create-map.c" />
 
 FastPFOR decoding applies to every MapLibre Tiles source that the map loads.
 Enable it at creation when your tile sets use that encoding.
 
-## Close in order
+## Release in order
 
 Release the map before releasing the runtime. A runtime release preflight
 reports invalid state and leaves the handle open while a live child or pending

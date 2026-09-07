@@ -53,10 +53,7 @@ static void empty_feature_query_completes_with_an_empty_borrowed_array(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_map_set_style_json(
-      map, MLN_BUFFER_LITERAL("{\"version\":8,\"sources\":{},\"layers\":[]}")
-    )
+    MLN_STATUS_OK, mln_test_map_set_style_json(map, mln_test_empty_style_json)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   mln_test_render_fixture fixture = {0};

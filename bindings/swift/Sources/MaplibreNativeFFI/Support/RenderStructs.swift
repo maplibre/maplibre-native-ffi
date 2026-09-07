@@ -208,7 +208,7 @@ struct NativeOpenGLContextDescriptor: Equatable {
   }
 }
 
-struct NativeMetalSurfaceDescriptorInput: Equatable {
+struct NativeMetalSurfaceDescriptorInput: Equatable, NativeDescriptor {
   let extent: NativeRenderTargetExtent
   let context: NativeMetalContextDescriptor
   let layerAddress: UInt
@@ -224,7 +224,7 @@ struct NativeMetalSurfaceDescriptorInput: Equatable {
   }
 }
 
-struct NativeVulkanSurfaceDescriptorInput: Equatable {
+struct NativeVulkanSurfaceDescriptorInput: Equatable, NativeDescriptor {
   let extent: NativeRenderTargetExtent
   let context: NativeVulkanContextDescriptor
   let surfaceBits: UInt64
@@ -240,7 +240,7 @@ struct NativeVulkanSurfaceDescriptorInput: Equatable {
   }
 }
 
-struct NativeOpenGLSurfaceDescriptorInput: Equatable {
+struct NativeOpenGLSurfaceDescriptorInput: Equatable, NativeDescriptor {
   let extent: NativeRenderTargetExtent
   let context: NativeOpenGLContextDescriptor
   let surfaceAddress: UInt
@@ -272,7 +272,7 @@ struct NativeTextureImageInfo: Equatable {
   }
 }
 
-struct NativeMetalOwnedTextureDescriptorInput: Equatable {
+struct NativeMetalOwnedTextureDescriptorInput: Equatable, NativeDescriptor {
   let extent: NativeRenderTargetExtent
   let context: NativeMetalContextDescriptor
 
@@ -286,7 +286,7 @@ struct NativeMetalOwnedTextureDescriptorInput: Equatable {
   }
 }
 
-struct NativeMetalBorrowedTextureDescriptorInput: Equatable {
+struct NativeMetalBorrowedTextureDescriptorInput: Equatable, NativeDescriptor {
   let extent: NativeRenderTargetExtent
   let physicalWidth: UInt32
   let physicalHeight: UInt32
@@ -305,7 +305,7 @@ struct NativeMetalBorrowedTextureDescriptorInput: Equatable {
   }
 }
 
-struct NativeVulkanOwnedTextureDescriptorInput: Equatable {
+struct NativeVulkanOwnedTextureDescriptorInput: Equatable, NativeDescriptor {
   let extent: NativeRenderTargetExtent
   let context: NativeVulkanContextDescriptor
 
@@ -320,7 +320,7 @@ struct NativeVulkanOwnedTextureDescriptorInput: Equatable {
   }
 }
 
-struct NativeVulkanBorrowedTextureDescriptorInput: Equatable {
+struct NativeVulkanBorrowedTextureDescriptorInput: Equatable, NativeDescriptor {
   let extent: NativeRenderTargetExtent
   let physicalWidth: UInt32
   let physicalHeight: UInt32
@@ -349,7 +349,7 @@ struct NativeVulkanBorrowedTextureDescriptorInput: Equatable {
   }
 }
 
-struct NativeOpenGLOwnedTextureDescriptorInput: Equatable {
+struct NativeOpenGLOwnedTextureDescriptorInput: Equatable, NativeDescriptor {
   let extent: NativeRenderTargetExtent
   let context: NativeOpenGLContextDescriptor
 
@@ -366,7 +366,7 @@ struct NativeOpenGLOwnedTextureDescriptorInput: Equatable {
   }
 }
 
-struct NativeOpenGLBorrowedTextureDescriptorInput: Equatable {
+struct NativeOpenGLBorrowedTextureDescriptorInput: Equatable, NativeDescriptor {
   let extent: NativeRenderTargetExtent
   let physicalWidth: UInt32
   let physicalHeight: UInt32
@@ -391,30 +391,6 @@ struct NativeOpenGLBorrowedTextureDescriptorInput: Equatable {
   }
 }
 
-struct NativeMetalOwnedTextureFrame {
-  var raw: mln_metal_owned_texture_frame
-
-  init(_ raw: mln_metal_owned_texture_frame) {
-    self.raw = raw
-  }
-}
-
-struct NativeVulkanOwnedTextureFrame {
-  var raw: mln_vulkan_owned_texture_frame
-
-  init(_ raw: mln_vulkan_owned_texture_frame) {
-    self.raw = raw
-  }
-}
-
-struct NativeOpenGLOwnedTextureFrame {
-  var raw: mln_opengl_owned_texture_frame
-
-  init(_ raw: mln_opengl_owned_texture_frame) {
-    self.raw = raw
-  }
-}
-
 struct NativeWebGPUContextDescriptor: Equatable {
   let instanceAddress: UInt
   let deviceAddress: UInt
@@ -430,7 +406,7 @@ struct NativeWebGPUContextDescriptor: Equatable {
   }
 }
 
-struct NativeWebGPUSurfaceDescriptorInput: Equatable {
+struct NativeWebGPUSurfaceDescriptorInput: Equatable, NativeDescriptor {
   let extent: NativeRenderTargetExtent
   let context: NativeWebGPUContextDescriptor
   let surfaceAddress: UInt
@@ -448,7 +424,7 @@ struct NativeWebGPUSurfaceDescriptorInput: Equatable {
   }
 }
 
-struct NativeWebGPUOwnedTextureDescriptorInput: Equatable {
+struct NativeWebGPUOwnedTextureDescriptorInput: Equatable, NativeDescriptor {
   let extent: NativeRenderTargetExtent
   let context: NativeWebGPUContextDescriptor
 
@@ -463,7 +439,7 @@ struct NativeWebGPUOwnedTextureDescriptorInput: Equatable {
   }
 }
 
-struct NativeWebGPUBorrowedTextureDescriptorInput: Equatable {
+struct NativeWebGPUBorrowedTextureDescriptorInput: Equatable, NativeDescriptor {
   let extent: NativeRenderTargetExtent
   let physicalWidth: UInt32
   let physicalHeight: UInt32

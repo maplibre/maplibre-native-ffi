@@ -705,7 +705,9 @@ public struct RenderSessionAttachOptions: Sendable, Hashable {
 /// reports the attachment result.
 ///
 /// A caller-graphics-thread host services driver work through ``session``
-/// while ``completion`` is pending.
+/// while ``completion`` is pending. Cancelling that task does not cancel the
+/// attachment: native reports it either way. A failed attachment still leaves
+/// a session that has to be detached or abandoned before it is closed.
 public struct RenderSessionAttachment: Sendable {
   public let session: RenderSessionHandle
   public let completion: Task<Void, Error>
@@ -941,6 +943,17 @@ public struct WebGPUOwnedTextureFrame: Sendable, Hashable {
   public let format: UInt32
 }
 
+/// One rendered frame leased out of a session's texture ring.
+///
+/// A host may pass the handle between threads: one lock serializes its own
+/// state. That lock is released before ``withMetalTexture(_:)`` and its
+/// siblings run the host closure, so the closure may call back into this
+/// handle. The frame values that the closure receives are borrowed for the
+/// closure and stop being readable once the frame is released.
+///
+/// Release the frame with ``release(consumerCompletion:)``. An unreleased
+/// handle that goes out of scope keeps its ring slot for the life of the
+/// session, and the handle leak reporter names it.
 public final class AcquiredFrameHandle: @unchecked Sendable {
   private let lock = NSLock()
   private var handle: mln_acquired_frame
@@ -960,161 +973,148 @@ public final class AcquiredFrameHandle: @unchecked Sendable {
     }
   }
 
+  /// True once ``release(consumerCompletion:)`` returned the frame to its ring.
   public var isReleased: Bool {
     lock.withLock { handle == 0 }
   }
 
+  /// Copies the frame result the session published for this frame.
   public func result() throws -> RenderFrameResult {
-    try mapNativeFailure {
-      try lock.withLock {
-        var value = mln_render_frame_result()
-        value.size = UInt32(MemoryLayout<mln_render_frame_result>.size)
-        try checkStatus(mln_acquired_frame_get_result(
-          requireLiveLocked(),
-          &value
-        ))
-        return RenderFrameResult(value)
-      }
-    }
+    var request = mln_render_frame_result()
+    request.size = UInt32(MemoryLayout<mln_render_frame_result>.size)
+    return try RenderFrameResult(
+      read(request) { mln_acquired_frame_get_result($0, $1) }
+    )
   }
 
+  /// Copies the synchronization object that the producer signals when this
+  /// frame's GPU work finishes. A consumer waits on it before it reads the
+  /// texture.
   public func producerSynchronization() throws -> GPUSynchronization {
-    try mapNativeFailure {
-      try lock.withLock {
-        var value = mln_gpu_sync_default()
-        try checkStatus(mln_acquired_frame_get_producer_sync(
-          requireLiveLocked(), &value
-        ))
-        // The C carrier is wider than a pointer on 32-bit targets, so bits it
-        // cannot address read as null for the pointer-typed kinds.
-        let object = NativePointer(
-          bitPattern: UInt(truncatingIfNeeded: value.object)
-        )
-        switch value.kind {
-        case MLN_GPU_SYNC_CPU_COMPLETE.rawValue:
-          return .cpuComplete
-        case MLN_GPU_SYNC_METAL_SHARED_EVENT.rawValue:
-          return .metalSharedEvent(object, value: value.value)
-        case MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE.rawValue:
-          return .vulkanTimelineSemaphore(
-            VulkanHandle(bitPattern: value.object), value: value.value
-          )
-        case MLN_GPU_SYNC_OPENGL_FENCE.rawValue:
-          return .openGLFence(object)
-        case MLN_GPU_SYNC_WEBGPU_TOKEN.rawValue:
-          return .webGPUToken(object, value: value.value)
-        default:
-          throw NativeStatusFailure.swiftNativeError(
-            "Unknown producer synchronization kind"
-          )
-        }
-      }
+    let value = try read(mln_gpu_sync_default()) {
+      mln_acquired_frame_get_producer_sync($0, $1)
+    }
+    // The C carrier is wider than a pointer on 32-bit targets, so bits it
+    // cannot address read as null for the pointer-typed kinds.
+    let object = NativePointer(
+      bitPattern: UInt(truncatingIfNeeded: value.object)
+    )
+    switch value.kind {
+    case MLN_GPU_SYNC_CPU_COMPLETE.rawValue:
+      return .cpuComplete
+    case MLN_GPU_SYNC_METAL_SHARED_EVENT.rawValue:
+      return .metalSharedEvent(object, value: value.value)
+    case MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE.rawValue:
+      return .vulkanTimelineSemaphore(
+        VulkanHandle(bitPattern: value.object), value: value.value
+      )
+    case MLN_GPU_SYNC_OPENGL_FENCE.rawValue:
+      return .openGLFence(object)
+    case MLN_GPU_SYNC_WEBGPU_TOKEN.rawValue:
+      return .webGPUToken(object, value: value.value)
+    default:
+      throw MaplibreError(
+        kind: .nativeError,
+        rawStatus: nil,
+        diagnostic: "Unknown producer synchronization kind \(value.kind)"
+      )
     }
   }
 
+  /// Runs `body` with this frame's Metal texture.
   public func withMetalTexture<Result>(
     _ body: (MetalOwnedTextureFrame) throws -> Result
   ) throws -> Result {
-    try mapNativeFailure {
-      try lock.withLock {
-        var value = mln_metal_owned_texture_frame()
-        value.size = UInt32(MemoryLayout<mln_metal_owned_texture_frame>.size)
-        try checkStatus(mln_acquired_frame_get_metal_texture(
-          requireLiveLocked(), &value
-        ))
-        return try body(MetalOwnedTextureFrame(
-          generation: value.generation,
-          width: value.width,
-          height: value.height,
-          scaleFactor: value.scale_factor,
-          frameID: value.frame_id,
-          texture: NativePointer(bitPattern: UInt(bitPattern: value.texture)),
-          device: NativePointer(bitPattern: UInt(bitPattern: value.device)),
-          pixelFormat: value.pixel_format
-        ))
-      }
+    var request = mln_metal_owned_texture_frame()
+    request.size = UInt32(MemoryLayout<mln_metal_owned_texture_frame>.size)
+    let value = try read(request) {
+      mln_acquired_frame_get_metal_texture($0, $1)
     }
+    return try body(MetalOwnedTextureFrame(
+      generation: value.generation,
+      width: value.width,
+      height: value.height,
+      scaleFactor: value.scale_factor,
+      frameID: value.frame_id,
+      texture: NativePointer(bitPattern: UInt(bitPattern: value.texture)),
+      device: NativePointer(bitPattern: UInt(bitPattern: value.device)),
+      pixelFormat: value.pixel_format
+    ))
   }
 
+  /// Runs `body` with this frame's Vulkan image.
   public func withVulkanTexture<Result>(
     _ body: (VulkanOwnedTextureFrame) throws -> Result
   ) throws -> Result {
-    try mapNativeFailure {
-      try lock.withLock {
-        var value = mln_vulkan_owned_texture_frame()
-        value.size = UInt32(MemoryLayout<mln_vulkan_owned_texture_frame>.size)
-        try checkStatus(mln_acquired_frame_get_vulkan_texture(
-          requireLiveLocked(), &value
-        ))
-        return try body(VulkanOwnedTextureFrame(
-          generation: value.generation,
-          width: value.width,
-          height: value.height,
-          scaleFactor: value.scale_factor,
-          frameID: value.frame_id,
-          image: VulkanHandle(bitPattern: value.image),
-          imageView: VulkanHandle(bitPattern: value.image_view),
-          device: NativePointer(bitPattern: UInt(bitPattern: value.device)),
-          format: value.format,
-          layout: value.layout
-        ))
-      }
+    var request = mln_vulkan_owned_texture_frame()
+    request.size = UInt32(MemoryLayout<mln_vulkan_owned_texture_frame>.size)
+    let value = try read(request) {
+      mln_acquired_frame_get_vulkan_texture($0, $1)
     }
+    return try body(VulkanOwnedTextureFrame(
+      generation: value.generation,
+      width: value.width,
+      height: value.height,
+      scaleFactor: value.scale_factor,
+      frameID: value.frame_id,
+      image: VulkanHandle(bitPattern: value.image),
+      imageView: VulkanHandle(bitPattern: value.image_view),
+      device: NativePointer(bitPattern: UInt(bitPattern: value.device)),
+      format: value.format,
+      layout: value.layout
+    ))
   }
 
+  /// Runs `body` with this frame's OpenGL texture.
   public func withOpenGLTexture<Result>(
     _ body: (OpenGLOwnedTextureFrame) throws -> Result
   ) throws -> Result {
-    try mapNativeFailure {
-      try lock.withLock {
-        var value = mln_opengl_owned_texture_frame()
-        value.size = UInt32(MemoryLayout<mln_opengl_owned_texture_frame>.size)
-        try checkStatus(mln_acquired_frame_get_opengl_texture(
-          requireLiveLocked(), &value
-        ))
-        return try body(OpenGLOwnedTextureFrame(
-          generation: value.generation,
-          width: value.width,
-          height: value.height,
-          scaleFactor: value.scale_factor,
-          frameID: value.frame_id,
-          texture: value.texture,
-          target: value.target,
-          internalFormat: value.internal_format,
-          format: value.format,
-          type: value.type
-        ))
-      }
+    var request = mln_opengl_owned_texture_frame()
+    request.size = UInt32(MemoryLayout<mln_opengl_owned_texture_frame>.size)
+    let value = try read(request) {
+      mln_acquired_frame_get_opengl_texture($0, $1)
     }
+    return try body(OpenGLOwnedTextureFrame(
+      generation: value.generation,
+      width: value.width,
+      height: value.height,
+      scaleFactor: value.scale_factor,
+      frameID: value.frame_id,
+      texture: value.texture,
+      target: value.target,
+      internalFormat: value.internal_format,
+      format: value.format,
+      type: value.type
+    ))
   }
 
+  /// Runs `body` with this frame's WebGPU texture.
   public func withWebGPUTexture<Result>(
     _ body: (WebGPUOwnedTextureFrame) throws -> Result
   ) throws -> Result {
-    try mapNativeFailure {
-      try lock.withLock {
-        var value = mln_webgpu_owned_texture_frame()
-        value.size = UInt32(MemoryLayout<mln_webgpu_owned_texture_frame>.size)
-        try checkStatus(mln_acquired_frame_get_webgpu_texture(
-          requireLiveLocked(), &value
-        ))
-        return try body(WebGPUOwnedTextureFrame(
-          generation: value.generation,
-          width: value.width,
-          height: value.height,
-          scaleFactor: value.scale_factor,
-          frameID: value.frame_id,
-          texture: NativePointer(bitPattern: UInt(bitPattern: value.texture)),
-          textureView: NativePointer(
-            bitPattern: UInt(bitPattern: value.texture_view)
-          ),
-          device: NativePointer(bitPattern: UInt(bitPattern: value.device)),
-          format: value.format
-        ))
-      }
+    var request = mln_webgpu_owned_texture_frame()
+    request.size = UInt32(MemoryLayout<mln_webgpu_owned_texture_frame>.size)
+    let value = try read(request) {
+      mln_acquired_frame_get_webgpu_texture($0, $1)
     }
+    return try body(WebGPUOwnedTextureFrame(
+      generation: value.generation,
+      width: value.width,
+      height: value.height,
+      scaleFactor: value.scale_factor,
+      frameID: value.frame_id,
+      texture: NativePointer(bitPattern: UInt(bitPattern: value.texture)),
+      textureView: NativePointer(
+        bitPattern: UInt(bitPattern: value.texture_view)
+      ),
+      device: NativePointer(bitPattern: UInt(bitPattern: value.device)),
+      format: value.format
+    ))
   }
 
+  /// Returns this frame to its ring once `consumerCompletion` signals.
+  ///
+  /// Releasing an already released frame does nothing.
   public func release(
     consumerCompletion: GPUSynchronization = .cpuComplete
   ) throws {
@@ -1127,14 +1127,39 @@ public final class AcquiredFrameHandle: @unchecked Sendable {
     }
   }
 
-  private func requireLiveLocked() throws -> mln_acquired_frame {
-    guard handle != 0 else {
-      throw NativeStatusFailure.swiftNativeError("Acquired frame is released")
+  /// Copies one native record out of the live frame, holding the lock across
+  /// the C call and releasing it before the caller reads the record.
+  private func read<Value>(
+    _ request: Value,
+    _ body: (mln_acquired_frame, UnsafeMutablePointer<Value>) -> mln_status
+  ) throws -> Value {
+    try mapNativeFailure {
+      try lock.withLock {
+        var value = request
+        guard handle != 0 else {
+          throw NativeStatusFailure(
+            rawStatus: MLN_STATUS_INVALID_STATE.rawValue,
+            diagnostic: "Acquired frame is released",
+            isNativeStatus: false
+          )
+        }
+        let frame = handle
+        try checkStatus(withUnsafeMutablePointer(to: &value) {
+          body(frame, $0)
+        })
+        return value
+      }
     }
-    return handle
   }
 }
 
+/// One attached render target and the commands that drive it.
+///
+/// A host may share one session across threads: its one stored handle box is
+/// lock-guarded, and the C API leases the native session for each entry point.
+/// Ordering between the calls themselves is the host's, and
+/// ``serviceDriverWork(maxWork:)`` additionally binds the session to whichever
+/// thread first calls it.
 public final class RenderSessionHandle: @unchecked Sendable {
   private let handle: NativeHandleBox<NativeRenderSessionHandle>
   private let frameWake: NativeWakeState
@@ -1153,6 +1178,7 @@ public final class RenderSessionHandle: @unchecked Sendable {
     )
   }
 
+  /// True once ``close()`` destroyed the native session.
   public var isClosed: Bool {
     handle.isClosed
   }
@@ -1161,16 +1187,28 @@ public final class RenderSessionHandle: @unchecked Sendable {
     try handle.requireLive()
   }
 
+  /// Schedules the receiver when frame results become ready to drain.
+  ///
+  /// The callback may coalesce and carries no result. It should schedule
+  /// ``drainFrameResults()`` on the host execution context that consumes them.
+  /// Passing nil clears the handler, which ``detach()``, ``abandon()`` and
+  /// ``close()`` also do.
   public func setFrameReadyHandler(_ handler: (@Sendable () -> Void)?) throws {
     try handle.withLive { _ in frameWake.setHandler(handler) }
   }
 
+  /// Schedules the receiver when this session has driver work to service.
+  ///
+  /// A caller-graphics-thread session reports work here; a core-worker session
+  /// services its own and never calls the handler.
   public func setDriverWorkReadyHandler(
     _ handler: (@Sendable () -> Void)?
   ) throws {
     try handle.withLive { _ in driverWorkWake.setHandler(handler) }
   }
 
+  /// Reads the driver, texture ring depth, and feature bits this session
+  /// attached with. They do not change while the session lives.
   public func capabilities() throws -> RenderSessionCapabilities {
     try mapNativeFailure {
       try handle.withLive { session in
@@ -1191,6 +1229,7 @@ public final class RenderSessionHandle: @unchecked Sendable {
     }
   }
 
+  /// Copies the latest immutable session state.
   public func snapshot() throws -> RenderSessionSnapshot {
     try mapNativeFailure {
       try handle.withLive { session in
@@ -1221,6 +1260,11 @@ public final class RenderSessionHandle: @unchecked Sendable {
     }
   }
 
+  /// Queues one frame demand. Its outcome arrives through
+  /// ``drainFrameResults()``, not through this call.
+  ///
+  /// A demand that clears the present option still renders, and a presenting
+  /// target keeps whatever it presented last.
   public func requestFrame(_ demand: FrameDemand = FrameDemand()) throws {
     try mapNativeFailure {
       try handle.withLive { session in
@@ -1230,14 +1274,18 @@ public final class RenderSessionHandle: @unchecked Sendable {
     }
   }
 
+  /// Drains this session's queued frame results, copying each one out of the
+  /// owned native batch before the call returns. An empty queue drains to an
+  /// empty array.
   public func drainFrameResults() throws -> [RenderFrameResult] {
-    return try mapNativeFailure {
+    try mapNativeFailure {
       try handle.withLive { session in
         var batch: mln_render_frame_batch = 0
-        try checkStatus(mln_render_session_drain_frame_results(
+        let status = mln_render_session_drain_frame_results(
           session.raw, &batch
-        ))
-        guard batch != 0 else { return [] }
+        )
+        if status == MLN_STATUS_NOT_READY { return [] }
+        try checkStatus(status)
         defer { mln_render_frame_batch_release(batch) }
         var count = 0
         try checkStatus(mln_render_frame_batch_count(batch, &count))
@@ -1251,6 +1299,13 @@ public final class RenderSessionHandle: @unchecked Sendable {
     }
   }
 
+  /// Leases the oldest rendered frame that is not already acquired, or nil
+  /// when no frame is ready. The frame owns its ring slot until it is
+  /// released.
+  ///
+  /// It throws ``MaplibreErrorKind/unsupported`` on a session without
+  /// ``RenderSessionCapabilities/Features/frameAcquisition`` and
+  /// ``MaplibreErrorKind/invalidState`` on one that is not attached.
   public func acquireFrame() throws -> AcquiredFrameHandle? {
     try mapNativeFailure {
       try handle.withLive { session in
@@ -1263,12 +1318,16 @@ public final class RenderSessionHandle: @unchecked Sendable {
     }
   }
 
+  /// Runs up to `maxWork` units of this session's pending graphics work and
+  /// returns how many ran. Zero runs every unit the session has.
+  ///
+  /// A caller-graphics-thread session does its graphics work here. The first
+  /// call fixes the session's graphics thread, and a later call from another
+  /// thread throws ``MaplibreErrorKind/wrongThread``.
   @discardableResult
   public func serviceDriverWork(maxWork: Int = 64) throws -> Int {
     guard maxWork >= 0 else {
-      throw NativeStatusFailure.swiftInvalidArgument(
-        "maxWork cannot be negative"
-      )
+      throw MaplibreError.invalidArgument("maxWork cannot be negative")
     }
     return try mapNativeFailure {
       try handle.withLive { session in
@@ -1281,6 +1340,11 @@ public final class RenderSessionHandle: @unchecked Sendable {
     }
   }
 
+  /// Resizes the target and the map behind it.
+  ///
+  /// This is the one authority on an attached session's size: it submits the
+  /// map's own resize itself. `extent` must keep the scale factor the session
+  /// attached with, and a later resize supersedes a pending one.
   public func resize(_ extent: RenderTargetExtent) async throws {
     try await performCompletion { session, completion in
       var value = extent.nativeInput.native
@@ -1288,107 +1352,124 @@ public final class RenderSessionHandle: @unchecked Sendable {
     }
   }
 
+  /// Points this Metal borrowed-texture session at another texture.
   public func setMetalBorrowedTextureTarget(
     _ descriptor: MetalBorrowedTextureDescriptor
   ) async throws {
-    let future = try mapNativeFailure {
-      try descriptor.nativeInput.withNativeDescriptor { descriptor in
-        try startCompletion { session, completion in
-          mln_metal_borrowed_texture_set_target(
-            session, descriptor, completion
-          )
-        }
-      }
+    try await setTarget(descriptor.nativeInput) {
+      mln_metal_borrowed_texture_set_target($0, $1, $2)
     }
-    try await future.value()
   }
 
+  /// Points this Vulkan borrowed-texture session at another image.
+  public func setVulkanBorrowedTextureTarget(
+    _ descriptor: VulkanBorrowedTextureDescriptor
+  ) async throws {
+    try await setTarget(descriptor.nativeInput) {
+      mln_vulkan_borrowed_texture_set_target($0, $1, $2)
+    }
+  }
+
+  /// Points this OpenGL borrowed-texture session at another texture.
+  public func setOpenGLBorrowedTextureTarget(
+    _ descriptor: OpenGLBorrowedTextureDescriptor
+  ) async throws {
+    try await setTarget(descriptor.nativeInput) {
+      mln_opengl_borrowed_texture_set_target($0, $1, $2)
+    }
+  }
+
+  /// Points this WebGPU borrowed-texture session at another texture.
+  public func setWebGPUBorrowedTextureTarget(
+    _ descriptor: WebGPUBorrowedTextureDescriptor
+  ) async throws {
+    try await setTarget(descriptor.nativeInput) {
+      mln_webgpu_borrowed_texture_set_target($0, $1, $2)
+    }
+  }
+
+  /// Points this Metal surface session at another layer.
   public func setMetalSurfaceTarget(
     _ descriptor: MetalSurfaceDescriptor
   ) async throws {
-    let future = try mapNativeFailure {
-      try descriptor.nativeInput.withNativeDescriptor { descriptor in
-        try startCompletion { session, completion in
-          mln_metal_surface_set_target(session, descriptor, completion)
-        }
-      }
+    try await setTarget(descriptor.nativeInput) {
+      mln_metal_surface_set_target($0, $1, $2)
     }
-    try await future.value()
   }
 
+  /// Points this Vulkan surface session at another surface.
   public func setVulkanSurfaceTarget(
     _ descriptor: VulkanSurfaceDescriptor
   ) async throws {
-    let future = try mapNativeFailure {
-      try descriptor.nativeInput.withNativeDescriptor { descriptor in
-        try startCompletion { session, completion in
-          mln_vulkan_surface_set_target(session, descriptor, completion)
-        }
-      }
+    try await setTarget(descriptor.nativeInput) {
+      mln_vulkan_surface_set_target($0, $1, $2)
     }
-    try await future.value()
   }
 
+  /// Points this OpenGL surface session at another surface.
   public func setOpenGLSurfaceTarget(
     _ descriptor: OpenGLSurfaceDescriptor
   ) async throws {
-    let future = try mapNativeFailure {
-      try descriptor.nativeInput.withNativeDescriptor { descriptor in
-        try startCompletion { session, completion in
-          mln_opengl_surface_set_target(session, descriptor, completion)
-        }
-      }
+    try await setTarget(descriptor.nativeInput) {
+      mln_opengl_surface_set_target($0, $1, $2)
     }
-    try await future.value()
   }
 
+  /// Points this WebGPU surface session at another surface.
   public func setWebGPUSurfaceTarget(
     _ descriptor: WebGPUSurfaceDescriptor
   ) async throws {
-    let future = try mapNativeFailure {
-      try descriptor.nativeInput.withNativeDescriptor { descriptor in
-        try startCompletion { session, completion in
-          mln_webgpu_surface_set_target(session, descriptor, completion)
-        }
-      }
+    try await setTarget(descriptor.nativeInput) {
+      mln_webgpu_surface_set_target($0, $1, $2)
     }
-    try await future.value()
   }
 
+  /// Waits until every render-session command accepted before this call has
+  /// committed.
   public func barrier() async throws {
     try await performCompletion {
       mln_render_session_barrier($0, $1)
     }
   }
 
+  /// Asks the renderer to release what it can of its memory.
   public func reduceMemoryUse() async throws {
     try await performCompletion(mln_render_session_reduce_memory_use)
   }
 
+  /// Drops the renderer's cached tiles and images.
   public func clearData() async throws {
     try await performCompletion(mln_render_session_clear_data)
   }
 
+  /// Writes the renderer's debug state to the log.
   public func dumpDebugLogs() async throws {
     try await performCompletion(mln_render_session_dump_debug_logs)
   }
 
+  /// Reads the target back as tightly packed premultiplied RGBA8 pixels.
+  ///
+  /// Only an owned texture target grants the readback feature that the session
+  /// must carry for this call.
   public func readPremultipliedRGBA8() async throws
     -> PremultipliedRGBA8Image
   {
-    let future = try startCompletion(
-      mln_texture_read_premultiplied_rgba8
-    ) { result in
-      let value: mln_texture_readback_result = try NativeCompletion
-        .value(result)
-      return try PremultipliedRGBA8Image(
-        info: TextureImageInfo(native: NativeTextureImageInfo(value.info)),
-        data: NativeCompletion.dataView(value.data)
-      )
+    try await awaitNative {
+      try startCompletion(mln_texture_read_premultiplied_rgba8) { result in
+        let value: mln_texture_readback_result = try NativeCompletion
+          .value(result)
+        return try PremultipliedRGBA8Image(
+          info: TextureImageInfo(native: NativeTextureImageInfo(value.info)),
+          data: NativeCompletion.dataView(value.data)
+        )
+      }
     }
-    return try await future.value()
   }
 
+  /// Detaches this session from its target, giving every outstanding demand
+  /// the target-not-ready result.
+  ///
+  /// The session stays valid afterward and still needs ``close()``.
   public func detach() async throws {
     try await performCompletion(mln_render_session_detach)
     frameWake.setHandler(nil)
@@ -1400,7 +1481,8 @@ public final class RenderSessionHandle: @unchecked Sendable {
   /// The call waits for the map's in-flight tile work before returning, so no
   /// library thread touches the session's target or device afterward and the
   /// host may destroy its graphics objects immediately. Do not call it from a
-  /// MapLibre worker callback.
+  /// MapLibre worker callback. It throws ``MaplibreErrorKind/busy`` while a
+  /// driver call is in flight, having changed nothing.
   public func abandon() throws -> RenderAbandonResult {
     try mapNativeFailure {
       try handle.withLive { session in
@@ -1424,6 +1506,8 @@ public final class RenderSessionHandle: @unchecked Sendable {
     }
   }
 
+  /// Destroys the native session. It is callable from one of this session's
+  /// own completions.
   public func close() throws {
     try mapNativeFailure {
       try handle.closeOnce { session in
@@ -1434,7 +1518,24 @@ public final class RenderSessionHandle: @unchecked Sendable {
     }
   }
 
-  func startCompletion<Value: Sendable>(
+  private func setTarget<Descriptor: NativeDescriptor>(
+    _ descriptor: Descriptor,
+    _ retarget: (
+      mln_render_session,
+      UnsafePointer<Descriptor.NativeValue>,
+      UnsafePointer<mln_completion>
+    ) -> mln_status
+  ) async throws {
+    try await awaitNative {
+      try descriptor.withNativeDescriptor { descriptor in
+        try startCompletion { session, completion in
+          retarget(session, descriptor, completion)
+        }
+      }
+    }
+  }
+
+  private func startCompletion<Value: Sendable>(
     _ body: (mln_render_session, UnsafePointer<mln_completion>) -> mln_status,
     convert: @escaping (UnsafePointer<mln_completion_result>) throws -> Value
   ) throws -> NativeFuture<Value> {
@@ -1446,257 +1547,175 @@ public final class RenderSessionHandle: @unchecked Sendable {
     }
   }
 
-  func startCompletion(
+  private func startCompletion(
     _ body: (mln_render_session, UnsafePointer<mln_completion>) -> mln_status
   ) throws -> NativeFuture<Void> {
     try startCompletion(body) { _ in () }
   }
 
-  func performCompletion(
+  private func performCompletion(
     _ body: (mln_render_session, UnsafePointer<mln_completion>) -> mln_status
   ) async throws {
-    try await mapNativeFailure { try startCompletion(body) }.value()
+    try await awaitNative { try startCompletion(body) }
   }
 }
 
 public extension MapHandle {
-  private typealias StartedRenderSession = (
-    attachment: NativeRender.Attachment,
-    frameWake: NativeWakeState,
-    driverWorkWake: NativeWakeState
-  )
-
-  private func startRenderSession(
-    options: RenderSessionAttachOptions,
-    _ start: (UnsafePointer<mln_render_session_attach_options>) throws
-      -> NativeRender.Attachment
-  ) throws -> StartedRenderSession {
-    let frameWake = NativeWakeState()
-    let driverWorkWake = NativeWakeState()
-    let frameDescriptor = frameWake.makeDescriptor()
-    let driverDescriptor = driverWorkWake.makeDescriptor()
-    do {
-      let attachment = try mapNativeFailure {
-        try options.withNative(
-          frameWake: frameDescriptor,
-          driverWorkWake: driverDescriptor,
-          start
-        )
-      }
-      return (attachment, frameWake, driverWorkWake)
-    } catch {
-      frameWake.releaseRejectedDescriptor()
-      driverWorkWake.releaseRejectedDescriptor()
-      throw error
-    }
-  }
-
-  private func finishRenderSession(
-    _ started: StartedRenderSession
-  ) throws -> RenderSessionAttachment {
-    let session = try RenderSessionHandle(
-      session: started.attachment.session,
-      frameWake: started.frameWake,
-      driverWorkWake: started.driverWorkWake
-    )
-    let completed = Task { [session] in
-      try await mapNativeFailure {
-        try await started.attachment.completion.value()
-      }
-      withExtendedLifetime(session) {}
-    }
-    return RenderSessionAttachment(session: session, completion: completed)
-  }
-
   func attachMetalSurface(
     _ descriptor: MetalSurfaceDescriptor,
     options: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
-    let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
-      try startRenderSession(options: options) { options in
-        try NativeRender.metalSurfaceAttachStart(
-          map: requireLiveHandle(),
-          descriptor: value,
-          options: options
-        )
-      }
+    try attachRenderSession(descriptor.nativeInput, options: options) {
+      mln_metal_surface_attach($0, $1, $2, $3, $4)
     }
-    return try finishRenderSession(attachment)
   }
 
   func attachVulkanSurface(
     _ descriptor: VulkanSurfaceDescriptor,
     options: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
-    let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
-      try startRenderSession(options: options) { options in
-        try NativeRender.vulkanSurfaceAttachStart(
-          map: requireLiveHandle(),
-          descriptor: value,
-          options: options
-        )
-      }
+    try attachRenderSession(descriptor.nativeInput, options: options) {
+      mln_vulkan_surface_attach($0, $1, $2, $3, $4)
     }
-    return try finishRenderSession(attachment)
   }
 
   func attachOpenGLSurface(
     _ descriptor: OpenGLSurfaceDescriptor,
     options: RenderSessionAttachOptions = .init(driver: .callerGraphicsThread)
   ) throws -> RenderSessionAttachment {
-    let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
-      try startRenderSession(options: options) { options in
-        try NativeRender.openGLSurfaceAttachStart(
-          map: requireLiveHandle(),
-          descriptor: value,
-          options: options
-        )
-      }
+    try attachRenderSession(descriptor.nativeInput, options: options) {
+      mln_opengl_surface_attach($0, $1, $2, $3, $4)
     }
-    return try finishRenderSession(attachment)
-  }
-
-  func attachMetalOwnedTexture(
-    _ descriptor: MetalOwnedTextureDescriptor,
-    options: RenderSessionAttachOptions
-  ) throws -> RenderSessionAttachment {
-    let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
-      try startRenderSession(options: options) { options in
-        try NativeRender.metalOwnedTextureAttachStart(
-          map: requireLiveHandle(),
-          descriptor: value,
-          options: options
-        )
-      }
-    }
-    return try finishRenderSession(attachment)
-  }
-
-  func attachMetalBorrowedTexture(
-    _ descriptor: MetalBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions
-  ) throws -> RenderSessionAttachment {
-    let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
-      try startRenderSession(options: options) { options in
-        try NativeRender.metalBorrowedTextureAttachStart(
-          map: requireLiveHandle(),
-          descriptor: value,
-          options: options
-        )
-      }
-    }
-    return try finishRenderSession(attachment)
-  }
-
-  func attachVulkanOwnedTexture(
-    _ descriptor: VulkanOwnedTextureDescriptor,
-    options: RenderSessionAttachOptions
-  ) throws -> RenderSessionAttachment {
-    let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
-      try startRenderSession(options: options) { options in
-        try NativeRender.vulkanOwnedTextureAttachStart(
-          map: requireLiveHandle(),
-          descriptor: value,
-          options: options
-        )
-      }
-    }
-    return try finishRenderSession(attachment)
-  }
-
-  func attachVulkanBorrowedTexture(
-    _ descriptor: VulkanBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions
-  ) throws -> RenderSessionAttachment {
-    let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
-      try startRenderSession(options: options) { options in
-        try NativeRender.vulkanBorrowedTextureAttachStart(
-          map: requireLiveHandle(),
-          descriptor: value,
-          options: options
-        )
-      }
-    }
-    return try finishRenderSession(attachment)
-  }
-
-  func attachOpenGLOwnedTexture(
-    _ descriptor: OpenGLOwnedTextureDescriptor,
-    options: RenderSessionAttachOptions = .init(driver: .callerGraphicsThread)
-  ) throws -> RenderSessionAttachment {
-    let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
-      try startRenderSession(options: options) { options in
-        try NativeRender.openGLOwnedTextureAttachStart(
-          map: requireLiveHandle(),
-          descriptor: value,
-          options: options
-        )
-      }
-    }
-    return try finishRenderSession(attachment)
-  }
-
-  func attachOpenGLBorrowedTexture(
-    _ descriptor: OpenGLBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions = .init(driver: .callerGraphicsThread)
-  ) throws -> RenderSessionAttachment {
-    let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
-      try startRenderSession(options: options) { options in
-        try NativeRender.openGLBorrowedTextureAttachStart(
-          map: requireLiveHandle(),
-          descriptor: value,
-          options: options
-        )
-      }
-    }
-    return try finishRenderSession(attachment)
   }
 
   func attachWebGPUSurface(
     _ descriptor: WebGPUSurfaceDescriptor,
     options: RenderSessionAttachOptions = .init(driver: .callerGraphicsThread)
   ) throws -> RenderSessionAttachment {
-    let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
-      try startRenderSession(options: options) { options in
-        try NativeRender.webGPUSurfaceAttachStart(
-          map: requireLiveHandle(),
-          descriptor: value,
-          options: options
-        )
-      }
+    try attachRenderSession(descriptor.nativeInput, options: options) {
+      mln_webgpu_surface_attach($0, $1, $2, $3, $4)
     }
-    return try finishRenderSession(attachment)
+  }
+
+  func attachMetalOwnedTexture(
+    _ descriptor: MetalOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions
+  ) throws -> RenderSessionAttachment {
+    try attachRenderSession(descriptor.nativeInput, options: options) {
+      mln_metal_owned_texture_attach($0, $1, $2, $3, $4)
+    }
+  }
+
+  func attachVulkanOwnedTexture(
+    _ descriptor: VulkanOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions
+  ) throws -> RenderSessionAttachment {
+    try attachRenderSession(descriptor.nativeInput, options: options) {
+      mln_vulkan_owned_texture_attach($0, $1, $2, $3, $4)
+    }
+  }
+
+  func attachOpenGLOwnedTexture(
+    _ descriptor: OpenGLOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions = .init(driver: .callerGraphicsThread)
+  ) throws -> RenderSessionAttachment {
+    try attachRenderSession(descriptor.nativeInput, options: options) {
+      mln_opengl_owned_texture_attach($0, $1, $2, $3, $4)
+    }
   }
 
   func attachWebGPUOwnedTexture(
     _ descriptor: WebGPUOwnedTextureDescriptor,
     options: RenderSessionAttachOptions = .init(driver: .callerGraphicsThread)
   ) throws -> RenderSessionAttachment {
-    let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
-      try startRenderSession(options: options) { options in
-        try NativeRender.webGPUOwnedTextureAttachStart(
-          map: requireLiveHandle(),
-          descriptor: value,
-          options: options
-        )
-      }
+    try attachRenderSession(descriptor.nativeInput, options: options) {
+      mln_webgpu_owned_texture_attach($0, $1, $2, $3, $4)
     }
-    return try finishRenderSession(attachment)
+  }
+
+  func attachMetalBorrowedTexture(
+    _ descriptor: MetalBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions
+  ) throws -> RenderSessionAttachment {
+    try attachRenderSession(descriptor.nativeInput, options: options) {
+      mln_metal_borrowed_texture_attach($0, $1, $2, $3, $4)
+    }
+  }
+
+  func attachVulkanBorrowedTexture(
+    _ descriptor: VulkanBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions
+  ) throws -> RenderSessionAttachment {
+    try attachRenderSession(descriptor.nativeInput, options: options) {
+      mln_vulkan_borrowed_texture_attach($0, $1, $2, $3, $4)
+    }
+  }
+
+  func attachOpenGLBorrowedTexture(
+    _ descriptor: OpenGLBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions = .init(driver: .callerGraphicsThread)
+  ) throws -> RenderSessionAttachment {
+    try attachRenderSession(descriptor.nativeInput, options: options) {
+      mln_opengl_borrowed_texture_attach($0, $1, $2, $3, $4)
+    }
   }
 
   func attachWebGPUBorrowedTexture(
     _ descriptor: WebGPUBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions = .init(driver: .callerGraphicsThread)
   ) throws -> RenderSessionAttachment {
-    let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
-      try startRenderSession(options: options) { options in
-        try NativeRender.webGPUBorrowedTextureAttachStart(
-          map: requireLiveHandle(),
-          descriptor: value,
-          options: options
-        )
-      }
+    try attachRenderSession(descriptor.nativeInput, options: options) {
+      mln_webgpu_borrowed_texture_attach($0, $1, $2, $3, $4)
     }
-    return try finishRenderSession(attachment)
+  }
+
+  /// Attaches one render target, publishing the session synchronously and
+  /// reporting the attachment itself through the returned task.
+  ///
+  /// The two wake descriptors are retained for the session's life; a rejected
+  /// submission releases them before the error reaches the caller.
+  private func attachRenderSession<Descriptor: NativeDescriptor>(
+    _ descriptor: Descriptor,
+    options: RenderSessionAttachOptions,
+    _ attach: (
+      mln_map,
+      UnsafePointer<Descriptor.NativeValue>,
+      UnsafePointer<mln_render_session_attach_options>,
+      UnsafeMutablePointer<mln_render_session>,
+      UnsafePointer<mln_completion>
+    ) -> mln_status
+  ) throws -> RenderSessionAttachment {
+    let frameWake = NativeWakeState()
+    let driverWorkWake = NativeWakeState()
+    let started: NativeRender.Attachment
+    do {
+      started = try mapNativeFailure {
+        let map = try requireLiveHandle()
+        return try descriptor.withNativeDescriptor { descriptor in
+          try options.withNative(
+            frameWake: frameWake.makeDescriptor(),
+            driverWorkWake: driverWorkWake.makeDescriptor()
+          ) { options in
+            try NativeRender.attachment { session, completion in
+              attach(map.raw, descriptor, options, session, completion)
+            }
+          }
+        }
+      }
+    } catch {
+      frameWake.releaseRejectedDescriptor()
+      driverWorkWake.releaseRejectedDescriptor()
+      throw error
+    }
+    let session = try RenderSessionHandle(
+      session: started.session,
+      frameWake: frameWake,
+      driverWorkWake: driverWorkWake
+    )
+    let completion = Task { [session] in
+      try await mapNativeFailure { try await started.completion.value() }
+      withExtendedLifetime(session) {}
+    }
+    return RenderSessionAttachment(session: session, completion: completion)
   }
 }

@@ -788,7 +788,7 @@ extern "C" MLN_API void mln_adapter_handle_leak_report(void* token) noexcept {
 extern "C" MLN_API auto mln_adapter_resource_request_queue_create(
   const mln_wake* wake, mln_adapter_resource_request_queue* out_queue
 ) noexcept -> mln_status {
-  try {
+  return mln::c_api::status_boundary([&]() -> mln_status {
     if (out_queue == nullptr || *out_queue != MLN_HANDLE_NULL) {
       mln::core::set_thread_error("out_queue must point to the null handle");
       return MLN_STATUS_INVALID_ARGUMENT;
@@ -804,16 +804,14 @@ extern "C" MLN_API auto mln_adapter_resource_request_queue_create(
     owned->wake->accept();
     *out_queue = handle;
     return MLN_STATUS_OK;
-  } catch (...) {
-    return MLN_STATUS_NATIVE_ERROR;
-  }
+  });
 }
 
 extern "C" MLN_API auto mln_adapter_resource_request_queue_acquire(
   mln_adapter_resource_request_queue queue,
   mln_adapter_queued_resource_request** out_request
 ) noexcept -> mln_status {
-  try {
+  return mln::c_api::status_boundary([&]() -> mln_status {
     if (out_request == nullptr || *out_request != nullptr) {
       mln::core::set_thread_error("out_request must point to null");
       return MLN_STATUS_INVALID_ARGUMENT;
@@ -845,9 +843,7 @@ extern "C" MLN_API auto mln_adapter_resource_request_queue_acquire(
       live->wake_pending = false;
     }
     return MLN_STATUS_OK;
-  } catch (...) {
-    return MLN_STATUS_NATIVE_ERROR;
-  }
+  });
 }
 
 extern "C" MLN_API void mln_adapter_resource_request_queue_close(
@@ -864,7 +860,7 @@ extern "C" MLN_API void mln_adapter_resource_request_queue_close(
 extern "C" MLN_API auto mln_adapter_log_queue_create(
   const mln_wake* wake, mln_adapter_log_queue* out_queue
 ) noexcept -> mln_status {
-  try {
+  return mln::c_api::status_boundary([&]() -> mln_status {
     if (out_queue == nullptr || *out_queue != MLN_HANDLE_NULL) {
       mln::core::set_thread_error("out_queue must point to the null handle");
       return MLN_STATUS_INVALID_ARGUMENT;
@@ -878,15 +874,13 @@ extern "C" MLN_API auto mln_adapter_log_queue_create(
     owned->wake->accept();
     *out_queue = handle;
     return MLN_STATUS_OK;
-  } catch (...) {
-    return MLN_STATUS_NATIVE_ERROR;
-  }
+  });
 }
 
 extern "C" MLN_API auto mln_adapter_log_queue_acquire(
   mln_adapter_log_queue queue, mln_adapter_log_record** out_record
 ) noexcept -> mln_status {
-  try {
+  return mln::c_api::status_boundary([&]() -> mln_status {
     if (out_record == nullptr || *out_record != nullptr) {
       mln::core::set_thread_error("out_record must point to null");
       return MLN_STATUS_INVALID_ARGUMENT;
@@ -916,9 +910,7 @@ extern "C" MLN_API auto mln_adapter_log_queue_acquire(
       live->wake_pending = false;
     }
     return MLN_STATUS_OK;
-  } catch (...) {
-    return MLN_STATUS_NATIVE_ERROR;
-  }
+  });
 }
 
 extern "C" MLN_API void mln_adapter_log_queue_close(
@@ -1055,14 +1047,12 @@ extern "C" MLN_API auto mln_adapter_http_header_transform_callback(
 extern "C" MLN_API auto mln_adapter_http_header_validate(
   const char* name, const char* value
 ) noexcept -> mln_status {
-  try {
+  return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::validate_http_header(
       name, name == nullptr ? 0 : std::strlen(name), value,
       value == nullptr ? 0 : std::strlen(value)
     );
-  } catch (...) {
-    return MLN_STATUS_NATIVE_ERROR;
-  }
+  });
 }
 
 extern "C" MLN_API auto mln_adapter_resource_provider_rules_callback(

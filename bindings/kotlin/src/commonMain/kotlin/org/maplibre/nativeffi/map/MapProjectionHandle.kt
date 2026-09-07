@@ -9,10 +9,10 @@ import org.maplibre.nativeffi.geo.ScreenPoint
  * Owned standalone projection snapshot created from a map.
  *
  * Every call is synchronous, runs on the calling thread, is internally serialized, and may be made
- * from any thread. A projection copies the map's transform state at creation and never observes map
- * changes made after that and remains usable after its source map and runtime close.
+ * from any thread. A projection copies the map's transform state at creation, never observes later
+ * map changes, and stays usable after its source map and runtime close.
  */
-public expect class MapProjectionHandle {
+public expect class MapProjectionHandle : AutoCloseable {
   /** Copies the projection camera, observing every earlier projection setter. */
   public fun camera(): CameraOptions
 
@@ -37,5 +37,5 @@ public expect class MapProjectionHandle {
   public val isClosed: Boolean
 
   /** Closes the projection after waiting for projection calls already running on other threads. */
-  public fun close()
+  override fun close()
 }

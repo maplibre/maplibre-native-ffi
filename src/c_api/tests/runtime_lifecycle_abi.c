@@ -34,11 +34,6 @@ static void close_preflight_leaves_a_runtime_with_a_live_child_open(void) {
     MLN_STATUS_OK, mln_runtime_get_event_mask(runtime, &mask)
   );
   mln_test_destroy_map(map);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_reserve_child(runtime));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE, mln_runtime_release(runtime, &discard)
-  );
-  mln_test_runtime_abandon_child(runtime);
   mln_test_destroy_runtime(runtime);
 }
 

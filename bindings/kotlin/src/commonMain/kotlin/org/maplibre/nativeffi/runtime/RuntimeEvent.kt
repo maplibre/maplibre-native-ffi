@@ -16,7 +16,6 @@ import org.maplibre.nativeffi.map.MapHandle
  * @property mapSource the map that raised the event, resolved through a weak reference to the
  *   public wrapper and null once the host drops its own reference to that [MapHandle]. Read
  *   [sourceType] to tell a map-originated event from a runtime-originated one.
- * @property code the secondary event detail carried by the event.
  * @property payload the typed payload, preserved as raw bytes for unknown domains.
  * @property message the copied diagnostic message.
  */

@@ -25,7 +25,7 @@ public sealed class MapFeatureStateTests
     [Fact]
     public async Task FeatureStateRoundTripsThroughTheMapStore()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions { Width = 512, Height = 512 }
@@ -38,10 +38,12 @@ public sealed class MapFeatureStateTests
         Assert.Equal(JsonValueKind.Object, missing.ValueKind);
         Assert.Empty(missing.EnumerateObject());
 
-        RuntimeEventTestHelpers.AssertCommandFinishes(
-            runtime,
-            map.SetFeatureStateAsync(Selector(), """{"hover":true,"rank":2}"""u8.ToArray()),
-            MaplibreStatus.Ok
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.SetFeatureStateAsync(
+                Selector(),
+                """{"hover":true,"rank":2}"""u8.ToArray(),
+                TestContext.Current.CancellationToken
+            )
         );
 
         var state = ParseState(
@@ -51,10 +53,8 @@ public sealed class MapFeatureStateTests
         Assert.Equal(2, state.GetProperty("rank").GetInt32());
 
         // Removing one key leaves the others in place.
-        RuntimeEventTestHelpers.AssertCommandFinishes(
-            runtime,
-            map.RemoveFeatureStateAsync(Selector("hover")),
-            MaplibreStatus.Ok
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.RemoveFeatureStateAsync(Selector("hover"), TestContext.Current.CancellationToken)
         );
         var remaining = ParseState(
             await map.GetFeatureStateAsync(Selector(), TestContext.Current.CancellationToken)
@@ -63,10 +63,8 @@ public sealed class MapFeatureStateTests
         Assert.Equal(2, remaining.GetProperty("rank").GetInt32());
 
         // Removing without a key clears the feature's state.
-        RuntimeEventTestHelpers.AssertCommandFinishes(
-            runtime,
-            map.RemoveFeatureStateAsync(Selector()),
-            MaplibreStatus.Ok
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.RemoveFeatureStateAsync(Selector(), TestContext.Current.CancellationToken)
         );
         var cleared = ParseState(
             await map.GetFeatureStateAsync(Selector(), TestContext.Current.CancellationToken)
@@ -78,7 +76,7 @@ public sealed class MapFeatureStateTests
     [Fact]
     public async Task FeatureStateCommandsValidateSelectorShape()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions { Width = 512, Height = 512 }
@@ -87,7 +85,11 @@ public sealed class MapFeatureStateTests
 
         // Set and get require a feature ID.
         await Assert.ThrowsAsync<InvalidArgumentException>(() =>
-            map.SetFeatureStateAsync(withoutFeature, """{"hover":true}"""u8.ToArray())
+            map.SetFeatureStateAsync(
+                withoutFeature,
+                """{"hover":true}"""u8.ToArray(),
+                TestContext.Current.CancellationToken
+            )
         );
         await Assert.ThrowsAsync<InvalidArgumentException>(() =>
             map.GetFeatureStateAsync(withoutFeature, TestContext.Current.CancellationToken)
@@ -96,13 +98,18 @@ public sealed class MapFeatureStateTests
         // Remove accepts a bare state key only alongside a feature ID.
         await Assert.ThrowsAsync<InvalidArgumentException>(() =>
             map.RemoveFeatureStateAsync(
-                new FeatureStateSelector { SourceId = "geo", StateKey = "hover" }
+                new FeatureStateSelector { SourceId = "geo", StateKey = "hover" },
+                TestContext.Current.CancellationToken
             )
         );
 
         // Set requires one JSON object.
         await Assert.ThrowsAsync<InvalidArgumentException>(() =>
-            map.SetFeatureStateAsync(Selector(), """["not-an-object"]"""u8.ToArray())
+            map.SetFeatureStateAsync(
+                Selector(),
+                """["not-an-object"]"""u8.ToArray(),
+                TestContext.Current.CancellationToken
+            )
         );
     }
 }

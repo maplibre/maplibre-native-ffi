@@ -1,7 +1,6 @@
 package org.maplibre.nativeffi.render
 
 import kotlin.jvm.JvmInline
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.status.Status
 
@@ -16,14 +15,19 @@ public value class RenderDriver public constructor(public val nativeValue: Int) 
   }
 }
 
-/** Attachment policy for a render session. */
+/**
+ * Attachment policy for a render session.
+ *
+ * [requestedTextureRingDepth] is a hint. Zero asks for the target's default depth, and native
+ * clamps a larger request to the depth the target supports.
+ */
 public data class RenderSessionAttachOptions(
   public val driver: RenderDriver = RenderDriver.CORE_WORKER,
   public val requestedTextureRingDepth: Int = 0,
 ) {
   init {
-    Status.requireArgument(requestedTextureRingDepth in 0..3) {
-      "requestedTextureRingDepth must be between zero and three"
+    Status.requireArgument(requestedTextureRingDepth >= 0) {
+      "requestedTextureRingDepth must not be negative"
     }
   }
 }
@@ -33,18 +37,6 @@ public data class RenderSessionAttachment(
   public val session: RenderSessionHandle,
   public val completed: Deferred<Unit>,
 )
-
-internal fun retainSessionUntilComplete(
-  session: RenderSessionHandle,
-  source: Deferred<Unit>,
-): Deferred<Unit> {
-  val retained = CompletableDeferred<Unit>()
-  source.invokeOnCompletion { failure ->
-    if (failure == null) retained.complete(Unit) else retained.completeExceptionally(failure)
-    session.hashCode()
-  }
-  return retained
-}
 
 public data class RenderSessionCapabilities(
   public val driver: RenderDriver,
@@ -69,20 +61,33 @@ public value class RenderSessionState public constructor(public val nativeValue:
   }
 }
 
+/**
+ * One frame demand. Every `uint64_t` field is preserved as a [Long] bit pattern; format through
+ * `toULong()`.
+ */
 public data class FrameDemand(
-  public val token: ULong = 0u,
-  public val coalescingBoundary: ULong = 0u,
-  public val timeoutNanoseconds: ULong = 0u,
+  public val token: Long = 0L,
+  public val coalescingBoundary: Long = 0L,
+  public val timeoutNanoseconds: Long = 0L,
+  /** Skips rendering when the map published nothing new, reporting `NO_UPDATE` instead. */
   public val ifNeeded: Boolean = true,
+  /**
+   * Presents the rendered frame on a presenting target. A demand that clears it still renders, and
+   * the target keeps whatever it presented last.
+   */
   public val present: Boolean = false,
 )
 
+/**
+ * One frame outcome. Every `uint64_t` field is preserved as a [Long] bit pattern; format through
+ * `toULong()`.
+ */
 public data class RenderFrameResult(
   public val disposition: RenderResult,
-  public val token: ULong,
-  public val mapUpdateGeneration: ULong,
-  public val extentGeneration: ULong,
-  public val frameGeneration: ULong,
+  public val token: Long,
+  public val mapUpdateGeneration: Long,
+  public val extentGeneration: Long,
+  public val frameGeneration: Long,
   /**
    * Whether the map asked for another frame while it rendered this one, as during an ongoing camera
    * transition. Set only when [disposition] is [RenderResult.RENDERED], and false for every other
@@ -91,17 +96,21 @@ public data class RenderFrameResult(
   public val needsRepaint: Boolean,
 )
 
+/**
+ * One published render-session generation. Every `uint64_t` field is preserved as a [Long] bit
+ * pattern; format through `toULong()`.
+ */
 public data class RenderSessionSnapshot(
   public val state: RenderSessionState,
   public val driver: RenderDriver,
   public val latestResult: RenderResult,
   public val extent: RenderTargetExtent,
-  public val generation: ULong,
-  public val mapUpdateGeneration: ULong,
-  public val renderedUpdateGeneration: ULong,
-  public val extentGeneration: ULong,
-  public val frameGeneration: ULong,
-  public val latestDemandToken: ULong,
+  public val generation: Long,
+  public val mapUpdateGeneration: Long,
+  public val renderedUpdateGeneration: Long,
+  public val extentGeneration: Long,
+  public val frameGeneration: Long,
+  public val latestDemandToken: Long,
   public val pendingDemandCount: Int,
   public val acquiredFrameCount: Int,
   public val targetReady: Boolean,
@@ -127,11 +136,12 @@ public value class GpuSyncKind public constructor(public val nativeValue: Int) {
  * @property objectHandle Bit pattern of the backend object that [kind] names: the
  *   `id<MTLSharedEvent>` pointer, the `VkSemaphore` handle, the `GLsync` pointer, or the WebGPU
  *   token. Zero when [kind] is [GpuSyncKind.CPU_COMPLETE].
+ * @property value Native `uint64_t` timeline value preserved as a [Long] bit pattern.
  */
 public data class GpuSync(
   public val kind: GpuSyncKind = GpuSyncKind.CPU_COMPLETE,
-  public val objectHandle: ULong = 0u,
-  public val value: ULong = 0u,
+  public val objectHandle: Long = 0L,
+  public val value: Long = 0L,
 )
 
 @JvmInline
@@ -149,4 +159,12 @@ public data class RenderAbandonResult(
   public val quarantinedResourceCount: Int,
 )
 
-public data class TextureReadback(public val bytes: ByteArray, public val info: TextureImageInfo)
+/** Copied readback pixels and the image metadata that describes them. */
+public class TextureReadback(public val bytes: ByteArray, public val info: TextureImageInfo) {
+  override fun equals(other: Any?): Boolean =
+    other is TextureReadback && bytes.contentEquals(other.bytes) && info == other.info
+
+  override fun hashCode(): Int = 31 * bytes.contentHashCode() + info.hashCode()
+
+  override fun toString(): String = "TextureReadback(bytes=${bytes.size} bytes, info=$info)"
+}

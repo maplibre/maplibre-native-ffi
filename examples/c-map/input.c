@@ -30,9 +30,7 @@ static mln_animation_options animation(double duration_ms) {
 }
 
 static input_result submitted(app_error error) {
-  return (input_result){
-    .handled = true, .camera_changed = error == APP_OK, .error = error
-  };
+  return (input_result){.camera_changed = error == APP_OK, .error = error};
 }
 
 static app_error submit_camera(
@@ -116,8 +114,7 @@ static input_result handle_mouse_button_down(
   input_controller* controller, const SDL_MouseButtonEvent* button,
   map_state* state, viewport value
 ) {
-  if (controller->drag_mode != DRAG_MODE_NONE)
-    return (input_result){.handled = true};
+  if (controller->drag_mode != DRAG_MODE_NONE) return (input_result){};
   const drag_mode mode = drag_mode_for_button(button->button);
   if (mode == DRAG_MODE_NONE) return (input_result){};
   const mln_screen_point cursor = logical_point(button->x, button->y, value);
@@ -125,10 +122,13 @@ static input_result handle_mouse_button_down(
   controller->last_y = cursor.y;
   controller->drag_mode = mode;
   controller->drag_button = button->button;
-  mln_camera_options camera = mln_camera_options_default();
-  const app_error error = map_state_update_camera(
-    state, &camera, MLN_CAMERA_UPDATE_MODE_JUMP, NULL, MLN_GESTURE_PHASE_BEGIN
-  );
+  app_error error = map_state_cancel_transitions(state);
+  if (error == APP_OK) {
+    mln_camera_options camera = mln_camera_options_default();
+    error = map_state_update_camera(
+      state, &camera, MLN_CAMERA_UPDATE_MODE_JUMP, NULL, MLN_GESTURE_PHASE_BEGIN
+    );
+  }
   return submitted(error);
 }
 
@@ -138,15 +138,14 @@ static input_result handle_mouse_button_up(
 ) {
   if (button->button != SDL_BUTTON_LEFT && button->button != SDL_BUTTON_RIGHT)
     return (input_result){};
-  if (button->button != controller->drag_button)
-    return (input_result){.handled = true};
+  if (button->button != controller->drag_button) return (input_result){};
   controller->drag_mode = DRAG_MODE_NONE;
   controller->drag_button = 0;
   mln_camera_options camera = mln_camera_options_default();
   const app_error error = map_state_update_camera(
     state, &camera, MLN_CAMERA_UPDATE_MODE_JUMP, NULL, MLN_GESTURE_PHASE_END
   );
-  return (input_result){.handled = true, .error = error};
+  return (input_result){.error = error};
 }
 
 static input_result handle_mouse_motion(
@@ -159,7 +158,7 @@ static input_result handle_mouse_motion(
   const double dy = cursor.y - controller->last_y;
   controller->last_x = cursor.x;
   controller->last_y = cursor.y;
-  if (dx == 0.0 && dy == 0.0) return (input_result){.handled = true};
+  if (dx == 0.0 && dy == 0.0) return (input_result){};
   return submitted(
     controller->drag_mode == DRAG_MODE_PAN
       ? pan(state, dx, dy, MLN_CAMERA_UPDATE_MODE_JUMP, 0.0)
@@ -172,7 +171,7 @@ static input_result handle_mouse_motion(
 static input_result handle_mouse_wheel(
   const SDL_MouseWheelEvent* wheel, map_state* state, viewport value
 ) {
-  if (wheel->y == 0.0) return (input_result){.handled = true};
+  if (wheel->y == 0.0) return (input_result){};
   return submitted(zoom(
     state, pow(2.0, wheel->y * 0.25),
     logical_point(wheel->mouse_x, wheel->mouse_y, value),

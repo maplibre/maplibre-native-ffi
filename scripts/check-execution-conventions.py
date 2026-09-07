@@ -5,7 +5,8 @@ A ``const mln_completion* completion`` parameter identifies one-shot
 asynchronous work. Drains transfer queued stream records, driver service keeps
 its graphics-thread contract, published snapshots are synchronous copies, and
 everything else is immediate. Public operation handles, result-taking
-accessors, and command IDs are forbidden.
+accessors, and command IDs are forbidden, and every status-returning
+declaration carries a ``Returns:`` list.
 """
 
 from __future__ import annotations
@@ -19,16 +20,6 @@ FUNCTION = re.compile(
     r"MLN_API\s+[^;]*?\b(mln_[A-Za-z0-9_]+)\s*\([^;]*?\)\s*MLN_NOEXCEPT\s*;",
     re.DOTALL,
 )
-
-
-def header_files(paths: list[pathlib.Path]) -> list[pathlib.Path]:
-    files: list[pathlib.Path] = []
-    for path in paths:
-        if path.is_dir():
-            files.extend(sorted(path.glob("*.h")))
-        else:
-            files.append(path)
-    return files
 
 
 def exported_functions(
@@ -77,6 +68,11 @@ def convention_errors(
     )
     if legacy or name.endswith(("_start", "_take_result")):
         errors.append(f"legacy asynchronous shape remains public: {name}")
+    if (
+        re.match(r"MLN_API\s+mln_status\b", declaration.strip())
+        and "Returns:" not in documentation
+    ):
+        errors.append(f"status-returning function has no Returns list: {name}")
     if category == "completion":
         if not documentation:
             errors.append(f"completion function has no boundary documentation: {name}")
@@ -95,13 +91,13 @@ def convention_errors(
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("headers", nargs="+", type=pathlib.Path)
+    parser.add_argument("include_directory", type=pathlib.Path)
     arguments = parser.parse_args()
 
     errors: list[str] = []
     try:
         declarations, documentation = exported_functions(
-            header_files(arguments.headers)
+            sorted(arguments.include_directory.glob("*.h"))
         )
     except (OSError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)

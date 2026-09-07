@@ -60,14 +60,8 @@ internal sealed unsafe class ResourceTransformState : IDisposable
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
-    private static void Release(void* userData)
-    {
-        try
-        {
-            ((ResourceTransformState?)GCHandle.FromIntPtr((nint)userData).Target)?.Dispose();
-        }
-        catch { }
-    }
+    private static void Release(void* userData) =>
+        CallbackRelease.Dispose<ResourceTransformState>(userData);
 
     private static mln_status Invoke(
         ResourceTransformState? state,

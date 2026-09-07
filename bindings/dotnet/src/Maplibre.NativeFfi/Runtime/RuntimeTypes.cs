@@ -128,28 +128,6 @@ public enum RuntimeEventMask : ulong
     All = AllMapEvents | AllRuntimeEvents,
 }
 
-/// <summary>One drained batch of copied runtime events.</summary>
-/// <remarks>
-/// Every value in the batch is a copy, so it stays readable after the next drain and after the map
-/// that produced it is closed.
-/// </remarks>
-/// <param name="Events">The copied events in queue order.</param>
-public sealed record RuntimeEventBatch(IReadOnlyList<RuntimeEvent> Events)
-{
-    private readonly IReadOnlyList<RuntimeEvent> events = ValueEquality.Snapshot(Events);
-
-    public IReadOnlyList<RuntimeEvent> Events
-    {
-        get => events;
-        init => events = ValueEquality.Snapshot(value);
-    }
-
-    public bool Equals(RuntimeEventBatch? other) =>
-        other is not null && ValueEquality.SequenceEquals(events, other.events);
-
-    public override int GetHashCode() => ValueEquality.SequenceHashCode(events);
-}
-
 /// <summary>One copied runtime event from <see cref="RuntimeHandle.DrainEvents()" />.</summary>
 /// <param name="Type">The event kind, when this binding knows the raw value.</param>
 /// <param name="RawType">The raw native event kind.</param>
@@ -259,7 +237,6 @@ public abstract record RuntimeEventPayload
     /// </param>
     public sealed record CameraTransitionFinished(ulong TransitionId) : RuntimeEventPayload;
 
-    /// <summary>Terminal outcome of an accepted ordered command.</summary>
     /// <summary>Payload for a payload kind this binding does not declare.</summary>
     /// <remarks>
     /// <see cref="PayloadBytes" /> holds the event record's fixed payload window, copied unchanged,

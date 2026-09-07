@@ -313,7 +313,6 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # The Emscripten suite runs as a page in headless Chromium; see
 # scripts/run-browser-test.mjs for how a browser is located.
 run = '''
-cmake --build --preset "$usage_preset" --target mln_ffi_c_api_tests
 if [[ "$usage_preset" == linux-musl-* ]]; then
   exec "$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh" "$usage_preset"
 elif [[ "$usage_preset" == ios-simulator-* ]]; then

@@ -260,18 +260,30 @@ const (
 type GesturePhase uint32
 
 const (
-	GesturePhaseNone   GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_NONE)
-	GesturePhaseBegin  GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_BEGIN)
+	// GesturePhaseNone carries no gesture boundary and leaves the flag as it is.
+	GesturePhaseNone GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_NONE)
+	// GesturePhaseBegin marks the first update of a gesture. It only sets
+	// MapSnapshot.GestureInProgress; it cancels no running transition.
+	GesturePhaseBegin GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_BEGIN)
+	// GesturePhaseUpdate marks an update inside a gesture and keeps the flag
+	// set.
 	GesturePhaseUpdate GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_UPDATE)
-	GesturePhaseEnd    GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_END)
+	// GesturePhaseEnd marks the last update of a gesture and clears the flag.
+	GesturePhaseEnd GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_END)
+	// GesturePhaseCancel cancels the transitions running after the camera
+	// write, then clears the flag.
 	GesturePhaseCancel GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_CANCEL)
 )
 
 // CameraUpdate is one atomic absolute camera update.
 type CameraUpdate struct {
-	Mode         CameraUpdateMode
-	Camera       CameraOptions
-	Animation    *AnimationOptions
+	// Mode selects how the camera reaches the new value.
+	Mode CameraUpdateMode
+	// Camera carries the fields to apply; unset fields keep their value.
+	Camera CameraOptions
+	// Animation tunes an eased or flying transition, nil for native defaults.
+	Animation *AnimationOptions
+	// GesturePhase is the gesture boundary applied around the camera write.
 	GesturePhase GesturePhase
 }
 
@@ -298,21 +310,29 @@ const (
 
 // CameraDelta describes one relative camera operation.
 type CameraDelta struct {
-	Kind      CameraDeltaKind
-	Offset    ScreenPoint
-	Amount    float64
-	Anchor    *ScreenPoint
+	// Kind selects the relative operation.
+	Kind CameraDeltaKind
+	// Offset is the logical-pixel pan for CameraDeltaKindMove.
+	Offset ScreenPoint
+	// Amount is the scale factor, bearing degrees, or pitch degrees the Kind
+	// selects. CameraDeltaKindPitch adds to the current pitch, the opposite
+	// sign of MapLibre Native's Map::pitchBy().
+	Amount float64
+	// Anchor is the logical screen point the operation pivots around, nil to
+	// pivot around the viewport center.
+	Anchor *ScreenPoint
+	// Animation tunes the transition, nil for an immediate change.
 	Animation *AnimationOptions
 }
 
 func cCameraDelta(delta CameraDelta) C.mln_camera_delta {
 	raw := C.mln_camera_delta_default()
 	raw.kind = C.uint32_t(delta.Kind)
-	raw.offset = C.mln_screen_point{x: C.double(delta.Offset.X), y: C.double(delta.Offset.Y)}
+	raw.offset = cScreenPoint(delta.Offset)
 	raw.amount = C.double(delta.Amount)
 	if delta.Anchor != nil {
 		raw.has_anchor = true
-		raw.anchor = C.mln_screen_point{x: C.double(delta.Anchor.X), y: C.double(delta.Anchor.Y)}
+		raw.anchor = cScreenPoint(*delta.Anchor)
 	}
 	if delta.Animation != nil {
 		raw.animation = cAnimationOptions(*delta.Animation)
@@ -372,12 +392,12 @@ func cCameraFitOptions(options CameraFitOptions) C.mln_camera_fit_options {
 	return raw
 }
 
-func cCameraFitOptionsPointer(options *CameraFitOptions) (C.mln_camera_fit_options, *C.mln_camera_fit_options) {
+func cCameraFitOptionsPointer(options *CameraFitOptions) *C.mln_camera_fit_options {
 	if options == nil {
-		return C.mln_camera_fit_options{}, nil
+		return nil
 	}
 	raw := cCameraFitOptions(*options)
-	return raw, &raw
+	return &raw
 }
 
 // BoundsConstraintKind selects which case a BoundsConstraint carries.

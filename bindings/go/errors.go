@@ -8,6 +8,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	internalstatus "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/status"
 )
@@ -106,6 +107,15 @@ func (e *Error) Diagnostic() string {
 		return ""
 	}
 	return e.diagnostic
+}
+
+// validateCStringArgument rejects a value that C would truncate at an embedded
+// NUL byte. name is the argument name the diagnostic reports.
+func validateCStringArgument(name string, value string) error {
+	if strings.IndexByte(value, 0) >= 0 {
+		return newBindingError(ErrInvalidArgument, name+" contains embedded NUL")
+	}
+	return nil
 }
 
 func checkNative[S ~int32](call func() S) error {

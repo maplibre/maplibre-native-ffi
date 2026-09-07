@@ -58,7 +58,8 @@ func (future *Future[T]) retain(value any) {
 }
 
 // Done closes when native has delivered the terminal result. It lets a host
-// service another loop without blocking in Await.
+// service another loop without blocking in Await. A nil Future reports done
+// immediately, and Await then reports ErrInvalidArgument rather than blocking.
 func (future *Future[T]) Done() <-chan struct{} {
 	if future == nil || future.state == nil {
 		closed := make(chan struct{})
@@ -90,16 +91,18 @@ type completionReceiver interface {
 }
 
 type completionBridge[T any] struct {
-	state   *futureState[T]
-	convert func(*C.mln_completion_result) (T, error)
+	state *futureState[T]
+	// deliversStatus reports whether a non-OK terminal status belongs in the
+	// converted value rather than in the future's error.
+	deliversStatus bool
+	convert        func(*C.mln_completion_result) (T, error)
 }
 
 func (bridge *completionBridge[T]) complete(raw *C.mln_completion_result) {
 	var result futureResult[T]
-	_, isCommand := any(*new(T)).(CommandCompletion)
 	if raw == nil {
 		result.err = newBindingError(ErrInvalidState, "native completion returned nil")
-	} else if raw.status != C.MLN_STATUS_OK && !isCommand {
+	} else if raw.status != C.MLN_STATUS_OK && !bridge.deliversStatus {
 		diagnostic := ""
 		if raw.diagnostic.data != nil && raw.diagnostic.size != 0 {
 			diagnostic = string(unsafe.Slice((*byte)(raw.diagnostic.data), int(raw.diagnostic.size)))
@@ -128,7 +131,8 @@ func startCompletion[T any](
 	convert func(*C.mln_completion_result) (T, error),
 ) (*Future[T], error) {
 	state := &futureState[T]{ready: make(chan struct{})}
-	bridge := &completionBridge[T]{state: state, convert: convert}
+	_, deliversStatus := any(*new(T)).(CommandCompletion)
+	bridge := &completionBridge[T]{state: state, deliversStatus: deliversStatus, convert: convert}
 	handle := cgo.NewHandle(completionReceiver(bridge))
 	completion := C.mln_go_make_completion_from_handle(C.uintptr_t(handle))
 	if err := checkNative(func() int32 { return start(&completion) }); err != nil {
@@ -136,6 +140,56 @@ func startCompletion[T any](
 		return nil, err
 	}
 	return &Future[T]{state: state}, nil
+}
+
+// startMapCompletion submits one map command or ordered query and returns its
+// future. The handle stays reachable across the native call.
+func startMapCompletion[T any](
+	m *MapHandle,
+	start func(C.mln_map, *C.mln_completion) int32,
+	convert func(*C.mln_completion_result) (T, error),
+) (*Future[T], error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer m.state.KeepAlive()
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return start(C.mln_map(ptr), completion)
+	}, convert)
+}
+
+// startRuntimeCompletion submits one runtime operation and returns its future.
+func startRuntimeCompletion[T any](
+	runtime *RuntimeHandle,
+	start func(C.mln_runtime, *C.mln_completion) int32,
+	convert func(*C.mln_completion_result) (T, error),
+) (*Future[T], error) {
+	ptr, err := runtime.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.state.KeepAlive()
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return start(C.mln_runtime(ptr), completion)
+	}, convert)
+}
+
+// startRenderCompletion submits one render-session operation and returns its
+// future.
+func startRenderCompletion[T any](
+	session *RenderSessionHandle,
+	start func(C.mln_render_session, *C.mln_completion) int32,
+	convert func(*C.mln_completion_result) (T, error),
+) (*Future[T], error) {
+	ptr, err := session.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer session.state.KeepAlive()
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return start(C.mln_render_session(ptr), completion)
+	}, convert)
 }
 
 func completionUnit(result *C.mln_completion_result) (struct{}, error) {
@@ -208,19 +262,17 @@ func mln_go_completion_callback(userData unsafe.Pointer, result *C.mln_completio
 	if userData == nil {
 		return
 	}
-	receiver, ok := cgo.Handle(uintptr(userData)).Value().(completionReceiver)
-	if ok {
-		receiver.complete(result)
-	}
+	// startCompletion is the only writer of this handle, so a value of another
+	// type is a binding defect and the assertion panics rather than dropping a
+	// terminal result.
+	cgo.Handle(uintptr(userData)).Value().(completionReceiver).complete(result)
 }
 
 //export mln_go_completion_release
 func mln_go_completion_release(userData unsafe.Pointer) {
 	if userData != nil {
 		handle := cgo.Handle(uintptr(userData))
-		if receiver, ok := handle.Value().(completionReceiver); ok {
-			receiver.release()
-		}
+		handle.Value().(completionReceiver).release()
 		handle.Delete()
 	}
 }

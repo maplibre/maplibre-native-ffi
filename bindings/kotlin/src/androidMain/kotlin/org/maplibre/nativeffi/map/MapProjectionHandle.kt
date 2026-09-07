@@ -14,11 +14,10 @@ import org.maplibre.nativeffi.internal.status.Status
 /**
  * Owned Android JNI standalone projection snapshot.
  *
- * Every call is synchronous, runs on the calling thread, is internally serialized, and may be made
- * from any thread. A projection copies the map's transform state at creation and never observes map
- * changes made after that and remains usable after its source map and runtime close.
+ * See the common declaration for the projection's threading and lifetime rules.
  */
-public actual class MapProjectionHandle internal constructor(private val handleId: Long) {
+public actual class MapProjectionHandle internal constructor(private val handleId: Long) :
+  AutoCloseable {
   private val core = HandleStateCore("MapProjectionHandle", handleId)
 
   init {
@@ -142,15 +141,8 @@ public actual class MapProjectionHandle internal constructor(private val handleI
   public actual val isClosed: Boolean
     get() = core.isReleased()
 
-  public actual fun close() {
-    if (!core.beginClose()) return
-    try {
-      Status.check(MaplibreNativeC.mln_map_projection_close(handleId))
-    } catch (error: Throwable) {
-      core.abortClose()
-      throw error
-    }
-    core.completeClose()
+  actual override fun close() {
+    core.closeOnce(destroy = { MaplibreNativeC.mln_map_projection_close(handleId) })
   }
 
   private fun <T> withLiveHandle(block: (Long) -> T): T = core.withLive { block(handleId) }

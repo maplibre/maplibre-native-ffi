@@ -123,9 +123,11 @@ is what rejects a mismatched handle, so document the handle type each parameter
 expects.
 
 Handle values are safe to copy, compare, hash, and move between threads, and
-carry no ownership on their own. Runtime, map, projection, render-session, and
-event-batch handles are callable from any native thread. Render-driver comments
-name the calls that require a graphics thread.
+carry no ownership on their own. Runtime, map, projection, render-session
+control, event-batch, frame-result-batch, and acquired-frame handles are
+callable from any native thread; backend accessors on acquired frames keep their
+graphics-context requirement. Render-driver comments name the calls that require
+a graphics thread.
 
 The bit layout is internal. Hosts pass handles back as issued, and decoding or
 synthesizing an id is unsupported.
@@ -155,12 +157,15 @@ to equal `MLN_HANDLE_NULL` on entry and preserve live host-owned handles on
 failure. Document when scoped resource ownership begins and when it ends.
 
 One-shot asynchronous work accepts a completion callback, `user_data`, and a
-release callback. A successful submission transfers that callback state to the C
-API. The completion runs exactly once and may run before the submission returns.
-Its result pointers and diagnostic bytes remain borrowed for the callback. The
-release callback runs after the completion returns and after no native path can
-invoke it again. A rejected submission invokes neither callback and leaves
-callback-state ownership with the caller.
+release callback. A submission validates and deep-copies every input before
+returning acceptance, and a successful submission transfers that callback state
+to the C API. The completion runs exactly once and may run before the submission
+returns. Its result pointers and diagnostic bytes remain borrowed for the
+callback. The release callback runs after the completion returns and after no
+native path can invoke it again. A rejected submission invokes neither callback
+and leaves callback-state ownership with the caller. Native work retains its
+callback state and other dependencies independently from the public runtime or
+map handle.
 
 The runtime owns a native scheduler thread and one continuously running MapLibre
 `RunLoop`. Runtime and map entry points resolve a handle, acquire its
@@ -172,10 +177,9 @@ captured, serialized by the projection's internal lock.
 A render session selects one of two execution contracts at attachment. A
 core-worker driver owns a native serial graphics worker. A
 caller-graphics-thread driver stores typed work until the host services it where
-the context is usable. WGL targets, EGL surfaces, shared EGL textures, existing
-WebGL, and browser WebGPU use the caller driver. Transferable Metal and Vulkan
-targets, private EGL owned texture targets, and `OffscreenCanvas` WebGL targets
-may use a core worker.
+the context is usable. The
+[render session concepts](/maplibre-native-ffi/concepts/#render-session) table
+gives the driver that each target kind accepts.
 
 Keep render-session control separate from graphics execution. Demand, snapshots,
 operations, abandonment, and destruction are any-thread calls. The caller-driver
@@ -188,13 +192,15 @@ Event batch, or Render-driver call. A binding maps that category to one
 target-language shape; it does not add another scheduler or asynchronous
 boundary.
 
-The category follows from the declaration, and
-`scripts/check-execution-conventions.py` enforces the mapping as a test:
+The category follows from the declaration.
+`scripts/check-execution-conventions.py` derives it with the rows below, in
+order, and the first row that matches wins. A completion parameter therefore
+decides the category on its own, which is why `mln_map_release` and
+`mln_runtime_release` are completions rather than immediate calls:
 
 | Declaration                                          | Category           |
 | ---------------------------------------------------- | ------------------ |
 | completion callback parameter                        | Completion         |
-| `_destroy` or `_release` suffix                      | Immediate          |
 | `_drain_` in the name                                | Event batch        |
 | `_service_driver_work` suffix                        | Render-driver call |
 | `snapshot` in the name reading a live map or session | Published snapshot |
@@ -203,14 +209,19 @@ The category follows from the declaration, and
 Name a new function so that its category derives from this table. A call whose
 effects surface only through a drained event stream and that accepts no
 completion is immediate: `mln_render_session_request_frame` returns its final
-status synchronously and reports the frame through frame results. The checker
-keeps an exception table for forms that the conventions cannot express; it is
-empty today, and growth is a design smell.
+status synchronously and reports the frame through frame results.
+
+The checker reports the count it derived per category, and fails on four rules:
+a public operation handle, command ID, `_start` suffix, or `_take_result`
+suffix; a status-returning declaration without a `Returns:` list; a completion
+function without a documentation comment; and a render-driver call that names no
+session parameter or documents no graphics-thread contract.
 
 Pick the category from what the function reads or writes:
 
 - A read of unkeyed, fixed-size map state that changes only through the caller's
-  own commands or through load progress is a published-snapshot field. Every
+  own commands or through load progress is a published-snapshot field. It copies
+  immutable committed state without entering mutable MapLibre state. Every
   committed map command publishes a snapshot and reports the published
   generation in its completion, so a snapshot at or past that generation
   observes the commit.
@@ -235,22 +246,9 @@ when each form does distinct work, as camera does: the snapshot serves
 latest-published consumers, and the ordered query is the fence. Delete an
 ordered form that strictly duplicates the snapshot.
 
-One-shot functions validate and deep-copy every input before returning
-acceptance. Each accepted completion reaches one terminal result. Native work
-retains its callback state and other dependencies independently from the public
-runtime or map handle. Command completions report committed, superseded, failed,
-or cancelled disposition. A committed map command reports the snapshot
-generation that its commit published.
-
-Published snapshots copy immutable committed state without entering mutable
-MapLibre state. Use an ordered completion instead when a query must observe
-every preceding command.
-
 Graphics contexts that bind to a thread, such as OpenGL, are made current during
 caller-driver service and restored afterward under shared ownership. Dedicated
-ownership keeps a session-created context current between renders. WGL and EGL
-surface targets use a caller driver. Private EGL owned texture targets and
-transferred WebGL targets use a core worker.
+ownership keeps a session-created context current between renders.
 
 On Apple targets each entry point and queued runtime submission drains its own
 Objective-C autorelease pool, so a native worker or host render thread does not
@@ -270,8 +268,9 @@ Runtime submissions follow these rules:
 - Committing eligible work invokes the run loop and wakes it when idle.
 - Registry locks protect lookup and state transitions only. Release them before
   run-loop joins or callback quiescence.
-- A close preflight checks live children and pending child reservations before
-  committing an irreversible close.
+- A close preflight rejects while the handle owns a child, counting each child
+  from the moment its creation is accepted, before committing an irreversible
+  close.
 - A runtime barrier completes after every preceding submission reaches a
   terminal disposition, not merely after its run-loop callback starts.
 - Complete every accepted one-shot submission exactly once. State consumers may
@@ -299,7 +298,17 @@ Use these categories consistently:
 - `MLN_STATUS_UNSUPPORTED` for backends, platforms, entry points, or requested
   behavior unavailable in this build;
 - `MLN_STATUS_NATIVE_ERROR` for native MapLibre errors or C++ exceptions
-  converted to status.
+  converted to status;
+- `MLN_STATUS_CANCELLED` for a completion that reached its terminal cancelled
+  disposition;
+- `MLN_STATUS_BUSY` for a conflicting in-flight driver call or lifecycle
+  transition;
+- `MLN_STATUS_TARGET_LOST` for an irreversibly lost render target or graphics
+  receiver;
+- `MLN_STATUS_NOT_READY` for a nonblocking acquisition, drain, or service call
+  with nothing available yet;
+- `MLN_STATUS_NOT_FOUND` for a command that names an ID with no live object
+  behind it.
 
 Every exported `MLN_API` C++ definition must be `noexcept`. Status-returning
 entry points use the C API boundary helper to clear thread-local diagnostics on
@@ -332,11 +341,7 @@ undrained event stream during native teardown. A drain transfers the complete
 queue into an owned batch, which stays readable across later drains and runtime
 release until the caller releases it.
 
-Use the five execution categories defined in Ownership And Execution. An
-Immediate return is final. A Completion return reports copied acceptance and
-later delivers one terminal result. Published snapshots are immutable
-synchronous copies. Event batches contain drainable observations. Render-driver
-calls execute on the graphics thread named by their target contract.
+Use the five execution categories defined in Ownership And Execution.
 
 Logging, resource transform, and resource provider callbacks may run on MapLibre
 worker, network, logging, or render-related threads.

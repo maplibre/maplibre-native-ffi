@@ -62,8 +62,6 @@ internal class HttpHeaderTransformState(private val callback: HttpHeaderTransfor
     }
   }
 
-  fun checkCanClose() = gate.checkCanClose()
-
   override fun close() = gate.close()
 
   private fun closeNative() {

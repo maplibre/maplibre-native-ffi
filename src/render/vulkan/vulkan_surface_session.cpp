@@ -582,7 +582,7 @@ auto vulkan_surface_attach_start(
   };
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),
-    .driver = options == nullptr ? 0u : options->driver,
+    .driver = 0,
     .texture_ring_depth = 0,
     .flags = MLN_RENDER_SESSION_CAPABILITY_PRESENTATION
   };
@@ -596,6 +596,12 @@ auto vulkan_surface_set_target_start(
   mln_render_session session, const mln_vulkan_surface_descriptor* descriptor,
   const mln_completion* completion
 ) -> mln_status {
+  const auto submission_status = validate_render_session_retarget_submission(
+    session, RetargetTargetKind::Surface, completion
+  );
+  if (submission_status != MLN_STATUS_OK) {
+    return submission_status;
+  }
   const auto descriptor_status = validate_vulkan_surface_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
@@ -604,10 +610,7 @@ auto vulkan_surface_set_target_start(
   return enqueue_driver_operation(
     session,
     [copied](mln_render_session_object& target) {
-      const auto handles_status = validate_vulkan_handles(copied);
-      if (handles_status != MLN_STATUS_OK) {
-        return handles_status;
-      }
+      // set_vulkan_target() runs the handle checks itself.
       return surface_session_set_target(
         target.self, copied.extent, [&copied](mln_render_session_object& live) {
           return live.surface.backend->set_vulkan_target(copied);

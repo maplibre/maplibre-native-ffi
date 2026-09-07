@@ -128,3 +128,87 @@ void mln_zig_test_destroy_window_metal_layer(
   window_layer->window = NULL;
   window_layer->layer = NULL;
 }
+
+typedef struct mln_zig_test_metal_texture {
+  void* device;
+  void* texture;
+  uint32_t width;
+  uint32_t height;
+} mln_zig_test_metal_texture;
+
+bool mln_zig_test_create_metal_texture(
+  uint32_t width, uint32_t height, mln_zig_test_metal_texture* out_texture
+) {
+  if (out_texture == NULL || width == 0 || height == 0) {
+    return false;
+  }
+  id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+  if (device == nil) {
+    return false;
+  }
+  MTLTextureDescriptor* descriptor = [MTLTextureDescriptor
+    texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                                 width:width
+                                height:height
+                             mipmapped:NO];
+  descriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+  descriptor.storageMode = MTLStorageModeManaged;
+  id<MTLTexture> texture = [device newTextureWithDescriptor:descriptor];
+  if (texture == nil) {
+    [device release];
+    return false;
+  }
+  out_texture->device = device;
+  out_texture->texture = texture;
+  out_texture->width = width;
+  out_texture->height = height;
+  return true;
+}
+
+// Copies the texture into host memory and reports whether any byte is set, so a
+// test can tell a rendered target from an untouched one.
+bool mln_zig_test_metal_texture_has_non_zero_pixel(
+  const mln_zig_test_metal_texture* owned_texture, bool* out_has_non_zero
+) {
+  if (
+    owned_texture == NULL || owned_texture->texture == NULL ||
+    out_has_non_zero == NULL
+  ) {
+    return false;
+  }
+  id<MTLTexture> texture = (id<MTLTexture>)owned_texture->texture;
+  const size_t stride = (size_t)owned_texture->width * 4u;
+  const size_t byte_length = stride * (size_t)owned_texture->height;
+  uint8_t* pixels = (uint8_t*)calloc(1, byte_length);
+  if (pixels == NULL) {
+    return false;
+  }
+  [texture getBytes:pixels
+        bytesPerRow:stride
+         fromRegion:MTLRegionMake2D(
+                      0, 0, owned_texture->width, owned_texture->height
+                    )
+        mipmapLevel:0];
+  bool found = false;
+  for (size_t index = 0; index < byte_length; index += 1) {
+    if (pixels[index] != 0) {
+      found = true;
+      break;
+    }
+  }
+  free(pixels);
+  *out_has_non_zero = found;
+  return true;
+}
+
+void mln_zig_test_destroy_metal_texture(
+  mln_zig_test_metal_texture* owned_texture
+) {
+  if (owned_texture == NULL) {
+    return;
+  }
+  [(id<MTLTexture>)owned_texture->texture release];
+  [(id<MTLDevice>)owned_texture->device release];
+  owned_texture->texture = NULL;
+  owned_texture->device = NULL;
+}

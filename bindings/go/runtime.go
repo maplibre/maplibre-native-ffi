@@ -8,13 +8,11 @@ package maplibre
 import "C"
 
 import (
-	"errors"
 	"sync"
 	"unsafe"
 
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/memory"
 )
 
 // NetworkStatus is MapLibre Native's process-global network reachability mode.
@@ -37,7 +35,10 @@ const (
 
 // RuntimeOptions configures runtime creation.
 type RuntimeOptions struct {
+	// AssetPath is the directory MapLibre resolves asset:// URLs against.
 	AssetPath string
+	// CachePath is the file path of the runtime's ambient cache and offline
+	// database.
 	CachePath string
 	// EventMask selects the runtime-originated event types this runtime queues.
 	// NewRuntimeOptions sets it to the native default, which selects every type.
@@ -72,19 +73,10 @@ func (options RuntimeOptions) Equal(other RuntimeOptions) bool {
 }
 
 func (options RuntimeOptions) validate() error {
-	if _, err := memory.NewCString(options.AssetPath); err != nil {
-		if errors.Is(err, memory.EmbeddedNulError()) {
-			return newBindingError(ErrInvalidArgument, "RuntimeOptions.AssetPath contains embedded NUL")
-		}
+	if err := validateCStringArgument("RuntimeOptions.AssetPath", options.AssetPath); err != nil {
 		return err
 	}
-	if _, err := memory.NewCString(options.CachePath); err != nil {
-		if errors.Is(err, memory.EmbeddedNulError()) {
-			return newBindingError(ErrInvalidArgument, "RuntimeOptions.CachePath contains embedded NUL")
-		}
-		return err
-	}
-	return nil
+	return validateCStringArgument("RuntimeOptions.CachePath", options.CachePath)
 }
 
 // RuntimeEventType identifies a runtime event kind.
@@ -226,14 +218,6 @@ type RuntimeEvent struct {
 	Payload any
 }
 
-// RuntimeEventBatch is one drained batch of runtime events in queue order.
-// Every field of every event is copied out of runtime-owned storage before the
-// drain returns, so a batch and the values taken out of it stay readable after
-// the next drain.
-type RuntimeEventBatch struct {
-	Events []RuntimeEvent
-}
-
 // CameraChangeMode reports whether a camera change belongs to an animated
 // transition. It is the meaning of RuntimeEvent.Code for
 // RuntimeEventMapCameraWillChange and RuntimeEventMapCameraDidChange.
@@ -366,16 +350,6 @@ type RuntimeHandle struct {
 	maps map[MapID]*MapHandle
 }
 
-func statusFromError(err error) int32 {
-	var native *Error
-	if errors.As(err, &native) {
-		if status, ok := native.RawStatus(); ok {
-			return status
-		}
-	}
-	return int32(C.MLN_STATUS_NATIVE_ERROR)
-}
-
 // String returns a diagnostic name for the status.
 func (status NetworkStatus) String() string {
 	switch status {
@@ -428,6 +402,8 @@ func NewRuntime() (*RuntimeHandle, error) {
 // NewRuntimeWithOptions creates a runtime using explicit options. Start from
 // NewRuntimeOptions to keep every event type selected; a zero-value
 // RuntimeOptions queues no event.
+//
+// The calling goroutine blocks until the runtime worker finishes initializing.
 func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 	if err := options.validate(); err != nil {
 		return nil, err
@@ -450,19 +426,13 @@ func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 	}); err != nil {
 		return nil, err
 	}
-	state, err := newRuntimeState(nativeRuntime(raw))
+	state, err := handle.New(nativeRuntime(raw), "RuntimeHandle")
 	if err != nil {
-		_ = closeNativeRuntime(nativeRuntime(raw))
+		// The wrapper never became visible, so no caller can await this future.
+		_, _ = startNativeRuntimeRelease(nativeRuntime(raw))
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
 	return &RuntimeHandle{state: state}, nil
-}
-
-// closeNativeRuntime releases a native runtime whose Go wrapper never became
-// visible, so no caller can await its teardown future.
-func closeNativeRuntime(runtime nativeRuntime) error {
-	_, err := startNativeRuntimeRelease(runtime)
-	return err
 }
 
 // startNativeRuntimeRelease releases a native runtime and returns the future
@@ -471,10 +441,6 @@ func startNativeRuntimeRelease(runtime nativeRuntime) (*Future[struct{}], error)
 	return startCompletion(func(completion *C.mln_completion) int32 {
 		return int32(C.mln_runtime_release(C.mln_runtime(runtime), completion))
 	}, completionUnit)
-}
-
-func newRuntimeState(runtime nativeRuntime) (*handle.State[nativeRuntime], error) {
-	return handle.New(runtime, "RuntimeHandle")
 }
 
 func (runtime *RuntimeHandle) ptr() (nativeRuntime, error) {
@@ -488,6 +454,16 @@ func (runtime *RuntimeHandle) ptr() (nativeRuntime, error) {
 	return value, nil
 }
 
+// runtimeEventMaskByIDForTest calls the C runtime accessor with a raw handle
+// id, so a test can pass an id of another handle kind. The safe API cannot
+// express a raw id.
+func runtimeEventMaskByIDForTest(id nativeRuntime) error {
+	var mask C.uint64_t
+	return checkNative(func() int32 {
+		return int32(C.mln_runtime_get_event_mask(C.mln_runtime(id), &mask))
+	})
+}
+
 // Barrier starts an ordered runtime operation that completes after every
 // command accepted before it reaches a terminal disposition.
 func (runtime *RuntimeHandle) Barrier() (*Future[struct{}], error) {
@@ -496,22 +472,24 @@ func (runtime *RuntimeHandle) Barrier() (*Future[struct{}], error) {
 	}, completionUnit)
 }
 
-// DrainEvents takes this runtime's whole event queue as one batch of copied
-// values in queue order.
-func (runtime *RuntimeHandle) DrainEvents() (RuntimeEventBatch, error) {
+// DrainEvents takes this runtime's whole event queue in queue order. Every
+// field of every event is copied out of runtime-owned storage and the native
+// batch is released before the call returns, so the events stay readable after
+// the next drain. An empty queue yields no events.
+func (runtime *RuntimeHandle) DrainEvents() ([]RuntimeEvent, error) {
 	ptr, err := runtime.ptr()
 	if err != nil {
-		return RuntimeEventBatch{}, err
+		return nil, err
 	}
 
 	defer runtime.state.KeepAlive()
 
 	rawBatch, ownedBatch, err := drainRawEvents(ptr)
 	if err != nil {
-		return RuntimeEventBatch{}, err
+		return nil, err
 	}
 	defer C.mln_event_batch_release(ownedBatch)
-	return runtime.copyEventBatch(rawBatch), nil
+	return runtime.copyEvents(rawBatch), nil
 }
 
 // SetEventMask selects which runtime-originated event types this runtime queues.
@@ -573,13 +551,13 @@ func drainRawEvents(ptr nativeRuntime) (C.mln_runtime_event_batch_view, C.mln_ev
 // batch's event stride minus this offset is the payload window.
 var runtimeEventPayloadOffset = unsafe.Offsetof(C.mln_runtime_event{}.payload)
 
-// copyEventBatch copies an owned native batch view into owned Go values. It
-// takes the map registry lock once for the whole batch.
-func (runtime *RuntimeHandle) copyEventBatch(raw C.mln_runtime_event_batch_view) RuntimeEventBatch {
-	batch := RuntimeEventBatch{}
+// copyEvents copies a borrowed native batch view into owned Go values. It
+// resolves map sources in one short critical section after the copy, so a drain
+// never holds the map registry lock while native map creation wants it.
+func (runtime *RuntimeHandle) copyEvents(raw C.mln_runtime_event_batch_view) []RuntimeEvent {
 	count := int(raw.event_count)
 	if count <= 0 || raw.events == nil {
-		return batch
+		return nil
 	}
 	// The stride comes from the batch, never from this binding's own event size,
 	// so a C API version that widens the payload union stays readable.
@@ -590,9 +568,9 @@ func (runtime *RuntimeHandle) copyEventBatch(raw C.mln_runtime_event_batch_view)
 		payloadWindow = stride - runtimeEventPayloadOffset
 	}
 
-	events := make([]RuntimeEvent, 0, count)
-	runtime.mapsMu.Lock()
-	for index := 0; index < count; index++ {
+	events := make([]RuntimeEvent, count)
+	var mapSourced []int
+	for index := range events {
 		eventPtr := unsafe.Add(base, uintptr(index)*stride)
 		rawEvent := (*C.mln_runtime_event)(eventPtr)
 		source := RuntimeEventSource{
@@ -600,26 +578,30 @@ func (runtime *RuntimeHandle) copyEventBatch(raw C.mln_runtime_event_batch_view)
 			RawID: uint64(rawEvent.source),
 		}
 		if source.Type == RuntimeEventSourceMap {
-			if sourceMap := runtime.maps[MapID(rawEvent.source)]; sourceMap != nil {
-				source.MapID = sourceMap.id
-			}
+			mapSourced = append(mapSourced, index)
 		}
-		payload := runtimeEventPayloadFromC(rawEvent, unsafe.Add(eventPtr, runtimeEventPayloadOffset), payloadWindow)
-		event := RuntimeEvent{
+		events[index] = RuntimeEvent{
 			Type:        RuntimeEventType(rawEvent._type),
 			SourceType:  source.Type,
 			Source:      source,
 			Code:        int32(rawEvent.code),
 			PayloadType: RuntimeEventPayloadType(rawEvent.payload_type),
 			Message:     runtimeEventMessage(raw, rawEvent),
-			Payload:     payload,
+			Payload:     runtimeEventPayloadFromC(rawEvent, unsafe.Add(eventPtr, runtimeEventPayloadOffset), payloadWindow),
 		}
-		events = append(events, event)
+	}
+	if len(mapSourced) == 0 {
+		return events
+	}
+
+	runtime.mapsMu.Lock()
+	for _, index := range mapSourced {
+		if sourceMap := runtime.maps[MapID(events[index].Source.RawID)]; sourceMap != nil {
+			events[index].Source.MapID = sourceMap.id
+		}
 	}
 	runtime.mapsMu.Unlock()
-
-	batch.Events = events
-	return batch
+	return events
 }
 
 func runtimeEventMessage(batch C.mln_runtime_event_batch_view, event *C.mln_runtime_event) string {
@@ -738,17 +720,20 @@ func offlineRegionStatusFromC(status C.mln_offline_region_status) OfflineRegionS
 	}
 }
 
-// AmbientCacheOperation starts a native ambient cache maintenance
-// operation.
+// AmbientCacheOperation starts one ambient cache maintenance operation. The
+// call validates its arguments and returns without waiting for the runtime
+// worker; a database failure reports ErrNative through the returned future.
 func (runtime *RuntimeHandle) AmbientCacheOperation(operation AmbientCacheOperation) (*Future[struct{}], error) {
 	return startRuntimeCompletion(runtime, func(handle C.mln_runtime, out *C.mln_completion) int32 {
 		return int32(C.mln_runtime_run_ambient_cache_operation(handle, C.uint32_t(operation), out))
 	}, completionUnit)
 }
 
-// SetMaximumAmbientCacheSize starts a change to this runtime's maximum
-// ambient cache size. Lowering it evicts ambient resources to fit the new
-// budget; offline regions are unaffected.
+// SetMaximumAmbientCacheSize starts a change to this runtime's maximum ambient
+// cache size. Lowering it evicts ambient resources to fit the new budget, and
+// leaves offline regions in place. The call returns without waiting for the
+// runtime worker; a database failure reports ErrNative through the returned
+// future.
 func (runtime *RuntimeHandle) SetMaximumAmbientCacheSize(size uint64) (*Future[struct{}], error) {
 	return startRuntimeCompletion(runtime, func(handle C.mln_runtime, out *C.mln_completion) int32 {
 		return int32(C.mln_runtime_set_maximum_ambient_cache_size(handle, C.uint64_t(size), out))
@@ -922,20 +907,16 @@ func (runtime *RuntimeHandle) NewMapWithOptions(options MapOptions) (*Future[*Ma
 		}
 		state, err := handle.New(nativeMap(raw), "MapHandle")
 		if err != nil {
-			_ = closeNativeMap(nativeMap(raw))
+			// The wrapper never became visible, so no caller can await this future.
+			_, _ = startCompletion(func(completion *C.mln_completion) int32 {
+				return int32(C.mln_map_release(C.mln_map(raw), completion))
+			}, completionUnit)
 			return nil, newBindingError(ErrInvalidArgument, err.Error())
 		}
 		m := &MapHandle{state: state, runtime: runtime, id: MapID(raw)}
 		runtime.registerMap(m)
 		return m, nil
 	})
-}
-
-func closeNativeMap(m nativeMap) error {
-	_, err := startCompletion(func(completion *C.mln_completion) int32 {
-		return int32(C.mln_map_release(C.mln_map(m), completion))
-	}, completionUnit)
-	return err
 }
 
 // Close releases this runtime's public native handle and returns the future for
@@ -951,19 +932,18 @@ func (runtime *RuntimeHandle) Close() (*Future[struct{}], error) {
 	if runtime == nil || runtime.state == nil {
 		return nil, newBindingError(ErrInvalidArgument, "RuntimeHandle is nil")
 	}
-	var closeErr error
+	// A closed handle leaves teardown unset, because its native release already
+	// ran for an earlier caller.
 	teardown := completedFuture(struct{}{})
-	_ = runtime.state.Close(func(native nativeRuntime) int32 {
+	if err := runtime.state.Close(func(native nativeRuntime) error {
 		future, err := startNativeRuntimeRelease(native)
 		if err != nil {
-			closeErr = err
-			return statusFromError(err)
+			return err
 		}
 		teardown = future
-		return int32(C.MLN_STATUS_OK)
-	})
-	if closeErr != nil {
-		return nil, closeErr
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 	runtime.mapsMu.Lock()
 	runtime.maps = nil

@@ -381,10 +381,10 @@ final class LayerInfo {
   /// Whether the layer draws.
   final StyleLayerVisibility visibility;
 
-  /// Source ID, when the layer carries one.
+  /// Source ID, and null for a layer type that takes no source.
   final String? sourceId;
 
-  /// Source-layer ID, when the layer carries one.
+  /// Source-layer ID, and null when the layer sets none.
   final String? sourceLayer;
 }
 

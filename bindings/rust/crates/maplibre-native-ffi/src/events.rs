@@ -1,10 +1,7 @@
-use std::fmt;
-use std::str;
-
 use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_sys as sys;
 
-use crate::{Error, Result};
+use crate::Result;
 pub use maplibre_core::events::{
     CameraTransitionFinishedEvent, CommandDisposition, OfflineRegionResponseErrorEvent,
     OfflineRegionStatus, OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent,
@@ -76,137 +73,17 @@ pub struct RuntimeEvent {
     pub payload: RuntimeEventPayload,
 }
 
-/// Owned batch of runtime events.
-///
-/// Native storage remains stable until this batch is dropped, including across
-/// later drains from the same runtime.
-pub struct RuntimeEventBatch {
-    handle: sys::mln_event_batch,
-    raw: sys::mln_runtime_event_batch_view,
-}
-
-impl RuntimeEventBatch {
-    /// Acquires the immutable view for an owned native batch.
+impl RuntimeEvent {
+    /// Copies one event out of the storage a drained batch owns.
     ///
     /// # Safety
     ///
-    /// `handle` must be an owned batch returned by `mln_runtime_drain_events`.
-    pub(crate) unsafe fn new(handle: sys::mln_event_batch) -> Result<Self> {
-        let mut raw = sys::mln_runtime_event_batch_view {
-            size: std::mem::size_of::<sys::mln_runtime_event_batch_view>() as u32,
-            event_size: 0,
-            events: std::ptr::null(),
-            event_count: 0,
-            messages: std::ptr::null(),
-            messages_size: 0,
-        };
-        // SAFETY: `handle` is live and `raw` is writable for this ABI version.
-        if let Err(error) =
-            maplibre_core::check(unsafe { sys::mln_event_batch_get(handle, &mut raw) })
-        {
-            // SAFETY: This function owns the handle on every path.
-            unsafe { sys::mln_event_batch_release(handle) };
-            return Err(error);
-        }
-        Ok(Self { handle, raw })
-    }
-
-    /// Returns how many events this batch reports.
-    pub fn len(&self) -> usize {
-        self.raw.event_count
-    }
-
-    /// Reports whether this batch has no events.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Walks this batch's events in queue order.
-    pub fn iter(&self) -> impl Iterator<Item = RuntimeEventRef<'_>> {
-        (0..self.len()).map(move |index| {
-            // SAFETY: The owned batch keeps its immutable storage live, and
-            // index names one of its events.
-            RuntimeEventRef {
-                view: unsafe { maplibre_core::events::event_view(&self.raw, index) },
-            }
-        })
-    }
-}
-
-impl Drop for RuntimeEventBatch {
-    fn drop(&mut self) {
-        // SAFETY: This wrapper owns exactly one native batch handle.
-        unsafe { sys::mln_event_batch_release(self.handle) };
-    }
-}
-
-impl fmt::Debug for RuntimeEventBatch {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("RuntimeEventBatch")
-            .field("len", &self.len())
-            .finish()
-    }
-}
-
-/// One event of a [`RuntimeEventBatch`], read from batch-owned storage.
-#[derive(Clone, Copy)]
-pub struct RuntimeEventRef<'a> {
-    view: maplibre_core::NativeEventView<'a>,
-}
-
-impl<'a> RuntimeEventRef<'a> {
-    /// Returns this event's type.
-    pub fn event_type(&self) -> RuntimeEventType {
-        RuntimeEventType::from_raw(self.view.raw.type_)
-    }
-
-    /// Returns the object that emitted this event.
-    pub fn source(&self) -> RuntimeEventSource {
-        RuntimeEventSource::from_raw(self.view.raw.source_type, self.view.raw.source)
-    }
-
-    /// Returns the secondary detail whose meaning the event type selects. See
-    /// [`RuntimeEvent::code`].
-    pub fn code(&self) -> i32 {
-        self.view.raw.code
-    }
-
-    /// Decodes the payload union member that this event's payload type names.
-    /// A payload type this version does not define keeps its raw value and the
-    /// payload's copied byte window.
-    pub fn payload(&self) -> RuntimeEventPayload {
-        // SAFETY: The view came from a drained batch, so the payload union
-        // holds initialized bytes for the member payload_type names.
-        unsafe { maplibre_core::events::payload_from_view(&self.view) }
-    }
-
-    /// Returns this event's message as text, or `None` when it carries no
-    /// message. A message that is not UTF-8 fails on its own event.
-    pub fn message(&self) -> Result<Option<&'a str>> {
-        if self.view.message.is_empty() {
-            return Ok(None);
-        }
-        str::from_utf8(self.view.message)
-            .map(Some)
-            .map_err(|error| {
-                Error::invalid_argument(format!(
-                    "runtime event message was not valid UTF-8: {error}"
-                ))
-            })
-    }
-
-    /// Returns this event's message bytes, which are empty when it carries no
-    /// message.
-    pub fn message_bytes(&self) -> &'a [u8] {
-        self.view.message
-    }
-
-    /// Copies this event into a value that outlives the batch.
-    pub fn to_owned(&self) -> Result<RuntimeEvent> {
-        // SAFETY: The view came from a drained batch whose storage is readable
-        // for 'a, so every field copied here is live.
-        let copied = unsafe { maplibre_core::events::copied_event_from_view(&self.view) }?;
-        Ok(RuntimeEvent {
+    /// `view` must come from a batch that `mln_runtime_drain_events` filled,
+    /// and that batch must be live for this call.
+    pub(crate) unsafe fn from_view(view: &maplibre_core::NativeEventView<'_>) -> Result<Self> {
+        // SAFETY: The caller promised the view reads live batch storage.
+        let copied = unsafe { maplibre_core::events::copied_event_from_view(view) }?;
+        Ok(Self {
             event_type: copied.event_type,
             source: RuntimeEventSource::from_raw(
                 copied.source.source_type,
@@ -219,15 +96,44 @@ impl<'a> RuntimeEventRef<'a> {
     }
 }
 
-impl fmt::Debug for RuntimeEventRef<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("RuntimeEventRef")
-            .field("event_type", &self.event_type())
-            .field("source", &self.source())
-            .field("code", &self.code())
-            .field("message_bytes", &self.message_bytes())
-            .finish()
+/// Copies every event of an owned native batch and releases the batch.
+///
+/// # Safety
+///
+/// `handle` must be an owned batch returned by `mln_runtime_drain_events`.
+pub(crate) unsafe fn copy_event_batch(handle: sys::mln_event_batch) -> Result<Vec<RuntimeEvent>> {
+    // SAFETY: handle is live until the release below.
+    let copied = unsafe { copy_events(handle) };
+    // SAFETY: This function owns the handle on every path.
+    unsafe { sys::mln_event_batch_release(handle) };
+    copied
+}
+
+/// Copies the events a live batch holds.
+///
+/// # Safety
+///
+/// `handle` must be live for this call.
+unsafe fn copy_events(handle: sys::mln_event_batch) -> Result<Vec<RuntimeEvent>> {
+    let mut raw = sys::mln_runtime_event_batch_view {
+        size: std::mem::size_of::<sys::mln_runtime_event_batch_view>() as u32,
+        event_size: 0,
+        events: std::ptr::null(),
+        event_count: 0,
+        messages: std::ptr::null(),
+        messages_size: 0,
+    };
+    // SAFETY: handle is live and raw is writable for this ABI version.
+    maplibre_core::check(unsafe { sys::mln_event_batch_get(handle, &mut raw) })?;
+    let mut events = Vec::with_capacity(raw.event_count);
+    for index in 0..raw.event_count {
+        // SAFETY: the batch is live for this call and index names one of its
+        // events.
+        let view = unsafe { maplibre_core::events::event_view(&raw, index) };
+        // SAFETY: the view reads the live batch's storage.
+        events.push(unsafe { RuntimeEvent::from_view(&view) }?);
     }
+    Ok(events)
 }
 
 /// Batch a test fills itself, so batch decoding is exercised without a live
@@ -290,14 +196,14 @@ impl SynthesizedBatch {
         }
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = RuntimeEventRef<'_>> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = Result<RuntimeEvent>> + '_ {
         let raw = self.raw();
         (0..self.count).map(move |index| {
             // SAFETY: This fixture owns the event records and message arena for
             // the iterator's lifetime, and index names one of its records.
-            RuntimeEventRef {
-                view: unsafe { maplibre_core::events::event_view(&raw, index) },
-            }
+            let view = unsafe { maplibre_core::events::event_view(&raw, index) };
+            // SAFETY: The view reads storage this fixture keeps live.
+            unsafe { RuntimeEvent::from_view(&view) }
         })
     }
 }
@@ -326,7 +232,10 @@ mod tests {
         unknown_source.source_type = 999_003;
         unknown_source.source = 0x0300_0000_0000_0063;
         batch.push(unknown_source, b"");
-        let sources = batch.iter().map(|event| event.source()).collect::<Vec<_>>();
+        let sources = batch
+            .iter()
+            .map(|event| event.unwrap().source)
+            .collect::<Vec<_>>();
 
         assert_eq!(
             sources,
@@ -368,14 +277,17 @@ mod tests {
         let mut records = SynthesizedBatch::new();
         records.push(status_event, b"");
         records.push(error_event, b"offline failed");
-        let events = records.iter().collect::<Vec<_>>();
+        let events = records
+            .iter()
+            .collect::<Result<Vec<_>>>()
+            .expect("every synthesized message is text");
 
         assert_eq!(
-            events[0].event_type(),
+            events[0].event_type,
             RuntimeEventType::OfflineRegionStatusChanged
         );
-        assert_eq!(events[0].source(), RuntimeEventSource::Runtime);
-        let RuntimeEventPayload::OfflineRegionStatus(status) = events[0].payload() else {
+        assert_eq!(events[0].source, RuntimeEventSource::Runtime);
+        let RuntimeEventPayload::OfflineRegionStatus(status) = &events[0].payload else {
             panic!("the first event should carry an offline region status payload");
         };
         assert_eq!(status.region_id, 7);
@@ -386,9 +298,9 @@ mod tests {
         assert_eq!(status.status.completed_resource_count, 3);
         assert!(status.status.complete);
 
-        assert_eq!(events[1].message().unwrap(), Some("offline failed"));
-        assert_eq!(events[1].code(), -1);
-        let RuntimeEventPayload::OfflineRegionResponseError(error) = events[1].payload() else {
+        assert_eq!(events[1].message.as_deref(), Some("offline failed"));
+        assert_eq!(events[1].code, -1);
+        let RuntimeEventPayload::OfflineRegionResponseError(error) = &events[1].payload else {
             panic!("the second event should carry a response-error payload");
         };
         assert_eq!(error.region_id, 7);
@@ -409,12 +321,10 @@ mod tests {
                 transition_id: 0x0102_0304_0506_0708,
             };
         records.push(event, b"future payload");
-        let borrowed = records.iter().next().unwrap();
 
-        let owned = borrowed.to_owned().unwrap();
-        assert_eq!(borrowed.message_bytes(), b"future payload");
-        // The batch borrows these records, so releasing the storage the events
-        // were read from leaves only the copy.
+        let owned = records.iter().next().unwrap().unwrap();
+        // The copy reads these records, so releasing the storage the event was
+        // read from leaves only the copy.
         drop(records);
 
         assert_eq!(owned.event_type, RuntimeEventType::Unknown(999_001));
@@ -432,7 +342,7 @@ mod tests {
     }
 
     #[test]
-    fn a_message_that_is_not_utf8_fails_only_its_own_event() {
+    fn a_message_that_is_not_utf8_fails_the_copy_it_belongs_to() {
         let mut records = SynthesizedBatch::new();
         records.push(
             SynthesizedBatch::zeroed_event(sys::MLN_RUNTIME_EVENT_MAP_LOADING_FAILED),
@@ -444,12 +354,12 @@ mod tests {
         );
         let events = records.iter().collect::<Vec<_>>();
 
-        let error = events[0].message().unwrap_err();
+        let error = events[0].as_ref().unwrap_err();
         assert_eq!(error.kind(), crate::ErrorKind::InvalidArgument);
         assert!(error.diagnostic().contains("not valid UTF-8"));
-        assert_eq!(events[0].message_bytes(), &[0xff, 0xfe]);
-        assert!(events[0].to_owned().is_err());
-        assert_eq!(events[1].message().unwrap(), Some("loaded"));
-        assert!(events[1].to_owned().is_ok());
+        assert_eq!(
+            events[1].as_ref().unwrap().message.as_deref(),
+            Some("loaded")
+        );
     }
 }

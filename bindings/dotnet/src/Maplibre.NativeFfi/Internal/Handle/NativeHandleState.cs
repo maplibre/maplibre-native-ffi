@@ -107,27 +107,6 @@ internal sealed class NativeHandleState<T>
         return handle;
     }
 
-    /// <summary>
-    /// Runs <paramref name="use" /> after checking that this wrapper still owns the handle.
-    /// </summary>
-    /// <remarks>
-    /// The C API leases the native object for each entry point, so concurrent release does not need
-    /// a second binding-side active-use lease.
-    /// </remarks>
-    internal TResult WithLive<TResult>(Func<T, TResult> use)
-    {
-        return use(Handle);
-    }
-
-    internal void WithLive(Action<T> use)
-    {
-        WithLive<object?>(handle =>
-        {
-            use(handle);
-            return null;
-        });
-    }
-
     internal void Close()
     {
         T handle;

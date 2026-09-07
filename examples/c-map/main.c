@@ -11,13 +11,15 @@
 #include "input.h"
 #include "map_state.h"
 #include "render/render.h"
-#include "render_request.h"
 #include "types.h"
 #include "util.h"
 #include "viewport.h"
 
 typedef struct wake_receiver {
   atomic_bool scheduled;
+  /// Set when a wake could not reach the SDL queue, so the next render-loop
+  /// iteration drains instead of waiting for an event that never arrives.
+  atomic_bool push_failed;
   Uint32 event_type;
 } wake_receiver;
 
@@ -32,24 +34,41 @@ static void schedule_event_drain(void* user_data) {
   }
   SDL_Event event = {.type = receiver->event_type};
   if (!SDL_PushEvent(&event)) {
-    atomic_store_explicit(&receiver->scheduled, false, memory_order_release);
+    atomic_store_explicit(&receiver->push_failed, true, memory_order_release);
   }
+}
+
+static app_error drain_events(
+  map_state* state, wake_receiver* receiver, bool* render_request
+) {
+  atomic_store_explicit(&receiver->scheduled, false, memory_order_release);
+  bool render_update = false;
+  MAP_TRY(map_state_drain_events(state, &render_update));
+  if (render_update) {
+    *render_request = true;
+  }
+  return APP_OK;
 }
 
 static app_error render_loop_iteration(
   SDL_Window* window, render_target* target, viewport* current_viewport,
-  map_state* state, render_request* request, wake_receiver* receiver,
-  input_controller* controller, bool* running
+  bool* viewport_dirty, map_state* state, bool* render_request,
+  wake_receiver* receiver, input_controller* controller, bool* running
 ) {
+  // The runtime raises its wake only when the queue goes from empty to
+  // non-empty, so a dropped push has to be recovered here.
+  if (
+    atomic_exchange_explicit(
+      &receiver->push_failed, false, memory_order_acq_rel
+    )
+  ) {
+    MAP_TRY(drain_events(state, receiver, render_request));
+  }
+
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
     if (event.type == receiver->event_type) {
-      atomic_store_explicit(&receiver->scheduled, false, memory_order_release);
-      bool render_update = false;
-      MAP_TRY(map_state_drain_events(state, &render_update));
-      if (render_update) {
-        render_request_set(request);
-      }
+      MAP_TRY(drain_events(state, receiver, render_request));
       continue;
     }
 
@@ -63,9 +82,8 @@ static app_error render_loop_iteration(
       case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
         *current_viewport = viewport_get(window);
         viewport_log("resized viewport", *current_viewport);
-        MAP_TRY(map_state_resize(state, *current_viewport));
-        MAP_TRY(render_target_resize(target, *current_viewport));
-        render_request_set(request);
+        *viewport_dirty = true;
+        *render_request = true;
         break;
       default: {
         const input_result result = input_controller_handle_event(
@@ -75,20 +93,32 @@ static app_error render_loop_iteration(
           return result.error;
         }
         if (result.camera_changed) {
-          render_request_set(request);
+          *render_request = true;
         }
         break;
       }
     }
   }
 
+  bool target_pending = false;
+  MAP_TRY(render_target_poll_pending(target, &target_pending));
+  if (!target_pending && *viewport_dirty) {
+    *viewport_dirty = false;
+    // The session resize carries the new logical extent to the map, so this
+    // loop starts one and never resizes the map itself. Starting it here
+    // instead of from the resize event coalesces a live resize into one
+    // outstanding submission.
+    MAP_TRY(render_target_resize(target, *current_viewport));
+    target_pending = true;
+  }
   // Consume before rendering, so a request published during the render call is
   // not discarded.
-  if (render_request_consume(request)) {
-    bool rendered = false;
-    MAP_TRY(render_target_render_update(target, *current_viewport, &rendered));
-    if (!rendered) {
-      render_request_set(request);
+  if (!target_pending && *render_request) {
+    *render_request = false;
+    render_frame_outcome outcome = {};
+    MAP_TRY(render_target_render_update(target, *current_viewport, &outcome));
+    if (!outcome.rendered || outcome.needs_repaint) {
+      *render_request = true;
     }
   }
   MAP_TRY(render_target_finish_frame(target));
@@ -100,8 +130,7 @@ static app_error render_loop_iteration(
 
 static app_error render_loop(
   SDL_Window* window, render_target_mode mode, render_target* target,
-  viewport* current_viewport, map_state* state, render_request* request,
-  wake_receiver* receiver
+  viewport* current_viewport, map_state* state, wake_receiver* receiver
 ) {
   app_error error = render_target_attach(target, state->map, *current_viewport);
   if (error != APP_OK) {
@@ -111,15 +140,16 @@ static app_error render_loop(
   printf("render target: %s\n", render_target_mode_label(mode));
   printf("render target status: %s\n", render_target_mode_status_line(mode));
   input_log_controls();
-  render_request_set(request);
 
   bool running = true;
+  bool render_request = true;
+  bool viewport_dirty = false;
   input_controller controller = {};
   while (running) {
     void* frame_scope = render_target_frame_scope_open();
     error = render_loop_iteration(
-      window, target, current_viewport, state, request, receiver, &controller,
-      &running
+      window, target, current_viewport, &viewport_dirty, state, &render_request,
+      receiver, &controller, &running
     );
     render_target_frame_scope_close(frame_scope);
     if (error != APP_OK) {
@@ -227,6 +257,7 @@ int main(int argc, char** argv) {
     .event_type = SDL_RegisterEvents(1),
   };
   atomic_init(&receiver.scheduled, false);
+  atomic_init(&receiver.push_failed, false);
   if (receiver.event_type == 0) {
     error = APP_ERROR_EVENT_DRAIN_FAILED;
     goto out_target;
@@ -239,11 +270,8 @@ int main(int argc, char** argv) {
     goto out_target;
   }
 
-  render_request request;
-  render_request_init(&request);
-  error = render_loop(
-    window, mode, target, &current_viewport, &state, &request, &receiver
-  );
+  error =
+    render_loop(window, mode, target, &current_viewport, &state, &receiver);
 
   // The graphics-thread-affine session closes before its map and runtime.
   render_target_deinit(target);
@@ -258,6 +286,7 @@ int main(int argc, char** argv) {
   goto out_window;
 
 out_target:
+  fprintf(stderr, "c-map failed: %s\n", app_error_name(error));
   render_target_deinit(target);
 out_window:
   SDL_DestroyWindow(window);

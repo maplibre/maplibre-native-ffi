@@ -1,6 +1,21 @@
 /**
  * @file maplibre_native_c/style.h
  * Public C API declarations for style sources, layers, and images.
+ *
+ * Every mutation is a command. It validates and copies all input bytes, arrays,
+ * option structs, and image pixels before returning. Parsing and application
+ * run later on the map worker, in runtime order. Its completion reports
+ * committed, superseded, failed, or cancelled disposition. Committed
+ * completions carry the map snapshot generation they published, so a caller can
+ * fence a later mln_map_snapshot_get() on it.
+ *
+ * Every query is ordered. It copies its inputs before returning and observes
+ * all commands accepted earlier by the runtime. Its completion borrows the
+ * typed result for the duration of the callback.
+ *
+ * All declarations in this header are callable from any thread. A per-function
+ * Returns list gives the statuses this call returns; a Completes with list
+ * gives the statuses that reach the caller through the completion.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_STYLE_H
@@ -21,32 +36,7 @@
 extern "C" {
 #endif
 
-typedef uint64_t mln_style_id_list;
-typedef uint64_t mln_style_string_list;
 typedef uint64_t mln_geojson_source_data;
-
-/**
- * @name Style execution contract
- *
- * Every mutation is a command. It validates and copies all input bytes, arrays,
- * option structs, and image pixels before returning. Application runs later in
- * runtime order. Its completion reports committed, superseded, failed, or
- * cancelled disposition. Committed completions carry the map snapshot
- * generation they published, so a caller can fence a later
- * mln_map_snapshot_get() on it.
- *
- * Every query is ordered. It copies its inputs before returning and observes
- * all commands accepted earlier by the runtime. Its completion borrows the
- * typed result for the duration of the callback; owned handle values inside a
- * successful result transfer to the receiver.
- *
- * All declarations in this header are callable from any thread. Submission
- * return values describe validation and acceptance failures.
- * State-dependent style errors described in the per-function Returns sections
- * are delivered through the completion. Command inputs described below as
- * borrowed remain caller-owned; accepted calls have already copied them when
- * they return.
- */
 
 /** Style source type values returned by source metadata queries. */
 typedef enum mln_style_source_type : uint32_t {
@@ -77,14 +67,6 @@ typedef enum mln_style_source_info_field : uint32_t {
   /** The source exposes a DEM raster encoding. */
   MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 1U << 5U,
 } mln_style_source_info_field;
-
-/** Fields available in mln_style_layer_info. */
-typedef enum mln_style_layer_info_field : uint32_t {
-  /** The layer carries a source ID. */
-  MLN_STYLE_LAYER_INFO_SOURCE_ID = 1U << 0U,
-  /** The layer carries a source-layer ID. */
-  MLN_STYLE_LAYER_INFO_SOURCE_LAYER = 1U << 1U,
-} mln_style_layer_info_field;
 
 /** Field mask values for mln_style_tile_source_options. */
 typedef enum mln_style_tile_source_option_field : uint32_t {
@@ -271,8 +253,7 @@ typedef struct mln_style_source_result {
 /** Fixed layer metadata included in mln_style_layer_result. */
 typedef struct mln_style_layer_info {
   uint32_t size;
-  /** Bitwise combination of mln_style_layer_info_field values. */
-  uint32_t fields;
+  uint32_t reserved;
   /** View of a static style-spec layer type string. It stays valid for the
      life of the process. */
   mln_buffer_view type;
@@ -282,12 +263,6 @@ typedef struct mln_style_layer_info {
   double max_zoom;
   /** One of mln_style_layer_visibility. */
   uint32_t visibility;
-  /** Source ID byte length, excluding any null terminator; 0 when fields
-     lacks SOURCE_ID. */
-  size_t source_id_size;
-  /** Source-layer byte length, excluding any null terminator; 0 when fields
-     lacks SOURCE_LAYER. */
-  size_t source_layer_size;
 } mln_style_layer_info;
 
 /** Complete layer metadata borrowed for a completion callback. */
@@ -295,7 +270,9 @@ typedef struct mln_style_layer_result {
   uint32_t size;
   uint32_t reserved;
   mln_style_layer_info info;
+  /** Source ID. Empty for a layer type that takes no source. */
   mln_buffer_view source_id;
+  /** Source-layer ID. Empty when the layer sets none. */
   mln_buffer_view source_layer;
 } mln_style_layer_result;
 
@@ -630,84 +607,23 @@ MLN_API mln_style_transition_options
 mln_style_transition_options_default(void) MLN_NOEXCEPT;
 
 /**
- * Gets the number of IDs in a style ID list handle.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when list is null or not live, or out_count is
- *   null.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status
-mln_style_id_list_count(mln_style_id_list list, size_t* out_count) MLN_NOEXCEPT;
-
-/**
- * Borrows one ID from a style ID list handle.
- *
- * On success, out_id receives a view into list-owned storage. The view remains
- * valid until the list is destroyed.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when list is null or not live, index is out of
- *   range, or out_id is null.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_style_id_list_get(
-  mln_style_id_list list, size_t index, mln_buffer_view* out_id
-) MLN_NOEXCEPT;
-
-/** Destroys a style ID list handle. Null is accepted as a no-op. */
-MLN_API void mln_style_id_list_destroy(mln_style_id_list list) MLN_NOEXCEPT;
-
-/**
- * Gets the number of strings in a style string list handle.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when list is null or not live, or out_count is
- *   null.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_style_string_list_count(
-  mln_style_string_list list, size_t* out_count
-) MLN_NOEXCEPT;
-
-/**
- * Borrows one string from a style string list handle.
- *
- * On success, out_value receives a view into list-owned storage. The view
- * remains valid until the list is destroyed.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when list is null or not live, index is out of
- *   range, or out_value is null.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_style_string_list_get(
-  mln_style_string_list list, size_t index, mln_buffer_view* out_value
-) MLN_NOEXCEPT;
-
-/** Destroys a style string list handle. Null is accepted as a no-op. */
-MLN_API void mln_style_string_list_destroy(
-  mln_style_string_list list
-) MLN_NOEXCEPT;
-
-/**
  * Adds one style source from a style-spec source JSON object.
  *
- * source_id and source_json are borrowed for the call. source_json is the
- * object that appears under sources[source_id] in a style document. The
- * function parses and copies the accepted source into MapLibre Native before
- * return.
+ * source_id and source_json are borrowed for the call and copied before
+ * return. source_json is the object that appears under sources[source_id] in a
+ * style document. Parsing and application run on the map worker.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, source_json is empty or invalid, the source JSON cannot
- * be converted.
+ *   invalid or empty, source_json is empty or invalid, or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID, or the
+ *   source JSON cannot be converted.
  */
 MLN_API mln_status mln_map_add_style_source_json(
   mln_map map, mln_buffer_view source_id, mln_buffer_view source_json,
@@ -721,12 +637,15 @@ MLN_API mln_status mln_map_add_style_source_json(
  * that ID existed and was removed.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
  *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style source has that ID.
  * - MLN_STATUS_INVALID_STATE when the source exists but a layer still uses it.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_remove_style_source(
   mln_map map, mln_buffer_view source_id, const mln_completion* completion
@@ -740,9 +659,10 @@ MLN_API mln_status mln_map_remove_style_source(
  * and tile URL views before the callback returns.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
  *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_style_source_info(
@@ -756,14 +676,17 @@ MLN_API mln_status mln_map_get_style_source_info(
  * implementations that fetch tiles stop storing them in persistent storage.
  * Other source types retain the value for inspection without changing how they
  * load. The change applies when the command commits and is visible through
- * mln_map_get_style_source_info as info.is_volatile. A missing source completes
- * with MLN_STATUS_NOT_FOUND, like mln_map_remove_style_source.
+ * mln_map_get_style_source_info as info.is_volatile.
  *
  * Returns:
- * - MLN_STATUS_OK when the command is accepted.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
  *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style source has that ID.
  */
 MLN_API mln_status mln_map_set_style_source_volatile(
   mln_map map, mln_buffer_view source_id, bool is_volatile,
@@ -777,9 +700,10 @@ MLN_API mln_status mln_map_set_style_source_volatile(
  * source or attribution completes successfully with no value.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
  *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_copy_style_source_attribution(
@@ -793,9 +717,10 @@ MLN_API mln_status mln_map_copy_style_source_attribution(
  * URL completes successfully with no value.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
  *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_copy_style_source_url(
@@ -809,9 +734,10 @@ MLN_API mln_status mln_map_copy_style_source_url(
  * URL-backed source or source without inline TileJSON returns an empty array.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
  *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_style_source_tile_urls(
@@ -824,9 +750,10 @@ MLN_API mln_status mln_map_get_style_source_tile_urls(
  * The completion borrows an array of mln_buffer_view values.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
  *   invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_list_style_source_ids(
@@ -841,10 +768,15 @@ MLN_API mln_status mln_map_list_style_source_ids(
  * null for defaults, and the options are fixed for the lifetime of the source.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
- *   is invalid or empty, options is invalid.
+ *   is invalid, or options is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when source_id or url is empty, a source
+ *   already has that ID, or the options cannot be converted.
  */
 MLN_API mln_status mln_map_add_geojson_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
@@ -907,10 +839,15 @@ MLN_API void mln_geojson_source_data_destroy(
  * with, fixed for the lifetime of the source.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, or data is null or not live.
+ *   invalid, or data is null or not live.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when source_id is empty or a source already
+ *   has that ID.
  */
 MLN_API mln_status mln_map_add_geojson_source_data(
   mln_map map, mln_buffer_view source_id, mln_geojson_source_data data,
@@ -924,11 +861,15 @@ MLN_API mln_status mln_map_add_geojson_source_data(
  * mln_geojson_source_options it was added with.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
- *   is invalid or empty, the source does not exist, or the source is not a
- *   GeoJSON source.
+ *   is invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style source has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source is not a GeoJSON source.
  */
 MLN_API mln_status mln_map_set_geojson_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
@@ -952,12 +893,16 @@ MLN_API mln_status mln_map_set_geojson_source_url(
  * inconsistently with them.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, data is null or not live, the source does not exist, the
- *   source is not a GeoJSON source, or the data was prepared with options that
- *   do not match the source's options.
+ *   invalid or empty, data is null or not live, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style source has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source is not a GeoJSON source, or
+ *   the data was prepared with options that do not match the source's options.
  */
 MLN_API mln_status mln_map_set_geojson_source_data(
   mln_map map, mln_buffer_view source_id, mln_geojson_source_data data,
@@ -975,11 +920,15 @@ MLN_API mln_status mln_map_set_geojson_source_data(
  * so each installed update reaches the next rendered frame.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, the source does not exist, or the source is not a
- *   GeoJSON source.
+ *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style source has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source is not a GeoJSON source.
  */
 MLN_API mln_status mln_map_set_geojson_source_synchronous_tiling(
   mln_map map, mln_buffer_view source_id, bool enabled,
@@ -994,10 +943,15 @@ MLN_API mln_status mln_map_set_geojson_source_synchronous_tiling(
  * values from the loaded TileJSON when their field bits are set.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
- *   is invalid or empty, options is invalid.
+ *   is invalid, or options is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when source_id or url is empty, or a source
+ *   already has that ID.
  */
 MLN_API mln_status mln_map_add_vector_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
@@ -1007,16 +961,20 @@ MLN_API mln_status mln_map_add_vector_source_url(
 /**
  * Adds a vector source with inline tile URLs.
  *
- * source_id and tile URL views are borrowed for the call. The function copies
- * accepted strings into MapLibre Native before return. options may be null for
- * defaults.
+ * source_id and tile URL views are borrowed for the call and copied before
+ * return. options may be null for defaults.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, tile URLs are null, empty, or invalid, options is
- *   invalid.
+ *   invalid, tile URLs are null or invalid, or options is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when source_id is empty, the tile URL list or
+ *   any tile URL is empty, a source already has that ID, or the tileset cannot
+ *   be built.
  */
 MLN_API mln_status mln_map_add_vector_source_tiles(
   mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
@@ -1031,10 +989,15 @@ MLN_API mln_status mln_map_add_vector_source_tiles(
  * defaults. For URL sources, only tile_size is used when its field bit is set.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
- *   is invalid or empty, options is invalid.
+ *   is invalid, or options is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when source_id or url is empty, or a source
+ *   already has that ID.
  */
 MLN_API mln_status mln_map_add_raster_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
@@ -1044,16 +1007,20 @@ MLN_API mln_status mln_map_add_raster_source_url(
 /**
  * Adds a raster source with inline tile URLs.
  *
- * source_id and tile URL views are borrowed for the call. The function copies
- * accepted strings into MapLibre Native before return. options may be null for
- * defaults.
+ * source_id and tile URL views are borrowed for the call and copied before
+ * return. options may be null for defaults.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, tile URLs are null, empty, or invalid, options is
- *   invalid.
+ *   invalid, tile URLs are null or invalid, or options is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when source_id is empty, the tile URL list or
+ *   any tile URL is empty, a source already has that ID, or the tileset cannot
+ *   be built.
  */
 MLN_API mln_status mln_map_add_raster_source_tiles(
   mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
@@ -1069,10 +1036,15 @@ MLN_API mln_status mln_map_add_raster_source_tiles(
  * field bits are set.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
- *   is invalid or empty, options is invalid.
+ *   is invalid, or options is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when source_id or url is empty, or a source
+ *   already has that ID.
  */
 MLN_API mln_status mln_map_add_raster_dem_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
@@ -1082,16 +1054,20 @@ MLN_API mln_status mln_map_add_raster_dem_source_url(
 /**
  * Adds a raster DEM source with inline tile URLs.
  *
- * source_id and tile URL views are borrowed for the call. The function copies
- * accepted strings into MapLibre Native before return. options may be null for
- * defaults.
+ * source_id and tile URL views are borrowed for the call and copied before
+ * return. options may be null for defaults.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, tile URLs are null, empty, or invalid, options is
- * invalid.
+ *   invalid, tile URLs are null or invalid, or options is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when source_id is empty, the tile URL list or
+ *   any tile URL is empty, a source already has that ID, or the tileset cannot
+ *   be built.
  */
 MLN_API mln_status mln_map_add_raster_dem_source_tiles(
   mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
@@ -1126,10 +1102,16 @@ MLN_API mln_status mln_map_add_raster_dem_source_tiles(
  * mln_custom_geometry_source_options.release_user_data.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, options is null or invalid, fetch_tile is null.
+ *   invalid, options is null or invalid, or fetch_tile is null.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when source_id is empty or a source already
+ *   has that ID. This API runs release_user_data once, because the accepted
+ *   command already referenced user_data.
  */
 MLN_API mln_status mln_map_add_custom_geometry_source(
   mln_map map, mln_buffer_view source_id,
@@ -1140,15 +1122,21 @@ MLN_API mln_status mln_map_add_custom_geometry_source(
 /**
  * Sets custom geometry source data for one canonical tile.
  *
- * source_id and UTF-8 GeoJSON data are borrowed for the call and parsed before
- * return.
+ * source_id and the UTF-8 GeoJSON data are borrowed for the call and copied
+ * before return. Parsing and application run on the map worker.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, tile_id is invalid, data is empty or invalid, the source
- *   does not exist, or the source is not a custom geometry source.
+ *   invalid or empty, tile_id is invalid, data is empty, or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style source has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the data is not valid GeoJSON, or the
+ *   source is not a custom geometry source.
  */
 MLN_API mln_status mln_map_set_custom_geometry_source_tile_data(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
@@ -1159,11 +1147,16 @@ MLN_API mln_status mln_map_set_custom_geometry_source_tile_data(
  * Invalidates custom geometry source data for one canonical tile.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, tile_id is invalid, the source does not exist, or the
- *   source is not a custom geometry source.
+ *   invalid or empty, tile_id is invalid, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style source has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom geometry
+ *   source.
  */
 MLN_API mln_status mln_map_invalidate_custom_geometry_source_tile(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
@@ -1174,11 +1167,16 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_tile(
  * Invalidates custom geometry source data inside one geographic region.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, bounds is invalid, the source does not exist, or the
- *   source is not a custom geometry source.
+ *   invalid or empty, bounds is invalid, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style source has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom geometry
+ *   source.
  */
 MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
   mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds,
@@ -1215,10 +1213,16 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
  * mln_custom_mvt_vector_source_options.release_user_data.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, options is null or invalid, fetch_tile is null.
+ *   invalid, options is null or invalid, or fetch_tile is null.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when source_id is empty or a source already
+ *   has that ID. This API runs release_user_data once, because the accepted
+ *   command already referenced user_data.
  */
 MLN_API mln_status mln_map_add_custom_mvt_vector_source(
   mln_map map, mln_buffer_view source_id,
@@ -1238,12 +1242,17 @@ MLN_API mln_status mln_map_add_custom_mvt_vector_source(
  * MLN_STATUS_OK after validation.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
  *   invalid or empty, tile_id is invalid, data is a null pointer with a
- *   nonzero size, the source does not exist, or the source is not a custom MVT
- *   vector source.
+ *   nonzero size, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style source has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom MVT vector
+ *   source.
  */
 MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_data(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
@@ -1261,12 +1270,17 @@ MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_data(
  * MLN_STATUS_OK after validation.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
  *   invalid or empty, tile_id is invalid, message is a null pointer with a
- *   nonzero size, the source does not exist, or the source is not a custom MVT
- *   vector source.
+ *   nonzero size, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style source has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom MVT vector
+ *   source.
  */
 MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_error(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
@@ -1277,11 +1291,16 @@ MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_error(
  * Invalidates custom MVT vector source data for one canonical tile.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, tile_id is invalid, the source does not exist, or the
- *   source is not a custom MVT vector source.
+ *   invalid or empty, tile_id is invalid, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style source has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom MVT vector
+ *   source.
  */
 MLN_API mln_status mln_map_invalidate_custom_mvt_vector_source_tile(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
@@ -1291,18 +1310,19 @@ MLN_API mln_status mln_map_invalidate_custom_mvt_vector_source_tile(
 /**
  * Sets one runtime style image.
  *
- * image_id, image, and image pixels are borrowed for the call. The function
- * copies accepted pixel bytes into the current style before return. If image_id
- * already exists, the native image is replaced.
+ * image_id, image, and image pixels are borrowed for the call and copied
+ * before return. If image_id already exists, the native image is replaced when
+ * the command commits.
  *
  * Runtime style images belong to the current style. Loading another style URL
  * or JSON document drops images that were added to the previous style.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
  *   invalid or empty, image or options is invalid, image pixels are null, image
  *   dimensions or stride are invalid, or image byte_length is too small.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_style_image(
@@ -1318,11 +1338,14 @@ MLN_API mln_status mln_map_set_style_image(
  * that ID existed and was removed.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_NOT_FOUND when no runtime style image has that ID.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no runtime style image has that ID.
  */
 MLN_API mln_status mln_map_remove_style_image(
   mln_map map, mln_buffer_view image_id, const mln_completion* completion
@@ -1336,9 +1359,10 @@ MLN_API mln_status mln_map_remove_style_image(
  * successfully with no value.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
  *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_style_image_info(
@@ -1352,9 +1376,10 @@ MLN_API mln_status mln_map_get_style_image_info(
  * completes successfully with no value.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
  *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_copy_style_image_premultiplied_rgba8(
@@ -1368,9 +1393,10 @@ MLN_API mln_status mln_map_copy_style_image_premultiplied_rgba8(
  * A missing image completes successfully with no value.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
  *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_copy_style_image_stretches(
@@ -1382,19 +1408,22 @@ MLN_API mln_status mln_map_copy_style_image_stretches(
  *
  * source_id, coordinates, and url are borrowed for the call. coordinates must
  * contain exactly four coordinates in top-left, top-right, bottom-right,
- * bottom-left order. The function copies accepted strings and coordinates into
- * the current style before return. Later URL load or decode failures are
- * reported through runtime events.
+ * bottom-left order. The strings and coordinates are copied before return.
+ * Later URL load or decode failures are reported through runtime events.
  *
  * Image sources belong to the current style. Loading another style URL or JSON
  * document drops sources that were added to the previous style.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
- *   is invalid or empty, coordinates is null or invalid, coordinate_count is
- * not 4.
+ *   is invalid or empty, coordinates is null or invalid, or coordinate_count
+ *   is not 4.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID.
  */
 MLN_API mln_status mln_map_add_image_source_url(
   mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
@@ -1406,19 +1435,23 @@ MLN_API mln_status mln_map_add_image_source_url(
  *
  * source_id, coordinates, image, and image pixels are borrowed for the call.
  * coordinates must contain exactly four coordinates in top-left, top-right,
- * bottom-right, bottom-left order. The function copies accepted coordinates and
- * pixels into the current style before return.
+ * bottom-right, bottom-left order. The coordinates and pixels are copied
+ * before return.
  *
  * Image sources belong to the current style. Loading another style URL or JSON
  * document drops sources that were added to the previous style.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
  *   invalid or empty, coordinates is null or invalid, coordinate_count is not
- * 4, image is invalid, image pixels are null, image dimensions or stride are
- *   invalid, image byte_length is too small.
+ *   4, image is invalid, image pixels are null, image dimensions or stride are
+ *   invalid, or image byte_length is too small.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID.
  */
 MLN_API mln_status mln_map_add_image_source_image(
   mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
@@ -1433,11 +1466,15 @@ MLN_API mln_status mln_map_add_image_source_image(
  * failures are reported through runtime events.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
- *   is invalid or empty, the source does not exist, or the source is not an
- *   image source.
+ *   is invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style source has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source is not an image source.
  */
 MLN_API mln_status mln_map_set_image_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
@@ -1447,15 +1484,16 @@ MLN_API mln_status mln_map_set_image_source_url(
 /**
  * Updates an image source with inline image pixels.
  *
- * source_id, image, and image pixels are borrowed for the call. The function
- * copies accepted pixels into MapLibre Native before return.
+ * source_id, image, and image pixels are borrowed for the call and copied
+ * before return.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
  *   invalid or empty, image is invalid, image pixels are null, image dimensions
  *   or stride are invalid, image byte_length is too small, the source does not
  *   exist, or the source is not an image source.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_image_source_image(
@@ -1466,16 +1504,21 @@ MLN_API mln_status mln_map_set_image_source_image(
 /**
  * Updates image source coordinates.
  *
- * coordinates is borrowed for the call and must contain exactly four
- * coordinates in top-left, top-right, bottom-right, bottom-left order. The
- * function copies accepted coordinates into MapLibre Native before return.
+ * coordinates is borrowed for the call and copied before return, and must
+ * contain exactly four coordinates in top-left, top-right, bottom-right,
+ * bottom-left order.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
  *   invalid or empty, coordinates is null or invalid, coordinate_count is not
- * 4, the source does not exist, or the source is not an image source.
+ *   4, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style source has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source is not an image source.
  */
 MLN_API mln_status mln_map_set_image_source_coordinates(
   mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
@@ -1489,10 +1532,11 @@ MLN_API mln_status mln_map_set_image_source_coordinates(
  * missing source completes successfully with no value.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
  *   invalid or empty, completion is invalid, or the source exists and is not
  *   an image source.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_image_source_coordinates(
@@ -1507,11 +1551,18 @@ MLN_API mln_status mln_map_get_image_source_coordinates(
  * before that existing layer.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
- *   source_id is invalid or empty, before_layer_id is invalid or does not
- *   exist, source_id does not exist, or source_id is not a raster DEM source.
+ *   source_id is invalid or empty, before_layer_id is invalid, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style source has source_id, or before_layer_id
+ *   is non-empty and no style layer has it.
+ * - MLN_STATUS_INVALID_ARGUMENT when a layer already has layer_id, or source_id
+ *   is not a raster DEM source.
  */
 MLN_API mln_status mln_map_add_hillshade_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
@@ -1527,11 +1578,18 @@ MLN_API mln_status mln_map_add_hillshade_layer(
  * color-relief-color to set the color ramp expression.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
- *   source_id is invalid or empty, before_layer_id is invalid or does not
- *   exist, source_id does not exist, or source_id is not a raster DEM source.
+ *   source_id is invalid or empty, before_layer_id is invalid, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style source has source_id, or before_layer_id
+ *   is non-empty and no style layer has it.
+ * - MLN_STATUS_INVALID_ARGUMENT when a layer already has layer_id, or source_id
+ *   is not a raster DEM source.
  */
 MLN_API mln_status mln_map_add_color_relief_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
@@ -1546,10 +1604,16 @@ MLN_API mln_status mln_map_add_color_relief_layer(
  * that existing layer.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, or before_layer_id is invalid or does not exist.
+ *   invalid or empty, before_layer_id is invalid, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when before_layer_id is non-empty and no style layer
+ *   has it.
+ * - MLN_STATUS_INVALID_ARGUMENT when a layer already has layer_id.
  */
 MLN_API mln_status mln_map_add_location_indicator_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id,
@@ -1564,11 +1628,17 @@ MLN_API mln_status mln_map_add_location_indicator_layer(
  * the renderer reads it back in.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, coordinate or altitude is invalid, the layer does not
- *   exist, or the layer is not a location indicator layer.
+ *   invalid or empty, coordinate or altitude is invalid, or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the layer is not a location indicator
+ *   layer.
  */
 MLN_API mln_status mln_map_set_location_indicator_location(
   mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate,
@@ -1579,11 +1649,16 @@ MLN_API mln_status mln_map_set_location_indicator_location(
  * Sets a location indicator layer bearing in degrees.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, bearing is not finite float32, the layer does not exist,
- *   or the layer is not a location indicator layer.
+ *   invalid or empty, bearing is not finite float32, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the layer is not a location indicator
+ *   layer.
  */
 MLN_API mln_status mln_map_set_location_indicator_bearing(
   mln_map map, mln_buffer_view layer_id, double bearing,
@@ -1594,11 +1669,17 @@ MLN_API mln_status mln_map_set_location_indicator_bearing(
  * Sets a location indicator layer accuracy radius in meters.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, radius is negative or not finite float32, the layer does
- *   not exist, or the layer is not a location indicator layer.
+ *   invalid or empty, radius is negative or not finite float32, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the layer is not a location indicator
+ *   layer.
  */
 MLN_API mln_status mln_map_set_location_indicator_accuracy_radius(
   mln_map map, mln_buffer_view layer_id, double radius,
@@ -1612,11 +1693,17 @@ MLN_API mln_status mln_map_set_location_indicator_accuracy_radius(
  * named style image does not need to exist when this function is called.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
- *   image_id is invalid or empty, image_kind is invalid, the layer does not
- *   exist, or the layer is not a location indicator layer.
+ *   image_id is invalid or empty, image_kind is invalid, or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the layer is not a location indicator
+ *   layer.
  */
 MLN_API mln_status mln_map_set_location_indicator_image_name(
   mln_map map, mln_buffer_view layer_id, uint32_t image_kind,
@@ -1637,11 +1724,17 @@ MLN_API mln_status mln_map_set_location_indicator_image_name(
  * layer; otherwise the layer is inserted before that existing layer.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_json is
- *   empty or invalid, before_layer_id is invalid or does not exist, or the
- *   layer JSON cannot be converted.
+ *   empty or invalid, before_layer_id is invalid, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when before_layer_id is non-empty and no style layer
+ *   has it, or the layer requires a source no style source has.
+ * - MLN_STATUS_INVALID_ARGUMENT when the layer JSON cannot be converted, or a
+ *   layer already has the JSON's id.
  */
 MLN_API mln_status mln_map_add_style_layer_json(
   mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id,
@@ -1655,11 +1748,14 @@ MLN_API mln_status mln_map_add_style_layer_json(
  * that ID existed and was removed.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
 MLN_API mln_status mln_map_remove_style_layer(
   mln_map map, mln_buffer_view layer_id, const mln_completion* completion
@@ -1672,9 +1768,10 @@ MLN_API mln_status mln_map_remove_style_layer(
  * layer completes successfully with no value.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
  *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_style_layer_info(
@@ -1687,9 +1784,10 @@ MLN_API mln_status mln_map_get_style_layer_info(
  * The completion borrows an array of mln_buffer_view values.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
  *   invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_list_style_layer_ids(
@@ -1703,11 +1801,15 @@ MLN_API mln_status mln_map_list_style_layer_ids(
  * before_layer_id moves the layer to the top of the style order.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, before_layer_id is invalid, layer_id does not exist, or
- *   before_layer_id is non-empty and does not exist.
+ *   invalid or empty, before_layer_id is invalid, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has layer_id, or before_layer_id
+ *   is non-empty and no style layer has it.
  */
 MLN_API mln_status mln_map_move_style_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id,
@@ -1721,9 +1823,10 @@ MLN_API mln_status mln_map_move_style_layer(
  * completes successfully with no value.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
  *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_style_layer_json(
@@ -1733,14 +1836,18 @@ MLN_API mln_status mln_map_get_style_layer_json(
 /**
  * Sets the style light from a style-spec light JSON object.
  *
- * light_json is borrowed for the call. The function parses and copies the
- * accepted light into MapLibre Native before return.
+ * light_json is borrowed for the call and copied before return. Parsing and
+ * application run on the map worker.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, light_json is
- *   empty or invalid, or the light JSON cannot be converted.
+ *   empty or invalid, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when the light JSON cannot be converted.
  */
 MLN_API mln_status mln_map_set_style_light_json(
   mln_map map, mln_buffer_view light_json, const mln_completion* completion
@@ -1749,16 +1856,21 @@ MLN_API mln_status mln_map_set_style_light_json(
 /**
  * Sets one style light property using its MapLibre style-spec property name.
  *
- * property_name and value are borrowed for the call. value is a style-spec JSON
- * value. The function parses and copies the accepted value into
- * MapLibre Native's typed light property storage before return.
+ * property_name and value are borrowed for the call and copied before return.
+ * value is a style-spec JSON value. Parsing and application into MapLibre
+ * Native's typed light property storage run on the map worker.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, property_name is
- *   invalid or empty, value is empty or invalid, the property name is unknown,
- *   or the property value cannot be converted for that property.
+ *   invalid or empty, value is empty or invalid, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_STATE when the style has no light.
+ * - MLN_STATUS_INVALID_ARGUMENT when the property name is unknown, or the
+ *   value cannot be converted for that property.
  */
 MLN_API mln_status mln_map_set_style_light_property(
   mln_map map, mln_buffer_view property_name, mln_buffer_view value,
@@ -1772,9 +1884,10 @@ MLN_API mln_status mln_map_set_style_light_property(
  * property completes successfully with no value.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, property_name is
  *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_style_light_property(
@@ -1793,12 +1906,17 @@ MLN_API mln_status mln_map_get_style_light_property(
  * a host that overrides them applies the override after the style loads.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null
- *   or undersized, options->fields contains unknown bits, or an enabled
- *   duration or delay is negative, non-finite, or out of the native duration
- *   range.
+ *   or undersized, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when options->fields contains unknown bits, or
+ *   an enabled duration or delay is negative, non-finite, or out of the native
+ *   duration range. A rejected command changes nothing.
+ * - MLN_STATUS_NATIVE_ERROR when applying the options throws on the map worker.
  */
 MLN_API mln_status mln_map_set_style_transition_options(
   mln_map map, const mln_style_transition_options* options,
@@ -1822,9 +1940,10 @@ MLN_API mln_status mln_map_set_style_transition_options(
  * return and reports nothing about the field.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
  *   invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_style_transition_options(
@@ -1834,18 +1953,23 @@ MLN_API mln_status mln_map_get_style_transition_options(
 /**
  * Sets one layer property using its MapLibre style-spec property name.
  *
- * layer_id, property_name, and value are borrowed for the call. value is a
- * style-spec JSON value. Expressions use style-spec expression JSON
- * arrays. The function parses and copies the accepted value into MapLibre
- * Native's typed style property storage before return.
+ * layer_id, property_name, and value are borrowed for the call and copied
+ * before return. value is a style-spec JSON value; expressions use style-spec
+ * expression JSON arrays. Parsing and application into MapLibre Native's typed
+ * style property storage run on the map worker.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
- *   property_name is invalid or empty, value is empty or invalid, the layer
- * does not exist, the property name is unknown for that layer, or the property
- *   value cannot be converted for that property.
+ *   property_name is invalid or empty, value is empty or invalid, or
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the property name is unknown for that
+ *   layer, or the value cannot be converted for that property.
  */
 MLN_API mln_status mln_map_set_layer_property(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
@@ -1859,11 +1983,14 @@ MLN_API mln_status mln_map_set_layer_property(
  * property completes successfully with no value.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
- *   property_name is invalid or empty, completion is invalid, or the layer does
- *   not exist.
+ *   property_name is invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
 MLN_API mln_status mln_map_get_layer_property(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
@@ -1873,17 +2000,21 @@ MLN_API mln_status mln_map_get_layer_property(
 /**
  * Sets or clears one layer filter.
  *
- * layer_id and filter are borrowed for the call. Passing null for filter clears
- * the layer filter. Non-null filters use the MapLibre style-spec filter JSON
- * representation. The function parses and copies the accepted filter into
- * MapLibre Native's typed filter expression storage before return.
+ * layer_id and filter are borrowed for the call and copied before return.
+ * Passing null for filter clears the layer filter. Non-null filters use the
+ * MapLibre style-spec filter JSON representation. Parsing and application into
+ * MapLibre Native's typed filter expression storage run on the map worker.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, filter is invalid, the layer does not exist, or the
- *   filter cannot be converted.
+ *   invalid or empty, filter is invalid, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the filter cannot be converted.
  */
 MLN_API mln_status mln_map_set_layer_filter(
   mln_map map, mln_buffer_view layer_id, const mln_buffer_view* filter,
@@ -1897,10 +2028,14 @@ MLN_API mln_status mln_map_set_layer_filter(
  * filter completes successfully with no value.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, completion is invalid, or the layer does not exist.
+ *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
 MLN_API mln_status mln_map_get_layer_filter(
   mln_map map, mln_buffer_view layer_id, const mln_completion* completion
@@ -1909,19 +2044,22 @@ MLN_API mln_status mln_map_get_layer_filter(
 /**
  * Sets one layer's source-layer ID.
  *
- * layer_id and source_layer are borrowed for the call and copied into MapLibre
- * Native's layer storage before return. Passing an empty source_layer clears
- * it.
+ * layer_id and source_layer are borrowed for the call and copied before
+ * return. Passing an empty source_layer clears it.
  *
  * Only layer types that require a source carry a source-layer; this rejects the
  * others, such as background and custom.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, source_layer is invalid, the layer does not exist, or the
- *   layer's type does not take a source.
+ *   invalid or empty, source_layer is invalid, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the layer's type does not take a source.
  */
 MLN_API mln_status mln_map_set_layer_source_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer,
@@ -1935,10 +2073,14 @@ MLN_API mln_status mln_map_set_layer_source_layer(
  * carries no source-layer ID.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, completion is invalid, or the layer does not exist.
+ *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
 MLN_API mln_status mln_map_copy_layer_source_layer(
   mln_map map, mln_buffer_view layer_id, const mln_completion* completion
@@ -1947,19 +2089,23 @@ MLN_API mln_status mln_map_copy_layer_source_layer(
 /**
  * Sets one layer's source ID.
  *
- * layer_id and source_id are borrowed for the call and copied into MapLibre
- * Native's layer storage before return. This does not require the named source
- * to exist yet; MapLibre reports an unresolved source through style events.
+ * layer_id and source_id are borrowed for the call and copied before return.
+ * This does not require the named source to exist yet; MapLibre reports an
+ * unresolved source through style events.
  *
  * Only layer types that require a source carry a source ID; this rejects the
  * others, such as background and custom.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, source_id is invalid or empty, the layer does not exist,
- *   or the layer's type does not take a source.
+ *   invalid or empty, source_id is invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the layer's type does not take a source.
  */
 MLN_API mln_status mln_map_set_layer_source_id(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
@@ -1973,10 +2119,14 @@ MLN_API mln_status mln_map_set_layer_source_id(
  * carries no source ID.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, completion is invalid, or the layer does not exist.
+ *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
 MLN_API mln_status mln_map_copy_layer_source_id(
   mln_map map, mln_buffer_view layer_id, const mln_completion* completion
@@ -1989,10 +2139,14 @@ MLN_API mln_status mln_map_copy_layer_source_id(
  * single-precision floats, so this narrows the value.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, min_zoom is NaN, or the layer does not exist.
+ *   invalid or empty, min_zoom is NaN, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
 MLN_API mln_status mln_map_set_layer_min_zoom(
   mln_map map, mln_buffer_view layer_id, double min_zoom,
@@ -2006,10 +2160,14 @@ MLN_API mln_status mln_map_set_layer_min_zoom(
  * single-precision floats, so this narrows the value.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, max_zoom is NaN, or the layer does not exist.
+ *   invalid or empty, max_zoom is NaN, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
 MLN_API mln_status mln_map_set_layer_max_zoom(
   mln_map map, mln_buffer_view layer_id, double max_zoom,
@@ -2022,11 +2180,15 @@ MLN_API mln_status mln_map_set_layer_max_zoom(
  * visibility is an mln_style_layer_visibility value.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, visibility is not an mln_style_layer_visibility value, or
- *   the layer does not exist.
+ *   invalid or empty, visibility is not an mln_style_layer_visibility value,
+ *   or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
 MLN_API mln_status mln_map_set_layer_visibility(
   mln_map map, mln_buffer_view layer_id, uint32_t visibility,

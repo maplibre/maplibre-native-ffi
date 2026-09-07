@@ -6,7 +6,6 @@ import kotlin.test.assertTrue
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.cstr
 import kotlinx.cinterop.memScoped
-import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.internal.callback.LogCallbackState
 
 @OptIn(ExperimentalForeignApi::class)
@@ -15,7 +14,7 @@ class LogCallbackStateTest : org.maplibre.nativeffi.NativeTestBase() {
   fun callbackCopiesRecordsContainsFailuresAndStopsAfterClose() = memScoped {
     var copied: LogRecord? = null
     val state =
-      LogCallbackState.createForTesting(
+      LogCallbackState(
         LogCallback { record ->
           copied = record
           true
@@ -35,16 +34,8 @@ class LogCallbackStateTest : org.maplibre.nativeffi.NativeTestBase() {
     assertEquals(0U, state.invoke(1U, 0U, 0, null))
     assertTrue(state.isClosedForTesting())
 
-    val throwing = LogCallbackState.createForTesting(LogCallback { error("contained") })
+    val throwing = LogCallbackState(LogCallback { error("contained") })
     assertEquals(0U, throwing.invoke(1U, 0U, 0, null))
     throwing.close()
-  }
-
-  @Test
-  fun nativeRegistrationReplacesAndClearsOwnedState() {
-    Maplibre.setLogCallback(LogCallback { true })
-    Maplibre.setLogCallback(LogCallback { false })
-    Maplibre.clearLogCallback()
-    Maplibre.clearLogCallback()
   }
 }

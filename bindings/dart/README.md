@@ -110,6 +110,7 @@ complete, and release such a request on that isolate. An exception the callback
 throws is contained inside the binding.
 
 Unsigned C `uint64_t` JSON values, feature identifiers, and camera transition
-IDs use Dart `BigInt` so the complete native range is preserved. Native buffers
-return copied bytes; direct pointer access is explicitly unsafe and ends at
-`NativeBuffer.close()`.
+IDs use Dart `BigInt` so the complete native range is preserved. Native byte
+views are copied into Dart-owned lists before a call returns; the scoped pointer
+accessors that expose native addresses are explicitly unsafe and end with the
+frame or handle that owns them.

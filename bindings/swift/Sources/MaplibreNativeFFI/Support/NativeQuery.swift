@@ -26,9 +26,9 @@ enum NativeQuery {
       size: hit.source_layer_id.size
     ) : nil
     let state = hasField(hit, MLN_QUERIED_FEATURE_STATE.rawValue)
-      ? try copyView(hit.state) : nil
+      ? try NativeCompletion.dataView(hit.state) : nil
     return try QueriedFeature(
-      feature: copyView(hit.feature),
+      feature: NativeCompletion.dataView(hit.feature),
       sourceId: sourceId,
       sourceLayerId: sourceLayerId,
       state: state
@@ -40,15 +40,5 @@ enum NativeQuery {
     _ field: UInt32
   ) -> Bool {
     (hit.fields & field) != 0
-  }
-
-  private static func copyView(_ view: mln_buffer_view) throws -> Data {
-    guard view.size > 0 else { return Data() }
-    guard let data = view.data else {
-      throw NativeStatusFailure.swiftNativeError(
-        "buffer view has nil data with non-zero size"
-      )
-    }
-    return Data(bytes: data, count: view.size)
   }
 }

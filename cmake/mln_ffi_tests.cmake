@@ -193,15 +193,17 @@ function(mln_ffi_add_c_api_test)
       YES
       CXX_EXTENSIONS
       OFF)
-  if(TARGET maplibre_native_c_static)
-    set(MLN_FFI_TEST_C_API_TARGET maplibre_native_c_static)
-  else()
-    set(MLN_FFI_TEST_C_API_TARGET maplibre_native_c)
-  endif()
+  # The suite links the shipped library so it exercises the same export
+  # boundary hosts link against. The one symbol it needs beyond the public API
+  # is the blocking driver hook, which the library exports under
+  # MLN_FFI_ENABLE_TEST_HOOKS and only in a test build.
+  target_compile_definitions(
+    maplibre_native_c_objects
+    PRIVATE MLN_FFI_ENABLE_TEST_HOOKS)
   target_link_libraries(
     mln_ffi_c_api_tests
     PRIVATE
-      ${MLN_FFI_TEST_C_API_TARGET} unity::framework MLN_FFI::RenderDependencies
+      maplibre_native_c unity::framework MLN_FFI::RenderDependencies
       ${dependency_test_libraries})
   target_include_directories(
     mln_ffi_c_api_tests
@@ -264,6 +266,13 @@ function(mln_ffi_add_c_api_test)
     find_package(Threads REQUIRED)
     target_link_libraries(mln_ffi_c_api_tests PRIVATE Threads::Threads)
   endif()
+  # The Metal test support defines an Objective-C class, which the iOS and
+  # tvOS test app links against the runtime and Foundation directly.
+  if(APPLE AND MLN_FFI_RENDER_BACKEND STREQUAL "metal")
+    target_link_libraries(
+      mln_ffi_c_api_tests
+      PRIVATE "-framework Foundation" objc)
+  endif()
 
   get_target_property(test_link_options mln_ffi_platform_dependencies
                       MLN_FFI_TEST_LINK_OPTIONS)
@@ -285,6 +294,9 @@ function(mln_ffi_add_c_api_test)
   else()
     add_test(NAME c-api COMMAND mln_ffi_c_api_tests)
   endif()
+  # The suite's own waits are bounded and name what never arrived, so a run
+  # that reaches this timeout has stalled somewhere they do not cover.
+  set_property(TEST c-api PROPERTY TIMEOUT 900)
 
   get_target_property(test_library_path_variable mln_ffi_platform_dependencies
                       MLN_FFI_TEST_LIBRARY_PATH_VARIABLE)

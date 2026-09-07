@@ -24,21 +24,47 @@ namespace {
 
 char deallocation_probe_key;
 
+// Settles a completion the caller submitted successfully.
 auto finish(mln_test_completion& completion) -> bool {
   const auto status = mln_test_completion_finish(&completion);
   mln_test_completion_destroy(&completion);
   return status == MLN_STATUS_OK;
 }
 
+// Settles a completion a rejected submission left with the caller.
+void discard(mln_test_completion& completion) {
+  mln_test_completion_reject(&completion);
+  mln_test_completion_destroy(&completion);
+}
+
+// Detaches and destroys the session on every exit path, and reports the first
+// failure the caller saw, or its own.
+auto teardown(mln_render_session session, const char* failure) -> const char* {
+  auto detach = mln_test_completion_default(0);
+  if (mln_render_session_detach(session, &detach.descriptor) != MLN_STATUS_OK) {
+    discard(detach);
+    if (failure == nullptr) failure = "the session detach was rejected";
+  } else if (!finish(detach) && failure == nullptr) {
+    failure = "the session detach failed";
+  }
+  if (
+    mln_render_session_destroy(session) != MLN_STATUS_OK && failure == nullptr
+  ) {
+    failure = "the session destroy was rejected";
+  }
+  return failure;
+}
+
 }  // namespace
 
-extern "C" bool mln_test_metal_surface_retarget_retains_submission(
-  mln_map map
-) {
+extern "C" auto mln_test_metal_surface_retarget_retains_submission(mln_map map)
+  -> const char* {
   @autoreleasepool {
     id<MTLDevice> device = MTLCreateSystemDefaultDevice();
     CAMetalLayer* initial_layer = [[CAMetalLayer alloc] init];
-    if (device == nil || initial_layer == nil) return false;
+    if (device == nil || initial_layer == nil) {
+      return "this host has no Metal device or layer";
+    }
 
     auto descriptor = mln_metal_surface_descriptor_default();
     descriptor.context.device = (__bridge void*)device;
@@ -50,28 +76,36 @@ extern "C" bool mln_test_metal_surface_retarget_retains_submission(
     if (
       mln_metal_surface_attach(
         map, &descriptor, &options, &session, &attach.descriptor
-      ) != MLN_STATUS_OK ||
-      !finish(attach)
+      ) != MLN_STATUS_OK
     ) {
-      return false;
+      discard(attach);
+      return "the Metal surface attach was rejected";
     }
+    const char* failure =
+      finish(attach) ? nullptr : "the attach completion failed";
     initial_layer = nil;
 
+    // Every later step runs behind one blocking driver operation, so the tail
+    // below has to release it and settle its completion on every path.
     atomic_bool entered = false;
     atomic_bool release = false;
     auto blocker = mln_test_completion_default(0);
     if (
-      mln_test_render_session_blocking_operation_create(
-        session, &entered, &release, &blocker.descriptor
-      ) != MLN_STATUS_OK
+      failure != nullptr || mln_test_render_session_blocking_operation_create(
+                              session, &entered, &release, &blocker.descriptor
+                            ) != MLN_STATUS_OK
     ) {
-      return false;
+      discard(blocker);
+      if (failure == nullptr) {
+        failure = "the blocking driver operation was rejected";
+      }
+      return teardown(session, failure);
     }
-    for (unsigned int attempt = 0; attempt < 10000 && !atomic_load(&entered);
-         ++attempt) {
-      mln_test_sleep_millisecond();
+    if (!mln_test_wait_for_flag(&entered)) {
+      atomic_store(&release, true);
+      static_cast<void>(finish(blocker));
+      return teardown(session, "the blocking driver operation never ran");
     }
-    if (!atomic_load(&entered)) return false;
 
     std::atomic_bool replacement_deallocated = false;
     CAMetalLayer* replacement_layer = [[CAMetalLayer alloc] init];
@@ -89,34 +123,29 @@ extern "C" bool mln_test_metal_surface_retarget_retains_submission(
       session, &descriptor, &replacement.descriptor
     );
     replacement_layer = nil;
-    const auto retained_before_driver_execution =
-      !replacement_deallocated.load();
+    if (replacement_deallocated.load()) {
+      failure =
+        "the retarget released the replacement layer before the driver "
+        "ran it";
+    }
 
     atomic_store(&release, true);
-    const auto blocker_finished = finish(blocker);
-    const auto replacement_finished =
-      replacement_status == MLN_STATUS_OK && finish(replacement);
+    if (!finish(blocker) && failure == nullptr) {
+      failure = "the blocking driver operation did not complete";
+    }
     if (replacement_status != MLN_STATUS_OK) {
-      mln_test_completion_reject(&replacement);
-      mln_test_completion_destroy(&replacement);
+      discard(replacement);
+      if (failure == nullptr) failure = "the Metal retarget was rejected";
+    } else if (!finish(replacement) && failure == nullptr) {
+      failure = "the retarget completion failed";
     }
 
-    auto detach = mln_test_completion_default(0);
-    const auto detach_status =
-      mln_render_session_detach(session, &detach.descriptor);
-    const auto detached = detach_status == MLN_STATUS_OK && finish(detach);
-    if (detach_status != MLN_STATUS_OK) {
-      mln_test_completion_reject(&detach);
-      mln_test_completion_destroy(&detach);
-    }
-    const auto destroyed = mln_render_session_destroy(session) == MLN_STATUS_OK;
     if (weak_replacement_layer != nil) {
       objc_setAssociatedObject(
         weak_replacement_layer, &deallocation_probe_key, nil,
         OBJC_ASSOCIATION_RETAIN_NONATOMIC
       );
     }
-    return retained_before_driver_execution && blocker_finished &&
-           replacement_finished && detached && destroyed;
+    return teardown(session, failure);
   }
 }

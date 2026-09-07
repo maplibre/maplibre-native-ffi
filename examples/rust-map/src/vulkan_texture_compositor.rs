@@ -2,7 +2,7 @@ use std::io::Cursor;
 
 use ash::vk;
 use ash::vk::Handle;
-use maplibre_native_ffi::{AcquiredFrameHandle, Error, ErrorKind};
+use maplibre_native_ffi::{AcquiredFrameHandle, Error, ErrorKind, VulkanFrameTexture};
 
 use crate::viewport::Viewport;
 use crate::vulkan::VulkanContext;
@@ -109,7 +109,11 @@ impl VulkanTextureCompositor {
     }
 
     pub fn draw(&mut self, frame: &AcquiredFrameHandle) -> maplibre_native_ffi::Result<bool> {
-        let (metadata, _, image_view, _) = frame.vulkan_texture()?;
+        let VulkanFrameTexture {
+            frame: metadata,
+            image_view,
+            ..
+        } = frame.vulkan_texture()?;
         if metadata.width == 0 || metadata.height == 0 {
             return Err(compositor_error("owned Vulkan frame has an empty extent"));
         }

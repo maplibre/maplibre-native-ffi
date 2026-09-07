@@ -13,52 +13,51 @@ import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class ResourceRequestHandleAndroidTest {
   @Test
-  fun unreachableProviderOwnedHandleReleasesNativeRequest(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      val released = CountDownLatch(1)
+  fun unreachableProviderOwnedHandleReleasesNativeRequest(): Unit = runSuspendTest {
+    val released = CountDownLatch(1)
 
-      registerUnreachableProviderOwnedHandle(released)
+    registerUnreachableProviderOwnedHandle(released)
 
-      assertTrue(awaitRelease(released), "expected unreachable request cleanup to release native")
-    }
+    assertTrue(awaitRelease(released), "expected unreachable request cleanup to release native")
+  }
 
   @Test
-  fun completionFailureIsTerminalAndCopiesDiagnosticBeforeReleaseCleanup(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      val releases = AtomicInteger(0)
-      val handle =
-        ResourceRequestHandle(
-          1L,
-          completer = { _, _ -> MaplibreNativeC.mln_network_status_set(999_999) },
-          releaser = {
-            releases.incrementAndGet()
-            MaplibreNativeC.mln_runtime_release(0L, null)
-          },
-        )
-      assertEquals(
-        ResourceProviderDecision.HANDLE.nativeValue,
-        handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
+  fun completionFailureIsTerminalAndCopiesDiagnosticBeforeReleaseCleanup(): Unit = runSuspendTest {
+    val releases = AtomicInteger(0)
+    val handle =
+      ResourceRequestHandle(
+        1L,
+        completer = { _, _ -> MaplibreNativeC.mln_network_status_set(999_999) },
+        releaser = {
+          releases.incrementAndGet()
+          MaplibreNativeC.mln_runtime_release(0L, null)
+        },
       )
+    assertEquals(
+      ResourceProviderDecision.HANDLE.nativeValue,
+      handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
+    )
 
-      val failure =
-        assertFailsWith<InvalidArgumentException> {
-          handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
-        }
-      assertTrue(failure.diagnostic.contains("network status"))
-      // The releaser's own failing call must not overwrite the copied diagnostic.
-      assertFalse(failure.diagnostic.contains("completion"))
-      assertEquals(1, releases.get())
-      assertFailsWith<InvalidStateException> {
+    val failure =
+      assertFailsWith<InvalidArgumentException> {
         handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
       }
+    assertTrue(failure.diagnostic.contains("network status"))
+    // The releaser's own failing call must not overwrite the copied diagnostic.
+    assertFalse(failure.diagnostic.contains("completion"))
+    assertEquals(1, releases.get())
+    assertFailsWith<InvalidStateException> {
+      handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
     }
+  }
 
   @Test
   fun concurrentCloseDefersReleaseUntilCompletionAndCancellationUsesInjectedCheck(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
+    runSuspendTest {
       val entered = CountDownLatch(1)
       val continueCompletion = CountDownLatch(1)
       val releases = AtomicInteger(0)

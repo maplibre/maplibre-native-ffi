@@ -25,79 +25,70 @@ class NativeStatusDiagnosticTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-020, BND-021, BND-022, BND-023, BND-024, BND-025, BND-026.
 
   @Test
-  fun deterministicNativeStatusProducersThrowMappedExceptionTypes(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      memScoped {
-        val invalidArgument =
-          assertFailsWith<InvalidArgumentException> {
-            Status.check(mln_network_status_set(999_999U))
-          }
-        assertEquals(MaplibreStatus.INVALID_ARGUMENT, invalidArgument.status)
-        assertTrue(invalidArgument.diagnostic.contains("network status"))
+  fun deterministicNativeStatusProducersThrowMappedExceptionTypes() {
+    memScoped {
+      val invalidArgument =
+        assertFailsWith<InvalidArgumentException> { Status.check(mln_network_status_set(999_999U)) }
+      assertEquals(MaplibreStatus.INVALID_ARGUMENT, invalidArgument.status)
+      assertTrue(invalidArgument.diagnostic.contains("network status"))
 
-        val response = alloc<mln_resource_transform_response>()
-        response.size = sizeOf<mln_resource_transform_response>().toUInt()
-        val replacement = "https://example.com/style.json"
-        val invalidState =
-          assertFailsWith<InvalidStateException> {
-            Status.check(
-              mln_resource_transform_response_set_url(
-                response.ptr,
-                replacement,
-                replacement.length.toCSize(),
-              )
+      val response = alloc<mln_resource_transform_response>()
+      response.size = sizeOf<mln_resource_transform_response>().toUInt()
+      val replacement = "https://example.com/style.json"
+      val invalidState =
+        assertFailsWith<InvalidStateException> {
+          Status.check(
+            mln_resource_transform_response_set_url(
+              response.ptr,
+              replacement,
+              replacement.length.toCSize(),
             )
-          }
-        assertEquals(MaplibreStatus.INVALID_STATE, invalidState.status)
-        assertTrue(invalidState.diagnostic.contains("resource transform"))
-      }
+          )
+        }
+      assertEquals(MaplibreStatus.INVALID_STATE, invalidState.status)
+      assertTrue(invalidState.diagnostic.contains("resource transform"))
     }
+  }
 
   @Test
-  fun thrownExceptionCarriesNativeStatusCodeAndCopiedDiagnostic(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      val exception = assertFailsWith<InvalidArgumentException> { Status.check(-1) }
+  fun thrownExceptionCarriesNativeStatusCodeAndCopiedDiagnostic() {
+    val exception = assertFailsWith<InvalidArgumentException> { Status.check(-1) }
+
+    assertEquals(MaplibreStatus.INVALID_ARGUMENT, exception.status)
+    assertEquals(-1, exception.nativeStatusCode)
+    assertEquals(Status.currentDiagnostic(), exception.diagnostic)
+  }
+
+  @Test
+  fun nativeStatusConversionCapturesDiagnosticImmediately() {
+    try {
+      val exception =
+        assertFailsWith<InvalidArgumentException> { Status.check(mln_network_status_set(999_999U)) }
+      val diagnostic = exception.diagnostic
 
       assertEquals(MaplibreStatus.INVALID_ARGUMENT, exception.status)
-      assertEquals(-1, exception.nativeStatusCode)
-      assertEquals(Status.currentDiagnostic(), exception.diagnostic)
+      assertTrue(diagnostic.contains("network status"))
+
+      Status.check(mln_network_status_set(NetworkStatus.ONLINE.nativeValue.toUInt()))
+
+      assertEquals("", Status.currentDiagnostic())
+      assertEquals(diagnostic, exception.diagnostic)
+    } finally {
+      Status.check(mln_network_status_set(NetworkStatus.ONLINE.nativeValue.toUInt()))
     }
+  }
 
   @Test
-  fun nativeStatusConversionCapturesDiagnosticImmediately(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      try {
-        val exception =
-          assertFailsWith<InvalidArgumentException> {
-            Status.check(mln_network_status_set(999_999U))
-          }
-        val diagnostic = exception.diagnostic
+  fun nullTerminatedStringsRejectEmbeddedNul() {
+    memScoped {
+      Status.exception(mln_network_status_set(999_999U))
 
-        assertEquals(MaplibreStatus.INVALID_ARGUMENT, exception.status)
-        assertTrue(diagnostic.contains("network status"))
+      val error = assertFailsWith<InvalidArgumentException> { MemoryUtil.cString(this, "a\u0000b") }
 
-        Status.check(mln_network_status_set(NetworkStatus.ONLINE.nativeValue.toUInt()))
-
-        assertEquals("", Status.currentDiagnostic())
-        assertEquals(diagnostic, exception.diagnostic)
-      } finally {
-        Status.check(mln_network_status_set(NetworkStatus.ONLINE.nativeValue.toUInt()))
-      }
+      assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
+      assertEquals(MaplibreStatus.INVALID_ARGUMENT.nativeCode, error.nativeStatusCode)
+      assertEquals("C string inputs cannot contain embedded NUL characters", error.diagnostic)
+      assertFalse(error.diagnostic.contains("network status"))
     }
-
-  @Test
-  fun nullTerminatedStringsRejectEmbeddedNul(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      memScoped {
-        Status.exception(mln_network_status_set(999_999U))
-
-        val error =
-          assertFailsWith<InvalidArgumentException> { MemoryUtil.cString(this, "a\u0000b") }
-
-        assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
-        assertEquals(MaplibreStatus.INVALID_ARGUMENT.nativeCode, error.nativeStatusCode)
-        assertEquals("C string inputs cannot contain embedded NUL characters", error.diagnostic)
-        assertFalse(error.diagnostic.contains("network status"))
-      }
-    }
+  }
 }

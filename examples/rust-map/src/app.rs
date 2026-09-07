@@ -9,7 +9,7 @@ use winit::window::{Window, WindowId};
 use crate::graphics::GraphicsContext;
 use crate::input::Controller;
 use crate::map_state::MapState;
-use crate::render_target::{Mode, RenderTarget};
+use crate::render_target::{FrameOutcome, Mode, RenderTarget};
 use crate::viewport::Viewport;
 
 pub struct App {
@@ -133,12 +133,18 @@ impl App {
         if next.is_empty() {
             return Ok(());
         }
-        self.map.as_mut().expect("map is open").resize(next)?;
         self.graphics.resize(next)?;
+        // The attached session's resize is the extent authority, except on the
+        // paths that hand over a graphics resource instead; the render target
+        // resizes the map itself there.
         self.target
             .as_mut()
             .expect("render target is open")
-            .resize(&self.graphics, next)?;
+            .resize(
+                &self.graphics,
+                self.map.as_ref().expect("map is open"),
+                next,
+            )?;
         self.render_requested = true;
         self.window.request_redraw();
         Ok(())
@@ -156,13 +162,17 @@ impl App {
             return Ok(());
         }
         self.render_requested = false;
-        if !self
+        let FrameOutcome {
+            rendered,
+            needs_repaint,
+        } = self
             .target
             .as_mut()
             .expect("render target is open")
-            .render_update(&self.graphics)?
-        {
+            .render_update(&self.graphics)?;
+        if !rendered || needs_repaint {
             self.render_requested = true;
+            self.window.request_redraw();
         }
         Ok(())
     }
@@ -222,22 +232,13 @@ fn append_error(message: &mut Option<String>, error: String) {
     }
 }
 
-#[cfg(unix)]
 fn immediate_exit(code: i32) -> ! {
-    // SAFETY: Abort paths intentionally skip destructors after a fatal native or
-    // graphics error, and `_exit` terminates the process immediately.
-    unsafe { libc::_exit(code) }
-}
-
-#[cfg(windows)]
-fn immediate_exit(code: i32) -> ! {
-    // SAFETY: Abort paths intentionally skip destructors after a fatal native or
-    // graphics error, and `TerminateProcess` terminates the current process.
-    unsafe {
-        windows_sys::Win32::System::Threading::TerminateProcess(
-            windows_sys::Win32::System::Threading::GetCurrentProcess(),
-            code as u32,
-        );
+    unsafe extern "C" {
+        fn _exit(status: std::ffi::c_int) -> !;
     }
-    std::process::abort()
+
+    // SAFETY: `_exit` terminates without running native teardown, which the
+    // macOS Vulkan stack can abort during after the window has closed. The
+    // operating system reclaims the example's resources.
+    unsafe { _exit(code) }
 }

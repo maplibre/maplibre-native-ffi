@@ -16,10 +16,10 @@ The runtime owns one native scheduler thread and its event storage. Runtime
 creation starts that thread, which keeps MapLibre Native's run loop active until
 native teardown finishes after runtime release.
 
-Any host thread can submit runtime and map work. Submissions wake the native run
-loop, so progress never depends on a display callback or a host pump. One
-runtime may own multiple maps; their commands, queries, barriers, and release
-work share one ordered submission stream.
+Any host thread can submit runtime and map work. A submission wakes the native
+run loop, and the runtime's own thread carries the work forward. One runtime may
+own multiple maps; their commands, queries, barriers, and release work share one
+ordered submission stream.
 
 Use a runtime barrier when later work must wait for every preceding submission
 to reach a terminal disposition. The runtime's direct event wake callback tells
@@ -28,13 +28,14 @@ the host when its event queue is ready to drain.
 ## Map
 
 A map belongs to a runtime. It owns style documents, sources, layers, images,
-camera state, observer events, and render invalidation.
+camera state, feature state, observer events, and render invalidation.
 
-Closing a map consumes its public handle synchronously and returns a completion
-for native retirement. That completion runs after earlier map work is terminal
-and map-owned callback state has been destroyed. Backend worker and graphics
-resource cleanup can continue after that completion. Await it when later host
-work depends on cleanup; a runtime close also remains ordered after it.
+Releasing a map consumes its public handle synchronously; the release accepts a
+completion that runs after native retirement. That completion runs after earlier
+map work is terminal and map-owned callback state has been destroyed. Backend
+worker and graphics resource cleanup can continue after that completion. Await
+it when later host work depends on cleanup; a runtime release also remains
+ordered after it.
 
 A map is independent of a render target. The host can create, configure, query,
 and observe a map before the first frame.
@@ -58,9 +59,9 @@ published, so a host can fence a snapshot read on it.
 ## Render session
 
 A render session renders one map to one render target. A map carries at most one
-live render session. Feature state belongs to the render session, because
-MapLibre stores it in the session's render state: the session's feature-state
-and query operations read and mutate it in session order.
+live render session. Feature state belongs to the map; a session pushes the
+map's store into its renderer on the next render update, and the session's
+queries read the last frame the session drew.
 
 Render targets come in three kinds:
 
@@ -85,11 +86,20 @@ backend, or MoltenVK for the Vulkan backend. That implementation brings the
 headers to build against.
 
 Execution placement is fixed when attachment starts. A core-worker session owns
-a native serial graphics worker for transferable Metal or Vulkan state, private
-EGL owned texture targets, or transferred `OffscreenCanvas` WebGL state. A
-caller-graphics-thread session stores typed work until the host services it
-where the graphics context is usable. WGL targets, EGL surfaces, shared EGL
-textures, existing WebGL contexts, and browser WebGPU use the caller driver.
+a native serial graphics worker. A caller-graphics-thread session stores typed
+work until the host services it where the graphics context is usable. The target
+decides which drivers it accepts:
+
+| Render target                                               | Driver                 |
+| ----------------------------------------------------------- | ---------------------- |
+| Metal surface or texture                                    | either                 |
+| Vulkan surface or texture                                   | either                 |
+| OpenGL surface on WGL, EGL, or an existing WebGL context    | caller graphics thread |
+| OpenGL surface on a transferred `OffscreenCanvas`           | core worker            |
+| OpenGL owned texture on a shared WGL, EGL, or WebGL context | caller graphics thread |
+| OpenGL owned texture on a private EGL context               | core worker            |
+| OpenGL borrowed texture                                     | caller graphics thread |
+| WebGPU surface or texture                                   | caller graphics thread |
 
 Session control is separate from graphics execution. Any host thread may request
 a frame, read a snapshot, start an asynchronous call, abandon a target, or
@@ -149,7 +159,7 @@ One drain transfers the queued event records and their message storage into an
 owned batch. A batch remains readable across later drains and runtime close.
 Copy values that must outlive the batch, then release it.
 
-Closing a map or disabling offline-region observation prevents future events
+Releasing a map or disabling offline-region observation prevents future events
 from that source and leaves queued events unchanged. Each queued event keeps a
 copied source ID that remains meaningful after the source handle closes.
 

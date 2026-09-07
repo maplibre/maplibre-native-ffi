@@ -1,8 +1,7 @@
 package org.maplibre.nativeffi.render
 
 import kotlinx.coroutines.Deferred
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
@@ -45,23 +44,39 @@ internal expect object OwnedTextureTestSupport {
 internal val OWNED_TEXTURE_ATTACH_OPTIONS: RenderSessionAttachOptions =
   RenderSessionAttachOptions(driver = RenderDriver.CALLER_GRAPHICS_THREAD)
 
-/** Completes [deferred] while servicing the driver work only this thread can run. */
-internal suspend fun <T> RenderSessionHandle.completeOnDriver(deferred: Deferred<T>): T {
-  while (!deferred.isCompleted) serviceDriverWork()
-  return deferred.await()
+/**
+ * Completes [deferred] while servicing the driver work only this thread can run.
+ *
+ * The loop is bounded so a completion nothing resolves fails the test instead of hanging the suite.
+ */
+internal suspend fun <T> RenderSessionHandle.completeOnDriver(
+  deferred: Deferred<T>,
+  attempts: Int = DRIVER_SERVICE_ATTEMPTS,
+  service: RenderSessionHandle.() -> Unit = { serviceDriverWork() },
+): T {
+  repeat(attempts) {
+    if (deferred.isCompleted) return deferred.await()
+    service()
+  }
+  error("a driver-serviced completion never resolved; session state: ${snapshot().state}")
 }
 
 /** Demands one frame and services driver work until the demand reaches a terminal result. */
 internal fun RenderSessionHandle.renderOneFrame(
-  demand: FrameDemand = FrameDemand(ifNeeded = false)
+  demand: FrameDemand = FrameDemand(ifNeeded = false),
+  attempts: Int = DRIVER_SERVICE_ATTEMPTS,
 ): RenderFrameResult {
   requestFrame(demand)
-  while (true) {
+  repeat(attempts) {
     serviceDriverWork()
-    val results = drainFrameResultsOrEmpty()
+    val results = drainFrameResults()
     if (results.isNotEmpty()) return results.last()
   }
+  error("a frame demand never reached a terminal result; session state: ${snapshot().state}")
 }
+
+/** Service rounds a bounded driver loop runs before it calls the work stuck. */
+private const val DRIVER_SERVICE_ATTEMPTS: Int = 100_000
 
 /** Renders until the map settles, and returns the frame that asked for no repaint. */
 internal fun RenderSessionHandle.renderUntilSettled(attempts: Int = 500): RenderFrameResult {
@@ -87,10 +102,10 @@ internal fun RenderSessionHandle.awaitRenderedFrame(attempts: Int = 1000): Rende
   var last: RenderFrameResult? = null
   val present = capabilities().presentation
   for (attempt in 0 until attempts) {
-    val token = snapshot().latestDemandToken + 1uL
+    val token = snapshot().latestDemandToken + 1
     requestFrame(FrameDemand(ifNeeded = false, present = present, token = token))
     for (poll in 0 until 10) {
-      val result = drainFrameResultsOrEmpty().lastOrNull { it.token == token }
+      val result = drainFrameResults().lastOrNull { it.token == token }
       if (result != null) {
         if (result.disposition == RenderResult.RENDERED) return result
         last = result
@@ -101,14 +116,6 @@ internal fun RenderSessionHandle.awaitRenderedFrame(attempts: Int = 1000): Rende
   }
   error("the session never rendered a frame; last frame result: $last")
 }
-
-/** Treats an empty native frame-result queue as an empty Kotlin collection. */
-private fun RenderSessionHandle.drainFrameResultsOrEmpty(): List<RenderFrameResult> =
-  try {
-    drainFrameResults()
-  } catch (error: MaplibreException) {
-    if (error.status == MaplibreStatus.NOT_READY) emptyList() else throw error
-  }
 
 /** Leaves a session closable: an attached session is abandoned rather than leaked. */
 internal fun RenderSessionHandle.abandonAndClose() {
@@ -146,7 +153,14 @@ internal suspend fun withOwnedTextureSession(
       )
       .await()
   val owned = OwnedTextureTestSupport.attach(map, width, height)
-  if (owned != null) {
+  if (owned == null) {
+    // The fixture attaches the one texture backend this target builds, so a null fixture means
+    // the loaded library was built without it.
+    println(
+      "skipped: the loaded MapLibre library supports only " +
+        "${Maplibre.supportedRenderBackends()}, which has no owned-texture fixture here"
+    )
+  } else {
     try {
       owned.session.completeOnDriver(owned.attachment.completed)
       block(runtime, map, owned)

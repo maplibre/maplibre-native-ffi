@@ -100,7 +100,7 @@ public extension RenderSessionHandle {
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions = RenderedFeatureQueryOptions()
   ) async throws -> [QueriedFeature] {
-    let future = try mapNativeFailure {
+    try await awaitNative {
       let session = try requireLiveHandle()
       return try geometry.nativeGeometry.withNativeGeometry { geometry in
         try options.nativeOptions.withNativeOptions { options in
@@ -115,14 +115,13 @@ public extension RenderSessionHandle {
         }
       }
     }
-    return try await mapNativeFailure { try await future.value() }
   }
 
   func querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions = SourceFeatureQueryOptions()
   ) async throws -> [QueriedFeature] {
-    let future = try mapNativeFailure {
+    try await awaitNative {
       let session = try requireLiveHandle()
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
@@ -137,7 +136,6 @@ public extension RenderSessionHandle {
         )
       }
     }
-    return try await mapNativeFailure { try await future.value() }
   }
 
   func queryFeatureExtension(
@@ -147,7 +145,7 @@ public extension RenderSessionHandle {
     extensionField: String,
     arguments: Data? = nil
   ) async throws -> Data {
-    let future = try mapNativeFailure {
+    try await awaitNative {
       let session = try requireLiveHandle()
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
@@ -173,6 +171,5 @@ public extension RenderSessionHandle {
       }
       return try start(nil)
     }
-    return try await mapNativeFailure { try await future.value() }
   }
 }

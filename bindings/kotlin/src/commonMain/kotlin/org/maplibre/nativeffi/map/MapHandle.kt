@@ -3,6 +3,8 @@ package org.maplibre.nativeffi.map
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraDelta
+import org.maplibre.nativeffi.camera.CameraFitOptions
+import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.CameraSnapshot
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.FreeCameraOptions
@@ -25,6 +27,7 @@ import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.CommandCompletion
+import org.maplibre.nativeffi.runtime.CommandDisposition
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
@@ -35,7 +38,6 @@ import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.LayerInfo
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
-import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleLayerVisibility
@@ -49,16 +51,13 @@ public expect class MapHandle {
   public fun runtime(): RuntimeHandle
 
   /**
-   * Map-originated event types that this map queues, [RuntimeEventMask.ALL] until a host narrows
-   * it.
+   * Changes the map-originated event types queued after this command commits, and publishes them as
+   * [MapSnapshot.eventMask].
    *
-   * The setter reads the [RuntimeEventMask.ALL_MAP_EVENTS] bits and ignores the rest, so a host
-   * reads this mask, changes one bit, and writes it back. Narrowing gates later events and keeps
-   * queued ones.
+   * The command reads the [RuntimeEventMask.ALL_MAP_EVENTS] bits and ignores the rest, so a host
+   * reads [MapSnapshot.eventMask], changes one bit, and writes it back. Narrowing gates later
+   * events and keeps queued ones.
    */
-  public val eventMask: RuntimeEventMask
-
-  /** Changes the map-originated event types queued after this command commits. */
   public fun setEventMask(value: RuntimeEventMask): Deferred<CommandCompletion>
 
   /**
@@ -70,9 +69,11 @@ public expect class MapHandle {
   public fun setStyleUrl(url: String): Deferred<CommandCompletion>
 
   /**
-   * Loads [json] as the map style.
+   * Loads [json] as the map style. The bytes are copied before the call returns, and the map worker
+   * parses them.
    *
-   * Malformed JSON throws [org.maplibre.nativeffi.error.NativeErrorException] and also enqueues a
+   * Malformed JSON completes with [CommandDisposition.FAILED] and
+   * [org.maplibre.nativeffi.error.MaplibreStatus.NATIVE_ERROR], and also enqueues a
    * `MAP_LOADING_FAILED` runtime event carrying the same message.
    *
    * @see org.maplibre.nativeffi.runtime.RuntimeHandle.drainEvents
@@ -121,8 +122,8 @@ public expect class MapHandle {
   ): Deferred<CommandCompletion>
 
   /**
-   * Removes one style source. The returned deferred fails with
-   * [org.maplibre.nativeffi.error.MaplibreStatus.NOT_FOUND] when no source has [sourceId] and
+   * Removes one style source. The command completes with [CommandDisposition.FAILED] and
+   * [org.maplibre.nativeffi.error.MaplibreStatus.NOT_FOUND] when no source has [sourceId], and with
    * [org.maplibre.nativeffi.error.MaplibreStatus.INVALID_STATE] when a layer still uses the source.
    */
   public fun removeStyleSource(sourceId: String): Deferred<CommandCompletion>
@@ -132,13 +133,32 @@ public expect class MapHandle {
 
   /**
    * Sets whether [sourceId] stores fetched tiles in persistent storage. Source types that do not
-   * fetch tiles retain the value only for [styleSourceInfo]. The returned deferred fails with
-   * [org.maplibre.nativeffi.error.MaplibreStatus.NOT_FOUND] when no source has [sourceId].
+   * fetch tiles retain the value only for [styleSourceInfo]. The command completes with
+   * [CommandDisposition.FAILED] and [org.maplibre.nativeffi.error.MaplibreStatus.NOT_FOUND] when no
+   * source has [sourceId].
    */
   public fun setStyleSourceVolatile(
     sourceId: String,
     isVolatile: Boolean,
   ): Deferred<CommandCompletion>
+
+  /**
+   * Returns one source's copied attribution, or null when no source carries [sourceId] and when the
+   * source carries no attribution.
+   */
+  public fun styleSourceAttribution(sourceId: String): Deferred<String?>
+
+  /**
+   * Returns one source's copied URL, or null when no source carries [sourceId] and when the source
+   * carries inline TileJSON instead of a URL.
+   */
+  public fun styleSourceUrl(sourceId: String): Deferred<String?>
+
+  /**
+   * Returns one source's copied inline TileJSON tile URLs. The list is empty when no source carries
+   * [sourceId] and when the source loads its TileJSON from a URL.
+   */
+  public fun styleSourceTileUrls(sourceId: String): Deferred<List<String>>
 
   public fun styleSourceIds(): Deferred<List<String>>
 
@@ -283,7 +303,7 @@ public expect class MapHandle {
   ): Deferred<CommandCompletion>
 
   /**
-   * Removes one runtime style image. The returned deferred fails with
+   * Removes one runtime style image. The command completes with [CommandDisposition.FAILED] and
    * [org.maplibre.nativeffi.error.MaplibreStatus.NOT_FOUND] when no image has [imageId].
    */
   public fun removeStyleImage(imageId: String): Deferred<CommandCompletion>
@@ -299,7 +319,11 @@ public expect class MapHandle {
     imageId: String
   ): Deferred<Pair<List<ImageStretch>, List<ImageStretch>>?>
 
-  public fun copyStyleImagePremultipliedRgba8(imageId: String): Deferred<StyleImage?>
+  /**
+   * Returns one runtime style image's tightly packed premultiplied RGBA8 pixels, or null when no
+   * image carries [imageId]. [styleImageInfo] reports the dimensions those bytes describe.
+   */
+  public fun copyStyleImagePremultipliedRgba8(imageId: String): Deferred<ByteArray?>
 
   public fun addImageSourceUrl(
     sourceId: String,
@@ -372,7 +396,7 @@ public expect class MapHandle {
   ): Deferred<CommandCompletion>
 
   /**
-   * Removes one style layer. The returned deferred fails with
+   * Removes one style layer. The command completes with [CommandDisposition.FAILED] and
    * [org.maplibre.nativeffi.error.MaplibreStatus.NOT_FOUND] when no layer has [layerId].
    */
   public fun removeStyleLayer(layerId: String): Deferred<CommandCompletion>
@@ -443,10 +467,20 @@ public expect class MapHandle {
     visibility: StyleLayerVisibility,
   ): Deferred<CommandCompletion>
 
-  /** Submits a repaint command. */
+  /**
+   * Submits a repaint command. The returned [Deferred] fails with
+   * [org.maplibre.nativeffi.error.InvalidStateException] when the map is not in
+   * [MapMode.CONTINUOUS].
+   */
   public fun requestRepaint(): Deferred<CommandCompletion>
 
-  /** Suspends until one noncoalescing still-image request completes. */
+  /**
+   * Submits one noncoalescing still-image request.
+   *
+   * The map must be in [MapMode.STATIC] or [MapMode.TILE]. A request submitted while another is
+   * pending completes with [CommandDisposition.FAILED] and
+   * [org.maplibre.nativeffi.error.MaplibreStatus.INVALID_STATE].
+   */
   public fun requestStillImage(): Deferred<CommandCompletion>
 
   /** Copies the latest immutable state generation published by the map worker. */
@@ -488,7 +522,25 @@ public expect class MapHandle {
    */
   public fun setFreeCameraOptions(options: FreeCameraOptions): Deferred<CommandCompletion>
 
-  /** Submits the map's logical extent. */
+  /**
+   * Submits a copied projection-mode command. The committed options are visible through [snapshot]
+   * as [MapSnapshot.projectionMode].
+   */
+  public fun setProjectionMode(options: ProjectionModeOptions): Deferred<CommandCompletion>
+
+  /** Submits a command that writes this map's debug state to the log. */
+  public fun dumpDebugLogs(): Deferred<CommandCompletion>
+
+  /**
+   * Submits the map's logical extent. Only the width and height may change: for a [MapSize] whose
+   * [MapSize.scaleFactor] differs from the one the map was created with, the returned [Deferred]
+   * fails with [org.maplibre.nativeffi.error.InvalidArgumentException].
+   *
+   * While a render session is attached, resize through
+   * [org.maplibre.nativeffi.render.RenderSessionHandle.resize], which submits this command itself;
+   * a direct map resize to a different extent leaves the session waiting for an update the map
+   * never publishes.
+   */
   public fun resize(size: MapSize): Deferred<CommandCompletion>
 
   /** Copies the latest camera generation published by the map worker. */
@@ -500,8 +552,45 @@ public expect class MapHandle {
   /** Submits one relative camera operation. */
   public fun applyCameraDelta(delta: CameraDelta): Deferred<CommandCompletion>
 
-  /** Suspends for an ordered camera observation behind commands accepted before this call. */
+  /**
+   * Cancels the camera transitions running when this command commits.
+   *
+   * A cancelled transition that carried
+   * [org.maplibre.nativeffi.camera.AnimationOptions.transitionId] reports its end through
+   * [org.maplibre.nativeffi.runtime.RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED], the same way
+   * a completed one does. Cancelling with no transition running commits and changes nothing.
+   */
+  public fun cancelTransitions(): Deferred<CommandCompletion>
+
+  /** Queries an ordered camera observation behind commands accepted before this call. */
   public fun queryCamera(): Deferred<CameraSnapshot>
+
+  /** Queries the camera that fits [bounds] inside the map's viewport. */
+  public fun cameraForLatLngBounds(
+    bounds: LatLngBounds,
+    fitOptions: CameraFitOptions?,
+  ): Deferred<CameraOptions>
+
+  /** Queries the camera that fits [coordinates] inside the map's viewport. */
+  public fun cameraForLatLngs(
+    coordinates: List<LatLng>,
+    fitOptions: CameraFitOptions?,
+  ): Deferred<CameraOptions>
+
+  /** Queries the camera that fits GeoJSON Geometry [geometry] inside the map's viewport. */
+  public fun cameraForGeometry(
+    geometry: ByteArray,
+    fitOptions: CameraFitOptions?,
+  ): Deferred<CameraOptions>
+
+  /** Queries the bounds [camera] covers, with each longitude wrapped to -180 through 180. */
+  public fun latLngBoundsForCamera(camera: CameraOptions): Deferred<LatLngBounds>
+
+  /**
+   * Queries the bounds [camera] covers, with longitudes that preserve the visible world copy and
+   * may fall outside -180 through 180.
+   */
+  public fun latLngBoundsForCameraUnwrapped(camera: CameraOptions): Deferred<LatLngBounds>
 
   /**
    * Converts one coordinate to a screen point.

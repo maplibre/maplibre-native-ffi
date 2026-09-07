@@ -54,17 +54,11 @@ func (projection *MapProjectionHandle) Close() error {
 	if projection == nil || projection.state == nil {
 		return newBindingError(ErrInvalidArgument, "MapProjectionHandle is nil")
 	}
-	var closeErr error
-	_ = projection.state.Close(func(native nativeProjection) int32 {
-		if err := checkNative(func() int32 {
+	return projection.state.Close(func(native nativeProjection) error {
+		return checkNative(func() int32 {
 			return int32(C.mln_map_projection_close(C.mln_map_projection(native)))
-		}); err != nil {
-			closeErr = err
-			return statusFromError(err)
-		}
-		return int32(C.MLN_STATUS_OK)
+		})
 	})
-	return closeErr
 }
 
 // Camera returns a copy of the projection camera. The result observes every

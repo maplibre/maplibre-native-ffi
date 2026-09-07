@@ -18,8 +18,10 @@ final class MetalMapView: NSView {
   private var timer: Timer?
   private var frameTask: Task<Void, Never>?
   private var shutdownTask: Task<Void, Never>?
+  private var pendingUpdates: Task<Void, Never>?
   private var currentViewport: Viewport?
   private var renderRequested = true
+  private var pendingResize = false
   private var consecutiveRenderFailures = 0
   private var didLogStartupStatus = false
   private var isShutDown = false
@@ -43,12 +45,6 @@ final class MetalMapView: NSView {
       setupError = error
     }
     postsFrameChangedNotifications = true
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(shutdown),
-      name: AppDelegate.willTerminateMapViews,
-      object: nil
-    )
     if let setupError {
       showError(String(describing: setupError))
     }
@@ -68,14 +64,18 @@ final class MetalMapView: NSView {
   override func viewWillMove(toWindow newWindow: NSWindow?) {
     super.viewWillMove(toWindow: newWindow)
     if newWindow == nil {
-      shutdown()
+      Task { @MainActor in await shutdown() }
     }
   }
 
-  /// Closes the session before closing the map; a map with an
-  /// attached session cannot be destroyed.
-  @objc private func shutdown() {
+  /// Stops the host loop, then releases the render session, the map, and the
+  /// runtime in that order; a map with an attached session cannot be destroyed.
+  /// The caller may await the same teardown from more than one place.
+  func shutdown() async {
     beginShutdown()
+    await frameTask?.value
+    finishShutdown()
+    await shutdownTask?.value
   }
 
   private func beginShutdown(terminate: Bool = false) {
@@ -94,6 +94,10 @@ final class MetalMapView: NSView {
     let target = renderTarget
     renderTarget = nil
     let setup = setupTask
+    // A failing update reaches here from inside the update chain, so the chain
+    // is dropped rather than awaited; `isShutDown` stops every queued update
+    // before it touches the map.
+    pendingUpdates = nil
     shutdownTask = Task { @MainActor in
       await setup?.value
       do {
@@ -103,7 +107,6 @@ final class MetalMapView: NSView {
         print(error)
       }
       self.mapState = nil
-      NotificationCenter.default.removeObserver(self)
       if self.terminateAfterShutdown {
         NSApp.terminate(nil)
       }
@@ -157,23 +160,32 @@ final class MetalMapView: NSView {
     }
   }
 
+  /// Submits one camera command. Each task awaits the one before it, so a
+  /// gesture-begin submission always reaches the map ahead of the deltas the
+  /// same gesture produces; main-actor isolation alone gives exclusion, not
+  /// order.
   private func updateMap(
-    _ update: @escaping (MapState) async throws -> Bool
+    _ update: @escaping @MainActor (MapState) async throws -> Bool
   ) {
-    guard !isShutDown, let state = mapState else { return }
-    Task { @MainActor in
+    guard !isShutDown, mapState != nil else { return }
+    let previous = pendingUpdates
+    pendingUpdates = Task { @MainActor in
+      await previous?.value
+      guard !self.isShutDown, let state = self.mapState else { return }
       do {
         if try await update(state) {
-          renderRequested = true
+          self.renderRequested = true
         }
       } catch {
-        fail(String(describing: error))
+        self.fail(String(describing: error))
       }
     }
   }
 
   private func startTimerIfNeeded() {
     guard timer == nil else { return }
+    // TODO(map-example-spec): Replace the fixed interval with a display-paced
+    // host loop. See Frame loop.
     timer = Timer
       .scheduledTimer(withTimeInterval: 1.0 / 60.0,
                       repeats: true)
@@ -240,14 +252,21 @@ final class MetalMapView: NSView {
 
     graphics.resize(viewport)
     currentViewport = viewport
-    updateMap { state in
-      try await state.resize(MapLogicalExtent(
-        width: viewport.logicalWidth,
-        height: viewport.logicalHeight,
-        scaleFactor: viewport.scaleFactor
-      ))
-      return true
+    if renderTarget == nil {
+      // With no session attached the map is the only extent authority; a live
+      // session carries the extent through its own resize on the next tick.
+      updateMap { state in
+        try await state.resize(MapLogicalExtent(
+          width: viewport.logicalWidth,
+          height: viewport.logicalHeight,
+          scaleFactor: viewport.scaleFactor
+        ))
+        return true
+      }
+    } else {
+      pendingResize = true
     }
+    renderRequested = true
     startMapStateIfNeeded(viewport: viewport)
   }
 
@@ -267,6 +286,10 @@ final class MetalMapView: NSView {
         graphics: graphics,
         viewport: viewport
       )
+      // The viewport can change while the attach is in flight; the session
+      // was attached at the captured extent, so carry any later change into
+      // the next tick's session resize.
+      pendingResize = currentViewport != viewport
       if !didLogStartupStatus {
         logStartupStatus(mode: mode)
         didLogStartupStatus = true
@@ -299,9 +322,10 @@ final class MetalMapView: NSView {
     else { return }
 
     do {
-      if try renderTargetNeedsResize(renderTarget, viewport: viewport) {
+      if pendingResize {
         try await renderTarget.resize(graphics: graphics, viewport: viewport)
         self.renderTarget = renderTarget
+        pendingResize = false
       }
       if renderRequested {
         renderRequested = false
@@ -317,18 +341,6 @@ final class MetalMapView: NSView {
       if consecutiveRenderFailures >= 3 {
         fail(String(describing: error))
       }
-    }
-  }
-
-  private func renderTargetNeedsResize(
-    _ target: MetalRenderTarget,
-    viewport: Viewport
-  ) throws -> Bool {
-    switch target {
-    case let .ownedTexture(session, _),
-         let .borrowedTexture(session, _, _),
-         let .nativeSurface(session):
-      return try session.snapshot().extent != viewport.extent
     }
   }
 

@@ -25,12 +25,11 @@ func loadProbeStyle(t *testing.T, runtime *RuntimeHandle, m *MapHandle, styleURL
 		t.Fatalf("SetStyleURL(%q): %v", styleURL, err)
 	}
 	for range make([]struct{}, 5000) {
-		time.Sleep(time.Millisecond)
-		batch, err := runtime.DrainEvents()
+		drained, err := runtime.DrainEvents()
 		if err != nil {
 			t.Fatalf("DrainEvents(): %v", err)
 		}
-		for _, event := range batch.Events {
+		for _, event := range drained {
 			if event.Type == RuntimeEventMapLoadingFailed && strings.Contains(event.Message, styleURL) {
 				return
 			}
@@ -41,23 +40,7 @@ func loadProbeStyle(t *testing.T, runtime *RuntimeHandle, m *MapHandle, styleURL
 }
 
 func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	runtime, m := newRuntimeAndMap(t, nil)
 
 	var firstCalls, secondCalls atomic.Int64
 	if _, err := runtime.SetResourceProvider(countingResourceProvider(&firstCalls)); err != nil {
@@ -101,7 +84,6 @@ func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
 // reaches the provider as the alias, alongside the HTTPS URL the built-in
 // network path would have fetched.
 func TestResourceProviderSeesSchemeAliasAndItsResolvedURL(t *testing.T) {
-	const emptyStyle = `{"version":8,"sources":{},"layers":[]}`
 	var resolvedURL atomic.Value
 
 	runtime, err := NewRuntime()
@@ -113,7 +95,7 @@ func TestResourceProviderSeesSchemeAliasAndItsResolvedURL(t *testing.T) {
 			return ResourceProviderDecisionPassThrough
 		}
 		resolvedURL.Store(request.ResolvedURL)
-		if err := handle.Complete(ResourceResponse{Status: ResourceResponseStatusOK, Bytes: []byte(emptyStyle)}); err != nil {
+		if err := handle.Complete(ResourceResponse{Status: ResourceResponseStatusOK, Bytes: []byte(emptyStyleJSON)}); err != nil {
 			return ResourceProviderDecisionPassThrough
 		}
 		return ResourceProviderDecisionHandle
@@ -127,7 +109,7 @@ func TestResourceProviderSeesSchemeAliasAndItsResolvedURL(t *testing.T) {
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
-		if err := m.Close(); err != nil {
+		if err := closeMapForTest(m); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
 		if err := closeRuntimeForTest(runtime); err != nil {
@@ -163,30 +145,6 @@ func TestResourceResponseAllowsUnknownEnumsForNativeValidation(t *testing.T) {
 	}
 	if err := validateResourceResponse(ResourceResponse{Status: ResourceResponseStatusOK, ErrorReason: ResourceErrorReason(99)}); err != nil {
 		t.Fatalf("unknown error reason error = %v, want nil", err)
-	}
-}
-
-func TestResourceResponseAcceptsKnownEnums(t *testing.T) {
-	statuses := []ResourceResponseStatus{
-		ResourceResponseStatusOK,
-		ResourceResponseStatusError,
-		ResourceResponseStatusNoContent,
-		ResourceResponseStatusNotModified,
-	}
-	reasons := []ResourceErrorReason{
-		ResourceErrorReasonNone,
-		ResourceErrorReasonNotFound,
-		ResourceErrorReasonServer,
-		ResourceErrorReasonConnection,
-		ResourceErrorReasonRateLimit,
-		ResourceErrorReasonOther,
-	}
-	for _, status := range statuses {
-		for _, reason := range reasons {
-			if err := validateResourceResponse(ResourceResponse{Status: status, ErrorReason: reason}); err != nil {
-				t.Fatalf("validateResourceResponse(%v, %v) error = %v", status, reason, err)
-			}
-		}
 	}
 }
 
@@ -304,14 +262,14 @@ func TestResourceRequestCancelCallbackReportsDiscardedRequest(t *testing.T) {
 	if _, err := m.SetStyleURL(styleURL); err != nil {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
-	waitForResourceSignal(t, requested, "the provider to receive the style request")
+	waitForResourceSignalValue(t, requested, "the provider to receive the style request")
 	// Map teardown discards the request the provider never completed, and the
 	// cancel callback runs on the thread that discards it.
-	teardown, err := m.CloseAsync()
+	teardown, err := m.Close()
 	if err != nil {
-		t.Fatalf("Map CloseAsync(): %v", err)
+		t.Fatalf("Map Close(): %v", err)
 	}
-	waitForResourceSignal(t, cancelled, "the cancel callback to run")
+	waitForResourceSignalValue(t, cancelled, "the cancel callback to run")
 	if _, err := awaitForTest(teardown, nil); err != nil {
 		t.Fatalf("map teardown: %v", err)
 	}
@@ -368,7 +326,7 @@ func TestResourceRequestCancelCallbackRunsForAlreadyCancelledRequest(t *testing.
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
 	handle := waitForResourceSignalValue(t, handles, "the provider to receive the style request")
-	if err := m.Close(); err != nil {
+	if err := closeMapForTest(m); err != nil {
 		t.Fatalf("Map Close(): %v", err)
 	}
 	waitForResourceRequestCancelled(t, handle)
@@ -433,9 +391,9 @@ func TestResourceRequestCancelCallbackSkipsCompletedRequest(t *testing.T) {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
 	waitForRuntimeEvent(t, runtime, RuntimeEventMapStyleLoaded)
-	teardown, err := m.CloseAsync()
+	teardown, err := m.Close()
 	if err != nil {
-		t.Fatalf("Map CloseAsync(): %v", err)
+		t.Fatalf("Map Close(): %v", err)
 	}
 	if _, err := awaitForTest(teardown, nil); err != nil {
 		t.Fatalf("map teardown: %v", err)
@@ -449,13 +407,8 @@ func TestResourceRequestCancelCallbackSkipsCompletedRequest(t *testing.T) {
 	}
 }
 
-// waitForResourceSignal waits for a signal that native code raises from a
+// waitForResourceSignalValue waits for a signal that native code raises from a
 // MapLibre thread.
-func waitForResourceSignal(t *testing.T, signal <-chan struct{}, what string) {
-	t.Helper()
-	waitForResourceSignalValue(t, signal, what)
-}
-
 func waitForResourceSignalValue[T any](t *testing.T, signal <-chan T, what string) T {
 	t.Helper()
 	select {

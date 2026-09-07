@@ -532,7 +532,9 @@ private func resourceTransformTrampoline(
   return box.invoke(kind: kind, url: url, outResponse: outResponse)
 }
 
-final class NativeResourceTransformState: @unchecked Sendable {
+final class NativeResourceTransformState: NativeDescriptor,
+  @unchecked Sendable
+{
   private let box: NativeResourceTransformBox
 
   init(_ callback: @escaping @Sendable (NativeResourceTransformRequest)
@@ -555,7 +557,7 @@ final class NativeResourceTransformState: @unchecked Sendable {
     return (status.rawValue, response.url.map { String(cString: $0) })
   }
 
-  func withDescriptor<Result>(
+  func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_resource_transform>) throws -> Result
   ) throws -> Result {
     var transform = mln_resource_transform()
@@ -640,7 +642,9 @@ private func httpHeaderTransformTrampoline(
     )
 }
 
-final class NativeHttpHeaderTransformState: @unchecked Sendable {
+final class NativeHttpHeaderTransformState: NativeDescriptor,
+  @unchecked Sendable
+{
   private let box: NativeHttpHeaderTransformBox
 
   init(_ callback: @escaping @Sendable (HttpHeaderTransformRequest)
@@ -649,7 +653,7 @@ final class NativeHttpHeaderTransformState: @unchecked Sendable {
     box = NativeHttpHeaderTransformBox(callback)
   }
 
-  func withDescriptor<Result>(
+  func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_http_header_transform>) throws -> Result
   ) throws -> Result {
     var transform = mln_http_header_transform()
@@ -726,7 +730,7 @@ private func resourceProviderTrampoline(
   return box.invoke(request: request, rawHandle: rawHandle)
 }
 
-final class NativeResourceProviderState: @unchecked Sendable {
+final class NativeResourceProviderState: NativeDescriptor, @unchecked Sendable {
   private let box: NativeResourceProviderBox
 
   init(
@@ -753,7 +757,7 @@ final class NativeResourceProviderState: @unchecked Sendable {
     }
   }
 
-  func withDescriptor<Result>(
+  func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_resource_provider>) throws -> Result
   ) throws -> Result {
     var provider = mln_resource_provider()

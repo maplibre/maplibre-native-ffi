@@ -210,8 +210,7 @@ MetalTextureBackend::MetalTextureBackend(
 )
     : mln::mtl::RendererBackend(mln::gfx::ContextMode::Unique),
       mln::gfx::HeadlessBackend(size),
-      slot_resources_(ring_depth),
-      slot_sizes_(ring_depth) {
+      ring_(ring_depth) {
   device = NS::RetainPtr(host_device);
   commandQueue = NS::TransferPtr(device->newCommandQueue());
 }
@@ -223,15 +222,15 @@ MetalTextureBackend::MetalTextureBackend(
       mln::gfx::HeadlessBackend(size),
       borrowed_texture_(borrowed_texture),
       borrowed_pixel_format_(borrowed_texture->pixelFormat()),
-      slot_resources_(1),
-      slot_sizes_(1) {
+      ring_(0) {
   device = NS::RetainPtr(borrowed_texture->device());
   commandQueue = NS::TransferPtr(device->newCommandQueue());
 }
+
 MetalTextureBackend::~MetalTextureBackend() {
   auto guard = mln::gfx::BackendScope{*this};
   resource.reset();
-  slot_resources_.clear();
+  ring_.clear();
   context.reset();
 }
 
@@ -243,12 +242,17 @@ auto MetalTextureBackend::getDefaultRenderable() -> mln::gfx::Renderable& {
       *this, static_cast<mln::mtl::Context&>(getContext()), size,
       borrowed_texture_
     );
+    // Recorded with the resource it describes, so a slot that keeps an older
+    // resource keeps the size that resource was built for.
+    ring_.record_size(size);
   }
-  slot_sizes_[selected_slot_] = size;
   return *this;
 }
 
 auto MetalTextureBackend::readStillImage() -> mln::PremultipliedImage {
+  // A render that aborted before it asked for the renderable leaves no
+  // resource behind, so build it here rather than dereference nothing.
+  getDefaultRenderable();
   return getResource<MetalTextureRenderableResource>().readStillImage();
 }
 
@@ -267,39 +271,8 @@ auto MetalTextureBackend::metal_texture() -> MTL::Texture* {
   return getResource<MetalTextureRenderableResource>().metal_texture();
 }
 
-auto MetalTextureBackend::metal_texture_at(std::size_t slot) -> MTL::Texture* {
-  if (slot >= slot_resources_.size()) {
-    return nullptr;
-  }
-  if (slot == selected_slot_) {
-    return metal_texture();
-  }
-  auto* stored = slot_resources_[slot].get();
-  if (stored == nullptr) {
-    const auto previous = selected_slot_;
-    if (!select_slot(slot)) return nullptr;
-    auto* texture = metal_texture();
-    static_cast<void>(select_slot(previous));
-    return texture;
-  }
-  return static_cast<MetalTextureRenderableResource*>(stored)->metal_texture();
-}
-
 auto MetalTextureBackend::select_slot(std::size_t slot) -> bool {
-  if (slot >= slot_resources_.size()) {
-    return false;
-  }
-  if (slot == selected_slot_) {
-    if (resource != nullptr && slot_sizes_[slot] != size) resource.reset();
-    return true;
-  }
-  slot_resources_[selected_slot_] = std::move(resource);
-  if (slot_resources_[slot] != nullptr && slot_sizes_[slot] != size) {
-    slot_resources_[slot].reset();
-  }
-  resource = std::move(slot_resources_[slot]);
-  selected_slot_ = slot;
-  return true;
+  return ring_.select(slot, size, resource);
 }
 
 void MetalTextureBackend::set_ring_size(mln::Size new_size) { size = new_size; }

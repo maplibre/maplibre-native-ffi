@@ -2,7 +2,6 @@ package org.maplibre.nativeffi.map
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.cinterop.ExperimentalForeignApi
 import org.maplibre.nativeffi.camera.CameraOptions
@@ -46,12 +45,12 @@ class MapHandleNativeTest : org.maplibre.nativeffi.NativeTestBase() {
         .await()
     val command =
       map.updateCamera(CameraUpdate(camera = CameraOptions().apply { zoom = 2.0 })).await()
-    assertTrue(command.generation > 0uL)
+    assertTrue(command.generation > 0L)
     runtime.barrier().await()
     assertEquals(2.0, map.queryCamera().await().camera.zoom)
-    map.close()
-    runtime.close()
+    map.close().await()
+    runtime.close().await()
     assertTrue(map.isClosed)
-    assertFalse(runtime.isClosed.not())
+    assertTrue(runtime.isClosed)
   }
 }

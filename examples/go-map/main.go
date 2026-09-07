@@ -134,6 +134,7 @@ func run(mode renderTargetMode) (result error) {
 
 	running := true
 	renderRequested := true
+	viewportDirty := false
 	input := inputController{}
 	handleEvent := func(event *sdl.Event) error {
 		switch event.Type() {
@@ -145,17 +146,7 @@ func run(mode renderTargetMode) (result error) {
 			if view.empty() {
 				return nil
 			}
-			if err := state.resize(view); err != nil {
-				return err
-			}
-			_, err := mapState.mapRef.Resize(maplibre.LogicalExtent{
-				Width:       view.logicalWidth,
-				Height:      view.logicalHeight,
-				ScaleFactor: view.scaleFactor,
-			})
-			if err != nil {
-				return err
-			}
+			viewportDirty = true
 			renderRequested = true
 		default:
 			if view.empty() {
@@ -189,15 +180,31 @@ func run(mode renderTargetMode) (result error) {
 			didWork = true
 		}
 
-		if renderRequested && !view.empty() && running {
+		targetPending, err := state.pollPending()
+		if err != nil {
+			return err
+		}
+		if !targetPending && viewportDirty && !view.empty() {
+			viewportDirty = false
+			// The session resize carries the new logical extent to the map, so
+			// this loop starts one and never resizes the map itself. Starting
+			// it here instead of from the resize event coalesces a live resize
+			// into one outstanding submission.
+			if err := state.resize(view); err != nil {
+				return err
+			}
+			targetPending = true
+		}
+		if !targetPending && renderRequested && !view.empty() && running {
 			renderRequested = false
-			rendered, err := state.driveFrame()
+			outcome, err := state.driveFrame()
 			if err != nil {
 				return err
 			}
-			if rendered {
+			if outcome.rendered {
 				didWork = true
-			} else {
+			}
+			if !outcome.rendered || outcome.needsRepaint {
 				renderRequested = true
 			}
 		}

@@ -22,9 +22,11 @@ contains every resource that a defined area needs and remains outside the
 ambient budget. Download a region when the host must draw a known area without
 a network.
 
-Database operations are asynchronous. A submission validates its arguments and
-queues the work. Each accepted submission invokes its one-shot completion with
-the terminal status, diagnostic, and any borrowed result. Copy values that must
+Database operations are asynchronous. A submission validates its arguments on
+the calling thread and queues the work, so no host thread waits on the database.
+Each accepted submission invokes its one-shot completion with the terminal
+status, diagnostic, and any borrowed result. A command that names a region the
+database does not hold completes with a not-found status. Copy values that must
 outlive the callback.
 
 ## Download a region
@@ -57,8 +59,8 @@ The region ID is the part of the record that the remaining calls need.
 <Code code={region(offlineRegion, "region-id")} lang="c" title="offline-region.c" />
 
 Mark the region as observed to receive progress and error events. Then submit
-the active download-state command. MapLibre fetches resources on the native
-scheduler without a host pump.
+the active download-state command. MapLibre fetches the region's resources on
+the native scheduler thread.
 
 <Code code={region(offlineRegion, "download")} lang="c" title="offline-region.c" />
 

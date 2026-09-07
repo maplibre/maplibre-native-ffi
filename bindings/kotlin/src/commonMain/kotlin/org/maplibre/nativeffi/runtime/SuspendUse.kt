@@ -12,10 +12,10 @@ public suspend inline fun <T> RuntimeHandle.use(block: suspend (RuntimeHandle) -
     withContext(NonCancellable) { close().await() }
   }
 
-/** Runs [block] and suspends until this map has closed. */
+/** Runs [block] and suspends until this map's native retirement has finished. */
 public suspend inline fun <T> MapHandle.use(block: suspend (MapHandle) -> T): T =
   try {
     block(this)
   } finally {
-    close()
+    withContext(NonCancellable) { close().await() }
   }

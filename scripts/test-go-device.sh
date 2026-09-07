@@ -12,6 +12,10 @@ case "$preset" in
   android-x64-*)
     abi=x86_64
     ;;
+  android-*)
+    echo "The Android emulator runs arm64 and x64 guests; check $preset with //bindings/go:build and test an android-arm64 or android-x64 preset instead." >&2
+    exit 2
+    ;;
   ohos-x64-egl) ;;
   ohos-x64-*)
     echo "The OpenHarmony emulator runs EGL only; check $preset with //bindings/go:build and test ohos-x64-egl instead." >&2

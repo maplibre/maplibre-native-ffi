@@ -163,9 +163,10 @@ struct ResourceProviderState {
 };
 
 // Borrows the resource provider registered on a runtime for one callback. A
-// replacement or clear command waits for every live lease on the runtime
-// executor before it emits its terminal event. The lease retains the state, so
-// it stays readable after the runtime handle is retired.
+// replacement or clear command swaps the registration and completes; this lease
+// keeps the retired registration and its user_data alive until the last
+// in-flight callback returns. The lease retains the state, so it stays readable
+// after the runtime handle is retired.
 class ResourceProviderLease {
  public:
   ResourceProviderLease(
@@ -349,29 +350,12 @@ auto offline_region_delete_start(
   mln_runtime runtime, mln_offline_region_id region_id,
   const mln_completion* completion
 ) -> mln_status;
-auto offline_region_snapshot_get(
-  mln_offline_region_snapshot snapshot, mln_offline_region_info* out_info
-) -> mln_status;
-auto offline_region_snapshot_destroy(
-  mln_offline_region_snapshot snapshot
-) noexcept -> void;
-auto offline_region_list_count(mln_offline_region_list list, size_t* out_count)
-  -> mln_status;
-auto offline_region_list_get(
-  mln_offline_region_list list, size_t index, mln_offline_region_info* out_info
-) -> mln_status;
-auto offline_region_list_destroy(mln_offline_region_list list) noexcept -> void;
 auto retain_runtime_map(mln_runtime runtime) -> mln_status;
 auto release_runtime_map(mln_runtime runtime) noexcept -> void;
 auto validate_runtime(mln_runtime runtime, RuntimeObject*& out_runtime)
   -> mln_status;
 [[nodiscard]] auto lease_runtime(mln_runtime runtime)
   -> std::shared_ptr<RuntimeObject>;
-auto validate_offline_side_database_path(const char* side_database_path)
-  -> mln_status;
-auto dispatch_runtime_sync(
-  mln_runtime runtime, std::function<mln_status()> function
-) -> mln_status;
 auto submit_runtime_command(
   const std::shared_ptr<RuntimeObject>& runtime,
   std::function<void(uint64_t)> function,
@@ -383,9 +367,6 @@ auto submit_runtime_operation(
   const std::shared_ptr<OperationObject>& operation,
   std::function<void()> function
 ) -> mln_status;
-auto associate_runtime_operation_with_current_submission(
-  RuntimeObject* runtime, const std::shared_ptr<OperationObject>& operation
-) noexcept -> bool;
 
 // The continuously running run loop owned by this runtime's executor.
 auto runtime_run_loop(RuntimeObject* runtime) -> mln::util::RunLoop&;

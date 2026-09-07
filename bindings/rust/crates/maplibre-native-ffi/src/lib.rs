@@ -21,6 +21,8 @@ mod projection;
 mod render;
 mod resource;
 mod runtime;
+#[cfg(test)]
+mod test_support;
 mod values;
 
 use crate::values::NativeValue;
@@ -38,9 +40,8 @@ pub use custom_mvt_vector::CustomMvtVectorSourceOptions;
 pub use events::{
     CameraTransitionFinishedEvent, CommandDisposition, MapId, OfflineRegionResponseErrorEvent,
     OfflineRegionStatus, OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent,
-    RenderFrameEvent, RenderMapEvent, RenderingStats, RuntimeEvent, RuntimeEventBatch,
-    RuntimeEventPayload, RuntimeEventRef, RuntimeEventSource, TileActionEvent, TileId,
-    UnknownRuntimeEventPayload,
+    RenderFrameEvent, RenderMapEvent, RenderingStats, RuntimeEvent, RuntimeEventPayload,
+    RuntimeEventSource, TileActionEvent, TileId, UnknownRuntimeEventPayload,
 };
 pub use geojson::GeoJsonSourceDataHandle;
 pub use logging::{LogRecord, clear_log_callback, set_async_log_severity_mask, set_log_callback};
@@ -64,17 +65,18 @@ pub use projection::MapProjectionHandle;
 pub use render::{
     AcquiredFrameHandle, EglContextDescriptor, FeatureStateSelector, FrameDemand, FrameDisposition,
     FrameGpuSync, FrameNativePointer, FrameOpenGLTextureName, FrameVulkanHandle, GpuSync,
-    MetalBorrowedTextureDescriptor, MetalContextDescriptor, MetalOwnedTextureDescriptor,
-    MetalOwnedTextureFrame, MetalSurfaceDescriptor, NativePointer, OpenGLBorrowedTextureDescriptor,
-    OpenGLContextDescriptor, OpenGLOwnedTextureDescriptor, OpenGLOwnedTextureFrame,
-    OpenGLSurfaceDescriptor, PremultipliedRgba8Image, QueriedFeature, RenderAbandonResult,
-    RenderDriverKind, RenderFrameBatch, RenderFrameResult, RenderSessionAttachOptions,
-    RenderSessionAttachment, RenderSessionCapabilities, RenderSessionHandle,
-    RenderSessionLifecycle, RenderSessionSnapshot, RenderTargetExtent, RenderedFeatureQueryOptions,
-    RenderedQueryGeometry, SourceFeatureQueryOptions, TextureImageInfo,
-    VulkanBorrowedTextureDescriptor, VulkanContextDescriptor, VulkanHandle,
-    VulkanOwnedTextureDescriptor, VulkanOwnedTextureFrame, VulkanSurfaceDescriptor,
-    WebGlContextDescriptor, WebGpuBorrowedTextureDescriptor, WebGpuContextDescriptor,
+    MetalBorrowedTextureDescriptor, MetalContextDescriptor, MetalFrameTexture,
+    MetalOwnedTextureDescriptor, MetalOwnedTextureFrame, MetalSurfaceDescriptor, NativePointer,
+    OpenGLBorrowedTextureDescriptor, OpenGLContextDescriptor, OpenGLFrameTexture,
+    OpenGLOwnedTextureDescriptor, OpenGLOwnedTextureFrame, OpenGLSurfaceDescriptor,
+    PremultipliedRgba8Image, QueriedFeature, RenderAbandonResult, RenderDriverKind,
+    RenderFrameResult, RenderSessionAttachOptions, RenderSessionAttachment,
+    RenderSessionCapabilities, RenderSessionHandle, RenderSessionLifecycle, RenderSessionSnapshot,
+    RenderTargetExtent, RenderedFeatureQueryOptions, RenderedQueryGeometry,
+    SourceFeatureQueryOptions, TextureImageInfo, VulkanBorrowedTextureDescriptor,
+    VulkanContextDescriptor, VulkanFrameTexture, VulkanHandle, VulkanOwnedTextureDescriptor,
+    VulkanOwnedTextureFrame, VulkanSurfaceDescriptor, WebGlContextDescriptor,
+    WebGpuBorrowedTextureDescriptor, WebGpuContextDescriptor, WebGpuFrameTexture,
     WebGpuOwnedTextureDescriptor, WebGpuOwnedTextureFrame, WebGpuSurfaceDescriptor,
     WglContextDescriptor,
 };

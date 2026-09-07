@@ -25,7 +25,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     bool fully_loaded;
  *     bool rendering_stats_view_enabled;
  *     bool repaint_demand;
- *     uint8_t reserved_flags;
+ *     bool gesture_in_progress;
  *     uint64_t event_mask;
  *     uint64_t latest_render_update_generation;
  *     mln_map_tile_options tile;
@@ -51,7 +51,7 @@ public class mln_map_snapshot {
         MapLibreNativeC.C_BOOL.withName("fully_loaded"),
         MapLibreNativeC.C_BOOL.withName("rendering_stats_view_enabled"),
         MapLibreNativeC.C_BOOL.withName("repaint_demand"),
-        MapLibreNativeC.C_CHAR.withName("reserved_flags"),
+        MapLibreNativeC.C_BOOL.withName("gesture_in_progress"),
         MemoryLayout.paddingLayout(4),
         MapLibreNativeC.C_LONG.withName("event_mask"),
         MapLibreNativeC.C_LONG.withName("latest_render_update_generation"),
@@ -507,48 +507,48 @@ public class mln_map_snapshot {
         struct.set(repaint_demand$LAYOUT, repaint_demand$OFFSET, fieldValue);
     }
 
-    private static final OfByte reserved_flags$LAYOUT = (OfByte)$LAYOUT.select(groupElement("reserved_flags"));
+    private static final OfBoolean gesture_in_progress$LAYOUT = (OfBoolean)$LAYOUT.select(groupElement("gesture_in_progress"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t reserved_flags
+     * bool gesture_in_progress
      * }
      */
-    public static final OfByte reserved_flags$layout() {
-        return reserved_flags$LAYOUT;
+    public static final OfBoolean gesture_in_progress$layout() {
+        return gesture_in_progress$LAYOUT;
     }
 
-    private static final long reserved_flags$OFFSET = $LAYOUT.byteOffset(groupElement("reserved_flags"));
+    private static final long gesture_in_progress$OFFSET = $LAYOUT.byteOffset(groupElement("gesture_in_progress"));
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t reserved_flags
+     * bool gesture_in_progress
      * }
      */
-    public static final long reserved_flags$offset() {
-        return reserved_flags$OFFSET;
+    public static final long gesture_in_progress$offset() {
+        return gesture_in_progress$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t reserved_flags
+     * bool gesture_in_progress
      * }
      */
-    public static byte reserved_flags(MemorySegment struct) {
-        return struct.get(reserved_flags$LAYOUT, reserved_flags$OFFSET);
+    public static boolean gesture_in_progress(MemorySegment struct) {
+        return struct.get(gesture_in_progress$LAYOUT, gesture_in_progress$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t reserved_flags
+     * bool gesture_in_progress
      * }
      */
-    public static void reserved_flags(MemorySegment struct, byte fieldValue) {
-        struct.set(reserved_flags$LAYOUT, reserved_flags$OFFSET, fieldValue);
+    public static void gesture_in_progress(MemorySegment struct, boolean fieldValue) {
+        struct.set(gesture_in_progress$LAYOUT, gesture_in_progress$OFFSET, fieldValue);
     }
 
     private static final OfLong event_mask$LAYOUT = (OfLong)$LAYOUT.select(groupElement("event_mask"));

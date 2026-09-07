@@ -104,6 +104,7 @@ pub fn main(init_args: std.process.Init) !void {
 
     try renderLoop(
         init_args.io,
+        allocator,
         window_handle,
         target_mode,
         &target,
@@ -117,6 +118,7 @@ pub fn main(init_args: std.process.Init) !void {
 /// remains attached to this graphics thread.
 fn renderLoop(
     io: std.Io,
+    allocator: std.mem.Allocator,
     window_handle: *c.SDL_Window,
     target_mode: types.RenderTargetMode,
     target: *RenderTarget,
@@ -129,21 +131,24 @@ fn renderLoop(
 
     var running = true;
     var render_requested = true;
+    var viewport_dirty = false;
     var input_controller = input.Controller{};
     while (running) {
         const pool = if (build_options.supports_metal) objc.AutoreleasePool.init() else {};
         defer if (build_options.supports_metal) pool.deinit();
 
+        // The runtime raises its wake only when the queue goes from empty to
+        // non-empty, so a dropped push has to be recovered here.
         if (event_receiver.wake_failed.swap(false, .acq_rel)) {
             event_receiver.scheduled.store(false, .release);
-            if (try map_state.drainEvents(state)) render_requested = true;
+            if (try state.drainEvents()) render_requested = true;
         }
 
         var event: c.SDL_Event = undefined;
         while (c.SDL_PollEvent(&event)) {
             if (event.type == event_receiver.event_type) {
                 event_receiver.scheduled.store(false, .release);
-                if (try map_state.drainEvents(state)) render_requested = true;
+                if (try state.drainEvents()) render_requested = true;
                 continue;
             }
             switch (event.type) {
@@ -155,13 +160,7 @@ fn renderLoop(
                 => {
                     current_viewport.* = viewport.get(window_handle);
                     viewport.log("resized viewport", current_viewport.*);
-                    try target.resize(current_viewport.*);
-                    var resize_completion = try state.map.resize(
-                        current_viewport.logical_width,
-                        current_viewport.logical_height,
-                        current_viewport.scale_factor,
-                    );
-                    resize_completion.deinit();
+                    viewport_dirty = true;
                     render_requested = true;
                 },
                 else => {
@@ -177,11 +176,20 @@ fn renderLoop(
 
         try target.finishFrame();
 
-        if (render_requested) {
+        var target_pending = try target.pollPending();
+        if (!target_pending and viewport_dirty) {
+            viewport_dirty = false;
+            // The session resize carries the new logical extent to the map, so
+            // this loop starts one and never resizes the map itself. Starting
+            // it here instead of from the resize event coalesces a live resize
+            // into one outstanding submission.
+            try target.resize(current_viewport.*);
+            target_pending = true;
+        }
+        if (!target_pending and render_requested) {
             render_requested = false;
-            if (!try target.renderUpdate(null, current_viewport.*)) {
-                render_requested = true;
-            }
+            const outcome = try target.renderUpdate(allocator, null, current_viewport.*);
+            if (!outcome.rendered or outcome.needs_repaint) render_requested = true;
         }
 
         // Stand-in for a display-refresh subscription.

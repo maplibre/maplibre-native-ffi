@@ -458,7 +458,7 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L460_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L483_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -583,8 +583,8 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("bool")]
         public byte repaint_demand;
 
-        [NativeTypeName("uint8_t")]
-        public byte reserved_flags;
+        [NativeTypeName("bool")]
+        public byte gesture_in_progress;
 
         [NativeTypeName("uint64_t")]
         public ulong event_mask;
@@ -644,21 +644,6 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_runtime_offline_region_delete([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_region_id")] long region_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_offline_region_snapshot_get([NativeTypeName("mln_offline_region_snapshot")] MlnOfflineRegionSnapshot snapshot, mln_offline_region_info* out_info);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void mln_offline_region_snapshot_destroy([NativeTypeName("mln_offline_region_snapshot")] MlnOfflineRegionSnapshot snapshot);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_offline_region_list_count([NativeTypeName("mln_offline_region_list")] MlnOfflineRegionList list, [NativeTypeName("size_t *")] nuint* out_count);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_offline_region_list_get([NativeTypeName("mln_offline_region_list")] MlnOfflineRegionList list, [NativeTypeName("size_t")] nuint index, mln_offline_region_info* out_info);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void mln_offline_region_list_destroy([NativeTypeName("mln_offline_region_list")] MlnOfflineRegionList list);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_map_options mln_map_options_default();

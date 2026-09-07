@@ -68,488 +68,462 @@ class OptionsValueSemanticsTest {
   }
 
   @Test
-  fun cameraOptionsComparesByFieldValue(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertValueSemantics(
-        baseline = {
-          CameraOptions().apply {
-            center = LatLng(1.0, 2.0)
-            centerAltitude = 3.0
-            padding = EdgeInsets(4.0, 5.0, 6.0, 7.0)
-            anchor = ScreenPoint(8.0, 9.0)
-            zoom = 10.0
-            bearing = 11.0
-            pitch = 12.0
-            roll = 13.0
-            fieldOfView = 14.0
-          }
-        },
-        copyOf = { it.copy() },
-        mutators =
-          listOf(
-            { center = LatLng(90.0, 90.0) },
-            { centerAltitude = 300.0 },
-            { padding = EdgeInsets.ZERO },
-            { anchor = ScreenPoint(80.0, 90.0) },
-            { zoom = 100.0 },
-            { bearing = 110.0 },
-            { pitch = 120.0 },
-            { roll = 130.0 },
-            { fieldOfView = 140.0 },
-          ),
-      )
-    }
+  fun cameraOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        CameraOptions().apply {
+          center = LatLng(1.0, 2.0)
+          centerAltitude = 3.0
+          padding = EdgeInsets(4.0, 5.0, 6.0, 7.0)
+          anchor = ScreenPoint(8.0, 9.0)
+          zoom = 10.0
+          bearing = 11.0
+          pitch = 12.0
+          roll = 13.0
+          fieldOfView = 14.0
+        }
+      },
+      copyOf = { it.copy() },
+      mutators =
+        listOf(
+          { center = LatLng(90.0, 90.0) },
+          { centerAltitude = 300.0 },
+          { padding = EdgeInsets.ZERO },
+          { anchor = ScreenPoint(80.0, 90.0) },
+          { zoom = 100.0 },
+          { bearing = 110.0 },
+          { pitch = 120.0 },
+          { roll = 130.0 },
+          { fieldOfView = 140.0 },
+        ),
+    )
+  }
 
   @Test
-  fun animationOptionsComparesByFieldValue(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertValueSemantics(
-        baseline = {
-          AnimationOptions().apply {
-            durationMs = 1.0
-            velocity = 2.0
-            minZoom = 3.0
-            easing = UnitBezier(0.1, 0.2, 0.3, 0.4)
-            transitionId = 4L
-          }
-        },
-        copyOf = { it.copy() },
-        mutators =
-          listOf(
-            { durationMs = 10.0 },
-            { velocity = 20.0 },
-            { minZoom = 30.0 },
-            { easing = UnitBezier(0.9, 0.8, 0.7, 0.6) },
-            { transitionId = 40L },
-          ),
-      )
-    }
+  fun animationOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        AnimationOptions().apply {
+          durationMs = 1.0
+          velocity = 2.0
+          minZoom = 3.0
+          easing = UnitBezier(0.1, 0.2, 0.3, 0.4)
+          transitionId = 4L
+        }
+      },
+      copyOf = { it.copy() },
+      mutators =
+        listOf(
+          { durationMs = 10.0 },
+          { velocity = 20.0 },
+          { minZoom = 30.0 },
+          { easing = UnitBezier(0.9, 0.8, 0.7, 0.6) },
+          { transitionId = 40L },
+        ),
+    )
+  }
 
   @Test
-  fun boundOptionsComparesByFieldValue(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertValueSemantics(
-        baseline = {
-          BoundOptions().apply {
-            bounds = BoundsConstraint.Bounded(LatLngBounds(LatLng(0.0, 0.0), LatLng(1.0, 1.0)))
-            minZoom = 2.0
-            maxZoom = 3.0
-            minPitch = 4.0
-            maxPitch = 5.0
-          }
-        },
-        copyOf = { it.copy() },
-        mutators =
-          listOf(
-            {
-              bounds = BoundsConstraint.Bounded(LatLngBounds(LatLng(-1.0, -1.0), LatLng(2.0, 2.0)))
-            },
-            { bounds = BoundsConstraint.Unbounded },
-            { minZoom = 20.0 },
-            { maxZoom = 30.0 },
-            { minPitch = 40.0 },
-            { maxPitch = 50.0 },
-          ),
-      )
-    }
+  fun boundOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        BoundOptions().apply {
+          bounds = BoundsConstraint.Bounded(LatLngBounds(LatLng(0.0, 0.0), LatLng(1.0, 1.0)))
+          minZoom = 2.0
+          maxZoom = 3.0
+          minPitch = 4.0
+          maxPitch = 5.0
+        }
+      },
+      copyOf = { it.copy() },
+      mutators =
+        listOf(
+          { bounds = BoundsConstraint.Bounded(LatLngBounds(LatLng(-1.0, -1.0), LatLng(2.0, 2.0))) },
+          { bounds = BoundsConstraint.Unbounded },
+          { minZoom = 20.0 },
+          { maxZoom = 30.0 },
+          { minPitch = 40.0 },
+          { maxPitch = 50.0 },
+        ),
+    )
+  }
 
   @Test
-  fun cameraFitOptionsComparesByFieldValue(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertValueSemantics(
-        baseline = {
-          CameraFitOptions().apply {
-            padding = EdgeInsets(1.0, 2.0, 3.0, 4.0)
-            bearing = 5.0
-            pitch = 6.0
-          }
-        },
-        copyOf = { it.copy() },
-        mutators = listOf({ padding = EdgeInsets.ZERO }, { bearing = 50.0 }, { pitch = 60.0 }),
-      )
-    }
+  fun cameraFitOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        CameraFitOptions().apply {
+          padding = EdgeInsets(1.0, 2.0, 3.0, 4.0)
+          bearing = 5.0
+          pitch = 6.0
+        }
+      },
+      copyOf = { it.copy() },
+      mutators = listOf({ padding = EdgeInsets.ZERO }, { bearing = 50.0 }, { pitch = 60.0 }),
+    )
+  }
 
   @Test
-  fun freeCameraOptionsComparesByFieldValue(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertValueSemantics(
-        baseline = {
-          FreeCameraOptions().apply {
-            position = Vec3(1.0, 2.0, 3.0)
-            orientation = Quaternion(0.0, 0.0, 0.0, 1.0)
-          }
-        },
-        copyOf = { it.copy() },
-        mutators =
-          listOf(
-            { position = Vec3(9.0, 9.0, 9.0) },
-            { orientation = Quaternion(1.0, 0.0, 0.0, 0.0) },
-          ),
-      )
-    }
+  fun freeCameraOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        FreeCameraOptions().apply {
+          position = Vec3(1.0, 2.0, 3.0)
+          orientation = Quaternion(0.0, 0.0, 0.0, 1.0)
+        }
+      },
+      copyOf = { it.copy() },
+      mutators =
+        listOf({ position = Vec3(9.0, 9.0, 9.0) }, { orientation = Quaternion(1.0, 0.0, 0.0, 0.0) }),
+    )
+  }
 
   @Test
-  fun viewportOptionsComparesByFieldValue(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertValueSemantics(
-        baseline = {
-          ViewportOptions().apply {
-            northOrientation = NorthOrientation(0)
-            constrainMode = ConstrainMode(0)
-            viewportMode = ViewportMode(0)
-            frustumOffset = EdgeInsets(1.0, 2.0, 3.0, 4.0)
-          }
-        },
-        copyOf = { it.copy() },
-        mutators =
-          listOf(
-            { northOrientation = NorthOrientation(2) },
-            { constrainMode = ConstrainMode(1) },
-            { viewportMode = ViewportMode(1) },
-            { frustumOffset = EdgeInsets.ZERO },
-          ),
-      )
-    }
+  fun viewportOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        ViewportOptions().apply {
+          northOrientation = NorthOrientation(0)
+          constrainMode = ConstrainMode(0)
+          viewportMode = ViewportMode(0)
+          frustumOffset = EdgeInsets(1.0, 2.0, 3.0, 4.0)
+        }
+      },
+      copyOf = { it.copy() },
+      mutators =
+        listOf(
+          { northOrientation = NorthOrientation(2) },
+          { constrainMode = ConstrainMode(1) },
+          { viewportMode = ViewportMode(1) },
+          { frustumOffset = EdgeInsets.ZERO },
+        ),
+    )
+  }
 
   @Test
-  fun tileOptionsComparesByFieldValue(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertValueSemantics(
-        baseline = {
-          TileOptions().apply {
-            prefetchZoomDelta = 1
-            lodMinRadius = 2.0
-            lodScale = 3.0
-            lodPitchThreshold = 4.0
-            lodZoomShift = 5.0
-            lodMode = TileLodMode(0)
-          }
-        },
-        copyOf = { it.copy() },
-        mutators =
-          listOf(
-            { prefetchZoomDelta = 7 },
-            { lodMinRadius = 20.0 },
-            { lodScale = 30.0 },
-            { lodPitchThreshold = 40.0 },
-            { lodZoomShift = 50.0 },
-            { lodMode = TileLodMode(1) },
-          ),
-      )
-    }
+  fun tileOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        TileOptions().apply {
+          prefetchZoomDelta = 1
+          lodMinRadius = 2.0
+          lodScale = 3.0
+          lodPitchThreshold = 4.0
+          lodZoomShift = 5.0
+          lodMode = TileLodMode(0)
+        }
+      },
+      copyOf = { it.copy() },
+      mutators =
+        listOf(
+          { prefetchZoomDelta = 7 },
+          { lodMinRadius = 20.0 },
+          { lodScale = 30.0 },
+          { lodPitchThreshold = 40.0 },
+          { lodZoomShift = 50.0 },
+          { lodMode = TileLodMode(1) },
+        ),
+    )
+  }
 
   @Test
-  fun projectionModeOptionsComparesByFieldValue(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertValueSemantics(
-        baseline = {
-          ProjectionModeOptions().apply {
-            axonometric = true
-            xSkew = 1.0
-            ySkew = 2.0
-          }
-        },
-        copyOf = { it.copy() },
-        mutators = listOf({ axonometric = false }, { xSkew = 10.0 }, { ySkew = 20.0 }),
-      )
-    }
+  fun projectionModeOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        ProjectionModeOptions().apply {
+          axonometric = true
+          xSkew = 1.0
+          ySkew = 2.0
+        }
+      },
+      copyOf = { it.copy() },
+      mutators = listOf({ axonometric = false }, { xSkew = 10.0 }, { ySkew = 20.0 }),
+    )
+  }
 
   @Test
-  fun mapOptionsComparesByFieldValue(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertValueSemantics(
-        baseline = {
-          MapOptions().apply {
-            width = 100
-            height = 200
-            scaleFactor = 2.0
-            mapMode = MapMode(0)
-            fastPforEnabled = false
-            eventMask = RuntimeEventMask.ALL
-          }
-        },
-        copyOf = { it.copy() },
-        mutators =
-          listOf(
-            { width = 300 },
-            { height = 400 },
-            { scaleFactor = 3.0 },
-            { mapMode = MapMode(1) },
-            { fastPforEnabled = true },
-            { eventMask = RuntimeEventMask.ALL_MAP_EVENTS },
-          ),
-      )
-    }
+  fun mapOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        MapOptions().apply {
+          width = 100
+          height = 200
+          scaleFactor = 2.0
+          mapMode = MapMode(0)
+          fastPforEnabled = false
+          eventMask = RuntimeEventMask.ALL
+        }
+      },
+      copyOf = { it.copy() },
+      mutators =
+        listOf(
+          { width = 300 },
+          { height = 400 },
+          { scaleFactor = 3.0 },
+          { mapMode = MapMode(1) },
+          { fastPforEnabled = true },
+          { eventMask = RuntimeEventMask.ALL_MAP_EVENTS },
+        ),
+    )
+  }
 
   @Test
-  fun runtimeOptionsComparesByFieldValue(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertValueSemantics(
-        baseline = {
-          RuntimeOptions().apply {
-            assetPath = "assets"
-            cachePath = "cache"
-            eventMask = RuntimeEventMask.ALL
-          }
-        },
-        copyOf = { it.copy() },
-        mutators =
-          listOf(
-            { assetPath = "other-assets" },
-            { cachePath = "other-cache" },
-            { eventMask = RuntimeEventMask.NONE },
-          ),
-      )
-    }
+  fun runtimeOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        RuntimeOptions().apply {
+          assetPath = "assets"
+          cachePath = "cache"
+          eventMask = RuntimeEventMask.ALL
+        }
+      },
+      copyOf = { it.copy() },
+      mutators =
+        listOf(
+          { assetPath = "other-assets" },
+          { cachePath = "other-cache" },
+          { eventMask = RuntimeEventMask.NONE },
+        ),
+    )
+  }
 
   @Test
-  fun tileSourceOptionsComparesByFieldValue(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertValueSemantics(
-        baseline = {
-          TileSourceOptions().apply {
-            minZoom = 1.0
-            maxZoom = 2.0
-            attribution = "attribution"
-            scheme = TileScheme.XYZ
-            bounds = LatLngBounds(LatLng(0.0, 0.0), LatLng(1.0, 1.0))
-            tileSize = 256
-            vectorEncoding = VectorTileEncoding.MVT
-            rasterDemEncoding = RasterDemEncoding.MAPBOX
-          }
-        },
-        copyOf = { it.copy() },
-        mutators =
-          listOf(
-            { minZoom = 10.0 },
-            { maxZoom = 20.0 },
-            { attribution = "other" },
-            { scheme = TileScheme.TMS },
-            { bounds = LatLngBounds(LatLng(-1.0, -1.0), LatLng(2.0, 2.0)) },
-            { tileSize = 512 },
-            { vectorEncoding = VectorTileEncoding.MLT },
-            { rasterDemEncoding = RasterDemEncoding.TERRARIUM },
-          ),
-      )
-    }
+  fun tileSourceOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        TileSourceOptions().apply {
+          minZoom = 1.0
+          maxZoom = 2.0
+          attribution = "attribution"
+          scheme = TileScheme.XYZ
+          bounds = LatLngBounds(LatLng(0.0, 0.0), LatLng(1.0, 1.0))
+          tileSize = 256
+          vectorEncoding = VectorTileEncoding.MVT
+          rasterDemEncoding = RasterDemEncoding.MAPBOX
+        }
+      },
+      copyOf = { it.copy() },
+      mutators =
+        listOf(
+          { minZoom = 10.0 },
+          { maxZoom = 20.0 },
+          { attribution = "other" },
+          { scheme = TileScheme.TMS },
+          { bounds = LatLngBounds(LatLng(-1.0, -1.0), LatLng(2.0, 2.0)) },
+          { tileSize = 512 },
+          { vectorEncoding = VectorTileEncoding.MLT },
+          { rasterDemEncoding = RasterDemEncoding.TERRARIUM },
+        ),
+    )
+  }
 
   @Test
-  fun geoJsonSourceOptionsComparesByFieldValue(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertValueSemantics(
-        baseline = {
-          GeoJsonSourceOptions().apply {
-            minZoom = 1.0
-            maxZoom = 2.0
-            tolerance = 0.5
-            clusterMaxZoom = 14.0
-            clusterProperties = clusterProperties("sum")
-            tileSize = 256
-            buffer = 64
-            clusterRadius = 40
-            clusterMinPoints = 3
-            lineMetrics = true
-            cluster = true
-            synchronousTiling = true
-          }
-        },
-        copyOf = { it.copy() },
-        mutators =
-          listOf(
-            { minZoom = 10.0 },
-            { maxZoom = 20.0 },
-            { tolerance = 0.25 },
-            { clusterMaxZoom = 12.0 },
-            { clusterProperties = clusterProperties("max") },
-            { tileSize = 512 },
-            { buffer = 128 },
-            { clusterRadius = 50 },
-            { clusterMinPoints = 2 },
-            { lineMetrics = false },
-            { cluster = false },
-            { synchronousTiling = false },
-          ),
-      )
-    }
+  fun geoJsonSourceOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        GeoJsonSourceOptions().apply {
+          minZoom = 1.0
+          maxZoom = 2.0
+          tolerance = 0.5
+          clusterMaxZoom = 14.0
+          clusterProperties = clusterProperties("sum")
+          tileSize = 256
+          buffer = 64
+          clusterRadius = 40
+          clusterMinPoints = 3
+          lineMetrics = true
+          cluster = true
+          synchronousTiling = true
+        }
+      },
+      copyOf = { it.copy() },
+      mutators =
+        listOf(
+          { minZoom = 10.0 },
+          { maxZoom = 20.0 },
+          { tolerance = 0.25 },
+          { clusterMaxZoom = 12.0 },
+          { clusterProperties = clusterProperties("max") },
+          { tileSize = 512 },
+          { buffer = 128 },
+          { clusterRadius = 50 },
+          { clusterMinPoints = 2 },
+          { lineMetrics = false },
+          { cluster = false },
+          { synchronousTiling = false },
+        ),
+    )
+  }
 
   /** Builds a `clusterProperties` object whose aggregation operator is [operator]. */
   private fun clusterProperties(operator: String): ByteArray =
     "{\"weight\":[\"$operator\",[\"get\",\"weight\"]]}".encodeToByteArray()
 
   @Test
-  fun styleImageOptionsComparesByFieldValue(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertValueSemantics(
-        baseline = {
-          StyleImageOptions().apply {
-            pixelRatio = 2.0f
-            sdf = true
-          }
-        },
-        copyOf = { it.copy() },
-        mutators = listOf({ pixelRatio = 3.0f }, { sdf = false }),
-      )
-    }
-
-  @Test
-  fun styleTransitionOptionsComparesByFieldValue(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertValueSemantics(
-        baseline = {
-          StyleTransitionOptions().apply {
-            durationMs = 300.0
-            delayMs = 0.0
-            enablePlacementTransitions = false
-          }
-        },
-        copyOf = { it.copy() },
-        mutators =
-          listOf(
-            { durationMs = 500.0 },
-            // A present zero stays distinguishable from an absent field.
-            { delayMs = null },
-            // A present false stays distinguishable from an absent field.
-            { enablePlacementTransitions = null },
-          ),
-      )
-    }
-
-  @Test
-  fun renderedFeatureQueryOptionsComparesByFieldValue(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertValueSemantics(
-        baseline = {
-          RenderedFeatureQueryOptions().apply {
-            layerIds = listOf("a", "b")
-            filter = "true".encodeToByteArray()
-          }
-        },
-        copyOf = { it.copy() },
-        mutators = listOf({ layerIds = listOf("a") }, { filter = "\"filter\"".encodeToByteArray() }),
-      )
-    }
-
-  @Test
-  fun sourceFeatureQueryOptionsComparesByFieldValue(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertValueSemantics(
-        baseline = {
-          SourceFeatureQueryOptions().apply {
-            sourceLayerIds = listOf("a", "b")
-            filter = "true".encodeToByteArray()
-          }
-        },
-        copyOf = { it.copy() },
-        mutators =
-          listOf({ sourceLayerIds = listOf("a") }, { filter = "\"filter\"".encodeToByteArray() }),
-      )
-    }
-
-  @Test
-  fun absentLayerIdsDifferFromEmptyLayerIds(): Unit =
-    org.maplibre.nativeffi.runtime
-      .runSuspendTest { // The native field mask distinguishes an absent layer filter from an empty
-        // one.
-        val absent = RenderedFeatureQueryOptions()
-        val empty = RenderedFeatureQueryOptions().apply { layerIds = emptyList() }
-
-        assertNotEquals(absent, empty)
-      }
-
-  @Test
-  fun absentJsonBytesDifferFromEmptyJsonBytes(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertNotEquals(
-        RenderedFeatureQueryOptions(),
-        RenderedFeatureQueryOptions().apply { filter = byteArrayOf() },
-      )
-      assertNotEquals(
-        SourceFeatureQueryOptions(),
-        SourceFeatureQueryOptions().apply { filter = byteArrayOf() },
-      )
-      assertNotEquals(
-        GeoJsonSourceOptions(),
-        GeoJsonSourceOptions().apply { clusterProperties = byteArrayOf() },
-      )
-    }
-
-  @Test
-  fun copyBlockAppliesToTheCopyOnly(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      val original = CameraOptions().apply { zoom = 1.0 }
-      val derived = original.copy { zoom = 2.0 }
-
-      assertEquals(1.0, original.zoom)
-      assertEquals(2.0, derived.zoom)
-    }
-
-  @Test
-  fun queryOptionsSnapshotCallerOwnedLayerIds(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest { // BND-069.
-      val layerIds = mutableListOf("a")
-      val options = RenderedFeatureQueryOptions().apply { this.layerIds = layerIds }
-      val copy = options.copy()
-
-      layerIds.add("b")
-
-      assertEquals(listOf("a"), options.layerIds)
-      assertEquals(listOf("a"), copy.layerIds)
-
-      val sourceLayerIds = mutableListOf("a")
-      val sourceOptions = SourceFeatureQueryOptions().apply { this.sourceLayerIds = sourceLayerIds }
-
-      sourceLayerIds.add("b")
-
-      assertEquals(listOf("a"), sourceOptions.sourceLayerIds)
-    }
-
-  @Test
-  fun byteTransitDescriptorsSnapshotCallerOwnedArrays(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      val filter = "true".encodeToByteArray()
-      val query = RenderedFeatureQueryOptions().apply { this.filter = filter }
-      filter[0] = 'f'.code.toByte()
-      assertContentEquals("true".encodeToByteArray(), query.filter)
-
-      val exposedFilter = query.filter ?: error("missing filter")
-      exposedFilter[0] = 'f'.code.toByte()
-      assertContentEquals("true".encodeToByteArray(), query.filter)
-
-      val sourceFilter = "false".encodeToByteArray()
-      val sourceQuery = SourceFeatureQueryOptions().apply { this.filter = sourceFilter }
-      sourceFilter[0] = 't'.code.toByte()
-      assertContentEquals("false".encodeToByteArray(), sourceQuery.filter)
-
-      val properties = "{}".encodeToByteArray()
-      val source = GeoJsonSourceOptions().apply { clusterProperties = properties }
-      properties[0] = '['.code.toByte()
-      assertContentEquals("{}".encodeToByteArray(), source.clusterProperties)
-
-      val geometry = "{\"type\":\"Point\",\"coordinates\":[0,0]}".encodeToByteArray()
-      val region = OfflineRegionDefinition.GeometryRegion("style", geometry, 0.0, 1.0, 1f, false)
-      geometry[0] = '['.code.toByte()
-      assertContentEquals(
-        "{\"type\":\"Point\",\"coordinates\":[0,0]}".encodeToByteArray(),
-        region.geometry,
-      )
-    }
-
-  @Test
-  fun styleImageOptionsSnapshotCallerOwnedStretches(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest { // BND-069.
-      val stretchX = mutableListOf(ImageStretch(0.0f, 1.0f))
-      val options =
+  fun styleImageOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
         StyleImageOptions().apply {
-          this.stretchX = stretchX
-          stretchY = emptyList()
+          pixelRatio = 2.0f
+          sdf = true
         }
-      val copy = options.copy()
+      },
+      copyOf = { it.copy() },
+      mutators = listOf({ pixelRatio = 3.0f }, { sdf = false }),
+    )
+  }
 
-      stretchX.add(ImageStretch(1.0f, 2.0f))
+  @Test
+  fun styleTransitionOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        StyleTransitionOptions().apply {
+          durationMs = 300.0
+          delayMs = 0.0
+          enablePlacementTransitions = false
+        }
+      },
+      copyOf = { it.copy() },
+      mutators =
+        listOf(
+          { durationMs = 500.0 },
+          // A present zero stays distinguishable from an absent field.
+          { delayMs = null },
+          // A present false stays distinguishable from an absent field.
+          { enablePlacementTransitions = null },
+        ),
+    )
+  }
 
-      assertEquals(listOf(ImageStretch(0.0f, 1.0f)), options.stretchX)
-      assertEquals(listOf(ImageStretch(0.0f, 1.0f)), copy.stretchX)
-      // A present empty list stays distinguishable from an absent one.
-      assertEquals(emptyList(), copy.stretchY)
-    }
+  @Test
+  fun renderedFeatureQueryOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        RenderedFeatureQueryOptions().apply {
+          layerIds = listOf("a", "b")
+          filter = "true".encodeToByteArray()
+        }
+      },
+      copyOf = { it.copy() },
+      mutators = listOf({ layerIds = listOf("a") }, { filter = "\"filter\"".encodeToByteArray() }),
+    )
+  }
+
+  @Test
+  fun sourceFeatureQueryOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        SourceFeatureQueryOptions().apply {
+          sourceLayerIds = listOf("a", "b")
+          filter = "true".encodeToByteArray()
+        }
+      },
+      copyOf = { it.copy() },
+      mutators =
+        listOf({ sourceLayerIds = listOf("a") }, { filter = "\"filter\"".encodeToByteArray() }),
+    )
+  }
+
+  // The native field mask distinguishes an absent layer filter from an empty one.
+  @Test
+  fun absentLayerIdsDifferFromEmptyLayerIds() {
+    val absent = RenderedFeatureQueryOptions()
+    val empty = RenderedFeatureQueryOptions().apply { layerIds = emptyList() }
+
+    assertNotEquals(absent, empty)
+  }
+
+  @Test
+  fun absentJsonBytesDifferFromEmptyJsonBytes() {
+    assertNotEquals(
+      RenderedFeatureQueryOptions(),
+      RenderedFeatureQueryOptions().apply { filter = byteArrayOf() },
+    )
+    assertNotEquals(
+      SourceFeatureQueryOptions(),
+      SourceFeatureQueryOptions().apply { filter = byteArrayOf() },
+    )
+    assertNotEquals(
+      GeoJsonSourceOptions(),
+      GeoJsonSourceOptions().apply { clusterProperties = byteArrayOf() },
+    )
+  }
+
+  @Test
+  fun copyBlockAppliesToTheCopyOnly() {
+    val original = CameraOptions().apply { zoom = 1.0 }
+    val derived = original.copy { zoom = 2.0 }
+
+    assertEquals(1.0, original.zoom)
+    assertEquals(2.0, derived.zoom)
+  }
+
+  // BND-069.
+  @Test
+  fun queryOptionsSnapshotCallerOwnedLayerIds() {
+    val layerIds = mutableListOf("a")
+    val options = RenderedFeatureQueryOptions().apply { this.layerIds = layerIds }
+    val copy = options.copy()
+
+    layerIds.add("b")
+
+    assertEquals(listOf("a"), options.layerIds)
+    assertEquals(listOf("a"), copy.layerIds)
+
+    val sourceLayerIds = mutableListOf("a")
+    val sourceOptions = SourceFeatureQueryOptions().apply { this.sourceLayerIds = sourceLayerIds }
+
+    sourceLayerIds.add("b")
+
+    assertEquals(listOf("a"), sourceOptions.sourceLayerIds)
+  }
+
+  @Test
+  fun byteTransitDescriptorsSnapshotCallerOwnedArrays() {
+    val filter = "true".encodeToByteArray()
+    val query = RenderedFeatureQueryOptions().apply { this.filter = filter }
+    filter[0] = 'f'.code.toByte()
+    assertContentEquals("true".encodeToByteArray(), query.filter)
+
+    val exposedFilter = query.filter ?: error("missing filter")
+    exposedFilter[0] = 'f'.code.toByte()
+    assertContentEquals("true".encodeToByteArray(), query.filter)
+
+    val sourceFilter = "false".encodeToByteArray()
+    val sourceQuery = SourceFeatureQueryOptions().apply { this.filter = sourceFilter }
+    sourceFilter[0] = 't'.code.toByte()
+    assertContentEquals("false".encodeToByteArray(), sourceQuery.filter)
+
+    val properties = "{}".encodeToByteArray()
+    val source = GeoJsonSourceOptions().apply { clusterProperties = properties }
+    properties[0] = '['.code.toByte()
+    assertContentEquals("{}".encodeToByteArray(), source.clusterProperties)
+
+    val geometry = "{\"type\":\"Point\",\"coordinates\":[0,0]}".encodeToByteArray()
+    val region = OfflineRegionDefinition.GeometryRegion("style", geometry, 0.0, 1.0, 1f, false)
+    geometry[0] = '['.code.toByte()
+    assertContentEquals(
+      "{\"type\":\"Point\",\"coordinates\":[0,0]}".encodeToByteArray(),
+      region.geometry,
+    )
+  }
+
+  // BND-069.
+  @Test
+  fun styleImageOptionsSnapshotCallerOwnedStretches() {
+    val stretchX = mutableListOf(ImageStretch(0.0f, 1.0f))
+    val options =
+      StyleImageOptions().apply {
+        this.stretchX = stretchX
+        stretchY = emptyList()
+      }
+    val copy = options.copy()
+
+    stretchX.add(ImageStretch(1.0f, 2.0f))
+
+    assertEquals(listOf(ImageStretch(0.0f, 1.0f)), options.stretchX)
+    assertEquals(listOf(ImageStretch(0.0f, 1.0f)), copy.stretchX)
+    // A present empty list stays distinguishable from an absent one.
+    assertEquals(emptyList(), copy.stretchY)
+  }
 }

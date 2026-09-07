@@ -28,21 +28,15 @@ public sealed unsafe class MapProjectionHandle : IDisposable
         );
     }
 
-    internal static Task<MapProjectionHandle> CreateAsync(
-        MapHandle map,
-        CancellationToken cancellationToken
-    )
+    internal static Task<MapProjectionHandle> CreateAsync(MapHandle map)
     {
         ArgumentNullException.ThrowIfNull(map);
-        cancellationToken.ThrowIfCancellationRequested();
-        return NativeCompletion
-            .Submit(
-                completion => NativeMethods.mln_map_projection_create(map.Handle, completion),
-                static result => new MapProjectionHandle(
-                    NativeCompletion.Value<MlnMapProjection>(result)
-                )
+        return NativeCompletion.Submit(
+            completion => NativeMethods.mln_map_projection_create(map.Handle, completion),
+            static result => new MapProjectionHandle(
+                NativeCompletion.Value<MlnMapProjection>(result)
             )
-            .WaitAsync(cancellationToken);
+        );
     }
 
     internal MlnMapProjection Handle => state.Handle;
@@ -53,24 +47,16 @@ public sealed unsafe class MapProjectionHandle : IDisposable
     /// <summary>Copies the projection camera, observing every earlier projection setter.</summary>
     public CameraOptions GetCamera()
     {
-        var camera = state.WithLive(live =>
-        {
-            var native = NativeMethods.mln_camera_options_default();
-            NativeStatus.Check(NativeMethods.mln_map_projection_get_camera(live, &native));
-            return native;
-        });
-        return MapStructs.CameraOptionsFromNative(camera);
+        var native = NativeMethods.mln_camera_options_default();
+        NativeStatus.Check(NativeMethods.mln_map_projection_get_camera(Handle, &native));
+        return MapStructs.CameraOptionsFromNative(native);
     }
 
     /// <summary>Applies a camera update; only fields present on <paramref name="camera" /> apply.</summary>
     public void SetCamera(CameraOptions camera)
     {
-        var nativeCamera = MapStructs.ToNative(camera);
-        state.WithLive(live =>
-        {
-            var native = nativeCamera;
-            NativeStatus.Check(NativeMethods.mln_map_projection_set_camera(live, &native));
-        });
+        var native = MapStructs.ToNative(camera);
+        NativeStatus.Check(NativeMethods.mln_map_projection_set_camera(Handle, &native));
     }
 
     /// <summary>Applies a camera fit for the coordinates.</summary>
@@ -83,20 +69,18 @@ public sealed unsafe class MapProjectionHandle : IDisposable
             nativeCoordinates[index] = CoreStructs.ToNative(coordinates[index]);
         }
         var nativePadding = MapStructs.ToNative(padding);
-        state.WithLive(live =>
+        var live = Handle;
+        fixed (mln_lat_lng* coordinatesPointer = nativeCoordinates)
         {
-            fixed (mln_lat_lng* coordinatesPointer = nativeCoordinates)
-            {
-                NativeStatus.Check(
-                    NativeMethods.mln_map_projection_set_visible_coordinates(
-                        live,
-                        nativeCoordinates.Length == 0 ? null : coordinatesPointer,
-                        (nuint)nativeCoordinates.Length,
-                        nativePadding
-                    )
-                );
-            }
-        });
+            NativeStatus.Check(
+                NativeMethods.mln_map_projection_set_visible_coordinates(
+                    live,
+                    nativeCoordinates.Length == 0 ? null : coordinatesPointer,
+                    (nuint)nativeCoordinates.Length,
+                    nativePadding
+                )
+            );
+        }
     }
 
     /// <summary>Applies a camera fit for GeoJSON Geometry bytes.</summary>
@@ -105,13 +89,11 @@ public sealed unsafe class MapProjectionHandle : IDisposable
         ArgumentNullException.ThrowIfNull(geometry);
         using var nativeGeometry = NativeStringView.From(geometry, nameof(geometry));
         var nativePadding = MapStructs.ToNative(padding);
-        state.WithLive(live =>
-            NativeStatus.Check(
-                NativeMethods.mln_map_projection_set_visible_geometry(
-                    live,
-                    nativeGeometry.Value,
-                    nativePadding
-                )
+        NativeStatus.Check(
+            NativeMethods.mln_map_projection_set_visible_geometry(
+                Handle,
+                nativeGeometry.Value,
+                nativePadding
             )
         );
     }
@@ -120,15 +102,11 @@ public sealed unsafe class MapProjectionHandle : IDisposable
     public ScreenPoint PixelForLatLng(LatLng coordinate)
     {
         var nativeCoordinate = CoreStructs.ToNative(coordinate);
-        var point = state.WithLive(live =>
-        {
-            mln_screen_point native = default;
-            NativeStatus.Check(
-                NativeMethods.mln_map_projection_pixel_for_lat_lng(live, nativeCoordinate, &native)
-            );
-            return native;
-        });
-        return MapStructs.FromNative(point);
+        mln_screen_point native = default;
+        NativeStatus.Check(
+            NativeMethods.mln_map_projection_pixel_for_lat_lng(Handle, nativeCoordinate, &native)
+        );
+        return MapStructs.FromNative(native);
     }
 
     /// <summary>Converts a logical-pixel screen point to a geographic coordinate.</summary>
@@ -136,15 +114,11 @@ public sealed unsafe class MapProjectionHandle : IDisposable
     public LatLng LatLngForPixel(ScreenPoint point)
     {
         var nativePoint = MapStructs.ToNative(point);
-        var coordinate = state.WithLive(live =>
-        {
-            mln_lat_lng native = default;
-            NativeStatus.Check(
-                NativeMethods.mln_map_projection_lat_lng_for_pixel(live, nativePoint, &native)
-            );
-            return native;
-        });
-        return CoreStructs.FromNative(coordinate);
+        mln_lat_lng native = default;
+        NativeStatus.Check(
+            NativeMethods.mln_map_projection_lat_lng_for_pixel(Handle, nativePoint, &native)
+        );
+        return CoreStructs.FromNative(native);
     }
 
     /// <summary>Converts a logical-pixel screen point to an unwrapped geographic coordinate.</summary>
@@ -152,25 +126,24 @@ public sealed unsafe class MapProjectionHandle : IDisposable
     public LatLng LatLngForPixelUnwrapped(ScreenPoint point)
     {
         var nativePoint = MapStructs.ToNative(point);
-        var coordinate = state.WithLive(live =>
-        {
-            mln_lat_lng native = default;
-            NativeStatus.Check(
-                NativeMethods.mln_map_projection_lat_lng_for_pixel_unwrapped(
-                    live,
-                    nativePoint,
-                    &native
-                )
-            );
-            return native;
-        });
-        return CoreStructs.FromNative(coordinate);
+        mln_lat_lng native = default;
+        NativeStatus.Check(
+            NativeMethods.mln_map_projection_lat_lng_for_pixel_unwrapped(
+                Handle,
+                nativePoint,
+                &native
+            )
+        );
+        return CoreStructs.FromNative(native);
     }
 
-    /// <summary>
-    /// Closes the projection after waiting for projection calls already running on other threads.
-    /// </summary>
+    /// <summary>Closes the projection, rejecting every later call on this handle.</summary>
+    /// <remarks>
+    /// A concurrent conversion running on another thread keeps the native object alive for its own
+    /// call, because the C API leases the projection for each entry point.
+    /// </remarks>
     public void Close() => state.Close();
 
+    /// <inheritdoc />
     public void Dispose() => state.TryClose();
 }

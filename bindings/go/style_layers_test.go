@@ -8,25 +8,9 @@ import (
 )
 
 func TestDedicatedStyleLayerHelpers(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	demOptions := StyleTileSourceOptions{}.WithTileSize(512).WithRasterEncoding(StyleRasterDEMEncodingMapbox)
@@ -68,7 +52,7 @@ func TestDedicatedStyleLayerHelpers(t *testing.T) {
 			t.Fatalf("StyleLayerInfo(%s) type = (%q, %v), want %q true", id, info.Type, found, wantType)
 		}
 	}
-	ids, err := takeStyleOperationForTest(m.StyleLayerIDs())
+	ids, err := awaitForTest(m.StyleLayerIDs())
 	if err != nil {
 		t.Fatalf("StyleLayerIDs(): %v", err)
 	}
@@ -80,9 +64,9 @@ func TestDedicatedStyleLayerHelpers(t *testing.T) {
 		t.Fatalf("StyleLayerIDs() = %v, want relief before hillshade and location after hillshade", ids)
 	}
 	completion, err := m.SetLocationIndicatorImageName("location", LocationIndicatorImageKind(99), "bad")
-	requireStyleCommandFailed(t, runtime, completion, err)
+	requireStyleCommandFailed(t, completion, err)
 	completion, err = m.AddHillshadeLayer("bad-hillshade", "missing", "")
-	requireStyleCommandFailed(t, runtime, completion, err)
+	requireStyleCommandFailed(t, completion, err)
 }
 
 const layerAccessorStyleJSON = `{"version":8,"sources":{"geo":{"type":"geojson",` +
@@ -90,50 +74,46 @@ const layerAccessorStyleJSON = `{"version":8,"sources":{"geo":{"type":"geojson",
 	`{"id":"bg","type":"background"},{"id":"fill","type":"fill","source":"geo"}]}`
 
 func TestLayerBaseAccessorsRoundTrip(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
 	if _, err := m.SetStyleJSON([]byte(layerAccessorStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(): %v", err)
 	}
 
 	info, found, err := takeOptionalStyleOperationForTest(m.StyleLayerInfo("fill"))
-	if err != nil || !found || info.SourceLayer != nil {
-		t.Fatalf("StyleLayerInfo(fill) source layer = %v, %v; want absent", info.SourceLayer, err)
+	if err != nil || !found || info.SourceLayer != "" {
+		t.Fatalf("StyleLayerInfo(fill) source layer = %q, %v; want empty", info.SourceLayer, err)
 	}
 	if _, err := m.SetLayerSourceLayer("fill", "roads"); err != nil {
 		t.Fatalf("SetLayerSourceLayer(): %v", err)
 	}
 	info, found, err = takeOptionalStyleOperationForTest(m.StyleLayerInfo("fill"))
-	if err != nil || !found || info.SourceLayer == nil || *info.SourceLayer != "roads" || info.SourceID == nil || *info.SourceID != "geo" {
-		t.Fatalf("StyleLayerInfo(fill) sources = (%v, %v, %v)", info.SourceID, info.SourceLayer, err)
+	if err != nil || !found || info.SourceLayer != "roads" || info.SourceID != "geo" {
+		t.Fatalf("StyleLayerInfo(fill) sources = (%q, %q, %v)", info.SourceID, info.SourceLayer, err)
+	}
+
+	// The narrow copies report the same values the aggregate carries.
+	sourceLayer, err := awaitForTest(m.LayerSourceLayer("fill"))
+	if err != nil || sourceLayer != "roads" {
+		t.Fatalf("LayerSourceLayer(fill) = (%q, %v), want roads", sourceLayer, err)
+	}
+	sourceID, err := awaitForTest(m.LayerSourceID("fill"))
+	if err != nil || sourceID != "geo" {
+		t.Fatalf("LayerSourceID(fill) = (%q, %v), want geo", sourceID, err)
+	}
+	if _, err := awaitForTest(m.LayerSourceID("missing")); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("LayerSourceID(missing) error = %v, want ErrNotFound", err)
 	}
 
 	// A layer type that takes no source is rejected rather than silently ignored.
 	completion, err := m.SetLayerSourceLayer("bg", "roads")
-	requireStyleCommandFailed(t, runtime, completion, err)
+	requireStyleCommandFailed(t, completion, err)
 	background, found, queryErr := takeOptionalStyleOperationForTest(m.StyleLayerInfo("bg"))
-	if queryErr != nil || !found || background.SourceID != nil {
-		t.Fatalf("StyleLayerInfo(bg) source = %v, %v; want absent", background.SourceID, queryErr)
+	if queryErr != nil || !found || background.SourceID != "" {
+		t.Fatalf("StyleLayerInfo(bg) source = %q, %v; want empty", background.SourceID, queryErr)
 	}
 
-	// An unset zoom range crosses the boundary as infinities, and the layer
-	// info reports the source-ID and source-layer sizes that feed the copies.
+	// An unset zoom range crosses the boundary as infinities.
 	info, found, err = takeOptionalStyleOperationForTest(m.StyleLayerInfo("fill"))
 	if err != nil || !found {
 		t.Fatalf("StyleLayerInfo(fill) = (%#v, %v, %v), want found", info, found, err)
@@ -143,12 +123,6 @@ func TestLayerBaseAccessorsRoundTrip(t *testing.T) {
 	}
 	if !math.IsInf(info.MinZoom, -1) || !math.IsInf(info.MaxZoom, 1) {
 		t.Fatalf("StyleLayerInfo(fill) zoom range = (%v, %v), want infinities", info.MinZoom, info.MaxZoom)
-	}
-	if !info.HasSourceID || info.SourceIDSize != uint64(len("geo")) {
-		t.Fatalf("StyleLayerInfo(fill) source ID size = (%v, %d), want (true, %d)", info.HasSourceID, info.SourceIDSize, len("geo"))
-	}
-	if !info.HasSourceLayer || info.SourceLayerSize != uint64(len("roads")) {
-		t.Fatalf("StyleLayerInfo(fill) source layer size = (%v, %d), want (true, %d)", info.HasSourceLayer, info.SourceLayerSize, len("roads"))
 	}
 	if _, err := m.SetLayerMinZoom("fill", 4); err != nil {
 		t.Fatalf("SetLayerMinZoom(): %v", err)
@@ -172,42 +146,26 @@ func TestLayerBaseAccessorsRoundTrip(t *testing.T) {
 
 	// An unknown raw visibility passes through to C, which rejects it.
 	completion, err = m.SetLayerVisibility("fill", StyleLayerVisibility(900))
-	requireStyleCommandFailed(t, runtime, completion, err)
+	requireStyleCommandFailed(t, completion, err)
 
 	// A background layer carries neither a source ID nor a source layer.
 	if info, found, err := takeOptionalStyleOperationForTest(m.StyleLayerInfo("bg")); err != nil || !found ||
-		info.HasSourceID || info.SourceIDSize != 0 || info.HasSourceLayer || info.SourceLayerSize != 0 {
+		info.SourceID != "" || info.SourceLayer != "" {
 		t.Fatalf("StyleLayerInfo(bg) = (%#v, %v, %v), want found without source fields", info, found, err)
 	}
 
 	// Removing an existing layer commits, and the info getter stops finding it.
 	completion, err = m.RemoveStyleLayer("fill")
-	requireCommandCommitted(t, runtime, completion, err)
+	requireCommandCommitted(t, completion, err)
 	if _, found, err := takeOptionalStyleOperationForTest(m.StyleLayerInfo("fill")); err != nil || found {
 		t.Fatalf("StyleLayerInfo(fill) after removal = (%v, %v), want (false, nil)", found, err)
 	}
 }
 
 func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	if _, err := m.AddStyleSourceJSON("points", []byte(`{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}`)); err != nil {
@@ -238,7 +196,7 @@ func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
 	if _, err := m.SetLayerProperty("points-layer", "circle-radius", []byte("5")); err != nil {
 		t.Fatalf("SetLayerProperty(circle-radius): %v", err)
 	}
-	property, err := takeStyleOperationForTest(m.LayerProperty("points-layer", "circle-radius"))
+	property, err := awaitForTest(m.LayerProperty("points-layer", "circle-radius"))
 	if err != nil {
 		t.Fatalf("LayerProperty(circle-radius): %v", err)
 	}
@@ -260,38 +218,22 @@ func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
 		t.Fatalf("SetLayerFilter(nil): %v", err)
 	}
 	completion, err := m.SetLayerProperty("points-layer", "circle-radius", []byte("NaN"))
-	requireStyleCommandFailed(t, runtime, completion, err)
-	if _, err := takeStyleOperationForTest(m.LayerProperty("missing", "circle-radius")); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("LayerProperty(missing layer) error = %v, want ErrInvalidArgument", err)
+	requireStyleCommandFailed(t, completion, err)
+	if _, err := awaitForTest(m.LayerProperty("missing", "circle-radius")); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("LayerProperty(missing layer) error = %v, want ErrNotFound", err)
 	}
 }
 
 func TestStyleLightPropertyJSONSnapshots(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	if _, err := m.SetStyleLightJSON([]byte(`{"anchor":"viewport","color":"#ffffff","intensity":0.5}`)); err != nil {
 		t.Fatalf("SetStyleLightJSON(): %v", err)
 	}
-	undefined, err := takeStyleOperationForTest(m.StyleLightProperty("does-not-exist"))
+	undefined, err := awaitForTest(m.StyleLightProperty("does-not-exist"))
 	if err != nil {
 		t.Fatalf("StyleLightProperty(does-not-exist): %v", err)
 	}
@@ -301,7 +243,7 @@ func TestStyleLightPropertyJSONSnapshots(t *testing.T) {
 	if _, err := m.SetStyleLightProperty("intensity", []byte("0.75")); err != nil {
 		t.Fatalf("SetStyleLightProperty(intensity): %v", err)
 	}
-	intensity, err := takeStyleOperationForTest(m.StyleLightProperty("intensity"))
+	intensity, err := awaitForTest(m.StyleLightProperty("intensity"))
 	if err != nil {
 		t.Fatalf("StyleLightProperty(intensity): %v", err)
 	}
@@ -309,32 +251,16 @@ func TestStyleLightPropertyJSONSnapshots(t *testing.T) {
 		t.Fatalf("StyleLightProperty(intensity) = %s, want 0.75", intensity)
 	}
 	completion, err := m.SetStyleLightProperty("intensity", []byte("-Infinity"))
-	requireStyleCommandFailed(t, runtime, completion, err)
+	requireStyleCommandFailed(t, completion, err)
 }
 
 func TestStyleLayerMetadataForMissingLayers(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
-	ids, err := takeStyleOperationForTest(m.StyleLayerIDs())
+	ids, err := awaitForTest(m.StyleLayerIDs())
 	if err != nil {
 		t.Fatalf("StyleLayerIDs(): %v", err)
 	}
@@ -351,34 +277,18 @@ func TestStyleLayerMetadataForMissingLayers(t *testing.T) {
 		t.Fatalf("StyleLayerInfo(missing) = (%#v, %v), want empty false", info, found)
 	}
 	completion, err := m.RemoveStyleLayer("missing")
-	requireCommandFailedWith(t, runtime, completion, err, ErrNotFound)
+	requireCommandFailedWith(t, completion, err, ErrNotFound)
 	completion, err = m.MoveStyleLayer("missing", "")
-	requireStyleCommandFailed(t, runtime, completion, err)
+	requireStyleCommandFailed(t, completion, err)
 	if _, _, err := takeOptionalStyleOperationForTest(m.StyleLayerInfo("")); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("StyleLayerInfo(empty) error = %v, want ErrInvalidArgument", err)
 	}
 }
 
 func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
-	defaults, err := takeStyleOperationForTest(m.StyleTransitionOptions())
+	defaults, err := awaitForTest(m.StyleTransitionOptions())
 	if err != nil {
 		t.Fatalf("StyleTransitionOptions(): %v", err)
 	}
@@ -391,10 +301,10 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	}
 
 	// The style parser fills in its own 300ms duration for a style that declares no transition.
-	if _, err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
-	parsed, err := takeStyleOperationForTest(m.StyleTransitionOptions())
+	parsed, err := awaitForTest(m.StyleTransitionOptions())
 	if err != nil {
 		t.Fatalf("StyleTransitionOptions(): %v", err)
 	}
@@ -409,7 +319,7 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	if _, err := m.SetStyleJSON([]byte(transitionStyle)); err != nil {
 		t.Fatalf("SetStyleJSON(transition style): %v", err)
 	}
-	declared, err := takeStyleOperationForTest(m.StyleTransitionOptions())
+	declared, err := awaitForTest(m.StyleTransitionOptions())
 	if err != nil {
 		t.Fatalf("StyleTransitionOptions(): %v", err)
 	}
@@ -431,7 +341,7 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	if _, err := m.SetStyleTransitionOptions(options); err != nil {
 		t.Fatalf("SetStyleTransitionOptions(): %v", err)
 	}
-	applied, err := takeStyleOperationForTest(m.StyleTransitionOptions())
+	applied, err := awaitForTest(m.StyleTransitionOptions())
 	if err != nil {
 		t.Fatalf("StyleTransitionOptions(): %v", err)
 	}
@@ -445,7 +355,7 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	if _, err := m.SetStyleTransitionOptions(StyleTransitionOptions{DurationMS: &durationOnly}); err != nil {
 		t.Fatalf("SetStyleTransitionOptions(): %v", err)
 	}
-	kept, err := takeStyleOperationForTest(m.StyleTransitionOptions())
+	kept, err := awaitForTest(m.StyleTransitionOptions())
 	if err != nil {
 		t.Fatalf("StyleTransitionOptions(): %v", err)
 	}
@@ -456,7 +366,7 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	if _, err := m.SetStyleJSON([]byte(transitionStyle)); err != nil {
 		t.Fatalf("SetStyleJSON(transition style): %v", err)
 	}
-	reloaded, err := takeStyleOperationForTest(m.StyleTransitionOptions())
+	reloaded, err := awaitForTest(m.StyleTransitionOptions())
 	if err != nil {
 		t.Fatalf("StyleTransitionOptions(): %v", err)
 	}
@@ -466,5 +376,5 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 
 	negative := -1.0
 	completion, err := m.SetStyleTransitionOptions(StyleTransitionOptions{DelayMS: &negative})
-	requireStyleCommandFailed(t, runtime, completion, err)
+	requireStyleCommandFailed(t, completion, err)
 }

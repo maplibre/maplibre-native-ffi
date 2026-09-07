@@ -106,70 +106,32 @@ internal class InputController(
     if (action != GLFW_PRESS && action != GLFW_REPEAT) {
       return
     }
-    val cameraChanged =
-      when (key) {
-        GLFW_KEY_LEFT,
-        GLFW_KEY_A -> {
-          mapState.moveBy(KEYBOARD_PAN, 0.0, KEYBOARD_ANIMATION_MS)
-          true
-        }
+    when (key) {
+      GLFW_KEY_LEFT,
+      GLFW_KEY_A -> mapState.moveBy(KEYBOARD_PAN, 0.0, KEYBOARD_ANIMATION_MS)
 
-        GLFW_KEY_RIGHT,
-        GLFW_KEY_D -> {
-          mapState.moveBy(-KEYBOARD_PAN, 0.0, KEYBOARD_ANIMATION_MS)
-          true
-        }
+      GLFW_KEY_RIGHT,
+      GLFW_KEY_D -> mapState.moveBy(-KEYBOARD_PAN, 0.0, KEYBOARD_ANIMATION_MS)
 
-        GLFW_KEY_UP,
-        GLFW_KEY_W -> {
-          mapState.moveBy(0.0, KEYBOARD_PAN, KEYBOARD_ANIMATION_MS)
-          true
-        }
+      GLFW_KEY_UP,
+      GLFW_KEY_W -> mapState.moveBy(0.0, KEYBOARD_PAN, KEYBOARD_ANIMATION_MS)
 
-        GLFW_KEY_DOWN,
-        GLFW_KEY_S -> {
-          mapState.moveBy(0.0, -KEYBOARD_PAN, KEYBOARD_ANIMATION_MS)
-          true
-        }
+      GLFW_KEY_DOWN,
+      GLFW_KEY_S -> mapState.moveBy(0.0, -KEYBOARD_PAN, KEYBOARD_ANIMATION_MS)
 
-        GLFW_KEY_EQUAL -> {
-          mapState.scaleBy(KEYBOARD_ZOOM, viewportCenter(), KEYBOARD_ANIMATION_MS)
-          true
-        }
+      GLFW_KEY_EQUAL -> mapState.scaleBy(KEYBOARD_ZOOM, viewportCenter(), KEYBOARD_ANIMATION_MS)
 
-        GLFW_KEY_MINUS -> {
-          mapState.scaleBy(1.0 / KEYBOARD_ZOOM, viewportCenter(), KEYBOARD_ANIMATION_MS)
-          true
-        }
+      GLFW_KEY_MINUS ->
+        mapState.scaleBy(1.0 / KEYBOARD_ZOOM, viewportCenter(), KEYBOARD_ANIMATION_MS)
 
-        GLFW_KEY_Q -> {
-          mapState.adjustBearing(-KEYBOARD_BEARING, KEYBOARD_ANIMATION_MS)
-          true
-        }
-
-        GLFW_KEY_E -> {
-          mapState.adjustBearing(KEYBOARD_BEARING, KEYBOARD_ANIMATION_MS)
-          true
-        }
-        GLFW_KEY_RIGHT_BRACKET -> {
-          mapState.adjustPitch(KEYBOARD_PITCH, KEYBOARD_ANIMATION_MS)
-          true
-        }
-
-        GLFW_KEY_LEFT_BRACKET -> {
-          mapState.adjustPitch(-KEYBOARD_PITCH, KEYBOARD_ANIMATION_MS)
-          true
-        }
-
-        GLFW_KEY_0 -> {
-          mapState.resetOrientation(RESET_ANIMATION_MS)
-          true
-        }
-        else -> false
-      }
-    if (cameraChanged) {
-      renderRequest.set()
+      GLFW_KEY_Q -> mapState.adjustBearing(-KEYBOARD_BEARING, KEYBOARD_ANIMATION_MS)
+      GLFW_KEY_E -> mapState.adjustBearing(KEYBOARD_BEARING, KEYBOARD_ANIMATION_MS)
+      GLFW_KEY_RIGHT_BRACKET -> mapState.adjustPitch(KEYBOARD_PITCH, KEYBOARD_ANIMATION_MS)
+      GLFW_KEY_LEFT_BRACKET -> mapState.adjustPitch(-KEYBOARD_PITCH, KEYBOARD_ANIMATION_MS)
+      GLFW_KEY_0 -> mapState.resetOrientation(RESET_ANIMATION_MS)
+      else -> return
     }
+    renderRequest.set()
   }
 
   private fun viewportCenter(): ScreenPoint {

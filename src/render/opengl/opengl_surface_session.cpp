@@ -31,58 +31,12 @@
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 #include "render/opengl/egl_context.hpp"
 #endif
+#include "render/opengl/webgl_worker.hpp"
 #include "render/opengl/wgl_common.hpp"
 #include "render/render_session_common.hpp"
 #include "render/surface_session.hpp"
 
 namespace {
-
-#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
-struct WebGLWorkerCall {
-  std::function<void()> function;
-};
-
-auto run_webgl_worker(void* opaque) -> void* {
-  auto call =
-    std::unique_ptr<WebGLWorkerCall>{static_cast<WebGLWorkerCall*>(opaque)};
-  call->function();
-  return nullptr;
-}
-
-auto configure_transferred_webgl_worker(
-  mln_render_session_object& session, std::string selector
-) -> void {
-  auto thread = std::make_shared<pthread_t>();
-  session.start_worker =
-    [thread, selector = std::move(selector)](std::function<void()> function) {
-      auto attributes = pthread_attr_t{};
-      if (
-        pthread_attr_init(&attributes) != 0 ||
-        emscripten_pthread_attr_settransferredcanvases(
-          &attributes, selector.c_str()
-        ) != 0
-      ) {
-        pthread_attr_destroy(&attributes);
-        mln::core::set_thread_error("transferring the WebGL canvas failed");
-        return MLN_STATUS_NATIVE_ERROR;
-      }
-      auto call =
-        std::make_unique<WebGLWorkerCall>(WebGLWorkerCall{std::move(function)});
-      const auto result =
-        pthread_create(thread.get(), &attributes, run_webgl_worker, call.get());
-      pthread_attr_destroy(&attributes);
-      if (result != 0) {
-        mln::core::set_thread_error("creating the WebGL worker failed");
-        return MLN_STATUS_NATIVE_ERROR;
-      }
-      static_cast<void>(call.release());
-      return MLN_STATUS_OK;
-    };
-  session.join_worker = [thread]() {
-    static_cast<void>(pthread_join(*thread, nullptr));
-  };
-}
-#endif
 
 class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
                                    public mln::gfx::Renderable {
@@ -562,49 +516,31 @@ auto opengl_surface_attach_start(
   session->map = map;
   set_session_extent(*session, descriptor->extent);
   auto copied = *descriptor;
-#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
-  const auto transferred =
-    copied.context.platform == MLN_OPENGL_CONTEXT_PLATFORM_WEBGL &&
-    copied.context.data.webgl.kind == MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS;
-  auto selector = std::string{};
+  const auto transferred = opengl::is_transferred_webgl_canvas(copied.context);
+  auto selector =
+    transferred ? opengl::webgl_canvas_selector(copied.context) : std::string{};
   if (transferred) {
-    const auto view = copied.context.data.webgl.canvas_selector;
-    selector.assign(static_cast<const char*>(view.data), view.size);
-    configure_transferred_webgl_worker(*session, selector);
+    opengl::configure_transferred_webgl_worker(*session, selector);
   }
-#else
-  constexpr auto transferred = false;
-  auto selector = std::string{};
-#endif
-  if (
-    options != nullptr &&
-    options->driver != (transferred ? MLN_RENDER_DRIVER_CORE_WORKER
-                                    : MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD)
-  ) {
-    set_thread_error("OpenGL driver does not match its context placement");
-    return MLN_STATUS_UNSUPPORTED;
+  const auto driver_status = require_render_driver(
+    options,
+    transferred ? MLN_RENDER_DRIVER_CORE_WORKER
+                : MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+    "OpenGL driver does not match its context placement"
+  );
+  if (driver_status != MLN_STATUS_OK) {
+    return driver_status;
   }
   session->initialize_backend =
     [copied, selector = std::move(selector),
      transferred](mln_render_session_object& target) mutable {
-      (void)selector;
-      (void)transferred;
-#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
       if (transferred) {
-        auto attributes = EmscriptenWebGLContextAttributes{};
-        emscripten_webgl_init_context_attributes(&attributes);
-        attributes.majorVersion = 2;
-        attributes.proxyContextToMainThread =
-          EMSCRIPTEN_WEBGL_CONTEXT_PROXY_DISALLOW;
-        const auto context =
-          emscripten_webgl_create_context(selector.c_str(), &attributes);
-        if (context <= 0) {
-          set_thread_error("creating the transferred WebGL 2 context failed");
-          return MLN_STATUS_NATIVE_ERROR;
+        const auto context_status =
+          opengl::create_transferred_webgl_context(copied.context, selector);
+        if (context_status != MLN_STATUS_OK) {
+          return context_status;
         }
-        copied.context.data.webgl.context = context;
       }
-#endif
       target.surface.backend = std::make_unique<OpenGLSurfaceSessionBackend>(
         copied, mln::Size{target.physical_width, target.physical_height}
       );
@@ -612,7 +548,7 @@ auto opengl_surface_attach_start(
     };
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),
-    .driver = options == nullptr ? 0u : options->driver,
+    .driver = 0,
     .texture_ring_depth = 0,
     .flags = MLN_RENDER_SESSION_CAPABILITY_PRESENTATION
   };
@@ -626,6 +562,12 @@ auto opengl_surface_set_target_start(
   mln_render_session session, const mln_opengl_surface_descriptor* descriptor,
   const mln_completion* completion
 ) -> mln_status {
+  const auto submission_status = validate_render_session_retarget_submission(
+    session, RetargetTargetKind::Surface, completion
+  );
+  if (submission_status != MLN_STATUS_OK) {
+    return submission_status;
+  }
   const auto descriptor_status =
     validate_opengl_surface_descriptor(descriptor, true);
   if (descriptor_status != MLN_STATUS_OK) {

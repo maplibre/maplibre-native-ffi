@@ -28,12 +28,12 @@ public sealed class StyleImageTests
     [Fact]
     public async Task ImageSourceApisAdaptCoordinatesAndImagesThroughNativeMap()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        map.SetStyleJsonAsync("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
         var coordinates = new[]
         {
             new LatLng(10, 10),
@@ -50,54 +50,103 @@ public sealed class StyleImageTests
         };
         var image = new PremultipliedRgba8Image([0, 255, 0, 255], new TextureImageInfo(1, 1, 4, 4));
 
-        map.AddImageSourceUrlAsync("image-url", coordinates, "https://example.test/image.png");
-        map.SetImageSourceUrlAsync("image-url", "https://example.test/other.png");
-        map.SetImageSourceCoordinatesAsync("image-url", updatedCoordinates);
-        map.AddImageSourceImageAsync("image-inline", coordinates, image);
-        map.SetImageSourceImageAsync("image-inline", image);
+        _ = map.AddImageSourceUrlAsync(
+            "image-url",
+            coordinates,
+            "https://example.test/image.png",
+            TestContext.Current.CancellationToken
+        );
+        _ = map.SetImageSourceUrlAsync(
+            "image-url",
+            "https://example.test/other.png",
+            TestContext.Current.CancellationToken
+        );
+        _ = map.SetImageSourceCoordinatesAsync(
+            "image-url",
+            updatedCoordinates,
+            TestContext.Current.CancellationToken
+        );
+        _ = map.AddImageSourceImageAsync(
+            "image-inline",
+            coordinates,
+            image,
+            TestContext.Current.CancellationToken
+        );
+        _ = map.SetImageSourceImageAsync(
+            "image-inline",
+            image,
+            TestContext.Current.CancellationToken
+        );
 
-        Assert.Equal(SourceType.Image, (await map.StyleSourceInfoAsync("image-url"))?.Type);
-        Assert.Equal(SourceType.Image, (await map.StyleSourceInfoAsync("image-inline"))?.Type);
-        Assert.Equal(updatedCoordinates, await map.GetImageSourceCoordinatesAsync("image-url"));
-        Assert.Equal(coordinates, await map.GetImageSourceCoordinatesAsync("image-inline"));
+        Assert.Equal(
+            SourceType.Image,
+            (
+                await map.StyleSourceInfoAsync("image-url", TestContext.Current.CancellationToken)
+            )?.Type
+        );
+        Assert.Equal(
+            SourceType.Image,
+            (
+                await map.StyleSourceInfoAsync(
+                    "image-inline",
+                    TestContext.Current.CancellationToken
+                )
+            )?.Type
+        );
+        Assert.Equal(
+            updatedCoordinates,
+            await map.GetImageSourceCoordinatesAsync(
+                "image-url",
+                TestContext.Current.CancellationToken
+            )
+        );
+        Assert.Equal(
+            coordinates,
+            await map.GetImageSourceCoordinatesAsync(
+                "image-inline",
+                TestContext.Current.CancellationToken
+            )
+        );
     }
 
     [BindingSpecTest("BND-105")]
     [Fact]
     public async Task StyleImageRoundTripsMetadataAndPixelsThroughNativeMap()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        map.SetStyleJsonAsync("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
         var image = new PremultipliedRgba8Image([255, 0, 0, 255], new TextureImageInfo(1, 1, 4, 4));
         var options = new StyleImageOptions { PixelRatio = 2, Sdf = true };
 
-        RuntimeEventTestHelpers.AssertCommitted(map.SetStyleImageAsync("dot", image, options));
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.SetStyleImageAsync("dot", image, options, TestContext.Current.CancellationToken)
+        );
 
-        var copied = Assert.IsType<StyleImage>(await map.StyleImageAsync("dot"));
+        var copied = Assert.IsType<StyleImage>(
+            await map.StyleImageAsync("dot", TestContext.Current.CancellationToken)
+        );
         Assert.Equal([255, 0, 0, 255], copied.Image.Bytes);
         Assert.Equal(new TextureImageInfo(1, 1, 4, 4), copied.Image.Info);
         Assert.Equal(2, copied.Options.PixelRatio);
         Assert.True(copied.Options.Sdf);
 
-        RuntimeEventTestHelpers.AssertCommandFinishes(
-            runtime,
-            map.RemoveStyleImageAsync("dot"),
-            MaplibreStatus.Ok
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.RemoveStyleImageAsync("dot", TestContext.Current.CancellationToken)
         );
-        Assert.Null(await map.StyleImageAsync("dot"));
+        Assert.Null(await map.StyleImageAsync("dot", TestContext.Current.CancellationToken));
     }
 
     [BindingSpecTest("BND-105")]
     [Fact]
     public async Task NinePatchStyleImageRoundTripsStretchContentAndTextFit()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 64, Height = 64 });
-        map.SetStyleJsonAsync("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
 
         var image = new PremultipliedRgba8Image(new byte[16], new TextureImageInfo(2, 2, 8, 16));
         var options = new StyleImageOptions
@@ -107,22 +156,52 @@ public sealed class StyleImageTests
             Content = new ImageContent(0.5f, 0.5f, 1.5f, 1.5f),
             TextFitHeight = StyleImageTextFit.Proportional,
         };
-        RuntimeEventTestHelpers.AssertCommitted(map.SetStyleImageAsync("patch", image, options));
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.SetStyleImageAsync("patch", image, options, TestContext.Current.CancellationToken)
+        );
 
-        var copied = Assert.IsType<StyleImage>(await map.StyleImageAsync("patch"));
+        var copied = Assert.IsType<StyleImage>(
+            await map.StyleImageAsync("patch", TestContext.Current.CancellationToken)
+        );
         Assert.Equal([new ImageStretch(0, 1)], copied.Options.StretchX);
         Assert.Equal([new ImageStretch(0, 1), new ImageStretch(1, 2)], copied.Options.StretchY);
         Assert.Equal(new ImageContent(0.5f, 0.5f, 1.5f, 1.5f), copied.Options.Content);
         Assert.Null(copied.Options.TextFitWidth);
         Assert.Equal(StyleImageTextFit.Proportional, copied.Options.TextFitHeight);
-        Assert.Null(await map.StyleImageAsync("missing"));
+        Assert.Null(await map.StyleImageAsync("missing", TestContext.Current.CancellationToken));
+
+        // The narrow copies read the same image one part at a time.
+        Assert.Equal(
+            copied.Image.Bytes,
+            await map.GetStyleImagePremultipliedRgba8Async(
+                "patch",
+                TestContext.Current.CancellationToken
+            )
+        );
+        var stretches = await map.GetStyleImageStretchesAsync(
+            "patch",
+            TestContext.Current.CancellationToken
+        );
+        Assert.NotNull(stretches);
+        Assert.Equal(copied.Options.StretchX, stretches!.Value.StretchX);
+        Assert.Equal(copied.Options.StretchY, stretches.Value.StretchY);
+        Assert.Null(
+            await map.GetStyleImagePremultipliedRgba8Async(
+                "missing",
+                TestContext.Current.CancellationToken
+            )
+        );
+        Assert.Null(
+            await map.GetStyleImageStretchesAsync("missing", TestContext.Current.CancellationToken)
+        );
 
         // A backwards interval is rejected by C.
         await Assert.ThrowsAsync<InvalidArgumentException>(() =>
             map.SetStyleImageAsync(
                 "bad",
                 image,
-                new StyleImageOptions { StretchX = [new ImageStretch(2, 1)] }
+                new StyleImageOptions { StretchX = [new ImageStretch(2, 1)] },
+                TestContext.Current.CancellationToken
             )
         );
     }

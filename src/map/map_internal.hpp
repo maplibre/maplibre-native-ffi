@@ -28,9 +28,14 @@ struct RuntimeObject;
 
 struct MapObject {
   ControlState control;
+  // This map's own handle, so worker-side code that already holds the object
+  // can name it in an event without resolving the table again.
+  mln_map self = MLN_HANDLE_NULL;
   mln_runtime runtime = MLN_HANDLE_NULL;
   std::shared_ptr<RuntimeObject> runtime_state;
   uint32_t map_mode = MLN_MAP_MODE_CONTINUOUS;
+  // Width and height follow resize on the runtime worker; scale_factor is
+  // fixed at creation, so map_scale_factor() may read it from any thread.
   mln_logical_extent logical_extent{256, 256, 1.0};
   mutable std::mutex snapshot_mutex;
   mln_map_snapshot snapshot{};

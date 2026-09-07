@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <any>
 #include <atomic>
 #include <chrono>
@@ -20,6 +21,7 @@
 
 #include <mln/actor/scheduler.hpp>
 #include <mln/gfx/headless_backend.hpp>
+#include <mln/gfx/renderable.hpp>
 #include <mln/gfx/renderer_backend.hpp>
 #include <mln/renderer/renderer.hpp>
 #include <mln/renderer/renderer_observer.hpp>
@@ -44,21 +46,14 @@ class UpdateParameters;
 namespace mln::core {
 
 enum class RenderSessionKind : uint8_t { Surface, Texture };
-enum class TextureSessionApi : uint8_t {
-  Generic,
-  Metal,
-  OpenGL,
-  Vulkan,
-  WebGPU
-};
-enum class TextureSessionFrameKind : uint8_t {
-  None,
-  MetalOwned,
-  OpenGLOwned,
-  VulkanOwned,
-  WebGPUOwned
-};
 enum class TextureSessionMode : uint8_t { Owned, Borrowed };
+
+// Which renderer cache a maintenance submission releases.
+enum class RenderSessionMaintenance : uint8_t {
+  ReduceMemoryUse,
+  ClearData,
+  DumpDebugLogs,
+};
 
 // Reports a target replacement the backend does not implement. Compiled GPU
 // state lives partly outside the renderer, so a target that state cannot serve
@@ -122,6 +117,17 @@ class SurfaceSessionBackend {
       "session does not render through a WebGPU surface"
     );
   }
+};
+
+// What an acquirable frame's metadata takes from the session rather than from
+// the graphics resource. Captured under the session lock and handed to the
+// driver thread, so a backend never reads session state without it.
+struct RenderFrameMetadata {
+  uint64_t generation = 0;
+  uint64_t frame_id = 0;
+  uint32_t physical_width = 0;
+  uint32_t physical_height = 0;
+  double scale_factor = 1.0;
 };
 
 class TextureSessionBackend {
@@ -201,9 +207,13 @@ class TextureSessionBackend {
     return sync.kind == MLN_GPU_SYNC_CPU_COMPLETE ? MLN_STATUS_OK
                                                   : MLN_STATUS_UNSUPPORTED;
   }
-  virtual auto copy_slot_metadata(
-    const mln_render_session_object&, std::size_t, std::any&
-  ) -> mln_status {
+  // Records the backend metadata a host reads back from an acquired frame.
+  // Runs on the driver thread, right after the render, for the slot the
+  // backend still has selected, so it may touch graphics state; the acquiring
+  // thread only copies what this stored. NOT_READY reports a slot with no
+  // publishable texture yet.
+  virtual auto record_frame_metadata(const RenderFrameMetadata&, std::any&)
+    -> mln_status {
     return MLN_STATUS_UNSUPPORTED;
   }
   virtual auto select_render_slot(std::size_t) -> mln_status {
@@ -318,9 +328,60 @@ struct RenderTextureSlot {
     .object = 0,
     .value = 0
   };
+  // Recorded by the driver thread when the slot's frame is published. Empty
+  // until then, which makes the slot unacquirable.
+  std::any backend_metadata;
   bool available = false;
   bool acquired = false;
   bool rendering = false;
+};
+
+// The renderable resources a session-owned texture backend cycles through. The
+// selected slot's resource lives in the backend's own `resource` member, which
+// mbgl reads every frame; this parks the others and drops any whose recorded
+// size no longer matches the backend's. A borrowed target has no ring, so an
+// empty one accepts size records and refuses every selection.
+class RenderableSlotRing {
+ public:
+  explicit RenderableSlotRing(std::size_t depth)
+      : resources_(depth), sizes_(depth) {}
+
+  [[nodiscard]] auto selected_size() const -> mln::Size {
+    return sizes_.empty() ? mln::Size{} : sizes_[selected_];
+  }
+
+  auto record_size(mln::Size size) -> void {
+    if (!sizes_.empty()) sizes_[selected_] = size;
+  }
+
+  auto select(
+    std::size_t slot, mln::Size size,
+    std::unique_ptr<mln::gfx::RenderableResource>& resource
+  ) -> bool {
+    if (slot >= resources_.size()) return false;
+    if (slot == selected_) {
+      if (resource != nullptr && sizes_[slot] != size) resource.reset();
+      return true;
+    }
+    resources_[selected_] = std::move(resource);
+    if (resources_[slot] != nullptr && sizes_[slot] != size) {
+      resources_[slot].reset();
+    }
+    resource = std::move(resources_[slot]);
+    selected_ = slot;
+    return true;
+  }
+
+  auto clear() -> void {
+    resources_.clear();
+    sizes_.clear();
+    selected_ = 0;
+  }
+
+ private:
+  std::vector<std::unique_ptr<mln::gfx::RenderableResource>> resources_;
+  std::vector<mln::Size> sizes_;
+  std::size_t selected_ = 0;
 };
 
 // Records the frame status that mln::Renderer reports synchronously out of
@@ -477,14 +538,7 @@ class SessionFrameObserver final : public mln::RendererObserver {
 
 struct RenderTextureState {
   std::unique_ptr<TextureSessionBackend> backend = nullptr;
-  uint64_t next_frame_id = 1;
-  uint64_t acquired_frame_id = 0;
-  bool acquired = false;
-  TextureSessionFrameKind acquired_frame_kind = TextureSessionFrameKind::None;
-  TextureSessionApi api_kind = TextureSessionApi::Generic;
   TextureSessionMode mode = TextureSessionMode::Owned;
-  void* rendered_native_texture = nullptr;
-  void* acquired_native_texture = nullptr;
   std::vector<RenderTextureSlot> slots;
 };
 
@@ -497,6 +551,14 @@ struct PendingFrameDemand {
   mln_frame_demand demand;
   std::chrono::steady_clock::time_point accepted_at;
   std::uint64_t barrier_epoch;
+};
+
+// An accepted barrier waiting for the demands that preceded it. Demands carry
+// the barrier epoch current when they were accepted, so a barrier completes
+// once no demand with a lower epoch is still outstanding.
+struct PendingBarrier {
+  std::shared_ptr<OperationObject> operation;
+  std::uint64_t epoch;
 };
 }  // namespace mln::core
 
@@ -529,12 +591,18 @@ struct mln_render_session_object
   std::optional<std::thread::id> graphics_thread;
   uint32_t acquired_frame_count = 0;
   bool driver_call_in_flight = false;
-  uint32_t active_demand_count = 0;
   bool stop_worker = false;
   bool attached = false;
+  // Ticket of the newest accepted resize. An older ticket reaching the driver
+  // was replaced and completes as superseded instead of waiting for an extent
+  // the map will never publish.
+  uint64_t resize_submission = 0;
 
   std::deque<mln_render_frame_result> frame_results;
   std::deque<mln::core::PendingFrameDemand> demands;
+  // Barrier epochs of the demands currently running on the driver.
+  std::vector<uint64_t> active_demand_epochs;
+  std::deque<mln::core::PendingBarrier> barriers;
   std::deque<mln::core::RenderDriverWork> waiting_update_work;
   std::deque<mln::core::RenderDriverWork> driver_work;
   std::condition_variable worker_condition;
@@ -603,6 +671,14 @@ using RenderDriverResultCallable =
 
 [[nodiscard]] auto lease_render_session(mln_render_session session)
   -> std::shared_ptr<mln_render_session_object>;
+// Occupies the session's driver until *release is set, publishing *entered
+// once it runs. Reachable from outside the library through the test hook the
+// C ABI suite links; see src/c_api/test_hooks.hpp.
+auto enqueue_blocking_test_render_operation(
+  mln_render_session session, std::atomic_bool* entered,
+  const std::atomic_bool* release, const mln_completion* completion
+) -> mln_status;
+
 auto enqueue_driver_operation(
   mln_render_session session, RenderDriverCallable work,
   const mln_completion* completion
@@ -860,43 +936,88 @@ auto render_session_query_feature_extensions_start(
 ) -> mln_status;
 
 auto render_session_get_capabilities(
-  mln_render_session, mln_render_session_capabilities*
+  mln_render_session session, mln_render_session_capabilities* out_capabilities
 ) -> mln_status;
 auto render_session_get_snapshot(
-  mln_render_session, mln_render_session_snapshot*
+  mln_render_session session, mln_render_session_snapshot* out_snapshot
 ) -> mln_status;
-auto render_session_request_frame(mln_render_session, const mln_frame_demand*)
-  -> mln_status;
+auto render_session_request_frame(
+  mln_render_session session, const mln_frame_demand* demand
+) -> mln_status;
 auto render_session_service_driver_work(
-  mln_render_session, std::size_t, std::size_t*
+  mln_render_session session, std::size_t max_work, std::size_t* out_serviced
 ) -> mln_status;
 auto render_session_drain_frame_results(
-  mln_render_session, mln_render_frame_batch*
+  mln_render_session session, mln_render_frame_batch* out_batch
 ) -> mln_status;
-auto render_frame_batch_count(mln_render_frame_batch, std::size_t*)
-  -> mln_status;
+auto render_frame_batch_count(
+  mln_render_frame_batch batch, std::size_t* out_count
+) -> mln_status;
 auto render_frame_batch_get(
-  mln_render_frame_batch, std::size_t, mln_render_frame_result*
+  mln_render_frame_batch batch, std::size_t index,
+  mln_render_frame_result* out_result
 ) -> mln_status;
-auto render_frame_batch_release(mln_render_frame_batch) noexcept -> void;
-auto render_session_acquire_frame(mln_render_session, mln_acquired_frame*)
-  -> mln_status;
-auto acquired_frame_get_result(mln_acquired_frame, mln_render_frame_result*)
-  -> mln_status;
-auto acquired_frame_get_producer_sync(mln_acquired_frame, mln_gpu_sync*)
-  -> mln_status;
-auto acquired_frame_release(mln_acquired_frame*, const mln_gpu_sync*)
-  -> mln_status;
+auto render_frame_batch_release(mln_render_frame_batch batch) noexcept -> void;
+auto render_session_acquire_frame(
+  mln_render_session session, mln_acquired_frame* out_frame
+) -> mln_status;
+auto acquired_frame_get_result(
+  mln_acquired_frame frame, mln_render_frame_result* out_result
+) -> mln_status;
+auto acquired_frame_get_producer_sync(
+  mln_acquired_frame frame, mln_gpu_sync* out_sync
+) -> mln_status;
+auto acquired_frame_release(
+  mln_acquired_frame* frame, const mln_gpu_sync* consumer_completion
+) -> mln_status;
 auto render_session_resize_start(
-  mln_render_session, const mln_render_target_extent*, const mln_completion*
+  mln_render_session session, const mln_render_target_extent* extent,
+  const mln_completion* completion
 ) -> mln_status;
-auto render_session_barrier_start(mln_render_session, const mln_completion*)
-  -> mln_status;
+auto render_session_barrier_start(
+  mln_render_session session, const mln_completion* completion
+) -> mln_status;
 auto render_session_maintenance_start(
-  mln_render_session, std::uint32_t, const mln_completion*
+  mln_render_session session, RenderSessionMaintenance maintenance,
+  const mln_completion* completion
 ) -> mln_status;
-auto render_session_detach_start(mln_render_session, const mln_completion*)
-  -> mln_status;
-auto render_session_abandon(mln_render_session, mln_render_abandon_result*)
-  -> mln_status;
+auto render_session_detach_start(
+  mln_render_session session, const mln_completion* completion
+) -> mln_status;
+auto render_session_abandon(
+  mln_render_session session, mln_render_abandon_result* out_result
+) -> mln_status;
+
+// Leases an acquired frame and checks that its session can still describe it.
+// A session that lost or abandoned its target no longer owns the texture the
+// frame names, so both states report MLN_STATUS_TARGET_LOST.
+auto lease_valid_acquired_frame(
+  mln_acquired_frame frame,
+  std::shared_ptr<mln_acquired_frame_object>& out_frame
+) -> mln_status;
+
+// Slot count a session-owned texture ring is granted. Attachment rejects null
+// options; the clamp keeps a ring sane for the backends that size themselves
+// before reaching that check.
+inline auto attach_ring_depth(const mln_render_session_attach_options* options)
+  -> uint32_t {
+  constexpr auto max_ring_depth = 3U;
+  return std::clamp(
+    options == nullptr ? 1U : options->requested_texture_ring_depth, 1U,
+    max_ring_depth
+  );
+}
+
+// Rejects an attachment whose requested driver is not the one this target can
+// run on.
+inline auto require_render_driver(
+  const mln_render_session_attach_options* options,
+  mln_render_driver_kind expected, const char* message
+) -> mln_status {
+  if (options != nullptr && options->driver != expected) {
+    set_thread_error(message);
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  return MLN_STATUS_OK;
+}
 }  // namespace mln::core

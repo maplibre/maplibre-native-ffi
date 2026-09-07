@@ -51,7 +51,7 @@ internal object MetalRenderTarget {
     try {
       session =
         RenderTarget.completeAttachment(
-          map.attachMetalOwnedTexture(descriptor, RenderTarget.callerDriverOptions)
+          map.attachMetalOwnedTexture(descriptor, RenderTarget.ownedTextureOptions)
         )
       compositor = MetalTextureCompositor(context)
       return OwnedTexture(session, compositor)
@@ -110,8 +110,10 @@ internal object MetalRenderTarget {
       RenderTarget.completeDriverOperation(session, session.resize(RenderTarget.extent(viewport)))
     }
 
-    override fun renderUpdate(): Boolean =
-      RenderTarget.renderFrame(session)?.disposition == RenderResult.RENDERED
+    override fun renderUpdate(): Boolean {
+      val result = RenderTarget.renderFrame(session) ?: return false
+      return result.disposition == RenderResult.RENDERED && !result.needsRepaint
+    }
 
     override fun close() {
       RenderTarget.closeSession(session)
@@ -129,18 +131,21 @@ internal object MetalRenderTarget {
     }
 
     override fun renderUpdate(): Boolean {
-      if (RenderTarget.renderFrame(session)?.disposition != RenderResult.RENDERED) return false
-      val frameHandle =
-        checkNotNull(session.acquireFrame()) { "rendered Metal frame was unavailable" }
-      return try {
-        val frame = frameHandle.metalTexture()
-        check(frame.width() != 0 && frame.height() != 0 && !frame.texture().isNull) {
-          "owned Metal frame has an empty extent or null texture"
+      val result = RenderTarget.renderFrame(session) ?: return false
+      if (result.disposition != RenderResult.RENDERED) return false
+      // An empty ring keeps the previously composited frame on screen.
+      val frameHandle = session.acquireFrame() ?: return false
+      val presented =
+        try {
+          val frame = frameHandle.metalTexture()
+          check(frame.width() != 0 && frame.height() != 0 && !frame.texture().isNull) {
+            "owned Metal frame has an empty extent or null texture"
+          }
+          compositor.drawTexture(frame.texture().address)
+        } finally {
+          frameHandle.release()
         }
-        compositor.drawTexture(frame.texture().address)
-      } finally {
-        frameHandle.release()
-      }
+      return presented && !result.needsRepaint
     }
 
     override fun close() {
@@ -158,6 +163,8 @@ internal object MetalRenderTarget {
     private val compositor: MetalTextureCompositor,
     private var texture: MetalBorrowedTexture,
   ) : RenderTarget {
+    private var sessionReleased = false
+
     override fun needsMetalAutoreleasePool(): Boolean = true
 
     /** Local to the render loop thread: allocate a texture at the new size and hand it over. */
@@ -172,17 +179,21 @@ internal object MetalRenderTarget {
         // A failed handover leaves it unknown which texture the session holds, so detach before
         // either is released.
         RenderTarget.detachSuppressed(error, session)
+        sessionReleased = true
         RenderTarget.closeSuppressed(error, replacement)
         throw error
       }
       // Released only once the session has taken the replacement.
       texture.close()
       texture = replacement
+      // A handover replaces only the graphics resource, so the map still needs the new extent.
+      RenderTarget.resizeMap(session.map(), viewport)
     }
 
     override fun renderUpdate(): Boolean {
-      if (RenderTarget.renderFrame(session)?.disposition != RenderResult.RENDERED) return false
-      return compositor.drawTexture(texture.texture())
+      val result = RenderTarget.renderFrame(session) ?: return false
+      if (result.disposition != RenderResult.RENDERED) return false
+      return compositor.drawTexture(texture.texture()) && !result.needsRepaint
     }
 
     override fun close() {
@@ -190,7 +201,7 @@ internal object MetalRenderTarget {
         compositor.close()
       } finally {
         try {
-          RenderTarget.closeSession(session)
+          RenderTarget.closeSession(session, sessionReleased)
         } finally {
           texture.close()
         }

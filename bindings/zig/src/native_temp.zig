@@ -5,22 +5,6 @@ const diagnostics = @import("diagnostics.zig");
 const status = @import("status.zig");
 const values = @import("values.zig");
 
-pub fn copyOwnedBuffer(
-    allocator: std.mem.Allocator,
-    buffer: c.mln_buffer,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-) status.Error!?values.OwnedString {
-    if (buffer == 0) return null;
-    defer c.mln_buffer_destroy(buffer);
-    var view = c.mln_buffer_view{ .data = null, .size = 0 };
-    try status.checkStatus(c.mln_buffer_get(buffer, &view), diagnostic_store);
-    if (view.size == 0) {
-        return .{ .allocator = allocator, .value = try allocator.dupe(u8, "") };
-    }
-    const data: [*]const u8 = @ptrCast(view.data orelse return error.NativeError);
-    return .{ .allocator = allocator, .value = try allocator.dupe(u8, data[0..view.size]) };
-}
-
 pub const TempStorage = struct {
     arena: std.heap.ArenaAllocator,
     diagnostic_store: ?*diagnostics.DiagnosticStore = null,

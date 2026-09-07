@@ -36,9 +36,7 @@ internal sealed class MapState : IDisposable
                         Height = viewport.LogicalHeight,
                         ScaleFactor = viewport.ScaleFactor,
                         MapMode = MapMode.Continuous,
-                        EventMask =
-                            RuntimeEventMask.MapRenderUpdateAvailable
-                            | RuntimeEventMask.MapRenderFrameFinished,
+                        EventMask = RuntimeEventMask.MapRenderUpdateAvailable,
                     }
                 )
                 .GetAwaiter()
@@ -71,7 +69,7 @@ internal sealed class MapState : IDisposable
 
     public void CancelTransitions()
     {
-        _ = Map.UpdateCameraAsync(new CameraUpdate());
+        _ = Map.CancelTransitionsAsync();
     }
 
     public void SetGestureInProgress(bool inProgress)
@@ -137,18 +135,13 @@ internal sealed class MapState : IDisposable
     public bool DrainRenderRequests()
     {
         var requested = false;
-        foreach (var runtimeEvent in runtime.DrainEvents().Events)
+        foreach (var runtimeEvent in runtime.DrainEvents())
         {
             if (!ReferenceEquals(runtimeEvent.MapSource, Map))
             {
                 continue;
             }
-            if (
-                runtimeEvent.Type == RuntimeEventType.MapRenderUpdateAvailable
-                || runtimeEvent.Type == RuntimeEventType.MapRenderFrameFinished
-                    && runtimeEvent.Payload
-                        is RuntimeEventPayload.RenderFrame { NeedsRepaint: true }
-            )
+            if (runtimeEvent.Type == RuntimeEventType.MapRenderUpdateAvailable)
             {
                 requested = true;
             }

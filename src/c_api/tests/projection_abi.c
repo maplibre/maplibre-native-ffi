@@ -15,11 +15,11 @@ static mln_map_projection create_projection(mln_map map) {
     MLN_STATUS_OK, mln_map_projection_create(map, &completion.descriptor)
   );
   mln_map_projection projection = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
-  TEST_ASSERT_TRUE(
-    mln_test_completion_copy_value(&completion, &projection, sizeof(projection))
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_completion_finish_value(
+                     &completion, &projection, sizeof(projection)
+                   )
   );
-  mln_test_completion_destroy(&completion);
   return projection;
 }
 

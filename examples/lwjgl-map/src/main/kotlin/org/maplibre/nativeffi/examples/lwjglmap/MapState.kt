@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraDelta
 import org.maplibre.nativeffi.camera.CameraDeltaKind
@@ -9,12 +10,11 @@ import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.CameraUpdateMode
 import org.maplibre.nativeffi.camera.GesturePhase
 import org.maplibre.nativeffi.geo.LatLng
+import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
-import org.maplibre.nativeffi.map.MapSize
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
-import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
@@ -24,7 +24,7 @@ internal class MapState
 private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : AutoCloseable {
 
   fun cancelTransitions() {
-    map.updateCamera(CameraUpdate())
+    map.cancelTransitions()
   }
 
   fun setGestureInProgress(inProgress: Boolean) {
@@ -35,45 +35,30 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
 
   fun moveBy(dx: Double, dy: Double, durationMs: Double? = null) {
     map.applyCameraDelta(
-      CameraDelta(
-        offset = org.maplibre.nativeffi.geo.ScreenPoint(dx, dy),
-        animation = animation(durationMs) ?: AnimationOptions(),
-      )
+      CameraDelta(offset = ScreenPoint(dx, dy), animation = animation(durationMs))
     )
   }
 
-  fun scaleBy(
-    scale: Double,
-    anchor: org.maplibre.nativeffi.geo.ScreenPoint,
-    durationMs: Double? = null,
-  ) {
+  fun scaleBy(scale: Double, anchor: ScreenPoint, durationMs: Double? = null) {
     map.applyCameraDelta(
       CameraDelta(
         kind = CameraDeltaKind.SCALE,
         amount = scale,
         anchor = anchor,
-        animation = animation(durationMs) ?: AnimationOptions(),
+        animation = animation(durationMs),
       )
     )
   }
 
   fun adjustPitch(delta: Double, durationMs: Double? = null) {
     map.applyCameraDelta(
-      CameraDelta(
-        kind = CameraDeltaKind.PITCH,
-        amount = delta,
-        animation = animation(durationMs) ?: AnimationOptions(),
-      )
+      CameraDelta(kind = CameraDeltaKind.PITCH, amount = delta, animation = animation(durationMs))
     )
   }
 
   fun adjustBearing(delta: Double, durationMs: Double? = null) {
     map.applyCameraDelta(
-      CameraDelta(
-        kind = CameraDeltaKind.BEARING,
-        amount = delta,
-        animation = animation(durationMs) ?: AnimationOptions(),
-      )
+      CameraDelta(kind = CameraDeltaKind.BEARING, amount = delta, animation = animation(durationMs))
     )
   }
 
@@ -87,14 +72,6 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
     )
   }
 
-  fun resize(viewport: Viewport) {
-    map.resize(MapSize(viewport.width(), viewport.height(), viewport.scaleFactor()))
-  }
-
-  fun requestRepaint() {
-    map.requestRepaint()
-  }
-
   /** Drains the runtime event stream during the host's paced loop turn. */
   fun pollEvents(renderRequest: RenderRequest) {
     if (drainEvents()) renderRequest.set()
@@ -105,25 +82,19 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
       CameraUpdate(
         mode = if (durationMs == null) CameraUpdateMode.JUMP else CameraUpdateMode.EASE,
         camera = camera,
-        animation = AnimationOptions().apply { durationMs?.let { this.durationMs = it } },
+        animation = animation(durationMs),
       )
     )
   }
 
-  private fun animation(durationMs: Double?): AnimationOptions? = durationMs?.let { duration ->
-    AnimationOptions().apply { this.durationMs = duration }
-  }
+  private fun animation(durationMs: Double?): AnimationOptions =
+    AnimationOptions().apply { durationMs?.let { this.durationMs = it } }
 
   private fun drainEvents(): Boolean {
     var renderUpdateAvailable = false
-    for (event in runtime.drainEvents().events) {
+    for (event in runtime.drainEvents()) {
       if (event.mapSource != map) continue
       if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE) {
-        renderUpdateAvailable = true
-      } else if (
-        event.type == RuntimeEventType.MAP_RENDER_FRAME_FINISHED &&
-          (event.payload as? RuntimeEventPayload.RenderFrame)?.needsRepaint == true
-      ) {
         renderUpdateAvailable = true
       }
     }
@@ -131,10 +102,12 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
   }
 
   override fun close() {
-    try {
-      map.close()
-    } finally {
-      runtime.close()
+    runBlocking {
+      try {
+        map.close().await()
+      } finally {
+        runtime.close().await()
+      }
     }
   }
 
@@ -152,7 +125,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
         }
       val map =
         try {
-          runSuspend {
+          runBlocking {
             MapHandle.create(
                 runtime,
                 MapOptions().apply {
@@ -160,15 +133,13 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
                   height = viewport.height()
                   scaleFactor = viewport.scaleFactor()
                   mapMode = MapMode.CONTINUOUS
-                  eventMask =
-                    RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE +
-                      RuntimeEventMask.MAP_RENDER_FRAME_FINISHED
+                  eventMask = RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE
                 },
               )
               .await()
           }
         } catch (error: Throwable) {
-          runtime.close()
+          runBlocking { runtime.close().await() }
           throw error
         }
       try {
@@ -177,15 +148,17 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
         map.updateCamera(CameraUpdate(camera = initialCamera))
         return state
       } catch (error: Throwable) {
-        map.close()
-        runtime.close()
+        runBlocking {
+          map.close().await()
+          runtime.close().await()
+        }
         throw error
       }
     }
   }
 }
 
-/** A one-bit frame request shared with native wake callbacks. */
+/** One-bit signal that a frame is worth drawing. */
 internal class RenderRequest {
   private val requested = AtomicBoolean(true)
 

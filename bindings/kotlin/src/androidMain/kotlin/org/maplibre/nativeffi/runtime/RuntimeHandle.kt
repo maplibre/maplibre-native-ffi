@@ -5,12 +5,12 @@ import java.nio.Buffer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.LongPointer
 import org.bytedeco.javacpp.Pointer
-import org.bytedeco.javacpp.SizeTPointer
 import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
@@ -41,10 +41,10 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 /** Owned runtime handle backed by the Android JNI bridge. */
 public actual class RuntimeHandle private constructor(private val handleId: Long) {
   private val core = HandleStateCore("RuntimeHandle", handleId)
-  private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
 
-  /** Teardown report of the close that consumed this handle. */
-  @Volatile private var tornDown: Deferred<Unit>? = null
+  // Registration runs on the completion thread that publishes a created map, while draining and
+  // closing run on host threads.
+  private val liveMaps = ConcurrentHashMap<Long, WeakReference<MapHandle>>()
 
   init {
     HandleLeakCleaner.register(this, core.leakReport)
@@ -213,57 +213,74 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
   ): Deferred<CommandCompletion> {
     val replacement = ResourceProviderState(callback)
     HandleLeakCleaner.retainNativeCallbackRoot(replacement)
-    return command { completion ->
-      MaplibreNativeC.mln_runtime_set_resource_provider(
-        requireLiveHandle(),
-        replacement.descriptor(),
-        completion,
-      )
+    return try {
+      CompletionBridge.commandChecked { completion ->
+        MaplibreNativeC.mln_runtime_set_resource_provider(
+          requireLiveHandle(),
+          replacement.descriptor(),
+          completion,
+        )
+      }
+    } catch (error: Throwable) {
+      releaseCallbackRoot(replacement)
+      throw error
     }
   }
 
-  public actual fun clearResourceProvider(): Deferred<CommandCompletion> = command { completion ->
-    MaplibreNativeC.mln_runtime_clear_resource_provider(requireLiveHandle(), completion)
-  }
+  public actual fun clearResourceProvider(): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      MaplibreNativeC.mln_runtime_clear_resource_provider(requireLiveHandle(), completion)
+    }
 
   public actual fun setResourceTransform(
     callback: ResourceTransformCallback
   ): Deferred<CommandCompletion> {
     val replacement = ResourceTransformState(callback)
     HandleLeakCleaner.retainNativeCallbackRoot(replacement)
-    return command { completion ->
-      MaplibreNativeC.mln_runtime_set_resource_transform(
-        requireLiveHandle(),
-        replacement.descriptor(),
-        completion,
-      )
+    return try {
+      CompletionBridge.commandChecked { completion ->
+        MaplibreNativeC.mln_runtime_set_resource_transform(
+          requireLiveHandle(),
+          replacement.descriptor(),
+          completion,
+        )
+      }
+    } catch (error: Throwable) {
+      releaseCallbackRoot(replacement)
+      throw error
     }
   }
 
-  public actual fun clearResourceTransform(): Deferred<CommandCompletion> = command { completion ->
-    MaplibreNativeC.mln_runtime_clear_resource_transform(requireLiveHandle(), completion)
-  }
+  public actual fun clearResourceTransform(): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      MaplibreNativeC.mln_runtime_clear_resource_transform(requireLiveHandle(), completion)
+    }
 
   public actual fun setHttpHeaderTransform(
     callback: HttpHeaderTransformCallback
   ): Deferred<CommandCompletion> {
     val replacement = HttpHeaderTransformState(callback)
     HandleLeakCleaner.retainNativeCallbackRoot(replacement)
-    return command { completion ->
-      MaplibreNativeC.mln_runtime_set_http_header_transform(
-        requireLiveHandle(),
-        replacement.descriptor(),
-        completion,
-      )
+    return try {
+      CompletionBridge.commandChecked { completion ->
+        MaplibreNativeC.mln_runtime_set_http_header_transform(
+          requireLiveHandle(),
+          replacement.descriptor(),
+          completion,
+        )
+      }
+    } catch (error: Throwable) {
+      releaseCallbackRoot(replacement)
+      throw error
     }
   }
 
   public actual fun clearHttpHeaderTransform(): Deferred<CommandCompletion> =
-    command { completion ->
+    CompletionBridge.command { completion ->
       MaplibreNativeC.mln_runtime_clear_http_header_transform(requireLiveHandle(), completion)
     }
 
-  public actual fun drainEvents(): RuntimeEventBatch {
+  public actual fun drainEvents(): List<RuntimeEvent> {
     NativeAccess.ensureLoaded()
     val runtime = requireLiveHandle()
     LongPointer(1).use { outBatch ->
@@ -276,7 +293,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
           view.size(view.sizeof())
           Status.check(MaplibreNativeC.mln_event_batch_get(batch, view))
           val eventCount = Math.toIntExact(view.event_count())
-          if (eventCount == 0) return RuntimeEventBatch(emptyList())
+          if (eventCount == 0) return emptyList()
           val eventSize = view.event_size()
           require(eventSize >= EventLayout.EVENT_SIZE) {
             "Loaded native library reports a ${eventSize}-byte runtime event, " +
@@ -287,11 +304,9 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
             if (view.messages() == null || view.messages().isNull || view.messages_size() == 0L)
               null
             else directBuffer(view.messages(), view.messages_size())
-          return RuntimeEventBatch(
-            List(eventCount) { index ->
-              copiedEvent(events, index * eventSize, eventSize, messages).toRuntimeEvent()
-            }
-          )
+          return List(eventCount) { index ->
+            copiedEvent(events, index * eventSize, eventSize, messages).toRuntimeEvent()
+          }
         }
       } finally {
         MaplibreNativeC.mln_event_batch_release(batch)
@@ -314,7 +329,9 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
     }
 
   public actual fun close(): Deferred<Unit> {
-    if (!core.beginClose()) return tornDown ?: CompletableDeferred(Unit)
+    val claim = CompletableDeferred<Unit>()
+    val retirement = core.claimRetirement(claim)
+    if (retirement !== claim) return retirement
     val completed =
       try {
         CompletionBridge.unitChecked { completion ->
@@ -322,11 +339,14 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
         }
       } catch (error: Throwable) {
         core.abortClose()
+        core.abandonRetirement(claim)
         throw error
       }
-    tornDown = completed
     core.completeClose { liveMaps.clear() }
-    return completed
+    completed.invokeOnCompletion { failure ->
+      if (failure == null) claim.complete(Unit) else claim.completeExceptionally(failure)
+    }
+    return claim
   }
 
   public actual companion object {
@@ -419,10 +439,6 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
   }
 }
 
-private inline fun command(
-  crossinline call: (MaplibreNativeC.mln_completion) -> Int
-): Deferred<CommandCompletion> = CompletionBridge.command { call(it) }
-
 private fun releaseCallbackRoot(root: AutoCloseable?) {
   HandleLeakCleaner.releaseNativeCallbackRoot(root)
   closeQuietly(root)
@@ -432,14 +448,6 @@ private fun closeQuietly(closeable: AutoCloseable?) {
   try {
     closeable?.close()
   } catch (_: RuntimeException) {}
-}
-
-private fun closeAndSuppress(error: Throwable, closeable: AutoCloseable?) {
-  try {
-    closeable?.close()
-  } catch (cleanup: Throwable) {
-    error.addSuppressed(cleanup)
-  }
 }
 
 private fun byteString(pointer: BytePointer?, byteCount: Long): String =
@@ -599,54 +607,6 @@ private fun offlineRegionStatus(
     status.complete(),
   )
 
-private fun offlineRegionSnapshot(outSnapshot: LongPointer): OfflineRegionInfo {
-  val snapshot = outSnapshot.get()
-  require(snapshot != 0L) { "offline operation returned a null snapshot" }
-  return try {
-    MaplibreNativeC.mln_offline_region_info().use { info ->
-      info.size(info.sizeof())
-      Status.check(MaplibreNativeC.mln_offline_region_snapshot_get(snapshot, info))
-      offlineRegionInfo(info)
-    }
-  } finally {
-    MaplibreNativeC.mln_offline_region_snapshot_destroy(snapshot)
-  }
-}
-
-private fun offlineRegionList(outList: LongPointer): List<OfflineRegionInfo> {
-  val list = outList.get()
-  require(list != 0L) { "offline operation returned a null region list" }
-  return offlineRegionList(
-    list,
-    counter = MaplibreNativeC::mln_offline_region_list_count,
-    getter = MaplibreNativeC::mln_offline_region_list_get,
-    destroyer = MaplibreNativeC::mln_offline_region_list_destroy,
-  )
-}
-
-private fun offlineRegionList(
-  list: Long,
-  counter: (Long, SizeTPointer) -> Int,
-  getter: (Long, Long, MaplibreNativeC.mln_offline_region_info) -> Int,
-  destroyer: (Long) -> Unit,
-): List<OfflineRegionInfo> {
-  return try {
-    SizeTPointer(1).use { outCount ->
-      Status.check(counter(list, outCount))
-      val count = Math.toIntExact(outCount.get())
-      List(count) { index ->
-        MaplibreNativeC.mln_offline_region_info().use { info ->
-          info.size(info.sizeof())
-          Status.check(getter(list, index.toLong(), info))
-          offlineRegionInfo(info)
-        }
-      }
-    }
-  } finally {
-    destroyer(list)
-  }
-}
-
 private fun offlineRegionInfo(info: MaplibreNativeC.mln_offline_region_info): OfflineRegionInfo =
   OfflineRegionInfo(
     info.id(),
@@ -694,9 +654,6 @@ private fun latLngBounds(bounds: MaplibreNativeC.mln_lat_lng_bounds): LatLngBoun
     LatLng(bounds.southwest().latitude(), bounds.southwest().longitude()),
     LatLng(bounds.northeast().latitude(), bounds.northeast().longitude()),
   )
-
-private fun latLng(value: MaplibreNativeC.mln_lat_lng): LatLng =
-  LatLng(value.latitude(), value.longitude())
 
 private fun cStringLength(pointer: BytePointer?): Long {
   if (pointer == null || pointer.isNull) {
@@ -1021,23 +978,5 @@ internal object JavaCppRuntimeStructs {
     bytes.copyInto(record, EventLayout.PAYLOAD)
     val events = ByteBuffer.wrap(record).order(ByteOrder.nativeOrder())
     return runtimeEventPayload(type, events, 0, record.size)
-  }
-
-  fun offlineRegionListCleanupAfterCopyFailure(): Int {
-    var destroys = 0
-    try {
-      offlineRegionList(
-        1L,
-        counter = { _, outCount ->
-          outCount.put(Long.MAX_VALUE)
-          org.maplibre.nativeffi.error.MaplibreStatus.OK.nativeCode
-        },
-        getter = { _, _, _ -> org.maplibre.nativeffi.error.MaplibreStatus.OK.nativeCode },
-        destroyer = { destroys++ },
-      )
-    } catch (_: ArithmeticException) {
-      return destroys
-    }
-    error("offline list conversion unexpectedly succeeded")
   }
 }

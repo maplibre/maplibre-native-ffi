@@ -11,9 +11,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class CustomGeometrySourceTests
 {
-    private static readonly byte[] EmptyStyleJson =
-        """{"version":8,"sources":{},"layers":[]}"""u8.ToArray();
-
     [BindingSpecTest("BND-121", "BND-124")]
     [Fact]
     public void CustomGeometryCallbacksCopyTileIdsAndSwallowExceptions()
@@ -122,7 +119,7 @@ public sealed class CustomGeometrySourceTests
             (_, _, _, _) =>
                 failInstall ? mln_status.MLN_STATUS_INVALID_STATE : mln_status.MLN_STATUS_OK
         );
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions { Width = 512, Height = 512 }
@@ -130,14 +127,24 @@ public sealed class CustomGeometrySourceTests
         var installed = new CustomGeometrySourceState(
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
-        map.AddCustomGeometrySourceAsync("custom", installed);
+        map.AddCustomGeometrySourceAsync(
+            "custom",
+            installed,
+            TestContext.Current.CancellationToken
+        );
 
         failInstall = true;
         var rejected = new CustomGeometrySourceState(
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
         Assert.Throws<InvalidStateException>(() =>
-            map.AddCustomGeometrySourceAsync("custom", rejected).GetAwaiter().GetResult()
+            map.AddCustomGeometrySourceAsync(
+                    "custom",
+                    rejected,
+                    TestContext.Current.CancellationToken
+                )
+                .GetAwaiter()
+                .GetResult()
         );
 
         // A rejected add owes no release callback, so the binding frees that state itself and
@@ -153,15 +160,15 @@ public sealed class CustomGeometrySourceTests
     [Fact]
     public async Task CustomGeometrySourceApisAdaptThroughNativeMap()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        map.SetStyleJsonAsync(EmptyStyleJson);
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
         var tile = new CanonicalTileId(0, 0, 0);
 
-        map.AddCustomGeometrySourceAsync(
+        _ = map.AddCustomGeometrySourceAsync(
             "custom",
             new CustomGeometrySourceOptions
             {
@@ -174,60 +181,88 @@ public sealed class CustomGeometrySourceTests
                 Buffer = 128,
                 Clip = true,
                 Wrap = false,
-            }
+            },
+            TestContext.Current.CancellationToken
         );
-        map.SetCustomGeometrySourceTileDataAsync(
+        _ = map.SetCustomGeometrySourceTileDataAsync(
             "custom",
             tile,
-            """{"type":"FeatureCollection","features":[]}"""u8.ToArray()
+            """{"type":"FeatureCollection","features":[]}"""u8.ToArray(),
+            TestContext.Current.CancellationToken
         );
-        map.InvalidateCustomGeometrySourceTileAsync("custom", tile);
-        map.InvalidateCustomGeometrySourceRegionAsync(
+        _ = map.InvalidateCustomGeometrySourceTileAsync(
             "custom",
-            new LatLngBounds(new LatLng(-1, -1), new LatLng(1, 1))
+            tile,
+            TestContext.Current.CancellationToken
+        );
+        _ = map.InvalidateCustomGeometrySourceRegionAsync(
+            "custom",
+            new LatLngBounds(new LatLng(-1, -1), new LatLng(1, 1)),
+            TestContext.Current.CancellationToken
         );
 
-        Assert.Equal(SourceType.CustomVector, (await map.StyleSourceInfoAsync("custom"))?.Type);
-        RuntimeEventTestHelpers.WaitForCommand(runtime, map.RemoveStyleSourceAsync("custom"));
-        Assert.Null(await map.StyleSourceInfoAsync("custom"));
+        Assert.Equal(
+            SourceType.CustomVector,
+            (await map.StyleSourceInfoAsync("custom", TestContext.Current.CancellationToken))?.Type
+        );
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.RemoveStyleSourceAsync("custom", TestContext.Current.CancellationToken)
+        );
+        Assert.Null(
+            await map.StyleSourceInfoAsync("custom", TestContext.Current.CancellationToken)
+        );
     }
 
     [BindingSpecTest("BND-124")]
     [Fact]
     public async Task RemovingACustomGeometrySourceReleasesItsCallbackState()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        map.SetStyleJsonAsync(EmptyStyleJson);
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
         var state = new CustomGeometrySourceState(
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
-        map.AddCustomGeometrySourceAsync("custom", state);
+        _ = map.AddCustomGeometrySourceAsync(
+            "custom",
+            state,
+            TestContext.Current.CancellationToken
+        );
         Assert.True(state.IsHandleAllocatedForTest);
 
-        RuntimeEventTestHelpers.WaitForCommand(runtime, map.RemoveStyleSourceAsync("custom"));
-        Assert.Null(await map.StyleSourceInfoAsync("custom"));
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.RemoveStyleSourceAsync("custom", TestContext.Current.CancellationToken)
+        );
+        Assert.Null(
+            await map.StyleSourceInfoAsync("custom", TestContext.Current.CancellationToken)
+        );
 
         Assert.False(state.IsHandleAllocatedForTest);
     }
 
     [BindingSpecTest("BND-124")]
     [Fact]
-    public void ClosingAMapReleasesItsCustomGeometrySourceCallbackState()
+    public async Task ClosingAMapReleasesItsCustomGeometrySourceCallbackState()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJsonAsync(EmptyStyleJson);
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
         var state = new CustomGeometrySourceState(
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
-        map.AddCustomGeometrySourceAsync("custom", state);
+        _ = map.AddCustomGeometrySourceAsync(
+            "custom",
+            state,
+            TestContext.Current.CancellationToken
+        );
 
-        TestHandles.Close(map);
-        runtime.BarrierAsync().GetAwaiter().GetResult();
+        map.Close();
+        // The runtime runs the release callback while retiring the map, so a barrier that
+        // observes the retirement observes the release too.
+        await runtime.BarrierAsync(TestContext.Current.CancellationToken);
 
         Assert.False(state.IsHandleAllocatedForTest);
     }
@@ -236,7 +271,7 @@ public sealed class CustomGeometrySourceTests
     [Fact]
     public void AStyleReplacementReleasesADroppedSourceWithoutStyleLoadedEvents()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions
@@ -246,24 +281,27 @@ public sealed class CustomGeometrySourceTests
                 EventMask = RuntimeEventMask.All & ~RuntimeEventMask.MapStyleLoaded,
             }
         );
-        map.SetStyleJsonAsync(EmptyStyleJson);
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
         var state = new CustomGeometrySourceState(
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
-        map.AddCustomGeometrySourceAsync("custom", state);
+        map.AddCustomGeometrySourceAsync("custom", state, TestContext.Current.CancellationToken);
 
         // The replacement style drops the source, and the C API reports that through the release
         // callback rather than through an event, so the host's cleared mask stays cleared.
-        map.SetStyleJsonAsync(EmptyStyleJson);
+        map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
         var drained = new List<RuntimeEventType>();
         for (var attempt = 0; attempt < 1000 && state.IsHandleAllocatedForTest; attempt++)
         {
             Thread.Sleep(1);
-            drained.AddRange(runtime.DrainEvents().Events.Select(polled => polled.Type));
+            drained.AddRange(runtime.DrainEvents().Select(polled => polled.Type));
         }
 
         Assert.False(state.IsHandleAllocatedForTest);
         Assert.DoesNotContain(RuntimeEventType.MapStyleLoaded, drained);
-        Assert.Equal(RuntimeEventMask.All & ~RuntimeEventMask.MapStyleLoaded, map.GetEventMask());
+        Assert.Equal(
+            RuntimeEventMask.All & ~RuntimeEventMask.MapStyleLoaded,
+            map.GetSnapshot().EventMask
+        );
     }
 }

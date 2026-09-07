@@ -86,14 +86,17 @@ final class MetalRenderTarget {
     try await session.resize(viewport.extent)
   }
 
-  /// Services graphics work and submits one display-link-paced frame demand.
+  /// Services graphics work, submits one display-link-paced frame demand, and
+  /// reports whether the loop may rest. It reports false when no frame reached
+  /// the screen and when the map asked for another frame while this one
+  /// rendered, so the loop demands one more.
   func renderFrame() throws -> Bool {
     try session.requestFrame(FrameDemand(options: [.ifNeeded, .present]))
     try session.serviceDriverWork()
-    let results = try session.drainFrameResults()
-    guard let result = results.last else { return false }
-    return result.result != .sizePending &&
-      result.result != .targetNotReady
+    guard let result = try session.drainFrameResults().last,
+          result.result == .rendered
+    else { return false }
+    return !result.needsRepaint
   }
 
   func close() async throws {

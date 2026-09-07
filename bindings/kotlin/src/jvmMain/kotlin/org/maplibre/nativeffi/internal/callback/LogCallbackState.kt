@@ -116,7 +116,5 @@ internal class LogCallbackState(private val callback: LogCallback) : AutoCloseab
       NativeAccess.ensureLoaded()
       Status.check(NativeAccess.clearLogCallback())
     }
-
-    fun createForTesting(callback: LogCallback): LogCallbackState = LogCallbackState(callback)
   }
 }

@@ -81,10 +81,10 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 @OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class, ExperimentalNativeApi::class)
 public actual class RuntimeHandle internal constructor(handle: NativeRuntime) {
   private val state = HandleState("RuntimeHandle", handle)
-  private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
 
-  /** Teardown report of the close that consumed this handle. */
-  private val tornDown = AtomicReference<Deferred<Unit>?>(null)
+  // Registration runs on the completion thread that publishes a created map, while draining and
+  // closing run on host threads.
+  private val liveMaps = AtomicReference(emptyMap<Long, WeakReference<MapHandle>>())
 
   public actual fun barrier(): Deferred<Unit> = CompletionBridge.unit { completion ->
     mln_runtime_barrier(state.requireLive().rawHandleValue, completion)
@@ -115,7 +115,7 @@ public actual class RuntimeHandle internal constructor(handle: NativeRuntime) {
     metadata: ByteArray,
   ): Deferred<OfflineRegionInfo> = memScoped {
     CompletionBridge.submit(
-      { result -> offlineRegionInfo(result)!! },
+      { result -> checkNotNull(offlineRegionInfo(result)) { "created offline region is missing" } },
       { completion ->
         mln_runtime_offline_region_create(
           state.requireLive().rawHandleValue,
@@ -164,7 +164,7 @@ public actual class RuntimeHandle internal constructor(handle: NativeRuntime) {
     metadata: ByteArray,
   ): Deferred<OfflineRegionInfo> = memScoped {
     CompletionBridge.submit(
-      { result -> offlineRegionInfo(result)!! },
+      { result -> checkNotNull(offlineRegionInfo(result)) { "updated offline region is missing" } },
       { completion ->
         mln_runtime_offline_region_update_metadata(
           state.requireLive().rawHandleValue,
@@ -293,7 +293,7 @@ public actual class RuntimeHandle internal constructor(handle: NativeRuntime) {
       mln_runtime_clear_http_header_transform(state.requireLive().rawHandleValue, completion)
     }
 
-  public actual fun drainEvents(): RuntimeEventBatch = memScoped {
+  public actual fun drainEvents(): List<RuntimeEvent> = memScoped {
     val outBatch = alloc<ULongVar>()
     outBatch.value = 0uL
     Status.check(mln_runtime_drain_events(state.requireLive().rawHandleValue, outBatch.ptr))
@@ -317,7 +317,7 @@ public actual class RuntimeHandle internal constructor(handle: NativeRuntime) {
             copyEvent(event, messages, eventSize)
           }
         }
-      RuntimeEventBatch(copied)
+      copied
     } finally {
       mln_event_batch_release(outBatch.value)
     }
@@ -336,18 +336,23 @@ public actual class RuntimeHandle internal constructor(handle: NativeRuntime) {
     }
 
   public actual fun close(): Deferred<Unit> {
-    if (!state.beginClose()) return tornDown.load() ?: CompletableDeferred(Unit)
+    val claim = CompletableDeferred<Unit>()
+    val retirement = state.claimRetirement(claim)
+    if (retirement !== claim) return retirement
     val handle = state.handleForClose().rawHandleValue
     val completed =
       try {
         CompletionBridge.unitChecked { completion -> mln_runtime_release(handle, completion) }
       } catch (error: Throwable) {
         state.abortClose()
+        state.abandonRetirement(claim)
         throw error
       }
-    tornDown.store(completed)
-    state.completeClose {}
-    return completed
+    state.completeClose { liveMaps.store(emptyMap()) }
+    completed.invokeOnCompletion { failure ->
+      if (failure == null) claim.complete(Unit) else claim.completeExceptionally(failure)
+    }
+    return claim
   }
 
   public actual val isClosed: Boolean
@@ -383,18 +388,30 @@ public actual class RuntimeHandle internal constructor(handle: NativeRuntime) {
     )
   }
 
-  private fun mapFor(sourceType: RuntimeEventSourceType, sourceId: Long): MapHandle? =
-    if (sourceType == RuntimeEventSourceType.MAP && sourceId != 0L) liveMaps[sourceId]?.value
-    else null
+  private fun mapFor(sourceType: RuntimeEventSourceType, sourceId: Long): MapHandle? {
+    if (sourceType != RuntimeEventSourceType.MAP || sourceId == 0L) return null
+    val map = liveMaps.load()[sourceId]?.value
+    if (map == null) updateLiveMaps { it - sourceId }
+    return map
+  }
 
   internal fun registerMap(map: MapHandle) {
-    liveMaps[map.nativeHandleId()] = WeakReference(map)
+    updateLiveMaps { it + (map.nativeHandleId() to WeakReference(map)) }
   }
 
   internal fun unregisterMap(map: MapHandle) {
     // An id names one map for the life of the process, so this key can only be
     // this map's.
-    liveMaps.remove(map.nativeHandleId())
+    updateLiveMaps { it - map.nativeHandleId() }
+  }
+
+  private inline fun updateLiveMaps(
+    transform: (Map<Long, WeakReference<MapHandle>>) -> Map<Long, WeakReference<MapHandle>>
+  ) {
+    while (true) {
+      val current = liveMaps.load()
+      if (liveMaps.compareAndSet(current, transform(current))) return
+    }
   }
 
   public actual companion object {

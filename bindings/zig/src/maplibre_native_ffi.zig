@@ -61,6 +61,7 @@ pub const RuntimeEventType = runtime.RuntimeEventType;
 pub const RuntimeEventSourceType = runtime.RuntimeEventSourceType;
 pub const RuntimeEventSourceId = runtime.RuntimeEventSourceId;
 pub const RuntimeEventPayloadType = runtime.RuntimeEventPayloadType;
+pub const WakeCallback = runtime.WakeCallback;
 pub const CameraChangeMode = runtime.CameraChangeMode;
 pub const CameraTransitionFinishedPayload = runtime.CameraTransitionFinishedPayload;
 pub const CommandDisposition = completion.CommandDisposition;
@@ -151,6 +152,8 @@ pub const CameraUpdate = map.CameraUpdate;
 pub const CameraDeltaKind = map.CameraDeltaKind;
 pub const CameraDelta = map.CameraDelta;
 pub const CameraSnapshot = map.CameraSnapshot;
+pub const ScreenPointList = map.ScreenPointList;
+pub const LatLngList = map.LatLngList;
 pub const MapSnapshot = map.MapSnapshot;
 pub const CanonicalTileId = map.CanonicalTileId;
 pub const CustomGeometrySourceTileCallback = map.CustomGeometrySourceTileCallback;
@@ -205,7 +208,6 @@ pub const StringList = values.StringList;
 pub const StyleSourceType = values.StyleSourceType;
 pub const StyleTileJsonInfo = values.StyleTileJsonInfo;
 pub const StyleSourceInfo = values.StyleSourceInfo;
-pub const StyleSourceMetadata = map.StyleSourceMetadata;
 pub const StyleLayerInfo = map.StyleLayerInfo;
 pub const OwnedString = values.OwnedString;
 
@@ -240,8 +242,4 @@ pub fn cAbiVersion() u32 {
 /// by this Zig package.
 pub fn validateAbiVersion(diagnostic_store: ?*DiagnosticStore) Error!void {
     return status.validateAbiVersion(diagnostic_store);
-}
-
-comptime {
-    _ = c.MLN_STATUS_OK;
 }

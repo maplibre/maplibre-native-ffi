@@ -71,17 +71,29 @@ pub const MetalRenderTarget = union(enum) {
         }
     }
 
+    /// Services caller-driver work, releases anything a completed target
+    /// replacement retired, and reports whether an ordered submission is still
+    /// outstanding.
+    pub fn pollPending(self: *MetalRenderTarget) !bool {
+        return switch (self.*) {
+            .owned_texture => |*backend| backend.session.poll(),
+            .borrowed_texture => |*backend| backend.pollPending(),
+            .native_surface => |*backend| backend.session.poll(),
+        };
+    }
+
     pub fn finishFrame(_: *MetalRenderTarget) !void {}
 
     pub fn renderUpdate(
         self: *MetalRenderTarget,
+        allocator: std.mem.Allocator,
         diagnostic_store: ?*const maplibre.DiagnosticStore,
         viewport: types.Viewport,
-    ) !bool {
+    ) !render_target.FrameOutcome {
         return switch (self.*) {
-            .owned_texture => |*backend| backend.renderUpdate(diagnostic_store, viewport),
-            .borrowed_texture => |*backend| backend.renderUpdate(diagnostic_store, viewport),
-            .native_surface => |*backend| backend.renderUpdate(diagnostic_store),
+            .owned_texture => |*backend| backend.renderUpdate(allocator, diagnostic_store, viewport),
+            .borrowed_texture => |*backend| backend.renderUpdate(allocator, diagnostic_store, viewport),
+            .native_surface => |*backend| backend.session.renderUpdate(allocator, diagnostic_store),
         };
     }
 };
@@ -215,14 +227,12 @@ const MetalOwnedTextureBackend = struct {
     ) !MetalOwnedTextureBackend {
         var self = MetalOwnedTextureBackend{
             .compositor = try MetalTextureCompositor.init(window, viewport),
-            .session = .none,
+            .session = .{},
         };
         errdefer self.deinit();
         return self;
     }
 
-    /// Attaches the render session on this thread, which becomes its owner
-    /// thread for the session's whole life.
     fn attach(self: *MetalOwnedTextureBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
         self.session = try self.attachRenderTarget(map, viewport);
     }
@@ -234,7 +244,7 @@ const MetalOwnedTextureBackend = struct {
 
     fn resize(self: *MetalOwnedTextureBackend, viewport: types.Viewport) !void {
         self.compositor.resize(viewport);
-        try self.session.resize(viewport, null);
+        try self.session.startResize(viewport);
     }
 
     fn attachRenderTarget(
@@ -249,35 +259,35 @@ const MetalOwnedTextureBackend = struct {
             diagnostics.logError("Metal texture attach failed", err, null);
             return types.AppError.TextureAttachFailed;
         };
-        return render_target.textureSession(texture);
+        return render_target.textureSession(map, texture);
     }
 
     fn renderUpdate(
         self: *MetalOwnedTextureBackend,
+        allocator: std.mem.Allocator,
         diagnostic_store: ?*const maplibre.DiagnosticStore,
         viewport: types.Viewport,
-    ) !bool {
+    ) !render_target.FrameOutcome {
         _ = viewport;
-        if (!try self.session.renderUpdate(diagnostic_store)) return false;
-        const texture = switch (self.session) {
-            .texture => |*texture| texture,
-            else => return false,
-        };
+        var outcome = try self.session.renderUpdate(allocator, diagnostic_store);
+        if (!outcome.rendered) return outcome;
+        const texture = try self.session.textureHandle();
         var frame = texture.acquireFrame() catch |err| switch (err) {
-            error.InvalidState => return false,
+            error.NotReady => {
+                outcome.rendered = false;
+                return outcome;
+            },
             else => {
                 diagnostics.logError("Metal texture acquire failed", err, null);
                 return types.AppError.BackendDrawFailed;
             },
         };
-        var frame_owned = true;
-        errdefer if (frame_owned) frame.release(.cpu_complete) catch {};
+        errdefer frame.release(.cpu_complete) catch {};
         const producer_sync = try frame.producerSync();
         const info = try frame.metalTexture();
-        const drawn = try self.compositor.drawMetalTexture(info.texture.toPtr(), producer_sync);
+        outcome.rendered = try self.compositor.drawMetalTexture(info.texture.toPtr(), producer_sync);
         try frame.release(.cpu_complete);
-        frame_owned = false;
-        return drawn;
+        return outcome;
     }
 };
 
@@ -285,6 +295,9 @@ const MetalBorrowedTextureBackend = struct {
     compositor: MetalTextureCompositor,
     session: render_target.Session,
     borrowed_texture: objc.Object,
+    /// The texture the session still renders into until the pending target
+    /// replacement completes.
+    retired_texture: ?objc.Object = null,
 
     fn init(
         window: *c.SDL_Window,
@@ -294,23 +307,33 @@ const MetalBorrowedTextureBackend = struct {
         errdefer compositor.deinit();
         var self = MetalBorrowedTextureBackend{
             .compositor = compositor,
-            .session = .none,
+            .session = .{},
             .borrowed_texture = try createBorrowedTexture(compositor.view.device, viewport),
         };
         errdefer self.deinit();
         return self;
     }
 
-    /// Attaches the render session on this thread, which becomes its owner
-    /// thread for the session's whole life.
     fn attach(self: *MetalBorrowedTextureBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
         self.session = try self.attachRenderTarget(map, viewport);
     }
 
     fn deinit(self: *MetalBorrowedTextureBackend) void {
         self.session.deinit();
+        self.releaseRetiredTexture();
         self.borrowed_texture.release();
         self.compositor.deinit();
+    }
+
+    fn pollPending(self: *MetalBorrowedTextureBackend) !bool {
+        const pending = try self.session.poll();
+        if (!pending) self.releaseRetiredTexture();
+        return pending;
+    }
+
+    fn releaseRetiredTexture(self: *MetalBorrowedTextureBackend) void {
+        if (self.retired_texture) |texture| texture.release();
+        self.retired_texture = null;
     }
 
     /// Follows a resized window: allocates a texture at the new size and hands
@@ -321,7 +344,7 @@ const MetalBorrowedTextureBackend = struct {
 
         const replacement = try createBorrowedTexture(self.compositor.view.device, viewport);
         errdefer replacement.release();
-        var completion = session.setMetalBorrowedTextureTarget(.{
+        const completion = session.setMetalBorrowedTextureTarget(.{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
@@ -330,14 +353,16 @@ const MetalBorrowedTextureBackend = struct {
             diagnostics.logError("Metal borrowed texture set target failed", err, null);
             return types.AppError.TextureResizeFailed;
         };
-        defer completion.deinit();
-        render_target.serviceUntilComplete(session, &completion) catch |err| {
-            diagnostics.logError("Metal borrowed texture replacement failed", err, null);
-            return types.AppError.TextureResizeFailed;
-        };
-        // Released only once the session has taken the replacement.
-        self.borrowed_texture.release();
+        self.session.beginPending(
+            completion,
+            types.AppError.TextureResizeFailed,
+            "Metal borrowed texture set target failed",
+        );
+        // The session keeps rendering into the outgoing texture until the
+        // replacement commits, so it outlives this call.
+        self.retired_texture = self.borrowed_texture;
         self.borrowed_texture = replacement;
+        try self.session.resizeMap(viewport);
     }
 
     fn attachRenderTarget(
@@ -354,17 +379,20 @@ const MetalBorrowedTextureBackend = struct {
             diagnostics.logError("Metal borrowed texture attach failed", err, null);
             return types.AppError.TextureAttachFailed;
         };
-        return render_target.textureSession(texture);
+        return render_target.textureSession(map, texture);
     }
 
     fn renderUpdate(
         self: *MetalBorrowedTextureBackend,
+        allocator: std.mem.Allocator,
         diagnostic_store: ?*const maplibre.DiagnosticStore,
         viewport: types.Viewport,
-    ) !bool {
+    ) !render_target.FrameOutcome {
         _ = viewport;
-        if (!try self.session.renderUpdate(diagnostic_store)) return false;
-        return try self.compositor.drawMetalTexture(self.borrowed_texture.value.?, .cpu_complete);
+        var outcome = try self.session.renderUpdate(allocator, diagnostic_store);
+        if (!outcome.rendered) return outcome;
+        outcome.rendered = try self.compositor.drawMetalTexture(self.borrowed_texture.value.?, .cpu_complete);
+        return outcome;
     }
 };
 
@@ -378,14 +406,12 @@ const MetalSurfaceBackend = struct {
     ) !MetalSurfaceBackend {
         var self = MetalSurfaceBackend{
             .view = try MetalView.init(window, viewport),
-            .session = .none,
+            .session = .{},
         };
         errdefer self.deinit();
         return self;
     }
 
-    /// Attaches the render session on this thread, which becomes its owner
-    /// thread for the session's whole life.
     fn attach(self: *MetalSurfaceBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
         self.session = try self.attachRenderTarget(map, viewport);
     }
@@ -397,14 +423,7 @@ const MetalSurfaceBackend = struct {
 
     fn resize(self: *MetalSurfaceBackend, viewport: types.Viewport) !void {
         self.view.resize(viewport);
-        try self.session.resize(viewport, null);
-    }
-
-    fn renderUpdate(
-        self: *MetalSurfaceBackend,
-        diagnostic_store: ?*const maplibre.DiagnosticStore,
-    ) !bool {
-        return try self.session.renderUpdate(diagnostic_store);
+        try self.session.startResize(viewport);
     }
 
     fn attachRenderTarget(
@@ -420,7 +439,7 @@ const MetalSurfaceBackend = struct {
             diagnostics.logError("Metal surface attach failed", err, null);
             return types.AppError.SurfaceAttachFailed;
         };
-        return render_target.surfaceSession(surface);
+        return render_target.surfaceSession(map, surface);
     }
 };
 

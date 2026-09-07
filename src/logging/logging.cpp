@@ -23,8 +23,13 @@ class CallbackLogObserver final : public mln::Log::Observer {
         release_user_data_(release_user_data) {}
 
   ~CallbackLogObserver() override {
-    if (release_user_data_ != nullptr) {
+    if (release_user_data_ == nullptr) {
+      return;
+    }
+    try {
       release_user_data_(user_data_);
+    } catch (...) {
+      // Host release callbacks must not unwind through the C boundary.
     }
   }
 

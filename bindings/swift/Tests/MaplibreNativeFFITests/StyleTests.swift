@@ -145,9 +145,7 @@ import Testing
   #expect(try await map.styleSourceInfo("missing") == nil)
 
   let removeCommand = try await map.removeStyleSource("inline")
-  #expect(try await commandDisposition(
-    removeCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(removeCommand.disposition == .committed)
   #expect(try await map.styleSourceInfo("inline") == nil)
   try await map.close()
 
@@ -157,6 +155,30 @@ import Testing
   #expect(inline.tileJSON?.tileURLs.count == 2)
   #expect(inline.tileJSON?.bounds == bounds)
   #expect(remote.url == "https://example.com/source.json")
+}
+
+/// An inline tile source reads back the tile URLs it was added with, and a
+/// missing source reads as an empty list.
+@Test func styleSourceTileURLsReadBackInlineTilesAndMissingSources()
+  async throws
+{
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(runtime: runtime,
+                                options: MapOptions(width: 1, height: 1))
+  defer { try? map.closeBlockingForTests() }
+
+  try await map
+    .setStyleJSON(jsonData(#"{"version":8,"sources":{},"layers":[]}"#))
+  let tiles = [
+    "https://a.example/{z}/{x}/{y}.mvt",
+    "https://b.example/{z}/{x}/{y}.mvt",
+  ]
+  try await map.addVectorSourceTiles(sourceId: "inline", tiles: tiles)
+
+  #expect(try await map.styleSourceTileURLs("inline") == tiles)
+  #expect(try await map.styleSourceTileURLs("missing").isEmpty)
 }
 
 /// Volatility toggles commit and are visible through source info, and a
@@ -181,17 +203,13 @@ import Testing
     sourceId: "tiles",
     isVolatile: true
   )
-  #expect(try await commandDisposition(
-    enabled, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(enabled.disposition == .committed)
   #expect(try await map.styleSourceInfo("tiles")?.isVolatile == true)
   let disabled = try await map.setStyleSourceVolatile(
     sourceId: "tiles",
     isVolatile: false
   )
-  #expect(try await commandDisposition(
-    disabled, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(disabled.disposition == .committed)
   #expect(try await map.styleSourceInfo("tiles")?.isVolatile == false)
 
   try expectCommandFailure(
@@ -279,13 +297,6 @@ import Testing
 /// The C API can call the release callback while a tile callback is still
 /// running on another thread, so the release waits for that call rather than
 /// freeing the state under it.
-private func waitForSemaphore(
-  _ semaphore: DispatchSemaphore,
-  timeout: DispatchTime
-) -> DispatchTimeoutResult {
-  semaphore.wait(timeout: timeout)
-}
-
 @Test func customGeometryCallbacksWaitForInFlightInvocationBeforeRelease(
 ) async throws {
   // The C ABI callbacks an options struct carries, held past the struct's
@@ -359,31 +370,17 @@ private func waitForSemaphore(
   }.value == .success)
 }
 
-/// Counts the custom geometry source callback states the C API has released.
-private final class ReleaseCounter: @unchecked Sendable {
-  private let lock = NSLock()
-  private var count = 0
-
-  var value: Int {
-    lock.withLock { count }
-  }
-
-  func increment() {
-    lock.withLock { count += 1 }
-  }
-}
-
-/// Captured by a custom geometry source's tile closure, so its deallocation
-/// reports that the C API released that source's callback state.
+/// Captured by a custom source's tile closure, so its deallocation reports
+/// that the C API released that source's callback state.
 private final class ReleaseSentinel: @unchecked Sendable {
-  private let counter: ReleaseCounter
+  private let counter: LockedBox<Int>
 
-  init(_ counter: ReleaseCounter) {
+  init(_ counter: LockedBox<Int>) {
     self.counter = counter
   }
 
   deinit {
-    counter.increment()
+    counter.update { $0 += 1 }
   }
 }
 
@@ -392,7 +389,7 @@ private final class ReleaseSentinel: @unchecked Sendable {
 private func addSourceReportingItsRelease(
   to map: MapHandle,
   sourceId: String = "custom",
-  counter: ReleaseCounter
+  counter: LockedBox<Int>
 ) async throws -> CommandCompletion {
   let sentinel = ReleaseSentinel(counter)
   return try await map.addCustomGeometrySource(
@@ -427,7 +424,7 @@ private func addSourceReportingItsRelease(
   defer { try? map.closeBlockingForTests() }
 
   try await map.setStyleJSON(emptyStyleJSON)
-  let counter = ReleaseCounter()
+  let counter = LockedBox(0)
   _ = try await addSourceReportingItsRelease(to: map, counter: counter)
   #expect(counter.value == 0)
 
@@ -437,13 +434,13 @@ private func addSourceReportingItsRelease(
   while Date() < deadline, counter.value == 0 {
     try await runtime.barrier()
     styleLoadedReported = try styleLoadedReported || runtime.drainEvents()
-      .events.contains { $0.type == .mapStyleLoaded }
+      .contains { $0.type == .mapStyleLoaded }
     try await Task<Never, Never>.sleep(nanoseconds: 1_000_000)
   }
 
   #expect(counter.value == 1)
   #expect(!styleLoadedReported)
-  #expect(try map.eventMask == narrowed)
+  #expect(try map.snapshot().eventMask == narrowed)
   #expect(try await map.styleSourceInfo("custom") == nil)
 }
 
@@ -458,13 +455,11 @@ private func addSourceReportingItsRelease(
   defer { try? map.closeBlockingForTests() }
 
   try await map.setStyleJSON(emptyStyleJSON)
-  let counter = ReleaseCounter()
+  let counter = LockedBox(0)
   _ = try await addSourceReportingItsRelease(to: map, counter: counter)
 
   let removeCommand = try await map.removeStyleSource("custom")
-  #expect(try await commandDisposition(
-    removeCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(removeCommand.disposition == .committed)
   #expect(counter.value == 1)
   try await map.close()
   #expect(counter.value == 1)
@@ -480,7 +475,7 @@ private func addSourceReportingItsRelease(
   defer { try? map.closeBlockingForTests() }
 
   try await map.setStyleJSON(emptyStyleJSON)
-  let counter = ReleaseCounter()
+  let counter = LockedBox(0)
   for sourceId in ["first", "second"] {
     _ = try await addSourceReportingItsRelease(
       to: map,
@@ -506,20 +501,19 @@ private func addSourceReportingItsRelease(
   defer { try? map.closeBlockingForTests() }
 
   let styleCommand = try await map.setStyleJSON(emptyStyleJSON)
-  #expect(try await commandDisposition(
-    styleCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
-  let accepted = ReleaseCounter()
+  #expect(styleCommand.disposition == .committed)
+  let accepted = LockedBox(0)
   let acceptedCommand = try await addSourceReportingItsRelease(
     to: map, counter: accepted
   )
-  #expect(try await commandDisposition(
-    acceptedCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(acceptedCommand.disposition == .committed)
 
-  let rejected = ReleaseCounter()
+  // A second source with the ID the accepted one already took is rejected.
+  let rejected = LockedBox(0)
   try expectCommandFailure(
-    await addSourceReportingItsRelease(to: map, counter: rejected),
+    await addSourceReportingItsRelease(
+      to: map, sourceId: "custom", counter: rejected
+    ),
     status: MLN_STATUS_INVALID_ARGUMENT
   )
   try await runtime.barrier()
@@ -533,7 +527,7 @@ private func addSourceReportingItsRelease(
 private func addMvtSourceReportingItsRelease(
   to map: MapHandle,
   sourceId: String = "custom-mvt",
-  counter: ReleaseCounter
+  counter: LockedBox<Int>
 ) async throws -> CommandCompletion {
   let sentinel = ReleaseSentinel(counter)
   return try await map.addCustomMvtVectorSource(
@@ -592,13 +586,11 @@ private func addMvtSourceReportingItsRelease(
   defer { try? map.closeBlockingForTests() }
 
   try await map.setStyleJSON(emptyStyleJSON)
-  let counter = ReleaseCounter()
+  let counter = LockedBox(0)
   let addCommand = try await addMvtSourceReportingItsRelease(
     to: map, counter: counter
   )
-  #expect(try await commandDisposition(
-    addCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(addCommand.disposition == .committed)
   #expect(try await map.styleSourceInfo("custom-mvt")?
     .type == .customMVTVector)
 
@@ -619,9 +611,7 @@ private func addMvtSourceReportingItsRelease(
   )
 
   let removeCommand = try await map.removeStyleSource("custom-mvt")
-  #expect(try await commandDisposition(
-    removeCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(removeCommand.disposition == .committed)
   #expect(counter.value == 1)
 }
 
@@ -635,17 +625,18 @@ private func addMvtSourceReportingItsRelease(
   defer { try? map.closeBlockingForTests() }
 
   try await map.setStyleJSON(emptyStyleJSON)
-  let accepted = ReleaseCounter()
+  let accepted = LockedBox(0)
   let acceptedCommand = try await addMvtSourceReportingItsRelease(
     to: map, counter: accepted
   )
-  #expect(try await commandDisposition(
-    acceptedCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(acceptedCommand.disposition == .committed)
 
-  let rejected = ReleaseCounter()
+  // A second source with the ID the accepted one already took is rejected.
+  let rejected = LockedBox(0)
   try expectCommandFailure(
-    await addMvtSourceReportingItsRelease(to: map, counter: rejected),
+    await addMvtSourceReportingItsRelease(
+      to: map, sourceId: "custom-mvt", counter: rejected
+    ),
     status: MLN_STATUS_INVALID_ARGUMENT
   )
   try await runtime.barrier()
@@ -763,17 +754,13 @@ private func addMvtSourceReportingItsRelease(
   let styleCommand = try await map.setStyleJSON(jsonData("""
   {"version":8,"sources":{"geo":{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}},"layers":[{"id":"bg","type":"background"},{"id":"fill","type":"fill","source":"geo"}]}
   """))
-  #expect(try await commandDisposition(
-    styleCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(styleCommand.disposition == .committed)
 
   #expect(try await map.layerSourceLayer("fill") == "")
   let sourceLayerCommand = try await map.setLayerSourceLayer(
     layerId: "fill", sourceLayer: "roads"
   )
-  #expect(try await commandDisposition(
-    sourceLayerCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(sourceLayerCommand.disposition == .committed)
   #expect(try await map.layerSourceLayer("fill") == "roads")
   #expect(try await map.layerSourceId("fill") == "geo")
 
@@ -803,21 +790,15 @@ private func addMvtSourceReportingItsRelease(
     layerId: "fill",
     minZoom: 4
   )
-  #expect(try await commandDisposition(
-    minZoomCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(minZoomCommand.disposition == .committed)
   let maxZoomCommand = try await map.setLayerMaxZoom(
     layerId: "fill", maxZoom: 12.5
   )
-  #expect(try await commandDisposition(
-    maxZoomCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(maxZoomCommand.disposition == .committed)
   let visibilityCommand = try await map.setLayerVisibility(
     layerId: "fill", visibility: .none
   )
-  #expect(try await commandDisposition(
-    visibilityCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(visibilityCommand.disposition == .committed)
   let bounded = try #require(try await map.styleLayerInfo("fill"))
   #expect(bounded.minZoom == 4)
   #expect(bounded.maxZoom == 12.5)
@@ -850,9 +831,7 @@ private func addMvtSourceReportingItsRelease(
   let styleCommand = try await map.setStyleJSON(jsonData("""
   {"version":8,"sources":{"geo":{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}},"layers":[{"id":"fill","type":"fill","source":"geo"}]}
   """))
-  #expect(try await commandDisposition(
-    styleCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(styleCommand.disposition == .committed)
   try await map.setStyleImage(
     imageId: "marker",
     image: StyleRGBA8Image(width: 1, height: 1, stride: 4,
@@ -875,9 +854,7 @@ private func addMvtSourceReportingItsRelease(
   ]
   for (subject, remove) in removals {
     let command = try await remove(map)
-    #expect(try await commandDisposition(
-      command, runtime: runtime
-    ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue, "removing a \(subject)")
+    #expect(command.disposition == .committed, "removing a \(subject)")
   }
   #expect(try await map.styleLayerInfo("fill") == nil)
   #expect(try await map.styleSourceInfo("geo") == nil)
@@ -993,9 +970,7 @@ private func addMvtSourceReportingItsRelease(
   let styleCommand = try await map.setStyleJSON(jsonData("""
   {"version":8,"sources":{},"layers":[]}
   """))
-  #expect(try await commandDisposition(
-    styleCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(styleCommand.disposition == .committed)
 
   let clustered = try GeoJSONSourceDataHandle(
     data: nearbyPoints(),
@@ -1007,16 +982,12 @@ private func addMvtSourceReportingItsRelease(
     sourceId: "first",
     data: clustered
   )
-  #expect(try await commandDisposition(
-    firstAdd, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(firstAdd.disposition == .committed)
   let secondAdd = try await map.addGeoJSONSourceData(
     sourceId: "second",
     data: clustered
   )
-  #expect(try await commandDisposition(
-    secondAdd, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(secondAdd.disposition == .committed)
   #expect(try #require(try await map.styleSourceInfo("first"))
     .type == .geoJSON)
   #expect(try #require(try await map.styleSourceInfo("second"))
@@ -1033,16 +1004,12 @@ private func addMvtSourceReportingItsRelease(
     sourceId: "first",
     data: replacement
   )
-  #expect(try await commandDisposition(
-    firstSet, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(firstSet.disposition == .committed)
   let secondSet = try await map.setGeoJSONSourceData(
     sourceId: "second",
     data: replacement
   )
-  #expect(try await commandDisposition(
-    secondSet, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(secondSet.disposition == .committed)
 
   // Cluster aggregations are part of the options-equality requirement, so
   // data prepared with different cluster_properties fails on the map thread.
@@ -1086,9 +1053,7 @@ private func addMvtSourceReportingItsRelease(
     sourceId: "clustered",
     data: clustered
   )
-  #expect(try await commandDisposition(
-    addCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(addCommand.disposition == .committed)
 
   let unclustered = try GeoJSONSourceDataHandle(data: nearbyPoints())
   defer { try? unclustered.close() }
@@ -1122,9 +1087,7 @@ private func addMvtSourceReportingItsRelease(
     sourceId: "kept",
     data: prepared
   )
-  #expect(try await commandDisposition(
-    addCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(addCommand.disposition == .committed)
 
   #expect(!prepared.isClosed)
   try prepared.close()
@@ -1168,34 +1131,26 @@ private func addMvtSourceReportingItsRelease(
     sourceId: "tracked",
     data: prepared
   )
-  #expect(try await commandDisposition(
-    addCommand, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(addCommand.disposition == .committed)
 
   let enable = try await map.setGeoJSONSourceSynchronousTiling(
     sourceId: "tracked",
     enabled: true
   )
-  #expect(try await commandDisposition(
-    enable, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(enable.disposition == .committed)
 
   // Installs under the override still take prepared data.
   let install = try await map.setGeoJSONSourceData(
     sourceId: "tracked",
     data: prepared
   )
-  #expect(try await commandDisposition(
-    install, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(install.disposition == .committed)
 
   let disable = try await map.setGeoJSONSourceSynchronousTiling(
     sourceId: "tracked",
     enabled: false
   )
-  #expect(try await commandDisposition(
-    disable, runtime: runtime
-  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(disable.disposition == .committed)
 
   // A source that does not exist fails on the map thread, asynchronously
   // through command completion.
@@ -1204,7 +1159,7 @@ private func addMvtSourceReportingItsRelease(
       sourceId: "missing",
       enabled: true
     ),
-    status: MLN_STATUS_INVALID_ARGUMENT
+    status: MLN_STATUS_NOT_FOUND
   )
 }
 
@@ -1293,4 +1248,79 @@ private func nearbyPoints() -> Data {
 
 private func jsonData(_ value: String) -> Data {
   Data(value.utf8)
+}
+
+/// A style mutation that names an ID no object carries fails with
+/// `MLN_STATUS_NOT_FOUND` through its completion, whichever kind of object the
+/// ID was meant to name.
+@Test func styleMutationsReportNotFoundForAMissingId() async throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(runtime: runtime,
+                                options: MapOptions(width: 1, height: 1))
+  defer { try? map.closeBlockingForTests() }
+
+  #expect(try await map.setStyleJSON(emptyStyleJSON).disposition == .committed)
+
+  let mutations: [(String, (MapHandle) async throws -> CommandCompletion)] = [
+    ("a GeoJSON source URL", {
+      try await $0.setGeoJSONSourceURL(
+        sourceId: "missing", url: "https://example.test/data.json"
+      )
+    }),
+    ("synchronous tiling", {
+      try await $0.setGeoJSONSourceSynchronousTiling(
+        sourceId: "missing", enabled: true
+      )
+    }),
+    ("an image source URL", {
+      try await $0.setImageSourceURL(
+        sourceId: "missing", url: "https://example.test/image.png"
+      )
+    }),
+    ("a layer's visibility", {
+      try await $0.setLayerVisibility(
+        layerId: "missing", visibility: StyleLayerVisibility.none
+      )
+    }),
+    ("a layer's minimum zoom", {
+      try await $0.setLayerMinZoom(layerId: "missing", minZoom: 2)
+    }),
+    ("a layer move", {
+      try await $0.moveStyleLayer("missing")
+    }),
+  ]
+  for (subject, mutate) in mutations {
+    let command = try await mutate(map)
+    #expect(command.disposition == .failed, "setting \(subject)")
+    #expect(
+      command.rawStatus == MLN_STATUS_NOT_FOUND.rawValue,
+      "setting \(subject)"
+    )
+  }
+}
+
+/// An image source takes exactly four corner coordinates, which the binding
+/// checks before it reaches the C API.
+@Test func imageSourceCoordinatesRejectAnyCountButFour() async throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(runtime: runtime,
+                                options: MapOptions(width: 1, height: 1))
+  defer { try? map.closeBlockingForTests() }
+
+  do {
+    _ = try await map.addImageSourceURL(
+      sourceId: "image",
+      coordinates: [LatLng(latitude: 0, longitude: 0)],
+      url: "https://example.test/image.png"
+    )
+    Issue.record("three missing corners should be rejected")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidArgument)
+    #expect(error.rawStatus == nil)
+    #expect(error.diagnostic.contains("exactly 4"))
+  }
 }

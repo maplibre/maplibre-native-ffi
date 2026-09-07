@@ -30,7 +30,7 @@ class RuntimeHandleNativeTest : org.maplibre.nativeffi.NativeTestBase() {
   }
 
   @Test
-  fun lifecycleAndOrderedQueryResumeWithoutThreadAffinity(): Unit = runSuspendTest {
+  fun closingAMapAndItsRuntimeRetiresBothWrappers(): Unit = runSuspendTest {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     assertFalse(runtime.isClosed)
     val map =
@@ -42,12 +42,9 @@ class RuntimeHandleNativeTest : org.maplibre.nativeffi.NativeTestBase() {
           },
         )
         .await()
-    val snapshot = map.snapshot()
-    runtime.barrier().await()
-    assertTrue(map.queryCamera().await().generation >= snapshot.generation)
-    map.close()
+    map.close().await()
     assertTrue(map.isClosed)
-    runtime.close()
+    runtime.close().await()
     assertTrue(runtime.isClosed)
   }
 }

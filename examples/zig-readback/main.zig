@@ -17,11 +17,9 @@ const sdl = if (build_options.supports_opengl and builtin.os.tag == .windows) @i
 const width = 512;
 const height = 512;
 const style_url = "https://tiles.openfreemap.org/styles/bright";
-fn waitForFuture(future: *maplibre.Future(void), diagnostic_store: ?*maplibre.DiagnosticStore) !void {
-    try future.wait(diagnostic_store);
-}
+
 fn waitForSessionFuture(session: *maplibre.RenderSessionHandle, future: *maplibre.Future(void), diagnostic_store: ?*maplibre.DiagnosticStore) !void {
-    if (!uses_caller_driver) return waitForFuture(future, diagnostic_store);
+    if (!uses_caller_driver) return future.wait(diagnostic_store);
     while (!try future.poll()) _ = try session.serviceDriverWork(0);
     try future.wait(diagnostic_store);
 }
@@ -50,15 +48,15 @@ pub fn main(init_args: std.process.Init) !void {
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .mode = .static });
     defer map_future.deinit();
     var map = try map_future.wait(&diagnostic_store);
-    defer map.close() catch {};
-    var event_mask = try map.setEventMask(.{
-        .map_render_update_available = true,
-        .map_still_image_finished = true,
-        .map_still_image_failed = true,
-        .map_loading_failed = true,
-        .map_render_error = true,
-    });
-    event_mask.deinit();
+    defer if (map.close()) |future| {
+        var teardown = future;
+        _ = teardown.wait(null) catch {};
+        teardown.deinit();
+    } else |_| {};
+
+    // This example selects no event types: the still-image request and the
+    // readback report through their own futures, and a frame that does not
+    // render arrives as the demand's disposition.
     var resize = try map.resize(width, height, 1.0);
     resize.deinit();
     try setInitialCamera(&map);
@@ -67,7 +65,7 @@ pub fn main(init_args: std.process.Init) !void {
 
     var barrier = try runtime.barrier();
     defer barrier.deinit();
-    try waitForFuture(&barrier, &diagnostic_store);
+    try barrier.wait(&diagnostic_store);
 
     var context = try OwnedTextureContext.init();
     defer context.deinit();
@@ -90,15 +88,17 @@ fn renderWithDriver(
     output_path: []const u8,
 ) !void {
     var attachment = try attachOwnedTexture(context, map, .{
-        .extent = .{ .width = width, .height = height, .scale_factor = 1.0 },
+        .width = width,
+        .height = height,
+        .scale_factor = 1.0,
     });
     var attachment_needs_cleanup = true;
     errdefer if (attachment_needs_cleanup) {
         _ = attachment.session.abandon() catch {};
         attachment.session.destroy() catch {};
     };
-    defer attachment.completion.deinit();
-    try waitForSessionFuture(&attachment.session, &attachment.completion, null);
+    defer attachment.attached.deinit();
+    try waitForSessionFuture(&attachment.session, &attachment.attached, null);
 
     var session = attachment.session;
     defer {
@@ -119,17 +119,7 @@ fn renderWithDriver(
     defer still_image.deinit();
 
     try session.requestFrame(.{ .token = 1, .if_needed = false });
-    try waitForRenderedFrame(io, &session, &still_image, 1);
-
-    const capabilities = try session.capabilities();
-    if (capabilities.frame_acquisition) {
-        var frame = try session.acquireFrame();
-        var frame_owned = true;
-        errdefer if (frame_owned) frame.release(.cpu_complete) catch {};
-        _ = try frame.producerSync();
-        try frame.release(.cpu_complete);
-        frame_owned = false;
-    }
+    try waitForRenderedFrame(io, allocator, &session, &still_image, 1);
 
     var readback = try session.readback(allocator);
     defer readback.deinit();
@@ -145,6 +135,7 @@ fn renderWithDriver(
 
 fn waitForRenderedFrame(
     io: std.Io,
+    allocator: std.mem.Allocator,
     session: *maplibre.RenderSessionHandle,
     still_image: *maplibre.Future(void),
     token: u64,
@@ -155,14 +146,10 @@ fn waitForRenderedFrame(
         if (uses_caller_driver) {
             _ = try session.serviceDriverWork(0);
         }
-        var results = session.drainFrameResults() catch |err| {
-            if (err != error.NotReady) return err;
-            try io.sleep(.fromMilliseconds(1), .awake);
-            continue;
-        };
-        defer results.release();
-        for (0..try results.count()) |index| {
-            const result = try results.get(index);
+        var results = try session.drainFrameResults(allocator);
+        defer results.deinit();
+        for (0..results.len()) |index| {
+            const result = try results.at(index);
             if (result.token != token) continue;
             demand_pending = false;
             switch (result.disposition) {
@@ -214,10 +201,6 @@ fn appendBackendLabel(buffer: []u8, len: *usize, has_backend: *bool, label: []co
     has_backend.* = true;
 }
 
-const OwnedTextureDescriptor = struct {
-    extent: maplibre.RenderTargetExtent,
-};
-
 const OwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachContext else if (build_options.supports_metal) struct {
     device: *anyopaque,
 
@@ -237,21 +220,21 @@ const OwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachConte
 fn attachOwnedTexture(
     context: *OwnedTextureContext,
     map: *maplibre.MapHandle,
-    descriptor: OwnedTextureDescriptor,
+    extent: maplibre.RenderTargetExtent,
 ) !maplibre.RenderSessionAttachment {
     return if (build_options.supports_vulkan)
         try maplibre.attachVulkanOwnedTexture(map, .{
-            .extent = descriptor.extent,
+            .extent = extent,
             .context = context.descriptor(),
         }, .{ .driver = .core_worker, .requested_texture_ring_depth = 1 })
     else if (build_options.supports_metal)
         try maplibre.attachMetalOwnedTexture(map, .{
-            .extent = descriptor.extent,
+            .extent = extent,
             .context = context.descriptor(),
         }, .{ .driver = .core_worker, .requested_texture_ring_depth = 1 })
     else if (build_options.supports_opengl)
         try maplibre.attachOpenGLOwnedTexture(map, .{
-            .extent = descriptor.extent,
+            .extent = extent,
             .context = context.descriptor(),
         }, .{
             .driver = if (supports_egl) .core_worker else .caller_graphics_thread,

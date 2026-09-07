@@ -73,7 +73,8 @@ static void a_rejected_submission_leaves_callback_state_with_the_caller(void) {
 }
 
 static void completion_state_handles_inline_abandonment_and_races(void) {
-  TEST_ASSERT_TRUE(mln_test_completion_contract());
+  const char* failure = mln_test_completion_contract();
+  TEST_ASSERT_NULL_MESSAGE(failure, failure);
 }
 
 static void record_wake(void* user_data) {
@@ -94,10 +95,7 @@ static void runtime_events_wake_the_receiver_directly(void) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_create(&options, &runtime));
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_map_set_style_json(
-      map, MLN_BUFFER_LITERAL("{\"version\":8,\"sources\":{},\"layers\":[]}")
-    )
+    MLN_STATUS_OK, mln_test_map_set_style_json(map, mln_test_empty_style_json)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   TEST_ASSERT_GREATER_THAN_UINT32(0, atomic_load(&wakes));

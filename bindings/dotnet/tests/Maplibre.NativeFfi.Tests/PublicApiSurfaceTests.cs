@@ -93,7 +93,6 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Render.MetalOwnedTextureDescriptor",
             "Maplibre.NativeFfi.Render.MetalOwnedTextureFrame",
             "Maplibre.NativeFfi.Render.MetalSurfaceDescriptor",
-            "Maplibre.NativeFfi.Render.NativeBuffer",
             "Maplibre.NativeFfi.Render.OpenGLBorrowedTextureDescriptor",
             "Maplibre.NativeFfi.Render.OpenGLClientApi",
             "Maplibre.NativeFfi.Render.OpenGLContextDescriptor",
@@ -107,7 +106,6 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Render.RenderAbandonResult",
             "Maplibre.NativeFfi.Render.RenderBackend",
             "Maplibre.NativeFfi.Render.RenderDriverKind",
-            "Maplibre.NativeFfi.Render.RenderFrameBatch",
             "Maplibre.NativeFfi.Render.RenderFrameResult",
             "Maplibre.NativeFfi.Render.RenderMode",
             "Maplibre.NativeFfi.Render.RenderResult",
@@ -154,7 +152,6 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Runtime.CommandCompletion",
             "Maplibre.NativeFfi.Runtime.CommandDisposition",
             "Maplibre.NativeFfi.Runtime.RuntimeEvent",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventBatch",
             "Maplibre.NativeFfi.Runtime.RuntimeEventMask",
             "Maplibre.NativeFfi.Runtime.RuntimeEventPayload",
             "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+CameraTransitionFinished",
@@ -320,6 +317,57 @@ public sealed class PublicApiSurfaceTests
         Assert.Empty(violations);
     }
 
+    // Every wrapper over a C completion hands the caller a task to await, so it takes a
+    // cancellation token. A create is the exception: its task carries the only reference to a
+    // native handle, and abandoning that task would leak it.
+    [Fact]
+    public void CompletionWrappersTakeACancellationTokenUnlessTheyProduceAHandle()
+    {
+        var handleProducing = new[] { "CreateAsync", "CreateProjectionAsync" };
+        var consumesTheHandle = new[] { "CloseAsync" };
+        var violations = new List<string>();
+
+        foreach (var type in typeof(Maplibre).Assembly.GetExportedTypes())
+        {
+            foreach (
+                var method in type.GetMethods(
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static
+                )
+            )
+            {
+                if (
+                    method.DeclaringType != type
+                    || method.IsSpecialName
+                    || !typeof(Task).IsAssignableFrom(method.ReturnType)
+                )
+                {
+                    continue;
+                }
+
+                var takesToken = method
+                    .GetParameters()
+                    .Any(parameter => parameter.ParameterType == typeof(CancellationToken));
+                if (
+                    handleProducing.Contains(method.Name) || consumesTheHandle.Contains(method.Name)
+                )
+                {
+                    if (takesToken)
+                    {
+                        violations.Add($"{type.FullName}.{method.Name} takes a token");
+                    }
+                    continue;
+                }
+
+                if (!takesToken)
+                {
+                    violations.Add($"{type.FullName}.{method.Name} takes no token");
+                }
+            }
+        }
+
+        Assert.Empty(violations);
+    }
+
     [Fact]
     public void OwnedNativeHandlesDoNotExposePublicConstructors()
     {
@@ -329,7 +377,6 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Map.MapHandle",
             "Maplibre.NativeFfi.Map.MapProjectionHandle",
             "Maplibre.NativeFfi.Render.AcquiredFrameHandle",
-            "Maplibre.NativeFfi.Render.RenderFrameBatch",
             "Maplibre.NativeFfi.Render.RenderSessionHandle",
             "Maplibre.NativeFfi.Resource.ResourceRequestHandle",
             "Maplibre.NativeFfi.Runtime.RuntimeHandle",

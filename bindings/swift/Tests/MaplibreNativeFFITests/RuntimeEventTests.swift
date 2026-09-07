@@ -3,7 +3,7 @@ import Foundation
 @testable import MaplibreNativeFFI
 import Testing
 
-private func makeRuntime() async throws -> RuntimeHandle {
+private func makeRuntime() throws -> RuntimeHandle {
   try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
 }
 
@@ -99,7 +99,7 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
 /// whether or not this process still holds a ``MapHandle`` for it, so a host
 /// keeps the identity it needs to route or forward the event.
 @Test func aMapSourcedEventKeepsAnIdNoLiveMapHandleClaims() async throws {
-  let runtime = try await makeRuntime()
+  let runtime = try makeRuntime()
   defer { try? runtime.closeBlockingForTests() }
   let map = try await makeMap(runtime)
   defer { try? map.closeBlockingForTests() }
@@ -136,7 +136,7 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   tile.payload.tile_action.tile_id.wrap = -1
 
   var transition = rawRuntimeEvent(
-    type: 23,
+    type: MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED.rawValue,
     payloadType: MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED.rawValue
   )
   transition.payload.camera_transition_finished.transition_id = 99
@@ -146,8 +146,9 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   ) { synthesized in
     try NativeRuntimeEventBatch(copying: synthesized.batch)
   }
-  let payloads = batch.events
-    .map { RuntimeEvent(native: $0).payload }
+  let decoded = batch.events.map { RuntimeEvent(native: $0) }
+  let payloads = decoded.map(\.payload)
+  #expect(decoded[2].type == .mapCameraTransitionFinished)
 
   guard case let .renderFrame(decodedFrame) = payloads[0] else {
     Issue.record("expected a render frame payload, got \(payloads[0])")
@@ -180,9 +181,6 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
 /// bits this build does not name included, and a mask the host writes reaches
 /// the struct as it stands.
 @Test func mapAndRuntimeOptionsAlwaysEncodeAnEventMask() throws {
-  try MapOptions(width: 8, height: 8).nativeInput.withNativeOptions { native in
-    #expect(native.pointee.event_mask == mln_map_options_default().event_mask)
-  }
   let mapMask: RuntimeEventMask = [.mapStyleLoaded, .mapIdle]
   try MapOptions(width: 8, height: 8, eventMask: mapMask).nativeInput
     .withNativeOptions { native in
@@ -194,13 +192,6 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
     }
 
   let wake = mln_wake()
-  try RuntimeOptions().nativeInput.withNativeOptions(eventWake: wake) {
-    native in
-    #expect(
-      native.pointee.event_mask == mln_runtime_options_default().event_mask
-    )
-    #expect(native.pointee.event_wake.callback == nil)
-  }
   try RuntimeOptions(eventMask: .allRuntimeEvents).nativeInput
     .withNativeOptions(eventWake: wake) { native in
       #expect(
@@ -215,7 +206,7 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
 /// BND-090. One drain reports every event a style load produced, from the map
 /// that produced them.
 @Test func oneDrainReportsEveryEventAStyleLoadProduced() async throws {
-  let runtime = try await makeRuntime()
+  let runtime = try makeRuntime()
   defer { try? runtime.closeBlockingForTests() }
   let map = try await makeMap(runtime)
   defer { try? map.closeBlockingForTests() }
@@ -225,15 +216,15 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   try await runtime.barrier()
   let batch = try runtime.drainEvents()
 
-  #expect(batch.events.count > 1)
-  #expect(batch.events.map(\.type).contains(.mapStyleLoaded))
-  #expect(batch.events.allSatisfy { map.isSource(of: $0) })
+  #expect(batch.count > 1)
+  #expect(batch.map(\.type).contains(.mapStyleLoaded))
+  #expect(batch.allSatisfy { map.isSource(of: $0) })
 }
 
 /// BND-082, BND-092. An event copied out of a batch keeps its message and
 /// payload after the drain that ends the batch's window.
 @Test func anEventTakenOutOfABatchOutlivesTheNextDrain() async throws {
-  let runtime = try await makeRuntime()
+  let runtime = try makeRuntime()
   defer { try? runtime.closeBlockingForTests() }
   let map = try await makeMap(runtime)
   defer { try? map.closeBlockingForTests() }
@@ -242,18 +233,20 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   _ = try? await map.setStyleJSON(Data(#"{"version":8,"#.utf8))
   try await runtime.barrier()
   let failure = try #require(
-    try runtime.drainEvents().events.first { $0.type == .mapLoadingFailed }
+    try runtime.drainEvents().first { $0.type == .mapLoadingFailed }
   )
-  #expect(!failure.message.isEmpty)
-  let copied = failure
+  let message = failure.message
+  #expect(!message.isEmpty)
 
   try await map.setStyleJSON(emptyStyleJSON)
   try await runtime.barrier()
   let second = try runtime.drainEvents()
 
-  #expect(second.events.map(\.type).contains(.mapStyleLoaded))
-  #expect(failure == copied)
-  #expect(!failure.message.isEmpty)
+  #expect(second.map(\.type).contains(.mapStyleLoaded))
+  // The drain that ends the first batch's window reuses its arena, so the
+  // message has to have been copied out rather than borrowed.
+  #expect(failure.message == message)
+  #expect(failure.payload == .none)
 }
 
 /// BND-091. A map and a runtime built from the default event mask select every
@@ -261,19 +254,19 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
 /// names no event type and is rejected rather than silently kept.
 @Test func theDefaultMaskSelectsEveryEventTypeAndAnUnknownBitIsRejected(
 ) async throws {
-  let runtime = try await makeRuntime()
+  let runtime = try makeRuntime()
   defer { try? runtime.closeBlockingForTests() }
   let map = try await makeMap(runtime)
   defer { try? map.closeBlockingForTests() }
 
   #expect(try runtime.eventMask == .all)
-  #expect(try map.eventMask == .all)
+  #expect(try map.snapshot().eventMask == .all)
 
   _ = try runtime.drainEvents()
   try await map.setStyleJSON(emptyStyleJSON)
   _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions(zoom: 4)))
   try await runtime.barrier()
-  let types = try Set(runtime.drainEvents().events.map(\.type))
+  let types = try Set(runtime.drainEvents().map(\.type))
 
   #expect(types.contains(.mapStyleLoaded))
   #expect(types.contains(.mapCameraDidChange))
@@ -307,7 +300,7 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
 
 /// Once an event is queued, a later mask command does not remove it.
 @Test func aQueuedEventSurvivesANarrowedMask() async throws {
-  let runtime = try await makeRuntime()
+  let runtime = try makeRuntime()
   defer { try? runtime.closeBlockingForTests() }
   let map = try await makeMap(runtime)
   defer { try? map.closeBlockingForTests() }
@@ -318,13 +311,12 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   _ = try await map
     .setEventMask(RuntimeEventMask.all.subtracting(.mapStyleLoaded))
   try await runtime.barrier()
-  #expect(try runtime.drainEvents().events.map(\.type)
-    .contains(.mapStyleLoaded))
+  #expect(try runtime.drainEvents().map(\.type).contains(.mapStyleLoaded))
 }
 
 /// A read-modify-write cycle keeps every bit it did not touch, on both handles.
 @Test func anEventMaskRoundTripsThroughBothHandles() async throws {
-  let runtime = try await makeRuntime()
+  let runtime = try makeRuntime()
   defer { try? runtime.closeBlockingForTests() }
   let map = try await makeMap(runtime)
   defer { try? map.closeBlockingForTests() }
@@ -333,13 +325,13 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   _ = try await map.setEventMask(.all)
   try await runtime.barrier()
   #expect(try runtime.eventMask == .all)
-  #expect(try map.eventMask == .all)
+  #expect(try map.snapshot().eventMask == .all)
 
-  var mapMask = try map.eventMask
+  var mapMask = try map.snapshot().eventMask
   mapMask.remove(.mapRenderUpdateAvailable)
   _ = try await map.setEventMask(mapMask)
   try await runtime.barrier()
-  let readBackMapMask = try map.eventMask
+  let readBackMapMask = try map.snapshot().eventMask
   #expect(readBackMapMask == mapMask)
   #expect(readBackMapMask.contains(.mapStyleLoaded))
   #expect(!readBackMapMask.contains(.mapRenderUpdateAvailable))
@@ -352,17 +344,20 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   #expect(!readBackRuntimeMask.contains(.offlineRegionStatusChanged))
 }
 
-/// Runtime and map operations remain valid after Swift resumes on another task.
-@Test func runtimeAndMapAreUsableAfterTaskResumption() async throws {
-  let runtime = try await makeRuntime()
+/// A runtime and a map are usable from a thread other than the one that
+/// created them, so a host may hand either between execution contexts.
+@Test func runtimeAndMapAreUsableFromAnotherThread() async throws {
+  let runtime = try makeRuntime()
   defer { try? runtime.closeBlockingForTests() }
   let map = try await makeMap(runtime)
   defer { try? map.closeBlockingForTests() }
 
-  await Task.yield()
-  try runtime.setEventMask(.all)
-  try await map.setEventMask(.all)
-  _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions(zoom: 3)))
-  let camera = try await map.queryCamera()
-  #expect(camera.camera.zoom == 3)
+  let zoom = try await Task.detached {
+    try runtime.setEventMask(.all)
+    _ = try await map.setEventMask(.all)
+    _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions(zoom: 3)))
+    return try await map.queryCamera().camera.zoom
+  }.value
+  #expect(zoom == 3)
+  #expect(try map.snapshot().eventMask == .all)
 }

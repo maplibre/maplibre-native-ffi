@@ -23,123 +23,120 @@ import org.maplibre.nativeffi.resource.ResourceUsage
 
 class ResourceProviderStateTest {
   @Test
-  fun providerCallbackCopiesRequestAndReturnsDecision(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      var copied: ResourceRequest? = null
-      ResourceProviderState(
-          ResourceProviderCallback { request, _ ->
-            copied = request
-            ResourceProviderDecision.PASS_THROUGH
-          }
-        )
-        .use { state ->
-          Arena.ofConfined().use { arena ->
-            val request = resourceRequest(arena)
-            val fakeHandle = SyntheticHandles.resourceRequest().raw
-
-            assertEquals(
-              ResourceProviderDecision.PASS_THROUGH.nativeValue,
-              state.invoke(MemorySegment.NULL, request, fakeHandle),
-            )
-          }
+  fun providerCallbackCopiesRequestAndReturnsDecision() {
+    var copied: ResourceRequest? = null
+    ResourceProviderState(
+        ResourceProviderCallback { request, _ ->
+          copied = request
+          ResourceProviderDecision.PASS_THROUGH
         }
+      )
+      .use { state ->
+        Arena.ofConfined().use { arena ->
+          val request = resourceRequest(arena)
+          val fakeHandle = SyntheticHandles.resourceRequest().raw
 
-      assertEquals(ResourceKind(900), copied?.kind)
-      assertEquals(ResourceLoadingMethod(901), copied?.loadingMethod)
-      assertEquals(ResourcePriority(902), copied?.priority)
-      assertEquals(ResourceUsage(903), copied?.usage)
-      assertEquals(ResourceStoragePolicy(904), copied?.storagePolicy)
-      assertEquals("maplibre://tiles/2/1/1.pbf", copied?.requestedUrl)
-      assertEquals("https://example.com/tile.pbf", copied?.resolvedUrl)
-      assertEquals(ResourceRequest.ByteRange(7, 11), copied?.range)
-      assertEquals(123L, copied?.priorModifiedUnixMs)
-      assertEquals(456L, copied?.priorExpiresUnixMs)
-      assertEquals("etag", copied?.priorEtag)
-      val priorData = copied?.priorData ?: ByteArray(0)
-      assertContentEquals(byteArrayOf(1, 2, 3), priorData)
-      priorData[0] = 9
-      assertContentEquals(byteArrayOf(1, 2, 3), copied?.priorData)
-    }
-
-  @Test
-  fun hostLanguageFailureTellsNativeNotToPassThrough(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      ResourceProviderState(
-          ResourceProviderCallback { _, _ -> throw IllegalStateException("contained") }
-        )
-        .use { state ->
-          Arena.ofConfined().use { arena ->
-            assertEquals(
-              UNKNOWN_DECISION,
-              state.invoke(
-                MemorySegment.NULL,
-                resourceRequest(arena),
-                SyntheticHandles.resourceRequest().raw,
-              ),
-            )
-          }
+          assertEquals(
+            ResourceProviderDecision.PASS_THROUGH.nativeValue,
+            state.invoke(MemorySegment.NULL, request, fakeHandle),
+          )
         }
-    }
-
-  @Test
-  fun providerClosureDuringAndConcurrentWithCallbacksRejectsLaterEntry(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      lateinit var reentrant: ResourceProviderState
-      reentrant =
-        ResourceProviderState(
-          ResourceProviderCallback { _, _ ->
-            reentrant.close()
-            ResourceProviderDecision.PASS_THROUGH
-          }
-        )
-      Arena.ofConfined().use { arena ->
-        assertEquals(
-          ResourceProviderDecision.PASS_THROUGH.nativeValue,
-          reentrant.invoke(
-            MemorySegment.NULL,
-            resourceRequest(arena),
-            SyntheticHandles.resourceRequest().raw,
-          ),
-        )
-        assertTrue(reentrant.isClosedForTesting())
-        assertEquals(
-          UNKNOWN_DECISION,
-          reentrant.invoke(
-            MemorySegment.NULL,
-            resourceRequest(arena),
-            SyntheticHandles.resourceRequest().raw,
-          ),
-        )
       }
 
-      val entered = CountDownLatch(1)
-      val release = CountDownLatch(1)
-      val state =
-        ResourceProviderState(
-          ResourceProviderCallback { _, _ ->
-            entered.countDown()
-            release.await(5, TimeUnit.SECONDS)
-            ResourceProviderDecision.PASS_THROUGH
-          }
-        )
-      Arena.ofShared().use { arena ->
-        val request = resourceRequest(arena)
-        val invocation = thread {
-          state.invoke(MemorySegment.NULL, request, SyntheticHandles.resourceRequest().raw)
+    assertEquals(ResourceKind(900), copied?.kind)
+    assertEquals(ResourceLoadingMethod(901), copied?.loadingMethod)
+    assertEquals(ResourcePriority(902), copied?.priority)
+    assertEquals(ResourceUsage(903), copied?.usage)
+    assertEquals(ResourceStoragePolicy(904), copied?.storagePolicy)
+    assertEquals("maplibre://tiles/2/1/1.pbf", copied?.requestedUrl)
+    assertEquals("https://example.com/tile.pbf", copied?.resolvedUrl)
+    assertEquals(ResourceRequest.ByteRange(7, 11), copied?.range)
+    assertEquals(123L, copied?.priorModifiedUnixMs)
+    assertEquals(456L, copied?.priorExpiresUnixMs)
+    assertEquals("etag", copied?.priorEtag)
+    val priorData = copied?.priorData ?: ByteArray(0)
+    assertContentEquals(byteArrayOf(1, 2, 3), priorData)
+    priorData[0] = 9
+    assertContentEquals(byteArrayOf(1, 2, 3), copied?.priorData)
+  }
+
+  @Test
+  fun hostLanguageFailureTellsNativeNotToPassThrough() {
+    ResourceProviderState(
+        ResourceProviderCallback { _, _ -> throw IllegalStateException("contained") }
+      )
+      .use { state ->
+        Arena.ofConfined().use { arena ->
+          assertEquals(
+            UNKNOWN_DECISION,
+            state.invoke(
+              MemorySegment.NULL,
+              resourceRequest(arena),
+              SyntheticHandles.resourceRequest().raw,
+            ),
+          )
         }
-        assertTrue(entered.await(5, TimeUnit.SECONDS))
-        val closed = CountDownLatch(1)
-        val closer = thread {
-          state.close()
-          closed.countDown()
-        }
-        assertFalse(closed.await(50, TimeUnit.MILLISECONDS))
-        release.countDown()
-        invocation.join()
-        closer.join()
-        assertTrue(state.isClosedForTesting())
       }
+  }
+
+  @Test
+  fun providerClosureDuringAndConcurrentWithCallbacksRejectsLaterEntry() {
+    lateinit var reentrant: ResourceProviderState
+    reentrant =
+      ResourceProviderState(
+        ResourceProviderCallback { _, _ ->
+          reentrant.close()
+          ResourceProviderDecision.PASS_THROUGH
+        }
+      )
+    Arena.ofConfined().use { arena ->
+      assertEquals(
+        ResourceProviderDecision.PASS_THROUGH.nativeValue,
+        reentrant.invoke(
+          MemorySegment.NULL,
+          resourceRequest(arena),
+          SyntheticHandles.resourceRequest().raw,
+        ),
+      )
+      assertTrue(reentrant.isClosedForTesting())
+      assertEquals(
+        UNKNOWN_DECISION,
+        reentrant.invoke(
+          MemorySegment.NULL,
+          resourceRequest(arena),
+          SyntheticHandles.resourceRequest().raw,
+        ),
+      )
     }
+
+    val entered = CountDownLatch(1)
+    val release = CountDownLatch(1)
+    val state =
+      ResourceProviderState(
+        ResourceProviderCallback { _, _ ->
+          entered.countDown()
+          release.await(5, TimeUnit.SECONDS)
+          ResourceProviderDecision.PASS_THROUGH
+        }
+      )
+    Arena.ofShared().use { arena ->
+      val request = resourceRequest(arena)
+      val invocation = thread {
+        state.invoke(MemorySegment.NULL, request, SyntheticHandles.resourceRequest().raw)
+      }
+      assertTrue(entered.await(5, TimeUnit.SECONDS))
+      val closed = CountDownLatch(1)
+      val closer = thread {
+        state.close()
+        closed.countDown()
+      }
+      assertFalse(closed.await(50, TimeUnit.MILLISECONDS))
+      release.countDown()
+      invocation.join()
+      closer.join()
+      assertTrue(state.isClosedForTesting())
+    }
+  }
 
   private fun resourceRequest(arena: Arena): MemorySegment {
     val request = arena.allocate(RESOURCE_REQUEST_SIZE)

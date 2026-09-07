@@ -43,7 +43,7 @@ mln_status download_region(
   offline_download* download, const mln_completion* observe_completion,
   const mln_completion* download_completion
 ) {
-  mln_runtime_set_event_mask(
+  (void)mln_runtime_set_event_mask(
     runtime, MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED
   );
 

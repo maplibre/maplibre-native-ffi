@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <memory>
 #include <string>
 #include <utility>
 
@@ -457,6 +458,8 @@ auto validate_live_attached_texture(
   return MLN_STATUS_OK;
 }
 
+namespace {
+
 auto texture_read_premultiplied_rgba8(
   mln_render_session texture, uint8_t* out_data, size_t out_data_capacity,
   mln_texture_image_info* out_info
@@ -545,6 +548,8 @@ struct TextureReadbackResult {
   mln_texture_image_info info{};
 };
 
+}  // namespace
+
 auto texture_read_premultiplied_rgba8_start(
   mln_render_session texture, const mln_completion* completion
 ) -> mln_status {
@@ -600,6 +605,8 @@ auto texture_read_premultiplied_rgba8_start(
   );
 }
 
+namespace {
+
 template <typename Frame>
 auto acquired_frame_get_backend(mln_acquired_frame handle, Frame* out_frame)
   -> mln_status {
@@ -607,18 +614,12 @@ auto acquired_frame_get_backend(mln_acquired_frame handle, Frame* out_frame)
     set_thread_error("out_frame must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto frame = handle_table<mln_acquired_frame_object>().lease(handle);
-  if (frame == nullptr || !frame->valid.load()) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  {
-    const auto lock = std::scoped_lock{frame->session->control_mutex};
-    if (
-      frame->session->state == MLN_RENDER_SESSION_STATE_ABANDONED ||
-      frame->session->state == MLN_RENDER_SESSION_STATE_TARGET_LOST
-    ) {
-      return MLN_STATUS_TARGET_LOST;
-    }
+  auto frame = std::shared_ptr<mln_acquired_frame_object>{};
+  if (
+    const auto status = lease_valid_acquired_frame(handle, frame);
+    status != MLN_STATUS_OK
+  ) {
+    return status;
   }
   const auto* metadata = std::any_cast<Frame>(&frame->backend_metadata);
   if (metadata == nullptr) {
@@ -628,6 +629,8 @@ auto acquired_frame_get_backend(mln_acquired_frame handle, Frame* out_frame)
   *out_frame = *metadata;
   return MLN_STATUS_OK;
 }
+
+}  // namespace
 
 auto acquired_frame_get_metal_texture(
   mln_acquired_frame frame, mln_metal_owned_texture_frame* out_frame

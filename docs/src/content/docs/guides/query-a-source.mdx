@@ -61,8 +61,9 @@ within that extension.
 
 <Code code={region(clusterLeaves, "query")} lang="c" title="cluster-leaves.c" />
 
-An extension result is one owned buffer. For `leaves`, parse it as a
-GeoJSON FeatureCollection; scalar extension fields return their JSON value.
+An extension result is one borrowed JSON buffer; copy or parse it before the
+callback returns. For `leaves`, parse it as a GeoJSON FeatureCollection; scalar
+extension fields return their JSON value.
 
 <Code code={region(clusterLeaves, "leaves")} lang="c" title="cluster-leaves.c" />
 

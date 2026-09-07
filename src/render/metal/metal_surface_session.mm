@@ -342,6 +342,8 @@ auto metal_surface_attach_start(
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
+  // The retains below send messages to the descriptor's layer and device, so
+  // this session validates the request before start_attach_render_session does.
   const auto request_status =
     validate_render_session_attach_request(options, out_session, completion);
   if (request_status != MLN_STATUS_OK) {
@@ -365,7 +367,7 @@ auto metal_surface_attach_start(
     };
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),
-    .driver = options == nullptr ? 0u : options->driver,
+    .driver = 0,
     .texture_ring_depth = 0,
     .flags = MLN_RENDER_SESSION_CAPABILITY_PRESENTATION
   };

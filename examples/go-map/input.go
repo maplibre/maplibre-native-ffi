@@ -70,6 +70,9 @@ func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent,
 	input.lastY = cursor.Y
 	input.dragMode = mode
 	input.dragButton = event.Button
+	if err := state.cancelTransitions(); err != nil {
+		return false, err
+	}
 	if err := state.setGestureInProgress(true); err != nil {
 		return false, err
 	}
@@ -197,14 +200,4 @@ func logicalCoordinate(value float64, windowSize uint32, logicalSize uint32) flo
 		return value
 	}
 	return value * float64(logicalSize) / float64(windowSize)
-}
-
-func clamp(value, min, max float64) float64 {
-	if value < min {
-		return min
-	}
-	if value > max {
-		return max
-	}
-	return value
 }

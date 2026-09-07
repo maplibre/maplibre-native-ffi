@@ -29,13 +29,6 @@ namespace Maplibre.NativeFfi.Internal.C
     }
 
     [NativeTypeName("uint32_t")]
-    internal enum mln_style_layer_info_field : uint
-    {
-        MLN_STYLE_LAYER_INFO_SOURCE_ID = 1U << 0,
-        MLN_STYLE_LAYER_INFO_SOURCE_LAYER = 1U << 1,
-    }
-
-    [NativeTypeName("uint32_t")]
     internal enum mln_style_tile_source_option_field : uint
     {
         MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM = 1U << 0,
@@ -262,7 +255,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public uint size;
 
         [NativeTypeName("uint32_t")]
-        public uint fields;
+        public uint reserved;
 
         public mln_buffer_view type;
 
@@ -272,12 +265,6 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [NativeTypeName("uint32_t")]
         public uint visibility;
-
-        [NativeTypeName("size_t")]
-        public nuint source_id_size;
-
-        [NativeTypeName("size_t")]
-        public nuint source_layer_size;
     }
 
     internal partial struct mln_style_layer_result
@@ -605,24 +592,6 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_style_transition_options mln_style_transition_options_default();
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_style_id_list_count([NativeTypeName("mln_style_id_list")] MlnStyleIdList list, [NativeTypeName("size_t *")] nuint* out_count);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_style_id_list_get([NativeTypeName("mln_style_id_list")] MlnStyleIdList list, [NativeTypeName("size_t")] nuint index, mln_buffer_view* out_id);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void mln_style_id_list_destroy([NativeTypeName("mln_style_id_list")] MlnStyleIdList list);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_style_string_list_count([NativeTypeName("mln_style_string_list")] MlnStyleStringList list, [NativeTypeName("size_t *")] nuint* out_count);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_style_string_list_get([NativeTypeName("mln_style_string_list")] MlnStyleStringList list, [NativeTypeName("size_t")] nuint index, mln_buffer_view* out_value);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void mln_style_string_list_destroy([NativeTypeName("mln_style_string_list")] MlnStyleStringList list);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_add_style_source_json([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view source_json, [NativeTypeName("const mln_completion *")] mln_completion* completion);

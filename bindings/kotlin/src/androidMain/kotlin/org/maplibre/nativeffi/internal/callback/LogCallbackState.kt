@@ -70,8 +70,6 @@ internal class LogCallbackState(private val callback: LogCallback) : AutoCloseab
       Status.check(MaplibreNativeC.mln_log_clear_callback())
     }
 
-    fun createForTesting(callback: LogCallback): LogCallbackState = LogCallbackState(callback)
-
     private val TOKENS = AtomicLong(1)
     private val STATES = ConcurrentHashMap<Long, LogCallbackState>()
 

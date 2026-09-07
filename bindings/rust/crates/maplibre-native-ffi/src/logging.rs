@@ -208,8 +208,8 @@ mod tests {
     }
 
     #[test]
-    // Spec coverage: BND-120.
-    fn log_callback_replacement_invokes_only_replacement() {
+    // Spec coverage: BND-120 and BND-122.
+    fn replacing_a_log_callback_releases_the_one_it_replaced() {
         let _guard = LoggingTestGuard::new();
         let first_calls = Arc::new(AtomicUsize::new(0));
         let second_calls = Arc::new(AtomicUsize::new(0));

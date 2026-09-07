@@ -9,15 +9,10 @@ import Testing
 
 private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   try await MapHandle(runtime: runtime,
-                      options: MapOptions(
-                        width: 64,
-                        height: 64,
-                        scaleFactor: 1.0,
-                        mode: .continuous
-                      ))
+                      options: MapOptions(width: 64, height: 64))
 }
 
-private func mapSize(_ map: NativeMapHandle) throws {
+private func readSnapshot(_ map: NativeMapHandle) throws {
   _ = try NativeMap.snapshot(map)
 }
 
@@ -36,16 +31,16 @@ private func mapSize(_ map: NativeMapHandle) throws {
   let second = try await makeMap(runtime)
   defer { try? second.closeBlockingForTests() }
 
-  #expect(throws: NativeStatusFailure.self) { try mapSize(released) }
   do {
-    try mapSize(released)
+    try readSnapshot(released)
+    Issue.record("a replayed map id should be rejected as stale")
   } catch let failure as NativeStatusFailure {
     #expect(failure.rawStatus == MLN_STATUS_INVALID_ARGUMENT.rawValue)
     #expect(failure.diagnostic.contains("stale"))
   }
 
   // The live map is unaffected by the replay.
-  try mapSize(second.requireLiveHandle())
+  try readSnapshot(second.requireLiveHandle())
 }
 
 /// BND-047.
@@ -59,8 +54,12 @@ private func mapSize(_ map: NativeMapHandle) throws {
   // NativeMapHandle and NativeRuntimeHandle are distinct types, so this call
   // has no expression in the safe API and needs the raw id.
   let wrongKind = try map.requireLiveHandle().raw
-  let state = NativeCompletionStateForTest()
-  var completion = state.descriptor
+  var completion = mln_completion(
+    size: UInt32(MemoryLayout<mln_completion>.size),
+    callback: { _, _ in },
+    user_data: nil,
+    release_user_data: nil
+  )
   do {
     try checkStatus(mln_runtime_barrier(wrongKind, &completion))
     Issue.record("a map id should not name a runtime")
@@ -69,13 +68,4 @@ private func mapSize(_ map: NativeMapHandle) throws {
     #expect(failure.diagnostic.contains("map"))
     #expect(failure.diagnostic.contains("runtime"))
   }
-}
-
-private final class NativeCompletionStateForTest {
-  private(set) lazy var descriptor = mln_completion(
-    size: UInt32(MemoryLayout<mln_completion>.size),
-    callback: { _, _ in },
-    user_data: nil,
-    release_user_data: nil
-  )
 }

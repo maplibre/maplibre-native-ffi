@@ -491,8 +491,6 @@ class RuntimeHandle(NativeHandleMixin):
         self, operation: AmbientCacheOperation
     ) -> Future[None]:
         """Start an ambient cache maintenance operation."""
-        from .offline import AmbientCacheOperation
-
         return self._native.run_ambient_cache_operation(
             AmbientCacheOperation(operation).native_code
         )
@@ -517,7 +515,7 @@ class RuntimeHandle(NativeHandleMixin):
         """Start creating an offline region."""
         return map_future(
             self._native.create_offline_region(definition, metadata),
-            _adapt_region_result,
+            OfflineRegionInfo._from_native,
         )
 
     def get_offline_region(self, region_id: int) -> Future[OfflineRegionInfo | None]:
@@ -549,13 +547,14 @@ class RuntimeHandle(NativeHandleMixin):
         """Start updating opaque binary metadata for an offline region."""
         return map_future(
             self._native.update_offline_region_metadata(region_id, metadata),
-            _adapt_region_result,
+            OfflineRegionInfo._from_native,
         )
 
     def get_offline_region_status(self, region_id: int) -> Future[OfflineRegionStatus]:
         """Start getting completed/download status for an offline region."""
         return map_future(
-            self._native.get_offline_region_status(region_id), _adapt_status_result
+            self._native.get_offline_region_status(region_id),
+            OfflineRegionStatus._from_native,
         )
 
     def set_offline_region_observed(
@@ -570,8 +569,6 @@ class RuntimeHandle(NativeHandleMixin):
         state: OfflineRegionDownloadState,
     ) -> Future[None]:
         """Start setting an offline region's native download state."""
-        from .offline import OfflineRegionDownloadState
-
         native_state = OfflineRegionDownloadState(state).native_code_for_set()
         return self._native.set_offline_region_download_state(region_id, native_state)
 
@@ -681,8 +678,6 @@ class RuntimeHandle(NativeHandleMixin):
 
     def create_map(self, options: MapOptions | None = None) -> Future[MapHandle]:
         """Return an eager future for a map owned by this runtime."""
-        from .map import MapHandle
-
         return MapHandle._create(self, options)
 
 
@@ -744,8 +739,6 @@ from .offline import (
     OfflineRegionTileCountLimitExceeded,
     _adapt_optional_region_result,
     _adapt_region_list_result,
-    _adapt_region_result,
-    _adapt_status_result,
 )
 
 RuntimeEventPayload = (

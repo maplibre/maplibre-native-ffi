@@ -6,6 +6,7 @@ import android.view.Choreographer
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import org.maplibre.nativeffi.render.RenderResult
 
 /**
  * The Choreographer-paced render loop.
@@ -96,9 +97,13 @@ internal class AndroidMapView(context: Context) :
         state.pollEvents()
         val target = ensureRenderTarget(state)
         if (target != null && state.renderRequest.consume()) {
-          if (target.renderUpdate()) {
+          val result = target.renderUpdate()
+          if (result?.disposition == RenderResult.RENDERED) {
             contextRebuildSpent = false
             finishPendingDrawing()
+            // The result carries the map's own follow-up demand, so an ongoing transition needs no
+            // runtime event round trip.
+            if (result.needsRepaint) state.renderRequest.set()
           } else {
             state.renderRequest.set()
           }
@@ -144,8 +149,10 @@ internal class AndroidMapView(context: Context) :
       Log.i(TAG, "render-target=native-surface status=${nextGraphics.backendName}")
     }
     if (mapState == null) {
-      mapState = MapState(nextViewport, ::requestRender)
-    } else {
+      mapState = MapState(nextViewport, ::startLoopIfReady)
+    } else if (renderTarget == null) {
+      // With no session attached the map is the only extent authority; a live session carries the
+      // extent through followSurface below.
       mapState?.resize(nextViewport)
     }
     followSurface("surface available")
@@ -170,8 +177,9 @@ internal class AndroidMapView(context: Context) :
     val currentGraphics = graphics ?: return
     val currentViewport = viewport?.takeUnless { it.isEmpty } ?: return
     val target = renderTarget ?: return
+    val state = mapState ?: return
     try {
-      target.resize(currentGraphics, currentViewport)
+      target.resize(state.map, currentGraphics, currentViewport)
     } catch (error: RuntimeException) {
       // A failed handover may leave the session naming a destroyed surface, so close it here; the
       // next surface attaches a new one.
@@ -205,7 +213,13 @@ internal class AndroidMapView(context: Context) :
   }
 
   private fun detachSurface() {
-    renderTarget?.close()
+    // Reached from surfaceDestroyed and onDetachedFromWindow, where a throw would escape into the
+    // platform and leave the graphics context leaked.
+    try {
+      renderTarget?.close()
+    } catch (error: RuntimeException) {
+      Log.w(TAG, "closing the render session failed", error)
+    }
     renderTarget = null
     graphics?.close()
     graphics = null

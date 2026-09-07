@@ -1,18 +1,71 @@
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.Callback;
 using Maplibre.NativeFfi.Log;
+using Maplibre.NativeFfi.Map;
+using Maplibre.NativeFfi.Runtime;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
 
 public sealed class LoggingTests
 {
+    // MapLibre logs a style load that names an unservable scheme, which drives the installed
+    // registration the way a host's own workload would.
     [BindingSpecTest("BND-120")]
     [Fact]
-    public void CanInstallAndClearLogCallback()
+    public void AnInstalledCallbackReceivesRecordsUntilReplacedAndThenCleared()
     {
-        Maplibre.SetLogCallback(_ => true);
-        Maplibre.ClearLogCallback();
+        var first = new List<LogRecord>();
+        var second = new List<LogRecord>();
+        try
+        {
+            Maplibre.SetLogCallback(record =>
+            {
+                lock (first)
+                    first.Add(record);
+                return true;
+            });
+            DriveAFailedStyleLoad("first-logged-scheme");
+            Assert.Contains(Copy(first), record => Names(record, "first-logged-scheme"));
+
+            Maplibre.SetLogCallback(record =>
+            {
+                lock (second)
+                    second.Add(record);
+                return false;
+            });
+            DriveAFailedStyleLoad("second-logged-scheme");
+            Assert.Contains(Copy(second), record => Names(record, "second-logged-scheme"));
+            Assert.DoesNotContain(Copy(first), record => Names(record, "second-logged-scheme"));
+
+            Maplibre.ClearLogCallback();
+            DriveAFailedStyleLoad("third-logged-scheme");
+            Assert.DoesNotContain(Copy(second), record => Names(record, "third-logged-scheme"));
+        }
+        finally
+        {
+            Maplibre.ClearLogCallback();
+        }
+    }
+
+    private static bool Names(LogRecord record, string scheme) =>
+        record.Message.Contains(scheme, StringComparison.Ordinal);
+
+    private static LogRecord[] Copy(List<LogRecord> records)
+    {
+        lock (records)
+            return [.. records];
+    }
+
+    // Loads a style whose scheme no provider serves, and returns once the map reports the
+    // failure, so every log record the load produced has been dispatched.
+    private static void DriveAFailedStyleLoad(string scheme)
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 64, Height = 64 });
+
+        _ = map.SetStyleUrlAsync($"{scheme}://style.json");
+        RuntimeEventTestHelpers.WaitForMapEvent(runtime, map, RuntimeEventType.MapLoadingFailed);
     }
 
     [BindingSpecTest("BND-020")]

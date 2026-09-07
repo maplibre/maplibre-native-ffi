@@ -16,8 +16,6 @@ const char* app_error_name(app_error error) {
       return "style load failed";
     case APP_ERROR_CAMERA_COMMAND_FAILED:
       return "camera command failed";
-    case APP_ERROR_MAP_RESIZE_FAILED:
-      return "map resize failed";
     case APP_ERROR_TEXTURE_RESIZE_FAILED:
       return "texture resize failed";
     case APP_ERROR_TEXTURE_RENDER_FAILED:

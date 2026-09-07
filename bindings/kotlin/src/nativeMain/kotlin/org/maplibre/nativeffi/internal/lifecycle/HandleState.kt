@@ -4,6 +4,10 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.ref.Cleaner
 import kotlin.native.ref.createCleaner
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.internal.status.Status
 
 /** Shared closed-state bookkeeping for native handles. */
 @OptIn(ExperimentalAtomicApi::class, ExperimentalNativeApi::class)
@@ -20,12 +24,12 @@ internal class HandleState<T : NativeHandle>(
 
   fun requireLive(): T {
     core.requireLive()
-    return handle ?: throw org.maplibre.nativeffi.internal.status.Status.released(typeName)
+    return handle ?: throw Status.released(typeName)
   }
 
   /** Runs [block] after checking that this wrapper still owns the handle. */
   fun <R> withLive(block: (T) -> R): R = core.withLive {
-    val live = handle ?: throw org.maplibre.nativeffi.internal.status.Status.released(typeName)
+    val live = handle ?: throw Status.released(typeName)
     block(live)
   }
 
@@ -33,12 +37,16 @@ internal class HandleState<T : NativeHandle>(
 
   fun handleId(): Long = core.handleId()
 
-  fun beginClose(): Boolean = core.beginClose()
-
-  fun handleForClose(): T =
-    handle ?: throw org.maplibre.nativeffi.internal.status.Status.released(typeName)
+  fun handleForClose(): T = handle ?: throw Status.released(typeName)
 
   fun abortClose() = core.abortClose()
+
+  fun claimRetirement(claim: CompletableDeferred<Unit>): Deferred<Unit> =
+    core.claimRetirement(claim)
+
+  fun abandonRetirement(claim: CompletableDeferred<Unit>) {
+    core.abandonRetirement(claim)
+  }
 
   fun completeClose(afterSuccess: () -> Unit = {}) {
     core.completeClose {
@@ -55,10 +63,7 @@ internal class HandleState<T : NativeHandle>(
     val live =
       handle
         ?: run {
-          core.closeOnce(
-            { org.maplibre.nativeffi.error.MaplibreStatus.OK.nativeCode },
-            afterSuccess,
-          )
+          core.closeOnce({ MaplibreStatus.OK.nativeCode }, afterSuccess)
           return
         }
     core.closeOnce({ destroy(live) }) {

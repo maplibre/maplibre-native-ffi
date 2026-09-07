@@ -35,6 +35,22 @@ public sealed class NativeStatusTests
         MaplibreStatus.NativeError,
         typeof(NativeErrorException)
     )]
+    [InlineData((int)mln_status.MLN_STATUS_BUSY, MaplibreStatus.Busy, typeof(MaplibreException))]
+    [InlineData(
+        (int)mln_status.MLN_STATUS_TARGET_LOST,
+        MaplibreStatus.TargetLost,
+        typeof(MaplibreException)
+    )]
+    [InlineData(
+        (int)mln_status.MLN_STATUS_NOT_READY,
+        MaplibreStatus.NotReady,
+        typeof(MaplibreException)
+    )]
+    [InlineData(
+        (int)mln_status.MLN_STATUS_NOT_FOUND,
+        MaplibreStatus.NotFound,
+        typeof(MaplibreException)
+    )]
     public void NativeStatusesMapToPublicExceptionCategories(
         int rawStatus,
         MaplibreStatus expectedStatus,
@@ -79,14 +95,6 @@ public sealed class NativeStatusTests
         Assert.Equal(MaplibreStatus.Unknown, error.Status);
         Assert.Equal(-12_345, error.RawStatus);
         Assert.Equal("future status", error.Diagnostic);
-    }
-
-    [Fact]
-    public void RenderDriverStatusesRemainDistinct()
-    {
-        Assert.Equal(MaplibreStatus.Busy, NativeStatus.StatusFromRaw(-7));
-        Assert.Equal(MaplibreStatus.TargetLost, NativeStatus.StatusFromRaw(-8));
-        Assert.Equal(MaplibreStatus.NotReady, NativeStatus.StatusFromRaw(-9));
     }
 
     [BindingSpecTest("BND-022")]

@@ -88,6 +88,12 @@ internal object MapStructs {
 
   fun animationOptions(value: AnimationOptions, scope: MemScope): CPointer<mln_animation_options> {
     val native = scope.alloc<mln_animation_options>()
+    writeAnimationOptions(native, value)
+    return native.ptr
+  }
+
+  /** Writes [value] over an animation-options field of a larger struct. */
+  fun writeAnimationOptions(native: mln_animation_options, value: AnimationOptions) {
     mln_animation_options_default().place(native.ptr)
     value.durationMs?.let {
       native.fields = native.fields or MLN_ANIMATION_OPTION_DURATION
@@ -112,11 +118,16 @@ internal object MapStructs {
       native.fields = native.fields or MLN_ANIMATION_OPTION_TRANSITION_ID
       native.transition_id = it.toULong()
     }
-    return native.ptr
   }
 
   fun cameraOptions(value: CameraOptions, scope: MemScope): CPointer<mln_camera_options> {
     val native = scope.alloc<mln_camera_options>()
+    writeCameraOptions(native, value)
+    return native.ptr
+  }
+
+  /** Writes [value] over a camera-options field of a larger struct. */
+  fun writeCameraOptions(native: mln_camera_options, value: CameraOptions) {
     mln_camera_options_default().place(native.ptr)
     value.center?.let {
       native.fields = native.fields or MLN_CAMERA_OPTION_CENTER
@@ -159,7 +170,6 @@ internal object MapStructs {
       native.fields = native.fields or MLN_CAMERA_OPTION_FOV
       native.field_of_view = it
     }
-    return native.ptr
   }
 
   fun cameraFitOptions(value: CameraFitOptions, scope: MemScope): CPointer<mln_camera_fit_options> {

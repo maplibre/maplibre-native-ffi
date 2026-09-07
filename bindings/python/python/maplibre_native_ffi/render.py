@@ -6,17 +6,19 @@ from collections.abc import Callable
 from concurrent.futures import Future
 from dataclasses import dataclass, field
 from enum import IntFlag
-from typing import Any, cast
+from typing import Any, ClassVar, Self, cast
 
 from . import _native
 from ._enum import UnknownIntEnum
 from ._future import map_future
-from ._lifecycle import NativeHandleMixin
+from ._lifecycle import ContextHandleMixin, NativeHandleMixin, WarnUnclosedMixin
+from .errors import InvalidStateError
 from .query import (
     QueriedFeature,
     RenderedFeatureQueryOptions,
     RenderedQueryGeometry,
     SourceFeatureQueryOptions,
+    _geometry_to_native_wire,
 )
 
 _RENDER_SESSION_HANDLE_CREATE_KEY = object()
@@ -24,14 +26,6 @@ _METAL_FRAME_HANDLE_CREATE_KEY = object()
 _VULKAN_FRAME_HANDLE_CREATE_KEY = object()
 _OPENGL_FRAME_HANDLE_CREATE_KEY = object()
 _WEBGPU_FRAME_HANDLE_CREATE_KEY = object()
-
-
-def _identity(value: object) -> object:
-    return value
-
-
-def _cast_bytes(value: object) -> bytes:
-    return cast(bytes, value)
 
 
 def _cast_queried_features(value: object) -> list[QueriedFeature]:
@@ -92,7 +86,11 @@ class FrameDemandFlag(IntFlag):
     """Frame-demand policy bits."""
 
     IF_NEEDED = 1 << 0
+    """Render only when a newer map update exists."""
     PRESENT = 1 << 1
+    """Present the rendered frame on a target that supports presentation. A
+    presenting target whose demand clears this bit still renders and keeps
+    whatever it presented last. Targets without presentation ignore it."""
 
 
 class RenderSessionCapability(IntFlag):
@@ -185,9 +183,7 @@ class NativePointer:
     def _require_live(self) -> None:
         if self._is_live is None or self._is_live():
             return
-        from .errors import InvalidStateError
-
-        raise InvalidStateError(None, f"{self._diagnostic_name} is no longer live")
+        raise InvalidStateError(f"{self._diagnostic_name} is no longer live")
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, NativePointer):
@@ -239,9 +235,7 @@ class VulkanHandle:
     def _require_live(self) -> None:
         if self._is_live is None or self._is_live():
             return
-        from .errors import InvalidStateError
-
-        raise InvalidStateError(None, f"{self._diagnostic_name} is no longer live")
+        raise InvalidStateError(f"{self._diagnostic_name} is no longer live")
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, VulkanHandle):
@@ -272,9 +266,7 @@ class FrameOpenGLTextureName:
         """Return the texture object name while its frame is still live."""
         if self._is_live():
             return self._texture
-        from .errors import InvalidStateError
-
-        raise InvalidStateError(None, "OpenGL texture is no longer live")
+        raise InvalidStateError("OpenGL texture is no longer live")
 
     def __int__(self) -> int:
         return self.value
@@ -322,7 +314,11 @@ class RenderSessionAttachOptions:
 
 @dataclass(frozen=True, slots=True)
 class FrameDemand:
-    """One nonblocking frame request."""
+    """One nonblocking frame request.
+
+    The default is the C API's own default demand: render only when a newer
+    map update exists, and do not present.
+    """
 
     flags: FrameDemandFlag = FrameDemandFlag.IF_NEEDED
     token: int = 0
@@ -810,7 +806,6 @@ class RenderSessionHandle(NativeHandleMixin):
             raise TypeError(msg)
         self._native = native
         self._map: MapHandle | None = map_handle
-        self._runtime = map_handle._runtime
 
     @classmethod
     def _from_native(cls, native: Any, map_handle: MapHandle) -> RenderSessionHandle:
@@ -821,21 +816,10 @@ class RenderSessionHandle(NativeHandleMixin):
         self._native.close()
         self._map = None
 
-    def _future(
-        self,
-        start: Callable[..., Future[Any]],
-        adapt_result: Callable[[Any], Any] | None = None,
-        *args: object,
-    ) -> Future[Any]:
-        source = start(*args)
-        return source if adapt_result is None else map_future(source, adapt_result)
-
-    @property
     def capabilities(self) -> RenderSessionCapabilities:
         """Return capabilities fixed during attachment."""
         return RenderSessionCapabilities._from_native(self._native.capabilities())
 
-    @property
     def snapshot(self) -> RenderSessionSnapshot:
         """Return the latest state and generation snapshot."""
         return RenderSessionSnapshot._from_native(self._native.snapshot())
@@ -850,7 +834,11 @@ class RenderSessionHandle(NativeHandleMixin):
         )
 
     def drain_frame_results(self) -> list[RenderFrameResult]:
-        """Drain an owned batch of terminal frame-demand results."""
+        """Drain this session's terminal frame-demand results.
+
+        :class:`NotReadyError` reports an empty queue. It is a poll result
+        rather than a failure.
+        """
         return [
             RenderFrameResult._from_native(raw)
             for raw in self._native.drain_frame_results()
@@ -864,18 +852,17 @@ class RenderSessionHandle(NativeHandleMixin):
         """Start an ordered logical resize.
 
         The session keeps its renderer, along with the tile pyramid, glyph and
-        image atlases, and symbol placement. A new scale factor retires the
-        renderer instead, because shaders are compiled for one pixel ratio.
-        Map-owned feature state survives either way. The same scale-factor
-        rule applies to every ``set_*_target`` method.
+        image atlases, and symbol placement, and map-owned feature state is
+        unchanged. The scale factor is fixed when the session attaches, because
+        shaders are compiled for one pixel ratio: another value raises
+        :class:`InvalidArgumentError`, and changing it takes a new session.
+
+        This is the extent authority for an attached session: it applies the
+        extent to the target and submits the matching map resize. A session
+        whose target is a caller-owned texture is sized by its owner instead,
+        and reports :class:`UnsupportedFeatureError` here.
         """
-        return self._future(
-            self._native.resize,
-            None,
-            extent.width,
-            extent.height,
-            extent.scale_factor,
-        )
+        return self._native.resize(extent.width, extent.height, extent.scale_factor)
 
     def barrier(self) -> Future[None]:
         """Start a barrier for previously accepted render work."""
@@ -910,14 +897,7 @@ class RenderSessionHandle(NativeHandleMixin):
         *args: object,
     ) -> Future[None]:
         extent = descriptor.extent
-        return self._future(
-            start,
-            None,
-            extent.width,
-            extent.height,
-            extent.scale_factor,
-            *args,
-        )
+        return start(extent.width, extent.height, extent.scale_factor, *args)
 
     def set_metal_surface_target(
         self, descriptor: MetalSurfaceDescriptor
@@ -925,9 +905,13 @@ class RenderSessionHandle(NativeHandleMixin):
         """Start an ordered Metal surface replacement.
 
         The session keeps its renderer, along with the tile pyramid, atlases,
-        and symbol placement. Map-owned feature state is unchanged. The
-        descriptor's extent applies as a resize does. The session assigns the
-        layer its own device and pixel format.
+        and symbol placement, and map-owned feature state is unchanged. The
+        session assigns the layer its own device and pixel format.
+
+        A replacement changes the graphics resource only: the descriptor's
+        extent sizes the new target, and the map takes it from a later
+        :meth:`resize` or :meth:`MapHandle.resize`. The scale factor is fixed
+        at attachment, as it is for :meth:`resize`.
         """
         return self._set_target(
             self._native.set_metal_surface_target,
@@ -1052,8 +1036,8 @@ class RenderSessionHandle(NativeHandleMixin):
         self,
     ) -> Future[PremultipliedRgba8Image]:
         """Start readback of the latest rendered texture frame."""
-        return self._future(
-            self._native.read_premultiplied_rgba8,
+        return map_future(
+            self._native.read_premultiplied_rgba8(),
             PremultipliedRgba8Image._from_native,
         )
 
@@ -1063,14 +1047,13 @@ class RenderSessionHandle(NativeHandleMixin):
         options: RenderedFeatureQueryOptions | None = None,
     ) -> Future[list[QueriedFeature]]:
         """Start a rendered-feature query."""
-        from .query import _geometry_to_native_wire
-
-        return self._future(
-            self._native.query_rendered_features,
+        return map_future(
+            self._native.query_rendered_features(
+                _geometry_to_native_wire(geometry),
+                options.layer_ids if options is not None else None,
+                options.filter if options is not None else None,
+            ),
             _cast_queried_features,
-            _geometry_to_native_wire(geometry),
-            options.layer_ids if options is not None else None,
-            options.filter if options is not None else None,
         )
 
     def query_source_features(
@@ -1079,12 +1062,13 @@ class RenderSessionHandle(NativeHandleMixin):
         options: SourceFeatureQueryOptions | None = None,
     ) -> Future[list[QueriedFeature]]:
         """Start a source-feature query."""
-        return self._future(
-            self._native.query_source_features,
+        return map_future(
+            self._native.query_source_features(
+                source_id,
+                options.source_layer_ids if options is not None else None,
+                options.filter if options is not None else None,
+            ),
             _cast_queried_features,
-            source_id,
-            options.source_layer_ids if options is not None else None,
-            options.filter if options is not None else None,
         )
 
     def query_feature_extensions(
@@ -1096,14 +1080,8 @@ class RenderSessionHandle(NativeHandleMixin):
         arguments: bytes | None = None,
     ) -> Future[bytes]:
         """Start a feature-extension query."""
-        return self._future(
-            self._native.query_feature_extensions,
-            _cast_bytes,
-            source_id,
-            feature,
-            extension,
-            extension_field,
-            arguments,
+        return self._native.query_feature_extensions(
+            source_id, feature, extension, extension_field, arguments
         )
 
     def acquire_metal_owned_texture_frame(self) -> MetalOwnedTextureFrameHandle:
@@ -1131,17 +1109,26 @@ class RenderSessionHandle(NativeHandleMixin):
         )
 
 
-class _AcquiredFrameHandle:
-    def __init__(
-        self,
-        native: Any,
-        create_key: object,
-        expected_key: object,
-    ) -> None:
-        if create_key is not expected_key:
+class _AcquiredFrameHandle(WarnUnclosedMixin, ContextHandleMixin):
+    """One acquired texture-slot lease.
+
+    A lease holds one slot of the session's texture ring, and the session
+    renders into the remaining slots. Leaving a ``with`` block releases the
+    lease with a CPU-complete sync. A lease that reaches garbage collection
+    still held reports a ``ResourceWarning``.
+    """
+
+    _create_key: ClassVar[object]
+
+    def __init__(self, native: Any, *, _create_key: object | None = None) -> None:
+        if _create_key is not type(self)._create_key:
             msg = "acquired frame handles are created by RenderSessionHandle"
             raise TypeError(msg)
         self._native = native
+
+    @classmethod
+    def _from_native(cls, native: Any) -> Self:
+        return cls(native, _create_key=cls._create_key)
 
     @property
     def closed(self) -> bool:
@@ -1166,21 +1153,17 @@ class _AcquiredFrameHandle:
             consumer_completion.value,
         )
 
+    def close(self) -> None:
+        """Release this lease with a CPU-complete consumer sync, once."""
+        if not self.closed:
+            self.release()
+
 
 class MetalOwnedTextureFrameHandle(_AcquiredFrameHandle):
     """Acquired Metal texture-slot lease."""
 
-    def __init__(
-        self,
-        native: Any,
-        *,
-        _create_key: object | None = None,
-    ) -> None:
-        super().__init__(native, _create_key, _METAL_FRAME_HANDLE_CREATE_KEY)
-
-    @classmethod
-    def _from_native(cls, native: Any) -> MetalOwnedTextureFrameHandle:
-        return cls(native, _create_key=_METAL_FRAME_HANDLE_CREATE_KEY)
+    _handle_name = "MetalOwnedTextureFrameHandle"
+    _create_key = _METAL_FRAME_HANDLE_CREATE_KEY
 
     @property
     def frame(self) -> MetalOwnedTextureFrame:
@@ -1209,17 +1192,8 @@ class MetalOwnedTextureFrameHandle(_AcquiredFrameHandle):
 class VulkanOwnedTextureFrameHandle(_AcquiredFrameHandle):
     """Acquired Vulkan texture-slot lease."""
 
-    def __init__(
-        self,
-        native: Any,
-        *,
-        _create_key: object | None = None,
-    ) -> None:
-        super().__init__(native, _create_key, _VULKAN_FRAME_HANDLE_CREATE_KEY)
-
-    @classmethod
-    def _from_native(cls, native: Any) -> VulkanOwnedTextureFrameHandle:
-        return cls(native, _create_key=_VULKAN_FRAME_HANDLE_CREATE_KEY)
+    _handle_name = "VulkanOwnedTextureFrameHandle"
+    _create_key = _VULKAN_FRAME_HANDLE_CREATE_KEY
 
     @property
     def frame(self) -> VulkanOwnedTextureFrame:
@@ -1257,17 +1231,8 @@ class VulkanOwnedTextureFrameHandle(_AcquiredFrameHandle):
 class WebGPUOwnedTextureFrameHandle(_AcquiredFrameHandle):
     """Acquired WebGPU texture-slot lease."""
 
-    def __init__(
-        self,
-        native: Any,
-        *,
-        _create_key: object | None = None,
-    ) -> None:
-        super().__init__(native, _create_key, _WEBGPU_FRAME_HANDLE_CREATE_KEY)
-
-    @classmethod
-    def _from_native(cls, native: Any) -> WebGPUOwnedTextureFrameHandle:
-        return cls(native, _create_key=_WEBGPU_FRAME_HANDLE_CREATE_KEY)
+    _handle_name = "WebGPUOwnedTextureFrameHandle"
+    _create_key = _WEBGPU_FRAME_HANDLE_CREATE_KEY
 
     @property
     def frame(self) -> WebGPUOwnedTextureFrame:
@@ -1305,17 +1270,8 @@ class WebGPUOwnedTextureFrameHandle(_AcquiredFrameHandle):
 class OpenGLOwnedTextureFrameHandle(_AcquiredFrameHandle):
     """Acquired OpenGL texture-slot lease."""
 
-    def __init__(
-        self,
-        native: Any,
-        *,
-        _create_key: object | None = None,
-    ) -> None:
-        super().__init__(native, _create_key, _OPENGL_FRAME_HANDLE_CREATE_KEY)
-
-    @classmethod
-    def _from_native(cls, native: Any) -> OpenGLOwnedTextureFrameHandle:
-        return cls(native, _create_key=_OPENGL_FRAME_HANDLE_CREATE_KEY)
+    _handle_name = "OpenGLOwnedTextureFrameHandle"
+    _create_key = _OPENGL_FRAME_HANDLE_CREATE_KEY
 
     @property
     def frame(self) -> OpenGLOwnedTextureFrame:

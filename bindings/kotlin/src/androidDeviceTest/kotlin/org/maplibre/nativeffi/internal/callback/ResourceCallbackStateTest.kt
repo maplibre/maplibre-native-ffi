@@ -16,81 +16,74 @@ import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceProviderDecision
 import org.maplibre.nativeffi.resource.ResourceRequest
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class ResourceCallbackStateTest {
   @Test
-  fun providerCopiesResourceRequestAndUnknownRawEnums(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      var copied: ResourceRequest? = null
-      ResourceProviderState(
-          ResourceProviderCallback { request, _ ->
-            copied = request
-            ResourceProviderDecision.PASS_THROUGH
-          }
-        )
-        .use { state ->
-          withRequest { request ->
-            assertEquals(
-              ResourceProviderDecision.PASS_THROUGH.nativeValue,
-              state.invoke(request, 1),
-            )
-          }
+  fun providerCopiesResourceRequestAndUnknownRawEnums(): Unit = runSuspendTest {
+    var copied: ResourceRequest? = null
+    ResourceProviderState(
+        ResourceProviderCallback { request, _ ->
+          copied = request
+          ResourceProviderDecision.PASS_THROUGH
         }
-      assertEquals("maplibre://tiles/2/1/1.pbf", copied?.requestedUrl)
-      assertEquals("https://example.com/tile.pbf", copied?.resolvedUrl)
-      assertEquals(900, copied?.kind?.nativeValue)
-      assertEquals(901, copied?.loadingMethod?.nativeValue)
-    }
+      )
+      .use { state ->
+        withRequest { request ->
+          assertEquals(ResourceProviderDecision.PASS_THROUGH.nativeValue, state.invoke(request, 1))
+        }
+      }
+    assertEquals("maplibre://tiles/2/1/1.pbf", copied?.requestedUrl)
+    assertEquals("https://example.com/tile.pbf", copied?.resolvedUrl)
+    assertEquals(900, copied?.kind?.nativeValue)
+    assertEquals(901, copied?.loadingMethod?.nativeValue)
+  }
 
   @Test
-  fun providerClosureDuringAndConcurrentWithCallbacksRejectsLaterEntry(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      lateinit var reentrant: ResourceProviderState
-      reentrant =
-        ResourceProviderState(
-          ResourceProviderCallback { _, _ ->
-            reentrant.close()
-            ResourceProviderDecision.PASS_THROUGH
-          }
-        )
-      withRequest { request ->
-        assertEquals(
-          ResourceProviderDecision.PASS_THROUGH.nativeValue,
-          reentrant.invoke(request, 1),
-        )
-        assertTrue(reentrant.isClosedForTesting())
-        assertEquals(-1, reentrant.invoke(request, 1))
-      }
-
-      val entered = CountDownLatch(1)
-      val release = CountDownLatch(1)
-      val state =
-        ResourceProviderState(
-          ResourceProviderCallback { _, _ ->
-            entered.countDown()
-            release.await(5, TimeUnit.SECONDS)
-            ResourceProviderDecision.PASS_THROUGH
-          }
-        )
-      withRequest { request ->
-        val invocation = thread { state.invoke(request, 2) }
-        assertTrue(entered.await(5, TimeUnit.SECONDS))
-        val closed = CountDownLatch(1)
-        val closer = thread {
-          state.close()
-          closed.countDown()
+  fun providerClosureDuringAndConcurrentWithCallbacksRejectsLaterEntry(): Unit = runSuspendTest {
+    lateinit var reentrant: ResourceProviderState
+    reentrant =
+      ResourceProviderState(
+        ResourceProviderCallback { _, _ ->
+          reentrant.close()
+          ResourceProviderDecision.PASS_THROUGH
         }
-        assertFalse(closed.await(50, TimeUnit.MILLISECONDS))
-        release.countDown()
-        invocation.join()
-        closer.join()
-        assertTrue(state.isClosedForTesting())
-      }
+      )
+    withRequest { request ->
+      assertEquals(ResourceProviderDecision.PASS_THROUGH.nativeValue, reentrant.invoke(request, 1))
+      assertTrue(reentrant.isClosedForTesting())
+      assertEquals(-1, reentrant.invoke(request, 1))
     }
+
+    val entered = CountDownLatch(1)
+    val release = CountDownLatch(1)
+    val state =
+      ResourceProviderState(
+        ResourceProviderCallback { _, _ ->
+          entered.countDown()
+          release.await(5, TimeUnit.SECONDS)
+          ResourceProviderDecision.PASS_THROUGH
+        }
+      )
+    withRequest { request ->
+      val invocation = thread { state.invoke(request, 2) }
+      assertTrue(entered.await(5, TimeUnit.SECONDS))
+      val closed = CountDownLatch(1)
+      val closer = thread {
+        state.close()
+        closed.countDown()
+      }
+      assertFalse(closed.await(50, TimeUnit.MILLISECONDS))
+      release.countDown()
+      invocation.join()
+      closer.join()
+      assertTrue(state.isClosedForTesting())
+    }
+  }
 
   @Test
   fun resourceTransformCopiesUnknownKindsContainsFailuresAndClosesDuringCallback(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
+    runSuspendTest {
       var copiedKind: ResourceKind? = null
       lateinit var state: ResourceTransformState
       state =

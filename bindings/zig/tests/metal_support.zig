@@ -1,3 +1,5 @@
+const maplibre = @import("maplibre_native_ffi");
+
 pub const AutoreleasePool = struct {
     token: *anyopaque,
 
@@ -54,4 +56,43 @@ pub fn createCountingWindowLayer(width: u32, height: u32) !WindowLayer {
         return error.MetalLayerUnavailable;
     }
     return window_layer;
+}
+
+/// Caller-owned Metal texture for a borrowed-texture session.
+pub const BorrowedTexture = extern struct {
+    device: ?*anyopaque,
+    texture: ?*anyopaque,
+    width: u32,
+    height: u32,
+
+    pub fn deinit(self: *BorrowedTexture) void {
+        mln_zig_test_destroy_metal_texture(self);
+    }
+
+    pub fn descriptor(self: BorrowedTexture, extent: maplibre.RenderTargetExtent) maplibre.MetalBorrowedTextureDescriptor {
+        return .{
+            .extent = extent,
+            .physical_width = self.width,
+            .physical_height = self.height,
+            .texture = maplibre.NativePointer.fromPtr(self.texture.?),
+        };
+    }
+
+    pub fn hasNonZeroPixel(self: BorrowedTexture) !bool {
+        var found = false;
+        if (!mln_zig_test_metal_texture_has_non_zero_pixel(&self, &found)) return error.MetalTextureUnavailable;
+        return found;
+    }
+};
+
+extern "c" fn mln_zig_test_create_metal_texture(width: u32, height: u32, out_texture: *BorrowedTexture) bool;
+extern "c" fn mln_zig_test_metal_texture_has_non_zero_pixel(owned_texture: *const BorrowedTexture, out_has_non_zero: *bool) bool;
+extern "c" fn mln_zig_test_destroy_metal_texture(owned_texture: *BorrowedTexture) void;
+
+pub fn createBorrowedTexture(width: u32, height: u32) !BorrowedTexture {
+    var texture = BorrowedTexture{ .device = null, .texture = null, .width = width, .height = height };
+    if (!mln_zig_test_create_metal_texture(width, height, &texture) or texture.texture == null) {
+        return error.MetalTextureUnavailable;
+    }
+    return texture;
 }

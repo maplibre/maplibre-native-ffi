@@ -7,6 +7,7 @@
 #include <SDL3/SDL.h>
 #include <maplibre_native_c.h>
 
+#include "../render_target.h"
 #include "../types.h"
 
 typedef struct render_target render_target;
@@ -39,8 +40,8 @@ void render_target_frame_scope_close(void* scope);
   render_target_mode mode
 );
 
-/// Attaches a render session to the live map. The calling render-loop thread
-/// remains the session's graphics-affine thread for its whole life.
+/// Attaches a render session to the live map on the render-loop thread, which
+/// owns the graphics context the session drives.
 [[nodiscard]] app_error render_target_attach(
   render_target* target, mln_map map, viewport current_viewport
 );
@@ -49,8 +50,18 @@ void render_target_frame_scope_close(void* scope);
 /// no session attached.
 void render_target_deinit(render_target* target);
 
+/// Starts the session resize or target replacement a new viewport needs and
+/// returns without waiting. The render loop drives it through
+/// render_target_poll_pending().
 [[nodiscard]] app_error render_target_resize(
   render_target* target, viewport current_viewport
+);
+
+/// Services caller-driver work, releases anything a completed target
+/// replacement retired, and reports whether an ordered submission is still
+/// outstanding. The render loop holds frame demand back while one is.
+[[nodiscard]] app_error render_target_poll_pending(
+  render_target* target, bool* out_pending
 );
 
 /// Runs once per render loop iteration, before the render request is consumed:
@@ -58,9 +69,10 @@ void render_target_deinit(render_target* target);
 [[nodiscard]] app_error render_target_finish_frame(render_target* target);
 
 /// Consumes one render request: renders, composites when the mode needs it,
-/// and presents. Reports whether the session rendered an update.
+/// and presents. Reports the demand's outcome.
 [[nodiscard]] app_error render_target_render_update(
-  render_target* target, viewport current_viewport, bool* out_rendered
+  render_target* target, viewport current_viewport,
+  render_frame_outcome* out_outcome
 );
 
 #endif  // C_MAP_RENDER_RENDER_H

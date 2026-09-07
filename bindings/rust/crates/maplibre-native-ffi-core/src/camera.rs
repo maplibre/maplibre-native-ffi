@@ -731,4 +731,77 @@ mod tests {
         );
         assert_eq!(projection_mode_from_native(raw_projection), projection);
     }
+
+    #[test]
+    // Spec coverage: BND-060 and BND-061.
+    fn camera_updates_and_deltas_map_every_mode_phase_and_kind() {
+        for (mode, raw_mode) in [
+            (CameraUpdateMode::Jump, sys::MLN_CAMERA_UPDATE_MODE_JUMP),
+            (CameraUpdateMode::Ease, sys::MLN_CAMERA_UPDATE_MODE_EASE),
+            (CameraUpdateMode::Fly, sys::MLN_CAMERA_UPDATE_MODE_FLY),
+        ] {
+            for (phase, raw_phase) in [
+                (GesturePhase::None, sys::MLN_GESTURE_PHASE_NONE),
+                (GesturePhase::Begin, sys::MLN_GESTURE_PHASE_BEGIN),
+                (GesturePhase::Update, sys::MLN_GESTURE_PHASE_UPDATE),
+                (GesturePhase::End, sys::MLN_GESTURE_PHASE_END),
+                (GesturePhase::Cancel, sys::MLN_GESTURE_PHASE_CANCEL),
+            ] {
+                let update = CameraUpdate {
+                    mode,
+                    gesture_phase: phase,
+                    animation: AnimationOptions {
+                        transition_id: Some(9),
+                        ..AnimationOptions::default()
+                    },
+                    ..CameraUpdate::default()
+                };
+                let raw = update.to_native();
+
+                assert_eq!(
+                    raw.size,
+                    std::mem::size_of::<sys::mln_camera_update>() as u32
+                );
+                assert_eq!(raw.mode, raw_mode);
+                assert_eq!(raw.gesture_phase, raw_phase);
+                assert_ne!(
+                    raw.animation.fields & sys::MLN_ANIMATION_OPTION_TRANSITION_ID,
+                    0
+                );
+                assert_eq!(raw.animation.transition_id, 9);
+            }
+        }
+
+        for (kind, raw_kind) in [
+            (CameraDeltaKind::Move, sys::MLN_CAMERA_DELTA_MOVE),
+            (CameraDeltaKind::Scale, sys::MLN_CAMERA_DELTA_SCALE),
+            (CameraDeltaKind::Bearing, sys::MLN_CAMERA_DELTA_BEARING),
+            (CameraDeltaKind::Pitch, sys::MLN_CAMERA_DELTA_PITCH),
+        ] {
+            let mut delta = CameraDelta {
+                kind,
+                offset: ScreenPoint::new(3.0, -4.0),
+                amount: 1.5,
+                ..CameraDelta::default()
+            };
+            let raw = delta.to_native();
+
+            assert_eq!(
+                raw.size,
+                std::mem::size_of::<sys::mln_camera_delta>() as u32
+            );
+            assert_eq!(raw.kind, raw_kind);
+            assert_eq!(raw.offset.x, 3.0);
+            assert_eq!(raw.offset.y, -4.0);
+            assert_eq!(raw.amount, 1.5);
+            // An absent anchor leaves the anchor field unread.
+            assert!(!raw.has_anchor);
+
+            delta.anchor = Some(ScreenPoint::new(8.0, 9.0));
+            let anchored = delta.to_native();
+            assert!(anchored.has_anchor);
+            assert_eq!(anchored.anchor.x, 8.0);
+            assert_eq!(anchored.anchor.y, 9.0);
+        }
+    }
 }

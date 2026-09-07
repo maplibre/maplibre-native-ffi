@@ -13,33 +13,17 @@ public sealed class RuntimeExecutorTests
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = await MapHandle.CreateAsync(
             runtime,
-            new MapOptions { Width = 512, Height = 512 },
-            TestContext.Current.CancellationToken
+            new MapOptions { Width = 512, Height = 512 }
         );
 
-        map.SetStyleUrlAsync("unsupported://style.json");
-        await runtime.BarrierAsync();
+        _ = map.SetStyleUrlAsync("unsupported://style.json", TestContext.Current.CancellationToken);
+        await runtime.BarrierAsync(TestContext.Current.CancellationToken);
 
         RuntimeEventTestHelpers.WaitForMapEvent(runtime, map, RuntimeEventType.MapLoadingFailed);
     }
 
-    [BindingSpecTest("BND-089")]
-    [Fact]
-    public async Task CrossThreadCommandsProgressAutonomously()
-    {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = await MapHandle.CreateAsync(
-            runtime,
-            new MapOptions { Width = 512, Height = 512 },
-            TestContext.Current.CancellationToken
-        );
-
-        var completion = await Task.Run(map.RequestRepaintAsync);
-        await runtime.BarrierAsync();
-
-        Assert.Equal(CommandDisposition.Committed, completion.Disposition);
-    }
-
+    // A completion is delivered by the runtime itself, so a host that never drains events still
+    // observes every barrier it awaits.
     [Fact]
     public async Task RepeatedCompletionWaitsNeedNoEventDrain()
     {
@@ -47,7 +31,9 @@ public sealed class RuntimeExecutorTests
 
         for (var index = 0; index < 256; index++)
         {
-            await runtime.BarrierAsync();
+            await runtime.BarrierAsync(TestContext.Current.CancellationToken);
         }
+
+        Assert.Empty(runtime.DrainEvents());
     }
 }

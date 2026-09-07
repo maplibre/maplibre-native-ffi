@@ -25,10 +25,9 @@ readback.
 Execution placement is a separate choice. A core-worker driver owns a native
 serial graphics worker and requires transferable graphics state. A
 caller-graphics-thread driver stores work until the host services it where the
-graphics context is usable. WGL targets, EGL surfaces, shared EGL textures,
-existing WebGL contexts, and browser WebGPU require the caller driver.
-Transferable Metal and Vulkan targets, private EGL owned texture targets, and
-`OffscreenCanvas` WebGL targets can use a core worker.
+graphics context is usable. The
+[render session concepts](/maplibre-native-ffi/concepts/#render-session) table
+gives the driver that each target kind accepts.
 
 The common attach options select the driver and request an owned-texture ring
 depth from one to three. They also carry direct wake callbacks for frame-result
@@ -78,9 +77,11 @@ unchanged.
 
 <Code code={region(renderTarget, "set-target")} lang="c" title="render-target.c" />
 
-Changing the scale factor recreates the session's rendering resources because
-its shaders use a fixed pixel ratio. Map-owned feature state survives, and the
-next render update pushes it into the new renderer.
+A session's scale factor is fixed at attachment because its shaders use a fixed
+pixel ratio, so a resize that names a different one reports an invalid-argument
+status. Detach the session and attach a new one at the new scale factor.
+Map-owned feature state survives that, and the next render update pushes it into
+the new renderer.
 
 Normal detach completes asynchronously. The selected driver destroys graphics
 resources on its owner and detaches the map. Continue servicing a caller driver

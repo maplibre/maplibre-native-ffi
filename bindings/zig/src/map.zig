@@ -7,6 +7,7 @@ const native_temp = @import("native_temp.zig");
 const runtime_module = @import("runtime.zig");
 const RuntimeHandle = runtime_module.RuntimeHandle;
 const status = @import("status.zig");
+const sync = @import("sync.zig");
 const values = @import("values.zig");
 
 const CustomGeometrySourceState = struct {
@@ -14,7 +15,7 @@ const CustomGeometrySourceState = struct {
     cancel_tile: ?CustomGeometrySourceTileCallback,
     release_context: ?CustomGeometrySourceReleaseCallback,
     context: ?*anyopaque,
-    active_upcalls: std.atomic.Value(usize),
+    upcalls: sync.UpcallGate = .{},
 };
 
 const CustomMvtVectorSourceState = struct {
@@ -22,7 +23,7 @@ const CustomMvtVectorSourceState = struct {
     cancel_tile: ?CustomMvtVectorSourceTileCallback,
     release_context: ?CustomMvtVectorSourceReleaseCallback,
     context: ?*anyopaque,
-    active_upcalls: std.atomic.Value(usize),
+    upcalls: sync.UpcallGate = .{},
 };
 
 const MapState = struct {
@@ -31,13 +32,11 @@ const MapState = struct {
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     attached_render_sessions: std.atomic.Value(usize),
     closing: bool,
-    runtime: RuntimeHandle,
 };
 
 pub const RenderSessionRegistration = struct {
     native: c.mln_map,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
-    runtime: RuntimeHandle,
 };
 
 var custom_geometry_state_registry_lock = std.Io.Mutex.init;
@@ -181,6 +180,8 @@ pub const MapSnapshot = struct {
     free_camera: values.FreeCameraOptions,
     /// True once every requested style and tile resource finished loading.
     fully_loaded: bool,
+    /// True between a gesture-phase begin and its end or cancel.
+    gesture_in_progress: bool,
     rendering_stats_view_enabled: bool,
     repaint_demand: bool,
     event_mask: runtime_module.RuntimeEventMask,
@@ -192,25 +193,9 @@ pub const CanonicalTileId = struct {
     x: u32,
     y: u32,
 };
-pub const StyleSourceMetadata = struct {
-    source_type: values.StyleSourceType,
-    id_size: usize,
-    is_volatile: bool,
-    has_attribution: bool,
-    has_url: bool,
-    has_tile_json: bool,
-    min_zoom: f64,
-    max_zoom: f64,
-    scheme: values.StyleTileScheme,
-    bounds: ?values.LatLngBounds,
-    tile_count: usize,
-    tile_size: ?u32,
-    vector_encoding: ?values.StyleVectorTileEncoding,
-    raster_encoding: ?values.StyleRasterDemEncoding,
-};
-
-/// Fixed layer metadata returned by `MapHandle.getStyleLayerInfoTakeResult`.
+/// Fixed layer metadata copied by `MapHandle.getStyleLayerInfo`.
 pub const StyleLayerInfo = struct {
+    allocator: std.mem.Allocator,
     /// Style-spec layer type name. It views a static native string that stays
     /// valid for the life of the process.
     layer_type: []const u8,
@@ -219,12 +204,17 @@ pub const StyleLayerInfo = struct {
     /// Highest zoom at which the layer draws; +inf with no upper bound.
     max_zoom: f64,
     visibility: values.StyleLayerVisibility,
-    /// Source ID byte length, null when the layer names no source. It sizes
-    /// buffers for `copyLayerSourceId`.
-    source_id_size: ?usize,
-    /// Source-layer byte length, null when the layer names no source layer. It
-    /// sizes buffers for `copyLayerSourceLayer`.
-    source_layer_size: ?usize,
+    /// Source ID, null for a layer type that takes no source.
+    source_id: ?[]const u8,
+    /// Source-layer ID, null when the layer sets none.
+    source_layer: ?[]const u8,
+
+    pub fn deinit(self: *StyleLayerInfo) void {
+        if (self.source_id) |value| self.allocator.free(value);
+        if (self.source_layer) |value| self.allocator.free(value);
+        self.source_id = null;
+        self.source_layer = null;
+    }
 };
 
 pub const CustomGeometrySourceTileCallback = *const fn (
@@ -356,6 +346,10 @@ pub const MapHandle = enum(c.mln_map) {
         return completion.submitWithCopyContext(MapHandle, CopyContext, diagnostic_store, struct {
             fn copyResult(result: *const c.mln_completion_result, context: *CopyContext) status.Error!MapHandle {
                 const map = try completion.value(c.mln_map)(result);
+                // A map this binding cannot track would otherwise stay live and
+                // hold its runtime open forever, so a failed registration
+                // releases it.
+                errdefer releaseUntrackedMap(map);
                 var runtime_handle = context.runtime;
                 const registration = try runtime_module.registerMap(&runtime_handle, map);
                 errdefer runtime_module.unregisterMap(registration.registry, map);
@@ -364,7 +358,6 @@ pub const MapHandle = enum(c.mln_map) {
                     .runtime_registry = registration.registry,
                     .id_value = registration.id,
                     .diagnostic_store = context.diagnostic_store,
-                    .runtime = context.runtime,
                     .attached_render_sessions = std.atomic.Value(usize).init(0),
                     .closing = false,
                 };
@@ -388,18 +381,14 @@ pub const MapHandle = enum(c.mln_map) {
         return mapIdForHandle(self);
     }
 
-    /// Accepts an ordered inline-style command.
     pub fn setStyleJson(
         self: *MapHandle,
-        allocator: std.mem.Allocator,
         json: []const u8,
     ) status.Error!completion.Future(completion.CommandCompletion) {
-        _ = allocator;
         return submitCommand(self, c.mln_map_set_style_json, .{ try native(self), stringView(json) });
     }
 
-    /// Accepts an ordered per-feature-state command. The committed command
-    /// requests a map repaint.
+    /// The committed command requests a map repaint.
     pub fn setFeatureState(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -433,8 +422,7 @@ pub const MapHandle = enum(c.mln_map) {
         });
     }
 
-    /// Accepts an ordered feature-state removal command. The committed command
-    /// requests a map repaint.
+    /// The committed command requests a map repaint.
     pub fn removeFeatureState(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -449,7 +437,6 @@ pub const MapHandle = enum(c.mln_map) {
         });
     }
 
-    /// Accepts an ordered style-URL command.
     pub fn setStyleUrl(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -586,21 +573,27 @@ pub const MapHandle = enum(c.mln_map) {
         });
     }
 
+    /// Copies fixed layer metadata, completing with null when no layer has the
+    /// ID.
     pub fn getStyleLayerInfo(self: *MapHandle, allocator: std.mem.Allocator, layer_id: []const u8) status.Error!completion.Future(?StyleLayerInfo) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        return submitQuery(?StyleLayerInfo, self, struct {
-            fn copyResult(result: *const c.mln_completion_result) status.Error!?StyleLayerInfo {
+        return submitAllocatedQuery(?StyleLayerInfo, self, allocator, struct {
+            fn copyResult(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?StyleLayerInfo {
                 const raw_result = (try optionalCompletionValue(c.mln_style_layer_result, result)) orelse return null;
                 const raw = raw_result.info;
                 const type_data: [*]const u8 = @ptrCast(raw.type.data orelse return error.NativeError);
+                const source_id = try copyPresentView(target.*, raw_result.source_id);
+                errdefer if (source_id) |owned| target.free(owned);
+                const source_layer = try copyPresentView(target.*, raw_result.source_layer);
                 return .{
+                    .allocator = target.*,
                     .layer_type = type_data[0..raw.type.size],
                     .min_zoom = raw.min_zoom,
                     .max_zoom = raw.max_zoom,
                     .visibility = values.StyleLayerVisibility.fromRaw(raw.visibility),
-                    .source_id_size = if ((raw.fields & c.MLN_STYLE_LAYER_INFO_SOURCE_ID) != 0) raw.source_id_size else null,
-                    .source_layer_size = if ((raw.fields & c.MLN_STYLE_LAYER_INFO_SOURCE_LAYER) != 0) raw.source_layer_size else null,
+                    .source_id = source_id,
+                    .source_layer = source_layer,
                 };
             }
         }.copyResult, c.mln_map_get_style_layer_info, .{ try native(self), try temp.stringView(layer_id) });
@@ -629,39 +622,19 @@ pub const MapHandle = enum(c.mln_map) {
         });
     }
 
-    /// Accepts an ordered source-removal command and returns its runtime-wide
-    /// ID. The command's finished event reports a committed removal, a
-    /// `NotFound` failure when no source has the ID, and an `InvalidState`
-    /// failure when a layer still uses the source.
+    /// Accepts an ordered source-removal command. The completion reports a
+    /// committed removal, a `NotFound` failure when no source has the ID, and
+    /// an `InvalidState` failure when a layer still uses the source.
     pub fn removeStyleSource(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
         return self.removeStyleObjectCommand(allocator, source_id, c.mln_map_remove_style_source);
     }
 
-    pub fn getStyleSourceInfo(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!completion.Future(?StyleSourceMetadata) {
+    /// Copies one source's metadata, attribution, URL, and inline TileJSON,
+    /// completing with null when no source has the ID.
+    pub fn getStyleSourceInfo(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!completion.Future(?values.StyleSourceInfo) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        return submitQuery(?StyleSourceMetadata, self, struct {
-            fn copyResult(result: *const c.mln_completion_result) status.Error!?StyleSourceMetadata {
-                const raw_result = (try optionalCompletionValue(c.mln_style_source_result, result)) orelse return null;
-                const raw = raw_result.info;
-                return .{
-                    .source_type = values.styleSourceTypeFromNative(raw.type),
-                    .id_size = raw.id_size,
-                    .is_volatile = raw.is_volatile,
-                    .has_attribution = raw.has_attribution,
-                    .has_url = (raw.fields & c.MLN_STYLE_SOURCE_INFO_URL) != 0,
-                    .has_tile_json = (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILEJSON) != 0,
-                    .min_zoom = raw.min_zoom,
-                    .max_zoom = raw.max_zoom,
-                    .scheme = values.StyleTileScheme.fromRaw(raw.scheme),
-                    .bounds = if ((raw.fields & c.MLN_STYLE_SOURCE_INFO_BOUNDS) != 0) values.latLngBoundsFromNative(raw.bounds) else null,
-                    .tile_count = raw_result.tile_url_count,
-                    .tile_size = if ((raw.fields & c.MLN_STYLE_SOURCE_INFO_TILE_SIZE) != 0) raw.tile_size else null,
-                    .vector_encoding = if ((raw.fields & c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING) != 0) values.StyleVectorTileEncoding.fromRaw(raw.vector_encoding) else null,
-                    .raster_encoding = if ((raw.fields & c.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING) != 0) values.StyleRasterDemEncoding.fromRaw(raw.raster_encoding) else null,
-                };
-            }
-        }.copyResult, c.mln_map_get_style_source_info, .{ try native(self), try temp.stringView(source_id) });
+        return submitAllocatedQuery(?values.StyleSourceInfo, self, allocator, copyStyleSourceInfoResult, c.mln_map_get_style_source_info, .{ try native(self), try temp.stringView(source_id) });
     }
 
     pub fn copyStyleSourceAttribution(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!completion.Future(?values.OwnedString) {
@@ -710,9 +683,8 @@ pub const MapHandle = enum(c.mln_map) {
         });
     }
 
-    /// Accepts an ordered layer-removal command and returns its runtime-wide
-    /// ID. The command's finished event reports a committed removal, and a
-    /// `NotFound` failure when no layer has the ID.
+    /// Accepts an ordered layer-removal command. The completion reports a
+    /// committed removal, and a `NotFound` failure when no layer has the ID.
     pub fn removeStyleLayer(self: *MapHandle, allocator: std.mem.Allocator, layer_id: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
         return self.removeStyleObjectCommand(allocator, layer_id, c.mln_map_remove_style_layer);
     }
@@ -928,9 +900,9 @@ pub const MapHandle = enum(c.mln_map) {
         }.copyResult, c.mln_map_copy_style_image_stretches, .{ try native(self), try temp.stringView(image_id) });
     }
 
-    /// Accepts an ordered image-removal command and returns its runtime-wide
-    /// ID. The command's finished event reports a committed removal, and a
-    /// `NotFound` failure when no runtime style image has the ID.
+    /// Accepts an ordered image-removal command. The completion reports a
+    /// committed removal, and a `NotFound` failure when no runtime style image
+    /// has the ID.
     pub fn removeStyleImage(self: *MapHandle, allocator: std.mem.Allocator, image_id: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
         return self.removeStyleObjectCommand(allocator, image_id, c.mln_map_remove_style_image);
     }
@@ -1199,7 +1171,6 @@ pub const MapHandle = enum(c.mln_map) {
             .cancel_tile = options.cancel_tile,
             .release_context = options.release_context,
             .context = options.context,
-            .active_upcalls = std.atomic.Value(usize).init(0),
         };
         errdefer std.heap.smp_allocator.destroy(source_state);
 
@@ -1264,7 +1235,6 @@ pub const MapHandle = enum(c.mln_map) {
             .cancel_tile = options.cancel_tile,
             .release_context = options.release_context,
             .context = options.context,
-            .active_upcalls = std.atomic.Value(usize).init(0),
         };
         errdefer std.heap.smp_allocator.destroy(source_state);
 
@@ -1352,6 +1322,7 @@ pub const MapHandle = enum(c.mln_map) {
             .bounds = values.boundOptionsFromNative(raw.bounds),
             .free_camera = values.freeCameraOptionsFromNative(raw.free_camera),
             .fully_loaded = raw.fully_loaded,
+            .gesture_in_progress = raw.gesture_in_progress,
             .rendering_stats_view_enabled = raw.rendering_stats_view_enabled,
             .repaint_demand = raw.repaint_demand,
             .event_mask = runtime_module.eventMaskFromRaw(raw.event_mask),
@@ -1359,11 +1330,10 @@ pub const MapHandle = enum(c.mln_map) {
         };
     }
 
-    pub fn getSize(self: *MapHandle) status.Error!struct { width: u32, height: u32, scale_factor: f64 } {
-        const current = try self.snapshot();
-        return .{ .width = current.width, .height = current.height, .scale_factor = current.scale_factor };
-    }
-
+    /// Accepts a new logical extent. `scale_factor` is fixed at map creation:
+    /// a different value is rejected with `error.InvalidArgument`, and only the
+    /// width and height change. While a render session is attached, resize
+    /// through `RenderSessionHandle.resize`, which submits this command itself.
     pub fn resize(self: *MapHandle, width: u32, height: u32, scale_factor: f64) status.Error!completion.Future(completion.CommandCompletion) {
         return submitCommand(self, c.mln_map_resize, .{ try native(self), c.mln_logical_extent{ .width = width, .height = height, .scale_factor = scale_factor } });
     }
@@ -1401,6 +1371,12 @@ pub const MapHandle = enum(c.mln_map) {
         return submitCommand(self, c.mln_map_update_camera, .{ try native(self), &raw });
     }
 
+    /// Stops any running camera transition where it is. A map with no running
+    /// transition commits the command anyway.
+    pub fn cancelTransitions(self: *MapHandle) status.Error!completion.Future(completion.CommandCompletion) {
+        return submitCommand(self, c.mln_map_cancel_transitions, .{try native(self)});
+    }
+
     pub fn applyCameraDelta(self: *MapHandle, delta: CameraDelta) status.Error!completion.Future(completion.CommandCompletion) {
         var raw = c.mln_camera_delta_default();
         raw.kind = delta.kind.toRaw();
@@ -1429,10 +1405,6 @@ pub const MapHandle = enum(c.mln_map) {
     pub fn setProjectionMode(self: *MapHandle, mode: values.ProjectionMode) status.Error!completion.Future(completion.CommandCompletion) {
         var raw_mode = values.projectionModeToNative(mode);
         return submitCommand(self, c.mln_map_set_projection_mode, .{ try native(self), &raw_mode });
-    }
-
-    pub fn getProjectionMode(self: *MapHandle) status.Error!values.ProjectionMode {
-        return (try self.snapshot()).projection_mode;
     }
 
     pub fn pixelForLatLng(self: *MapHandle, coordinate: values.LatLng) status.Error!completion.Future(values.ScreenPoint) {
@@ -1584,10 +1556,6 @@ pub const MapHandle = enum(c.mln_map) {
         return submitCommand(self, c.mln_map_set_event_mask, .{ try native(self), runtime_module.eventMaskToRaw(mask) });
     }
 
-    pub fn eventMask(self: *MapHandle) status.Error!runtime_module.RuntimeEventMask {
-        return (try self.snapshot()).event_mask;
-    }
-
     fn removeStyleObjectCommand(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -1623,12 +1591,13 @@ pub const MapHandle = enum(c.mln_map) {
         return submitCommand(self, command, .{ try native(self), try temp.stringView(layer_id), value });
     }
 
-    pub fn close(self: *MapHandle) status.Error!void {
-        var teardown = try self.closeAsync();
-        teardown.deinit();
-    }
-
-    pub fn closeAsync(self: *MapHandle) status.Error!completion.Future(void) {
+    /// Releases the map handle and returns the future for its native teardown.
+    ///
+    /// The future completes after the map's accepted commands reach a terminal
+    /// disposition and its native state is gone. A host that outlives its maps
+    /// deinitializes the future without waiting. Closing a map that still has
+    /// an attached render session reports `error.InvalidState`.
+    pub fn close(self: *MapHandle) status.Error!completion.Future(void) {
         const map_close = beginMapClose(self.*) catch |err| {
             if (err == error.InvalidState) {
                 if (diagnosticStore(self)) |store| {
@@ -1811,7 +1780,7 @@ fn customMvtVectorSourceOptionsToNative(
 fn customGeometryFetchTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_canonical_tile_id) callconv(.c) void {
     const source_state: *CustomGeometrySourceState = @ptrCast(@alignCast(user_data orelse return));
     if (!beginCustomGeometryUpcall(source_state)) return;
-    defer endCustomGeometryUpcall(source_state);
+    defer source_state.upcalls.end();
 
     source_state.fetch_tile(source_state.context, canonicalTileIdFromNative(raw_tile_id));
 }
@@ -1819,7 +1788,7 @@ fn customGeometryFetchTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_
 fn customGeometryCancelTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_canonical_tile_id) callconv(.c) void {
     const source_state: *CustomGeometrySourceState = @ptrCast(@alignCast(user_data orelse return));
     if (!beginCustomGeometryUpcall(source_state)) return;
-    defer endCustomGeometryUpcall(source_state);
+    defer source_state.upcalls.end();
 
     const cancel_tile = source_state.cancel_tile orelse return;
     cancel_tile(source_state.context, canonicalTileIdFromNative(raw_tile_id));
@@ -1831,15 +1800,11 @@ fn beginCustomGeometryUpcall(source_state: *CustomGeometrySourceState) bool {
 
     for (custom_geometry_state_registry.items) |live_state| {
         if (live_state == source_state) {
-            _ = source_state.active_upcalls.fetchAdd(1, .seq_cst);
+            source_state.upcalls.begin();
             return true;
         }
     }
     return false;
-}
-
-fn endCustomGeometryUpcall(source_state: *CustomGeometrySourceState) void {
-    _ = source_state.active_upcalls.fetchSub(1, .seq_cst);
 }
 
 fn canonicalTileIdToNative(tile_id: CanonicalTileId) c.mln_canonical_tile_id {
@@ -1860,7 +1825,7 @@ fn customGeometryReleaseTrampoline(user_data: ?*anyopaque) callconv(.c) void {
 
 fn freeCustomGeometrySourceState(source_state: *CustomGeometrySourceState) void {
     retireLiveCustomGeometrySourceState(source_state);
-    waitForCustomGeometryUpcalls(source_state);
+    source_state.upcalls.waitUntilIdle();
     if (source_state.release_context) |release| release(source_state.context);
     std.heap.smp_allocator.destroy(source_state);
 }
@@ -1892,16 +1857,10 @@ fn removeLiveCustomGeometrySourceStateLocked(source_state: *CustomGeometrySource
     }
 }
 
-fn waitForCustomGeometryUpcalls(source_state: *CustomGeometrySourceState) void {
-    while (source_state.active_upcalls.load(.seq_cst) != 0) {
-        std.Thread.yield() catch {};
-    }
-}
-
 fn customMvtVectorFetchTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_canonical_tile_id) callconv(.c) void {
     const source_state: *CustomMvtVectorSourceState = @ptrCast(@alignCast(user_data orelse return));
     if (!beginCustomMvtVectorUpcall(source_state)) return;
-    defer endCustomMvtVectorUpcall(source_state);
+    defer source_state.upcalls.end();
 
     source_state.fetch_tile(source_state.context, canonicalTileIdFromNative(raw_tile_id));
 }
@@ -1909,7 +1868,7 @@ fn customMvtVectorFetchTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln
 fn customMvtVectorCancelTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_canonical_tile_id) callconv(.c) void {
     const source_state: *CustomMvtVectorSourceState = @ptrCast(@alignCast(user_data orelse return));
     if (!beginCustomMvtVectorUpcall(source_state)) return;
-    defer endCustomMvtVectorUpcall(source_state);
+    defer source_state.upcalls.end();
 
     const cancel_tile = source_state.cancel_tile orelse return;
     cancel_tile(source_state.context, canonicalTileIdFromNative(raw_tile_id));
@@ -1921,15 +1880,11 @@ fn beginCustomMvtVectorUpcall(source_state: *CustomMvtVectorSourceState) bool {
 
     for (custom_mvt_vector_state_registry.items) |live_state| {
         if (live_state == source_state) {
-            _ = source_state.active_upcalls.fetchAdd(1, .seq_cst);
+            source_state.upcalls.begin();
             return true;
         }
     }
     return false;
-}
-
-fn endCustomMvtVectorUpcall(source_state: *CustomMvtVectorSourceState) void {
-    _ = source_state.active_upcalls.fetchSub(1, .seq_cst);
 }
 
 fn customMvtVectorReleaseTrampoline(user_data: ?*anyopaque) callconv(.c) void {
@@ -1939,7 +1894,7 @@ fn customMvtVectorReleaseTrampoline(user_data: ?*anyopaque) callconv(.c) void {
 
 fn freeCustomMvtVectorSourceState(source_state: *CustomMvtVectorSourceState) void {
     retireLiveCustomMvtVectorSourceState(source_state);
-    waitForCustomMvtVectorUpcalls(source_state);
+    source_state.upcalls.waitUntilIdle();
     if (source_state.release_context) |release| release(source_state.context);
     std.heap.smp_allocator.destroy(source_state);
 }
@@ -1971,10 +1926,18 @@ fn removeLiveCustomMvtVectorSourceStateLocked(source_state: *CustomMvtVectorSour
     }
 }
 
-fn waitForCustomMvtVectorUpcalls(source_state: *CustomMvtVectorSourceState) void {
-    while (source_state.active_upcalls.load(.seq_cst) != 0) {
-        std.Thread.yield() catch {};
-    }
+fn discardCompletion(_: ?*anyopaque, _: [*c]const c.mln_completion_result) callconv(.c) void {}
+
+// Releases a native map the binding never registered. Nothing is left to report
+// the teardown to, so the completion discards it.
+fn releaseUntrackedMap(map: c.mln_map) void {
+    const descriptor = c.mln_completion{
+        .size = @sizeOf(c.mln_completion),
+        .callback = discardCompletion,
+        .user_data = null,
+        .release_user_data = null,
+    };
+    _ = c.mln_map_release(map, &descriptor);
 }
 
 fn mapStateForHandle(handle: *MapHandle) status.BindingError!*MapState {
@@ -2106,6 +2069,67 @@ fn copyView(allocator: std.mem.Allocator, view: c.mln_buffer_view) status.Error!
     return allocator.dupe(u8, @as([*]const u8, @ptrCast(data))[0..view.size]);
 }
 
+/// Copies a borrowed view the native result marks present, reporting null for
+/// an absent value, which the C API spells as an empty view.
+fn copyPresentView(allocator: std.mem.Allocator, view: c.mln_buffer_view) status.Error!?[]const u8 {
+    if (view.size == 0) return null;
+    return try copyView(allocator, view);
+}
+
+fn copyStyleSourceInfoResult(
+    result: *const c.mln_completion_result,
+    allocator: *std.mem.Allocator,
+) status.Error!?values.StyleSourceInfo {
+    const raw_result = (try optionalCompletionValue(c.mln_style_source_result, result)) orelse return null;
+    const raw = raw_result.info;
+    const attribution = if (raw.has_attribution) try copyView(allocator.*, raw_result.attribution) else null;
+    errdefer if (attribution) |owned| allocator.free(owned);
+    const url = if ((raw.fields & c.MLN_STYLE_SOURCE_INFO_URL) != 0) try copyView(allocator.*, raw_result.url) else null;
+    errdefer if (url) |owned| allocator.free(owned);
+
+    var tile_json: ?values.StyleTileJsonInfo = null;
+    errdefer if (tile_json) |json| {
+        for (json.tile_urls) |tile_url| allocator.free(tile_url);
+        allocator.free(json.tile_urls);
+    };
+    if ((raw.fields & c.MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
+        const tile_urls = try allocator.alloc([]const u8, raw_result.tile_url_count);
+        var initialized: usize = 0;
+        errdefer {
+            for (tile_urls[0..initialized]) |tile_url| allocator.free(tile_url);
+            allocator.free(tile_urls);
+        }
+        if (raw_result.tile_url_count != 0) {
+            if (raw_result.tile_urls == null) return error.NativeError;
+            const views = raw_result.tile_urls[0..raw_result.tile_url_count];
+            for (views, tile_urls) |view, *tile_url| {
+                tile_url.* = try copyView(allocator.*, view);
+                initialized += 1;
+            }
+        }
+        tile_json = .{
+            .tile_urls = tile_urls,
+            .min_zoom = raw.min_zoom,
+            .max_zoom = raw.max_zoom,
+            .scheme = values.StyleTileScheme.fromRaw(raw.scheme),
+            .bounds = if ((raw.fields & c.MLN_STYLE_SOURCE_INFO_BOUNDS) != 0) values.latLngBoundsFromNative(raw.bounds) else null,
+        };
+    }
+
+    return .{
+        .allocator = allocator.*,
+        .source_type = values.styleSourceTypeFromNative(raw.type),
+        .id_size = raw.id_size,
+        .is_volatile = raw.is_volatile,
+        .attribution = attribution,
+        .url = url,
+        .tile_json = tile_json,
+        .tile_size = if ((raw.fields & c.MLN_STYLE_SOURCE_INFO_TILE_SIZE) != 0) raw.tile_size else null,
+        .vector_encoding = if ((raw.fields & c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING) != 0) values.StyleVectorTileEncoding.fromRaw(raw.vector_encoding) else null,
+        .raster_encoding = if ((raw.fields & c.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING) != 0) values.StyleRasterDemEncoding.fromRaw(raw.raster_encoding) else null,
+    };
+}
+
 fn copyOwnedStringResult(result: *const c.mln_completion_result, allocator: *std.mem.Allocator) status.Error!values.OwnedString {
     const view = try completion.value(c.mln_buffer_view)(result);
     return .{ .allocator = allocator.*, .value = try copyView(allocator.*, view) };
@@ -2188,7 +2212,6 @@ pub fn registerRenderSession(handle: *MapHandle) status.BindingError!RenderSessi
     return .{
         .native = @intFromEnum(handle.*),
         .diagnostic_store = map_state.diagnostic_store,
-        .runtime = map_state.runtime,
     };
 }
 
@@ -2209,56 +2232,6 @@ fn liveCustomMvtVectorSourceCountForTesting() usize {
     std.Io.Threaded.mutexLock(&custom_mvt_vector_state_registry_lock);
     defer std.Io.Threaded.mutexUnlock(&custom_mvt_vector_state_registry_lock);
     return custom_mvt_vector_state_registry.items.len;
-}
-
-fn copyStyleIdList(
-    allocator: std.mem.Allocator,
-    list: c.mln_style_id_list,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-) status.Error!values.StringList {
-    var count: usize = 0;
-    try status.checkStatus(c.mln_style_id_list_count(list, &count), diagnostic_store);
-    const items = try allocator.alloc([]const u8, count);
-    var initialized: usize = 0;
-    errdefer {
-        for (items[0..initialized]) |item| allocator.free(item);
-        allocator.free(items);
-    }
-    for (items, 0..) |*item, index| {
-        var view = c.mln_buffer_view{ .data = null, .size = 0 };
-        try status.checkStatus(c.mln_style_id_list_get(list, index, &view), diagnostic_store);
-        item.* = if (view.size == 0) try allocator.dupe(u8, "") else blk: {
-            const data: [*]const u8 = @ptrCast(view.data orelse return error.NativeError);
-            break :blk try allocator.dupe(u8, data[0..view.size]);
-        };
-        initialized += 1;
-    }
-    return .{ .allocator = allocator, .items = items };
-}
-
-fn copyStyleStringList(
-    allocator: std.mem.Allocator,
-    list: c.mln_style_string_list,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-) status.Error!values.StringList {
-    var count: usize = 0;
-    try status.checkStatus(c.mln_style_string_list_count(list, &count), diagnostic_store);
-    const items = try allocator.alloc([]const u8, count);
-    var initialized: usize = 0;
-    errdefer {
-        for (items[0..initialized]) |item| allocator.free(item);
-        allocator.free(items);
-    }
-    for (items, 0..) |*item, index| {
-        var view = c.mln_buffer_view{ .data = null, .size = 0 };
-        try status.checkStatus(c.mln_style_string_list_get(list, index, &view), diagnostic_store);
-        item.* = if (view.size == 0) try allocator.dupe(u8, "") else blk: {
-            const data: [*]const u8 = @ptrCast(view.data orelse return error.NativeError);
-            break :blk try allocator.dupe(u8, data[0..view.size]);
-        };
-        initialized += 1;
-    }
-    return .{ .allocator = allocator, .items = items };
 }
 
 fn stringView(value: []const u8) c.mln_buffer_view {
@@ -2309,7 +2282,7 @@ test "custom geometry trampolines route semantic tile ids" {
         .cancel_tile = testCancelCustomGeometryTile,
         .release_context = null,
         .context = &test_state,
-        .active_upcalls = std.atomic.Value(usize).init(0),
+        .upcalls = .{},
     };
     try registerLiveCustomGeometrySourceState(&source_state);
     defer unregisterLiveCustomGeometrySourceState(&source_state);
@@ -2329,7 +2302,7 @@ test "custom geometry trampolines route semantic tile ids" {
     retireLiveCustomGeometrySourceState(&source_state);
     customGeometryFetchTileTrampoline(&source_state, .{ .z = 12, .x = 13, .y = 14 });
     try std.testing.expectEqual(@as(usize, 1), test_state.fetch_count);
-    try std.testing.expectEqual(@as(usize, 0), source_state.active_upcalls.load(.seq_cst));
+    try std.testing.expectEqual(@as(usize, 0), source_state.upcalls.activeCount());
 }
 
 const test_style_json =
@@ -2352,17 +2325,29 @@ fn createLoadedMapForTesting(runtime: *RuntimeHandle) !MapHandle {
     var map_future = try MapHandle.create(runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);
-    errdefer map.close() catch {};
-    _ = try map.setStyleJson(std.testing.allocator, test_style_json);
+    errdefer closeMapForTesting(&map) catch {};
+    try expectCommittedForTesting(try map.setStyleJson(test_style_json));
     try std.testing.expect(try waitForRuntimeEventForTesting(runtime, .map_style_loaded));
     return map;
 }
 
-fn waitForCommandDispositionForTesting(runtime: *RuntimeHandle, future_value: completion.Future(completion.CommandCompletion)) !completion.CommandDisposition {
-    _ = runtime;
+fn closeMapForTesting(map: *MapHandle) !void {
+    var teardown = try map.close();
+    defer teardown.deinit();
+    try teardown.wait(null);
+}
+
+fn waitForCommandDispositionForTesting(future_value: completion.Future(completion.CommandCompletion)) !completion.CommandDisposition {
     var future = future_value;
     defer future.deinit();
     return (try future.wait(null)).disposition;
+}
+
+fn expectCommittedForTesting(future_value: completion.Future(completion.CommandCompletion)) !void {
+    try std.testing.expect(std.meta.eql(
+        try waitForCommandDispositionForTesting(future_value),
+        completion.CommandDisposition.committed,
+    ));
 }
 
 fn waitForRuntimeEventForTesting(runtime: *RuntimeHandle, event_type: runtime_module.RuntimeEventType) !bool {
@@ -2401,19 +2386,17 @@ test "an explicit source removal releases the callback state" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
     defer runtime_module.closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
     var map = try createLoadedMapForTesting(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer closeMapForTesting(&map) catch @panic("map close failed");
 
     const baseline = liveCustomGeometrySourceCountForTesting();
     var state = TestCustomGeometryCallbackState{};
-    _ = try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
+    try expectCommittedForTesting(try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
         .fetch_tile = testFetchCustomGeometryTile,
         .context = &state,
-    });
+    }));
     try std.testing.expectEqual(baseline + 1, liveCustomGeometrySourceCountForTesting());
 
-    const remove_id = try map.removeStyleSource(std.testing.allocator, "custom");
-    const disposition = try waitForCommandDispositionForTesting(&runtime, remove_id);
-    try std.testing.expect(std.meta.eql(disposition, completion.CommandDisposition.committed));
+    try expectCommittedForTesting(try map.removeStyleSource(std.testing.allocator, "custom"));
     try std.testing.expectEqual(baseline, liveCustomGeometrySourceCountForTesting());
 }
 
@@ -2421,19 +2404,17 @@ test "an explicit custom MVT vector source removal releases the callback state" 
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
     defer runtime_module.closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
     var map = try createLoadedMapForTesting(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer closeMapForTesting(&map) catch @panic("map close failed");
 
     const baseline = liveCustomMvtVectorSourceCountForTesting();
     var state = TestCustomGeometryCallbackState{};
-    _ = try map.addCustomMvtVectorSource(std.testing.allocator, "custom-mvt", .{
+    try expectCommittedForTesting(try map.addCustomMvtVectorSource(std.testing.allocator, "custom-mvt", .{
         .fetch_tile = testFetchCustomGeometryTile,
         .context = &state,
-    });
+    }));
     try std.testing.expectEqual(baseline + 1, liveCustomMvtVectorSourceCountForTesting());
 
-    const remove_id = try map.removeStyleSource(std.testing.allocator, "custom-mvt");
-    const disposition = try waitForCommandDispositionForTesting(&runtime, remove_id);
-    try std.testing.expect(std.meta.eql(disposition, completion.CommandDisposition.committed));
+    try expectCommittedForTesting(try map.removeStyleSource(std.testing.allocator, "custom-mvt"));
     try std.testing.expectEqual(baseline, liveCustomMvtVectorSourceCountForTesting());
 }
 
@@ -2454,25 +2435,25 @@ test "a style load that drops a source releases the callback state unsubscribed"
     _ = try provider_future.wait(null);
 
     var map = try createLoadedMapForTesting(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer closeMapForTesting(&map) catch @panic("map close failed");
     var mask_future = try map.setEventMask(narrowed);
     defer mask_future.deinit();
     _ = try mask_future.wait(null);
 
     var state = TestCustomGeometryCallbackState{};
-    _ = try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
+    try expectCommittedForTesting(try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
         .fetch_tile = testFetchCustomGeometryTile,
         .release_context = testReleaseCustomGeometryContext,
         .context = &state,
-    });
+    }));
     var add_barrier = try runtime.barrier();
     defer add_barrier.deinit();
     _ = try add_barrier.wait(null);
     try std.testing.expectEqual(@as(usize, 0), state.release_count);
     // The mask stays what the host set, because the binding adds nothing to it.
-    try std.testing.expectEqual(narrowed, try map.eventMask());
+    try std.testing.expectEqual(narrowed, (try map.snapshot()).event_mask);
 
-    _ = try map.setStyleUrl(std.testing.allocator, "custom://style.json");
+    try expectCommittedForTesting(try map.setStyleUrl(std.testing.allocator, "custom://style.json"));
     var released = false;
     for (0..200) |_| {
         var batch = try runtime.drainEvents(std.testing.allocator);
@@ -2501,16 +2482,16 @@ test "closing a map releases its surviving source callback states" {
     defer runtime_module.closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
     var map = try createLoadedMapForTesting(&runtime);
     var map_open = true;
-    defer if (map_open) map.close() catch @panic("map close failed");
+    defer if (map_open) closeMapForTesting(&map) catch @panic("map close failed");
 
     var state = TestCustomGeometryCallbackState{};
-    _ = try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
+    try expectCommittedForTesting(try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
         .fetch_tile = testFetchCustomGeometryTile,
         .release_context = testReleaseCustomGeometryContext,
         .context = &state,
-    });
+    }));
 
-    try map.close();
+    try closeMapForTesting(&map);
     map_open = false;
     var close_barrier = try runtime.barrier();
     defer close_barrier.deinit();
@@ -2523,7 +2504,7 @@ test "a rejected custom geometry source add releases its own callback state" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
     defer runtime_module.closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
     var map = try createLoadedMapForTesting(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer closeMapForTesting(&map) catch @panic("map close failed");
 
     const baseline = liveCustomGeometrySourceCountForTesting();
     var state = TestCustomGeometryCallbackState{};
@@ -2551,7 +2532,7 @@ test "a released map id is stale and map snapshots work from another thread" {
 
     var first = try first_future.wait(null);
     const released = @intFromEnum(first);
-    try first.close();
+    try closeMapForTesting(&first);
 
     var stale_snapshot = std.mem.zeroes(c.mln_map_snapshot);
     stale_snapshot.size = @sizeOf(c.mln_map_snapshot);
@@ -2565,7 +2546,7 @@ test "a released map id is stale and map snapshots work from another thread" {
     defer second_future.deinit();
 
     var second = try second_future.wait(null);
-    defer second.close() catch @panic("map close failed");
+    defer closeMapForTesting(&second) catch @panic("map close failed");
 
     const CrossThread = struct {
         map: *MapHandle,

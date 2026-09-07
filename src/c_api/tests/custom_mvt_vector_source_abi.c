@@ -14,14 +14,8 @@
 #include "test_support.h"
 #include "unity.h"
 
-static const char background_style_json[] =
-  "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background\",\"type\":"
-  "\"background\",\"paint\":{\"background-color\":\"#102030\"}}]}";
-static const char empty_style_json[] =
-  "{\"version\":8,\"sources\":{},\"layers\":[]}";
 static const char source_id[] = "custom-mvt-vector";
 static const char geometry_source_id[] = "custom-geometry";
-static const size_t style_wait_attempts = 200;
 
 // The counters are written from native threads and read from the test thread,
 // so they are atomic; the barrier polls below provide the ordering.
@@ -61,19 +55,6 @@ static mln_custom_geometry_source_options geometry_probe_options(
   return options;
 }
 
-// Loads an inline style and waits for the map to reach a loaded state without
-// reaching the network.
-static void load_style_and_wait(
-  mln_runtime runtime, mln_map map, mln_buffer_view style_json
-) {
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_json(map, style_json)
-  );
-  for (size_t attempt = 0; attempt < style_wait_attempts; attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  }
-}
-
 static mln_map create_map_without_style_events(mln_runtime runtime) {
   mln_map_options options = mln_map_options_default();
   options.initial_extent.width = 256;
@@ -92,19 +73,10 @@ static void add_mvt_source(mln_map map, release_probe* probe) {
       map, MLN_BUFFER_LITERAL(source_id), &options, &add.descriptor
     )
   );
-  TEST_ASSERT_TRUE(mln_test_completion_wait(&add, -1));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_status(&add));
-  mln_test_completion_destroy(&add);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&add));
 }
 
 // Waits out one submitted command and returns its terminal status.
-static mln_status finish_command(mln_test_completion* completion) {
-  TEST_ASSERT_TRUE(mln_test_completion_wait(completion, -1));
-  const mln_status status = mln_test_completion_status(completion);
-  mln_test_completion_destroy(completion);
-  return status;
-}
-
 // A host that never subscribes to style-loaded events still learns that a style
 // replacement dropped its source.
 static void a_style_replacement_releases_a_dropped_source_unsubscribed(void) {
@@ -112,11 +84,11 @@ static void a_style_replacement_releases_a_dropped_source_unsubscribed(void) {
   mln_map map = create_map_without_style_events(runtime);
   release_probe probe = {0};
 
-  load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(background_style_json));
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
   add_mvt_source(map, &probe);
   TEST_ASSERT_EQUAL_size_t(0, atomic_load(&probe.release_count));
 
-  load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(empty_style_json));
+  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
   TEST_ASSERT_EQUAL_size_t(
     0, mln_test_drain_counting(runtime, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
@@ -133,7 +105,7 @@ static void an_explicit_removal_releases_once(void) {
   mln_map map = mln_test_create_map(runtime);
   release_probe probe = {0};
 
-  load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(background_style_json));
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
   add_mvt_source(map, &probe);
 
   mln_test_completion removal = mln_test_completion_default(0);
@@ -142,11 +114,11 @@ static void an_explicit_removal_releases_once(void) {
                      map, MLN_BUFFER_LITERAL(source_id), &removal.descriptor
                    )
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, finish_command(&removal));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&removal));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
 
   // A style load after the removal has nothing left to reconcile.
-  load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(empty_style_json));
+  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
   mln_test_destroy_map(map);
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
   mln_test_destroy_runtime(runtime);
@@ -160,7 +132,7 @@ static void accepted_adds_release_their_callback_state(void) {
   mln_map map = mln_test_create_map(runtime);
   release_probe probe = {0};
 
-  load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(background_style_json));
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
   mln_custom_mvt_vector_source_options options = probe_options(&probe);
   options.fields = MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM;
   options.min_zoom = -1;
@@ -196,7 +168,7 @@ static void accepted_adds_release_their_callback_state(void) {
       map, MLN_BUFFER_LITERAL(source_id), &options, &first.descriptor
     )
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, finish_command(&first));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&first));
   // The duplicate command is accepted, then fails application because the ID
   // already exists. Its callback state is released independently.
   mln_test_completion duplicate = mln_test_completion_default(0);
@@ -206,15 +178,12 @@ static void accepted_adds_release_their_callback_state(void) {
       map, MLN_BUFFER_LITERAL(source_id), &options, &duplicate.descriptor
     )
   );
-  TEST_ASSERT_NOT_EQUAL(MLN_STATUS_OK, finish_command(&duplicate));
-  // The duplicate's release is not ordered before a single barrier, so poll
-  // barriers until the count lands.
-  for (size_t attempt = 0;
-       attempt < style_wait_attempts && atomic_load(&probe.release_count) < 1;
-       attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  }
-  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
+  TEST_ASSERT_NOT_EQUAL(MLN_STATUS_OK, mln_test_completion_settle(&duplicate));
+  // The duplicate's release is not ordered before a single barrier.
+  mln_test_barrier_until_count(
+    runtime, &probe.release_count, 1,
+    "the duplicate custom MVT vector source never released its callback state"
+  );
 
   mln_test_destroy_map(map);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
@@ -227,7 +196,7 @@ static void tile_delivery_and_invalidate_accept_an_empty_tile(void) {
   mln_map map = mln_test_create_map(runtime);
   release_probe probe = {0};
 
-  load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(background_style_json));
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
   add_mvt_source(map, &probe);
 
   mln_test_completion info =
@@ -237,13 +206,12 @@ static void tile_delivery_and_invalidate_accept_an_empty_tile(void) {
                      map, MLN_BUFFER_LITERAL(source_id), &info.descriptor
                    )
   );
-  TEST_ASSERT_TRUE(mln_test_completion_wait(&info, -1));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_status(&info));
   mln_style_source_result source_result = {0};
-  TEST_ASSERT_TRUE(
-    mln_test_completion_copy_value(&info, &source_result, sizeof(source_result))
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_completion_finish_value(
+                     &info, &source_result, sizeof(source_result)
+                   )
   );
-  mln_test_completion_destroy(&info);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR, source_result.info.type
   );
@@ -257,7 +225,7 @@ static void tile_delivery_and_invalidate_accept_an_empty_tile(void) {
       map, MLN_BUFFER_LITERAL(source_id), tile_id, empty, &data.descriptor
     )
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, finish_command(&data));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&data));
   mln_test_completion error = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_custom_mvt_vector_source_tile_error(
@@ -265,7 +233,7 @@ static void tile_delivery_and_invalidate_accept_an_empty_tile(void) {
                      MLN_BUFFER_LITERAL("missing"), &error.descriptor
                    )
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, finish_command(&error));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&error));
   mln_test_completion invalidate = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
@@ -273,7 +241,7 @@ static void tile_delivery_and_invalidate_accept_an_empty_tile(void) {
       map, MLN_BUFFER_LITERAL(source_id), tile_id, &invalidate.descriptor
     )
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, finish_command(&invalidate));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&invalidate));
 
   mln_test_destroy_map(map);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
@@ -287,7 +255,7 @@ static void tile_operations_reject_the_other_custom_source_kind(void) {
   release_probe mvt_probe = {0};
   release_probe geometry_probe = {0};
 
-  load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(background_style_json));
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
   add_mvt_source(map, &mvt_probe);
   mln_custom_geometry_source_options geometry_options =
     geometry_probe_options(&geometry_probe);
@@ -298,7 +266,7 @@ static void tile_operations_reject_the_other_custom_source_kind(void) {
                      &geometry_options, &add.descriptor
                    )
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, finish_command(&add));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&add));
 
   // A tile operation against the other custom source kind is accepted, then
   // fails application on the worker.
@@ -311,7 +279,7 @@ static void tile_operations_reject_the_other_custom_source_kind(void) {
                      empty, &wrong_data.descriptor
                    )
   );
-  TEST_ASSERT_NOT_EQUAL(MLN_STATUS_OK, finish_command(&wrong_data));
+  TEST_ASSERT_NOT_EQUAL(MLN_STATUS_OK, mln_test_completion_settle(&wrong_data));
   mln_test_completion wrong_error = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_custom_mvt_vector_source_tile_error(
@@ -319,7 +287,9 @@ static void tile_operations_reject_the_other_custom_source_kind(void) {
                      MLN_BUFFER_LITERAL("missing"), &wrong_error.descriptor
                    )
   );
-  TEST_ASSERT_NOT_EQUAL(MLN_STATUS_OK, finish_command(&wrong_error));
+  TEST_ASSERT_NOT_EQUAL(
+    MLN_STATUS_OK, mln_test_completion_settle(&wrong_error)
+  );
   mln_test_completion wrong_invalidate = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_invalidate_custom_mvt_vector_source_tile(
@@ -327,7 +297,9 @@ static void tile_operations_reject_the_other_custom_source_kind(void) {
                      &wrong_invalidate.descriptor
                    )
   );
-  TEST_ASSERT_NOT_EQUAL(MLN_STATUS_OK, finish_command(&wrong_invalidate));
+  TEST_ASSERT_NOT_EQUAL(
+    MLN_STATUS_OK, mln_test_completion_settle(&wrong_invalidate)
+  );
   mln_test_completion wrong_geometry = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
@@ -337,7 +309,9 @@ static void tile_operations_reject_the_other_custom_source_kind(void) {
       &wrong_geometry.descriptor
     )
   );
-  TEST_ASSERT_NOT_EQUAL(MLN_STATUS_OK, finish_command(&wrong_geometry));
+  TEST_ASSERT_NOT_EQUAL(
+    MLN_STATUS_OK, mln_test_completion_settle(&wrong_geometry)
+  );
   mln_test_completion wrong_geometry_invalidate =
     mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
@@ -347,7 +321,7 @@ static void tile_operations_reject_the_other_custom_source_kind(void) {
                    )
   );
   TEST_ASSERT_NOT_EQUAL(
-    MLN_STATUS_OK, finish_command(&wrong_geometry_invalidate)
+    MLN_STATUS_OK, mln_test_completion_settle(&wrong_geometry_invalidate)
   );
 
   mln_test_destroy_map(map);

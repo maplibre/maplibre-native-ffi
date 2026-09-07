@@ -68,19 +68,7 @@ case "$1" in
     export "$rustflags_variable=${rustflags# }"
     ;;
   android-*)
-    ndk_prebuilt_root="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt"
-    ndk_prebuilt=
-    for host_prebuilt in "$ndk_prebuilt_root"/*; do
-      if [[ -d "$host_prebuilt/bin" ]]; then
-        if [[ -n "$ndk_prebuilt" ]]; then
-          echo "The pinned Android NDK has multiple host prebuilts under $ndk_prebuilt_root." >&2
-          return 2
-        fi
-        ndk_prebuilt="$host_prebuilt"
-      fi
-    done
-    if [[ -z "$ndk_prebuilt" ]]; then
-      echo "The pinned Android NDK has no host prebuilt under $ndk_prebuilt_root." >&2
+    if ! ndk_prebuilt="$("$(dirname "${BASH_SOURCE[0]}")/android-ndk-prebuilt.sh")"; then
       return 2
     fi
     compiler_target="$cargo_target"

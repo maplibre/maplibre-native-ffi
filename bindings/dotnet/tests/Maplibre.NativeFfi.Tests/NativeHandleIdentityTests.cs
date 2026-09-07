@@ -17,11 +17,11 @@ public sealed unsafe class NativeHandleIdentityTests
     [Fact]
     public void ReleasedMapIdReplayedAfterANewMapReportsInvalidArgument()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
 
         var first = TestHandles.CreateMap(runtime, new MapOptions { Width = 512, Height = 512 });
         var releasedId = first.Handle;
-        TestHandles.Close(first);
+        first.Close();
 
         // The released slot is the one the next map takes, so the replayed id
         // names a retired generation of a slot that is live again.
@@ -43,7 +43,7 @@ public sealed unsafe class NativeHandleIdentityTests
     [Fact]
     public void MapIdPassedToARuntimeOperationReportsInvalidArgument()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions { Width = 512, Height = 512 }
@@ -68,7 +68,7 @@ public sealed unsafe class NativeHandleIdentityTests
     [Fact]
     public void MapIdCanBeReadFromAnotherThread()
     {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions { Width = 512, Height = 512 }

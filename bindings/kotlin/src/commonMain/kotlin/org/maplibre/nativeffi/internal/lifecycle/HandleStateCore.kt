@@ -1,7 +1,10 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
 import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.status.Status
 
 /** Platform-neutral release-state bookkeeping for native handles. */
@@ -14,6 +17,7 @@ internal class HandleStateCore(
   @Suppress("unused") private val parents: Array<out Any> = parents
   val leakReport: LeakReport = LeakReport(typeName, handleId)
   private val releaseState = AtomicInt(STATE_LIVE)
+  private val retirement = AtomicReference<CompletableDeferred<Unit>?>(null)
 
   fun requireLive() {
     when (releaseState.load()) {
@@ -60,6 +64,23 @@ internal class HandleStateCore(
 
   fun abortClose() {
     check(releaseState.compareAndSet(STATE_RELEASING, STATE_LIVE))
+  }
+
+  /**
+   * Claims this handle's one asynchronous close and takes the close lease with it.
+   *
+   * The first caller gets [claim] back and owns the close; every later caller gets the deferred the
+   * first one published, so a repeated or concurrent close awaits the same native teardown.
+   */
+  fun claimRetirement(claim: CompletableDeferred<Unit>): Deferred<Unit> {
+    if (!retirement.compareAndSet(null, claim)) return checkNotNull(retirement.load())
+    check(beginClose()) { "$typeName retired without a claim" }
+    return claim
+  }
+
+  /** Releases a claim whose close was rejected before it started, so a later close can retry. */
+  fun abandonRetirement(claim: CompletableDeferred<Unit>) {
+    retirement.compareAndSet(claim, null)
   }
 
   fun closeOnce(destroy: () -> Int, afterSuccess: () -> Unit = {}) {

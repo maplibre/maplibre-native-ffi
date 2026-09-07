@@ -15,7 +15,6 @@ const keyboard_animation_ms = 160.0;
 const reset_animation_ms = 220.0;
 
 pub const Result = struct {
-    handled: bool = false,
     camera_changed: bool = false,
 };
 
@@ -48,17 +47,18 @@ pub const Controller = struct {
         state: *map_state.MapState,
         current_viewport: types.Viewport,
     ) !Result {
-        if (self.drag_mode != .none) return .{ .handled = true };
+        if (self.drag_mode != .none) return .{};
         const mode = dragModeForButton(button.button);
         if (mode == .none) return .{};
 
         const cursor = logicalPoint(button.x, button.y, current_viewport);
         self.last_x = cursor.x;
         self.last_y = cursor.y;
+        try state.cancelTransitions();
         try state.setGesture(.begin);
         self.drag_mode = mode;
         self.drag_button = button.button;
-        return .{ .handled = true };
+        return .{};
     }
 
     fn handleMouseButtonUp(
@@ -67,11 +67,11 @@ pub const Controller = struct {
         state: *map_state.MapState,
     ) !Result {
         if (button.button != c.SDL_BUTTON_LEFT and button.button != c.SDL_BUTTON_RIGHT) return .{};
-        if (button.button != self.drag_button) return .{ .handled = true };
+        if (button.button != self.drag_button) return .{};
         try self.endDrag(state);
         self.last_x = button.x;
         self.last_y = button.y;
-        return .{ .handled = true };
+        return .{};
     }
 
     fn endDrag(self: *Controller, state: *map_state.MapState) !void {
@@ -100,18 +100,18 @@ pub const Controller = struct {
             .pan => {
                 const dx = x - self.last_x;
                 const dy = y - self.last_y;
-                if (dx == 0 and dy == 0) return .{ .handled = true };
+                if (dx == 0 and dy == 0) return .{};
                 try state.moveBy(dx, dy);
             },
             .rotate => {
                 const dx = x - self.last_x;
                 const dy = y - self.last_y;
-                if (dx == 0 and dy == 0) return .{ .handled = true };
+                if (dx == 0 and dy == 0) return .{};
                 try state.adjustBearing(dx * 0.5);
                 try state.pitchBy(dy / 2.0);
             },
         }
-        return .{ .handled = true, .camera_changed = true };
+        return .{ .camera_changed = true };
     }
 };
 
@@ -136,12 +136,12 @@ fn handleMouseWheel(
     current_viewport: types.Viewport,
 ) !Result {
     const delta: f64 = wheel.y;
-    if (delta == 0) return .{ .handled = true };
+    if (delta == 0) return .{};
 
     const anchor = logicalPoint(wheel.mouse_x, wheel.mouse_y, current_viewport);
     const scale = std.math.pow(f64, 2.0, delta * 0.25);
     try state.scaleBy(scale, anchor);
-    return .{ .handled = true, .camera_changed = true };
+    return .{ .camera_changed = true };
 }
 
 fn handleKeyDown(
@@ -172,7 +172,7 @@ fn handleKeyDown(
         scancode(c.SDL_SCANCODE_0) => try state.resetOrientation(reset_animation_ms),
         else => return .{},
     }
-    return .{ .handled = true, .camera_changed = true };
+    return .{ .camera_changed = true };
 }
 
 fn dragModeForButton(button: u8) DragMode {

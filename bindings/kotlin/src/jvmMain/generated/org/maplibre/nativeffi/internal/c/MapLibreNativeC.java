@@ -178,24 +178,6 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     public static final OfLong mln_map_projection = MapLibreNativeC.C_LONG;
     /**
      * {@snippet lang=c :
-     * typedef uint64_t mln_offline_region_snapshot
-     * }
-     */
-    public static final OfLong mln_offline_region_snapshot = MapLibreNativeC.C_LONG;
-    /**
-     * {@snippet lang=c :
-     * typedef uint64_t mln_offline_region_list
-     * }
-     */
-    public static final OfLong mln_offline_region_list = MapLibreNativeC.C_LONG;
-    /**
-     * {@snippet lang=c :
-     * typedef uint64_t mln_buffer
-     * }
-     */
-    public static final OfLong mln_buffer = MapLibreNativeC.C_LONG;
-    /**
-     * {@snippet lang=c :
      * typedef uint64_t mln_resource_request_handle
      * }
      */
@@ -236,126 +218,6 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
      * }
      */
     public static final OfLong mln_render_frame_batch = MapLibreNativeC.C_LONG;
-
-    private static class mln_buffer_get {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_buffer_get");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mln_status mln_buffer_get(mln_buffer buffer, mln_buffer_view *out_view)
-     * }
-     */
-    public static FunctionDescriptor mln_buffer_get$descriptor() {
-        return mln_buffer_get.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mln_status mln_buffer_get(mln_buffer buffer, mln_buffer_view *out_view)
-     * }
-     */
-    public static MethodHandle mln_buffer_get$handle() {
-        return mln_buffer_get.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mln_status mln_buffer_get(mln_buffer buffer, mln_buffer_view *out_view)
-     * }
-     */
-    public static MemorySegment mln_buffer_get$address() {
-        return mln_buffer_get.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mln_status mln_buffer_get(mln_buffer buffer, mln_buffer_view *out_view)
-     * }
-     */
-    public static int mln_buffer_get(long buffer, MemorySegment out_view) {
-        var mh$ = mln_buffer_get.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_buffer_get", buffer, out_view);
-            }
-            return (int)mh$.invokeExact(buffer, out_view);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_buffer_destroy {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.ofVoid(
-            MapLibreNativeC.C_LONG
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_buffer_destroy");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * void mln_buffer_destroy(mln_buffer buffer)
-     * }
-     */
-    public static FunctionDescriptor mln_buffer_destroy$descriptor() {
-        return mln_buffer_destroy.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * void mln_buffer_destroy(mln_buffer buffer)
-     * }
-     */
-    public static MethodHandle mln_buffer_destroy$handle() {
-        return mln_buffer_destroy.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * void mln_buffer_destroy(mln_buffer buffer)
-     * }
-     */
-    public static MemorySegment mln_buffer_destroy$address() {
-        return mln_buffer_destroy.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * void mln_buffer_destroy(mln_buffer buffer)
-     * }
-     */
-    public static void mln_buffer_destroy(long buffer) {
-        var mh$ = mln_buffer_destroy.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_buffer_destroy", buffer);
-            }
-            mh$.invokeExact(buffer);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
 
     private static class mln_c_version {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
@@ -1179,10 +1041,10 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     public static int MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT() {
         return MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT;
     }
-    private static final int MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = (int)8L;
+    private static final int MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = (int)9L;
     /**
      * {@snippet lang=c :
-     * enum mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 8
+     * enum mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 9
      * }
      */
     public static int MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED() {
@@ -4418,308 +4280,6 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
-    private static class mln_offline_region_snapshot_get {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_offline_region_snapshot_get");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mln_status mln_offline_region_snapshot_get(mln_offline_region_snapshot snapshot, mln_offline_region_info *out_info)
-     * }
-     */
-    public static FunctionDescriptor mln_offline_region_snapshot_get$descriptor() {
-        return mln_offline_region_snapshot_get.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mln_status mln_offline_region_snapshot_get(mln_offline_region_snapshot snapshot, mln_offline_region_info *out_info)
-     * }
-     */
-    public static MethodHandle mln_offline_region_snapshot_get$handle() {
-        return mln_offline_region_snapshot_get.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mln_status mln_offline_region_snapshot_get(mln_offline_region_snapshot snapshot, mln_offline_region_info *out_info)
-     * }
-     */
-    public static MemorySegment mln_offline_region_snapshot_get$address() {
-        return mln_offline_region_snapshot_get.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mln_status mln_offline_region_snapshot_get(mln_offline_region_snapshot snapshot, mln_offline_region_info *out_info)
-     * }
-     */
-    public static int mln_offline_region_snapshot_get(long snapshot, MemorySegment out_info) {
-        var mh$ = mln_offline_region_snapshot_get.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_offline_region_snapshot_get", snapshot, out_info);
-            }
-            return (int)mh$.invokeExact(snapshot, out_info);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_offline_region_snapshot_destroy {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.ofVoid(
-            MapLibreNativeC.C_LONG
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_offline_region_snapshot_destroy");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * void mln_offline_region_snapshot_destroy(mln_offline_region_snapshot snapshot)
-     * }
-     */
-    public static FunctionDescriptor mln_offline_region_snapshot_destroy$descriptor() {
-        return mln_offline_region_snapshot_destroy.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * void mln_offline_region_snapshot_destroy(mln_offline_region_snapshot snapshot)
-     * }
-     */
-    public static MethodHandle mln_offline_region_snapshot_destroy$handle() {
-        return mln_offline_region_snapshot_destroy.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * void mln_offline_region_snapshot_destroy(mln_offline_region_snapshot snapshot)
-     * }
-     */
-    public static MemorySegment mln_offline_region_snapshot_destroy$address() {
-        return mln_offline_region_snapshot_destroy.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * void mln_offline_region_snapshot_destroy(mln_offline_region_snapshot snapshot)
-     * }
-     */
-    public static void mln_offline_region_snapshot_destroy(long snapshot) {
-        var mh$ = mln_offline_region_snapshot_destroy.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_offline_region_snapshot_destroy", snapshot);
-            }
-            mh$.invokeExact(snapshot);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_offline_region_list_count {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_offline_region_list_count");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mln_status mln_offline_region_list_count(mln_offline_region_list list, size_t *out_count)
-     * }
-     */
-    public static FunctionDescriptor mln_offline_region_list_count$descriptor() {
-        return mln_offline_region_list_count.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mln_status mln_offline_region_list_count(mln_offline_region_list list, size_t *out_count)
-     * }
-     */
-    public static MethodHandle mln_offline_region_list_count$handle() {
-        return mln_offline_region_list_count.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mln_status mln_offline_region_list_count(mln_offline_region_list list, size_t *out_count)
-     * }
-     */
-    public static MemorySegment mln_offline_region_list_count$address() {
-        return mln_offline_region_list_count.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mln_status mln_offline_region_list_count(mln_offline_region_list list, size_t *out_count)
-     * }
-     */
-    public static int mln_offline_region_list_count(long list, MemorySegment out_count) {
-        var mh$ = mln_offline_region_list_count.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_offline_region_list_count", list, out_count);
-            }
-            return (int)mh$.invokeExact(list, out_count);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_offline_region_list_get {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_offline_region_list_get");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mln_status mln_offline_region_list_get(mln_offline_region_list list, size_t index, mln_offline_region_info *out_info)
-     * }
-     */
-    public static FunctionDescriptor mln_offline_region_list_get$descriptor() {
-        return mln_offline_region_list_get.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mln_status mln_offline_region_list_get(mln_offline_region_list list, size_t index, mln_offline_region_info *out_info)
-     * }
-     */
-    public static MethodHandle mln_offline_region_list_get$handle() {
-        return mln_offline_region_list_get.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mln_status mln_offline_region_list_get(mln_offline_region_list list, size_t index, mln_offline_region_info *out_info)
-     * }
-     */
-    public static MemorySegment mln_offline_region_list_get$address() {
-        return mln_offline_region_list_get.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mln_status mln_offline_region_list_get(mln_offline_region_list list, size_t index, mln_offline_region_info *out_info)
-     * }
-     */
-    public static int mln_offline_region_list_get(long list, long index, MemorySegment out_info) {
-        var mh$ = mln_offline_region_list_get.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_offline_region_list_get", list, index, out_info);
-            }
-            return (int)mh$.invokeExact(list, index, out_info);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_offline_region_list_destroy {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.ofVoid(
-            MapLibreNativeC.C_LONG
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_offline_region_list_destroy");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * void mln_offline_region_list_destroy(mln_offline_region_list list)
-     * }
-     */
-    public static FunctionDescriptor mln_offline_region_list_destroy$descriptor() {
-        return mln_offline_region_list_destroy.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * void mln_offline_region_list_destroy(mln_offline_region_list list)
-     * }
-     */
-    public static MethodHandle mln_offline_region_list_destroy$handle() {
-        return mln_offline_region_list_destroy.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * void mln_offline_region_list_destroy(mln_offline_region_list list)
-     * }
-     */
-    public static MemorySegment mln_offline_region_list_destroy$address() {
-        return mln_offline_region_list_destroy.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * void mln_offline_region_list_destroy(mln_offline_region_list list)
-     * }
-     */
-    public static void mln_offline_region_list_destroy(long list) {
-        var mh$ = mln_offline_region_list_destroy.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_offline_region_list_destroy", list);
-            }
-            mh$.invokeExact(list);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
     private static class mln_map_options_default {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mln_map_options.layout()    );
@@ -6709,6 +6269,67 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
                 traceDowncall("mln_map_apply_camera_delta", map, delta, completion);
             }
             return (int)mh$.invokeExact(map, delta, completion);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_cancel_transitions {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_cancel_transitions");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_cancel_transitions(mln_map map, const mln_completion *completion)
+     * }
+     */
+    public static FunctionDescriptor mln_map_cancel_transitions$descriptor() {
+        return mln_map_cancel_transitions.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_cancel_transitions(mln_map map, const mln_completion *completion)
+     * }
+     */
+    public static MethodHandle mln_map_cancel_transitions$handle() {
+        return mln_map_cancel_transitions.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_cancel_transitions(mln_map map, const mln_completion *completion)
+     * }
+     */
+    public static MemorySegment mln_map_cancel_transitions$address() {
+        return mln_map_cancel_transitions.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_cancel_transitions(mln_map map, const mln_completion *completion)
+     * }
+     */
+    public static int mln_map_cancel_transitions(long map, MemorySegment completion) {
+        var mh$ = mln_map_cancel_transitions.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_cancel_transitions", map, completion);
+            }
+            return (int)mh$.invokeExact(map, completion);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -9160,246 +8781,6 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
-    private static class mln_queried_feature_default {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mln_queried_feature.layout()    );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_queried_feature_default");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mln_queried_feature mln_queried_feature_default()
-     * }
-     */
-    public static FunctionDescriptor mln_queried_feature_default$descriptor() {
-        return mln_queried_feature_default.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mln_queried_feature mln_queried_feature_default()
-     * }
-     */
-    public static MethodHandle mln_queried_feature_default$handle() {
-        return mln_queried_feature_default.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mln_queried_feature mln_queried_feature_default()
-     * }
-     */
-    public static MemorySegment mln_queried_feature_default$address() {
-        return mln_queried_feature_default.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mln_queried_feature mln_queried_feature_default()
-     * }
-     */
-    public static MemorySegment mln_queried_feature_default(SegmentAllocator allocator) {
-        var mh$ = mln_queried_feature_default.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_queried_feature_default", allocator);
-            }
-            return (MemorySegment)mh$.invokeExact(allocator);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_queried_feature_list_count {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_queried_feature_list_count");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mln_status mln_queried_feature_list_count(mln_queried_feature_list list, size_t *out_count)
-     * }
-     */
-    public static FunctionDescriptor mln_queried_feature_list_count$descriptor() {
-        return mln_queried_feature_list_count.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mln_status mln_queried_feature_list_count(mln_queried_feature_list list, size_t *out_count)
-     * }
-     */
-    public static MethodHandle mln_queried_feature_list_count$handle() {
-        return mln_queried_feature_list_count.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mln_status mln_queried_feature_list_count(mln_queried_feature_list list, size_t *out_count)
-     * }
-     */
-    public static MemorySegment mln_queried_feature_list_count$address() {
-        return mln_queried_feature_list_count.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mln_status mln_queried_feature_list_count(mln_queried_feature_list list, size_t *out_count)
-     * }
-     */
-    public static int mln_queried_feature_list_count(long list, MemorySegment out_count) {
-        var mh$ = mln_queried_feature_list_count.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_queried_feature_list_count", list, out_count);
-            }
-            return (int)mh$.invokeExact(list, out_count);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_queried_feature_list_get {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_queried_feature_list_get");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mln_status mln_queried_feature_list_get(mln_queried_feature_list list, size_t index, mln_queried_feature *out_feature)
-     * }
-     */
-    public static FunctionDescriptor mln_queried_feature_list_get$descriptor() {
-        return mln_queried_feature_list_get.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mln_status mln_queried_feature_list_get(mln_queried_feature_list list, size_t index, mln_queried_feature *out_feature)
-     * }
-     */
-    public static MethodHandle mln_queried_feature_list_get$handle() {
-        return mln_queried_feature_list_get.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mln_status mln_queried_feature_list_get(mln_queried_feature_list list, size_t index, mln_queried_feature *out_feature)
-     * }
-     */
-    public static MemorySegment mln_queried_feature_list_get$address() {
-        return mln_queried_feature_list_get.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mln_status mln_queried_feature_list_get(mln_queried_feature_list list, size_t index, mln_queried_feature *out_feature)
-     * }
-     */
-    public static int mln_queried_feature_list_get(long list, long index, MemorySegment out_feature) {
-        var mh$ = mln_queried_feature_list_get.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_queried_feature_list_get", list, index, out_feature);
-            }
-            return (int)mh$.invokeExact(list, index, out_feature);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_queried_feature_list_destroy {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.ofVoid(
-            MapLibreNativeC.C_LONG
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_queried_feature_list_destroy");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * void mln_queried_feature_list_destroy(mln_queried_feature_list list)
-     * }
-     */
-    public static FunctionDescriptor mln_queried_feature_list_destroy$descriptor() {
-        return mln_queried_feature_list_destroy.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * void mln_queried_feature_list_destroy(mln_queried_feature_list list)
-     * }
-     */
-    public static MethodHandle mln_queried_feature_list_destroy$handle() {
-        return mln_queried_feature_list_destroy.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * void mln_queried_feature_list_destroy(mln_queried_feature_list list)
-     * }
-     */
-    public static MemorySegment mln_queried_feature_list_destroy$address() {
-        return mln_queried_feature_list_destroy.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * void mln_queried_feature_list_destroy(mln_queried_feature_list list)
-     * }
-     */
-    public static void mln_queried_feature_list_destroy(long list) {
-        var mh$ = mln_queried_feature_list_destroy.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_queried_feature_list_destroy", list);
-            }
-            mh$.invokeExact(list);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
     private static class mln_render_session_query_rendered_features {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
@@ -11474,18 +10855,6 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
            throw new AssertionError("should not reach here", ex$);
         }
     }
-    /**
-     * {@snippet lang=c :
-     * typedef uint64_t mln_style_id_list
-     * }
-     */
-    public static final OfLong mln_style_id_list = MapLibreNativeC.C_LONG;
-    /**
-     * {@snippet lang=c :
-     * typedef uint64_t mln_style_string_list
-     * }
-     */
-    public static final OfLong mln_style_string_list = MapLibreNativeC.C_LONG;
     private static final int MLN_STYLE_SOURCE_TYPE_UNKNOWN = (int)0L;
     /**
      * {@snippet lang=c :
@@ -12456,64 +11825,6 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
-    private static class mln_style_image_info_default {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mln_style_image_info.layout()    );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_style_image_info_default");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mln_style_image_info mln_style_image_info_default()
-     * }
-     */
-    public static FunctionDescriptor mln_style_image_info_default$descriptor() {
-        return mln_style_image_info_default.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mln_style_image_info mln_style_image_info_default()
-     * }
-     */
-    public static MethodHandle mln_style_image_info_default$handle() {
-        return mln_style_image_info_default.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mln_style_image_info mln_style_image_info_default()
-     * }
-     */
-    public static MemorySegment mln_style_image_info_default$address() {
-        return mln_style_image_info_default.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mln_style_image_info mln_style_image_info_default()
-     * }
-     */
-    public static MemorySegment mln_style_image_info_default(SegmentAllocator allocator) {
-        var mh$ = mln_style_image_info_default.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_style_image_info_default", allocator);
-            }
-            return (MemorySegment)mh$.invokeExact(allocator);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
     private static class mln_style_transition_options_default {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mln_style_transition_options.layout()    );
@@ -12565,370 +11876,6 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
                 traceDowncall("mln_style_transition_options_default", allocator);
             }
             return (MemorySegment)mh$.invokeExact(allocator);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_style_id_list_count {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_style_id_list_count");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mln_status mln_style_id_list_count(mln_style_id_list list, size_t *out_count)
-     * }
-     */
-    public static FunctionDescriptor mln_style_id_list_count$descriptor() {
-        return mln_style_id_list_count.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mln_status mln_style_id_list_count(mln_style_id_list list, size_t *out_count)
-     * }
-     */
-    public static MethodHandle mln_style_id_list_count$handle() {
-        return mln_style_id_list_count.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mln_status mln_style_id_list_count(mln_style_id_list list, size_t *out_count)
-     * }
-     */
-    public static MemorySegment mln_style_id_list_count$address() {
-        return mln_style_id_list_count.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mln_status mln_style_id_list_count(mln_style_id_list list, size_t *out_count)
-     * }
-     */
-    public static int mln_style_id_list_count(long list, MemorySegment out_count) {
-        var mh$ = mln_style_id_list_count.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_style_id_list_count", list, out_count);
-            }
-            return (int)mh$.invokeExact(list, out_count);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_style_id_list_get {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_style_id_list_get");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mln_status mln_style_id_list_get(mln_style_id_list list, size_t index, mln_buffer_view *out_id)
-     * }
-     */
-    public static FunctionDescriptor mln_style_id_list_get$descriptor() {
-        return mln_style_id_list_get.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mln_status mln_style_id_list_get(mln_style_id_list list, size_t index, mln_buffer_view *out_id)
-     * }
-     */
-    public static MethodHandle mln_style_id_list_get$handle() {
-        return mln_style_id_list_get.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mln_status mln_style_id_list_get(mln_style_id_list list, size_t index, mln_buffer_view *out_id)
-     * }
-     */
-    public static MemorySegment mln_style_id_list_get$address() {
-        return mln_style_id_list_get.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mln_status mln_style_id_list_get(mln_style_id_list list, size_t index, mln_buffer_view *out_id)
-     * }
-     */
-    public static int mln_style_id_list_get(long list, long index, MemorySegment out_id) {
-        var mh$ = mln_style_id_list_get.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_style_id_list_get", list, index, out_id);
-            }
-            return (int)mh$.invokeExact(list, index, out_id);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_style_id_list_destroy {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.ofVoid(
-            MapLibreNativeC.C_LONG
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_style_id_list_destroy");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * void mln_style_id_list_destroy(mln_style_id_list list)
-     * }
-     */
-    public static FunctionDescriptor mln_style_id_list_destroy$descriptor() {
-        return mln_style_id_list_destroy.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * void mln_style_id_list_destroy(mln_style_id_list list)
-     * }
-     */
-    public static MethodHandle mln_style_id_list_destroy$handle() {
-        return mln_style_id_list_destroy.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * void mln_style_id_list_destroy(mln_style_id_list list)
-     * }
-     */
-    public static MemorySegment mln_style_id_list_destroy$address() {
-        return mln_style_id_list_destroy.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * void mln_style_id_list_destroy(mln_style_id_list list)
-     * }
-     */
-    public static void mln_style_id_list_destroy(long list) {
-        var mh$ = mln_style_id_list_destroy.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_style_id_list_destroy", list);
-            }
-            mh$.invokeExact(list);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_style_string_list_count {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_style_string_list_count");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mln_status mln_style_string_list_count(mln_style_string_list list, size_t *out_count)
-     * }
-     */
-    public static FunctionDescriptor mln_style_string_list_count$descriptor() {
-        return mln_style_string_list_count.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mln_status mln_style_string_list_count(mln_style_string_list list, size_t *out_count)
-     * }
-     */
-    public static MethodHandle mln_style_string_list_count$handle() {
-        return mln_style_string_list_count.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mln_status mln_style_string_list_count(mln_style_string_list list, size_t *out_count)
-     * }
-     */
-    public static MemorySegment mln_style_string_list_count$address() {
-        return mln_style_string_list_count.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mln_status mln_style_string_list_count(mln_style_string_list list, size_t *out_count)
-     * }
-     */
-    public static int mln_style_string_list_count(long list, MemorySegment out_count) {
-        var mh$ = mln_style_string_list_count.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_style_string_list_count", list, out_count);
-            }
-            return (int)mh$.invokeExact(list, out_count);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_style_string_list_get {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_style_string_list_get");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mln_status mln_style_string_list_get(mln_style_string_list list, size_t index, mln_buffer_view *out_value)
-     * }
-     */
-    public static FunctionDescriptor mln_style_string_list_get$descriptor() {
-        return mln_style_string_list_get.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mln_status mln_style_string_list_get(mln_style_string_list list, size_t index, mln_buffer_view *out_value)
-     * }
-     */
-    public static MethodHandle mln_style_string_list_get$handle() {
-        return mln_style_string_list_get.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mln_status mln_style_string_list_get(mln_style_string_list list, size_t index, mln_buffer_view *out_value)
-     * }
-     */
-    public static MemorySegment mln_style_string_list_get$address() {
-        return mln_style_string_list_get.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mln_status mln_style_string_list_get(mln_style_string_list list, size_t index, mln_buffer_view *out_value)
-     * }
-     */
-    public static int mln_style_string_list_get(long list, long index, MemorySegment out_value) {
-        var mh$ = mln_style_string_list_get.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_style_string_list_get", list, index, out_value);
-            }
-            return (int)mh$.invokeExact(list, index, out_value);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_style_string_list_destroy {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.ofVoid(
-            MapLibreNativeC.C_LONG
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_style_string_list_destroy");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * void mln_style_string_list_destroy(mln_style_string_list list)
-     * }
-     */
-    public static FunctionDescriptor mln_style_string_list_destroy$descriptor() {
-        return mln_style_string_list_destroy.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * void mln_style_string_list_destroy(mln_style_string_list list)
-     * }
-     */
-    public static MethodHandle mln_style_string_list_destroy$handle() {
-        return mln_style_string_list_destroy.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * void mln_style_string_list_destroy(mln_style_string_list list)
-     * }
-     */
-    public static MemorySegment mln_style_string_list_destroy$address() {
-        return mln_style_string_list_destroy.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * void mln_style_string_list_destroy(mln_style_string_list list)
-     * }
-     */
-    public static void mln_style_string_list_destroy(long list) {
-        var mh$ = mln_style_string_list_destroy.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_style_string_list_destroy", list);
-            }
-            mh$.invokeExact(list);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -18477,64 +17424,6 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
-    private static class mln_texture_image_info_default {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            mln_texture_image_info.layout()    );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_texture_image_info_default");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mln_texture_image_info mln_texture_image_info_default()
-     * }
-     */
-    public static FunctionDescriptor mln_texture_image_info_default$descriptor() {
-        return mln_texture_image_info_default.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mln_texture_image_info mln_texture_image_info_default()
-     * }
-     */
-    public static MethodHandle mln_texture_image_info_default$handle() {
-        return mln_texture_image_info_default.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mln_texture_image_info mln_texture_image_info_default()
-     * }
-     */
-    public static MemorySegment mln_texture_image_info_default$address() {
-        return mln_texture_image_info_default.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mln_texture_image_info mln_texture_image_info_default()
-     * }
-     */
-    public static MemorySegment mln_texture_image_info_default(SegmentAllocator allocator) {
-        var mh$ = mln_texture_image_info_default.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_texture_image_info_default", allocator);
-            }
-            return (MemorySegment)mh$.invokeExact(allocator);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
     private static class mln_metal_owned_texture_attach {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
@@ -19530,67 +18419,6 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         try {
             if (TRACE_DOWNCALLS) {
                 traceDowncall("mln_acquired_frame_get_opengl_texture", frame, out_frame);
-            }
-            return (int)mh$.invokeExact(frame, out_frame);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_acquired_frame_get_webgpu_texture {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_acquired_frame_get_webgpu_texture");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_webgpu_texture(mln_acquired_frame frame, mln_webgpu_owned_texture_frame *out_frame)
-     * }
-     */
-    public static FunctionDescriptor mln_acquired_frame_get_webgpu_texture$descriptor() {
-        return mln_acquired_frame_get_webgpu_texture.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_webgpu_texture(mln_acquired_frame frame, mln_webgpu_owned_texture_frame *out_frame)
-     * }
-     */
-    public static MethodHandle mln_acquired_frame_get_webgpu_texture$handle() {
-        return mln_acquired_frame_get_webgpu_texture.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_webgpu_texture(mln_acquired_frame frame, mln_webgpu_owned_texture_frame *out_frame)
-     * }
-     */
-    public static MemorySegment mln_acquired_frame_get_webgpu_texture$address() {
-        return mln_acquired_frame_get_webgpu_texture.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_webgpu_texture(mln_acquired_frame frame, mln_webgpu_owned_texture_frame *out_frame)
-     * }
-     */
-    public static int mln_acquired_frame_get_webgpu_texture(long frame, MemorySegment out_frame) {
-        var mh$ = mln_acquired_frame_get_webgpu_texture.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_acquired_frame_get_webgpu_texture", frame, out_frame);
             }
             return (int)mh$.invokeExact(frame, out_frame);
         } catch (Error | RuntimeException ex) {

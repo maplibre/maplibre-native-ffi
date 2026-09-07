@@ -59,7 +59,7 @@ cargo_support_tests() {
     -p maplibre-native-ffi-core \
     --target wasm32-unknown-emscripten \
     -Zbuild-std=std,panic_abort \
-    -- "$@" --test-threads=1
+    -- --test-threads=1
 }
 
 cargo_binding_test() {
@@ -73,37 +73,80 @@ cargo_binding_test() {
 # Chromium retains GPU and pthread resources longer than their native handles.
 # Give every integration test a fresh process so otherwise independent tests
 # cannot inherit a context budget or worker-pool state from their predecessors.
-run_file_tests() {
-  local prefix=$1
-  local source=$2
-  while IFS= read -r test_name; do
-    cargo_binding_test "$prefix$test_name" --exact
-  done < <(
-    awk '
-      /#\[test\]/ { test = 1; next }
-      test && /^fn / {
-        sub(/^fn /, "")
-        sub(/\(.*/, "")
-        print
-        test = 0
-      }
-    ' "$source"
-  )
+binding_source="$MISE_MONOREPO_ROOT/bindings/rust/crates/maplibre-native-ffi/src"
+
+# Each entry pairs a source file with the module path its tests are compiled
+# under. Tests live in indented `mod tests` blocks, so the names are read from
+# the first function declaration after each `#[test]` attribute at any depth.
+test_sources=(
+  "completion.rs completion::tests::"
+  "custom_geometry.rs custom_geometry::tests::"
+  "custom_mvt_vector.rs custom_mvt_vector::tests::"
+  "events.rs events::tests::"
+  "handle.rs handle::tests::"
+  "lib.rs tests::"
+  "logging.rs logging::tests::"
+  "map/tests.rs map::tests::"
+  "projection.rs projection::tests::"
+  "render/tests.rs render::tests::"
+  "resource.rs resource::tests::"
+  "runtime.rs runtime::tests::"
+)
+
+list_test_names() {
+  awk '
+    /#\[test\]/ { pending = 1; next }
+    pending && /^[[:space:]]*(pub[[:space:]]+)?(async[[:space:]]+)?fn[[:space:]]/ {
+      sub(/^[[:space:]]*(pub[[:space:]]+)?(async[[:space:]]+)?fn[[:space:]]+/, "")
+      sub(/[(<].*/, "")
+      print
+      pending = 0
+    }
+  ' "$1"
 }
 
-binding_source="$MISE_MONOREPO_ROOT/bindings/rust/crates/maplibre-native-ffi/src"
-run_file_tests 'completion::tests::' "$binding_source/completion.rs"
-run_file_tests 'custom_geometry::tests::' "$binding_source/custom_geometry.rs"
-run_file_tests 'custom_mvt_vector::tests::' "$binding_source/custom_mvt_vector.rs"
-run_file_tests 'events::tests::' "$binding_source/events.rs"
-run_file_tests 'handle::tests::' "$binding_source/handle.rs"
-run_file_tests 'logging::tests::' "$binding_source/logging.rs"
-run_file_tests 'map::tests::' "$binding_source/map/tests.rs"
-run_file_tests 'projection::tests::' "$binding_source/projection.rs"
-run_file_tests 'render::tests::' "$binding_source/render/tests.rs"
-run_file_tests 'resource::tests::' "$binding_source/resource.rs"
-run_file_tests 'runtime::tests::' "$binding_source/runtime.rs"
-run_file_tests 'tests::' "$binding_source/lib.rs"
+# A source file that grows tests without an entry here would otherwise be
+# skipped silently, and so would a file whose module path stopped matching.
+listed_files=()
+for entry in "${test_sources[@]}"; do
+  listed_files+=("${entry%% *}")
+done
+while IFS= read -r source; do
+  relative="${source#"$binding_source/"}"
+  for listed in "${listed_files[@]}"; do
+    if [[ "$listed" == "$relative" ]]; then
+      continue 2
+    fi
+  done
+  echo "$relative declares tests but is missing from test_sources in ${BASH_SOURCE[0]}" >&2
+  exit 1
+done < <(grep -rl $'#\[test\]' "$binding_source" | sort)
+
+for entry in "${test_sources[@]}"; do
+  relative="${entry%% *}"
+  prefix="${entry#* }"
+  source="$binding_source/$relative"
+  declared=$(grep -c $'#\[test\]' "$source")
+  enumerated=0
+  test_names=()
+  while IFS= read -r test_name; do
+    enumerated=$((enumerated + 1))
+    # A pair of `cfg` alternatives shares one name, and only one of them is
+    # compiled for this target.
+    case " ${test_names[*]:-} " in
+      *" $test_name "*) continue ;;
+    esac
+    test_names+=("$test_name")
+  done < <(list_test_names "$source")
+  if [[ "$enumerated" -ne "$declared" ]]; then
+    echo "enumerated $enumerated of $declared tests in $relative" >&2
+    exit 1
+  fi
+  for test_name in "${test_names[@]}"; do
+    cargo_binding_test "$prefix$test_name" --exact
+  done
+done
+
 cargo_support_tests
 cargo clippy \
   -p maplibre-native-ffi-sys \

@@ -4,6 +4,7 @@
 // forwards verbatim.
 
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -24,86 +25,74 @@ static const char credentialed_unsupported_scheme_style_url[] =
 static const uint8_t inline_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
+// Settles a runtime configuration command: a rejected submission leaves the
+// completion with the caller, and an accepted one reports its terminal status.
+static mln_status commit(mln_status status, mln_test_completion* completion) {
+  if (status != MLN_STATUS_OK) mln_test_completion_reject(completion);
+  const mln_status result =
+    status == MLN_STATUS_OK ? mln_test_completion_finish(completion) : status;
+  mln_test_completion_destroy(completion);
+  return result;
+}
+
 static mln_status set_resource_provider_committed(
   mln_runtime runtime, const mln_resource_provider* provider
 ) {
   mln_test_completion completion = mln_test_completion_default(0);
-  const mln_status status = mln_runtime_set_resource_provider(
-    runtime, provider, &completion.descriptor
+  return commit(
+    mln_runtime_set_resource_provider(
+      runtime, provider, &completion.descriptor
+    ),
+    &completion
   );
-  if (status != MLN_STATUS_OK) mln_test_completion_reject(&completion);
-  const mln_status result =
-    status == MLN_STATUS_OK ? mln_test_completion_finish(&completion) : status;
-  mln_test_completion_destroy(&completion);
-  return result;
 }
 
 static mln_status clear_resource_provider_committed(mln_runtime runtime) {
   mln_test_completion completion = mln_test_completion_default(0);
-  const mln_status status =
-    mln_runtime_clear_resource_provider(runtime, &completion.descriptor);
-  if (status != MLN_STATUS_OK) mln_test_completion_reject(&completion);
-  const mln_status result =
-    status == MLN_STATUS_OK ? mln_test_completion_finish(&completion) : status;
-  mln_test_completion_destroy(&completion);
-  return result;
+  return commit(
+    mln_runtime_clear_resource_provider(runtime, &completion.descriptor),
+    &completion
+  );
 }
 
 static mln_status set_resource_transform_committed(
   mln_runtime runtime, const mln_resource_transform* transform
 ) {
   mln_test_completion completion = mln_test_completion_default(0);
-  const mln_status status = mln_runtime_set_resource_transform(
-    runtime, transform, &completion.descriptor
+  return commit(
+    mln_runtime_set_resource_transform(
+      runtime, transform, &completion.descriptor
+    ),
+    &completion
   );
-  if (status != MLN_STATUS_OK) mln_test_completion_reject(&completion);
-  const mln_status result =
-    status == MLN_STATUS_OK ? mln_test_completion_finish(&completion) : status;
-  mln_test_completion_destroy(&completion);
-  return result;
 }
 
 static mln_status clear_resource_transform_committed(mln_runtime runtime) {
   mln_test_completion completion = mln_test_completion_default(0);
-  const mln_status status =
-    mln_runtime_clear_resource_transform(runtime, &completion.descriptor);
-  if (status != MLN_STATUS_OK) mln_test_completion_reject(&completion);
-  const mln_status result =
-    status == MLN_STATUS_OK ? mln_test_completion_finish(&completion) : status;
-  mln_test_completion_destroy(&completion);
-  return result;
+  return commit(
+    mln_runtime_clear_resource_transform(runtime, &completion.descriptor),
+    &completion
+  );
 }
 
 static mln_status set_http_header_transform_committed(
   mln_runtime runtime, const mln_http_header_transform* transform
 ) {
   mln_test_completion completion = mln_test_completion_default(0);
-  const mln_status status = mln_runtime_set_http_header_transform(
-    runtime, transform, &completion.descriptor
+  return commit(
+    mln_runtime_set_http_header_transform(
+      runtime, transform, &completion.descriptor
+    ),
+    &completion
   );
-  if (status != MLN_STATUS_OK) mln_test_completion_reject(&completion);
-  const mln_status result =
-    status == MLN_STATUS_OK ? mln_test_completion_finish(&completion) : status;
-  mln_test_completion_destroy(&completion);
-  return result;
 }
 
 static mln_status clear_http_header_transform_committed(mln_runtime runtime) {
   mln_test_completion completion = mln_test_completion_default(0);
-  const mln_status status =
-    mln_runtime_clear_http_header_transform(runtime, &completion.descriptor);
-  if (status != MLN_STATUS_OK) mln_test_completion_reject(&completion);
-  const mln_status result =
-    status == MLN_STATUS_OK ? mln_test_completion_finish(&completion) : status;
-  mln_test_completion_destroy(&completion);
-  return result;
-}
-
-static bool wait_for_offline_completion(
-  mln_runtime runtime, mln_test_completion* completion
-) {
-  (void)runtime;
-  return mln_test_completion_wait(completion, 5000);
+  return commit(
+    mln_runtime_clear_http_header_transform(runtime, &completion.descriptor),
+    &completion
+  );
 }
 
 static bool wait_for_map_loading_failure(
@@ -192,7 +181,7 @@ static bool create_and_activate_offline_region(
     return false;
   }
   if (
-    !wait_for_offline_completion(runtime, &creation) ||
+    !mln_test_completion_wait(&creation, 5000) ||
     mln_test_completion_status(&creation) != MLN_STATUS_OK
   ) {
     mln_test_completion_destroy(&creation);
@@ -512,6 +501,188 @@ static void offline_database_merge_reports_a_corrupt_side_database(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+typedef struct offline_reentry_probe {
+  mln_runtime runtime;
+  mln_test_completion* list;
+  atomic_bool entered;
+  atomic_bool offline_accepted;
+  atomic_bool finished;
+  atomic_int offline_status;
+  atomic_int reentrant_status;
+} offline_reentry_probe;
+
+// Submits an offline operation from a second host thread while the runtime
+// worker is occupied by the probe's completion.
+static void submit_offline_list(void* argument) {
+  offline_reentry_probe* probe = argument;
+  while (!atomic_load(&probe->entered)) {
+    mln_test_sleep_millisecond();
+  }
+  atomic_store(
+    &probe->offline_status,
+    mln_runtime_offline_regions_list(probe->runtime, &probe->list->descriptor)
+  );
+  atomic_store(&probe->offline_accepted, true);
+}
+
+// Occupies whichever thread delivers this completion until the offline
+// submission has been accepted, then submits runtime work from it.
+static void occupy_until_offline_accepted(
+  void* user_data, const mln_completion_result* result
+) {
+  offline_reentry_probe* probe = user_data;
+  (void)result;
+  atomic_store(&probe->entered, true);
+  while (!atomic_load(&probe->offline_accepted)) {
+    mln_test_sleep_millisecond();
+  }
+  const mln_completion discard = mln_test_discard_completion();
+  atomic_store(
+    &probe->reentrant_status, mln_runtime_barrier(probe->runtime, &discard)
+  );
+  atomic_store(&probe->finished, true);
+}
+
+static void offline_submission_never_waits_for_the_runtime_worker(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_test_completion list = mln_test_completion_default(0);
+  offline_reentry_probe probe = {.runtime = runtime, .list = &list};
+  atomic_init(&probe.entered, false);
+  atomic_init(&probe.offline_accepted, false);
+  atomic_init(&probe.finished, false);
+  atomic_init(&probe.offline_status, MLN_STATUS_INVALID_STATE);
+  atomic_init(&probe.reentrant_status, MLN_STATUS_INVALID_STATE);
+  mln_test_thread* thread = mln_test_thread_start(submit_offline_list, &probe);
+
+  // A resource configuration completion runs on the runtime worker, so this
+  // holds that worker until the other thread's offline call has been accepted.
+  const mln_completion occupied = {
+    .size = sizeof(mln_completion),
+    .callback = occupy_until_offline_accepted,
+    .user_data = &probe,
+    .release_user_data = NULL,
+  };
+  const mln_status accepted =
+    mln_runtime_clear_resource_provider(runtime, &occupied);
+  if (accepted != MLN_STATUS_OK) {
+    // The completion will never run, so release the waiting thread by hand.
+    atomic_store(&probe.entered, true);
+  }
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, accepted);
+  mln_test_thread_join(thread);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&probe.offline_status));
+  while (!atomic_load(&probe.finished)) {
+    mln_test_sleep_millisecond();
+  }
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&probe.reentrant_status));
+
+  TEST_ASSERT_TRUE(mln_test_completion_wait(&list, 5000));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_status(&list));
+  mln_test_completion_destroy(&list);
+  mln_test_destroy_runtime(runtime);
+}
+
+static mln_status offline_completion_status(
+  mln_status submission, mln_test_completion* completion
+) {
+  if (submission != MLN_STATUS_OK) {
+    mln_test_completion_reject(completion);
+    return submission;
+  }
+  if (!mln_test_completion_wait(completion, 5000)) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  return mln_test_completion_status(completion);
+}
+
+static void offline_operations_report_a_missing_region(void) {
+  static const mln_offline_region_id missing = 987654321;
+  mln_runtime runtime = mln_test_create_runtime();
+  const uint8_t metadata[] = {4, 5, 6};
+
+  // A get reports absence as an empty success, unlike every other operation.
+  mln_test_completion get =
+    mln_test_completion_default(sizeof(mln_offline_region_info));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    offline_completion_status(
+      mln_runtime_offline_region_get(runtime, missing, &get.descriptor), &get
+    )
+  );
+  TEST_ASSERT_EQUAL_size_t(0, mln_test_completion_value_count(&get));
+  mln_test_completion_destroy(&get);
+
+  mln_test_completion update = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_NOT_FOUND,
+    offline_completion_status(
+      mln_runtime_offline_region_update_metadata(
+        runtime, missing, metadata, sizeof(metadata), &update.descriptor
+      ),
+      &update
+    )
+  );
+  mln_test_completion_destroy(&update);
+
+  mln_test_completion region_status = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_NOT_FOUND, offline_completion_status(
+                            mln_runtime_offline_region_get_status(
+                              runtime, missing, &region_status.descriptor
+                            ),
+                            &region_status
+                          )
+  );
+  mln_test_completion_destroy(&region_status);
+
+  mln_test_completion observed = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_NOT_FOUND, offline_completion_status(
+                            mln_runtime_offline_region_set_observed(
+                              runtime, missing, true, &observed.descriptor
+                            ),
+                            &observed
+                          )
+  );
+  mln_test_completion_destroy(&observed);
+
+  mln_test_completion download = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_NOT_FOUND,
+    offline_completion_status(
+      mln_runtime_offline_region_set_download_state(
+        runtime, missing, MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
+        &download.descriptor
+      ),
+      &download
+    )
+  );
+  mln_test_completion_destroy(&download);
+
+  mln_test_completion invalidate = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_NOT_FOUND, offline_completion_status(
+                            mln_runtime_offline_region_invalidate(
+                              runtime, missing, &invalidate.descriptor
+                            ),
+                            &invalidate
+                          )
+  );
+  mln_test_completion_destroy(&invalidate);
+
+  mln_test_completion removal = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_NOT_FOUND,
+    offline_completion_status(
+      mln_runtime_offline_region_delete(runtime, missing, &removal.descriptor),
+      &removal
+    )
+  );
+  mln_test_completion_destroy(&removal);
+
+  mln_test_destroy_runtime(runtime);
+}
+
 static void resource_transform_rejects_raw_invalid_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
@@ -652,17 +823,6 @@ typedef struct provider_quiescence_probe {
   atomic_bool callback_returned;
 } provider_quiescence_probe;
 
-static bool wait_for_flag(atomic_bool* flag) {
-  for (size_t attempt = 0; attempt < teardown_probe_wait_attempts;
-       attempt += 1) {
-    if (atomic_load(flag)) {
-      return true;
-    }
-    mln_test_sleep_millisecond();
-  }
-  return false;
-}
-
 // Blocks so the per-runtime transform lock stays held while another thread
 // starts runtime teardown. Calls no C API function while blocked.
 static mln_status blocking_resource_transform(
@@ -696,7 +856,7 @@ static void other_runtime_entry(void* argument) {
   teardown_probe* probe = argument;
   mln_runtime runtime = MLN_HANDLE_NULL;
   const mln_runtime_options options = mln_runtime_options_default();
-  const mln_status create_status = mln_test_runtime_create(&options, &runtime);
+  const mln_status create_status = mln_runtime_create(&options, &runtime);
   if (create_status != MLN_STATUS_OK) {
     atomic_store(&probe->other_runtime_status, create_status);
     atomic_store(&probe->other_runtime_call_done, true);
@@ -704,7 +864,7 @@ static void other_runtime_entry(void* argument) {
   }
 
   atomic_store(&probe->other_runtime_ready, true);
-  wait_for_flag(&probe->teardown_started);
+  mln_test_wait_for_flag(&probe->teardown_started);
   // Give the teardown thread time to reach the transform wait.
   mln_test_sleep_milliseconds(teardown_call_delay_milliseconds);
   atomic_store(&probe->other_runtime_status, mln_test_runtime_barrier(runtime));
@@ -724,25 +884,11 @@ static bool activate_style_download(
 }
 
 // Waits until `flag` is set by a MapLibre thread.
-static bool wait_until_flag(mln_runtime runtime, atomic_bool* flag) {
-  for (size_t attempt = 0; attempt < teardown_probe_wait_attempts;
-       attempt += 1) {
-    if (atomic_load(flag)) {
-      return true;
-    }
-    if (mln_test_runtime_barrier(runtime) != MLN_STATUS_OK) {
-      return false;
-    }
-    mln_test_sleep_millisecond();
-  }
-  return false;
-}
-
 static bool start_offline_region_download(
   mln_runtime runtime, teardown_probe* probe
 ) {
   return activate_style_download(runtime, offline_style_url) &&
-         wait_until_flag(runtime, &probe->transform_entered);
+         mln_test_wait_until(runtime, &probe->transform_entered);
 }
 
 // Runtime teardown waits for an in-flight resource transform callback without
@@ -755,7 +901,7 @@ static void runtime_teardown_leaves_other_runtimes_responsive(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_thread* other_thread =
     mln_test_thread_start(other_runtime_entry, &probe);
-  TEST_ASSERT_TRUE(wait_for_flag(&probe.other_runtime_ready));
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.other_runtime_ready));
 
   const mln_resource_transform transform = {
     .size = sizeof(mln_resource_transform),
@@ -772,7 +918,7 @@ static void runtime_teardown_leaves_other_runtimes_responsive(void) {
   // Teardown blocks here until the transform callback returns.
   mln_test_destroy_runtime(runtime);
   mln_test_thread_join(other_thread);
-  TEST_ASSERT_TRUE(wait_for_flag(&probe.transform_released));
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.transform_released));
 
   TEST_ASSERT_TRUE_MESSAGE(
     atomic_load(&probe.other_runtime_call_observed),
@@ -845,13 +991,7 @@ static uint32_t lookup_probe_resource_provider(
   }
 
   atomic_store(&probe->provider_entered, true);
-  for (size_t attempt = 0; attempt < teardown_probe_wait_attempts;
-       attempt += 1) {
-    if (atomic_load(&probe->writer_pending)) {
-      break;
-    }
-    mln_test_sleep_millisecond();
-  }
+  mln_test_wait_for_flag(&probe->writer_pending);
   // Give the runtime worker time to reach the exclusive transform lock, so the
   // lookup this thread is about to make queues behind a waiting writer.
   mln_test_sleep_milliseconds(teardown_call_delay_milliseconds);
@@ -865,7 +1005,7 @@ static void lookup_other_runtime_entry(void* argument) {
   lookup_probe* probe = argument;
   mln_runtime runtime = MLN_HANDLE_NULL;
   const mln_runtime_options options = mln_runtime_options_default();
-  const mln_status create_status = mln_test_runtime_create(&options, &runtime);
+  const mln_status create_status = mln_runtime_create(&options, &runtime);
   if (create_status != MLN_STATUS_OK) {
     atomic_store(&probe->other_runtime_status, create_status);
     atomic_store(&probe->other_runtime_call_done, true);
@@ -873,7 +1013,7 @@ static void lookup_other_runtime_entry(void* argument) {
   }
 
   atomic_store(&probe->other_runtime_ready, true);
-  wait_for_flag(&probe->lookup_reached);
+  mln_test_wait_for_flag(&probe->lookup_reached);
   // Give the file source thread time to reach the lookup itself.
   mln_test_sleep_milliseconds(teardown_call_delay_milliseconds);
   atomic_store(&probe->other_runtime_status, mln_test_runtime_barrier(runtime));
@@ -891,7 +1031,7 @@ static void resource_transform_lookup_leaves_other_runtimes_responsive(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_thread* other_thread =
     mln_test_thread_start(lookup_other_runtime_entry, &probe);
-  TEST_ASSERT_TRUE(wait_for_flag(&probe.other_runtime_ready));
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.other_runtime_ready));
 
   const mln_resource_provider provider = {
     .size = sizeof(mln_resource_provider),
@@ -912,12 +1052,12 @@ static void resource_transform_lookup_leaves_other_runtimes_responsive(void) {
 
   // The first download parks a transform callback inside the shared lock.
   TEST_ASSERT_TRUE(activate_style_download(runtime, lookup_blocking_style_url));
-  TEST_ASSERT_TRUE(wait_until_flag(runtime, &probe.transform_entered));
+  TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.transform_entered));
 
   // The second download parks a file source thread in the provider callback,
   // one step ahead of the lookup under test.
   TEST_ASSERT_TRUE(activate_style_download(runtime, lookup_probe_style_url));
-  TEST_ASSERT_TRUE(wait_until_flag(runtime, &probe.provider_entered));
+  TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.provider_entered));
 
   atomic_store(&probe.writer_pending, true);
   // Clearing waits for the in-flight transform callback to return, so it is
@@ -977,13 +1117,7 @@ static uint32_t blocking_resource_provider_for_clear(
   (void)handle;
   provider_quiescence_probe* probe = user_data;
   atomic_store(&probe->entered, true);
-  for (size_t attempt = 0; attempt < teardown_probe_wait_attempts;
-       attempt += 1) {
-    if (atomic_load(&probe->clear_started)) {
-      break;
-    }
-    mln_test_sleep_millisecond();
-  }
+  mln_test_wait_for_flag(&probe->clear_started);
   // Keep running after clear submission so an implementation that emits the
   // terminal event too early exposes callback-owned state.
   mln_test_sleep_milliseconds(provider_callback_block_milliseconds);
@@ -1002,17 +1136,7 @@ static bool wait_for_clear_provider_callback(
     return false;
   }
 
-  for (size_t attempt = 0; attempt < teardown_probe_wait_attempts;
-       attempt += 1) {
-    if (atomic_load(&probe->entered)) {
-      return true;
-    }
-    if (mln_test_runtime_barrier(runtime) != MLN_STATUS_OK) {
-      return false;
-    }
-    mln_test_sleep_millisecond();
-  }
-  return false;
+  return mln_test_wait_until(runtime, &probe->entered);
 }
 typedef struct cross_thread_provider_submission {
   mln_runtime runtime;
@@ -1227,10 +1351,7 @@ static uint32_t blocking_resource_provider(
     }
     mln_test_sleep_millisecond();
   }
-  for (size_t elapsed = 0; elapsed < provider_teardown_block_milliseconds;
-       elapsed += 1) {
-    mln_test_sleep_millisecond();
-  }
+  mln_test_sleep_milliseconds(provider_teardown_block_milliseconds);
   atomic_store(&probe->callback_returned, true);
   // An unknown decision becomes a handled provider error, which keeps the
   // request off the native network teardown path.
@@ -1278,7 +1399,7 @@ static void runtime_teardown_waits_for_in_flight_provider_callback(void) {
 
   atomic_store(&probe.teardown_started, true);
   mln_test_destroy_runtime(runtime);
-  TEST_ASSERT_TRUE(wait_for_flag(&probe.released));
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.released));
   TEST_ASSERT_TRUE_MESSAGE(
     atomic_load(&probe.callback_returned),
     "runtime teardown returned while a provider callback was still running"
@@ -1349,7 +1470,7 @@ static mln_map start_cancel_probe_request(
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_test_map_set_style_url(map, "custom://cancel-style.json")
   );
-  TEST_ASSERT_TRUE(wait_for_flag(&probe->provider_entered));
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe->provider_entered));
   if (!atomic_load(&probe->skip_register)) {
     TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&probe->register_status));
     TEST_ASSERT_FALSE(atomic_load(&probe->register_reported_cancelled));
@@ -1537,7 +1658,7 @@ static void block_in_cancel(void* user_data) {
     );
   }
   atomic_store(&probe->callback_entered, true);
-  wait_for_flag(&probe->release_started);
+  mln_test_wait_for_flag(&probe->release_started);
   mln_test_sleep_milliseconds(provider_teardown_block_milliseconds);
   atomic_store(
     &probe->release_returned_during_callback,
@@ -1581,7 +1702,7 @@ static void run_release_waits_for_in_flight_cancel_callback(
     MLN_STATUS_OK,
     mln_test_map_set_style_url(map, "custom://blocking-cancel.json")
   );
-  TEST_ASSERT_TRUE(wait_for_flag(&probe->base.provider_entered));
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe->base.provider_entered));
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, atomic_load(&probe->base.register_status)
   );
@@ -1590,7 +1711,7 @@ static void run_release_waits_for_in_flight_cancel_callback(
   // The map release submits and returns, so the cancel callback runs on the
   // runtime worker while this thread does the release it must wait for.
   mln_test_destroy_map(map);
-  TEST_ASSERT_TRUE(wait_for_flag(&probe->callback_entered));
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe->callback_entered));
   atomic_store(&probe->release_started, true);
   if (atomic_load(&probe->waiter_drains_instead_of_releasing)) {
     TEST_ASSERT_EQUAL_INT(
@@ -1670,6 +1791,8 @@ void run_resources_abi_tests(void) {
   RUN_TEST(offline_database_merge_rejects_a_missing_file);
   RUN_TEST(offline_database_merge_rejects_sqlite_pseudo_paths);
   RUN_TEST(offline_database_merge_reports_a_corrupt_side_database);
+  RUN_TEST(offline_submission_never_waits_for_the_runtime_worker);
+  RUN_TEST(offline_operations_report_a_missing_region);
   RUN_TEST(resource_transform_rejects_raw_invalid_descriptors);
   RUN_TEST(http_header_transform_registration_follows_the_transport);
   RUN_TEST(http_header_transform_rejects_raw_invalid_inputs);

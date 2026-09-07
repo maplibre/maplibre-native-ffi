@@ -1,46 +1,18 @@
-using System.Reflection;
-using System.Runtime.InteropServices;
+using System.Diagnostics;
+using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Struct;
+using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Render;
+using Maplibre.NativeFfi.Runtime;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
 
-public sealed unsafe class RenderSessionTests
+public sealed class RenderSessionTests
 {
     [Fact]
-    public void PhaseThreeEnumsPreserveFrozenValues()
-    {
-        Assert.Equal(5u, (uint)RenderResult.DeadlineMissed);
-        Assert.Equal(2u, (uint)RenderDriverKind.CallerGraphicsThread);
-        Assert.Equal(5u, (uint)RenderSessionState.TargetLost);
-        Assert.Equal(1u << 2, (uint)RenderSessionCapabilities.ConsumerSync);
-        Assert.Equal(1u, (uint)WebGLContextKind.TransferredCanvas);
-        Assert.Equal(-9, (int)global::Maplibre.NativeFfi.Error.MaplibreStatus.NotReady);
-    }
-
-    [Fact]
-    public void AttachOptionsUseNativeDefaultsAndLeaveSourcesInherited()
-    {
-        var options = new RenderSessionAttachOptions
-        {
-            Driver = RenderDriverKind.CallerGraphicsThread,
-            RequestedTextureRingDepth = 3,
-        };
-        var native = new mln_render_session_attach_options
-        {
-            size = (uint)sizeof(mln_render_session_attach_options),
-            driver = (uint)options.Driver,
-            requested_texture_ring_depth = options.RequestedTextureRingDepth,
-        };
-
-        Assert.Equal((uint)RenderDriverKind.CallerGraphicsThread, native.driver);
-        Assert.Equal(3u, native.requested_texture_ring_depth);
-    }
-
-    [Fact]
-    public void WebGLDescriptorsRepresentExistingAndTransferredContexts()
+    public unsafe void WebGLDescriptorsRepresentExistingAndTransferredContexts()
     {
         var existing = RenderStructs.ToNative(
             new WebGLContextDescriptor
@@ -67,8 +39,9 @@ public sealed unsafe class RenderSessionTests
         Assert.Equal((uint)WebGLContextKind.TransferredCanvas, transferred.data.webgl.kind);
     }
 
+    [BindingSpecTest("BND-161")]
     [Fact]
-    public void VulkanDescriptorsCarryHandleBitsWithoutPointerConversion()
+    public unsafe void VulkanDescriptorsCarryHandleBitsWithoutPointerConversion()
     {
         var surface = RenderStructs.ToNative(
             new VulkanSurfaceDescriptor
@@ -111,51 +84,7 @@ public sealed unsafe class RenderSessionTests
         Assert.Equal(60u, borrowed.final_layout);
     }
 
-    [Fact]
-    public void RawSurfaceAttachReturnsSessionAndAcceptsCompletion()
-    {
-        var method = typeof(NativeMethods).GetMethod(
-            "mln_opengl_surface_attach",
-            BindingFlags.Public | BindingFlags.Static
-        );
-
-        Assert.NotNull(method);
-        var parameters = method!.GetParameters();
-        Assert.Equal(5, parameters.Length);
-        Assert.Equal(typeof(MlnRenderSession*), parameters[3].ParameterType);
-        Assert.Equal(typeof(mln_completion*), parameters[4].ParameterType);
-    }
-
-    [Fact]
-    public void PublicSessionSurfaceUsesTasksAndExplicitDriverService()
-    {
-        var type = typeof(RenderSessionHandle);
-
-        Assert.Equal(
-            typeof(Task),
-            type.GetProperty(nameof(RenderSessionHandle.Attachment))!.PropertyType
-        );
-        Assert.Equal(
-            typeof(Task),
-            type.GetMethod(nameof(RenderSessionHandle.DetachAsync))!.ReturnType
-        );
-        Assert.Equal(
-            typeof(Task),
-            type.GetMethod(nameof(RenderSessionHandle.BarrierAsync))!.ReturnType
-        );
-        Assert.Equal(
-            typeof(int),
-            type.GetMethod(nameof(RenderSessionHandle.ServiceDriverWork))!.ReturnType
-        );
-        Assert.Equal(
-            typeof(RenderFrameBatch),
-            type.GetMethod(nameof(RenderSessionHandle.DrainFrameResults))!.ReturnType
-        );
-        Assert.Null(type.GetMethod("RenderUpdate"));
-        Assert.Null(type.GetMethod("Resize"));
-        Assert.Null(type.GetMethod("ReadPremultipliedRgba8"));
-    }
-
+    [BindingSpecTest("BND-173")]
     [Fact]
     public void AcquiredFrameAccessIsScopedToItsLease()
     {
@@ -183,13 +112,134 @@ public sealed unsafe class RenderSessionTests
         Assert.Throws<ObjectDisposedException>(() => frame.ImageView);
     }
 
+    [BindingSpecTest("BND-162", "BND-163", "BND-164", "BND-167", "BND-168", "BND-169", "BND-178")]
     [Fact]
-    public void PhaseThreeNativeStructsUseExpectedHandleSizedLayouts()
+    public async Task OwnedTextureSessionRendersAcquiresAndDetaches()
     {
-        Assert.Equal(32, sizeof(mln_frame_demand));
-        Assert.Equal(48, sizeof(mln_render_frame_result));
-        Assert.Equal(24, sizeof(mln_gpu_sync));
-        Assert.Equal(8, Marshal.SizeOf<MlnAcquiredFrame>());
-        Assert.Equal(8, Marshal.SizeOf<MlnRenderFrameBatch>());
+        Assert.SkipUnless(
+            OwnedTextureFixture.IsAvailable,
+            "The loaded native library compiles no backend this suite can attach offscreen."
+        );
+
+        using var fixture = OwnedTextureFixture.Create();
+        var extent = new RenderTargetExtent(32, 16, 1.0);
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions
+            {
+                Width = 32,
+                Height = 16,
+                ScaleFactor = 1.0,
+            }
+        );
+
+        using var session = fixture.Attach(map, extent);
+        Assert.Empty(session.DrainFrameResults());
+        await session.Attachment.WaitAsync(
+            TimeSpan.FromSeconds(30),
+            TestContext.Current.CancellationToken
+        );
+        Assert.Equal(RenderSessionState.Attached, session.GetSnapshot().State);
+        Assert.Equal(RenderDriverKind.CoreWorker, session.GetCapabilities().Driver);
+        Assert.True(
+            session.GetCapabilities().Flags.HasFlag(RenderSessionCapabilities.FrameAcquisition)
+        );
+
+        var second = Assert.Throws<InvalidStateException>(() => fixture.Attach(map, extent));
+        Assert.Contains("render session", second.Message, StringComparison.OrdinalIgnoreCase);
+
+        session.RequestFrame(new FrameDemand(FrameDemandFlags.None, 7, 0, 0));
+        var result = Assert.Single(
+            PollFor(() => session.DrainFrameResults(), results => results.Count > 0)
+        );
+        Assert.Equal(7ul, result.Token);
+        Assert.Equal(RenderResult.Rendered, result.Disposition);
+
+        Assert.True(session.TryAcquireFrame(out var frame));
+        Assert.Equal(result.FrameGeneration, frame.Result.FrameGeneration);
+        frame.Release(null);
+        Assert.Throws<ObjectDisposedException>(() => frame.Result);
+
+        var closeWhileAttached = Assert.Throws<InvalidStateException>(session.Close);
+        Assert.NotEmpty(closeWhileAttached.Message);
+
+        await session.DetachAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(RenderSessionState.Detached, session.GetSnapshot().State);
+        session.Close();
+        Assert.True(session.IsClosed);
+    }
+
+    [BindingSpecTest("BND-165", "BND-176", "BND-183")]
+    [Fact]
+    public async Task OwnedTextureSessionRejectsRetargetAndScaleFactorChange()
+    {
+        Assert.SkipUnless(
+            OwnedTextureFixture.IsAvailable,
+            "The loaded native library compiles no backend this suite can attach offscreen."
+        );
+
+        using var fixture = OwnedTextureFixture.Create();
+        var extent = new RenderTargetExtent(32, 16, 1.0);
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions
+            {
+                Width = 32,
+                Height = 16,
+                ScaleFactor = 1.0,
+            }
+        );
+
+        using var session = fixture.Attach(map, extent);
+        await session.Attachment.WaitAsync(
+            TimeSpan.FromSeconds(30),
+            TestContext.Current.CancellationToken
+        );
+
+        await Assert.ThrowsAsync<UnsupportedFeatureException>(async () =>
+            await fixture.SetTargetAsync(session, extent)
+        );
+
+        Assert.Throws<InvalidArgumentException>(() =>
+        {
+            _ = session.ResizeAsync(
+                new RenderTargetExtent(64, 32, 2.0),
+                TestContext.Current.CancellationToken
+            );
+        });
+
+        Assert.Throws<InvalidArgumentException>(() =>
+            session.RequestFrame(new FrameDemand((FrameDemandFlags)0x8000u, 0, 0, 0))
+        );
+
+        await session.ResizeAsync(
+            new RenderTargetExtent(64, 32, 1.0),
+            TestContext.Current.CancellationToken
+        );
+        var resized = session.GetSnapshot();
+        Assert.Equal(64u, resized.Extent.Width);
+        Assert.Equal(32u, resized.Extent.Height);
+
+        await session.DetachAsync(TestContext.Current.CancellationToken);
+        session.Close();
+    }
+
+    /// <summary>Polls a nonblocking read until it satisfies the predicate or the deadline passes.</summary>
+    private static T PollFor<T>(Func<T> read, Func<T, bool> isSatisfied)
+    {
+        var deadline = Stopwatch.StartNew();
+        while (deadline.Elapsed < TimeSpan.FromSeconds(30))
+        {
+            var value = read();
+            if (isSatisfied(value))
+            {
+                return value;
+            }
+            Thread.Sleep(1);
+        }
+
+        throw new TimeoutException("The render session never produced the expected result.");
     }
 }

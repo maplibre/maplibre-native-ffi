@@ -15,6 +15,9 @@ const int nativeStatusUnsupported = -4;
 /// Native C status code for converted native errors.
 const int nativeStatusNativeError = -5;
 
+/// Native C status code for a poll that has no result yet.
+const int nativeStatusNotReady = -9;
+
 /// Converts a native status code into the public Dart exception model.
 void checkNativeStatus(int statusCode, String Function() diagnostic) {
   if (statusCode == nativeStatusOk) {

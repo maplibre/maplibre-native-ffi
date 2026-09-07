@@ -52,31 +52,56 @@ public enum RuntimeEventType: Sendable, Hashable {
   case mapCameraTransitionFinished
   case unknown(UInt32)
 
+  /// Names one native event ordinal. The ordinals come from the C API's own
+  /// constants, so a renumbered event type cannot silently become `.unknown`.
   public static func fromNative(_ rawValue: UInt32) -> Self {
     switch rawValue {
-    case 1: .mapCameraWillChange
-    case 2: .mapCameraIsChanging
-    case 3: .mapCameraDidChange
-    case 4: .mapStyleLoaded
-    case 5: .mapLoadingStarted
-    case 6: .mapLoadingFinished
-    case 7: .mapLoadingFailed
-    case 8: .mapIdle
-    case 9: .mapRenderUpdateAvailable
-    case 10: .mapRenderError
-    case 11: .mapStillImageFinished
-    case 12: .mapStillImageFailed
-    case 13: .mapRenderFrameStarted
-    case 14: .mapRenderFrameFinished
-    case 15: .mapRenderMapStarted
-    case 16: .mapRenderMapFinished
-    case 17: .mapStyleImageMissing
-    case 18: .mapTileAction
-    case 19: .offlineRegionStatusChanged
-    case 20: .offlineRegionResponseError
-    case 21: .offlineRegionTileCountLimitExceeded
-    case 23: .mapCameraTransitionFinished
-    default: .unknown(rawValue)
+    case MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE.rawValue:
+      .mapCameraWillChange
+    case MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING.rawValue:
+      .mapCameraIsChanging
+    case MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE.rawValue:
+      .mapCameraDidChange
+    case MLN_RUNTIME_EVENT_MAP_STYLE_LOADED.rawValue:
+      .mapStyleLoaded
+    case MLN_RUNTIME_EVENT_MAP_LOADING_STARTED.rawValue:
+      .mapLoadingStarted
+    case MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED.rawValue:
+      .mapLoadingFinished
+    case MLN_RUNTIME_EVENT_MAP_LOADING_FAILED.rawValue:
+      .mapLoadingFailed
+    case MLN_RUNTIME_EVENT_MAP_IDLE.rawValue:
+      .mapIdle
+    case MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.rawValue:
+      .mapRenderUpdateAvailable
+    case MLN_RUNTIME_EVENT_MAP_RENDER_ERROR.rawValue:
+      .mapRenderError
+    case MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED.rawValue:
+      .mapStillImageFinished
+    case MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED.rawValue:
+      .mapStillImageFailed
+    case MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED.rawValue:
+      .mapRenderFrameStarted
+    case MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED.rawValue:
+      .mapRenderFrameFinished
+    case MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED.rawValue:
+      .mapRenderMapStarted
+    case MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED.rawValue:
+      .mapRenderMapFinished
+    case MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING.rawValue:
+      .mapStyleImageMissing
+    case MLN_RUNTIME_EVENT_MAP_TILE_ACTION.rawValue:
+      .mapTileAction
+    case MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED.rawValue:
+      .offlineRegionStatusChanged
+    case MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR.rawValue:
+      .offlineRegionResponseError
+    case MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED.rawValue:
+      .offlineRegionTileCountLimitExceeded
+    case MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED.rawValue:
+      .mapCameraTransitionFinished
+    default:
+      .unknown(rawValue)
     }
   }
 }
@@ -467,15 +492,10 @@ public struct RuntimeEvent: Equatable, Sendable {
   }
 }
 
-/// One drained batch of runtime events.
+/// One runtime and the maps that it owns.
 ///
-/// This is a copy of an owned C event batch, so a host keeps events, their
-/// messages, and their payloads for as long as it likes.
-public struct RuntimeEventBatch: Equatable, Sendable {
-  /// The drained events, in queue order.
-  public let events: [RuntimeEvent]
-}
-
+/// A host may share one runtime across threads and across concurrent tasks:
+/// every stored property is either immutable or internally locked.
 public final class RuntimeHandle: @unchecked Sendable {
   private let handle: NativeHandleBox<NativeRuntimeHandle>
   private let eventWake: NativeWakeState
@@ -523,7 +543,10 @@ public final class RuntimeHandle: @unchecked Sendable {
   private func startClose() throws -> NativeFuture<Void>? {
     var teardown: NativeFuture<Void>?
     try mapNativeFailure {
-      try handle.closeOnce { teardown = try NativeRuntime.release($0) }
+      try handle.closeOnce { runtime in
+        teardown = try NativeRuntime.release(runtime)
+        eventWake.setHandler(nil)
+      }
     }
     return teardown
   }
@@ -537,9 +560,9 @@ public final class RuntimeHandle: @unchecked Sendable {
 
   /// Waits until every command accepted before this call has committed.
   public func barrier() async throws {
-    try await mapNativeFailure {
+    try await awaitNative {
       let runtime = try requireLiveHandle()
-      try await NativeCompletion.unit { completion in
+      return try NativeCompletion.startUnit { completion in
         mln_runtime_barrier(runtime.raw, completion)
       }
     }
@@ -554,12 +577,10 @@ public final class RuntimeHandle: @unchecked Sendable {
   ///
   /// Events arrive in queue order, from this runtime and from every map it
   /// owns. One drain takes the whole queue.
-  public func drainEvents() throws -> RuntimeEventBatch {
+  public func drainEvents() throws -> [RuntimeEvent] {
     try mapNativeFailure {
-      let batch = try NativeRuntime.drainEvents(handle.requireLive())
-      return RuntimeEventBatch(
-        events: batch.events.map { RuntimeEvent(native: $0) }
-      )
+      try NativeRuntime.drainEvents(handle.requireLive())
+        .events.map { RuntimeEvent(native: $0) }
     }
   }
 
@@ -568,6 +589,10 @@ public final class RuntimeHandle: @unchecked Sendable {
   /// The callback may coalesce and carries no event payload. It should schedule
   /// ``drainEvents()`` on the host execution context that consumes
   /// runtime events.
+  ///
+  /// The handler is held until it is replaced, cleared with nil, or ``close()``
+  /// drops it, so a closure that captures the runtime keeps it alive until
+  /// then.
   public func setEventReadyHandler(
     _ handler: (@Sendable () -> Void)?
   ) {
@@ -576,6 +601,10 @@ public final class RuntimeHandle: @unchecked Sendable {
 
   /// Selects which runtime-originated event types this runtime queues.
   ///
+  /// The call reads the bits in ``RuntimeEventMask/allRuntimeEvents`` and
+  /// ignores the rest, so ``RuntimeEventMask/all`` selects every one of them.
+  /// Narrowing gates later events and keeps queued ones, so a host drains what
+  /// it already caused.
   public func setEventMask(_ mask: RuntimeEventMask) throws {
     try mapNativeFailure { try NativeRuntime.setEventMask(
       handle.requireLive(),
@@ -601,11 +630,9 @@ public final class RuntimeHandle: @unchecked Sendable {
     let replacement = NativeResourceTransformState {
       callback(ResourceTransformRequest(native: $0))
     }
-    let future = try replacement.withDescriptor { try startCallbackSet(
-      $0,
-      mln_runtime_set_resource_transform
-    ) }
-    return try await mapNativeFailure { try await future.value() }
+    return try await submitCallbackSet(replacement) {
+      mln_runtime_set_resource_transform($0, $1, $2)
+    }
   }
 
   @discardableResult
@@ -620,11 +647,9 @@ public final class RuntimeHandle: @unchecked Sendable {
     -> [HttpHeader]) async throws -> CommandCompletion
   {
     let replacement = NativeHttpHeaderTransformState(callback)
-    let future = try replacement.withDescriptor { try startCallbackSet(
-      $0,
-      mln_runtime_set_http_header_transform
-    ) }
-    return try await mapNativeFailure { try await future.value() }
+    return try await submitCallbackSet(replacement) {
+      mln_runtime_set_http_header_transform($0, $1, $2)
+    }
   }
 
   @discardableResult
@@ -646,11 +671,9 @@ public final class RuntimeHandle: @unchecked Sendable {
       case .handle: return 1
       }
     }
-    let future = try replacement.withDescriptor { try startCallbackSet(
-      $0,
-      mln_runtime_set_resource_provider
-    ) }
-    return try await mapNativeFailure { try await future.value() }
+    return try await submitCallbackSet(replacement) {
+      mln_runtime_set_resource_provider($0, $1, $2)
+    }
   }
 
   @discardableResult
@@ -658,18 +681,20 @@ public final class RuntimeHandle: @unchecked Sendable {
     try await submitCallbackClear(mln_runtime_clear_resource_provider)
   }
 
-  private func startCallbackSet<Descriptor>(
-    _ descriptor: UnsafePointer<Descriptor>,
+  private func submitCallbackSet<State: NativeDescriptor>(
+    _ state: State,
     _ submit: (
       mln_runtime,
-      UnsafePointer<Descriptor>,
+      UnsafePointer<State.NativeValue>,
       UnsafePointer<mln_completion>
     ) -> mln_status
-  ) throws -> NativeFuture<CommandCompletion> {
-    try mapNativeFailure {
+  ) async throws -> CommandCompletion {
+    try await awaitNative {
       let runtime = try handle.requireLive()
-      return try NativeCompletion.startCommand { completion in
-        submit(runtime.raw, descriptor, completion)
+      return try state.withNativeDescriptor { descriptor in
+        try NativeCompletion.startCommand { completion in
+          submit(runtime.raw, descriptor, completion)
+        }
       }
     }
   }
@@ -678,9 +703,9 @@ public final class RuntimeHandle: @unchecked Sendable {
     mln_runtime,
     UnsafePointer<mln_completion>
   ) -> mln_status) async throws -> CommandCompletion {
-    try await mapNativeFailure {
+    try await awaitNative {
       let runtime = try handle.requireLive()
-      return try await NativeCompletion.command { completion in
+      return try NativeCompletion.startCommand { completion in
         submit(runtime.raw, completion)
       }
     }

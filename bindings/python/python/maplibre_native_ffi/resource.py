@@ -10,6 +10,7 @@ from typing import Any
 
 from ._enum import NativeIntEnum, UnknownIntEnum
 from ._lifecycle import ContextHandleMixin, WarnUnclosedMixin
+from .errors import InvalidStateError
 
 _REQUEST_HANDLE_CREATE_KEY = object()
 
@@ -221,12 +222,7 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
     def complete(self, response: ResourceResponse) -> None:
         """Complete this request with a copied response."""
         if self._closed:
-            from .errors import InvalidStateError
-
-            raise InvalidStateError(
-                None,
-                "resource request handle is already closed",
-            )
+            raise InvalidStateError("resource request handle is already closed")
         native_response = response._to_native()
         self._native.validate_completion_response(native_response)
         try:
@@ -240,12 +236,7 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
     def is_cancelled(self) -> bool:
         """Return whether native code has cancelled the request."""
         if self._closed:
-            from .errors import InvalidStateError
-
-            raise InvalidStateError(
-                None,
-                "resource request handle is already closed",
-            )
+            raise InvalidStateError("resource request handle is already closed")
         return bool(self._native.is_cancelled())
 
     def set_cancel_callback(self, callback: ResourceCancelCallback) -> None:
@@ -276,22 +267,14 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
         garbage collector can still reclaim.
         """
         if self._closed:
-            from .errors import InvalidStateError
-
-            raise InvalidStateError(
-                None,
-                "resource request handle is already closed",
-            )
+            raise InvalidStateError("resource request handle is already closed")
         if not callable(callback):
             msg = "cancel callback must be callable"
             raise TypeError(msg)
         with self._cancel_lock:
             if self._cancel_callback is not None:
-                from .errors import InvalidStateError
-
                 raise InvalidStateError(
-                    None,
-                    "resource request handle already has a cancel callback",
+                    "resource request handle already has a cancel callback"
                 )
             self._cancel_callback = callback
         handle_ref = weakref.ref(self)

@@ -28,6 +28,8 @@ impl super::RenderSessionHandle {
             .transpose()?;
         let session = self.inner.native()?;
         crate::completion::submit(
+            // SAFETY: the handle is live and every borrowed argument stays valid for this
+            // synchronous submission.
             |completion| unsafe {
                 sys::mln_render_session_query_rendered_features(
                     session,
@@ -54,6 +56,8 @@ impl super::RenderSessionHandle {
             .transpose()?;
         let session = self.inner.native()?;
         crate::completion::submit(
+            // SAFETY: the handle is live and every borrowed argument stays valid for this
+            // synchronous submission.
             |completion| unsafe {
                 sys::mln_render_session_query_source_features(
                     session,
@@ -85,6 +89,8 @@ impl super::RenderSessionHandle {
         let arguments = arguments.map(maplibre_core::string::buffer_view);
         let session = self.inner.native()?;
         crate::completion::submit(
+            // SAFETY: the handle is live and every borrowed argument stays valid for this
+            // synchronous submission.
             |completion| unsafe {
                 sys::mln_render_session_query_feature_extensions(
                     session,

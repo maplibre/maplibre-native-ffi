@@ -18,23 +18,23 @@ func TestRuntimeMapLifecycle(t *testing.T) {
 		t.Fatalf("NewMap(): %v", err)
 	}
 	if err := closeRuntimeForTest(runtime); !errors.Is(err, ErrInvalidState) {
-		_ = m.Close()
+		_ = closeMapForTest(m)
 		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("Close() with live map error = %v, want ErrInvalidState", err)
 	} else {
 		var bindingErr *Error
 		if !errors.As(err, &bindingErr) ||
 			bindingErr.Diagnostic() != "handle still owns live or pending children" {
-			_ = m.Close()
+			_ = closeMapForTest(m)
 			_ = closeRuntimeForTest(runtime)
 			t.Fatalf("Close() with live map diagnostic = %v", err)
 		}
 	}
-	if err := m.Close(); err != nil {
+	if err := closeMapForTest(m); err != nil {
 		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("Map Close(): %v", err)
 	}
-	if err := m.Close(); err != nil {
+	if err := closeMapForTest(m); err != nil {
 		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("second Map Close(): %v", err)
 	}
@@ -60,35 +60,35 @@ func TestMapIDIdentifiesEachMapUntilClose(t *testing.T) {
 	}
 	second, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = first.Close()
+		_ = closeMapForTest(first)
 		t.Fatalf("second NewMap(): %v", err)
 	}
 	defer func() {
-		if err := second.Close(); err != nil {
+		if err := closeMapForTest(second); err != nil {
 			t.Errorf("second Map Close(): %v", err)
 		}
 	}()
 
 	firstID, err := first.ID()
 	if err != nil {
-		_ = first.Close()
+		_ = closeMapForTest(first)
 		t.Fatalf("ID(): %v", err)
 	}
 	secondID, err := second.ID()
 	if err != nil {
-		_ = first.Close()
+		_ = closeMapForTest(first)
 		t.Fatalf("second ID(): %v", err)
 	}
 	if firstID == 0 || firstID == secondID {
-		_ = first.Close()
+		_ = closeMapForTest(first)
 		t.Fatalf("map IDs = %d and %d, want distinct nonzero IDs", firstID, secondID)
 	}
 	if repeated, err := first.ID(); err != nil || repeated != firstID {
-		_ = first.Close()
+		_ = closeMapForTest(first)
 		t.Fatalf("repeated ID() = %d, %v, want %d, nil", repeated, err, firstID)
 	}
 
-	if err := first.Close(); err != nil {
+	if err := closeMapForTest(first); err != nil {
 		t.Fatalf("Map Close(): %v", err)
 	}
 	if _, err := first.ID(); !errors.Is(err, ErrInvalidArgument) {
@@ -97,23 +97,7 @@ func TestMapIDIdentifiesEachMapUntilClose(t *testing.T) {
 }
 
 func TestMapCommandsAndStyleLoadingUseNativeABI(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
 	if _, err := m.RequestRepaint(); err != nil {
 		t.Fatalf("RequestRepaint(): %v", err)
@@ -130,23 +114,7 @@ func TestMapCommandsAndStyleLoadingUseNativeABI(t *testing.T) {
 }
 
 func TestMapReportsLoadedStyleDocumentAndURL(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
 	if document, err := awaitForTest(m.LoadedStyleJSON()); err != nil || len(document) != 0 {
 		t.Fatalf("LoadedStyleJSON() before load = %q, %v, want \"\", nil", document, err)
@@ -191,27 +159,11 @@ func TestMapReportsLoadedStyleDocumentAndURL(t *testing.T) {
 // generation, so a snapshot at or past that generation shows the committed
 // value.
 func TestMapSnapshotObservesCommittedCommands(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
 	options := MapDebugTileBorders | MapDebugCollision
 	completion, err := m.SetDebugOptions(options)
-	committed := requireCommandCommitted(t, runtime, completion, err)
+	committed := requireCommandCommitted(t, completion, err)
 	snapshot, err := m.Snapshot()
 	if err != nil {
 		t.Fatalf("Snapshot(): %v", err)
@@ -224,7 +176,7 @@ func TestMapSnapshotObservesCommittedCommands(t *testing.T) {
 	}
 
 	completion, err = m.SetRenderingStatsViewEnabled(true)
-	committed = requireCommandCommitted(t, runtime, completion, err)
+	committed = requireCommandCommitted(t, completion, err)
 	snapshot, err = m.Snapshot()
 	if err != nil {
 		t.Fatalf("Snapshot(): %v", err)
@@ -251,7 +203,7 @@ func TestMapSnapshotRoundTripsOptionCommands(t *testing.T) {
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
 	defer func() {
-		if err := m.Close(); err != nil {
+		if err := closeMapForTest(m); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
 		if err := closeRuntimeForTest(runtime); err != nil {
@@ -260,7 +212,7 @@ func TestMapSnapshotRoundTripsOptionCommands(t *testing.T) {
 	}()
 
 	completion, err := m.SetTileOptions(TileOptions{}.WithPrefetchZoomDelta(3))
-	committed := requireCommandCommitted(t, runtime, completion, err)
+	committed := requireCommandCommitted(t, completion, err)
 	snapshot, err := m.Snapshot()
 	if err != nil {
 		t.Fatalf("Snapshot(): %v", err)
@@ -273,7 +225,7 @@ func TestMapSnapshotRoundTripsOptionCommands(t *testing.T) {
 	}
 
 	completion, err = m.SetBounds(BoundOptions{}.WithMinZoom(2).WithMaxZoom(15))
-	committed = requireCommandCommitted(t, runtime, completion, err)
+	committed = requireCommandCommitted(t, completion, err)
 	snapshot, err = m.Snapshot()
 	if err != nil {
 		t.Fatalf("Snapshot(): %v", err)
@@ -286,7 +238,7 @@ func TestMapSnapshotRoundTripsOptionCommands(t *testing.T) {
 
 	position := Vec3{X: 0.25, Y: 0.25, Z: 0.1}
 	completion, err = m.SetFreeCameraOptions(FreeCameraOptions{}.WithPosition(position))
-	committed = requireCommandCommitted(t, runtime, completion, err)
+	committed = requireCommandCommitted(t, completion, err)
 	snapshot, err = m.Snapshot()
 	if err != nil {
 		t.Fatalf("Snapshot(): %v", err)
@@ -300,31 +252,40 @@ func TestMapSnapshotRoundTripsOptionCommands(t *testing.T) {
 	}
 }
 
-func TestMapSizeReportsCreationExtentAndPixelRatio(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(512, 256, 2)))
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMapWithOptions(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+func TestMapResizeChangesTheExtentAndKeepsTheCreationScaleFactor(t *testing.T) {
+	options := NewMapOptions(512, 256, 2)
+	_, m := newRuntimeAndMap(t, &options)
 
-	width, height, scaleFactor, err := m.Size()
+	snapshot, err := m.Snapshot()
 	if err != nil {
-		t.Fatalf("Size(): %v", err)
+		t.Fatalf("Snapshot(): %v", err)
 	}
-	if width != 512 || height != 256 || scaleFactor != 2 {
-		t.Fatalf("Size() = %d, %d, %v; want 512, 256, 2", width, height, scaleFactor)
+	created := LogicalExtent{Width: 512, Height: 256, ScaleFactor: 2}
+	if snapshot.LogicalExtent != created {
+		t.Fatalf("MapSnapshot.LogicalExtent = %#v, want %#v", snapshot.LogicalExtent, created)
+	}
+
+	resized := LogicalExtent{Width: 640, Height: 480, ScaleFactor: 2}
+	completion, err := m.Resize(resized)
+	committed := requireCommandCommitted(t, completion, err)
+	if snapshot, err = m.Snapshot(); err != nil {
+		t.Fatalf("Snapshot(): %v", err)
+	}
+	if snapshot.Generation < committed || snapshot.LogicalExtent != resized {
+		t.Fatalf("MapSnapshot.LogicalExtent = %#v, want %#v", snapshot.LogicalExtent, resized)
+	}
+
+	// The scale factor is fixed at creation, because the renderer bakes its
+	// pixel ratio into compiled shaders.
+	rescale, err := m.Resize(LogicalExtent{Width: 640, Height: 480, ScaleFactor: 3})
+	if rescale != nil || !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("Resize(changed scale factor) = (%v, %v), want nil and ErrInvalidArgument", rescale, err)
+	}
+	if snapshot, err = m.Snapshot(); err != nil {
+		t.Fatalf("Snapshot(): %v", err)
+	}
+	if snapshot.LogicalExtent != resized {
+		t.Fatalf("rejected resize changed the extent to %#v", snapshot.LogicalExtent)
 	}
 }
 
@@ -343,7 +304,7 @@ func TestMapAcceptsFastPFORDecoding(t *testing.T) {
 		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
-	if err := m.Close(); err != nil {
+	if err := closeMapForTest(m); err != nil {
 		t.Errorf("Map Close(): %v", err)
 	}
 	if err := closeRuntimeForTest(runtime); err != nil {
@@ -352,23 +313,7 @@ func TestMapAcceptsFastPFORDecoding(t *testing.T) {
 }
 
 func TestMapDebugOptionsRejectUnknownBitsBeforeSubmission(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
 	future, err := m.SetDebugOptions(MapDebugOptions(1 << 31))
 	if future != nil || !errors.Is(err, ErrInvalidArgument) {
@@ -377,23 +322,7 @@ func TestMapDebugOptionsRejectUnknownBitsBeforeSubmission(t *testing.T) {
 }
 
 func TestMapStyleStringsRejectEmbeddedNUL(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := closeRuntimeForTest(runtime); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	_, m := newRuntimeAndMap(t, nil)
 
 	if _, err := m.SetStyleURL("http://example.com/\x00style.json"); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetStyleURL embedded NUL error = %v, want ErrInvalidArgument", err)
@@ -404,17 +333,7 @@ func TestMapStyleStringsRejectEmbeddedNUL(t *testing.T) {
 }
 
 func TestMapCommandsCanMigrateAcrossGoroutines(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := awaitForTest(runtime.NewMap())
-	if err != nil {
-		_ = closeRuntimeForTest(runtime)
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer closeRuntimeForTest(runtime)
-	defer m.Close()
+	_, m := newRuntimeAndMap(t, nil)
 
 	result := make(chan struct {
 		generation uint64

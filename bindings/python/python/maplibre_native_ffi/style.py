@@ -10,7 +10,6 @@ from ._enum import NativeIntEnum, UnknownIntEnum
 from ._lifecycle import NativeHandleMixin
 from .errors import InvalidArgumentError
 from .geo import LatLng, LatLngBounds
-from .render import PremultipliedRgba8Image, TextureImageInfo
 
 _CUSTOM_GEOMETRY_SOURCE_HANDLE_CREATE_KEY = object()
 _CUSTOM_MVT_VECTOR_SOURCE_HANDLE_CREATE_KEY = object()
@@ -84,9 +83,7 @@ class GeoJsonSourceOptions:
         for name in ("tile_size", "buffer", "cluster_radius", "cluster_min_points"):
             value = getattr(self, name)
             if value is not None and not 0 <= value <= 0xFFFF_FFFF:
-                raise InvalidArgumentError(
-                    None, f"{name} must be within [0, 4294967295]"
-                )
+                raise InvalidArgumentError(f"{name} must be within [0, 4294967295]")
 
 
 def _geojson_source_parts(
@@ -385,32 +382,6 @@ class StyleTransitionOptions:
         )
 
 
-@dataclass(frozen=True, slots=True)
-class StyleImage:
-    """Copied runtime style image pixels with style-specific metadata."""
-
-    image: PremultipliedRgba8Image
-    pixel_ratio: float
-    sdf: bool
-
-    @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> StyleImage:
-        info = StyleImageInfo._from_native(raw)
-        return cls(
-            image=PremultipliedRgba8Image(
-                TextureImageInfo(
-                    width=info.width,
-                    height=info.height,
-                    stride=info.stride,
-                    byte_length=info.byte_length,
-                ),
-                raw["pixels"],
-            ),
-            pixel_ratio=info.pixel_ratio,
-            sdf=info.sdf,
-        )
-
-
 class LocationIndicatorImageKind(NativeIntEnum):
     """Location indicator image-name properties."""
 
@@ -577,7 +548,6 @@ __all__ = [
     "GeoJsonSourceOptions",
     "LocationIndicatorImageKind",
     "RasterDemEncoding",
-    "StyleImage",
     "StyleImageInfo",
     "StyleImageOptions",
     "StyleLayerInfo",

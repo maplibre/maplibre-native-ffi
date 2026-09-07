@@ -26,43 +26,26 @@ private final class ResourceCounters: @unchecked Sendable {
   }
 }
 
-private final class ResourceCancellationResult: @unchecked Sendable {
-  private let lock = NSLock()
-  private var result: Result<Bool, Error>?
-
-  func store(_ result: Result<Bool, Error>) {
-    lock.withLock { self.result = result }
-  }
-
-  func load() -> Result<Bool, Error>? {
-    lock.withLock { result }
-  }
-}
-
-private final class ResourceProviderCallCounter: @unchecked Sendable {
-  private let lock = NSLock()
-  private var count = 0
-
-  func recordCall() {
-    lock.withLock { count += 1 }
-  }
-
-  var callCount: Int {
-    lock.withLock { count }
-  }
-}
-
-private final class ResourceHandleStateCapture: @unchecked Sendable {
-  private let lock = NSLock()
-  private var state: NativeResourceRequestHandleState?
-
-  func store(_ state: NativeResourceRequestHandleState) {
-    lock.withLock { self.state = state }
-  }
-
-  func load() -> NativeResourceRequestHandleState? {
-    lock.withLock { state }
-  }
+/// The handle functions a test needs when it drives completion and release
+/// but registers no cancel callback. `complete` runs `onComplete` after
+/// counting, so a test may make the native side fail.
+private func countingHandleFunctions(
+  _ counters: ResourceCounters,
+  onComplete: @escaping @Sendable (NativeResourceResponseInput) throws
+    -> Void = { _ in }
+) -> NativeResourceRequestHandleFunctions {
+  NativeResourceRequestHandleFunctions(
+    complete: { _, response in
+      counters.completed()
+      try onComplete(response)
+    },
+    cancelled: { _ in false },
+    release: { _ in counters.released() },
+    setCancelCallback: { _, _, _ in
+      Issue.record("this test registers no cancel callback")
+      return false
+    }
+  )
 }
 
 @Test func runtimeCreateRunDrainAndClose() async throws {
@@ -93,13 +76,6 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
 /// matching loading failure arrives, and returns its message. The failure
 /// proves the request reached the network file source, where the
 /// runtime-scoped resource provider applies.
-private func waitForSemaphore(
-  _ semaphore: DispatchSemaphore,
-  timeout: DispatchTime
-) -> DispatchTimeoutResult {
-  semaphore.wait(timeout: timeout)
-}
-
 private func loadProbeStyle(
   runtime: RuntimeHandle,
   map: MapHandle,
@@ -109,7 +85,7 @@ private func loadProbeStyle(
   return try await drainUntilEvent(
     runtime,
     waitingFor: "a loading failure for \(styleURL)"
-  ) { $0.type == .mapLoadingFailed }?.message
+  ) { $0.type == .mapLoadingFailed && $0.message.contains(styleURL) }?.message
 }
 
 @Test func runtimeResourceProviderIsConsultedUntilReplacedAndCleared(
@@ -121,9 +97,9 @@ private func loadProbeStyle(
                                 options: MapOptions(width: 64, height: 64))
   defer { try? map.closeBlockingForTests() }
 
-  let firstCalls = ResourceProviderCallCounter()
+  let firstCalls = LockedBox(0)
   try await runtime.setResourceProvider { _, _ in
-    firstCalls.recordCall()
+    firstCalls.update { $0 += 1 }
     return .passThrough
   }
 
@@ -133,15 +109,15 @@ private func loadProbeStyle(
     styleURL: "jar:file:/packaged/first.json"
   )
   #expect(firstFailure?.contains("\"jar\"") == true)
-  #expect(firstCalls.callCount > 0)
+  #expect(firstCalls.value > 0)
 
   // The previous provider stops being consulted once the call returns.
-  let secondCalls = ResourceProviderCallCounter()
+  let secondCalls = LockedBox(0)
   try await runtime.setResourceProvider { _, _ in
-    secondCalls.recordCall()
+    secondCalls.update { $0 += 1 }
     return .passThrough
   }
-  let firstCallsAfterReplace = firstCalls.callCount
+  let firstCallsAfterReplace = firstCalls.value
 
   let secondFailure = try await loadProbeStyle(
     runtime: runtime,
@@ -149,11 +125,11 @@ private func loadProbeStyle(
     styleURL: "jar:file:/packaged/second.json"
   )
   #expect(secondFailure?.contains("\"jar\"") == true)
-  #expect(secondCalls.callCount > 0)
-  #expect(firstCalls.callCount == firstCallsAfterReplace)
+  #expect(secondCalls.value > 0)
+  #expect(firstCalls.value == firstCallsAfterReplace)
 
   try await runtime.clearResourceProvider()
-  let secondCallsAfterClear = secondCalls.callCount
+  let secondCallsAfterClear = secondCalls.value
 
   let clearedFailure = try await loadProbeStyle(
     runtime: runtime,
@@ -161,27 +137,14 @@ private func loadProbeStyle(
     styleURL: "jar:file:/packaged/third.json"
   )
   #expect(clearedFailure?.contains("\"jar\"") == true)
-  #expect(firstCalls.callCount == firstCallsAfterReplace)
-  #expect(secondCalls.callCount == secondCallsAfterClear)
+  #expect(firstCalls.value == firstCallsAfterReplace)
+  #expect(secondCalls.value == secondCallsAfterClear)
 
   // Clearing an already cleared provider stays a successful no-op.
   try await runtime.clearResourceProvider()
 }
 
 private let providerStyleJSON = #"{"version":8,"sources":{},"layers":[]}"#
-
-private final class ResolvedURLCapture: @unchecked Sendable {
-  private let lock = NSLock()
-  private var url: String?
-
-  func store(_ url: String) {
-    lock.withLock { self.url = url }
-  }
-
-  var value: String? {
-    lock.withLock { url }
-  }
-}
 
 /// BND-155: the default tile server's `maplibre:` scheme alias reaches the
 /// provider as the alias, alongside the URL the built-in network path would
@@ -191,12 +154,12 @@ private final class ResolvedURLCapture: @unchecked Sendable {
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
 
-  let resolved = ResolvedURLCapture()
+  let resolved = LockedBox<String?>(nil)
   try await runtime.setResourceProvider { request, handle in
     guard request.requestedUrl == "maplibre://maps/style" else {
       return .passThrough
     }
-    resolved.store(request.resolvedUrl)
+    resolved.update { $0 = request.resolvedUrl }
     try? handle.complete(ResourceResponse(
       status: .ok,
       bytes: Data(providerStyleJSON.utf8)
@@ -244,15 +207,7 @@ private final class ResolvedURLCapture: @unchecked Sendable {
 
 @Test func resourceProviderParseFailureFinalizesHandleState() {
   let counters = ResourceCounters()
-  let functions = NativeResourceRequestHandleFunctions(
-    complete: { _, _ in counters.completed() },
-    cancelled: { _ in false },
-    release: { _ in counters.released() },
-    setCancelCallback: { _, _, _ in
-      Issue.record("this test registers no cancel callback")
-      return false
-    }
-  )
+  let functions = countingHandleFunctions(counters)
   let state = NativeResourceProviderState(handleFunctions: functions) { _, _ in
     Issue.record("malformed request should not reach provider callback")
     return MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue
@@ -272,15 +227,7 @@ private final class ResolvedURLCapture: @unchecked Sendable {
 @Test func resourceRequestHandleRejectsSecondCompletionBeforeCallingNative(
 ) throws {
   let counters = ResourceCounters()
-  let functions = NativeResourceRequestHandleFunctions(
-    complete: { _, _ in counters.completed() },
-    cancelled: { _ in false },
-    release: { _ in counters.released() },
-    setCancelCallback: { _, _, _ in
-      Issue.record("this test registers no cancel callback")
-      return false
-    }
-  )
+  let functions = countingHandleFunctions(counters)
   let state = try NativeResourceRequestHandleState(
     handle: SyntheticHandles.resourceRequest(0x5),
     functions: functions
@@ -309,21 +256,12 @@ private final class ResolvedURLCapture: @unchecked Sendable {
 
 @Test func resourceRequestHandleKeepsFailedCompletionTerminal() throws {
   let counters = ResourceCounters()
-  let functions = NativeResourceRequestHandleFunctions(
-    complete: { _, _ in
-      counters.completed()
-      throw NativeStatusFailure(
-        rawStatus: MLN_STATUS_INVALID_STATE.rawValue,
-        diagnostic: "resource request can no longer accept a response"
-      )
-    },
-    cancelled: { _ in false },
-    release: { _ in counters.released() },
-    setCancelCallback: { _, _, _ in
-      Issue.record("this test registers no cancel callback")
-      return false
-    }
-  )
+  let functions = countingHandleFunctions(counters) { _ in
+    throw NativeStatusFailure(
+      rawStatus: MLN_STATUS_INVALID_STATE.rawValue,
+      diagnostic: "resource request can no longer accept a response"
+    )
+  }
   let state = try NativeResourceRequestHandleState(
     handle: SyntheticHandles.resourceRequest(0x5),
     functions: functions
@@ -383,9 +321,9 @@ private final class ResolvedURLCapture: @unchecked Sendable {
   _ = state
     .finishProviderDecision(MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue)
 
-  let cancellationResult = ResourceCancellationResult()
+  let cancellationResult = LockedBox<Result<Bool, Error>?>(nil)
   Thread {
-    cancellationResult.store(Result { try state.isCancelled() })
+    cancellationResult.update { $0 = Result { try state.isCancelled() } }
     cancellationFinished.signal()
   }.start()
 
@@ -414,7 +352,7 @@ private final class ResolvedURLCapture: @unchecked Sendable {
     waitForSemaphore(releaseFinished, timeout: .now() + .seconds(5))
   }.value == .success)
 
-  switch cancellationResult.load() {
+  switch cancellationResult.value {
   case let .success(isCancelled):
     #expect(isCancelled)
   case let .failure(error):
@@ -429,19 +367,10 @@ private final class ResolvedURLCapture: @unchecked Sendable {
 @Test func resourceProviderCallbackCopiesRequestAndCompletesHandledRequest(
 ) throws {
   let counters = ResourceCounters()
-  let functions = NativeResourceRequestHandleFunctions(
-    complete: { _, response in
-      counters.completed()
-      #expect(response.status == ResourceResponseStatus.ok.rawValue)
-      #expect(response.bytes == Array("ok".utf8))
-    },
-    cancelled: { _ in false },
-    release: { _ in counters.released() },
-    setCancelCallback: { _, _, _ in
-      Issue.record("this test registers no cancel callback")
-      return false
-    }
-  )
+  let functions = countingHandleFunctions(counters) { response in
+    #expect(response.status == ResourceResponseStatus.ok.rawValue)
+    #expect(response.bytes == Array("ok".utf8))
+  }
   let state =
     NativeResourceProviderState(handleFunctions: functions) { nativeRequest, nativeHandle in
       let request = ResourceRequest(native: nativeRequest)
@@ -501,19 +430,11 @@ private final class ResolvedURLCapture: @unchecked Sendable {
 
 @Test func resourceProviderPassThroughClosesEscapedHandleState() throws {
   let counters = ResourceCounters()
-  let functions = NativeResourceRequestHandleFunctions(
-    complete: { _, _ in counters.completed() },
-    cancelled: { _ in false },
-    release: { _ in counters.released() },
-    setCancelCallback: { _, _, _ in
-      Issue.record("this test registers no cancel callback")
-      return false
-    }
-  )
-  let escapedState = ResourceHandleStateCapture()
+  let functions = countingHandleFunctions(counters)
+  let escapedState = LockedBox<NativeResourceRequestHandleState?>(nil)
   let state =
     NativeResourceProviderState(handleFunctions: functions) { _, nativeHandle in
-      escapedState.store(nativeHandle)
+      escapedState.update { $0 = nativeHandle }
       return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue
     }
 
@@ -531,7 +452,7 @@ private final class ResolvedURLCapture: @unchecked Sendable {
 
   #expect(decision == MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue)
   do {
-    try escapedState.load()?.complete(NativeResourceResponseInput(
+    try escapedState.value?.complete(NativeResourceResponseInput(
       status: ResourceResponseStatus.ok.rawValue,
       errorReason: ResourceErrorReason.none.rawValue
     ))
@@ -545,18 +466,9 @@ private final class ResolvedURLCapture: @unchecked Sendable {
 
 @Test func resourceProviderInlineCompletionForcesHandleDecision() throws {
   let counters = ResourceCounters()
-  let functions = NativeResourceRequestHandleFunctions(
-    complete: { _, response in
-      counters.completed()
-      #expect(response.status == ResourceResponseStatus.ok.rawValue)
-    },
-    cancelled: { _ in false },
-    release: { _ in counters.released() },
-    setCancelCallback: { _, _, _ in
-      Issue.record("this test registers no cancel callback")
-      return false
-    }
-  )
+  let functions = countingHandleFunctions(counters) { response in
+    #expect(response.status == ResourceResponseStatus.ok.rawValue)
+  }
   let state =
     NativeResourceProviderState(handleFunctions: functions) { _, nativeHandle in
       try? nativeHandle.complete(NativeResourceResponseInput(
@@ -616,24 +528,6 @@ private final class CancelProbe: @unchecked Sendable {
   }
 }
 
-/// Waits until the condition holds while the runtime's own threads make
-/// progress, and reports a timeout as a failure the way `drainUntilEvent`
-/// does.
-private func waitUntil(
-  waitingFor subject: String,
-  timeout: TimeInterval = 10,
-  condition: () throws -> Bool
-) async throws -> Bool {
-  let deadline = Date().addingTimeInterval(timeout)
-  while Date() < deadline {
-    if try condition() { return true }
-    try await Task<Never, Never>.sleep(nanoseconds: 1_000_000)
-  }
-  if try condition() { return true }
-  Issue.record("timed out waiting for \(subject)")
-  return false
-}
-
 /// Installs a provider that takes every request and keeps the handle, then
 /// requests a style through it. `configure` runs inside the provider callback
 /// with the handle, before the provider returns. The request stays open unless
@@ -651,8 +545,8 @@ private func startCancelProbeRequest(
     return .handle
   }
   try await map.setStyleURL("custom://cancel-style.json")
-  return try await waitUntil(
-    waitingFor: "the provider to take the request"
+  return try await waitUntilTrue(
+    "the provider to take the request"
   ) { probe.wasProviderCalled }
 }
 
@@ -672,14 +566,16 @@ private func startCancelProbeRequest(
   defer { try? map.closeBlockingForTests() }
 
   let probe = CancelProbe()
-  let secondCalls = ResourceProviderCallCounter()
-  let secondRegistration = ResourceCancellationResult()
+  let secondCalls = LockedBox(0)
+  let secondRegistration = LockedBox<Result<Bool, Error>?>(nil)
   let configure: @Sendable (ResourceRequestHandle) -> Void = { handle in
     try? handle.setCancelCallback { probe.recordCancel() }
-    secondRegistration.store(Result {
-      try handle.setCancelCallback { secondCalls.recordCall() }
-      return true
-    })
+    secondRegistration.update {
+      $0 = Result {
+        try handle.setCancelCallback { secondCalls.update { $0 += 1 } }
+        return true
+      }
+    }
   }
   #expect(try await startCancelProbeRequest(
     runtime: runtime,
@@ -688,7 +584,7 @@ private func startCancelProbeRequest(
     configure: configure
   ))
   #expect(probe.cancels == 0)
-  switch secondRegistration.load() {
+  switch secondRegistration.value {
   case let .failure(error as MaplibreError):
     #expect(error.kind == .invalidState)
   case let other:
@@ -701,12 +597,12 @@ private func startCancelProbeRequest(
   // Closing the map waits for its native teardown, and that teardown is what
   // discards the request and runs the cancel callback.
   try await map.close()
-  #expect(try await waitUntil(waitingFor: "the cancel callback") {
+  #expect(try await waitUntilTrue("the cancel callback") {
     probe.cancels == 1
   })
   try await runtime.barrier()
   #expect(probe.cancels == 1)
-  #expect(secondCalls.callCount == 0)
+  #expect(secondCalls.value == 0)
 
   let handle = try #require(probe.handle)
   #expect(try handle.isCancelled())
@@ -749,7 +645,7 @@ private func startCancelProbeRequest(
   })
 
   try await map.close()
-  #expect(try await waitUntil(waitingFor: "the cancel callback") {
+  #expect(try await waitUntilTrue("the cancel callback") {
     probe.cancels == 1
   })
 
@@ -785,7 +681,7 @@ private func startCancelProbeRequest(
   let handle = try #require(probe.handle)
 
   try await map.close()
-  #expect(try await waitUntil(waitingFor: "the request to be cancelled") {
+  #expect(try await waitUntilTrue("the request to be cancelled") {
     try handle.isCancelled()
   })
 
@@ -802,10 +698,10 @@ private func registerCancelCallbackOnThisThread(
   probe: CancelProbe
 ) throws -> Bool {
   let registeringThread = Thread.current.description
-  let callbackThread = ResolvedURLCapture()
+  let callbackThread = LockedBox<String?>(nil)
   try handle.setCancelCallback {
     probe.recordCancel()
-    callbackThread.store(Thread.current.description)
+    callbackThread.update { $0 = Thread.current.description }
   }
   return callbackThread.value == registeringThread
 }
@@ -921,21 +817,21 @@ private func makeRecordedHandleState(
 @Test func resourceRequestCancelTokenResolvesWeaklyAndRunsOnce() throws {
   let recorder = CancelRegistrationRecorder()
   let counters = ResourceCounters()
-  let calls = ResourceProviderCallCounter()
+  let calls = LockedBox(0)
 
   var state: NativeResourceRequestHandleState? = try makeRecordedHandleState(
     recorder: recorder,
     counters: counters,
     ordinal: 0xA
   )
-  try state?.setCancelCallback { calls.recordCall() }
+  try state?.setCancelCallback { calls.update { $0 += 1 } }
   let token = try #require(recorder.token(0))
   #expect(token != 0)
   #expect(ResourceRequestCancelRegistry.shared.contains(token))
 
   recorder.invoke(0)
   recorder.invoke(0)
-  #expect(calls.callCount == 1)
+  #expect(calls.value == 1)
   #expect(!ResourceRequestCancelRegistry.shared.contains(token))
 
   // A registration whose request is released and freed leaves nothing behind
@@ -945,14 +841,14 @@ private func makeRecordedHandleState(
     counters: counters,
     ordinal: 0xB
   )
-  try state?.setCancelCallback { calls.recordCall() }
+  try state?.setCancelCallback { calls.update { $0 += 1 } }
   let secondToken = try #require(recorder.token(1))
   #expect(secondToken != token)
   state?.release()
   #expect(!ResourceRequestCancelRegistry.shared.contains(secondToken))
   state = nil
   recorder.invoke(1)
-  #expect(calls.callCount == 1)
+  #expect(calls.value == 1)
   #expect(counters.snapshot().release == 2)
 }
 
@@ -971,10 +867,10 @@ private func makeRecordedHandleState(
   )
 
   let registrationFinished = DispatchSemaphore(value: 0)
-  let cancels = ResourceProviderCallCounter()
+  let cancels = LockedBox(0)
   Thread {
     try? state.setCancelCallback {
-      cancels.recordCall()
+      cancels.update { $0 += 1 }
       state.release()
     }
     registrationFinished.signal()
@@ -982,7 +878,7 @@ private func makeRecordedHandleState(
 
   #expect(registrationFinished
     .wait(timeout: .now() + .seconds(5)) == .success)
-  #expect(cancels.callCount == 1)
+  #expect(cancels.value == 1)
   #expect(counters.snapshot().release == 1)
   let token = try #require(recorder.token(0))
   #expect(!ResourceRequestCancelRegistry.shared.contains(token))
