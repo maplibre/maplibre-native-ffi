@@ -237,15 +237,12 @@ constexpr auto kOrphanedRuntimeError =
   "runtime is orphaned: its owner thread exited without destroying it";
 
 // Releases an owner thread that exits with its runtime still live. Only the
-// owner thread can destroy a runtime, so that runtime can never leave
-// live_runtime_threads() through the API, and its id would otherwise reject
-// runtime creation on every later thread the platform gives the same id. The
-// runtime stays in the handle table, marked orphaned, so a thread with the
-// reused id cannot pump a run loop that belongs to a thread that no longer
-// exists.
+// owner thread can destroy a runtime, so that runtime would otherwise hold the
+// thread's id in live_runtime_threads() forever and reject runtime creation on
+// every later thread the platform gives the same id. The runtime stays in the
+// handle table, marked orphaned, so that thread cannot pump it either.
 struct OwnerThreadGuard {
   mln_runtime runtime = MLN_HANDLE_NULL;
-  std::thread::id owner_thread;
 
   ~OwnerThreadGuard() {
     if (runtime == MLN_HANDLE_NULL) {
@@ -260,12 +257,12 @@ struct OwnerThreadGuard {
       }
     }
     const std::scoped_lock lock(live_runtime_threads_mutex());
-    live_runtime_threads().erase(owner_thread);
+    live_runtime_threads().erase(std::this_thread::get_id());
   }
 };
 
 // Runtime creation and destruction are owner-thread calls, so the calling
-// thread's guard is always the one that tracks the runtime in question.
+// thread's guard always tracks the runtime in question.
 auto owner_thread_guard() -> OwnerThreadGuard& {
   thread_local OwnerThreadGuard value;
   return value;
@@ -1240,9 +1237,6 @@ auto create_runtime(
   // the runtime while unwinding.
   auto* const platform_context = reserve_platform_context();
   published->platform_context = platform_context;
-  // The first touch registers the guard's thread-exit destructor, which can
-  // allocate, so it also happens before this thread is marked.
-  auto& guard = owner_thread_guard();
   {
     const std::scoped_lock lock(live_runtime_threads_mutex());
     live_runtime_threads().insert(owner_thread);
@@ -1262,8 +1256,7 @@ auto create_runtime(
     throw;
   }
   published->self = *out_runtime;
-  guard.runtime = *out_runtime;
-  guard.owner_thread = owner_thread;
+  owner_thread_guard().runtime = *out_runtime;
   bind_platform_context(platform_context, *out_runtime);
   return MLN_STATUS_OK;
 }

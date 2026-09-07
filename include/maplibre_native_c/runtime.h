@@ -858,13 +858,9 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
  * Creates a runtime handle.
  *
  * The creating thread becomes the runtime owner thread. Each owner thread may
- * hold one live runtime, and destroys it before the thread exits.
- *
- * A runtime that outlives its owner thread is orphaned. The thread's identity
- * is released, so a later thread that the platform gives the same identity can
- * create a runtime of its own. The orphaned handle stays allocated for the life
- * of the process, and every call that takes it returns
- * MLN_STATUS_INVALID_STATE.
+ * hold one live runtime, and destroys it before the thread exits. A runtime
+ * that outlives its owner thread is orphaned: every later call that takes it
+ * returns MLN_STATUS_INVALID_STATE.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
