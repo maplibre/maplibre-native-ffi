@@ -233,6 +233,44 @@ auto owner_thread_has_live_runtime(std::thread::id owner_thread) -> bool {
   return live_runtime_threads().contains(owner_thread);
 }
 
+constexpr auto kOrphanedRuntimeError =
+  "runtime is orphaned: its owner thread exited without destroying it";
+
+// Releases an owner thread that exits with its runtime still live. Only the
+// owner thread can destroy a runtime, so that runtime can never leave
+// live_runtime_threads() through the API, and its id would otherwise reject
+// runtime creation on every later thread the platform gives the same id. The
+// runtime stays in the handle table, marked orphaned, so a thread with the
+// reused id cannot pump a run loop that belongs to a thread that no longer
+// exists.
+struct OwnerThreadGuard {
+  mln_runtime runtime = MLN_HANDLE_NULL;
+  std::thread::id owner_thread;
+
+  ~OwnerThreadGuard() {
+    if (runtime == MLN_HANDLE_NULL) {
+      return;
+    }
+    {
+      auto& table = mln::core::handle_table<mln::core::RuntimeObject>();
+      const std::scoped_lock lock(table.mutex());
+      auto* live = table.try_resolve_locked(runtime);
+      if (live != nullptr) {
+        live->owner_thread_exited.store(true, std::memory_order_relaxed);
+      }
+    }
+    const std::scoped_lock lock(live_runtime_threads_mutex());
+    live_runtime_threads().erase(owner_thread);
+  }
+};
+
+// Runtime creation and destruction are owner-thread calls, so the calling
+// thread's guard is always the one that tracks the runtime in question.
+auto owner_thread_guard() -> OwnerThreadGuard& {
+  thread_local OwnerThreadGuard value;
+  return value;
+}
+
 // Leases the resource transform registration for a MapLibre-owned thread. Only
 // a reference count increment happens under the handle table lock; the caller
 // takes the returned state's lock after this returns, so a writer waiting on
@@ -1089,6 +1127,13 @@ auto validate_runtime(mln_runtime runtime, RuntimeObject*& out_runtime)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
+  // Checked before the thread, so a thread that reuses the exited owner's id
+  // hears about the leak rather than passing as the owner.
+  if (out_runtime->owner_thread_exited.load(std::memory_order_relaxed)) {
+    set_thread_error(kOrphanedRuntimeError);
+    return MLN_STATUS_INVALID_STATE;
+  }
+
   if (out_runtime->owner_thread != std::this_thread::get_id()) {
     set_thread_error("runtime call must be made on its owner thread");
     return MLN_STATUS_WRONG_THREAD;
@@ -1195,6 +1240,9 @@ auto create_runtime(
   // the runtime while unwinding.
   auto* const platform_context = reserve_platform_context();
   published->platform_context = platform_context;
+  // The first touch registers the guard's thread-exit destructor, which can
+  // allocate, so it also happens before this thread is marked.
+  auto& guard = owner_thread_guard();
   {
     const std::scoped_lock lock(live_runtime_threads_mutex());
     live_runtime_threads().insert(owner_thread);
@@ -1214,6 +1262,8 @@ auto create_runtime(
     throw;
   }
   published->self = *out_runtime;
+  guard.runtime = *out_runtime;
+  guard.owner_thread = owner_thread;
   bind_platform_context(platform_context, *out_runtime);
   return MLN_STATUS_OK;
 }
@@ -2892,6 +2942,11 @@ auto destroy_runtime(mln_runtime runtime) -> mln_status {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
 
+    if (live->owner_thread_exited.load(std::memory_order_relaxed)) {
+      set_thread_error(kOrphanedRuntimeError);
+      return MLN_STATUS_INVALID_STATE;
+    }
+
     if (live->owner_thread != std::this_thread::get_id()) {
       set_thread_error("runtime must be destroyed on its owner thread");
       return MLN_STATUS_WRONG_THREAD;
@@ -2909,6 +2964,7 @@ auto destroy_runtime(mln_runtime runtime) -> mln_status {
     const std::scoped_lock lock(live_runtime_threads_mutex());
     live_runtime_threads().erase(owner_thread);
   }
+  owner_thread_guard().runtime = MLN_HANDLE_NULL;
   unregister_platform_context(owned_runtime->platform_context);
 
   // A resource transform callback that entered `invoke_resource_transform()`

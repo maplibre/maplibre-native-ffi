@@ -180,6 +180,9 @@ struct RuntimeObject {
   // The token this runtime hands to mbgl as its opaque platform context.
   void* platform_context = nullptr;
   std::thread::id owner_thread;
+  // Set once, by the owner thread's exit, when the runtime outlived it. Read
+  // by validation on any thread, so it is atomic rather than table-guarded.
+  std::atomic<bool> owner_thread_exited{false};
   std::unique_ptr<mln::util::RunLoop> run_loop;
   std::string asset_path;
   std::string cache_path;

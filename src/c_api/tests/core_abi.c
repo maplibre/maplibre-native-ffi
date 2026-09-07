@@ -1,6 +1,7 @@
 // Raw C ABI coverage: core runtime/map/style/event/diagnostic tests for unsafe
 // inputs, stale handles, and thread-local diagnostics hidden by bindings.
 
+#include <stdlib.h>
 #include <string.h>
 
 #if defined(_WIN32)
@@ -208,6 +209,148 @@ static void diagnostics_are_thread_local(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// The native identity of the calling thread, which is what the runtime's
+// owner-thread check compares.
+static uintptr_t current_thread_id(void) {
+#if defined(_WIN32)
+  return (uintptr_t)GetCurrentThreadId();
+#else
+  return (uintptr_t)pthread_self();
+#endif
+}
+
+typedef struct leaked_runtime_probe {
+  uintptr_t thread_id;
+  mln_runtime runtime;
+  mln_status create_status;
+} leaked_runtime_probe;
+
+// Exits with its runtime live, which is the leak under test.
+static void leak_runtime_entry(void* argument) {
+  leaked_runtime_probe* probe = argument;
+  probe->thread_id = current_thread_id();
+  const mln_runtime_options options = mln_runtime_options_default();
+  probe->create_status = mln_runtime_create(&options, &probe->runtime);
+}
+
+typedef struct reused_thread_probe {
+  uintptr_t wanted_thread_id;
+  atomic_bool* release;
+  atomic_bool reported;
+  bool matched;
+  mln_status create_status;
+  mln_status destroy_status;
+  char create_message[160];
+} reused_thread_probe;
+
+// A thread that reuses the exited owner's identity creates a runtime; any other
+// thread stays alive until released, so the next thread cannot take its
+// identity and the platform hands out the exited owner's in turn.
+static void reused_thread_entry(void* argument) {
+  reused_thread_probe* probe = argument;
+  probe->matched = current_thread_id() == probe->wanted_thread_id;
+  if (!probe->matched) {
+    atomic_store(&probe->reported, true);
+    while (!atomic_load(probe->release)) {
+      mln_test_sleep_millisecond();
+    }
+    return;
+  }
+
+  mln_runtime runtime = MLN_HANDLE_NULL;
+  const mln_runtime_options options = mln_runtime_options_default();
+  probe->create_status = mln_runtime_create(&options, &runtime);
+  strncpy(
+    probe->create_message, mln_thread_last_error_message(),
+    sizeof(probe->create_message) - 1
+  );
+  if (probe->create_status == MLN_STATUS_OK) {
+    probe->destroy_status = mln_runtime_destroy(runtime);
+  }
+  atomic_store(&probe->reported, true);
+}
+
+#define MLN_TEST_THREAD_REUSE_ATTEMPTS 32
+
+// Only the owner thread can destroy a runtime, so a runtime whose owner thread
+// exited can never leave the C API. Its thread identity must not leave with
+// it: platforms reuse thread identities, and a later thread that gets this one
+// creates a runtime of its own.
+static void a_runtime_that_outlives_its_owner_thread_releases_the_thread(void) {
+  leaked_runtime_probe leaked = {0};
+  mln_test_thread_join(mln_test_thread_start(leak_runtime_entry, &leaked));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, leaked.create_status);
+
+  // The orphaned handle reports the leak, on any thread, ahead of the
+  // owner-thread check that would otherwise name this thread as the problem.
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_STATE, mln_runtime_pump(leaked.runtime, 0, -1)
+  );
+  TEST_ASSERT_EQUAL_STRING(
+    "runtime is orphaned: its owner thread exited without destroying it",
+    mln_thread_last_error_message()
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_STATE, mln_runtime_destroy(leaked.runtime)
+  );
+
+  atomic_bool release;
+  atomic_init(&release, false);
+  reused_thread_probe* probes =
+    calloc(MLN_TEST_THREAD_REUSE_ATTEMPTS, sizeof(*probes));
+  mln_test_thread** threads =
+    calloc(MLN_TEST_THREAD_REUSE_ATTEMPTS, sizeof(*threads));
+  TEST_ASSERT_NOT_NULL(probes);
+  TEST_ASSERT_NOT_NULL(threads);
+
+  size_t started = 0;
+  size_t matched = MLN_TEST_THREAD_REUSE_ATTEMPTS;
+  while (started < MLN_TEST_THREAD_REUSE_ATTEMPTS &&
+         matched == MLN_TEST_THREAD_REUSE_ATTEMPTS) {
+    reused_thread_probe* probe = &probes[started];
+    probe->wanted_thread_id = leaked.thread_id;
+    probe->release = &release;
+    atomic_init(&probe->reported, false);
+    threads[started] = mln_test_thread_start(reused_thread_entry, probe);
+    started += 1;
+    while (!atomic_load(&probe->reported)) {
+      mln_test_sleep_millisecond();
+    }
+    if (probe->matched) {
+      matched = started - 1;
+    }
+  }
+  atomic_store(&release, true);
+  for (size_t index = 0; index < started; index += 1) {
+    mln_test_thread_join(threads[index]);
+  }
+
+  const bool found = matched < MLN_TEST_THREAD_REUSE_ATTEMPTS;
+  mln_status create_status = MLN_STATUS_OK;
+  mln_status destroy_status = MLN_STATUS_OK;
+  char create_message[sizeof(probes->create_message)] = {0};
+  if (found) {
+    create_status = probes[matched].create_status;
+    destroy_status = probes[matched].destroy_status;
+    memcpy(
+      create_message, probes[matched].create_message, sizeof(create_message)
+    );
+  }
+  free(threads);
+  free(probes);
+
+  if (!found) {
+    // The platform decides when it reuses a thread identity, and the test has
+    // no way to make it do so.
+    TEST_IGNORE_MESSAGE(
+      "No thread reused the exited owner's identity within "
+      "MLN_TEST_THREAD_REUSE_ATTEMPTS threads."
+    );
+  }
+  TEST_ASSERT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, create_status, create_message);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, destroy_status);
+}
+
 void run_core_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(runtime_rejects_invalid_arguments);
@@ -218,4 +361,5 @@ void run_core_abi_tests(void) {
   RUN_TEST(style_functions_reject_null_inputs);
   RUN_TEST(failing_status_sets_and_successful_status_clears_diagnostics);
   RUN_TEST(diagnostics_are_thread_local);
+  RUN_TEST(a_runtime_that_outlives_its_owner_thread_releases_the_thread);
 }
