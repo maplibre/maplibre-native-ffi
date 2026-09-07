@@ -859,8 +859,8 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
  *
  * The creating thread becomes the runtime owner thread. Each owner thread may
  * hold one live runtime, and destroys it before the thread exits. A runtime
- * that outlives its owner thread is orphaned: every later call that takes it
- * returns MLN_STATUS_INVALID_STATE.
+ * that outlives its owner thread is orphaned: no thread can call or destroy
+ * it, and its handle stays allocated.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -1183,8 +1183,7 @@ MLN_API mln_status mln_runtime_offline_operation_discard(
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
  *   handle.
- * - MLN_STATUS_INVALID_STATE when runtime still owns live maps, or when its
- *   owner thread exited.
+ * - MLN_STATUS_INVALID_STATE when runtime still owns live maps.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the creating
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
