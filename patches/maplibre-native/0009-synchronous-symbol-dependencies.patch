@@ -1,0 +1,151 @@
+diff --git a/src/mln/tile/geometry_tile_worker.cpp b/src/mln/tile/geometry_tile_worker.cpp
+index 459142d..8052f27 100644
+--- a/src/mln/tile/geometry_tile_worker.cpp
++++ b/src/mln/tile/geometry_tile_worker.cpp
+@@ -374,7 +374,8 @@ void GeometryTileWorker::onImagesAvailable(ImageMap newIconMap,
+     symbolDependenciesChanged();
+ }
+ 
+-void GeometryTileWorker::requestNewGlyphs(const GlyphDependencies& glyphDependencies) {
++void GeometryTileWorker::requestNewDependencies(const GlyphDependencies& glyphDependencies,
++                                                const ImageDependencies& imageDependencies) {
+     MLN_TRACE_FUNC();
+ 
+     for (auto& fontDependencies : glyphDependencies.glyphs) {
+@@ -395,16 +396,13 @@ void GeometryTileWorker::requestNewGlyphs(const GlyphDependencies& glyphDependen
+             }
+         }
+     }
++    // Synchronous actors can deliver cached dependencies inline. Register both
++    // sets before either request can reenter finalizeLayout().
++    pendingImageDependencies = imageDependencies;
++
+     if (!pendingGlyphDependencies.glyphs.empty()) {
+         parent.invoke(&GeometryTile::getGlyphs, pendingGlyphDependencies);
+     }
+-}
+-
+-void GeometryTileWorker::requestNewImages(const ImageDependencies& imageDependencies) {
+-    MLN_TRACE_FUNC();
+-
+-    pendingImageDependencies = imageDependencies;
+-
+     if (!pendingImageDependencies.empty()) {
+         parent.invoke(&GeometryTile::getImages, std::make_pair(pendingImageDependencies, ++imageCorrelationID));
+     }
+@@ -518,8 +516,7 @@ void GeometryTileWorker::parse() {
+         }
+     }
+ 
+-    requestNewGlyphs(glyphDependencies);
+-    requestNewImages(imageDependencies);
++    requestNewDependencies(glyphDependencies, imageDependencies);
+ 
+     MBGL_TIMING_FINISH(watch,
+                        " Action: " << "Parsing,"
+diff --git a/src/mln/tile/geometry_tile_worker.hpp b/src/mln/tile/geometry_tile_worker.hpp
+index 6717251..fce3fd0 100644
+--- a/src/mln/tile/geometry_tile_worker.hpp
++++ b/src/mln/tile/geometry_tile_worker.hpp
+@@ -73,8 +73,7 @@ private:
+ 
+     void coalesce();
+ 
+-    void requestNewGlyphs(const GlyphDependencies&);
+-    void requestNewImages(const ImageDependencies&);
++    void requestNewDependencies(const GlyphDependencies&, const ImageDependencies&);
+ 
+     void symbolDependenciesChanged();
+     bool hasPendingDependencies() const;
+diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
+index 5d67d35..9cd32fe 100644
+--- a/test/map/map.test.cpp
++++ b/test/map/map.test.cpp
+@@ -44,6 +44,7 @@
+ #include <mln/util/run_loop.hpp>
+ 
+ #include <atomic>
++#include <tuple>
+ 
+ using namespace mln;
+ using namespace mln::style;
+@@ -2039,3 +2040,79 @@ TEST(Map, SetFrustumOffset) {
+ 
+     test::checkImage("test/fixtures/map/setFrustumOffset/after", test.frontend.render(test.map).image, 0.0006, 0.1);
+ }
++
++class GeoJSONSymbolTest : public testing::TestWithParam<std::tuple<bool, bool>> {};
++
++TEST_P(GeoJSONSymbolTest, RetainsIconsAndTextAcrossZoom) {
++    const auto [synchronous, withText] = GetParam();
++    MapTest<> test;
++    test.frontend.setSize({512, 512});
++    test.map.setSize({512, 512});
++
++    unsigned glyphRequests = 0;
++    test.fileSource->glyphsResponse = [&](const Resource&) {
++        ++glyphRequests;
++        Response response;
++        response.data = std::make_shared<std::string>(util::read_file("test/fixtures/resources/glyphs.pbf"));
++        return response;
++    };
++    test.map.getStyle().loadJSON(R"({
++        "version": 8,
++        "glyphs": "https://example.com/{fontstack}/{range}.pbf",
++        "sources": {},
++        "layers": [{"id": "background", "type": "background", "paint": {"background-color": "white"}}]
++    })");
++
++    PremultipliedImage icon({40, 48});
++    for (size_t i = 0; i < icon.bytes(); i += 4) {
++        icon.data[i] = 255;
++        icon.data[i + 1] = 0;
++        icon.data[i + 2] = 0;
++        icon.data[i + 3] = 255;
++    }
++    test.map.getStyle().addImage(std::make_unique<style::Image>("marker", std::move(icon), 1.0f));
++
++    GeoJSONOptions options;
++    options.synchronousUpdate = synchronous;
++    for (int i = 0; i < 3; ++i) {
++        const auto sourceID = "point-" + std::to_string(i);
++        auto source = std::make_unique<GeoJSONSource>(sourceID, makeMutable<GeoJSONOptions>(options));
++        source->setGeoJSON(Geometry<double>{Point<double>{(i - 1) * 0.005, 0.0}});
++        test.map.getStyle().addSource(std::move(source));
++
++        auto layer = std::make_unique<SymbolLayer>("symbol-" + std::to_string(i), sourceID);
++        layer->setIconImage({"marker"s});
++        layer->setIconAnchor(SymbolAnchorType::Bottom);
++        layer->setIconAllowOverlap(true);
++        layer->setIconIgnorePlacement(true);
++        layer->setTextField(expression::Formatted(withText ? "New place" : ""));
++        layer->setTextFont(FontStack{"Open Sans Regular"});
++        layer->setTextAnchor(SymbolAnchorType::Top);
++        layer->setTextAllowOverlap(true);
++        layer->setTextIgnorePlacement(true);
++        test.map.getStyle().addLayer(std::move(layer));
++    }
++
++    // The first frame loads glyphs asynchronously. Replacement tiles at each
++    // zoom request the same cached range, whose callback can run inline.
++    for (const double zoom : {14.0, 13.5, 13.0, 12.5, 14.0}) {
++        SCOPED_TRACE(zoom);
++        test.map.jumpTo(CameraOptions().withCenter(LatLng{0.0, 0.0}).withZoom(zoom));
++        const auto image = test.frontend.render(test.map).image;
++        size_t redPixels = 0;
++        size_t blackPixels = 0;
++        for (size_t i = 0; i < image.bytes(); i += 4) {
++            const auto* pixel = image.data.get() + i;
++            redPixels += pixel[0] > 200 && pixel[1] < 50 && pixel[2] < 50;
++            blackPixels += pixel[0] < 100 && pixel[1] < 100 && pixel[2] < 100;
++        }
++        // Three separate 40 x 48 icons cover 5760 pixels, allowing edge antialiasing.
++        EXPECT_GE(redPixels, 5700u);
++        if (withText) {
++            EXPECT_GT(blackPixels, 100u);
++            EXPECT_EQ(glyphRequests, 1u);
++        }
++    }
++}
++
++INSTANTIATE_TEST_SUITE_P(GeoJSON, GeoJSONSymbolTest, testing::Combine(testing::Bool(), testing::Bool()));

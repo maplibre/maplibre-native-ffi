@@ -42,6 +42,13 @@ the configured pitch range. This keeps camera padding on small viewports from
 lowering the pitch below its minimum. See
 [issue #693](https://github.com/maplibre/maplibre-native-ffi/issues/693).
 
+`0009-synchronous-symbol-dependencies.patch` registers glyph and image
+dependencies before requesting either set. Cached glyphs can return inline for
+synchronous GeoJSON tiles; layout must wait for the images too. The patch
+includes a Native map regression test that checks icon and label pixels across
+zoom changes with a cached glyph range. See
+[issue #698](https://github.com/maplibre/maplibre-native-ffi/issues/698).
+
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
 before applying the list again. A pin bump, an edit to a patch, and a dropped
