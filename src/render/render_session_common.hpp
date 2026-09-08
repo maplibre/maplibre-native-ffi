@@ -15,7 +15,6 @@
 #include <mutex>
 #include <optional>
 #include <string>
-#include <thread>
 #include <unordered_set>
 #include <vector>
 
@@ -31,6 +30,7 @@
 #include "diagnostics/diagnostics.hpp"
 #include "execution/worker_thread.hpp"
 #include "handles/handle_table.hpp"
+#include "handles/owner_thread.hpp"
 #include "map/feature_state.hpp"
 #include "maplibre_native_c.h"
 #include "operation/operation.hpp"
@@ -588,7 +588,7 @@ struct mln_render_session_object
   bool target_ready = true;
   bool pending_changes = true;
   std::optional<mln_render_target_extent> pending_extent;
-  std::optional<std::thread::id> graphics_thread;
+  std::optional<mln::core::OwnerThreadToken> graphics_thread;
   uint32_t acquired_frame_count = 0;
   bool driver_call_in_flight = false;
   bool stop_worker = false;

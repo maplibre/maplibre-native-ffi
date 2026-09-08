@@ -115,6 +115,65 @@ static void runtime_release_waits_for_retired_map_cleanup(void) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, runtime_terminal);
 }
 
+typedef struct creator_thread_probe {
+  mln_runtime runtime;
+  mln_map map;
+  mln_status status;
+} creator_thread_probe;
+
+static void create_on_temporary_thread(void* argument) {
+  creator_thread_probe* probe = argument;
+  const mln_runtime_options options = mln_runtime_options_default();
+  probe->status = mln_runtime_create(&options, &probe->runtime);
+  if (probe->status != MLN_STATUS_OK) return;
+
+  mln_test_completion create_map = mln_test_completion_default(sizeof(mln_map));
+  probe->status = mln_map_create(probe->runtime, NULL, &create_map.descriptor);
+  if (probe->status == MLN_STATUS_OK) {
+    probe->status = mln_test_completion_finish_value(
+      &create_map, &probe->map, sizeof(probe->map)
+    );
+  } else {
+    mln_test_completion_reject(&create_map);
+    mln_test_completion_destroy(&create_map);
+  }
+  if (probe->status != MLN_STATUS_OK) {
+    (void)mln_test_runtime_close(probe->runtime);
+  }
+}
+
+static void runtime_and_map_outlive_the_creating_host_thread(void) {
+  creator_thread_probe probe = {.status = MLN_STATUS_NATIVE_ERROR};
+  mln_test_thread_join(
+    mln_test_thread_start(create_on_temporary_thread, &probe)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.status);
+
+  const mln_logical_extent extent = {320, 240, 1.0};
+  mln_test_completion resize = mln_test_completion_default(0);
+  mln_status resize_status =
+    mln_map_resize(probe.map, extent, &resize.descriptor);
+  if (resize_status == MLN_STATUS_OK) {
+    resize_status = mln_test_completion_settle(&resize);
+  } else {
+    mln_test_completion_reject(&resize);
+    mln_test_completion_destroy(&resize);
+  }
+  const mln_status barrier_status = mln_test_runtime_barrier(probe.runtime);
+  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
+  const mln_status snapshot_status = mln_map_snapshot_get(probe.map, &snapshot);
+  const mln_status map_close_status = mln_test_map_close(probe.map);
+  const mln_status runtime_close_status = mln_test_runtime_close(probe.runtime);
+
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, resize_status);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, barrier_status);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, snapshot_status);
+  TEST_ASSERT_EQUAL_UINT32(extent.width, snapshot.logical_extent.width);
+  TEST_ASSERT_EQUAL_UINT32(extent.height, snapshot.logical_extent.height);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, map_close_status);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, runtime_close_status);
+}
+
 typedef struct close_probe {
   mln_runtime runtime;
   atomic_int status;
@@ -157,4 +216,5 @@ void run_runtime_lifecycle_abi_tests(void) {
   RUN_TEST(a_barrier_completes_after_preceding_work);
   RUN_TEST(runtime_release_waits_for_retired_map_cleanup);
   RUN_TEST(accepted_close_is_any_thread_and_retires_the_handle);
+  RUN_TEST(runtime_and_map_outlive_the_creating_host_thread);
 }

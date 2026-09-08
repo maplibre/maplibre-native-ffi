@@ -2622,7 +2622,7 @@ auto render_session_service_driver_work(
     }
     if (
       live->graphics_thread &&
-      *live->graphics_thread != std::this_thread::get_id()
+      *live->graphics_thread != mln::core::current_owner_thread()
     ) {
       set_thread_error(
         "render session driver work belongs to the thread that first serviced "
@@ -2635,7 +2635,7 @@ auto render_session_service_driver_work(
       return MLN_STATUS_BUSY;
     }
     if (!live->graphics_thread)
-      live->graphics_thread = std::this_thread::get_id();
+      live->graphics_thread = mln::core::current_owner_thread();
     live->driver_call_in_flight = true;
   }
   struct DriverCallGuard {
