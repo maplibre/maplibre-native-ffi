@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import time
 
 
 def retryable(jobs: list[dict]) -> bool:
@@ -24,8 +25,7 @@ def retryable(jobs: list[dict]) -> bool:
     return len(required) == 1 and len(primary) == 1
 
 
-def main() -> None:
-    run_id = os.environ["CI_RUN_ID"]
+def retry_failed_run(run_id: str) -> None:
     path = f"repos/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{run_id}"
     run = json.loads(subprocess.check_output(["gh", "api", path], text=True))
     if run["run_attempt"] != 1:
@@ -49,6 +49,21 @@ def main() -> None:
     subprocess.run(
         ["gh", "api", "--method", "POST", f"{path}/rerun-failed-jobs"], check=True
     )
+
+
+def main() -> None:
+    for attempt in range(4):
+        try:
+            retry_failed_run(os.environ["CI_RUN_ID"])
+            return
+        except subprocess.CalledProcessError:
+            if attempt == 3:
+                raise
+            # Recheck eligibility as well as retrying the API: a failed POST
+            # response may have arrived after GitHub accepted the rerun.
+            delay = 2 ** (attempt + 1)
+            print(f"GitHub API request failed; checking again in {delay} seconds.")
+            time.sleep(delay)
 
 
 if __name__ == "__main__":

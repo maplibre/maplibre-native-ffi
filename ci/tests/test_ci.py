@@ -25,6 +25,7 @@ from ci.coverage import (
 )
 from ci.generate_workflow import ROOT, caller, serialize, suite, workflows
 from ci.plan import plan
+from ci.retry import main as retry_main
 from ci.retry import retryable
 from ci.workflow import load_configuration, preset_sets
 
@@ -458,6 +459,60 @@ class WorkflowTest(unittest.TestCase):
 
 
 class RetryTest(unittest.TestCase):
+    def test_api_failures_retry_with_backoff_and_recheck_run_attempt(self):
+        jobs = {
+            "jobs": [
+                {"name": "plan", "conclusion": "failure"},
+                {"name": "ci-required", "conclusion": "failure"},
+            ]
+        }
+        error = subprocess.CalledProcessError(1, "gh")
+        for failure_at in ("run", "jobs", "post"):
+            responses = {
+                "run": [error, '{"run_attempt": 1}', json.dumps([jobs])],
+                "jobs": [
+                    '{"run_attempt": 1}',
+                    error,
+                    '{"run_attempt": 1}',
+                    json.dumps([jobs]),
+                ],
+                "post": [
+                    '{"run_attempt": 1}',
+                    json.dumps([jobs]),
+                    '{"run_attempt": 2}',
+                ],
+            }[failure_at]
+            with (
+                self.subTest(failure_at=failure_at),
+                patch.dict(
+                    os.environ,
+                    {"CI_RUN_ID": "90", "GITHUB_REPOSITORY": ENV["GITHUB_REPOSITORY"]},
+                ),
+                patch("ci.retry.subprocess.check_output", side_effect=responses),
+                patch(
+                    "ci.retry.subprocess.run",
+                    side_effect=error if failure_at == "post" else None,
+                ) as post,
+                patch("ci.retry.time.sleep") as sleep,
+                patch("builtins.print"),
+            ):
+                retry_main()
+                sleep.assert_called_once_with(2)
+                self.assertEqual(post.call_count, 1)
+        with (
+            patch.dict(
+                os.environ,
+                {"CI_RUN_ID": "90", "GITHUB_REPOSITORY": ENV["GITHUB_REPOSITORY"]},
+            ),
+            patch("ci.retry.subprocess.check_output", side_effect=error) as get,
+            patch("ci.retry.time.sleep") as sleep,
+            patch("builtins.print"),
+        ):
+            with self.assertRaises(subprocess.CalledProcessError):
+                retry_main()
+            self.assertEqual(get.call_count, 4)
+            self.assertEqual([call.args[0] for call in sleep.call_args_list], [2, 4, 8])
+
     def test_one_primary_failure_retries_with_both_aggregates(self):
         jobs = [
             {"name": "coverage / target / linux-gnu-x64-egl", "conclusion": "failure"},
