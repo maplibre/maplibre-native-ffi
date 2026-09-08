@@ -200,17 +200,55 @@ generators usually live with the language package graph they serve.
 `mise run check`, and `mise run fix`. [`dprint`](https://dprint.dev/) owns
 repository-wide formatting defaults.
 
-GitHub Actions runs those checks, configured from two files under `ci/`.
-`ci/workflow.toml` declares the suites each target runs, and
-`mise run ci:generate-workflow` renders them into `.github/workflows/ci.yml`.
-`ci/snapshots.toml` declares the input scope of each component the daily
-snapshot workflow publishes, so a component republishes only when the paths it
-consumes changed; `mise run ci:check-snapshot-scopes` keeps every tracked path
-classified.
+GitHub Actions runs those checks. `ci/workflow.toml` declares the baseline and
+ready targets and the suites each target runs. `ci/generate_workflow.py` builds
+workflow objects and serializes them as YAML. `mise run ci:generate-workflow`
+updates the generated callers and reusable workflows under `.github/workflows/`;
+`--check` verifies that the checked-in files match. `ci/snapshots.toml` declares
+the input scope of each component the daily snapshot workflow publishes, so a
+component republishes only when the paths it consumes changed;
+`mise run ci:check-snapshot-scopes` keeps every tracked path classified.
 
 [Astro](https://astro.build/) and [Starlight](https://starlight.astro.build/)
 build the documentation site. Generated API reference HTML is installed into
 `docs/public/reference/` before each docs build.
+
+## CI coverage
+
+CI has three required checks:
+
+| Check                    | Coverage                                                          |
+| ------------------------ | ----------------------------------------------------------------- |
+| `ci-required (baseline)` | Hygiene, docs, and Linux x64 EGL/Vulkan on every PR code update   |
+| `ci-required (ready)`    | Additional representative targets when a PR leaves draft status   |
+| `ci-required`            | Requested platforms or full verification in the extended workflow |
+
+Promotion starts ready coverage while baseline results remain valid. The
+extended workflow combines platform labels into one selection. It builds each
+selected target once and includes every producer needed by Android multi-ABI
+packaging. Extended coverage can repeat targets covered by baseline or ready CI.
+
+State changes reuse actual success or failure only for the same tested merge
+commit and complete coverage scope. Adding or removing a platform changes the
+scope; unrelated labels preserve it. Omitted checks and restated verdicts never
+prove that tests ran. Missing or cancelled coverage executes again, as does an
+explicit workflow rerun. Selected jobs must succeed; only unselected jobs may be
+skipped.
+
+The extended workflow, `CI` (`ci.yml`), runs every target and complete packaging
+verification on main, manual runs, Dependabot PRs, and PRs with `ci:full`. All
+native packages and the verified Maven repository belong to that run. Snapshot
+publishing consumes that single successful main run. Main and manual runs have
+independent concurrency groups; a new PR commit cancels obsolete work in each PR
+workflow.
+
+Branch protection must require all three checks. Add baseline and ready
+alongside the existing `ci-required` before merging these workflows. An
+unrequested tier passes its check without running targets.
+
+`mise run ci:test` exercises coverage transitions, result reuse, generated job
+dependencies, required checks, retries, and release tooling. CI retries one
+primary failure once, including its dependent verification and required checks.
 
 ## Tests And Examples
 
