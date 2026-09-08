@@ -96,10 +96,11 @@ When you open a pull request, follow the repository PR template and write
 the PR description if more detail is needed. More context:
 [AI_POLICY.md](./AI_POLICY.md).
 
-Draft PRs run hygiene, docs, and the Linux x64 EGL/Vulkan targets with their
-binding suites. Ready PRs also run macOS Metal, Windows x64 WGL/Vulkan, Android
-x64 EGL/Vulkan, and browser WebGL/WebGPU. Main, manual runs, and
-Dependabot-authored PRs run every target and complete packaging verification.
+Every PR code update runs baseline coverage: hygiene, docs, and Linux x64
+EGL/Vulkan with their binding suites. Promotion adds macOS Metal, Windows x64
+WGL/Vulkan, Android x64 EGL/Vulkan, and browser WebGL/WebGPU in a separate ready
+workflow. Main, manual runs, Dependabot-authored PRs, and `ci:full` run complete
+coverage and packaging verification in one workflow.
 
 Use persistent PR labels to add coverage to either PR tier:
 
@@ -112,10 +113,18 @@ Use persistent PR labels to add coverage to either PR tier:
 | `ci:ohos`    | OpenHarmony targets and emulator tests                            |
 | `ci:full`    | Every target and complete packaging verification, including Maven |
 
-Labels combine and persist across pushes. Readiness and label changes start a
-new run. Every job selected by the planner must succeed for `ci-required` to
-pass; only jobs omitted by the plan may be skipped. For CI, ABI, shared
-toolchain, dependency, or publishing changes, request full coverage with
+Labels combine and persist across pushes. The extended workflow combines the
+requested platforms, including the producers needed by its packaging checks.
+Readiness and label changes reuse actual coverage for the same tested merge
+commit and coverage scope; missing evidence runs coverage again. An explicit
+workflow rerun also executes coverage again. Every job in a selected group must
+succeed.
+
+Extended CI retains `ci-required`; baseline and ready each have one additional
+required check; see
+[CI coverage](docs/src/content/docs/development/overview.md#ci-coverage) for the
+branch protection configuration. For CI, ABI, shared toolchain, dependency, or
+publishing changes, request full coverage with
 `gh pr edit <number> --add-label 'ci:full'`.
 
 ## Project Invariants

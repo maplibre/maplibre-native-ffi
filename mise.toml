@@ -428,9 +428,9 @@ run = 'python3 ci/python_snapshot.py "$@"'
 description = "Validate calendar release versions and source tags."
 run = 'python3 ci/release_version.py "$@"'
 
-[tasks."ci:test-release-tools"]
-description = "Test release version and native package tooling."
-run = 'PYTHONPATH="$MISE_MONOREPO_ROOT/ci${PYTHONPATH:+:$PYTHONPATH}" python3 -m unittest discover -s ci/tests -p "test_*.py"'
+[tasks."ci:test"]
+description = "Test CI planning, workflow generation, and release tooling."
+run = 'PYTHONPATH="$MISE_MONOREPO_ROOT/ci${PYTHONPATH:+:$PYTHONPATH}" uv run --no-sync python -m unittest discover -s ci/tests -p "test_*.py"'
 
 [tasks."kotlin:prepare-release"]
 description = "Merge, sign, and publish Kotlin Maven repositories."
