@@ -1,16 +1,9 @@
-#!/usr/bin/env python3
 import json
 import pathlib
 import re
-import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
-
-REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
-OUTPUT_PATH = REPO_ROOT / "docs" / "src" / "generated" / "support-matrix.json"
-SUPPORT_SOURCE = "ci/workflow.toml"
-sys.path.insert(0, str(REPO_ROOT))
 
 from ci.workflow import (
     architecture,
@@ -22,6 +15,11 @@ from ci.workflow import (
     preset_sets,
     runtime_tested,
 )
+
+REPO_ROOT = pathlib.Path.cwd()
+OUTPUT_PATH = REPO_ROOT / "docs" / "src" / "generated" / "support-matrix.json"
+SUPPORT_SOURCE = "ci/workflow.toml"
+
 
 PLATFORM_LABELS = {
     "android": "Android",

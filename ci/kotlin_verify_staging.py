@@ -1,20 +1,13 @@
-#!/usr/bin/env python3
-# [MISE] description="Verify staged Kotlin Maven payloads."
-# [MISE] shell="python"
-
 import json
 import pathlib
 import sys
 import xml.etree.ElementTree as element_tree
 import zipfile
+from importlib.resources import files
 
 MODULES = set(
     json.loads(
-        (
-            pathlib.Path(__file__).resolve().parents[3]
-            / "ci"
-            / "kotlin_maven_modules.json"
-        ).read_text(encoding="utf-8")
+        files("ci").joinpath("kotlin_maven_modules.json").read_text(encoding="utf-8")
     )
 )
 
@@ -139,7 +132,9 @@ def verify_repository_layout(root: pathlib.Path, expected_version: str | None) -
 
     for module in MODULES:
         module_root = group_root / module
-        version_directories = {path.name for path in module_root.iterdir() if path.is_dir()}
+        version_directories = {
+            path.name for path in module_root.iterdir() if path.is_dir()
+        }
         if expected_version is not None and version_directories != {expected_version}:
             raise SystemExit(
                 f"{module_root} contains versions {sorted(version_directories)}; "
@@ -157,7 +152,9 @@ def verify_repository_layout(root: pathlib.Path, expected_version: str | None) -
                 f"expected org.maplibre.nativeffi:{module}"
             )
         if expected_version is not None and version != expected_version:
-            raise SystemExit(f"{pom} has version {version}; expected {expected_version}")
+            raise SystemExit(
+                f"{pom} has version {version}; expected {expected_version}"
+            )
 
         for field in (
             "m:name",
@@ -210,11 +207,7 @@ def verify_metadata(root: pathlib.Path, expected_version: str | None) -> None:
             if available_at is None:
                 continue
             target = max(
-                (
-                    name
-                    for name in target_modules
-                    if variant["name"].startswith(name)
-                ),
+                (name for name in target_modules if variant["name"].startswith(name)),
                 key=len,
                 default=None,
             )
@@ -254,28 +247,20 @@ def verify_javadoc(root: pathlib.Path) -> None:
         with zipfile.ZipFile(javadoc) as jar:
             names = set(jar.namelist())
             if "index.html" not in names:
-                raise SystemExit(
-                    f"{javadoc} does not contain generated documentation"
-                )
+                raise SystemExit(f"{javadoc} does not contain generated documentation")
             if not any(
                 name.startswith("maplibre-native-ffi/org.maplibre.nativeffi")
                 and name.endswith(".html")
                 for name in names
             ):
-                raise SystemExit(
-                    f"{javadoc} does not contain generated API pages"
-                )
+                raise SystemExit(f"{javadoc} does not contain generated API pages")
 
 
 RUSTLS_VERIFIER_PACKAGE = "org.maplibre.nativeffi.internal.rustlsplatformverifier"
 
 
 def aar_keep_rules(aar: zipfile.ZipFile) -> str:
-    names = [
-        name
-        for name in aar.namelist()
-        if name.endswith((".pro", "proguard.txt"))
-    ]
+    names = [name for name in aar.namelist() if name.endswith((".pro", "proguard.txt"))]
     return "\n".join(aar.read(name).decode("utf-8") for name in names)
 
 
@@ -343,9 +328,7 @@ def verify_android(root: pathlib.Path) -> None:
             if RUSTLS_VERIFIER_PACKAGE not in aar_keep_rules(aar):
                 raise SystemExit(f"{runtime} is missing the Rustls consumer keep rule")
             for license_name in ("LICENSE-APACHE", "LICENSE-MIT", "NOTICE"):
-                expected = (
-                    "META-INF/licenses/rustls-platform-verifier/" + license_name
-                )
+                expected = "META-INF/licenses/rustls-platform-verifier/" + license_name
                 if expected not in names:
                     raise SystemExit(f"{runtime} is missing {expected}")
             abis = ("armeabi-v7a", "arm64-v8a", "x86_64")
@@ -355,7 +338,9 @@ def verify_android(root: pathlib.Path) -> None:
                     raise SystemExit(f"{runtime} is missing {expected}")
                 payload = aar.read(expected)
                 if not payload.startswith(b"\x7fELF"):
-                    raise SystemExit(f"{runtime} {expected} is not an ELF shared library")
+                    raise SystemExit(
+                        f"{runtime} {expected} is not an ELF shared library"
+                    )
                 # The Android presets link libc++ statically, so a host packages
                 # this library alone.
                 if b"libc++_shared.so" in payload:
@@ -367,7 +352,9 @@ def verify_android(root: pathlib.Path) -> None:
                 and not name.endswith(("/", "libmaplibre-native-c.so"))
             ]
             if unexpected:
-                raise SystemExit(f"{runtime} contains unexpected libraries: {unexpected}")
+                raise SystemExit(
+                    f"{runtime} contains unexpected libraries: {unexpected}"
+                )
 
 
 def verify_android_runtime_independence(root: pathlib.Path) -> None:
@@ -489,8 +476,7 @@ def verify_native(root: pathlib.Path) -> None:
         with zipfile.ZipFile(interop) as klib:
             names = set(klib.namelist())
             if not any(
-                name.endswith("/included/libmaplibre-native-c.a")
-                for name in names
+                name.endswith("/included/libmaplibre-native-c.a") for name in names
             ):
                 raise SystemExit(f"{interop} does not embed libmaplibre-native-c.a")
             if target.startswith(("android-", "linux-")) and not any(

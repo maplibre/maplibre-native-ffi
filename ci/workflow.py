@@ -203,6 +203,20 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
     return commands
 
 
+def consumer_roots(source: dict[str, object], preset: str) -> set[str]:
+    """Map CI commands to mise config roots, including colon-nested tasks."""
+    roots = set()
+    for command in consumer_commands(source, preset):
+        args = shlex.split(command)
+        if len(args) < 3 or args[:2] != ["mise", "run"]:
+            raise ValueError(f"CI consumer needs a namespaced mise task: {command}")
+        task = args[2]
+        if not task.startswith("//") or ":" not in task or task.endswith(":"):
+            raise ValueError(f"CI consumer needs a namespaced mise task: {command}")
+        roots.add(task[2:].split(":", 1)[0] or ".")
+    return roots
+
+
 ZIG_PROJECTS = (
     "mise run //bindings/zig:",
     "mise run //examples/zig-map:",
@@ -279,9 +293,6 @@ def target_rows(
 ) -> list[dict[str, object]]:
     configured, _, tested, packaged = preset_sets(presets)
     rows = []
-    # The toolchain cache key covers the runner OS, architecture and image, so
-    # one row per runner label is enough to write every entry the others read.
-    claimed_runners: set[str] = set()
     for preset in configured:
         native = native_commands(preset, tested)
         consumers = consumer_commands(source, preset)
@@ -292,10 +303,8 @@ def target_rows(
             "package": preset in packaged,
             "zig": uses_zig(native + consumers),
             "gradle": uses_gradle(native + consumers),
-            "save_toolchains": row_runner not in claimed_runners,
             "native_commands": native if preset in packaged else native + consumers,
         }
-        claimed_runners.add(row_runner)
         if preset in packaged:
             row["consumer_commands"] = consumers
         rows.append(row)

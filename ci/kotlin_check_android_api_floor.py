@@ -1,7 +1,3 @@
-#!/usr/bin/env python3
-# [MISE] description="Verify compiled androidMain bytecode stays on the android-minSdk floor."
-# [MISE] shell="python"
-
 """Reject Android platform APIs introduced above the ``android-minSdk`` floor.
 
 AGP's ``com.android.kotlin.multiplatform.library`` plugin accepts a ``lint {}``
@@ -102,7 +98,7 @@ ALLOWED_ABOVE_FLOOR = frozenset()
 class ApiClass:
     """One ``<class>`` entry from the platform API database."""
 
-    __slots__ = ("name", "since", "supers", "methods", "fields")
+    __slots__ = ("fields", "methods", "name", "since", "supers")
 
     def __init__(self, name, since):
         self.name = name
@@ -115,14 +111,6 @@ class ApiClass:
 def fail(message):
     print(f"error: {message}", file=sys.stderr)
     raise SystemExit(1)
-
-
-def repository_root():
-    root = os.environ.get("MISE_MONOREPO_ROOT")
-    if root:
-        return pathlib.Path(root)
-    # This file lives at <root>/.mise/tasks/kotlin/check-android-api-floor.
-    return pathlib.Path(__file__).resolve().parents[3]
 
 
 def catalog_version(root, key):
@@ -204,13 +192,21 @@ def api_database_path(sdk_directory, compile_sdk):
     An older database omits every API introduced since, which would silently
     accept calls above the floor, so this fails rather than falling back to one.
     """
-    preferred = sdk_directory / "platforms" / f"android-{compile_sdk}" / "data" / "api-versions.xml"
+    preferred = (
+        sdk_directory
+        / "platforms"
+        / f"android-{compile_sdk}"
+        / "data"
+        / "api-versions.xml"
+    )
     if preferred.is_file():
         return preferred
     wanted = int(compile_sdk.split(".", 1)[0])
     candidates = [
         (level, path)
-        for path in (sdk_directory / "platforms").glob("android-*/data/api-versions.xml")
+        for path in (sdk_directory / "platforms").glob(
+            "android-*/data/api-versions.xml"
+        )
         for level in [platform_api_level(path)]
         if level is not None and level >= wanted
     ]
@@ -239,7 +235,9 @@ def load_api_database(path):
                     # A relationship carries its own `since` when the type
                     # gained the supertype after being introduced, so an
                     # inherited member is only reachable from that level up.
-                    entry.supers.append((target, int(relation.get("since", entry.since))))
+                    entry.supers.append(
+                        (target, int(relation.get("since", entry.since)))
+                    )
             elif relation.tag in ("method", "field"):
                 member = relation.get("name")
                 if member is None:
@@ -402,7 +400,7 @@ def describe(reference):
 
 
 def main(argv):
-    root = repository_root()
+    root = pathlib.Path.cwd()
     floor = int(catalog_version(root, "android-minSdk"))
     compile_sdk = catalog_version(root, "android-compileSdk")
 
@@ -428,7 +426,9 @@ def main(argv):
     if not roots:
         fail("no compiled androidMain classes found in the requested directories")
 
-    database = load_api_database(api_database_path(android_sdk_directory(root), compile_sdk))
+    database = load_api_database(
+        api_database_path(android_sdk_directory(root), compile_sdk)
+    )
 
     violations = {}
     scanned = 0
@@ -455,7 +455,9 @@ def main(argv):
                 else:
                     if reference[1] in ALLOWED_ABOVE_FLOOR:
                         continue
-                    resolved = resolve_member(database, reference[1], reference[2], reference[0])
+                    resolved = resolve_member(
+                        database, reference[1], reference[2], reference[0]
+                    )
                     if resolved is None or resolved[0] <= floor:
                         continue
                     since = resolved[0]

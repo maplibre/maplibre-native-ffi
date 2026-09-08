@@ -14,15 +14,14 @@ import time
 import urllib.parse
 import zipfile
 from collections.abc import Callable
+from importlib.resources import files
 
-from release_version import require_current_month
+from ci.release_version import require_current_month
 
 GROUP_PATH = pathlib.PurePosixPath("org/maplibre/nativeffi")
 MODULES = set(
     json.loads(
-        pathlib.Path(__file__)
-        .with_name("kotlin_maven_modules.json")
-        .read_text(encoding="utf-8")
+        files("ci").joinpath("kotlin_maven_modules.json").read_text(encoding="utf-8")
     )
 )
 ROOT_MODULES = {

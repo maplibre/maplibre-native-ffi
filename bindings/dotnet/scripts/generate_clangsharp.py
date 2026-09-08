@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Regenerate the ClangSharp declarations the .NET binding builds against."""
 
 from __future__ import annotations
@@ -11,8 +10,8 @@ import shutil
 import subprocess
 import tempfile
 
-BINDING_DIR = pathlib.Path(__file__).resolve().parents[1]
-ROOT = BINDING_DIR.parents[1]
+ROOT = pathlib.Path.cwd()
+BINDING_DIR = ROOT / "bindings/dotnet"
 MANIFEST = BINDING_DIR / ".config" / "dotnet-tools.json"
 HEADER_DIR = ROOT / "include" / "maplibre_native_c"
 OUTPUT_DIR = BINDING_DIR / "src" / "Maplibre.NativeFfi" / "Generated"

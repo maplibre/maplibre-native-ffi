@@ -19,112 +19,47 @@ interop or the popular MapLibre Android/iOS SDKs.
 
 ## Workflow
 
-```bash
-# Install/refresh system packages, shared tools, and repository hooks.
-# On Linux this uses sudo; --yes accepts package-manager prompts. Use this on
-# Linux and macOS:
-mise bootstrap --yes
-# On Windows, skip mise's unused Unix-only managed-files phase.
-mise bootstrap --yes --skip files
+Mise owns tools, system packages, and repository tasks. CMake presets define
+native targets and render backends; Gradle owns Android builds.
 
-# Project-specific tools install automatically with namespaced tasks.
-
-# List available tasks across the workspace
-mise tasks --all
-
-# Configure, build, and install the host native library
-mise run build
-
-# Build and run C API tests (also runs build)
-mise run test
-
-# Build and run Rust binding tests (also runs build)
-mise run //bindings/rust:test
-
-# Headless smoke test — no display needed
-mise run //examples/zig-readback:run
-
-# GUI map app — use a brief timeout or run in background
-mise run //examples/zig-map:run
-
-# Build a different native target/backend
-mise run build linux-gnu-x64-egl
-
-# Package a native artifact with CPack
-mise run package-native linux-gnu-x64-egl
-
-# Build the Android binding for one ABI/backend
-mise run //bindings/kotlin:android-build opengl x86_64
-
-# Run formatters and linters on _all_ files (will stage affected files)
-mise run fix
-
-# Run formatters and linters on targeted files (will stage affected files)
-hk fix [FILES...]
-```
-
-Native targets and render backends are defined in `CMakePresets.json`. Gradle
-selects the Android presets when building platform packages; OpenHarmony and
-host workflows use the presets directly.
-
-Clangd uses the compilation database selected by the last
-`mise run build <preset>` invocation; select the matching preset before trusting
-target-specific diagnostics.
-
-The Android, Emscripten, and OpenHarmony SDKs are opt-in, each behind the mise
-configuration environment named after its presets. A build for one of those
-targets reads `ANDROID_HOME`, `EMSDK`, or `OHOS_SDK_NATIVE` from the
-environment. To use a pinned SDK instead, pass `-E` to the install and to every
-later command that builds for the target:
+Use `mise tasks --all` to discover tasks. Common entrypoints are:
 
 ```bash
-mise -E android install
-mise -E android run build android-arm64-vulkan
+mise run build                       # Build the host native library
+mise run test                        # Build and test the C API
+mise run //bindings/rust:test         # Build and test one binding
+mise run //examples/zig-readback:run   # Headless smoke test
 ```
 
-Formatters and linters run automatically on pre-commit; you usually don't need
-to run them manually.
+See the [development overview](docs/src/content/docs/development/overview.md)
+for setup, cross-compilation SDKs, and tooling details.
 
-The environment is managed by mise. If you need to run a command that's not
-already a mise task, use `mise exec -- ...` so repository tools and dependency
-paths are available.
+- Use `mise exec -- ...` for commands outside repository tasks. For read-only
+  inspection, use `mise exec --no-deps -- ...` to avoid dependency preparation,
+  which can reset managed submodules.
+- Select the matching `mise run build <preset>` before trusting target-specific
+  clangd diagnostics; the last build selects its compilation database.
+- Use a brief timeout or run GUI examples in the background.
+- Pre-commit runs formatters and linters. When running `mise run fix` or
+  `hk fix [FILES...]` manually, remember that they stage affected files.
+- Update cross-language dependencies in `[monorepo.projects]` in `mise.toml`
+  when adding bindings, examples, or generated reference inputs.
 
 ## Pull requests
 
-When you open a pull request, follow the repository PR template and write
-**Summary** and **Test plan** in at most one sentence each. The user will expand
-the PR description if more detail is needed. More context:
-[AI_POLICY.md](./AI_POLICY.md).
+Follow the repository PR template and [AI policy](AI_POLICY.md). Keep
+**Summary** and **Test plan** to at most one sentence each.
 
-Draft PRs run hygiene, docs, and the Linux x64 EGL/Vulkan targets with their
-binding suites. Ready PRs also run macOS Metal, Windows x64 WGL/Vulkan, Android
-x64 EGL/Vulkan, and browser WebGL/WebGPU. Main, manual runs, and
-Dependabot-authored PRs run every target and complete packaging verification.
+Request `ci:full` coverage for CI, ABI, shared toolchain, dependency, or
+publishing changes. Use platform labels when the change needs additional
+platform coverage; see
+[CI coverage](docs/src/content/docs/development/overview.md#ci-coverage).
 
-Use persistent PR labels to add coverage to either PR tier:
-
-| Label        | Additional coverage                                               |
-| ------------ | ----------------------------------------------------------------- |
-| `ci:apple`   | All macOS backends and iOS/tvOS device and simulator targets      |
-| `ci:android` | All Android ABIs/backends and multi-ABI packaging                 |
-| `ci:linux`   | Linux ARM64 and musl variants                                     |
-| `ci:windows` | Windows ARM64 variants                                            |
-| `ci:ohos`    | OpenHarmony targets and emulator tests                            |
-| `ci:full`    | Every target and complete packaging verification, including Maven |
-
-Labels combine and persist across pushes. Readiness and label changes start a
-new run. Every job selected by the planner must succeed for `ci-required` to
-pass; only jobs omitted by the plan may be skipped. For CI, ABI, shared
-toolchain, dependency, or publishing changes, request full coverage with
-`gh pr edit <number> --add-label 'ci:full'`.
-
-## Project Invariants
+## Project invariants
 
 ### General
 
 - Campsite rules apply: leave anything you touch tidier than when you found it.
-- Mise defines tools, system packages, and common workflows. CMake presets
-  define portable native builds, and Gradle defines Android builds.
 - The bindings are meant to be low level and broadly analogous to each other and
   to the C API, exposing MapLibre concepts directly, while following language
   conventions for memory and thread safety. Prioritize safety, similarity, and
@@ -159,7 +94,7 @@ sentence-level style, page structure, and project terminology.
 - Every test skip should be strictly justified. We do not skip rendering tests
   because the CI environment doesn't support them; we fix the environment.
 
-## Project Docs
+## Project docs
 
 Read these docs before changing related code:
 
@@ -175,32 +110,8 @@ Read these docs before changing related code:
   changing public C headers, C ABI behavior, callbacks, diagnostics, or render
   target contracts.
 
-## External Docs
+## External docs
 
-Read these docs whenever relevant:
-
-- `mise`:
-  - <https://mise.jdx.dev/configuration.html>
-  - <https://mise.jdx.dev/configuration/settings.html>
-  - <https://mise.jdx.dev/configuration/environments.html>
-  - <https://mise.jdx.dev/dev-tools/>
-  - <https://mise.jdx.dev/environments/>
-  - <https://mise.jdx.dev/tasks/>
-  - <https://mise.jdx.dev/tasks/toml-tasks.html>
-  - <https://mise.jdx.dev/tasks/file-tasks.html>
-  - <https://mise.jdx.dev/tasks/task-arguments.html>
-  - <https://mise.jdx.dev/tasks/task-configuration.html>
-  - ... and many more pages. Browse the site if needed.
-- `hk`:
-  - <https://hk.jdx.dev/configuration.html>
-  - <https://hk.jdx.dev/builtins.html>
-  - <https://hk.jdx.dev/reference/examples/>
-  - <https://hk.jdx.dev/pkl_introduction.html>
-- `dprint`:
-  - <https://dprint.dev/config/>
-  - <https://dprint.dev/plugins/>
-- `vp` / Vite+:
-  - <https://viteplus.dev/guide/>
-  - <https://viteplus.dev/guide/monorepo>
-  - <https://viteplus.dev/guide/lint>
-  - <https://viteplus.dev/guide/run>
+Consult the relevant official docs when changing tool configuration:
+[mise](https://mise.jdx.dev/), [hk](https://hk.jdx.dev/),
+[dprint](https://dprint.dev/config/), and [Vite+](https://viteplus.dev/guide/).

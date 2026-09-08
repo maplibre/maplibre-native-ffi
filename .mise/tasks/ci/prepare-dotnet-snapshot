@@ -15,4 +15,4 @@ if [[ "${usage_command?}" == feed ]]; then
   dotnet tool restore --tool-manifest bindings/dotnet/.config/dotnet-tools.json --verbosity quiet
 fi
 
-exec python ci/dotnet_snapshot.py "${usage_command}" "${arguments[@]}"
+exec python -m ci.dotnet_snapshot "${usage_command}" "${arguments[@]}"

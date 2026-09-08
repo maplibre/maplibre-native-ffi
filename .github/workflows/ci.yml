@@ -30,12 +30,25 @@ jobs:
     outputs:
       tier: ${{ steps.plan.outputs.tier }}
       expected: ${{ steps.plan.outputs.expected }}
+      toolchain_writers: ${{ steps.plan.outputs.toolchain_writers }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
+      - name: Install mise for affected selection
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.2
+          install: false
+          cache: false
+          env: false
       - id: plan
-        run: bash .mise/tasks/ci/plan
+        env:
+          MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+        run: python3 -m ci.pr_matrix
 
   hygiene:
     name: hygiene
@@ -99,7 +112,7 @@ jobs:
         with:
           target: linux-gnu-x64-egl
           zig: true
-          save-toolchains: true
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-linux-gnu-x64-egl') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test linux-gnu-x64-egl
@@ -188,6 +201,7 @@ jobs:
         with:
           target: linux-gnu-x64-vulkan
           zig: true
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-linux-gnu-x64-vulkan') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test linux-gnu-x64-vulkan
@@ -279,7 +293,7 @@ jobs:
         with:
           target: linux-gnu-arm64-egl
           zig: true
-          save-toolchains: true
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-linux-gnu-arm64-egl') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test linux-gnu-arm64-egl
@@ -368,6 +382,7 @@ jobs:
         with:
           target: linux-gnu-arm64-vulkan
           zig: true
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-linux-gnu-arm64-vulkan') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test linux-gnu-arm64-vulkan
@@ -452,6 +467,7 @@ jobs:
         with:
           target: linux-musl-x64-egl
           gradle: false
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-linux-musl-x64-egl') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test linux-musl-x64-egl
@@ -492,6 +508,7 @@ jobs:
         with:
           target: linux-musl-x64-vulkan
           gradle: false
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-linux-musl-x64-vulkan') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test linux-musl-x64-vulkan
@@ -532,6 +549,7 @@ jobs:
         with:
           target: linux-musl-arm64-egl
           gradle: false
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-linux-musl-arm64-egl') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test linux-musl-arm64-egl
@@ -572,6 +590,7 @@ jobs:
         with:
           target: linux-musl-arm64-vulkan
           gradle: false
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-linux-musl-arm64-vulkan') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test linux-musl-arm64-vulkan
@@ -612,7 +631,7 @@ jobs:
         with:
           target: emscripten-wasm32-webgl
           gradle: false
-          save-toolchains: true
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-emscripten-wasm32-webgl') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test emscripten-wasm32-webgl
@@ -649,6 +668,7 @@ jobs:
         with:
           target: emscripten-wasm32-webgpu
           gradle: false
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-emscripten-wasm32-webgpu') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test emscripten-wasm32-webgpu
@@ -686,7 +706,7 @@ jobs:
         with:
           target: macos-arm64-metal
           zig: true
-          save-toolchains: true
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-macos-arm64-metal') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test macos-arm64-metal
@@ -771,6 +791,7 @@ jobs:
         with:
           target: macos-arm64-vulkan
           zig: true
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-macos-arm64-vulkan') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test macos-arm64-vulkan
@@ -852,6 +873,7 @@ jobs:
         with:
           target: macos-arm64-egl
           zig: true
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-macos-arm64-egl') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test macos-arm64-egl
@@ -928,6 +950,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: ios-arm64-metal
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-ios-arm64-metal') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build ios-arm64-metal
@@ -975,6 +998,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: ios-simulator-arm64-metal
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-ios-simulator-arm64-metal') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test ios-simulator-arm64-metal
@@ -1022,6 +1046,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: tvos-arm64-metal
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-tvos-arm64-metal') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build tvos-arm64-metal
@@ -1063,6 +1088,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: tvos-simulator-arm64-metal
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-tvos-simulator-arm64-metal') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test tvos-simulator-arm64-metal
@@ -1104,6 +1130,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: android-arm-egl
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-android-arm-egl') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build android-arm-egl
@@ -1157,6 +1184,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: android-arm-vulkan
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-android-arm-vulkan') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build android-arm-vulkan
@@ -1210,6 +1238,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: android-arm64-egl
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-android-arm64-egl') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build android-arm64-egl
@@ -1263,6 +1292,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: android-arm64-vulkan
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-android-arm64-vulkan') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build android-arm64-vulkan
@@ -1316,6 +1346,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: android-x64-egl
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-android-x64-egl') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test android-x64-egl
@@ -1372,6 +1403,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: android-x64-vulkan
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-android-x64-vulkan') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test android-x64-vulkan
@@ -1429,6 +1461,7 @@ jobs:
         with:
           target: ohos-arm64-egl
           gradle: false
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-ohos-arm64-egl') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build ohos-arm64-egl
@@ -1468,6 +1501,7 @@ jobs:
         with:
           target: ohos-arm64-vulkan
           gradle: false
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-ohos-arm64-vulkan') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build ohos-arm64-vulkan
@@ -1507,6 +1541,7 @@ jobs:
         with:
           target: ohos-x64-egl
           gradle: false
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-ohos-x64-egl') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test ohos-x64-egl
@@ -1546,6 +1581,7 @@ jobs:
         with:
           target: ohos-x64-vulkan
           gradle: false
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-ohos-x64-vulkan') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build ohos-x64-vulkan
@@ -1586,7 +1622,7 @@ jobs:
         with:
           target: windows-x64-wgl
           zig: true
-          save-toolchains: true
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-windows-x64-wgl') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test windows-x64-wgl
@@ -1662,6 +1698,7 @@ jobs:
         with:
           target: windows-x64-vulkan
           zig: true
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-windows-x64-vulkan') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test windows-x64-vulkan
@@ -1735,7 +1772,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: windows-arm64-wgl
-          save-toolchains: true
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-windows-arm64-wgl') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test windows-arm64-wgl
@@ -1792,6 +1829,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: windows-arm64-vulkan
+          save-toolchains: ${{ contains(fromJSON(needs.plan.outputs.toolchain_writers), 'target-windows-arm64-vulkan') }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test windows-arm64-vulkan

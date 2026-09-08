@@ -12,8 +12,8 @@ import tempfile
 import unittest
 from unittest import mock
 
-from native_package_release import prepare_assets
-from release_version import (
+from ci.native_package_release import prepare_assets
+from ci.release_version import (
     family,
     require_current_month,
     validate_tag,
