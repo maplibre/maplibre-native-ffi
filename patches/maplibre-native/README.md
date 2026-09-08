@@ -31,6 +31,12 @@ destruction from joining a logging worker whose thread-local cleanup must detach
 from an already shut down host VM. Explicit observer replacement and removal
 still release the previous observer.
 
+`0007-retain-active-on-demand-images.patch` keeps present on-demand images
+registered to their requestor when the same request also needs missing images.
+This prevents cache cleanup from evicting active tile dependencies. The patch
+includes an ImageManager regression test for retention, delivery, and
+reclamation after the requestor releases its images.
+
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
 before applying the list again. A pin bump, an edit to a patch, and a dropped

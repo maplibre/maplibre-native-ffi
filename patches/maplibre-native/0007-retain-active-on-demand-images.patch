@@ -1,0 +1,108 @@
+diff --git a/src/mln/renderer/image_manager.cpp b/src/mln/renderer/image_manager.cpp
+index f1625f9..6da4bbc 100644
+--- a/src/mln/renderer/image_manager.cpp
++++ b/src/mln/renderer/image_manager.cpp
+@@ -226,6 +226,8 @@ void ImageManager::checkMissingAndNotify(ImageRequestor& requestor, const ImageR
+     for (const auto& dependency : pair.first) {
+         if (!images.contains(dependency.first)) {
+             missingDependencies.emplace(dependency);
++        } else if (auto it = requestedImages.find(dependency.first); it != requestedImages.end()) {
++            it->second.emplace(&requestor);
+         }
+     }
+ 
+@@ -277,12 +279,6 @@ void ImageManager::checkMissingAndNotify(ImageRequestor& requestor, const ImageR
+                                           Scheduler::GetCurrent()->bindOnce(std::move(removePendingRequests)));
+         }
+     } else {
+-        // Associate requestor with an image that was provided by the client.
+-        for (const auto& dependency : pair.first) {
+-            if (requestedImages.contains(dependency.first)) {
+-                requestedImages[dependency.first].emplace(&requestor);
+-            }
+-        }
+         notify(requestor, pair);
+     }
+ }
+diff --git a/test/renderer/image_manager.test.cpp b/test/renderer/image_manager.test.cpp
+index fbfded4..ccc2f12 100644
+--- a/test/renderer/image_manager.test.cpp
++++ b/test/renderer/image_manager.test.cpp
+@@ -359,3 +359,77 @@ TEST(ImageManager, RemoveUnusedStyleImages) {
+     ASSERT_TRUE(imageManager->getImage("1024px") == nullptr);
+     ASSERT_FALSE(imageManager->getImage("sprite") == nullptr);
+ }
++
++TEST(ImageManager, MixedDependenciesKeepPresentOnDemandImagesInUse) {
++    util::RunLoop runLoop;
++    auto imageManager = ImageManager::create();
++    StubImageManagerObserver observer;
++    imageManager->setObserver(&observer);
++    imageManager->setLoaded(true);
++
++    observer.imageMissing = [&](const std::string& id) {
++        imageManager->addImage(makeMutable<style::Image::Impl>(id, PremultipliedImage({213, 213}), 3.0f));
++    };
++    std::vector<std::string> evicted;
++    observer.removeUnusedStyleImages = [&](const std::vector<std::string>& ids) {
++        evicted.insert(evicted.end(), ids.begin(), ids.end());
++        for (const auto& id : ids) {
++            imageManager->removeImage(id);
++        }
++    };
++
++    auto requestor = std::make_unique<StubImageRequestor>(imageManager);
++    imageManager->addImage(makeMutable<style::Image::Impl>("sprite", PremultipliedImage({16, 16}), 1.0f));
++    ImageDependencies dependencies{{"sprite", ImageType::Icon}};
++    for (int i = 0; i < 6; ++i) {
++        dependencies.emplace("a" + std::to_string(i), ImageType::Icon);
++    }
++    bool notified = false;
++    requestor->imagesAvailable = [&](ImageMap icons, ImageMap, ImageVersionMap) {
++        notified = true;
++        EXPECT_EQ(icons.size(), dependencies.size());
++        for (const auto& dependency : dependencies) {
++            EXPECT_TRUE(icons.contains(dependency.first));
++        }
++    };
++    auto request = [&] {
++        notified = false;
++        imageManager->getImages(*requestor, std::make_pair(dependencies, ++requestor->imageCorrelationID));
++        imageManager->reduceMemoryUseIfCacheSizeExceedsLimit();
++        EXPECT_TRUE(evicted.empty());
++        runLoop.runOnce();
++        imageManager->notifyIfMissingImageAdded();
++        EXPECT_TRUE(notified);
++    };
++    request();
++    ASSERT_EQ(observer.count, 6);
++    imageManager->reduceMemoryUseIfCacheSizeExceedsLimit();
++    ASSERT_TRUE(evicted.empty());
++
++    request();
++    EXPECT_EQ(observer.count, 6);
++
++    // Existing on-demand images must stay in use when this tile also needs new images.
++    for (int i = 0; i < 6; ++i) {
++        dependencies.emplace("b" + std::to_string(i), ImageType::Icon);
++    }
++    for (int round = 0; round < 4; ++round) {
++        request();
++        imageManager->reduceMemoryUseIfCacheSizeExceedsLimit();
++        EXPECT_TRUE(evicted.empty());
++        EXPECT_EQ(observer.count, 12);
++        for (const auto& dependency : dependencies) {
++            EXPECT_NE(imageManager->getImage(dependency.first), nullptr);
++        }
++    }
++
++    // Still reclaim images after their last requestor releases them.
++    requestor.reset();
++    imageManager->reduceMemoryUseIfCacheSizeExceedsLimit();
++    EXPECT_EQ(evicted.size(), 12u);
++    dependencies.erase("sprite");
++    for (const auto& dependency : dependencies) {
++        EXPECT_EQ(imageManager->getImage(dependency.first), nullptr);
++    }
++    EXPECT_NE(imageManager->getImage("sprite"), nullptr);
++}
