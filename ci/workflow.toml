@@ -1,3 +1,16 @@
+[coverage]
+baseline = ["linux-gnu-x64-egl", "linux-gnu-x64-vulkan"]
+# These targets add coverage when a pull request leaves draft status.
+ready = [
+  "macos-arm64-metal",
+  "windows-x64-wgl",
+  "windows-x64-vulkan",
+  "android-x64-egl",
+  "android-x64-vulkan",
+  "emscripten-wasm32-webgl",
+  "emscripten-wasm32-webgpu",
+]
+
 # Desktop suites run in the matching native target job and reuse its build tree.
 [[suites]]
 platforms = ["linux-gnu", "macos", "windows"]

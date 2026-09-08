@@ -2,4 +2,4 @@
 # [MISE] description="Select CI coverage from the GitHub event."
 set -euo pipefail
 cd "${MISE_PROJECT_ROOT:-$(cd "$(dirname "$0")/../../.." && pwd)}"
-exec python3 -m ci.pr_matrix
+exec python3 -m ci.plan

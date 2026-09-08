@@ -44,6 +44,7 @@ shared = [
   ".github/workflows/**",
   "!.github/workflows/*-release.yml",
   "!.github/workflows/_*.yml",
+  ".github/workflows/_ci-*.yml",
   ".github/actions/**",
   "ci/**",
   "!ci/*release.py",
