@@ -190,6 +190,10 @@ const WglAttachContext = if (supports_wgl) struct {
         try self.context.readSurfaceRgba(width, height, pixels);
     }
 
+    pub fn destroyTexture(self: *const WglAttachContext, texture: gl.uint) void {
+        self.context.destroyTexture(texture);
+    }
+
     pub fn readRgbaTexture(self: *const WglAttachContext, texture: gl.uint, width: u32, height: u32, pixels: []u8) !void {
         _ = width;
         _ = height;
@@ -212,7 +216,7 @@ const WglBorrowedTexture = if (supports_wgl) struct {
 
     pub fn deinit(self: *WglBorrowedTexture) void {
         if (self.texture != 0) {
-            self.context.context.destroyTexture(self.texture);
+            self.context.destroyTexture(self.texture);
             self.texture = 0;
         }
         self.context.deinit();
@@ -226,7 +230,7 @@ const WglBorrowedTexture = if (supports_wgl) struct {
 
     /// Tracks a replacement the session has taken and releases the outgoing one.
     pub fn adopt(self: *WglBorrowedTexture, texture: gl.uint, width: u32, height: u32) void {
-        if (self.texture != 0) self.context.context.destroyTexture(self.texture);
+        if (self.texture != 0) self.context.destroyTexture(self.texture);
         self.texture = texture;
         self.width = width;
         self.height = height;
@@ -1481,13 +1485,15 @@ test "Vulkan borrowed texture replaces its target (BND-183)" {
         try support.waitForBarrier(&runtime);
     } else return error.FrameDidNotRender;
 
-    const replacement = try borrowed.allocateReplacement(48, 24);
-    errdefer borrowed.release(replacement);
-    try finishOperation(
-        session,
-        try session.setVulkanBorrowedTextureTarget(borrowed.descriptorFor(replacement, 48, 24)),
-    );
-    borrowed.adopt(replacement, 48, 24);
+    {
+        const replacement = try borrowed.allocateReplacement(48, 24);
+        errdefer borrowed.release(replacement);
+        try finishOperation(
+            session,
+            try session.setVulkanBorrowedTextureTarget(borrowed.descriptorFor(replacement, 48, 24)),
+        );
+        borrowed.adopt(replacement, 48, 24);
+    }
     // A borrowed texture belongs to the host, so the session cannot resize it;
     // the replacement target carries the new size and the map takes it here.
     try testing.expectError(error.Unsupported, session.resize(.{ .width = 48, .height = 24 }));
@@ -1525,13 +1531,15 @@ test "OpenGL borrowed texture replaces its target (BND-183)" {
     try borrowed.readRGBA8(&initial_pixels);
     try testing.expect(hasNonZeroByte(&initial_pixels));
 
-    const replacement = try borrowed.allocateReplacement(48, 24);
-    errdefer borrowed.context.destroyTexture(replacement);
-    try finishOperation(
-        session,
-        try session.setOpenGLBorrowedTextureTarget(borrowed.descriptorFor(replacement, 48, 24)),
-    );
-    borrowed.adopt(replacement, 48, 24);
+    {
+        const replacement = try borrowed.allocateReplacement(48, 24);
+        errdefer borrowed.context.destroyTexture(replacement);
+        try finishOperation(
+            session,
+            try session.setOpenGLBorrowedTextureTarget(borrowed.descriptorFor(replacement, 48, 24)),
+        );
+        borrowed.adopt(replacement, 48, 24);
+    }
     // A borrowed texture belongs to the host, so the session cannot resize it;
     // the replacement target carries the new size and the map takes it here.
     try testing.expectError(error.Unsupported, session.resize(.{ .width = 48, .height = 24 }));

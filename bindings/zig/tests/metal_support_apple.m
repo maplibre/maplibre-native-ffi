@@ -152,7 +152,11 @@ bool mln_zig_test_create_metal_texture(
                                 height:height
                              mipmapped:NO];
   descriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+#if TARGET_OS_OSX
   descriptor.storageMode = MTLStorageModeManaged;
+#else
+  descriptor.storageMode = MTLStorageModeShared;
+#endif
   id<MTLTexture> texture = [device newTextureWithDescriptor:descriptor];
   if (texture == nil) {
     [device release];

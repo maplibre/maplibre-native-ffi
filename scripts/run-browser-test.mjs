@@ -291,6 +291,9 @@ const child = spawn(
   browser,
   [
     "--headless=new",
+    // Temporary test profiles must not access the host's credential store.
+    "--password-store=basic",
+    "--use-mock-keychain",
     // Chromium's own logging carries the page console, so a run that hangs
     // still shows how far the suite got instead of only reporting the timeout.
     "--enable-logging=stderr",
