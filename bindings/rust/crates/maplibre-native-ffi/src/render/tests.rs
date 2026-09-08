@@ -2984,8 +2984,7 @@ fn webgpu_surface_session_renders_into_the_browser_canvas() {
             caller_attach_options(),
         )
         .unwrap(),
-    )
-    .unwrap();
+    );
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     await_runtime_barrier(&runtime);
     assert_eq!(

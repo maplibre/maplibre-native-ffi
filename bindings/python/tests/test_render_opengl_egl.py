@@ -111,7 +111,7 @@ class OpenGLOwnedSession:
         self.context.close()
 
     def render_once(self) -> None:
-        self.map.set_style_json(EMPTY_STYLE_JSON.encode())
+        self.map.set_style_json(EMPTY_STYLE_JSON.encode()).result(timeout=5)
         frame = wait_for_opengl_frame(self, lambda _: True)
         release_frame(frame)
 
@@ -224,7 +224,7 @@ def wait_for_opengl_frame(
 def test_caller_driver_renders_and_releases_owned_opengl_frame(
     opengl_owned_session: OpenGLOwnedSession,
 ) -> None:
-    opengl_owned_session.map.set_style_json(EMPTY_STYLE_JSON.encode())
+    opengl_owned_session.map.set_style_json(EMPTY_STYLE_JSON.encode()).result(timeout=5)
     render_until_update(opengl_owned_session.runtime, opengl_owned_session.session)
     result = opengl_owned_session.session.snapshot().latest_result
     assert result == render.RenderResult.RENDERED
@@ -451,7 +451,7 @@ def test_egl_pbuffer_surface_session_attaches_and_renders() -> None:
             assert session.capabilities().driver == (
                 render.RenderDriver.CALLER_GRAPHICS_THREAD
             )
-            map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
+            map_handle.set_style_json(EMPTY_STYLE_JSON.encode()).result(timeout=5)
             render_until_update(runtime, session)
         finally:
             close_session(session)
@@ -471,7 +471,9 @@ def test_dedicated_egl_surface_renders_and_keeps_its_context_current() -> None:
         )
         finish_render_operation(session, attach)
         try:
-            map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode())
+            map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode()).result(
+                timeout=5
+            )
             render_until_update(runtime, session)
 
             # A dedicated context belongs to the session, so it stays
@@ -498,9 +500,13 @@ def test_egl_borrowed_texture_session_close_preserves_caller_resources() -> None
             texture.descriptor()
         )
         finish_render_operation(session, attach)
-        map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode())
-        render_until_update(runtime, session)
-        close_session(session)
+        try:
+            map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode()).result(
+                timeout=5
+            )
+            render_until_update(runtime, session)
+        finally:
+            close_session(session)
 
         # The texture is caller-owned, so the session leaves it alive for
         # the host to read and destroy.
@@ -521,7 +527,9 @@ def test_egl_borrowed_texture_set_target_hands_over_a_replacement() -> None:
         session, attach = map_handle.attach_opengl_borrowed_texture(first.descriptor())
         finish_render_operation(session, attach)
         try:
-            map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode())
+            map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode()).result(
+                timeout=5
+            )
             render_until_update(runtime, session)
 
             finish_render_operation(

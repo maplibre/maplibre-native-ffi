@@ -1573,6 +1573,11 @@ test "a detached session rejects the calls that need a target" {
     var session = try attachOwnedTexture(&map, &context, .{ .width = 16, .height = 16 });
     defer session.destroy() catch @panic("render session destroy failed");
 
+    // Establish a renderable update before racing a demand with detach.
+    try support.expectCommitted(try map.setStyleJson(support.style_json));
+    try support.waitForBarrier(&runtime);
+    try testing.expectEqual(.rendered, std.meta.activeTag((try support.renderFrame(session, false, true)).disposition));
+
     // A demand still outstanding at detach reports a target that went away.
     const token = support.nextFrameToken();
     try session.requestFrame(.{ .if_needed = false, .token = token });

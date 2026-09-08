@@ -1,6 +1,7 @@
 // Raw C ABI/backend coverage: render target descriptors expose pointer, size,
 // nested descriptor, and output-handle states hidden by bindings.
 
+#include <assert.h>
 #include <stdint.h>
 
 #include "abi_tests.h"

@@ -3529,8 +3529,9 @@ auto start_map_string_operation(
         }
       );
     });
+  const auto runtime = live->runtime_state;
   const auto submit_status = submit_runtime_operation(
-    live->runtime_state, state,
+    runtime, state,
     [live = std::move(live), state, read = std::move(read),
      submission = std::move(submission)]() mutable -> void {
       try {
@@ -3944,8 +3945,9 @@ auto map_camera_query_start(mln_map map, const mln_completion* completion)
       }
       complete_value(completion_state, MLN_STATUS_OK, {}, *value);
     });
+  const auto runtime = live->runtime_state;
   const auto submit_status = submit_runtime_operation(
-    live->runtime_state, state,
+    runtime, state,
     [live = std::move(live), state,
      submission = std::move(submission)]() mutable -> void {
       try {

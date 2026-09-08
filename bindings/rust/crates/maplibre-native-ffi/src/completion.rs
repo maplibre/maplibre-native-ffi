@@ -83,6 +83,7 @@ impl<T> NativeFuture<T> {
 }
 
 #[cfg(test)]
+#[track_caller]
 pub(crate) fn blocking<T>(future: Result<NativeFuture<T>>) -> T {
     let future = future.expect("native submission failed");
     assert!(

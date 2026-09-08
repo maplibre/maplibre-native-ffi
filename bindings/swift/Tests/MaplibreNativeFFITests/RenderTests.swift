@@ -99,19 +99,23 @@ import Testing
   /// Reports whether every pixel of `texture` carries the background color
   /// that `redBackgroundStyleJSON` paints.
   ///
-  /// A texture created without an explicit storage mode is managed on macOS,
-  /// so its CPU copy stays stale until a blit synchronizes it.
+  /// Managed textures on macOS need a blit to update their CPU copy after
+  /// rendering. Shared textures expose the completed frame directly.
   private func isPaintedRed(
     _ texture: MTLTexture,
     device: MTLDevice
   ) throws -> Bool {
-    let queue = try #require(device.makeCommandQueue())
-    let buffer = try #require(queue.makeCommandBuffer())
-    let encoder = try #require(buffer.makeBlitCommandEncoder())
-    encoder.synchronize(resource: texture)
-    encoder.endEncoding()
-    buffer.commit()
-    buffer.waitUntilCompleted()
+    #if os(macOS)
+      if texture.storageMode == .managed {
+        let queue = try #require(device.makeCommandQueue())
+        let buffer = try #require(queue.makeCommandBuffer())
+        let encoder = try #require(buffer.makeBlitCommandEncoder())
+        encoder.synchronize(resource: texture)
+        encoder.endEncoding()
+        buffer.commit()
+        buffer.waitUntilCompleted()
+      }
+    #endif
 
     let bytesPerRow = texture.width * 4
     var pixels = [UInt8](repeating: 0, count: bytesPerRow * texture.height)

@@ -1779,7 +1779,7 @@ mod tests {
             "MLN_FFI_TEST_FIXTURE_ORIGIN is unset; run the suite through \
              `mise run //bindings/rust:test emscripten-wasm32-webgl`",
         );
-        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let transform_url = format!("{origin}/__fixture/rewritten-style.json");
         // Matches the URL loaded after the clear as well, so a transform that
         // outlived the clear rewrites that request too and the layer id says so.

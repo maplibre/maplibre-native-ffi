@@ -357,7 +357,7 @@ pub fn closeSession(session: *maplibre.RenderSessionHandle, service_driver: bool
     try session.destroy();
 }
 
-var next_frame_token: std.atomic.Value(u64) = .init(1);
+var next_frame_token: std.atomic.Value(u32) = .init(1);
 
 pub fn nextFrameToken() u64 {
     return next_frame_token.fetchAdd(1, .seq_cst);

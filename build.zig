@@ -723,7 +723,10 @@ pub fn build(b: *std.Build) void {
         b.default_step.dependOn(&tests.step);
     }
 
-    if (options.target.result.abi == .android) {
+    if (options.target.result.abi == .android and options.target.result.cpu.arch == .arm) {
+        const unsupported = b.addFail("The Android emulator runs ARM64 and x64 guests; build this target without the test step.");
+        test_step.dependOn(&unsupported.step);
+    } else if (options.target.result.abi == .android) {
         const run_tests = addAndroidTestRunStep(
             b,
             &test_compiles,
