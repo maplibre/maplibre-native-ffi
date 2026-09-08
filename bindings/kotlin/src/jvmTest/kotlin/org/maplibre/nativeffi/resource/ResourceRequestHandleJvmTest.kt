@@ -18,10 +18,11 @@ import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelRegistry
 import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelSetResult
 import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.internal.loader.NativeAccess
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class ResourceRequestHandleJvmTest {
   @Test
-  fun unreachableProviderOwnedHandleReleasesNativeRequest() {
+  fun unreachableProviderOwnedHandleReleasesNativeRequest(): Unit = runSuspendTest {
     val released = CountDownLatch(1)
 
     registerUnreachableProviderOwnedHandle(released)
@@ -30,17 +31,14 @@ class ResourceRequestHandleJvmTest {
   }
 
   @Test
-  fun completionFailureIsTerminalAndCopiesDiagnosticBeforeReleaseCleanup() {
+  fun completionFailureIsTerminalAndCopiesDiagnosticBeforeReleaseCleanup(): Unit = runSuspendTest {
     NativeAccess.ensureLoaded()
     val releases = AtomicInteger(0)
     val handle =
       ResourceRequestHandle(
         SyntheticHandles.resourceRequest(),
         completer = { _, _ -> MapLibreNativeC.mln_network_status_set(999_999) },
-        releaser = {
-          releases.incrementAndGet()
-          MapLibreNativeC.mln_runtime_destroy(0L)
-        },
+        releaser = { releases.incrementAndGet() },
       )
     assertEquals(
       ResourceProviderDecision.HANDLE.nativeValue,
@@ -60,35 +58,38 @@ class ResourceRequestHandleJvmTest {
   }
 
   @Test
-  fun concurrentCloseDefersReleaseUntilCompletionAndCancellationUsesInjectedCheck() {
-    val entered = CountDownLatch(1)
-    val continueCompletion = CountDownLatch(1)
-    val releases = AtomicInteger(0)
-    val handle =
-      ResourceRequestHandle(
-        SyntheticHandles.resourceRequest(),
-        completer = { _, _ ->
-          entered.countDown()
-          continueCompletion.await(5, TimeUnit.SECONDS)
-          MaplibreStatus.OK.nativeCode
-        },
-        cancellationChecker = { true },
-        releaser = { releases.incrementAndGet() },
+  fun concurrentCloseDefersReleaseUntilCompletionAndCancellationUsesInjectedCheck(): Unit =
+    runSuspendTest {
+      val entered = CountDownLatch(1)
+      val continueCompletion = CountDownLatch(1)
+      val releases = AtomicInteger(0)
+      val handle =
+        ResourceRequestHandle(
+          SyntheticHandles.resourceRequest(),
+          completer = { _, _ ->
+            entered.countDown()
+            continueCompletion.await(5, TimeUnit.SECONDS)
+            MaplibreStatus.OK.nativeCode
+          },
+          cancellationChecker = { true },
+          releaser = { releases.incrementAndGet() },
+        )
+      assertEquals(
+        ResourceProviderDecision.HANDLE.nativeValue,
+        handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
       )
-    assertEquals(
-      ResourceProviderDecision.HANDLE.nativeValue,
-      handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
-    )
-    assertTrue(handle.isCancelled())
-    val completion = thread { handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT)) }
-    assertTrue(entered.await(5, TimeUnit.SECONDS))
-    handle.close()
-    assertEquals(0, releases.get())
-    continueCompletion.countDown()
-    completion.join()
-    assertEquals(1, releases.get())
-    assertFailsWith<InvalidStateException> { handle.isCancelled() }
-  }
+      assertTrue(handle.isCancelled())
+      val completion = thread {
+        handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
+      }
+      assertTrue(entered.await(5, TimeUnit.SECONDS))
+      handle.close()
+      assertEquals(0, releases.get())
+      continueCompletion.countDown()
+      completion.join()
+      assertEquals(1, releases.get())
+      assertFailsWith<InvalidStateException> { handle.isCancelled() }
+    }
 
   // BND-198.
   @Test

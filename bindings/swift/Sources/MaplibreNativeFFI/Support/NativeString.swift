@@ -10,11 +10,16 @@ struct NativeStringError: Error, Equatable {
 }
 
 enum NativeString {
-  static func copyUTF8(data: UnsafeRawPointer?, size: UInt) throws -> String {
-    try copyUTF8(data: data, size: Int(size))
+  static func copyUTF8(data: UnsafeRawPointer?, size: Int) throws -> String {
+    try copyCUTF8(
+      data: data?.assumingMemoryBound(to: CChar.self),
+      size: size
+    )
   }
 
-  static func copyUTF8(data: UnsafeRawPointer?, size: Int) throws -> String {
+  private static func copyCUTF8(data: UnsafePointer<CChar>?,
+                                size: Int) throws -> String
+  {
     guard size > 0 else { return "" }
     guard let data else {
       throw NativeStringError(
@@ -22,7 +27,7 @@ enum NativeString {
       )
     }
     let bytes = UnsafeBufferPointer(
-      start: data.assumingMemoryBound(to: UInt8.self),
+      start: UnsafeRawPointer(data).assumingMemoryBound(to: UInt8.self),
       count: size
     )
     guard let text = String(bytes: bytes, encoding: .utf8) else {

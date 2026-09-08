@@ -41,10 +41,9 @@ impl CanonicalTileId {
 type TileCallback = dyn Fn(CanonicalTileId) + Send + Sync + 'static;
 
 /// Options used when adding a custom geometry source.
-///
 /// Custom geometry callbacks may run on native worker threads. Keep callbacks
-/// quick, and hand work back to the map owner thread before calling map APIs
-/// such as `set_custom_geometry_source_tile_data` or invalidation helpers.
+/// quick; map commands may be submitted directly from any thread outside the
+/// callback.
 #[non_exhaustive]
 pub struct CustomGeometrySourceOptions {
     fetch_tile: Box<TileCallback>,

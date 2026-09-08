@@ -1,5 +1,7 @@
 package maplibre
 
+import "bytes"
+
 // Structural comparison helpers for the option structs, whose optional fields
 // are pointers.
 
@@ -52,4 +54,35 @@ func equalBoundsConstraint(left, right *BoundsConstraint) bool {
 		return false
 	}
 	return left.Kind != BoundsConstraintBounded || left.Bounds == right.Bounds
+}
+
+// equalOptionalBytes reports whether two optional byte fields are equal. A nil
+// slice marks an absent field and is never equal to an empty one.
+func equalOptionalBytes(left []byte, right []byte) bool {
+	return (left == nil) == (right == nil) && bytes.Equal(left, right)
+}
+
+// equalStretches compares stretch slices by content, keeping a present empty
+// slice distinct from an absent one.
+func equalStretches(left, right []ImageStretch) bool {
+	if (left == nil) != (right == nil) || len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
+}
+
+// cloneStretches copies a stretch slice, keeping a present empty slice distinct
+// from an absent one.
+func cloneStretches(stretches []ImageStretch) []ImageStretch {
+	if stretches == nil {
+		return nil
+	}
+	cloned := make([]ImageStretch, len(stretches))
+	copy(cloned, stretches)
+	return cloned
 }

@@ -161,7 +161,7 @@ private fun Modifier.mapKeyboard(renderer: MapLibreSurfaceRenderer): Modifier =
       Key.RightBracket -> renderer.pitchBy(KEYBOARD_PITCH)
       Key.LeftBracket -> renderer.pitchBy(-KEYBOARD_PITCH)
       Key.Zero,
-      Key.NumPad0 -> renderer.resetPitchAndBearing()
+      Key.NumPad0 -> renderer.resetOrientation()
       else -> return@onPreviewKeyEvent false
     }
     true

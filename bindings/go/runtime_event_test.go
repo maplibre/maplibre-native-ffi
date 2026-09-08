@@ -8,46 +8,49 @@ import (
 	"time"
 )
 
-// drainAllRuntimeEvents pumps until the runtime stops producing events, and
-// returns everything it drained in queue order.
-func drainAllRuntimeEvents(t *testing.T, runtime *RuntimeHandle) []RuntimeEvent {
+func waitForRuntimeBarrier(t *testing.T, runtime *RuntimeHandle) {
+	t.Helper()
+	operation, err := runtime.Barrier()
+	if _, err := awaitForTest(operation, err); err != nil {
+		t.Fatalf("Barrier completion: %v", err)
+	}
+}
+
+// drainQueuedRuntimeEvents drains what the queue already holds, in queue order,
+// and stops at the first empty batch. It waits for no further work, so a caller
+// fences the work it wants to observe before it drains.
+func drainQueuedRuntimeEvents(t *testing.T, runtime *RuntimeHandle) []RuntimeEvent {
 	t.Helper()
 	var events []RuntimeEvent
 	for range make([]struct{}, 100) {
-		if err := runtime.Pump(0, -1); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
-		batch, err := runtime.DrainEvents(0)
+		drained, err := runtime.DrainEvents()
 		if err != nil {
 			t.Fatalf("DrainEvents(): %v", err)
 		}
-		if len(batch.Events) == 0 {
+		if len(drained) == 0 {
 			return events
 		}
-		events = append(events, batch.Events...)
+		events = append(events, drained...)
 	}
 	t.Fatal("the runtime kept producing events")
 	return nil
 }
 
-// collectRuntimeEventsUntil pumps and drains until every wanted event type has
-// arrived, and returns every event it saw.
+// collectRuntimeEventsUntil drains until every wanted event type has arrived,
+// and returns every event it saw.
 func collectRuntimeEventsUntil(t *testing.T, runtime *RuntimeHandle, wanted ...RuntimeEventType) []RuntimeEvent {
 	t.Helper()
 	var events []RuntimeEvent
 	seen := make(map[RuntimeEventType]bool, len(wanted))
 	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0, -1); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
-		batch, err := runtime.DrainEvents(0)
+		drained, err := runtime.DrainEvents()
 		if err != nil {
 			t.Fatalf("DrainEvents(): %v", err)
 		}
-		for _, event := range batch.Events {
+		for _, event := range drained {
 			seen[event.Type] = true
 		}
-		events = append(events, batch.Events...)
+		events = append(events, drained...)
 		complete := true
 		for _, eventType := range wanted {
 			if !seen[eventType] {
@@ -64,8 +67,8 @@ func collectRuntimeEventsUntil(t *testing.T, runtime *RuntimeHandle, wanted ...R
 	return nil
 }
 
-// waitForRuntimeEvent pumps and drains until one event of the wanted type
-// arrives, and returns it.
+// waitForRuntimeEvent drains until one event of the wanted type arrives, and
+// returns it.
 func waitForRuntimeEvent(t *testing.T, runtime *RuntimeHandle, eventType RuntimeEventType) RuntimeEvent {
 	t.Helper()
 	events := collectRuntimeEventsUntil(t, runtime, eventType)
@@ -83,122 +86,47 @@ func eventTypes(events []RuntimeEvent) []RuntimeEventType {
 	return types
 }
 
-const emptyStyleJSON = `{"version":8,"sources":{},"layers":[]}`
-
-// newRuntimeAndMap creates a runtime and one map on the calling OS thread, and
-// registers their close.
-func newRuntimeAndMap(t *testing.T, options *MapOptions) (*RuntimeHandle, *MapHandle) {
-	t.Helper()
-	lockOSThreadForTest(t)
-
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	var m *MapHandle
-	if options == nil {
-		m, err = runtime.NewMap()
-	} else {
-		m, err = runtime.NewMapWithOptions(*options)
-	}
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	t.Cleanup(func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	})
-	return runtime, m
-}
-
-func TestRuntimeDrainReportsOneStyleLoadAsOneBatch(t *testing.T) {
+func TestRuntimeDrainReportsStyleLoadInQueueOrder(t *testing.T) {
 	runtime, m := newRuntimeAndMap(t, nil)
 
-	drainAllRuntimeEvents(t, runtime)
-	if err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
+	drainQueuedRuntimeEvents(t, runtime)
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(): %v", err)
 	}
-	// One style load queues several events, and one drain reports all of them in
-	// queue order.
-	var loaded RuntimeEventBatch
-	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0, -1); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
-		batch, err := runtime.DrainEvents(0)
-		if err != nil {
-			t.Fatalf("DrainEvents(): %v", err)
-		}
-		if slices.Contains(eventTypes(batch.Events), RuntimeEventMapStyleLoaded) {
-			loaded = batch
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
-	types := eventTypes(loaded.Events)
+	// A drain never waits for worker progress, so collect successive batches
+	// until the style load finishes and preserve their queue order.
+	events := collectRuntimeEventsUntil(t, runtime, RuntimeEventMapStyleLoaded)
+	types := eventTypes(events)
 	if len(types) < 2 {
-		t.Fatalf("style load batch = %v, want more than one event", types)
+		t.Fatalf("style load events = %v, want more than one event", types)
 	}
 	started := slices.Index(types, RuntimeEventMapLoadingStarted)
 	styleLoaded := slices.Index(types, RuntimeEventMapStyleLoaded)
 	if started < 0 || started > styleLoaded {
-		t.Fatalf("style load batch = %v, want loading-started before style-loaded", types)
-	}
-	if loaded.RemainingCount != 0 {
-		t.Fatalf("unbounded drain remaining = %d, want 0", loaded.RemainingCount)
-	}
-}
-
-func TestRuntimeBoundedDrainLeavesTheRestQueued(t *testing.T) {
-	runtime, m := newRuntimeAndMap(t, nil)
-	if err := m.JumpTo(CameraOptions{}.WithZoom(2)); err != nil {
-		t.Fatalf("JumpTo(): %v", err)
-	}
-
-	bounded, err := runtime.DrainEvents(1)
-	if err != nil {
-		t.Fatalf("DrainEvents(1): %v", err)
-	}
-	if len(bounded.Events) != 1 || bounded.RemainingCount == 0 {
-		t.Fatalf("bounded drain = %d events, %d remaining, want 1 event and a remainder", len(bounded.Events), bounded.RemainingCount)
-	}
-
-	rest, err := runtime.DrainEvents(0)
-	if err != nil {
-		t.Fatalf("DrainEvents(0): %v", err)
-	}
-	if uint64(len(rest.Events)) != bounded.RemainingCount || rest.RemainingCount != 0 {
-		t.Fatalf("unbounded drain = %d events, %d remaining, want %d events and none left", len(rest.Events), rest.RemainingCount, bounded.RemainingCount)
+		t.Fatalf(
+			"style load events = %v, want loading-started before style-loaded",
+			types,
+		)
 	}
 }
 
-func TestRuntimeDrainRejectsNegativeBoundAndEmptiesFreshRuntime(t *testing.T) {
-	lockOSThreadForTest(t)
-
+func TestRuntimeDrainEmptiesFreshRuntime(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Close(): %v", err)
 		}
 	}()
 
-	if _, err := runtime.DrainEvents(-1); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("DrainEvents(-1) error = %v, want ErrInvalidArgument", err)
-	}
-	batch, err := runtime.DrainEvents(0)
+	drained, err := runtime.DrainEvents()
 	if err != nil {
 		t.Fatalf("DrainEvents(): %v", err)
 	}
-	if len(batch.Events) != 0 || batch.RemainingCount != 0 {
-		t.Fatalf("fresh runtime batch = %d events, %d remaining", len(batch.Events), batch.RemainingCount)
+	if len(drained) != 0 {
+		t.Fatalf("fresh runtime batch = %d events", len(drained))
 	}
 }
 
@@ -206,10 +134,7 @@ func TestRuntimeEventMasksRoundTripAndRejectUnknownBits(t *testing.T) {
 	runtime, m := newRuntimeAndMap(t, nil)
 
 	// A handle nobody narrowed selects every type this binding version defines.
-	mapMask, err := m.EventMask()
-	if err != nil {
-		t.Fatalf("map EventMask(): %v", err)
-	}
+	mapMask := mapEventMaskForTest(t, m)
 	runtimeMask, err := runtime.EventMask()
 	if err != nil {
 		t.Fatalf("runtime EventMask(): %v", err)
@@ -218,7 +143,7 @@ func TestRuntimeEventMasksRoundTripAndRejectUnknownBits(t *testing.T) {
 		t.Fatalf("default masks = (%#x, %#x), want %#x", uint64(mapMask), uint64(runtimeMask), uint64(RuntimeEventMaskAll))
 	}
 
-	if err := m.SetEventMask(RuntimeEventMaskAll); err != nil {
+	if _, err := m.SetEventMask(RuntimeEventMaskAll); err != nil {
 		t.Fatalf("map SetEventMask(all): %v", err)
 	}
 	if err := runtime.SetEventMask(RuntimeEventMaskAll); err != nil {
@@ -227,13 +152,11 @@ func TestRuntimeEventMasksRoundTripAndRejectUnknownBits(t *testing.T) {
 
 	// A read-modify-write keeps every other bit.
 	narrowed := mapMask &^ RuntimeEventMaskMapTileAction
-	if err := m.SetEventMask(narrowed); err != nil {
+	if _, err := m.SetEventMask(narrowed); err != nil {
 		t.Fatalf("map SetEventMask(narrowed): %v", err)
 	}
-	readBack, err := m.EventMask()
-	if err != nil {
-		t.Fatalf("map EventMask(): %v", err)
-	}
+	waitForRuntimeBarrier(t, runtime)
+	readBack := mapEventMaskForTest(t, m)
 	if readBack != narrowed {
 		t.Fatalf("map mask = %#x, want %#x", uint64(readBack), uint64(narrowed))
 	}
@@ -245,36 +168,35 @@ func TestRuntimeEventMasksRoundTripAndRejectUnknownBits(t *testing.T) {
 	}
 
 	restored := readBack | RuntimeEventMaskMapTileAction
-	if err := m.SetEventMask(restored); err != nil {
+	if _, err := m.SetEventMask(restored); err != nil {
 		t.Fatalf("map SetEventMask(restored): %v", err)
 	}
-	if readBack, err = m.EventMask(); err != nil || readBack != RuntimeEventMaskAll {
-		t.Fatalf("map mask after restore = (%#x, %v), want %#x", uint64(readBack), err, uint64(RuntimeEventMaskAll))
+	waitForRuntimeBarrier(t, runtime)
+	if readBack = mapEventMaskForTest(t, m); readBack != RuntimeEventMaskAll {
+		t.Fatalf("map mask after restore = %#x, want %#x", uint64(readBack), uint64(RuntimeEventMaskAll))
 	}
 
 	unknown := RuntimeEventMaskAll | RuntimeEventMask(1)<<63
-	if err := m.SetEventMask(unknown); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := m.SetEventMask(unknown); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("map SetEventMask(unknown bit) error = %v, want ErrInvalidArgument", err)
 	}
 	if err := runtime.SetEventMask(unknown); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("runtime SetEventMask(unknown bit) error = %v, want ErrInvalidArgument", err)
 	}
 	// A rejected mask leaves the previous selection in place.
-	if readBack, err = m.EventMask(); err != nil || readBack != RuntimeEventMaskAll {
-		t.Fatalf("map mask after a rejected set = (%#x, %v), want %#x", uint64(readBack), err, uint64(RuntimeEventMaskAll))
+	if readBack = mapEventMaskForTest(t, m); readBack != RuntimeEventMaskAll {
+		t.Fatalf("map mask after a rejected set = %#x, want %#x", uint64(readBack), uint64(RuntimeEventMaskAll))
 	}
 }
 
 // Both option constructors validate the mask before native sees it, so an
 // unknown bit is rejected at creation as well as by the setters.
 func TestOptionsEventMaskRejectsUnknownBits(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtimeOptions := NewRuntimeOptions("", ":memory:")
 	runtimeOptions.EventMask = RuntimeEventMaskAll | RuntimeEventMask(1)<<63
 	if runtime, err := NewRuntimeWithOptions(runtimeOptions); !errors.Is(err, ErrInvalidArgument) {
 		if err == nil {
-			_ = runtime.Close()
+			_ = closeRuntimeForTest(runtime)
 		}
 		t.Fatalf("NewRuntimeWithOptions(unknown bit) error = %v, want ErrInvalidArgument", err)
 	}
@@ -282,10 +204,7 @@ func TestOptionsEventMaskRejectsUnknownBits(t *testing.T) {
 	runtime, _ := newRuntimeAndMap(t, nil)
 	mapOptions := NewMapOptions(64, 64, 1)
 	mapOptions.EventMask = RuntimeEventMaskAll | RuntimeEventMask(1)<<63
-	if m, err := runtime.NewMapWithOptions(mapOptions); !errors.Is(err, ErrInvalidArgument) {
-		if err == nil {
-			_ = m.Close()
-		}
+	if _, err := runtime.NewMapWithOptions(mapOptions); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("NewMapWithOptions(unknown bit) error = %v, want ErrInvalidArgument", err)
 	}
 }
@@ -295,44 +214,39 @@ func TestMapOptionsEventMaskSuppressesClearedTypesFromCreation(t *testing.T) {
 	options.EventMask = RuntimeEventMaskAll &^ RuntimeEventMaskMapStyleLoaded
 	runtime, m := newRuntimeAndMap(t, &options)
 
-	mask, err := m.EventMask()
-	if err != nil {
-		t.Fatalf("EventMask(): %v", err)
-	}
-	if mask.Has(RuntimeEventMaskMapStyleLoaded) {
-		t.Fatalf("EventMask() = %#x, want the style-loaded bit cleared", uint64(mask))
+	if mask := mapEventMaskForTest(t, m); mask.Has(RuntimeEventMaskMapStyleLoaded) {
+		t.Fatalf("MapSnapshot.EventMask = %#x, want the style-loaded bit cleared", uint64(mask))
 	}
 
-	if err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
-		t.Fatalf("SetStyleJSON(): %v", err)
+	style, err := m.SetStyleJSON([]byte(emptyStyleJSON))
+	if _, err := awaitForTest(style, err); err != nil {
+		t.Fatalf("SetStyleJSON completion: %v", err)
 	}
-	// Loading-started and style-loaded arrive in one batch, so a run that saw the
-	// first would have seen the second.
-	events := collectRuntimeEventsUntil(t, runtime, RuntimeEventMapLoadingStarted)
-	events = append(events, drainAllRuntimeEvents(t, runtime)...)
-	if types := eventTypes(events); slices.Contains(types, RuntimeEventMapStyleLoaded) {
+	// The style load and a runtime barrier both finish before the drain, so
+	// every event the load produced is queued by the time the drain reads it.
+	waitForRuntimeBarrier(t, runtime)
+	types := eventTypes(drainQueuedRuntimeEvents(t, runtime))
+	if !slices.Contains(types, RuntimeEventMapLoadingStarted) {
+		t.Fatalf("drained event types = %v, want the loading-started event the mask kept", types)
+	}
+	if slices.Contains(types, RuntimeEventMapStyleLoaded) {
 		t.Fatalf("drained event types = %v, want no style-loaded event", types)
 	}
 }
 
-func TestRuntimeDrainAndMaskSettersReportWrongThread(t *testing.T) {
+func TestRuntimeDrainAndMaskSettersMigrateAcrossGoroutines(t *testing.T) {
 	runtime, m := newRuntimeAndMap(t, nil)
-
-	type result struct {
-		name string
-		err  error
-	}
-	results := make(chan result, 3)
+	results := make(chan error, 3)
 	go func() {
-		_, err := runtime.DrainEvents(0)
-		results <- result{"DrainEvents", err}
-		results <- result{"runtime SetEventMask", runtime.SetEventMask(RuntimeEventMaskAll)}
-		results <- result{"map SetEventMask", m.SetEventMask(RuntimeEventMaskAll)}
+		_, err := runtime.DrainEvents()
+		results <- err
+		results <- runtime.SetEventMask(RuntimeEventMaskAll)
+		_, err = m.SetEventMask(RuntimeEventMaskAll)
+		results <- err
 	}()
-	for range make([]struct{}, 3) {
-		got := <-results
-		if !errors.Is(got.err, ErrWrongThread) {
-			t.Fatalf("%s from another thread error = %v, want ErrWrongThread", got.name, got.err)
+	for i := 0; i < 3; i++ {
+		if err := <-results; err != nil {
+			t.Fatalf("any-thread runtime/map call %d: %v", i, err)
 		}
 	}
 }
@@ -341,48 +255,49 @@ func TestRuntimeEventCopiesSurviveTheNextDrain(t *testing.T) {
 	runtime, m := newRuntimeAndMap(t, nil)
 
 	// A failed style load carries text, so this batch holds arena-backed values.
-	if err := m.SetStyleURL("unsupported://style.json"); err != nil {
+	if _, err := m.SetStyleURL("unsupported://style.json"); err != nil {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
-	var kept RuntimeEventBatch
+	var kept []RuntimeEvent
 	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0, -1); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
-		batch, err := runtime.DrainEvents(0)
+		drained, err := runtime.DrainEvents()
 		if err != nil {
 			t.Fatalf("DrainEvents(): %v", err)
 		}
-		if slices.Contains(eventTypes(batch.Events), RuntimeEventMapLoadingFailed) {
-			kept = batch
+		if slices.Contains(eventTypes(drained), RuntimeEventMapLoadingFailed) {
+			kept = drained
 			break
 		}
 		time.Sleep(time.Millisecond)
 	}
-	failure := kept.Events[slices.Index(eventTypes(kept.Events), RuntimeEventMapLoadingFailed)]
+	failureIndex := slices.Index(eventTypes(kept), RuntimeEventMapLoadingFailed)
+	if failureIndex < 0 {
+		t.Fatal("the map did not report a loading failure before the deadline")
+	}
+	failure := kept[failureIndex]
 	if failure.Message == "" {
 		t.Fatal("the loading failure carried no message")
 	}
-	snapshotTypes := eventTypes(kept.Events)
-	snapshotMessages := make([]string, len(kept.Events))
-	for index, event := range kept.Events {
+	snapshotTypes := eventTypes(kept)
+	snapshotMessages := make([]string, len(kept))
+	for index, event := range kept {
 		snapshotMessages[index] = event.Message
 	}
 
 	// Two more style loads reuse the runtime's event and message storage.
-	if err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(): %v", err)
 	}
 	collectRuntimeEventsUntil(t, runtime, RuntimeEventMapStyleLoaded)
-	if err := m.SetStyleURL("also-unsupported://style.json"); err != nil {
+	if _, err := m.SetStyleURL("also-unsupported://style.json"); err != nil {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
 	collectRuntimeEventsUntil(t, runtime, RuntimeEventMapLoadingFailed)
 
-	if !slices.Equal(eventTypes(kept.Events), snapshotTypes) {
-		t.Fatalf("kept event types = %v, want %v", eventTypes(kept.Events), snapshotTypes)
+	if !slices.Equal(eventTypes(kept), snapshotTypes) {
+		t.Fatalf("kept event types = %v, want %v", eventTypes(kept), snapshotTypes)
 	}
-	for index, event := range kept.Events {
+	for index, event := range kept {
 		if event.Message != snapshotMessages[index] {
 			t.Fatalf("kept event %d message = %q, want %q", index, event.Message, snapshotMessages[index])
 		}
@@ -393,14 +308,13 @@ func TestRuntimeEventCopiesSurviveTheNextDrain(t *testing.T) {
 }
 
 func TestRuntimeEventDecoderUsesTheBatchStride(t *testing.T) {
-	lockOSThreadForTest(t)
 	runtime, _ := newRuntimeAndMap(t, nil)
 	stride := runtimeEventSizeForTest()
 
 	// A batch whose stride exceeds the compiled event size is what a later C API
 	// version looks like, and every event after the first misdecodes when the
 	// decoder strides by its own struct size.
-	batch := newRuntimeEventBatchForTest(stride+16, 0, []runtimeEventForTest{
+	batch := newRuntimeEventBatchForTest(stride+16, []runtimeEventForTest{
 		newRuntimeEventForTest(RuntimeEventMapRenderFrameFinished, RuntimeEventSourceMap, 0, 0).
 			withRenderFrame(RuntimeEventRenderFramePayload{RawMode: uint32(RenderModeFull), NeedsRepaint: true}),
 		newRuntimeEventForTest(RuntimeEventMapTileAction, RuntimeEventSourceMap, 0, 0).
@@ -409,51 +323,41 @@ func TestRuntimeEventDecoderUsesTheBatchStride(t *testing.T) {
 				RawOperation: uint32(TileOperationLoadFromCache),
 				TileID:       TileID{OverscaledZ: 9, Wrap: -1, CanonicalZ: 8, CanonicalX: 7, CanonicalY: 6},
 			}),
-		newRuntimeEventForTest(RuntimeEventOfflineOperationCompleted, RuntimeEventSourceRuntime, 0, 3).
-			withMessage("operation failed").
-			withOfflineOperationCompleted(RuntimeEventOfflineOperationCompletedPayload{
-				OperationID:   7,
-				OperationKind: OfflineOperationRegionGet,
-				ResultKind:    OfflineOperationResultOptionalRegion,
-				ResultStatus:  3,
-				Found:         true,
+		newRuntimeEventForTest(RuntimeEventMapCameraTransitionFinished, RuntimeEventSourceMap, 0, 0).
+			withCameraTransitionFinished(RuntimeEventCameraTransitionFinishedPayload{
+				TransitionID: 7,
 			}),
 	})
 	defer batch.free()
 
 	decoded := runtime.decodeForTest(batch)
-	if len(decoded.Events) != 3 {
-		t.Fatalf("decoded %d events, want 3", len(decoded.Events))
+	if len(decoded) != 3 {
+		t.Fatalf("decoded %d events, want 3", len(decoded))
 	}
-	frame, ok := decoded.Events[0].Payload.(RuntimeEventRenderFramePayload)
+	frame, ok := decoded[0].Payload.(RuntimeEventRenderFramePayload)
 	if !ok || frame.Mode != RenderModeFull || !frame.NeedsRepaint {
-		t.Fatalf("render frame payload = %+v", decoded.Events[0].Payload)
+		t.Fatalf("render frame payload = %+v", decoded[0].Payload)
 	}
-	tile, ok := decoded.Events[1].Payload.(RuntimeEventTileActionPayload)
+	tile, ok := decoded[1].Payload.(RuntimeEventTileActionPayload)
 	if !ok || tile.Operation != TileOperationLoadFromCache || tile.TileID.Wrap != -1 || tile.TileID.CanonicalX != 7 {
-		t.Fatalf("tile action payload = %+v", decoded.Events[1].Payload)
+		t.Fatalf("tile action payload = %+v", decoded[1].Payload)
 	}
-	if decoded.Events[1].Message != "roads" {
-		t.Fatalf("tile action message = %q, want the source ID", decoded.Events[1].Message)
+	if decoded[1].Message != "roads" {
+		t.Fatalf("tile action message = %q, want the source ID", decoded[1].Message)
 	}
-	completion, ok := decoded.Events[2].Payload.(RuntimeEventOfflineOperationCompletedPayload)
-	if !ok || completion.OperationID != 7 || completion.ResultStatus != 3 || !completion.Found {
-		t.Fatalf("offline completion payload = %+v", decoded.Events[2].Payload)
-	}
-	if decoded.Events[2].Message != "operation failed" || decoded.Events[2].Code != 3 {
-		t.Fatalf("offline completion event = %+v", decoded.Events[2])
+	transition, ok := decoded[2].Payload.(RuntimeEventCameraTransitionFinishedPayload)
+	if !ok || transition.TransitionID != 7 {
+		t.Fatalf("camera transition payload = %+v", decoded[2].Payload)
 	}
 }
 
 func TestRuntimeEventKnownPayloadsDecodeFromTheUnion(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Close(): %v", err)
 		}
 	}()
@@ -461,7 +365,7 @@ func TestRuntimeEventKnownPayloadsDecodeFromTheUnion(t *testing.T) {
 	status := offlineRegionStatusForTest(uint32(OfflineRegionDownloadActive))
 	status.CompletedTileCount = 12
 	status.Complete = true
-	batch := newRuntimeEventBatchForTest(0, 0, []runtimeEventForTest{
+	batch := newRuntimeEventBatchForTest(0, []runtimeEventForTest{
 		newRuntimeEventForTest(RuntimeEventMapRenderMapFinished, RuntimeEventSourceMap, 0, 0).
 			withRenderMap(RuntimeEventRenderMapPayload{RawMode: uint32(RenderModePartial)}),
 		newRuntimeEventForTest(RuntimeEventMapCameraTransitionFinished, RuntimeEventSourceMap, 0, 0).
@@ -479,49 +383,47 @@ func TestRuntimeEventKnownPayloadsDecodeFromTheUnion(t *testing.T) {
 	defer batch.free()
 
 	decoded := runtime.decodeForTest(batch)
-	if len(decoded.Events) != 6 {
-		t.Fatalf("decoded %d events, want 6", len(decoded.Events))
+	if len(decoded) != 6 {
+		t.Fatalf("decoded %d events, want 6", len(decoded))
 	}
-	renderMap, ok := decoded.Events[0].Payload.(RuntimeEventRenderMapPayload)
+	renderMap, ok := decoded[0].Payload.(RuntimeEventRenderMapPayload)
 	if !ok || renderMap.Mode != RenderModePartial {
-		t.Fatalf("render map payload = %+v", decoded.Events[0].Payload)
+		t.Fatalf("render map payload = %+v", decoded[0].Payload)
 	}
-	transition, ok := decoded.Events[1].Payload.(RuntimeEventCameraTransitionFinishedPayload)
+	transition, ok := decoded[1].Payload.(RuntimeEventCameraTransitionFinishedPayload)
 	if !ok || transition.TransitionID != 99 {
-		t.Fatalf("transition payload = %+v", decoded.Events[1].Payload)
+		t.Fatalf("transition payload = %+v", decoded[1].Payload)
 	}
-	regionStatus, ok := decoded.Events[2].Payload.(RuntimeEventOfflineRegionStatusPayload)
+	regionStatus, ok := decoded[2].Payload.(RuntimeEventOfflineRegionStatusPayload)
 	if !ok || regionStatus.RegionID != 5 || regionStatus.Status.CompletedTileCount != 12 || !regionStatus.Status.Complete {
-		t.Fatalf("region status payload = %+v", decoded.Events[2].Payload)
+		t.Fatalf("region status payload = %+v", decoded[2].Payload)
 	}
-	responseError, ok := decoded.Events[3].Payload.(RuntimeEventOfflineRegionResponseErrorPayload)
+	responseError, ok := decoded[3].Payload.(RuntimeEventOfflineRegionResponseErrorPayload)
 	if !ok || responseError.Reason != ResourceErrorReasonConnection {
-		t.Fatalf("response error payload = %+v", decoded.Events[3].Payload)
+		t.Fatalf("response error payload = %+v", decoded[3].Payload)
 	}
-	if decoded.Events[3].Message != "connection reset" {
-		t.Fatalf("response error message = %q", decoded.Events[3].Message)
+	if decoded[3].Message != "connection reset" {
+		t.Fatalf("response error message = %q", decoded[3].Message)
 	}
-	tileLimit, ok := decoded.Events[4].Payload.(RuntimeEventOfflineRegionTileCountLimitPayload)
+	tileLimit, ok := decoded[4].Payload.(RuntimeEventOfflineRegionTileCountLimitPayload)
 	if !ok || tileLimit.Limit != 6000 {
-		t.Fatalf("tile count limit payload = %+v", decoded.Events[4].Payload)
+		t.Fatalf("tile count limit payload = %+v", decoded[4].Payload)
 	}
 	// A style-image-missing event carries the image ID as its message, and its
 	// payload type of none carries no payload value at all.
-	missing := decoded.Events[5]
+	missing := decoded[5]
 	if missing.Payload != nil || missing.PayloadType != RuntimeEventPayloadNone || missing.Message != "marker-1" {
 		t.Fatalf("style-image-missing event = %+v", missing)
 	}
 }
 
 func TestRuntimeEventUnknownDomainsPreserveRawValues(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Close(): %v", err)
 		}
 	}()
@@ -530,17 +432,17 @@ func TestRuntimeEventUnknownDomainsPreserveRawValues(t *testing.T) {
 	for index := range window {
 		window[index] = byte(index + 1)
 	}
-	batch := newRuntimeEventBatchForTest(0, 0, []runtimeEventForTest{
+	batch := newRuntimeEventBatchForTest(0, []runtimeEventForTest{
 		newRuntimeEventForTest(RuntimeEventType(0x7fff_0001), RuntimeEventSourceType(0x7fff_0002), 0x7fff_0004, 0).
 			withRawPayload(RuntimeEventPayloadType(0x7fff_0003), window),
 	})
 	defer batch.free()
 
 	decoded := runtime.decodeForTest(batch)
-	if len(decoded.Events) != 1 {
-		t.Fatalf("decoded %d events, want 1", len(decoded.Events))
+	if len(decoded) != 1 {
+		t.Fatalf("decoded %d events, want 1", len(decoded))
 	}
-	event := decoded.Events[0]
+	event := decoded[0]
 	if event.Type != RuntimeEventType(0x7fff_0001) || event.SourceType != RuntimeEventSourceType(0x7fff_0002) {
 		t.Fatalf("unknown event domains = (%d, %d)", event.Type, event.SourceType)
 	}
@@ -579,28 +481,28 @@ func TestRuntimeEventMapSourceUsesRuntimeLocalID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ID(): %v", err)
 	}
-	batch := newRuntimeEventBatchForTest(0, 0, []runtimeEventForTest{
+	batch := newRuntimeEventBatchForTest(0, []runtimeEventForTest{
 		newRuntimeEventForTest(RuntimeEventMapIdle, RuntimeEventSourceMap, uint64(mapID), 0),
 		newRuntimeEventForTest(RuntimeEventMapIdle, RuntimeEventSourceMap, uint64(mapID)+1, 0),
 	})
 	defer batch.free()
 
 	decoded := runtime.decodeForTest(batch)
-	if len(decoded.Events) != 2 {
-		t.Fatalf("decoded %d events, want 2", len(decoded.Events))
+	if len(decoded) != 2 {
+		t.Fatalf("decoded %d events, want 2", len(decoded))
 	}
-	if decoded.Events[0].Source.Type != RuntimeEventSourceMap || decoded.Events[0].Source.MapID != mapID {
-		t.Fatalf("source = %+v, want map %d", decoded.Events[0].Source, mapID)
+	if decoded[0].Source.Type != RuntimeEventSourceMap || decoded[0].Source.MapID != mapID {
+		t.Fatalf("source = %+v, want map %d", decoded[0].Source, mapID)
 	}
-	if decoded.Events[0].Source.RawID != uint64(mapID) {
-		t.Fatalf("resolved source raw ID = %d, want %d", decoded.Events[0].Source.RawID, uint64(mapID))
+	if decoded[0].Source.RawID != uint64(mapID) {
+		t.Fatalf("resolved source raw ID = %d, want %d", decoded[0].Source.RawID, uint64(mapID))
 	}
 	// An event from a map this runtime does not know reports no map identity, and
 	// still carries the native id the C API delivered.
-	if decoded.Events[1].Source.MapID != 0 {
-		t.Fatalf("unknown map source ID = %d, want 0", decoded.Events[1].Source.MapID)
+	if decoded[1].Source.MapID != 0 {
+		t.Fatalf("unknown map source ID = %d, want 0", decoded[1].Source.MapID)
 	}
-	if decoded.Events[1].Source.RawID != uint64(mapID)+1 {
-		t.Fatalf("unresolved source raw ID = %d, want %d", decoded.Events[1].Source.RawID, uint64(mapID)+1)
+	if decoded[1].Source.RawID != uint64(mapID)+1 {
+		t.Fatalf("unresolved source raw ID = %d, want %d", decoded[1].Source.RawID, uint64(mapID)+1)
 	}
 }

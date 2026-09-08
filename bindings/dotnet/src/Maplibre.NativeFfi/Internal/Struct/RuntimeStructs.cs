@@ -18,16 +18,16 @@ internal static unsafe class RuntimeStructs
     private static readonly uint PayloadOffset = (uint)
         Marshal.OffsetOf<mln_runtime_event>(nameof(mln_runtime_event.payload));
 
-    internal static List<RuntimeEvent> ReadBatch(in mln_runtime_event_batch batch) =>
+    internal static List<RuntimeEvent> ReadBatch(in mln_runtime_event_batch_view batch) =>
         ReadBatch(batch, null, static _ => null);
 
-    /// <summary>Copies every event of a borrowed batch, in queue order.</summary>
+    /// <summary>Copies every event from an owned batch view, in queue order.</summary>
     /// <remarks>
     /// Events are indexed by the stride the batch reports rather than by this binding's own record
     /// size, so a later C API version that widens the payload union stays readable.
     /// </remarks>
     internal static List<RuntimeEvent> ReadBatch(
-        in mln_runtime_event_batch batch,
+        in mln_runtime_event_batch_view batch,
         RuntimeHandle? runtimeSource,
         Func<ulong, MapHandle?> mapSource
     )
@@ -94,8 +94,6 @@ internal static unsafe class RuntimeStructs
                 ReadOfflineRegionResponseError(record->payload.offline_region_response_error),
             mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT =>
                 ReadOfflineRegionTileCountLimit(record->payload.offline_region_tile_count_limit),
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED =>
-                ReadOfflineOperationCompleted(record->payload.offline_operation_completed),
             mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED =>
                 ReadCameraTransitionFinished(record->payload.camera_transition_finished),
             _ => new RuntimeEventPayload.Unknown(
@@ -134,19 +132,6 @@ internal static unsafe class RuntimeStructs
     private static RuntimeEventPayload.OfflineRegionTileCountLimit ReadOfflineRegionTileCountLimit(
         in mln_runtime_event_offline_region_tile_count_limit payload
     ) => new(payload.region_id, payload.limit);
-
-    private static RuntimeEventPayload.OfflineOperationCompleted ReadOfflineOperationCompleted(
-        in mln_runtime_event_offline_operation_completed payload
-    ) =>
-        new(
-            payload.operation_id,
-            (OfflineOperationKind)payload.operation_kind,
-            payload.operation_kind,
-            (OfflineOperationResultKind)payload.result_kind,
-            payload.result_kind,
-            payload.result_status,
-            payload.found != 0
-        );
 
     private static RuntimeEventPayload.CameraTransitionFinished ReadCameraTransitionFinished(
         in mln_runtime_event_camera_transition_finished payload

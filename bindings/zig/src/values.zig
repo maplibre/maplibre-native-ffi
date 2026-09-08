@@ -44,9 +44,9 @@ pub const CameraOptions = struct {
     center: ?LatLng = null,
     center_altitude: ?f64 = null,
     padding: ?EdgeInsets = null,
-    /// Input-only screen point the camera pivots around. `jumpTo`, `easeTo`, and
-    /// `flyTo` honor it; MapLibre leaves it null on every read path, including
-    /// camera snapshots and the camera-for-bounds helpers.
+    /// Input-only screen point the camera pivots around. Atomic jump, ease, and
+    /// fly updates honor it; MapLibre leaves it null on every read path,
+    /// including camera snapshots and camera-for-bounds helpers.
     anchor: ?ScreenPoint = null,
     zoom: ?f64 = null,
     bearing: ?f64 = null,

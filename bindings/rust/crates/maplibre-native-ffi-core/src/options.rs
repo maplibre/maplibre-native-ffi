@@ -42,9 +42,9 @@ impl MapOptions {
         // SAFETY: Default constructor takes no arguments and initializes size
         // and default values for this C ABI version.
         let mut raw = unsafe { sys::mln_map_options_default() };
-        raw.width = self.width;
-        raw.height = self.height;
-        raw.scale_factor = self.scale_factor;
+        raw.initial_extent.width = self.width;
+        raw.initial_extent.height = self.height;
+        raw.initial_extent.scale_factor = self.scale_factor;
         raw.map_mode = self.mode.raw_for_set()?;
         raw.fast_pfor_enabled = self.fast_pfor_enabled;
         raw.event_mask = self.event_mask.bits();
@@ -58,9 +58,9 @@ impl Default for MapOptions {
         // for this C ABI version.
         let raw = unsafe { sys::mln_map_options_default() };
         Self {
-            width: raw.width,
-            height: raw.height,
-            scale_factor: raw.scale_factor,
+            width: raw.initial_extent.width,
+            height: raw.initial_extent.height,
+            scale_factor: raw.initial_extent.scale_factor,
             mode: MapMode::from_raw(raw.map_mode),
             fast_pfor_enabled: raw.fast_pfor_enabled,
             // Retained rather than named, so a newer native library's default
@@ -280,9 +280,9 @@ mod tests {
         let raw = map_options_to_native(&options).unwrap();
 
         assert_eq!(raw.size, std::mem::size_of::<sys::mln_map_options>() as u32);
-        assert_eq!(raw.width, 800);
-        assert_eq!(raw.height, 600);
-        assert_eq!(raw.scale_factor, 2.0);
+        assert_eq!(raw.initial_extent.width, 800);
+        assert_eq!(raw.initial_extent.height, 600);
+        assert_eq!(raw.initial_extent.scale_factor, 2.0);
         assert_eq!(raw.map_mode, sys::MLN_MAP_MODE_STATIC);
         assert!(raw.fast_pfor_enabled);
     }

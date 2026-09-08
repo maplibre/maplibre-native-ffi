@@ -304,12 +304,12 @@ public sealed unsafe class ResourceProviderTests
 
     [BindingSpecTest("BND-122")]
     [Fact]
-    public void ResourceProviderInstallFailurePreservesPreviousCallbackAndReleasesReplacement()
+    public void ResourceProviderInstallFailureReleasesReplacement()
     {
         var failInstall = false;
         ResourceProviderState? failedReplacement = null;
         using var install = RuntimeHandle.UseResourceCallbackInstallMethodsForTest(
-            (_, provider) =>
+            (_, provider, _) =>
             {
                 if (!failInstall)
                 {
@@ -320,25 +320,24 @@ public sealed unsafe class ResourceProviderTests
                     GCHandle.FromIntPtr((nint)provider->user_data).Target;
                 return mln_status.MLN_STATUS_INVALID_STATE;
             },
-            (_, _) => mln_status.MLN_STATUS_OK
+            (_, _, _) => mln_status.MLN_STATUS_OK
         );
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider((_, _) => ResourceProviderDecision.PassThrough);
-        var previous = Assert.IsType<ResourceProviderState>(runtime.ResourceProviderStateForTest);
+        runtime.SetResourceProviderAsync((_, _) => ResourceProviderDecision.PassThrough);
 
         failInstall = true;
         Assert.Throws<InvalidStateException>(() =>
-            runtime.SetResourceProvider((_, _) => ResourceProviderDecision.Handle)
+            runtime
+                .SetResourceProviderAsync((_, _) => ResourceProviderDecision.Handle)
+                .GetAwaiter()
+                .GetResult()
         );
 
-        Assert.Same(previous, runtime.ResourceProviderStateForTest);
-        Assert.True(previous.IsHandleAllocatedForTest);
         Assert.NotNull(failedReplacement);
         Assert.False(failedReplacement.IsHandleAllocatedForTest);
     }
 
-    // Each transition also releases the rooted state of the provider it retires,
-    // which the C call guarantees is unreachable once it returns.
+    // Native callback ownership keeps each registration alive through its final invocation.
     [BindingSpecTest("BND-142")]
     [Fact]
     public void ResourceProviderIsConsultedUntilClearedWhileMapIsLive()
@@ -346,38 +345,35 @@ public sealed unsafe class ResourceProviderTests
         var firstCalls = 0;
         var secondCalls = 0;
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
 
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (_, _) =>
             {
                 Interlocked.Increment(ref firstCalls);
                 return ResourceProviderDecision.PassThrough;
             }
         );
-        var first = Assert.IsType<ResourceProviderState>(runtime.ResourceProviderStateForTest);
         LoadProbeStyle(runtime, map, "jar:file:/packaged/first.json");
         Assert.True(Volatile.Read(ref firstCalls) > 0);
 
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (_, _) =>
             {
                 Interlocked.Increment(ref secondCalls);
                 return ResourceProviderDecision.PassThrough;
             }
         );
-        var second = Assert.IsType<ResourceProviderState>(runtime.ResourceProviderStateForTest);
-        Assert.NotSame(first, second);
-        Assert.False(first.IsHandleAllocatedForTest);
         var firstCallsAfterReplace = Volatile.Read(ref firstCalls);
         LoadProbeStyle(runtime, map, "jar:file:/packaged/second.json");
         Assert.True(Volatile.Read(ref secondCalls) > 0);
         Assert.Equal(firstCallsAfterReplace, Volatile.Read(ref firstCalls));
 
-        runtime.ClearResourceProvider();
+        runtime.ClearResourceProviderAsync();
 
-        Assert.Null(runtime.ResourceProviderStateForTest);
-        Assert.False(second.IsHandleAllocatedForTest);
         var secondCallsAfterClear = Volatile.Read(ref secondCalls);
         LoadProbeStyle(runtime, map, "jar:file:/packaged/third.json");
         Assert.Equal(firstCallsAfterReplace, Volatile.Read(ref firstCalls));
@@ -391,7 +387,7 @@ public sealed unsafe class ResourceProviderTests
         const string AliasUrl = "maplibre://maps/style";
         string? resolvedUrl = null;
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (request, handle) =>
             {
                 if (request.RequestedUrl != AliasUrl)
@@ -404,9 +400,12 @@ public sealed unsafe class ResourceProviderTests
                 return ResourceProviderDecision.Handle;
             }
         );
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
 
-        map.SetStyleUrl(AliasUrl);
+        map.SetStyleUrlAsync(AliasUrl);
         RuntimeEventTestHelpers.WaitForMapEvent(runtime, map, RuntimeEventType.MapStyleLoaded);
 
         Assert.Equal("https://demotiles.maplibre.org/style.json", resolvedUrl);
@@ -418,7 +417,7 @@ public sealed unsafe class ResourceProviderTests
     {
         ResourceRequestHandle? handled = null;
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (request, handle) =>
             {
                 Assert.Equal(StyleUrl, request.RequestedUrl);
@@ -427,9 +426,12 @@ public sealed unsafe class ResourceProviderTests
                 return ResourceProviderDecision.Handle;
             }
         );
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
 
-        map.SetStyleUrl(StyleUrl);
+        map.SetStyleUrlAsync(StyleUrl);
         var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
             runtime,
             map,
@@ -448,7 +450,7 @@ public sealed unsafe class ResourceProviderTests
         using var providerCalled = new ManualResetEventSlim(false);
         ResourceRequestHandle? handled = null;
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (request, handle) =>
             {
                 Assert.Equal(StyleUrl, request.RequestedUrl);
@@ -457,10 +459,13 @@ public sealed unsafe class ResourceProviderTests
                 return ResourceProviderDecision.Handle;
             }
         );
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
 
-        map.SetStyleUrl(StyleUrl);
-        DriveRuntimeUntil(runtime, providerCalled);
+        map.SetStyleUrlAsync(StyleUrl);
+        Assert.True(providerCalled.Wait(TimeSpan.FromSeconds(10)));
         Assert.NotNull(handled);
         handled.Complete(StyleResponse());
 
@@ -481,7 +486,7 @@ public sealed unsafe class ResourceProviderTests
         using var providerCalled = new ManualResetEventSlim(false);
         ResourceRequestHandle? handled = null;
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (_, handle) =>
             {
                 handled = handle;
@@ -489,14 +494,17 @@ public sealed unsafe class ResourceProviderTests
                 return ResourceProviderDecision.Handle;
             }
         );
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
 
-        map.SetStyleUrl(StyleUrl);
-        DriveRuntimeUntil(runtime, providerCalled);
+        map.SetStyleUrlAsync(StyleUrl);
+        Assert.True(providerCalled.Wait(TimeSpan.FromSeconds(10)));
         Assert.NotNull(handled);
 
-        map.SetStyleJson(System.Text.Encoding.UTF8.GetBytes(StyleJson));
-        DriveRuntimeUntilCancelled(runtime, handled);
+        map.SetStyleJsonAsync(System.Text.Encoding.UTF8.GetBytes(StyleJson));
+        WaitUntil(handled.IsCancelled);
 
         var error = Assert.Throws<InvalidStateException>(() => handled.Complete(StyleResponse()));
 
@@ -510,7 +518,7 @@ public sealed unsafe class ResourceProviderTests
     public void ResourceProviderErrorResponseProducesCopiedLoadingFailureEvent()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (_, handle) =>
             {
                 handle.Complete(
@@ -523,9 +531,12 @@ public sealed unsafe class ResourceProviderTests
                 return ResourceProviderDecision.Handle;
             }
         );
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
 
-        map.SetStyleUrl(StyleUrl);
+        map.SetStyleUrlAsync(StyleUrl);
         var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
             runtime,
             map,
@@ -544,7 +555,7 @@ public sealed unsafe class ResourceProviderTests
         var cancelCalls = 0;
         ResourceRequestHandle? handled = null;
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (_, handle) =>
             {
                 handled = handle;
@@ -552,10 +563,10 @@ public sealed unsafe class ResourceProviderTests
                 return ResourceProviderDecision.Handle;
             }
         );
-        var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 512, Height = 512 });
 
-        map.SetStyleUrl(StyleUrl);
-        DriveRuntimeUntil(runtime, providerCalled);
+        map.SetStyleUrlAsync(StyleUrl);
+        Assert.True(providerCalled.Wait(TimeSpan.FromSeconds(10)));
         Assert.NotNull(handled);
         var request = handled;
         request.SetCancelCallback(() =>
@@ -564,10 +575,12 @@ public sealed unsafe class ResourceProviderTests
             request.Close();
         });
 
-        // Destroying the map discards the style request the provider never
-        // completed, which is the cancellation the callback reports.
+        // Releasing the map discards the style request the provider never
+        // completed, which is the cancellation the callback reports. The
+        // callback runs on the runtime worker while this thread waits for
+        // teardown.
         map.Dispose();
-        DriveRuntimeUntil(runtime, () => Volatile.Read(ref cancelCalls) > 0);
+        WaitUntil(() => Volatile.Read(ref cancelCalls) > 0);
         RuntimeEventTestHelpers.DrainUntilIdle(runtime);
 
         Assert.Equal(1, Volatile.Read(ref cancelCalls));
@@ -581,7 +594,7 @@ public sealed unsafe class ResourceProviderTests
     {
         var cancelCalls = 0;
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (_, handle) =>
             {
                 handle.SetCancelCallback(() => Interlocked.Increment(ref cancelCalls));
@@ -589,9 +602,9 @@ public sealed unsafe class ResourceProviderTests
                 return ResourceProviderDecision.Handle;
             }
         );
-        var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 512, Height = 512 });
 
-        map.SetStyleUrl(StyleUrl);
+        map.SetStyleUrlAsync(StyleUrl);
         RuntimeEventTestHelpers.WaitForMapEvent(runtime, map, RuntimeEventType.MapStyleLoaded);
         map.Dispose();
         RuntimeEventTestHelpers.DrainUntilIdle(runtime);
@@ -608,7 +621,7 @@ public sealed unsafe class ResourceProviderTests
         var cancelCalls = 0;
         ResourceRequestHandle? handled = null;
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (_, handle) =>
             {
                 handled = handle;
@@ -616,13 +629,16 @@ public sealed unsafe class ResourceProviderTests
                 return ResourceProviderDecision.Handle;
             }
         );
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
 
-        map.SetStyleUrl(StyleUrl);
-        DriveRuntimeUntil(runtime, providerCalled);
+        map.SetStyleUrlAsync(StyleUrl);
+        Assert.True(providerCalled.Wait(TimeSpan.FromSeconds(10)));
         Assert.NotNull(handled);
-        map.SetStyleJson(Encoding.UTF8.GetBytes(StyleJson));
-        DriveRuntimeUntilCancelled(runtime, handled);
+        map.SetStyleJsonAsync(Encoding.UTF8.GetBytes(StyleJson));
+        WaitUntil(handled.IsCancelled);
 
         handled.SetCancelCallback(() =>
         {
@@ -867,7 +883,7 @@ public sealed unsafe class ResourceProviderTests
         // Drain earlier events so this probe observes its own failure.
         RuntimeEventTestHelpers.DrainUntilIdle(runtime);
 
-        map.SetStyleUrl(styleUrl);
+        map.SetStyleUrlAsync(styleUrl);
         var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
             runtime,
             map,
@@ -880,11 +896,11 @@ public sealed unsafe class ResourceProviderTests
     private static ResourceResponse StyleResponse() =>
         new(ResourceResponseStatus.Ok) { Bytes = Encoding.UTF8.GetBytes(StyleJson) };
 
-    private static void DriveRuntimeUntil(RuntimeHandle runtime, Func<bool> condition)
+    /// <summary>Waits for a condition a native thread satisfies, failing the test on timeout.</summary>
+    private static void WaitUntil(Func<bool> condition)
     {
-        for (var attempt = 0; attempt < 1000; attempt++)
+        for (var attempt = 0; attempt < 2000; attempt++)
         {
-            runtime.Pump(TimeSpan.Zero);
             if (condition())
             {
                 return;
@@ -894,41 +910,6 @@ public sealed unsafe class ResourceProviderTests
         }
 
         Assert.True(condition());
-    }
-
-    private static void DriveRuntimeUntil(RuntimeHandle runtime, ManualResetEventSlim signal)
-    {
-        for (var attempt = 0; attempt < 1000; attempt++)
-        {
-            runtime.Pump(TimeSpan.Zero);
-            if (signal.IsSet)
-            {
-                return;
-            }
-
-            Thread.Sleep(1);
-        }
-
-        Assert.True(signal.IsSet);
-    }
-
-    private static void DriveRuntimeUntilCancelled(
-        RuntimeHandle runtime,
-        ResourceRequestHandle handle
-    )
-    {
-        for (var attempt = 0; attempt < 1000; attempt++)
-        {
-            runtime.Pump(TimeSpan.Zero);
-            if (handle.IsCancelled())
-            {
-                return;
-            }
-
-            Thread.Sleep(1);
-        }
-
-        Assert.True(handle.IsCancelled());
     }
 }
 

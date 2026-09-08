@@ -13,31 +13,31 @@ import cameraSnippet from "../../../../snippets/c/camera.c?raw";
 import fitBoundsSnippet from "../../../../snippets/c/camera-fit-bounds.c?raw";
 import gestureSnippet from "../../../../snippets/c/camera-gesture.c?raw";
 
-The camera belongs to the map. A camera call needs a live map and the map's
-owner thread, and it works before any render session exists.
-
-Every command takes the same camera options. Set the fields that you want to
-change, and MapLibre leaves every other field at its current value.
+The camera belongs to the map. Any host thread can submit a camera command while
+the map is live, including before a render session exists. Every command copies
+one atomic camera update: set the fields to change, and MapLibre leaves every
+other field at its committed value.
 
 <Code code={region(cameraSnippet, "camera")} lang="c" title="camera.c" />
 
 ## Choose how the camera moves
 
-Three commands apply that camera, and they differ only in timing.
+One command, `mln_map_update_camera`, applies that camera, and its update mode
+selects the timing.
 
-`mln_map_jump_to` applies the camera immediately. Use it for the first position
+Jump mode applies the camera immediately. Use it for the first position
 of a session, a position restored from saved state, or a camera that the host
 recomputes every frame during a gesture.
 
 <Code code={region(cameraSnippet, "jump")} lang="c" title="camera.c" />
 
-`mln_map_ease_to` interpolates every field that you set along a cubic easing
+Ease mode interpolates every field that you set along a cubic easing
 curve. Use it for a short move that remains easy to follow. A duration of zero,
 the default, applies the camera immediately.
 
 <Code code={region(cameraSnippet, "ease")} lang="c" title="camera.c" />
 
-`mln_map_fly_to` takes the same animation options and follows a curved path. Use
+Fly mode takes the same animation options and follows a curved path. Use
 it for a long move. The zoom decreases through the middle of the transition to
 cross the distance without loading every high-zoom tile between the positions.
 When the duration is absent, MapLibre derives one from the distance and a
@@ -45,23 +45,20 @@ velocity of 1.2 screenfuls per second.
 
 <CameraPaths />
 
-An animated transition advances while the host pumps the runtime and draws
-frames. Its duration uses wall-clock time, but pausing the pump also pauses the
-transition. A host that pumps on demand continues until the transition ends.
-The repaint flag in
+An animated transition advances on the native scheduler while the host draws
+frames. Its duration uses wall-clock time. The repaint flag in
 [Run the render loop](/maplibre-native-ffi/guides/run-the-render-loop/)
 signals that more frames are required.
 
 ## Move by a gesture
 
-The three commands above take a destination. Gestures instead provide relative
+A camera update takes a destination. Gestures instead provide relative
 input: a drag provides a distance, and a pinch provides a scale factor and a
 screen position. Relative moves apply those values to the current camera.
 
-Set the gesture flag when the interaction starts, and clear it when the
-interaction ends. While the flag is set, a drag across the antimeridian
-continues in the same direction. Cancel a running transition when the gesture
-starts to give the gesture sole control of the camera.
+Submit the begin phase when the interaction starts and the end phase when it
+finishes. While a gesture is open, a drag across the antimeridian continues in
+the same direction, and the map snapshot reports the gesture as in progress.
 
 <Code code={region(gestureSnippet, "bracket")} lang="c" title="camera-gesture.c" />
 
@@ -76,14 +73,16 @@ moves around it.
 
 <Code code={region(gestureSnippet, "pinch")} lang="c" title="camera-gesture.c" />
 
-Clear the flag for both completed and cancelled gestures. The animated variants
-continue the gesture's momentum and take the same animation options as an ease.
+Submit the end phase for a completed gesture and the cancel phase for a
+cancelled one; the cancel phase also stops a running transition. The animated
+variants continue the gesture's momentum and take the same animation options as
+an ease.
 
 <Code code={region(gestureSnippet, "release")} lang="c" title="camera-gesture.c" />
 
-Call each camera operation on the map's owner thread. When another thread reads
-gestures, send relative deltas to the owner thread. An absolute camera computed
-from an earlier frame can be stale when the owner thread applies it.
+Submit relative gesture deltas instead of a camera computed from an earlier
+snapshot. The scheduler applies each command atomically to the committed camera
+state in runtime submission order.
 
 ## Fit the camera to bounds
 
@@ -94,7 +93,7 @@ viewport, inset by the padding that you pass in logical pixels.
 <Code code={region(fitBoundsSnippet, "padding")} lang="c" title="camera-fit-bounds.c" />
 
 The query reports a camera and leaves the map unchanged. Apply the result with
-the command that provides the required timing.
+the update mode that provides the required timing.
 
 <Code code={region(fitBoundsSnippet, "fit")} lang="c" title="camera-fit-bounds.c" />
 
@@ -112,3 +111,6 @@ it from the runtime that owns the map, as described in
 The event identifies the transition but has no completion reason. To distinguish
 completion from cancellation, compare the resulting camera with the requested
 camera.
+
+`mln_map_cancel_transitions` stops every transition running when it commits, and
+a cancelled transition reports its end through the same event.

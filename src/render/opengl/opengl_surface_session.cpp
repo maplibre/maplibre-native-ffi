@@ -2,6 +2,7 @@
 #include <memory>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 #include <mln/gfx/backend_scope.hpp>
@@ -20,6 +21,8 @@
 #include <EGL/egl.h>
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
 #include <emscripten/html5.h>
+#include <emscripten/threading.h>
+#include <pthread.h>
 #endif
 
 #include "diagnostics/diagnostics.hpp"
@@ -28,6 +31,7 @@
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 #include "render/opengl/egl_context.hpp"
 #endif
+#include "render/opengl/webgl_worker.hpp"
 #include "render/opengl/wgl_common.hpp"
 #include "render/render_session_common.hpp"
 #include "render/surface_session.hpp"
@@ -412,8 +416,16 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   void destroy_native_context() { egl_context_.reset(); }
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
-  // The host owns the context this session borrowed.
-  void destroy_native_context() {}
+  void destroy_native_context() {
+    if (
+      descriptor_.context.data.webgl.kind ==
+        MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS &&
+      descriptor_.context.data.webgl.context > 0
+    ) {
+      emscripten_webgl_destroy_context(descriptor_.context.data.webgl.context);
+      descriptor_.context.data.webgl.context = 0;
+    }
+  }
 #else
   void destroy_native_context() {}
 #endif
@@ -477,9 +489,10 @@ class OpenGLSurfaceSessionBackend final
 
 namespace mln::core {
 
-auto opengl_surface_attach(
+auto opengl_surface_attach_start(
   mln_map map, const mln_opengl_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   MapObject* live_map = nullptr;
   const auto map_status = validate_map_live(map, live_map);
@@ -490,13 +503,6 @@ auto opengl_surface_attach(
     validate_opengl_surface_descriptor(descriptor, true);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
-  }
-  const auto output_status = validate_attach_output(
-    out_session, "out_session must not be null",
-    "out_session must point to a null handle"
-  );
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
   }
   const auto physical_status = validate_physical_size(
     descriptor->extent.width, descriptor->extent.height,
@@ -509,39 +515,75 @@ auto opengl_surface_attach(
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
   set_session_extent(*session, descriptor->extent);
-  session->surface.backend = std::make_unique<OpenGLSurfaceSessionBackend>(
-    *descriptor, mln::Size{session->physical_width, session->physical_height}
+  auto copied = *descriptor;
+  const auto transferred = opengl::is_transferred_webgl_canvas(copied.context);
+  auto selector =
+    transferred ? opengl::webgl_canvas_selector(copied.context) : std::string{};
+  if (transferred) {
+    opengl::configure_transferred_webgl_worker(*session, selector);
+  }
+  const auto driver_status = require_render_driver(
+    options,
+    transferred ? MLN_RENDER_DRIVER_CORE_WORKER
+                : MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+    "OpenGL driver does not match its context placement"
   );
-  return attach_render_session(
-    std::move(session), out_session, RenderSessionKind::Surface,
-    RenderSessionAttachMessages{
-      .null_session = "surface session must not be null",
-      .null_output = "out_session must not be null",
-      .non_null_output = "out_session must point to a null handle"
-    }
+  if (driver_status != MLN_STATUS_OK) {
+    return driver_status;
+  }
+  session->initialize_backend =
+    [copied, selector = std::move(selector),
+     transferred](mln_render_session_object& target) mutable {
+      if (transferred) {
+        const auto context_status =
+          opengl::create_transferred_webgl_context(copied.context, selector);
+        if (context_status != MLN_STATUS_OK) {
+          return context_status;
+        }
+      }
+      target.surface.backend = std::make_unique<OpenGLSurfaceSessionBackend>(
+        copied, mln::Size{target.physical_width, target.physical_height}
+      );
+      return MLN_STATUS_OK;
+    };
+  const auto capabilities = mln_render_session_capabilities{
+    .size = sizeof(mln_render_session_capabilities),
+    .driver = 0,
+    .texture_ring_depth = 0,
+    .flags = MLN_RENDER_SESSION_CAPABILITY_PRESENTATION
+  };
+  return start_attach_render_session(
+    std::move(session), RenderSessionKind::Surface, options, capabilities,
+    out_session, completion
   );
 }
 
-auto opengl_surface_set_target(
-  mln_render_session session, const mln_opengl_surface_descriptor* descriptor
+auto opengl_surface_set_target_start(
+  mln_render_session session, const mln_opengl_surface_descriptor* descriptor,
+  const mln_completion* completion
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::Surface, live
+  const auto submission_status = validate_render_session_retarget_submission(
+    session, RetargetTargetKind::Surface, completion
   );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
+  if (submission_status != MLN_STATUS_OK) {
+    return submission_status;
   }
   const auto descriptor_status =
     validate_opengl_surface_descriptor(descriptor, true);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  return surface_session_set_target(
-    session, descriptor->extent,
-    [descriptor](mln_render_session_object& target_session) -> mln_status {
-      return target_session.surface.backend->set_opengl_target(*descriptor);
-    }
+  const auto copied = *descriptor;
+  return enqueue_driver_operation(
+    session,
+    [copied](mln_render_session_object& target) {
+      return surface_session_set_target(
+        target.self, copied.extent, [&copied](mln_render_session_object& live) {
+          return live.surface.backend->set_opengl_target(copied);
+        }
+      );
+    },
+    completion
   );
 }
 

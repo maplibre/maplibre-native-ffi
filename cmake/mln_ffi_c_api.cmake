@@ -92,23 +92,34 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/c_api/android.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/buffer.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/callback_adapter.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/camera.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/diagnostics.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/logging.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/map.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/projection.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/query.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/style.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/test_hooks.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/network.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/render_session.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/runtime.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/surface.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/texture.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/version.cpp
+      ${PROJECT_SOURCE_DIR}/src/completion/completion.cpp
       ${PROJECT_SOURCE_DIR}/src/diagnostics/diagnostics.cpp
       ${PROJECT_SOURCE_DIR}/src/geojson/geojson.cpp
       ${PROJECT_SOURCE_DIR}/src/geojson/geojson_source_data.cpp
       ${PROJECT_SOURCE_DIR}/src/handles/handle_table.cpp
+      ${PROJECT_SOURCE_DIR}/src/execution/runtime_executor.cpp
+      ${PROJECT_SOURCE_DIR}/src/execution/worker_thread.cpp
       ${PROJECT_SOURCE_DIR}/src/logging/logging.cpp
+      ${PROJECT_SOURCE_DIR}/src/operation/operation.cpp
       ${PROJECT_SOURCE_DIR}/src/map/feature_state.cpp
       ${PROJECT_SOURCE_DIR}/src/map/map.cpp
+      ${PROJECT_SOURCE_DIR}/src/map/style.cpp
       ${PROJECT_SOURCE_DIR}/src/render/render_session_common.cpp
+      ${PROJECT_SOURCE_DIR}/src/render/render_session_query.cpp
       ${PROJECT_SOURCE_DIR}/src/render/surface_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/texture_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/unsupported_sessions.cpp
@@ -118,6 +129,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/resources/resource_loader.cpp
       ${PROJECT_SOURCE_DIR}/src/style/style_value.cpp
       ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp)
+  list(APPEND MLN_FFI_C_API_SOURCES ${PROJECT_SOURCE_DIR}/src/wake/wake.cpp)
 
   # Every Apple target needs the pool, not just the Metal backend: MoltenVK and
   # the platform frameworks hand back autoreleased objects under Vulkan and

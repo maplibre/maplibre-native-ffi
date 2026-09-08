@@ -1,181 +1,210 @@
+const builtin = @import("builtin");
 const std = @import("std");
 const build_options = @import("build_options");
 const testing = std.testing;
 
 const maplibre = @import("maplibre_native_ffi");
-const metal_support = @import("metal_support.zig");
 const support = @import("support.zig");
 
-fn nativePointer(ptr: *anyopaque) maplibre.NativePointer {
-    return maplibre.NativePointer.fromPtr(ptr);
+const supports_metal_surface = build_options.supports_metal and switch (builtin.os.tag) {
+    .macos, .ios, .tvos => true,
+    else => false,
+};
+const metal = if (supports_metal_surface) @import("metal_support.zig") else struct {};
+
+fn metalSurfaceDescriptor(layer: metal.WindowLayer, extent: maplibre.RenderTargetExtent) !maplibre.MetalSurfaceDescriptor {
+    return .{
+        .extent = extent,
+        .layer = maplibre.NativePointer.fromPtr(try layer.layerPointer()),
+    };
 }
 
-fn fakeVulkanHandle() maplibre.VulkanHandle {
-    return maplibre.VulkanHandle.fromBits(1);
-}
-
-test "Metal surface renders to window-attached layer through public binding" {
-    if (!build_options.supports_metal) return error.SkipZigTest;
-
-    const pool = try metal_support.AutoreleasePool.init();
+test "Metal surface core worker presents and replaces its target" {
+    if (!supports_metal_surface) return error.SkipZigTest;
+    const pool = try metal.AutoreleasePool.init();
     defer pool.deinit();
 
-    var window_layer = try metal_support.createWindowLayer(64, 64);
-    defer window_layer.deinit();
-
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var surface = try maplibre.attachMetalSurface(&map, .{
-        .extent = .{ .width = 64, .height = 64 },
-        .layer = nativePointer(window_layer.layer.?),
-    });
-    defer surface.close() catch {};
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try surface.renderUpdate()).result);
-}
-
-test "Metal surface render acquires one drawable per frame through public binding" {
-    if (!build_options.supports_metal) return error.SkipZigTest;
-
-    const pool = try metal_support.AutoreleasePool.init();
-    defer pool.deinit();
-
-    var window_layer = try metal_support.createCountingWindowLayer(64, 64);
-    defer window_layer.deinit();
-
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    var surface = try maplibre.attachMetalSurface(&map, .{
-        .extent = .{ .width = 64, .height = 64 },
-        .layer = nativePointer(window_layer.layer.?),
-    });
-    defer surface.close() catch {};
-
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(u32, 0), metal_support.nextDrawableCount(window_layer.layer.?));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try surface.renderUpdate()).result);
-    try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(window_layer.layer.?));
-}
-
-test "Metal surface set target presents through a replacement layer" {
-    if (!build_options.supports_metal) return error.SkipZigTest;
-
-    const pool = try metal_support.AutoreleasePool.init();
-    defer pool.deinit();
-
-    var window_layer = try metal_support.createCountingWindowLayer(64, 64);
-    defer window_layer.deinit();
-    var replacement_layer = try metal_support.createCountingWindowLayer(48, 32);
+    var initial_layer = try metal.createCountingWindowLayer(32, 16);
+    defer initial_layer.deinit();
+    var replacement_layer = try metal.createCountingWindowLayer(48, 24);
     defer replacement_layer.deinit();
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 32, .height = 16 });
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    var surface = try maplibre.attachMetalSurface(&map, .{
-        .extent = .{ .width = 64, .height = 64 },
-        .layer = nativePointer(window_layer.layer.?),
-    });
-    defer surface.close() catch {};
+    var session = try support.finishAttachment(
+        try maplibre.attachMetalSurface(
+            &map,
+            try metalSurfaceDescriptor(initial_layer, .{ .width = 32, .height = 16, .scale_factor = 2 }),
+            .{ .driver = .core_worker },
+        ),
+        false,
+    );
+    defer support.closeSession(&session, false) catch @panic("render session close failed");
 
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try surface.renderUpdate()).result);
-    try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(window_layer.layer.?));
+    const capabilities = try session.capabilities();
+    try testing.expectEqual(.core_worker, capabilities.driver);
+    try testing.expect(capabilities.presentation);
+    try testing.expect(!capabilities.frame_acquisition);
+    try testing.expect(!capabilities.readback);
+    try testing.expect(try initial_layer.hasDevice());
+    const initial_drawable_size = try initial_layer.drawableSize();
+    try testing.expectEqual(@as(u32, 64), initial_drawable_size.width);
+    try testing.expectEqual(@as(u32, 32), initial_drawable_size.height);
 
-    // The session presents through whatever replacement surface it is handed.
-    try surface.setMetalSurfaceTarget(.{
-        .extent = .{ .width = 48, .height = 32 },
-        .layer = nativePointer(replacement_layer.layer.?),
-    });
+    try support.expectCommitted(try map.setStyleJson(support.style_json));
+    try support.waitForBarrier(&runtime);
+    const initial_frame = try support.expectRenderedFrame(session, false);
+    try testing.expect(initial_frame.frame_generation != 0);
+    const initial_drawable_count = try initial_layer.nextDrawableCount();
+    try testing.expect(initial_drawable_count != 0);
 
-    // A texture descriptor names a target this session does not have; the
-    // rejection leaves it presenting through the new layer.
-    try testing.expectError(error.Unsupported, surface.setMetalBorrowedTextureTarget(.{
-        .extent = .{ .width = 48, .height = 32 },
-        .physical_width = 48,
-        .physical_height = 32,
-        .texture = nativePointer(@ptrFromInt(1)),
-    }));
+    try support.finishOperation(
+        session,
+        try session.setMetalSurfaceTarget(try metalSurfaceDescriptor(replacement_layer, .{ .width = 48, .height = 24 })),
+        false,
+    );
+    // The session resize is the single authority for an attached session: it
+    // posts the map resize itself.
+    try support.finishOperation(session, try session.resize(.{ .width = 48, .height = 24 }), false);
+    try support.waitForBarrier(&runtime);
+    _ = try support.expectRenderedFrame(session, false);
 
-    // Replacing the surface enqueues the new size for the map's owner thread,
-    // so the map publishes a matching update only once pumped.
-    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), (try surface.renderUpdate()).result);
-    try runtime.pump(0, null);
-    const resized = try map.getSize();
-    try testing.expectEqual(@as(u32, 48), resized.width);
-    try testing.expectEqual(@as(u32, 32), resized.height);
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try surface.renderUpdate()).result);
-    try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(replacement_layer.layer.?));
-    try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(window_layer.layer.?));
+    try testing.expectEqual(initial_drawable_count, try initial_layer.nextDrawableCount());
+    try testing.expect((try replacement_layer.nextDrawableCount()) != 0);
+    const snapshot = try session.snapshot();
+    try testing.expectEqual(.attached, std.meta.activeTag(snapshot.state));
+    try testing.expectEqual(@as(u32, 48), snapshot.extent.width);
+    try testing.expectEqual(@as(u32, 24), snapshot.extent.height);
 }
 
-test "surface public descriptors report invalid native arguments" {
-    if (!build_options.supports_metal and !build_options.supports_vulkan) return error.SkipZigTest;
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+test "Metal surface caller driver presents when the host services it" {
+    if (!supports_metal_surface) return error.SkipZigTest;
+    const pool = try metal.AutoreleasePool.init();
+    defer pool.deinit();
 
-    if (build_options.supports_metal) {
-        const pool = try metal_support.AutoreleasePool.init();
-        defer pool.deinit();
-        const layer = try metal_support.createLayer();
-        try testing.expectError(error.InvalidArgument, maplibre.attachMetalSurface(&map, .{ .extent = .{ .width = 0 }, .layer = nativePointer(layer) }));
-        try testing.expectError(error.InvalidArgument, maplibre.attachMetalSurface(&map, .{ .extent = .{ .height = 0 }, .layer = nativePointer(layer) }));
-        try testing.expectError(error.InvalidArgument, maplibre.attachMetalSurface(&map, .{ .extent = .{ .scale_factor = 0 }, .layer = nativePointer(layer) }));
-    } else if (build_options.supports_vulkan) {
-        const fake = nativePointer(@ptrFromInt(1));
-        const descriptor = maplibre.VulkanSurfaceDescriptor{
-            .context = .{
-                .instance = fake,
-                .physical_device = fake,
-                .device = fake,
-                .graphics_queue = fake,
-                .graphics_queue_family_index = 0,
-                .get_instance_proc_addr = null,
-                .get_device_proc_addr = null,
-            },
-            .surface = fakeVulkanHandle(),
-        };
-        try testing.expectError(error.InvalidArgument, maplibre.attachVulkanSurface(&map, .{ .extent = .{ .width = 0 }, .context = descriptor.context, .surface = descriptor.surface }));
-        try testing.expectError(error.InvalidArgument, maplibre.attachVulkanSurface(&map, .{ .extent = .{ .height = 0 }, .context = descriptor.context, .surface = descriptor.surface }));
-        try testing.expectError(error.InvalidArgument, maplibre.attachVulkanSurface(&map, .{ .extent = .{ .scale_factor = 0 }, .context = descriptor.context, .surface = descriptor.surface }));
-    }
+    var layer = try metal.createCountingWindowLayer(24, 12);
+    defer layer.deinit();
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 24, .height = 12 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+
+    var session = try support.finishAttachment(
+        try maplibre.attachMetalSurface(
+            &map,
+            try metalSurfaceDescriptor(layer, .{ .width = 24, .height = 12 }),
+            .{ .driver = .caller_graphics_thread },
+        ),
+        true,
+    );
+    defer support.closeSession(&session, true) catch @panic("render session close failed");
+
+    try testing.expectEqual(.caller_graphics_thread, (try session.capabilities()).driver);
+    try support.expectCommitted(try map.setStyleJson(support.style_json));
+    try support.waitForBarrier(&runtime);
+    _ = try support.expectRenderedFrame(session, true);
+    try testing.expect((try layer.nextDrawableCount()) != 0);
 }
 
-test "unsupported public surface backends report unsupported" {
-    if (!build_options.supports_metal and !build_options.supports_vulkan) return error.SkipZigTest;
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+// A demand that clears the present bit still renders, and the target keeps
+// whatever it presented last.
+test "Metal surface honors the present bit on each demand" {
+    if (!supports_metal_surface) return error.SkipZigTest;
+    const pool = try metal.AutoreleasePool.init();
+    defer pool.deinit();
 
-    if (build_options.supports_metal) {
-        const fake = nativePointer(@ptrFromInt(1));
-        try testing.expectError(error.Unsupported, maplibre.attachVulkanSurface(&map, .{
-            .context = .{
-                .instance = fake,
-                .physical_device = fake,
-                .device = fake,
-                .graphics_queue = fake,
-                .graphics_queue_family_index = 0,
-                .get_instance_proc_addr = null,
-                .get_device_proc_addr = null,
-            },
-            .surface = fakeVulkanHandle(),
-        }));
-    } else if (build_options.supports_vulkan) {
-        try testing.expectError(error.Unsupported, maplibre.attachMetalSurface(&map, .{ .layer = nativePointer(@ptrFromInt(1)) }));
-    }
+    var layer = try metal.createCountingWindowLayer(32, 16);
+    defer layer.deinit();
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 32, .height = 16 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+
+    var session = try support.finishAttachment(
+        try maplibre.attachMetalSurface(
+            &map,
+            try metalSurfaceDescriptor(layer, .{ .width = 32, .height = 16 }),
+            .{ .driver = .core_worker },
+        ),
+        false,
+    );
+    defer support.closeSession(&session, false) catch @panic("render session close failed");
+
+    try support.expectCommitted(try map.setStyleJson(support.style_json));
+    try support.waitForBarrier(&runtime);
+    const presenting_start = try support.expectRenderedFrame(session, false);
+    const presented = try layer.nextDrawableCount();
+    try testing.expect(presented != 0);
+
+    const nonpresenting = try support.renderFrameWithDemand(session, .{
+        .if_needed = false,
+        .present = false,
+        .token = support.nextFrameToken(),
+    }, false);
+    try testing.expectEqual(.rendered, std.meta.activeTag(nonpresenting.disposition));
+    try testing.expect(nonpresenting.frame_generation > presenting_start.frame_generation);
+
+    const presenting = try support.renderFrameWithDemand(session, .{
+        .if_needed = false,
+        .present = true,
+        .token = support.nextFrameToken(),
+    }, false);
+    try testing.expectEqual(.rendered, std.meta.activeTag(presenting.disposition));
+    try testing.expect((try layer.nextDrawableCount()) > presented);
+}
+
+test "Metal borrowed texture renders and replaces its target (BND-183)" {
+    if (!supports_metal_surface) return error.SkipZigTest;
+    const pool = try metal.AutoreleasePool.init();
+    defer pool.deinit();
+
+    var initial = try metal.createBorrowedTexture(32, 16);
+    defer initial.deinit();
+    var replacement = try metal.createBorrowedTexture(48, 24);
+    defer replacement.deinit();
+
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 32, .height = 16 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+
+    var session = try support.finishAttachment(
+        try maplibre.attachMetalBorrowedTexture(&map, initial.descriptor(.{ .width = 32, .height = 16 }), .{
+            .driver = .core_worker,
+        }),
+        false,
+    );
+    defer support.closeSession(&session, false) catch @panic("render session close failed");
+
+    // A borrowed texture is the host's, so the session grants neither frame
+    // acquisition nor readback.
+    const capabilities = try session.capabilities();
+    try testing.expect(!capabilities.frame_acquisition);
+    try testing.expect(!capabilities.readback);
+    try testing.expect(!capabilities.presentation);
+
+    try support.expectCommitted(try map.setStyleJson(support.style_json));
+    try support.waitForBarrier(&runtime);
+    _ = try support.expectRenderedFrame(session, false);
+    try testing.expect(try initial.hasNonZeroPixel());
+
+    try support.finishOperation(
+        session,
+        try session.setMetalBorrowedTextureTarget(replacement.descriptor(.{ .width = 48, .height = 24 })),
+        false,
+    );
+    // A borrowed texture belongs to the host, so the session cannot resize it;
+    // the replacement target carries the new size and the map takes it here.
+    try testing.expectError(error.Unsupported, session.resize(.{ .width = 48, .height = 24 }));
+    try support.expectCommitted(try map.resize(48, 24, 1.0));
+    try support.waitForBarrier(&runtime);
+    _ = try support.expectRenderedFrame(session, false);
+    try testing.expect(try replacement.hasNonZeroPixel());
+
+    const snapshot = try session.snapshot();
+    try testing.expectEqual(@as(u32, 48), snapshot.extent.width);
+    try testing.expectEqual(@as(u32, 24), snapshot.extent.height);
 }

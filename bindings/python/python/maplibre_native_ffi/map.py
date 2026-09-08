@@ -3,19 +3,24 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from concurrent.futures import Future
 from dataclasses import dataclass, field
 from enum import IntFlag
 from typing import Any
 
 from . import _native
 from ._enum import NativeIntEnum
+from ._future import map_future
 from ._lifecycle import NativeHandleMixin
 from .camera import (
     AnimationOptions,
     Bounded,
     BoundOptions,
+    CameraDelta,
     CameraFitOptions,
     CameraOptions,
+    CameraUpdate,
+    CameraUpdateMode,
     EdgeInsets,
     FreeCameraOptions,
     ProjectionMode,
@@ -33,10 +38,15 @@ from .render import (
     OpenGLOwnedTextureDescriptor,
     OpenGLSurfaceDescriptor,
     PremultipliedRgba8Image,
+    RenderDriver,
+    RenderSessionAttachOptions,
     RenderSessionHandle,
     VulkanBorrowedTextureDescriptor,
     VulkanOwnedTextureDescriptor,
     VulkanSurfaceDescriptor,
+    WebGPUBorrowedTextureDescriptor,
+    WebGPUOwnedTextureDescriptor,
+    WebGPUSurfaceDescriptor,
     _opengl_context_parts,
 )
 from .style import (
@@ -49,16 +59,27 @@ from .style import (
     GeoJsonSourceOptions,
     ImageStretch,
     LocationIndicatorImageKind,
-    StyleImage,
     StyleImageInfo,
     StyleImageOptions,
+    StyleLayerInfo,
     StyleLayerVisibility,
     StyleSourceInfo,
-    StyleSourceType,
     StyleTransitionOptions,
     TileSourceOptions,
     _geojson_source_parts,
 )
+
+_CORE_WORKER_ATTACH_OPTIONS = RenderSessionAttachOptions(RenderDriver.CORE_WORKER)
+_CORE_WORKER_OWNED_ATTACH_OPTIONS = RenderSessionAttachOptions(
+    RenderDriver.CORE_WORKER, 2
+)
+_CALLER_GRAPHICS_ATTACH_OPTIONS = RenderSessionAttachOptions(
+    RenderDriver.CALLER_GRAPHICS_THREAD
+)
+_CALLER_GRAPHICS_OWNED_ATTACH_OPTIONS = RenderSessionAttachOptions(
+    RenderDriver.CALLER_GRAPHICS_THREAD, 2
+)
+
 
 _MAP_HANDLE_CREATE_KEY = object()
 _MAP_PROJECTION_HANDLE_CREATE_KEY = object()
@@ -193,6 +214,78 @@ class MapTileOptions:
             lod_mode=TileLodMode(raw["lod_mode"])
             if raw["lod_mode"] is not None
             else None,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class CameraSnapshot:
+    """Camera copied from a complete map-state generation."""
+
+    generation: int
+    camera: CameraOptions
+
+    @classmethod
+    def _from_native(cls, raw: dict[str, object]) -> CameraSnapshot:
+        return cls(
+            generation=raw["generation"],
+            camera=CameraOptions._from_native(raw["camera"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class MapSnapshot:
+    """Latest immutable state published by the map worker.
+
+    Every committed map command publishes a snapshot, so a snapshot whose
+    ``generation`` is at or past a command's reported generation observes that
+    commit.
+    """
+
+    generation: int
+    camera: CameraOptions
+    width: int
+    height: int
+    scale_factor: float
+    projection_mode: ProjectionMode
+    viewport: MapViewportOptions
+    debug_options: MapDebugOptions
+    fully_loaded: bool
+    """Whether every requested style and tile resource finished loading."""
+    rendering_stats_view_enabled: bool
+    repaint_demand: bool
+    gesture_in_progress: bool
+    """Whether the map is inside a gesture.
+
+    A camera update whose ``gesture_phase`` is :attr:`GesturePhase.BEGIN` or
+    :attr:`GesturePhase.UPDATE` sets it; :attr:`GesturePhase.END` and
+    :attr:`GesturePhase.CANCEL` clear it.
+    """
+    event_mask: RuntimeEventMask
+    latest_render_update_generation: int
+    tile: MapTileOptions
+    bounds: BoundOptions
+    free_camera: FreeCameraOptions
+
+    @classmethod
+    def _from_native(cls, raw: dict[str, object]) -> MapSnapshot:
+        return cls(
+            generation=raw["generation"],
+            camera=CameraOptions._from_native(raw["camera"]),
+            width=raw["width"],
+            height=raw["height"],
+            scale_factor=raw["scale_factor"],
+            projection_mode=ProjectionMode._from_native(raw["projection_mode"]),
+            viewport=MapViewportOptions._from_native(raw["viewport"]),
+            debug_options=MapDebugOptions(raw["debug_options"]),
+            fully_loaded=raw["fully_loaded"],
+            rendering_stats_view_enabled=raw["rendering_stats_view_enabled"],
+            repaint_demand=raw["repaint_demand"],
+            gesture_in_progress=raw["gesture_in_progress"],
+            event_mask=RuntimeEventMask(raw["event_mask"]),
+            latest_render_update_generation=raw["latest_render_update_generation"],
+            tile=MapTileOptions._from_native(raw["tile"]),
+            bounds=BoundOptions._from_native(raw["bounds"]),
+            free_camera=FreeCameraOptions._from_native(raw["free_camera"]),
         )
 
 
@@ -392,14 +485,19 @@ def projected_meters_for_lat_lng(coordinate: LatLng) -> ProjectedMeters:
 
 def lat_lng_for_projected_meters(meters: ProjectedMeters) -> LatLng:
     """Convert spherical Mercator projected meters to a geographic coordinate."""
-    from .geo import LatLng
-
     raw = _native.lat_lng_for_projected_meters(meters.northing, meters.easting)
     return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
 
 
 class MapProjectionHandle(NativeHandleMixin):
-    """Any-thread projection helper snapshotted from a map transform."""
+    """Any-thread standalone projection helper.
+
+    Every method is synchronous, thread-safe, and internally serialized. A
+    projection copies the map transform once at creation and never observes
+    map changes made after that, while its own setters apply before they
+    return, so a later read or conversion observes them. The projection remains
+    usable after its source map and runtime close.
+    """
 
     _handle_name = "MapProjectionHandle"
 
@@ -413,14 +511,8 @@ class MapProjectionHandle(NativeHandleMixin):
     def _from_native(cls, native: object) -> MapProjectionHandle:
         return cls(native, _create_key=_MAP_PROJECTION_HANDLE_CREATE_KEY)
 
-    def get_camera(self) -> CameraOptions:
-        """Return the helper's current camera snapshot."""
-        from .camera import CameraOptions
-
-        return CameraOptions._from_native(self._native.get_camera())
-
     def set_camera(self, camera: CameraOptions) -> None:
-        """Apply camera fields to this projection helper."""
+        """Apply camera fields to this projection before returning."""
         self._native.set_camera(*_camera_parts(camera))
 
     def set_visible_coordinates(
@@ -428,59 +520,80 @@ class MapProjectionHandle(NativeHandleMixin):
         coordinates: list[LatLng] | tuple[LatLng, ...],
         padding: EdgeInsets,
     ) -> None:
-        """Update this helper's camera so coordinates are visible."""
+        """Apply a visible-coordinate camera fit before returning."""
         self._native.set_visible_coordinates(
             [(coordinate.latitude, coordinate.longitude) for coordinate in coordinates],
             (padding.top, padding.left, padding.bottom, padding.right),
         )
 
     def set_visible_geometry(self, geometry: bytes, padding: EdgeInsets) -> None:
-        """Update this helper's camera so geometry coordinates are visible."""
+        """Apply a visible-geometry camera fit before returning."""
         self._native.set_visible_geometry(
             geometry,
             (padding.top, padding.left, padding.bottom, padding.right),
         )
 
+    def close(self) -> None:
+        """Release this projection handle exactly once.
+
+        The close is synchronous and waits for projection calls already running
+        on other threads before it returns. It holds the interpreter lock while
+        it waits, so other Python threads resume once those calls finish.
+        """
+        self._native.close()
+
+    def get_camera(self) -> CameraOptions:
+        """Return the projection camera, observing every earlier setter."""
+        return CameraOptions._from_native(self._native.get_camera())
+
     def pixel_for_lat_lng(self, coordinate: LatLng) -> ScreenPoint:
         """Convert a geographic coordinate to a screen-space point."""
-        from .camera import ScreenPoint
-
         raw = self._native.pixel_for_lat_lng(
             coordinate.latitude,
             coordinate.longitude,
         )
         return ScreenPoint(x=raw["x"], y=raw["y"])
 
-    def lat_lng_for_pixel(self, point: ScreenPoint) -> LatLng:
-        """Convert a screen-space point to a coordinate with longitude wrapped to [-180, 180]."""
-        from .geo import LatLng
+    def lat_lng_for_pixel(
+        self, point: ScreenPoint, *, unwrapped: bool = False
+    ) -> LatLng:
+        """Convert a screen point to a geographic coordinate.
 
-        raw = self._native.lat_lng_for_pixel(point.x, point.y)
-        return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
-
-    def lat_lng_for_pixel_unwrapped(self, point: ScreenPoint) -> LatLng:
-        """Convert a screen point to a coordinate that preserves its visible world copy."""
-        from .geo import LatLng
-
-        raw = self._native.lat_lng_for_pixel_unwrapped(point.x, point.y)
+        The longitude is wrapped to [-180, 180] unless ``unwrapped`` is set, in
+        which case the result preserves the point's visible world copy.
+        """
+        raw = (
+            self._native.lat_lng_for_pixel_unwrapped(point.x, point.y)
+            if unwrapped
+            else self._native.lat_lng_for_pixel(point.x, point.y)
+        )
         return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
 
 
 class MapHandle(NativeHandleMixin):
-    """Owner-thread map handle."""
+    """Any-thread map handle backed by autonomous native execution."""
 
     _handle_name = "MapHandle"
 
     def __init__(
         self,
         runtime: RuntimeHandle,
-        options: MapOptions | None = None,
+        native: Any,
         *,
         _create_key: object | None = None,
     ) -> None:
         if _create_key is not _MAP_HANDLE_CREATE_KEY:
             msg = "MapHandle instances are created by RuntimeHandle.create_map"
             raise TypeError(msg)
+        self._runtime = runtime
+        self._native = native
+        self._native_id_value = int(self._native.id())
+        runtime._register_map(self)
+
+    @classmethod
+    def _create(
+        cls, runtime: RuntimeHandle, options: MapOptions | None = None
+    ) -> Future[MapHandle]:
         options = options or MapOptions()
         map_mode = (
             None
@@ -491,48 +604,42 @@ class MapHandle(NativeHandleMixin):
                 else MapMode(options.mode)
             )
         )
-        self._runtime = runtime
-        self._native = _native.create_map(
-            runtime._native,
-            options.width,
-            options.height,
-            options.scale_factor,
-            None if map_mode is None else map_mode.native_code,
-            options.fast_pfor_enabled,
-            int(options.event_mask),
+        return map_future(
+            _native.create_map(
+                runtime._native,
+                options.width,
+                options.height,
+                options.scale_factor,
+                None if map_mode is None else map_mode.native_code,
+                options.fast_pfor_enabled,
+                int(options.event_mask),
+            ),
+            lambda native: cls(runtime, native, _create_key=_MAP_HANDLE_CREATE_KEY),
         )
-        self._native_id_value = int(self._native.id())
-        runtime._register_map(self)
-
-    @classmethod
-    def _create(
-        cls, runtime: RuntimeHandle, options: MapOptions | None = None
-    ) -> MapHandle:
-        return cls(runtime, options, _create_key=_MAP_HANDLE_CREATE_KEY)
 
     def _native_id(self) -> int:
         return self._native_id_value
 
-    def close(self) -> None:
+    def close(self) -> Future[None]:
         """Release this map handle exactly once.
 
-        Closing discards this map's queued runtime events and its recorded
-        loading failure. There is no flush and no terminal event, so read any
-        state you mirror from events before closing.
+        Closing prevents future runtime events from this map and leaves queued
+        events unchanged. A queued event keeps the map's copied source ID.
         """
-        self._native.close()
+        teardown: Future[None] = self._native.close()
         self._runtime._unregister_map(self)
+        return teardown
 
-    def request_repaint(self) -> None:
-        """Request a repaint for a continuous map."""
-        self._native.request_repaint()
+    def request_repaint(self) -> Future[CommandCompletion]:
+        """Request a repaint and return its completion future."""
+        return self._native.request_repaint()
 
-    def request_still_image(self) -> None:
-        """Request one still image for a static or tile map."""
-        self._native.request_still_image()
+    def request_still_image(self) -> Future[None]:
+        """Start one noncoalescing still-image operation."""
+        return self._native.request_still_image()
 
-    def set_event_mask(self, mask: RuntimeEventMask) -> None:
-        """Select which map-originated event types this map queues.
+    def set_event_mask(self, mask: RuntimeEventMask) -> Future[CommandCompletion]:
+        """Select queued map event types and return its completion future.
 
         The call reads the bits in :attr:`RuntimeEventMask.ALL_MAP_EVENTS` and
         ignores the rest, so :attr:`RuntimeEventMask.ALL` selects every
@@ -546,55 +653,56 @@ class MapHandle(NativeHandleMixin):
         :meth:`set_style_url` or :meth:`set_style_json` reaches the caller as an
         exception whatever this mask selects.
         """
-        self._native.set_event_mask(int(mask))
+        return self._native.set_event_mask(int(mask))
 
-    @property
-    def event_mask(self) -> RuntimeEventMask:
-        """Map-originated event types this map queues.
+    def set_debug_options(self, options: MapDebugOptions) -> Future[CommandCompletion]:
+        """Submit debug overlay mask bits and return its completion future.
 
-        The value is the mask last set, including bits this map ignores, so a
-        host reads it, changes one bit, and writes it back.
+        Read the committed value back from :attr:`MapSnapshot.debug_options`.
         """
-        return RuntimeEventMask(self._native.get_event_mask())
+        return self._native.set_debug_options(int(options))
 
-    def set_debug_options(self, options: MapDebugOptions) -> None:
-        """Apply MapLibre debug overlay mask bits."""
-        self._native.set_debug_options(int(options))
+    def set_rendering_stats_view_enabled(
+        self, enabled: bool
+    ) -> Future[CommandCompletion]:
+        """Submit rendering-stats visibility and return its completion future.
 
-    def get_debug_options(self) -> MapDebugOptions:
-        """Return the current MapLibre debug overlay mask bits."""
-        return MapDebugOptions(self._native.get_debug_options())
-
-    def set_rendering_stats_view_enabled(self, enabled: bool) -> None:
-        """Enable or disable MapLibre's rendering stats overlay view."""
-        self._native.set_rendering_stats_view_enabled(enabled)
-
-    def get_rendering_stats_view_enabled(self) -> bool:
-        """Return whether MapLibre's rendering stats overlay view is enabled."""
-        return self._native.get_rendering_stats_view_enabled()
-
-    def is_fully_loaded(self) -> bool:
-        """Return whether MapLibre currently considers the map fully loaded."""
-        return self._native.is_fully_loaded()
-
-    def dump_debug_logs(self) -> None:
-        """Dump map debug logs through MapLibre Native logging."""
-        self._native.dump_debug_logs()
-
-    def get_size(self) -> tuple[int, int, float]:
-        """Return the map's logical width, height, and pixel ratio.
-
-        The scale factor is fixed for the lifetime of the map and is
-        independent of any render target's scale factor.
+        Read the committed value back from
+        :attr:`MapSnapshot.rendering_stats_view_enabled`.
         """
-        return self._native.get_size()
+        return self._native.set_rendering_stats_view_enabled(enabled)
 
-    def get_viewport_options(self) -> MapViewportOptions:
-        """Return live map viewport and render-transform controls."""
-        return MapViewportOptions._from_native(self._native.get_viewport_options())
+    def dump_debug_logs(self) -> Future[CommandCompletion]:
+        """Submit a debug-log command and return its completion future."""
+        return self._native.dump_debug_logs()
 
-    def set_viewport_options(self, options: MapViewportOptions) -> None:
-        """Apply selected live map viewport and render-transform controls."""
+    def resize(
+        self, width: int, height: int, scale_factor: float
+    ) -> Future[CommandCompletion]:
+        """Submit a logical extent update and return its completion future.
+
+        The scale factor is fixed when the map is created, so only the width
+        and height may change. Another scale factor raises
+        :class:`InvalidArgumentError`.
+
+        While a render session is attached, resize through
+        :meth:`RenderSessionHandle.resize`, which submits this command itself.
+        A direct map resize to a different extent leaves the session waiting
+        for an update that the map never publishes.
+        """
+        return self._native.resize(width, height, scale_factor)
+
+    def snapshot(self) -> MapSnapshot:
+        """Copy the latest immutable map-state generation."""
+        return MapSnapshot._from_native(self._native.snapshot())
+
+    def set_viewport_options(
+        self, options: MapViewportOptions
+    ) -> Future[CommandCompletion]:
+        """Submit viewport controls and return its completion future.
+
+        Read the committed values back from :attr:`MapSnapshot.viewport`.
+        """
         frustum_offset = (
             (
                 options.frustum_offset.top,
@@ -605,7 +713,7 @@ class MapHandle(NativeHandleMixin):
             if options.frustum_offset is not None
             else None
         )
-        self._native.set_viewport_options(
+        return self._native.set_viewport_options(
             int(options.north_orientation)
             if options.north_orientation is not None
             else None,
@@ -614,13 +722,12 @@ class MapHandle(NativeHandleMixin):
             frustum_offset,
         )
 
-    def get_tile_options(self) -> MapTileOptions:
-        """Return tile prefetch and LOD tuning controls."""
-        return MapTileOptions._from_native(self._native.get_tile_options())
+    def set_tile_options(self, options: MapTileOptions) -> Future[CommandCompletion]:
+        """Submit tile prefetch and LOD controls and return its completion future.
 
-    def set_tile_options(self, options: MapTileOptions) -> None:
-        """Apply selected tile prefetch and LOD tuning controls."""
-        self._native.set_tile_options(
+        Read the committed values back from :attr:`MapSnapshot.tile`.
+        """
+        return self._native.set_tile_options(
             options.prefetch_zoom_delta,
             options.lod_min_radius,
             options.lod_scale,
@@ -629,7 +736,7 @@ class MapHandle(NativeHandleMixin):
             int(options.lod_mode) if options.lod_mode is not None else None,
         )
 
-    def set_style_url(self, url: str) -> None:
+    def set_style_url(self, url: str) -> Future[CommandCompletion]:
         """Load a style URL through MapLibre Native style APIs.
 
         Loading is asynchronous: a style that fails to fetch or parse returns
@@ -637,25 +744,29 @@ class MapHandle(NativeHandleMixin):
         A well-formed style with semantically invalid contents loads without an
         error and without an event.
         """
-        self._native.set_style_url(url)
+        return self._native.set_style_url(url)
 
-    def set_style_json(self, json: bytes) -> None:
-        """Load inline style JSON through MapLibre Native style APIs.
+    def set_style_json(self, json: bytes) -> Future[CommandCompletion]:
+        """Submit inline style JSON and return its completion future.
 
-        Malformed JSON is reported twice: this call raises the parse error, and
-        the same message also arrives as a loading-failed runtime event. A
-        well-formed style with semantically invalid contents loads without an
-        error and without an event.
+        Malformed JSON is accepted as a copied command, then reports a failed
+        command disposition and a loading-failed runtime event. A failed parse
+        leaves the previously loaded style unchanged.
         """
-        self._native.set_style_json(json)
+        return self._native.set_style_json(json)
 
     def set_feature_state(
         self,
         selector: FeatureStateSelector,
         state: bytes,
-    ) -> None:
-        """Set per-feature state on this map."""
-        self._native.set_feature_state(
+    ) -> Future[CommandCompletion]:
+        """Submit per-feature state and return its completion future.
+
+        Feature state belongs to the map. A render session pushes it into the
+        renderer on the next render update, including the first presented
+        frame that contains the source.
+        """
+        return self._native.set_feature_state(
             selector.source_id,
             selector.source_layer_id,
             selector.feature_id,
@@ -663,8 +774,13 @@ class MapHandle(NativeHandleMixin):
             state,
         )
 
-    def get_feature_state(self, selector: FeatureStateSelector) -> bytes:
-        """Return copied per-feature state JSON from this map."""
+    def get_feature_state(self, selector: FeatureStateSelector) -> Future[bytes]:
+        """Start an ordered read of copied per-feature state JSON.
+
+        The read observes every map command accepted before it and copies the
+        map store, not the last rendered frame. Missing feature state resolves
+        to an empty JSON object.
+        """
         return self._native.get_feature_state(
             selector.source_id,
             selector.source_layer_id,
@@ -672,16 +788,18 @@ class MapHandle(NativeHandleMixin):
             selector.state_key,
         )
 
-    def remove_feature_state(self, selector: FeatureStateSelector) -> None:
-        """Remove per-feature state from this map."""
-        self._native.remove_feature_state(
+    def remove_feature_state(
+        self, selector: FeatureStateSelector
+    ) -> Future[CommandCompletion]:
+        """Submit per-feature state removal and return its completion future."""
+        return self._native.remove_feature_state(
             selector.source_id,
             selector.source_layer_id,
             selector.feature_id,
             selector.state_key,
         )
 
-    def get_loaded_style_json(self) -> bytes:
+    def get_loaded_style_json(self) -> Future[bytes]:
         """Return the style document this map's style was last parsed from.
 
         This is the loaded document, not a serialization of the live style, so
@@ -691,7 +809,7 @@ class MapHandle(NativeHandleMixin):
         """
         return self._native.copy_loaded_style_json()
 
-    def get_style_url(self) -> str:
+    def get_style_url(self) -> Future[str]:
         """Return the URL this map's style was last requested from.
 
         set_style_url() records the URL before the response arrives, and
@@ -701,18 +819,20 @@ class MapHandle(NativeHandleMixin):
         """
         return self._native.copy_style_url()
 
-    def add_style_source_json(self, source_id: str, source_json: bytes) -> None:
+    def add_style_source_json(
+        self, source_id: str, source_json: bytes
+    ) -> Future[CommandCompletion]:
         """Add one style source from a style-spec source JSON object."""
-        self._native.add_style_source_json(source_id, source_json)
+        return self._native.add_style_source_json(source_id, source_json)
 
     def add_geojson_source_url(
         self,
         source_id: str,
         url: str,
         options: GeoJsonSourceOptions | None = None,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Add a GeoJSON source that loads data from a URL."""
-        self._native.add_geojson_source_url(
+        return self._native.add_geojson_source_url(
             source_id, url, *_geojson_source_parts(options)
         )
 
@@ -720,64 +840,66 @@ class MapHandle(NativeHandleMixin):
         self,
         source_id: str,
         data: GeoJsonSourceDataHandle,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Add a GeoJSON source backed by prepared data.
 
         The call borrows the handle, and the source adopts the options the
         data was prepared with.
         """
-        self._native.add_geojson_source_data(source_id, data._native)
+        return self._native.add_geojson_source_data(source_id, data._native)
 
-    def set_geojson_source_url(self, source_id: str, url: str) -> None:
+    def set_geojson_source_url(
+        self, source_id: str, url: str
+    ) -> Future[CommandCompletion]:
         """Update one GeoJSON source to load data from a URL."""
-        self._native.set_geojson_source_url(source_id, url)
+        return self._native.set_geojson_source_url(source_id, url)
 
     def set_geojson_source_data(
         self, source_id: str, data: GeoJsonSourceDataHandle
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Update one GeoJSON source with prepared data.
 
         The call borrows the handle and rejects data whose baked-in options
         differ from the source's, cluster properties excepted.
         """
-        self._native.set_geojson_source_data(source_id, data._native)
+        return self._native.set_geojson_source_data(source_id, data._native)
 
     def set_geojson_source_synchronous_tiling(
         self, source_id: str, enabled: bool
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Override one GeoJSON source's synchronous tiling at runtime.
 
         Tiling runs inline when either the source's baked-in option or this
         override enables it.
         """
-        self._native.set_geojson_source_synchronous_tiling(source_id, enabled)
+        return self._native.set_geojson_source_synchronous_tiling(source_id, enabled)
 
     def _add_tile_source_url(
         self,
-        add: Callable[..., None],
+        add: Callable[..., Future[CommandCompletion]],
         source_id: str,
         url: str,
         options: TileSourceOptions | None,
-    ) -> None:
-        add(source_id, url, *_tile_source_parts(options))
+    ) -> Future[CommandCompletion]:
+        return add(source_id, url, *_tile_source_parts(options))
 
     def _add_tile_source_tiles(
         self,
-        add: Callable[..., None],
+        add: Callable[..., Future[CommandCompletion]],
         source_id: str,
         tiles: list[str] | tuple[str, ...],
         options: TileSourceOptions | None,
-    ) -> None:
-        add(source_id, list(tiles), *_tile_source_parts(options))
+    ) -> Future[CommandCompletion]:
+        return add(source_id, list(tiles), *_tile_source_parts(options))
 
     def add_vector_source_url(
         self,
         source_id: str,
         url: str,
         options: TileSourceOptions | None = None,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Add a vector source with a TileJSON URL."""
-        self._add_tile_source_url(
+        return self._add_tile_source_url(
             self._native.add_vector_source_url, source_id, url, options
         )
 
@@ -786,9 +908,9 @@ class MapHandle(NativeHandleMixin):
         source_id: str,
         url: str,
         options: TileSourceOptions | None = None,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Add a raster source with a TileJSON URL."""
-        self._add_tile_source_url(
+        return self._add_tile_source_url(
             self._native.add_raster_source_url, source_id, url, options
         )
 
@@ -797,9 +919,9 @@ class MapHandle(NativeHandleMixin):
         source_id: str,
         url: str,
         options: TileSourceOptions | None = None,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Add a raster DEM source with a TileJSON URL."""
-        self._add_tile_source_url(
+        return self._add_tile_source_url(
             self._native.add_raster_dem_source_url, source_id, url, options
         )
 
@@ -808,9 +930,9 @@ class MapHandle(NativeHandleMixin):
         source_id: str,
         tiles: list[str] | tuple[str, ...],
         options: TileSourceOptions | None = None,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Add a vector source with inline tile URLs."""
-        self._add_tile_source_tiles(
+        return self._add_tile_source_tiles(
             self._native.add_vector_source_tiles, source_id, tiles, options
         )
 
@@ -819,9 +941,9 @@ class MapHandle(NativeHandleMixin):
         source_id: str,
         tiles: list[str] | tuple[str, ...],
         options: TileSourceOptions | None = None,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Add a raster source with inline tile URLs."""
-        self._add_tile_source_tiles(
+        return self._add_tile_source_tiles(
             self._native.add_raster_source_tiles, source_id, tiles, options
         )
 
@@ -830,172 +952,217 @@ class MapHandle(NativeHandleMixin):
         source_id: str,
         tiles: list[str] | tuple[str, ...],
         options: TileSourceOptions | None = None,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Add a raster DEM source with inline tile URLs."""
-        self._add_tile_source_tiles(
+        return self._add_tile_source_tiles(
             self._native.add_raster_dem_source_tiles, source_id, tiles, options
         )
 
-    def remove_style_source(self, source_id: str) -> bool:
-        """Remove a style source by ID and report whether it existed."""
+    def remove_style_source(self, source_id: str) -> Future[CommandCompletion]:
+        """Submit a style source removal and return its completion future.
+
+        The command's terminal event reports ``FAILED`` with
+        :attr:`MaplibreStatus.NOT_FOUND` when no style source has the ID and
+        ``FAILED`` with :attr:`MaplibreStatus.INVALID_STATE` while a layer
+        still uses the source. Re-check existence through
+        :meth:`get_style_source_info`.
+        """
         return self._native.remove_style_source(source_id)
 
-    def style_source_exists(self, source_id: str) -> bool:
-        """Return whether a style source ID exists."""
-        return self._native.style_source_exists(source_id)
+    def get_style_source_info(self, source_id: str) -> Future[StyleSourceInfo | None]:
+        """Return copied retained metadata for one style source.
 
-    def get_style_source_type(self, source_id: str) -> StyleSourceType | None:
-        """Return a style source type, or None when the source is missing."""
-        from .style import StyleSourceType
+        The result is None when the source is missing, so this is also the
+        existence check.
+        """
+        return map_future(
+            self._native.get_style_source_info(source_id),
+            lambda raw: StyleSourceInfo._from_native(raw) if raw is not None else None,
+        )
 
-        raw = self._native.get_style_source_type(source_id)
-        return StyleSourceType(raw) if raw is not None else None
+    def get_style_source_url(self, source_id: str) -> Future[str | None]:
+        """Return one style source's retained URL.
 
-    def get_style_source_info(self, source_id: str) -> StyleSourceInfo | None:
-        """Return copied retained metadata for one style source."""
-        from .style import StyleSourceInfo
+        The result is None when the source is missing or carries no URL.
+        """
+        return self._native.copy_style_source_url(source_id)
 
-        raw = self._native.get_style_source_info(source_id)
-        return StyleSourceInfo._from_native(raw) if raw is not None else None
+    def get_style_source_attribution(self, source_id: str) -> Future[str | None]:
+        """Return one style source's attribution.
 
-    def set_style_source_volatile(self, source_id: str, is_volatile: bool) -> None:
-        """Set whether a style source stores fetched tiles in persistent storage."""
-        self._native.set_style_source_volatile(source_id, is_volatile)
+        The result is None when the source is missing or carries no
+        attribution.
+        """
+        return self._native.copy_style_source_attribution(source_id)
 
-    def list_style_source_ids(self) -> tuple[str, ...]:
+    def get_style_source_tile_urls(self, source_id: str) -> Future[list[str] | None]:
+        """Return one style source's inline TileJSON tile URLs.
+
+        The result is None when the source does not exist, and empty for a
+        URL-backed source or a source without inline TileJSON.
+        """
+        return self._native.get_style_source_tile_urls(source_id)
+
+    def set_style_source_volatile(
+        self, source_id: str, is_volatile: bool
+    ) -> Future[CommandCompletion]:
+        """Submit a style source volatility change and return its completion future.
+
+        Volatile sources keep fetched tiles out of persistent storage. The
+        command's terminal event reports ``FAILED`` with
+        :attr:`MaplibreStatus.NOT_FOUND` when no style source has the ID.
+        """
+        return self._native.set_style_source_volatile(source_id, is_volatile)
+
+    def list_style_source_ids(self) -> Future[tuple[str, ...]]:
         """Return style source IDs in style order."""
-        return tuple(self._native.list_style_source_ids())
+        return map_future(self._native.list_style_source_ids(), tuple)
 
     def add_hillshade_layer(
         self,
         layer_id: str,
         source_id: str,
         before_layer_id: str | None = None,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Add a hillshade layer for a raster DEM source."""
-        self._native.add_hillshade_layer(layer_id, source_id, before_layer_id)
+        return self._native.add_hillshade_layer(layer_id, source_id, before_layer_id)
 
     def add_color_relief_layer(
         self,
         layer_id: str,
         source_id: str,
         before_layer_id: str | None = None,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Add a color-relief layer for a raster DEM source."""
-        self._native.add_color_relief_layer(layer_id, source_id, before_layer_id)
+        return self._native.add_color_relief_layer(layer_id, source_id, before_layer_id)
 
     def add_location_indicator_layer(
         self,
         layer_id: str,
         before_layer_id: str | None = None,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Add a source-free location indicator layer."""
-        self._native.add_location_indicator_layer(layer_id, before_layer_id)
+        return self._native.add_location_indicator_layer(layer_id, before_layer_id)
 
     def set_location_indicator_location(
         self,
         layer_id: str,
         coordinate: LatLng,
         altitude: float,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Set a location indicator layer location."""
-        self._native.set_location_indicator_location(
+        return self._native.set_location_indicator_location(
             layer_id,
             coordinate.latitude,
             coordinate.longitude,
             altitude,
         )
 
-    def set_location_indicator_bearing(self, layer_id: str, bearing: float) -> None:
+    def set_location_indicator_bearing(
+        self, layer_id: str, bearing: float
+    ) -> Future[CommandCompletion]:
         """Set a location indicator layer bearing in degrees."""
-        self._native.set_location_indicator_bearing(layer_id, bearing)
+        return self._native.set_location_indicator_bearing(layer_id, bearing)
 
     def set_location_indicator_accuracy_radius(
         self,
         layer_id: str,
         radius: float,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Set a location indicator layer accuracy radius in meters."""
-        self._native.set_location_indicator_accuracy_radius(layer_id, radius)
+        return self._native.set_location_indicator_accuracy_radius(layer_id, radius)
 
     def set_location_indicator_image_name(
         self,
         layer_id: str,
         image_kind: LocationIndicatorImageKind,
         image_id: str,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Set one location indicator image-name property."""
-        self._native.set_location_indicator_image_name(
+        return self._native.set_location_indicator_image_name(
             layer_id,
             image_kind.native_code,
             image_id,
         )
 
-    def remove_style_layer(self, layer_id: str) -> bool:
-        """Remove a style layer by ID and report whether it existed."""
+    def remove_style_layer(self, layer_id: str) -> Future[CommandCompletion]:
+        """Submit a style layer removal and return its completion future.
+
+        The command's terminal event reports ``FAILED`` with
+        :attr:`MaplibreStatus.NOT_FOUND` when no style layer has the ID.
+        Re-check existence through :meth:`get_style_layer_info`.
+        """
         return self._native.remove_style_layer(layer_id)
 
-    def style_layer_exists(self, layer_id: str) -> bool:
-        """Return whether a style layer ID exists."""
-        return self._native.style_layer_exists(layer_id)
+    def get_style_layer_info(self, layer_id: str) -> Future[StyleLayerInfo | None]:
+        """Return copied fixed metadata for one style layer.
 
-    def get_style_layer_type(self, layer_id: str) -> str | None:
-        """Return a style layer type string, or None when the layer is missing."""
-        return self._native.get_style_layer_type(layer_id)
+        The result is None when the layer is missing, so this is also the
+        existence check.
+        """
+        return map_future(
+            self._native.get_style_layer_info(layer_id),
+            lambda raw: StyleLayerInfo._from_native(raw) if raw is not None else None,
+        )
 
-    def list_style_layer_ids(self) -> tuple[str, ...]:
+    def list_style_layer_ids(self) -> Future[tuple[str, ...]]:
         """Return style layer IDs in style order."""
-        return tuple(self._native.list_style_layer_ids())
+        return map_future(self._native.list_style_layer_ids(), tuple)
 
     def move_style_layer(
         self,
         layer_id: str,
         before_layer_id: str | None = None,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Move one style layer before another layer or to the top."""
-        self._native.move_style_layer(layer_id, before_layer_id)
+        return self._native.move_style_layer(layer_id, before_layer_id)
 
     def add_style_layer_json(
         self,
         layer_json: bytes,
         before_layer_id: str | None = None,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Add one style layer from a full style-spec layer JSON object."""
-        self._native.add_style_layer_json(layer_json, before_layer_id)
+        return self._native.add_style_layer_json(layer_json, before_layer_id)
 
-    def get_style_layer_json(self, layer_id: str) -> bytes | None:
+    def get_style_layer_json(self, layer_id: str) -> Future[bytes | None]:
         """Return one style layer as a full style-spec layer JSON object."""
         return self._native.get_style_layer_json(layer_id)
 
-    def set_style_light_json(self, light_json: bytes) -> None:
+    def set_style_light_json(self, light_json: bytes) -> Future[CommandCompletion]:
         """Set the style light from a style-spec light JSON object."""
-        self._native.set_style_light_json(light_json)
+        return self._native.set_style_light_json(light_json)
 
-    def set_style_light_property(self, property_name: str, value: bytes) -> None:
+    def set_style_light_property(
+        self, property_name: str, value: bytes
+    ) -> Future[CommandCompletion]:
         """Set one style light property by style-spec property name."""
-        self._native.set_style_light_property(property_name, value)
+        return self._native.set_style_light_property(property_name, value)
 
-    def get_style_light_property(self, property_name: str) -> bytes | None:
+    def get_style_light_property(self, property_name: str) -> Future[bytes | None]:
         """Return one style light property as a style-spec JSON value."""
         return self._native.get_style_light_property(property_name)
 
-    def set_style_transition_options(self, options: StyleTransitionOptions) -> None:
+    def set_style_transition_options(
+        self, options: StyleTransitionOptions
+    ) -> Future[CommandCompletion]:
         """Set the style's global transition options.
 
         This call replaces the whole transition configuration rather than
         merging into it. Loading a style replaces these options with the ones
         that style declares, so apply an override after the style loads.
         """
-        self._native.set_style_transition_options(
+        return self._native.set_style_transition_options(
             options.duration_ms,
             options.delay_ms,
             options.enable_placement_transitions,
         )
 
-    def get_style_transition_options(self) -> StyleTransitionOptions:
+    def get_style_transition_options(self) -> Future[StyleTransitionOptions]:
         """Return the style's global transition options."""
-        return StyleTransitionOptions._from_native(
-            self._native.get_style_transition_options()
+        return map_future(
+            self._native.get_style_transition_options(),
+            StyleTransitionOptions._from_native,
         )
 
     def set_layer_property(
@@ -1003,103 +1170,96 @@ class MapHandle(NativeHandleMixin):
         layer_id: str,
         property_name: str,
         value: bytes,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Set one layer property by style-spec property name."""
-        self._native.set_layer_property(layer_id, property_name, value)
+        return self._native.set_layer_property(layer_id, property_name, value)
 
-    def get_layer_property(self, layer_id: str, property_name: str) -> bytes | None:
+    def get_layer_property(
+        self, layer_id: str, property_name: str
+    ) -> Future[bytes | None]:
         """Return one layer property as a style-spec JSON value."""
         return self._native.get_layer_property(layer_id, property_name)
 
-    def set_layer_filter(self, layer_id: str, filter: bytes | None) -> None:
+    def set_layer_filter(
+        self, layer_id: str, filter: bytes | None
+    ) -> Future[CommandCompletion]:
         """Set or clear one layer filter."""
-        self._native.set_layer_filter(layer_id, filter)
+        return self._native.set_layer_filter(layer_id, filter)
 
-    def get_layer_filter(self, layer_id: str) -> bytes | None:
+    def get_layer_filter(self, layer_id: str) -> Future[bytes | None]:
         """Return one layer filter as a style-spec JSON value."""
         return self._native.get_layer_filter(layer_id)
 
-    def set_layer_source_layer(self, layer_id: str, source_layer: str) -> None:
+    def set_layer_source_layer(
+        self, layer_id: str, source_layer: str
+    ) -> Future[CommandCompletion]:
         """Set one layer's source-layer ID.
 
         Layer types that take no source, such as background, are rejected.
         """
-        self._native.set_layer_source_layer(layer_id, source_layer)
+        return self._native.set_layer_source_layer(layer_id, source_layer)
 
-    def get_layer_source_layer(self, layer_id: str) -> str:
+    def get_layer_source_layer(self, layer_id: str) -> Future[str]:
         """Return one layer's source-layer ID, empty when it carries none."""
         return self._native.copy_layer_source_layer(layer_id)
 
-    def set_layer_source_id(self, layer_id: str, source_id: str) -> None:
+    def set_layer_source_id(
+        self, layer_id: str, source_id: str
+    ) -> Future[CommandCompletion]:
         """Set one layer's source ID.
 
         Layer types that take no source, such as background, are rejected. The
         named source need not exist yet.
         """
-        self._native.set_layer_source_id(layer_id, source_id)
+        return self._native.set_layer_source_id(layer_id, source_id)
 
-    def get_layer_source_id(self, layer_id: str) -> str:
+    def get_layer_source_id(self, layer_id: str) -> Future[str]:
         """Return one layer's source ID, empty when it carries none."""
         return self._native.copy_layer_source_id(layer_id)
 
-    def set_layer_min_zoom(self, layer_id: str, min_zoom: float) -> None:
+    def set_layer_min_zoom(
+        self, layer_id: str, min_zoom: float
+    ) -> Future[CommandCompletion]:
         """Set the lowest zoom at which one layer draws.
 
-        Pass ``-math.inf`` for no lower bound.
+        Pass ``-math.inf`` for no lower bound. Read the value back from
+        :attr:`StyleLayerInfo.min_zoom`.
         """
-        self._native.set_layer_min_zoom(layer_id, min_zoom)
+        return self._native.set_layer_min_zoom(layer_id, min_zoom)
 
-    def get_layer_min_zoom(self, layer_id: str) -> float:
-        """Return the lowest zoom at which one layer draws.
-
-        A layer with no lower bound reports ``-math.inf``.
-        """
-        return self._native.get_layer_min_zoom(layer_id)
-
-    def set_layer_max_zoom(self, layer_id: str, max_zoom: float) -> None:
+    def set_layer_max_zoom(
+        self, layer_id: str, max_zoom: float
+    ) -> Future[CommandCompletion]:
         """Set the highest zoom at which one layer draws.
 
-        Pass ``math.inf`` for no upper bound.
+        Pass ``math.inf`` for no upper bound. Read the value back from
+        :attr:`StyleLayerInfo.max_zoom`.
         """
-        self._native.set_layer_max_zoom(layer_id, max_zoom)
-
-    def get_layer_max_zoom(self, layer_id: str) -> float:
-        """Return the highest zoom at which one layer draws.
-
-        A layer with no upper bound reports ``math.inf``.
-        """
-        return self._native.get_layer_max_zoom(layer_id)
+        return self._native.set_layer_max_zoom(layer_id, max_zoom)
 
     def set_layer_visibility(
         self, layer_id: str, visibility: StyleLayerVisibility
-    ) -> None:
-        """Set whether one layer draws."""
-        self._native.set_layer_visibility(layer_id, int(visibility))
+    ) -> Future[CommandCompletion]:
+        """Set whether one layer draws.
 
-    def get_layer_visibility(self, layer_id: str) -> StyleLayerVisibility:
-        """Return whether one layer draws."""
-        return StyleLayerVisibility(self._native.get_layer_visibility(layer_id))
+        Read the value back from :attr:`StyleLayerInfo.visibility`.
+        """
+        return self._native.set_layer_visibility(layer_id, int(visibility))
 
     def set_style_image(
         self,
         image_id: str,
         image: PremultipliedRgba8Image,
         options: StyleImageOptions | None = None,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Add or replace one runtime style image."""
-        from .render import PremultipliedRgba8Image
-        from .style import StyleImageOptions
-
         options = options or StyleImageOptions()
         if not isinstance(image, PremultipliedRgba8Image):
             msg = "image must be a PremultipliedRgba8Image"
             raise TypeError(msg)
-        self._native.set_style_image(
+        return self._native.set_style_image(
             image_id,
-            image.info.width,
-            image.info.height,
-            image.info.stride,
-            image.data,
+            *_image_parts(image),
             options.pixel_ratio,
             options.sdf,
             None
@@ -1122,49 +1282,61 @@ class MapHandle(NativeHandleMixin):
 
     def get_style_image_stretches(
         self, image_id: str
-    ) -> tuple[tuple[ImageStretch, ...], tuple[ImageStretch, ...]] | None:
+    ) -> Future[tuple[tuple[ImageStretch, ...], tuple[ImageStretch, ...]] | None]:
         """Return one style image's stretchable intervals, or None when missing."""
-        from .style import ImageStretch
 
-        copied = self._native.copy_style_image_stretches(image_id)
-        if copied is None:
-            return None
-        stretch_x, stretch_y = copied
-        return (
-            tuple(ImageStretch(from_, to) for from_, to in stretch_x),
-            tuple(ImageStretch(from_, to) for from_, to in stretch_y),
+        def adapt(copied: object):
+            if copied is None:
+                return None
+            stretch_x, stretch_y = copied
+            return (
+                tuple(ImageStretch(from_, to) for from_, to in stretch_x),
+                tuple(ImageStretch(from_, to) for from_, to in stretch_y),
+            )
+
+        return map_future(
+            self._native.copy_style_image_stretches(image_id),
+            adapt,
         )
 
-    def remove_style_image(self, image_id: str) -> bool:
-        """Remove a runtime style image by ID and report whether it existed."""
+    def remove_style_image(self, image_id: str) -> Future[CommandCompletion]:
+        """Submit a runtime style image removal and return its completion future.
+
+        The command's terminal event reports ``FAILED`` with
+        :attr:`MaplibreStatus.NOT_FOUND` when no runtime style image has the
+        ID. Re-check existence through :meth:`get_style_image_info`.
+        """
         return self._native.remove_style_image(image_id)
 
-    def style_image_exists(self, image_id: str) -> bool:
-        """Return whether a runtime style image ID exists."""
-        return self._native.style_image_exists(image_id)
+    def get_style_image_info(self, image_id: str) -> Future[StyleImageInfo | None]:
+        """Return fixed metadata for one runtime style image.
 
-    def get_style_image_info(self, image_id: str) -> StyleImageInfo | None:
-        """Return fixed metadata for one runtime style image."""
-        from .style import StyleImageInfo
+        The result is None when the image is missing, so this is also the
+        existence check.
+        """
+        return map_future(
+            self._native.get_style_image_info(image_id),
+            lambda raw: StyleImageInfo._from_native(raw) if raw is not None else None,
+        )
 
-        raw = self._native.get_style_image_info(image_id)
-        return StyleImageInfo._from_native(raw) if raw is not None else None
+    def copy_style_image_premultiplied_rgba8(
+        self, image_id: str
+    ) -> Future[bytes | None]:
+        """Copy one runtime style image as tightly packed premultiplied RGBA8.
 
-    def copy_style_image_premultiplied_rgba8(self, image_id: str) -> StyleImage | None:
-        """Copy one runtime style image as premultiplied RGBA8 pixels."""
-        from .style import StyleImage
-
-        raw = self._native.copy_style_image_premultiplied_rgba8(image_id)
-        return StyleImage._from_native(raw) if raw is not None else None
+        The result is None when the image is missing. Read the pixel
+        dimensions from :meth:`get_style_image_info`.
+        """
+        return self._native.copy_style_image_premultiplied_rgba8(image_id)
 
     def add_image_source_url(
         self,
         source_id: str,
         coordinates: list[LatLng] | tuple[LatLng, ...],
         url: str,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Add an image source that loads its image from a URL."""
-        self._native.add_image_source_url(
+        return self._native.add_image_source_url(
             source_id, _coordinate_parts(coordinates), url
         )
 
@@ -1173,133 +1345,171 @@ class MapHandle(NativeHandleMixin):
         source_id: str,
         coordinates: list[LatLng] | tuple[LatLng, ...],
         image: PremultipliedRgba8Image,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Add an image source with inline image pixels."""
-        self._native.add_image_source_image(
+        return self._native.add_image_source_image(
             source_id,
             _coordinate_parts(coordinates),
             *_image_parts(image),
         )
 
-    def set_image_source_url(self, source_id: str, url: str) -> None:
+    def set_image_source_url(
+        self, source_id: str, url: str
+    ) -> Future[CommandCompletion]:
         """Update an image source to load its image from a URL."""
-        self._native.set_image_source_url(source_id, url)
+        return self._native.set_image_source_url(source_id, url)
 
     def set_image_source_image(
         self,
         source_id: str,
         image: PremultipliedRgba8Image,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Update an image source with inline image pixels."""
-        self._native.set_image_source_image(source_id, *_image_parts(image))
+        return self._native.set_image_source_image(source_id, *_image_parts(image))
 
     def set_image_source_coordinates(
         self,
         source_id: str,
         coordinates: list[LatLng] | tuple[LatLng, ...],
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Update image source coordinates."""
-        self._native.set_image_source_coordinates(
+        return self._native.set_image_source_coordinates(
             source_id, _coordinate_parts(coordinates)
         )
 
-    def get_image_source_coordinates(self, source_id: str) -> tuple[LatLng, ...] | None:
+    def get_image_source_coordinates(
+        self, source_id: str
+    ) -> Future[tuple[LatLng, ...] | None]:
         """Return copied image source coordinates, or None when missing."""
-        from .geo import LatLng
+        return map_future(
+            self._native.get_image_source_coordinates(source_id),
+            lambda raw: (
+                None
+                if raw is None
+                else tuple(LatLng(**coordinate) for coordinate in raw)
+            ),
+        )
 
-        raw = self._native.get_image_source_coordinates(source_id)
-        if raw is None:
-            return None
-        return tuple(LatLng(**coordinate) for coordinate in raw)
-
-    def create_projection(self) -> MapProjectionHandle:
+    def create_projection(self) -> Future[MapProjectionHandle]:
         """Create a standalone projection helper from the current map transform."""
-        return MapProjectionHandle._from_native(self._native.create_projection())
+        return map_future(
+            self._native.create_projection(), MapProjectionHandle._from_native
+        )
 
-    def get_camera(self) -> CameraOptions:
-        """Return the current camera snapshot."""
-        from .camera import CameraOptions
+    def get_camera(self) -> CameraSnapshot:
+        """Copy the camera of the latest complete map-state generation."""
+        return CameraSnapshot._from_native(self._native.get_camera())
 
-        return CameraOptions._from_native(self._native.get_camera())
+    def get_camera_ordered(self) -> Future[CameraSnapshot]:
+        """Return a future for a camera read ordered after prior commands."""
+        return map_future(
+            self._native.get_camera_ordered(), CameraSnapshot._from_native
+        )
 
-    def jump_to(self, camera: CameraOptions) -> None:
-        """Apply a camera jump command."""
-        self._native.jump_to(*_camera_parts(camera))
+    def update_camera(self, update: CameraUpdate) -> Future[CommandCompletion]:
+        """Submit one atomic absolute camera update.
+
+        The update carries its transition mode, its animation controls, and a
+        gesture boundary that applies around the camera write.
+        """
+        return self._native.update_camera(
+            update.mode.native_code,
+            *_camera_parts(update.camera),
+            _animation_parts(update.animation),
+            update.gesture_phase.native_code,
+        )
+
+    def cancel_transitions(self) -> Future[CommandCompletion]:
+        """Cancel the map's running camera transitions.
+
+        A cancelled transition reports its end through a
+        ``MAP_CAMERA_TRANSITION_FINISHED`` runtime event, as a completed one
+        does.
+        """
+        return self._native.cancel_transitions()
+
+    def jump_to(self, camera: CameraOptions) -> Future[CommandCompletion]:
+        """Submit a camera jump, an update in :attr:`CameraUpdateMode.JUMP`."""
+        return self.update_camera(CameraUpdate(camera, CameraUpdateMode.JUMP))
 
     def ease_to(
         self,
         camera: CameraOptions,
         animation: AnimationOptions | None = None,
-    ) -> None:
-        """Apply a camera ease transition command.
-
-        An absent `animation`, or one with no duration, reaches the target
-        before this call returns, with no runtime pump in between.
-        """
-        self._native.ease_to(*_camera_parts(camera), _animation_parts(animation))
+    ) -> Future[CommandCompletion]:
+        """Submit a camera ease, an update in :attr:`CameraUpdateMode.EASE`."""
+        return self.update_camera(
+            CameraUpdate(camera, CameraUpdateMode.EASE, animation)
+        )
 
     def fly_to(
         self,
         camera: CameraOptions,
         animation: AnimationOptions | None = None,
-    ) -> None:
-        """Apply a camera fly transition command.
+    ) -> Future[CommandCompletion]:
+        """Submit a camera fly, an update in :attr:`CameraUpdateMode.FLY`."""
+        return self.update_camera(CameraUpdate(camera, CameraUpdateMode.FLY, animation))
 
-        Fly animates by default: an absent `animation`, or one with no
-        duration, derives a duration from a velocity of 1.2 screenfuls per
-        second, so the camera advances as the runtime is pumped.
-        """
-        self._native.fly_to(*_camera_parts(camera), _animation_parts(animation))
+    def apply_camera_delta(self, delta: CameraDelta) -> Future[CommandCompletion]:
+        """Submit one relative camera operation."""
+        anchor = delta.anchor
+        return self._native.apply_camera_delta(
+            int(delta.kind),
+            (delta.offset.x, delta.offset.y),
+            delta.amount,
+            None if anchor is None else (anchor.x, anchor.y),
+            _animation_parts(delta.animation),
+        )
 
     def camera_for_lat_lng_bounds(
         self,
         bounds: LatLngBounds,
         fit: CameraFitOptions | None = None,
-    ) -> CameraOptions:
+    ) -> Future[CameraOptions]:
         """Compute a camera that fits geographic bounds in the current viewport."""
-        from .camera import CameraOptions
-
-        raw = self._native.camera_for_lat_lng_bounds(
-            (bounds.southwest.latitude, bounds.southwest.longitude),
-            (bounds.northeast.latitude, bounds.northeast.longitude),
-            *_fit_parts(fit),
+        return map_future(
+            self._native.camera_for_lat_lng_bounds(
+                (bounds.southwest.latitude, bounds.southwest.longitude),
+                (bounds.northeast.latitude, bounds.northeast.longitude),
+                *_fit_parts(fit),
+            ),
+            CameraOptions._from_native,
         )
-        return CameraOptions._from_native(raw)
 
     def camera_for_lat_lngs(
         self,
         coordinates: list[LatLng] | tuple[LatLng, ...],
         fit: CameraFitOptions | None = None,
-    ) -> CameraOptions:
+    ) -> Future[CameraOptions]:
         """Compute a camera that fits geographic coordinates in the current viewport."""
-        from .camera import CameraOptions
-
-        raw = self._native.camera_for_lat_lngs(
-            _coordinate_parts(coordinates),
-            *_fit_parts(fit),
+        return map_future(
+            self._native.camera_for_lat_lngs(
+                _coordinate_parts(coordinates),
+                *_fit_parts(fit),
+            ),
+            CameraOptions._from_native,
         )
-        return CameraOptions._from_native(raw)
 
     def camera_for_geometry(
         self,
         geometry: bytes,
         fit: CameraFitOptions | None = None,
-    ) -> CameraOptions:
+    ) -> Future[CameraOptions]:
         """Compute a camera that fits a geometry in the current viewport."""
-        from .camera import CameraOptions
-
-        raw = self._native.camera_for_geometry(
-            geometry,
-            *_fit_parts(fit),
+        return map_future(
+            self._native.camera_for_geometry(
+                geometry,
+                *_fit_parts(fit),
+            ),
+            CameraOptions._from_native,
         )
-        return CameraOptions._from_native(raw)
 
     def lat_lng_bounds_for_camera(
         self,
         camera: CameraOptions,
         *,
         unwrapped: bool = False,
-    ) -> LatLngBounds:
+    ) -> Future[LatLngBounds]:
         """Compute geographic bounds for a camera from two viewport corners.
 
         The box is the hull of the top-left and bottom-right screen corners
@@ -1313,126 +1523,28 @@ class MapHandle(NativeHandleMixin):
         viewport that crosses the antimeridian reports values outside -180
         to 180.
         """
-        from .geo import LatLng, LatLngBounds
-
-        raw = self._native.lat_lng_bounds_for_camera(*_camera_parts(camera), unwrapped)
-        return LatLngBounds(
-            southwest=LatLng(**raw["southwest"]),
-            northeast=LatLng(**raw["northeast"]),
+        return map_future(
+            self._native.lat_lng_bounds_for_camera(*_camera_parts(camera), unwrapped),
+            lambda raw: LatLngBounds(
+                southwest=LatLng(**raw["southwest"]),
+                northeast=LatLng(**raw["northeast"]),
+            ),
         )
 
-    def get_bounds(self) -> BoundOptions:
-        """Return map camera constraint options."""
-        from .camera import BoundOptions
+    def set_bounds(self, bounds: BoundOptions) -> Future[CommandCompletion]:
+        """Submit map camera constraints and return its completion future.
 
-        return BoundOptions._from_native(self._native.get_bounds())
-
-    def set_bounds(self, bounds: BoundOptions) -> None:
-        """Apply selected map camera constraint options."""
-        self._native.set_bounds(*_bounds_parts(bounds))
-
-    def move_by(self, delta_x: float, delta_y: float) -> None:
-        """Apply a screen-space pan command."""
-        self._native.move_by(delta_x, delta_y)
-
-    def move_by_animated(
-        self,
-        delta_x: float,
-        delta_y: float,
-        animation: AnimationOptions | None = None,
-    ) -> None:
-        """Apply an animated screen-space pan command.
-
-        Native routes this delta through the ease transition, so an absent
-        `animation`, or one with no duration, applies the pan instantly.
+        Read the committed values back from :attr:`MapSnapshot.bounds`.
         """
-        self._native.move_by_animated(delta_x, delta_y, _animation_parts(animation))
+        return self._native.set_bounds(*_bounds_parts(bounds))
 
-    def scale_by(self, scale: float, anchor: ScreenPoint | None = None) -> None:
-        """Apply a screen-space zoom command."""
-        raw_anchor = (anchor.x, anchor.y) if anchor is not None else None
-        self._native.scale_by(scale, raw_anchor)
+    def set_free_camera_options(
+        self, options: FreeCameraOptions
+    ) -> Future[CommandCompletion]:
+        """Submit free-camera fields and return its completion future.
 
-    def scale_by_animated(
-        self,
-        scale: float,
-        anchor: ScreenPoint | None = None,
-        animation: AnimationOptions | None = None,
-    ) -> None:
-        """Apply an animated screen-space zoom command.
-
-        Native routes this delta through the ease transition, so an absent
-        `animation`, or one with no duration, applies the zoom instantly.
+        Read the committed values back from :attr:`MapSnapshot.free_camera`.
         """
-        raw_anchor = (anchor.x, anchor.y) if anchor is not None else None
-        self._native.scale_by_animated(scale, raw_anchor, _animation_parts(animation))
-
-    def rotate_by(self, first: ScreenPoint, second: ScreenPoint) -> None:
-        """Apply a screen-space rotate command."""
-        self._native.rotate_by((first.x, first.y), (second.x, second.y))
-
-    def rotate_by_animated(
-        self,
-        first: ScreenPoint,
-        second: ScreenPoint,
-        animation: AnimationOptions | None = None,
-    ) -> None:
-        """Apply an animated screen-space rotate command.
-
-        Native routes this delta through the ease transition, so an absent
-        `animation`, or one with no duration, applies the rotation instantly.
-        """
-        self._native.rotate_by_animated(
-            (first.x, first.y),
-            (second.x, second.y),
-            _animation_parts(animation),
-        )
-
-    def pitch_by(self, pitch: float) -> None:
-        """Apply a pitch delta command."""
-        self._native.pitch_by(pitch)
-
-    def pitch_by_animated(
-        self,
-        pitch: float,
-        animation: AnimationOptions | None = None,
-    ) -> None:
-        """Apply an animated pitch delta command.
-
-        Native routes this delta through the ease transition, so an absent
-        `animation`, or one with no duration, applies the pitch instantly.
-        """
-        self._native.pitch_by_animated(pitch, _animation_parts(animation))
-
-    def cancel_transitions(self) -> None:
-        """Cancel active camera transitions.
-
-        A cancelled transition carrying a ``transition_id`` reports its end
-        through a ``MAP_CAMERA_TRANSITION_FINISHED`` runtime event.
-        """
-        self._native.cancel_transitions()
-
-    def set_gesture_in_progress(self, in_progress: bool) -> None:
-        """Mark whether a host-driven gesture is in progress.
-
-        Camera commands issued while the flag is set belong to one gesture. The
-        flag stays set until the host clears it, so pair every ``True`` with a
-        ``False``.
-        """
-        self._native.set_gesture_in_progress(in_progress)
-
-    def is_gesture_in_progress(self) -> bool:
-        """Return whether a host-driven gesture is currently in progress."""
-        return self._native.is_gesture_in_progress()
-
-    def get_free_camera_options(self) -> FreeCameraOptions:
-        """Return the current free camera position and orientation."""
-        from .camera import FreeCameraOptions
-
-        return FreeCameraOptions._from_native(self._native.get_free_camera_options())
-
-    def set_free_camera_options(self, options: FreeCameraOptions) -> None:
-        """Apply selected free camera position and orientation fields."""
         position = (
             (options.position.x, options.position.y, options.position.z)
             if options.position is not None
@@ -1448,88 +1560,77 @@ class MapHandle(NativeHandleMixin):
             if options.orientation is not None
             else None
         )
-        self._native.set_free_camera_options(position, orientation)
+        return self._native.set_free_camera_options(position, orientation)
 
-    def get_projection_mode(self) -> ProjectionMode:
-        """Return the current axonometric rendering options."""
-        from .camera import ProjectionMode
-
-        return ProjectionMode._from_native(self._native.get_projection_mode())
-
-    def set_projection_mode(self, mode: ProjectionMode) -> None:
+    def set_projection_mode(self, mode: ProjectionMode) -> Future[CommandCompletion]:
         """Apply axonometric rendering option fields to the map."""
-        self._native.set_projection_mode(mode.axonometric, mode.x_skew, mode.y_skew)
-
-    def pixel_for_lat_lng(self, coordinate: LatLng) -> ScreenPoint:
-        """Convert a geographic world coordinate to a screen point for this map."""
-        from .camera import ScreenPoint
-
-        raw = self._native.pixel_for_lat_lng(
-            coordinate.latitude,
-            coordinate.longitude,
+        return self._native.set_projection_mode(
+            mode.axonometric, mode.x_skew, mode.y_skew
         )
-        return ScreenPoint(x=raw["x"], y=raw["y"])
 
-    def lat_lng_for_pixel(self, point: ScreenPoint) -> LatLng:
-        """Convert a screen point to a coordinate with longitude wrapped to [-180, 180]."""
-        from .geo import LatLng
+    def pixel_for_lat_lng(self, coordinate: LatLng) -> Future[ScreenPoint]:
+        """Convert a geographic world coordinate to a screen point for this map."""
+        return map_future(
+            self._native.pixel_for_lat_lng(
+                coordinate.latitude,
+                coordinate.longitude,
+            ),
+            lambda raw: ScreenPoint(x=raw["x"], y=raw["y"]),
+        )
 
-        raw = self._native.lat_lng_for_pixel(point.x, point.y)
-        return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
+    def lat_lng_for_pixel(
+        self, point: ScreenPoint, *, unwrapped: bool = False
+    ) -> Future[LatLng]:
+        """Convert a screen point to a geographic world coordinate for this map.
 
-    def lat_lng_for_pixel_unwrapped(self, point: ScreenPoint) -> LatLng:
-        """Convert a screen point to a coordinate that preserves its visible world copy."""
-        from .geo import LatLng
-
-        raw = self._native.lat_lng_for_pixel_unwrapped(point.x, point.y)
-        return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
+        The longitude is wrapped to [-180, 180] unless ``unwrapped`` is set, in
+        which case the result preserves the point's visible world copy.
+        """
+        return map_future(
+            self._native.lat_lng_for_pixel(point.x, point.y, unwrapped),
+            lambda raw: LatLng(latitude=raw["latitude"], longitude=raw["longitude"]),
+        )
 
     def pixels_for_lat_lngs(
         self,
         coordinates: list[LatLng] | tuple[LatLng, ...],
-    ) -> tuple[ScreenPoint, ...]:
+    ) -> Future[tuple[ScreenPoint, ...]]:
         """Convert geographic world coordinates to screen points for this map."""
-        from .camera import ScreenPoint
-
-        raw = self._native.pixels_for_lat_lngs(_coordinate_parts(coordinates))
-        return tuple(ScreenPoint(x=point["x"], y=point["y"]) for point in raw)
+        return map_future(
+            self._native.pixels_for_lat_lngs(_coordinate_parts(coordinates)),
+            lambda raw: tuple(ScreenPoint(x=point["x"], y=point["y"]) for point in raw),
+        )
 
     def lat_lngs_for_pixels(
         self,
         points: list[ScreenPoint] | tuple[ScreenPoint, ...],
-    ) -> tuple[LatLng, ...]:
-        """Convert screen points to coordinates with longitudes wrapped to [-180, 180]."""
-        from .geo import LatLng
+        *,
+        unwrapped: bool = False,
+    ) -> Future[tuple[LatLng, ...]]:
+        """Convert screen points to geographic world coordinates for this map.
 
-        raw = self._native.lat_lngs_for_pixels([(point.x, point.y) for point in points])
-        return tuple(LatLng(**coordinate) for coordinate in raw)
-
-    def lat_lngs_for_pixels_unwrapped(
-        self,
-        points: list[ScreenPoint] | tuple[ScreenPoint, ...],
-    ) -> tuple[LatLng, ...]:
-        """Convert screen points to coordinates that preserve their visible world copies."""
-        from .geo import LatLng
-
-        raw = self._native.lat_lngs_for_pixels_unwrapped(
-            [(point.x, point.y) for point in points]
+        Longitudes are wrapped to [-180, 180] unless ``unwrapped`` is set, in
+        which case each result preserves its point's visible world copy.
+        """
+        return map_future(
+            self._native.lat_lngs_for_pixels(
+                [(point.x, point.y) for point in points], unwrapped
+            ),
+            lambda raw: tuple(LatLng(**coordinate) for coordinate in raw),
         )
-        return tuple(LatLng(**coordinate) for coordinate in raw)
 
     def add_custom_geometry_source(
         self,
         source_id: str,
         options: CustomGeometrySourceOptions | None = None,
-    ) -> CustomGeometrySourceHandle:
+    ) -> tuple[CustomGeometrySourceHandle, Future[CommandCompletion]]:
         """Add a custom geometry source and return its queued-event handle.
 
         The handle closes when the source goes away: an explicit removal, a
         style load that leaves a style without the source, or closing this map.
         """
-        from .style import CustomGeometrySourceHandle, CustomGeometrySourceOptions
-
         options = options or CustomGeometrySourceOptions()
-        native = self._native.add_custom_geometry_source(
+        native, completion = self._native.add_custom_geometry_source(
             source_id,
             options.max_queued_events,
             options.min_zoom,
@@ -1541,16 +1642,16 @@ class MapHandle(NativeHandleMixin):
             options.wrap,
             options.has_cancel_tile,
         )
-        return CustomGeometrySourceHandle._from_native(native)
+        return CustomGeometrySourceHandle._from_native(native), completion
 
     def set_custom_geometry_source_tile_data(
         self,
         source_id: str,
         tile_id: CanonicalTileId,
         data: bytes,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Set custom geometry source data for one canonical tile."""
-        self._native.set_custom_geometry_source_tile_data(
+        return self._native.set_custom_geometry_source_tile_data(
             source_id,
             tile_id.z,
             tile_id.x,
@@ -1562,9 +1663,9 @@ class MapHandle(NativeHandleMixin):
         self,
         source_id: str,
         tile_id: CanonicalTileId,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Invalidate custom geometry source data for one canonical tile."""
-        self._native.invalidate_custom_geometry_source_tile(
+        return self._native.invalidate_custom_geometry_source_tile(
             source_id,
             tile_id.z,
             tile_id.x,
@@ -1575,9 +1676,9 @@ class MapHandle(NativeHandleMixin):
         self,
         source_id: str,
         bounds: LatLngBounds,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Invalidate custom geometry source data inside one geographic region."""
-        self._native.invalidate_custom_geometry_source_region(
+        return self._native.invalidate_custom_geometry_source_region(
             source_id,
             (bounds.southwest.latitude, bounds.southwest.longitude),
             (bounds.northeast.latitude, bounds.northeast.longitude),
@@ -1587,32 +1688,30 @@ class MapHandle(NativeHandleMixin):
         self,
         source_id: str,
         options: CustomMvtVectorSourceOptions | None = None,
-    ) -> CustomMvtVectorSourceHandle:
+    ) -> tuple[CustomMvtVectorSourceHandle, Future[CommandCompletion]]:
         """Add a custom MVT vector source and return its queued-event handle.
 
         The handle closes when the source goes away: an explicit removal, a
         style load that leaves a style without the source, or closing this map.
         """
-        from .style import CustomMvtVectorSourceHandle, CustomMvtVectorSourceOptions
-
         options = options or CustomMvtVectorSourceOptions()
-        native = self._native.add_custom_mvt_vector_source(
+        native, completion = self._native.add_custom_mvt_vector_source(
             source_id,
             options.max_queued_events,
             options.min_zoom,
             options.max_zoom,
             options.has_cancel_tile,
         )
-        return CustomMvtVectorSourceHandle._from_native(native)
+        return CustomMvtVectorSourceHandle._from_native(native), completion
 
     def set_custom_mvt_vector_source_tile_data(
         self,
         source_id: str,
         tile_id: CanonicalTileId,
         data: bytes,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Set custom MVT vector source data for one canonical tile."""
-        self._native.set_custom_mvt_vector_source_tile_data(
+        return self._native.set_custom_mvt_vector_source_tile_data(
             source_id,
             tile_id.z,
             tile_id.x,
@@ -1625,9 +1724,9 @@ class MapHandle(NativeHandleMixin):
         source_id: str,
         tile_id: CanonicalTileId,
         message: str,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Report a custom MVT vector source error for one canonical tile."""
-        self._native.set_custom_mvt_vector_source_tile_error(
+        return self._native.set_custom_mvt_vector_source_tile_error(
             source_id,
             tile_id.z,
             tile_id.x,
@@ -1639,9 +1738,9 @@ class MapHandle(NativeHandleMixin):
         self,
         source_id: str,
         tile_id: CanonicalTileId,
-    ) -> None:
+    ) -> Future[CommandCompletion]:
         """Invalidate custom MVT vector source data for one canonical tile."""
-        self._native.invalidate_custom_mvt_vector_source_tile(
+        return self._native.invalidate_custom_mvt_vector_source_tile(
             source_id,
             tile_id.z,
             tile_id.x,
@@ -1652,36 +1751,48 @@ class MapHandle(NativeHandleMixin):
         self,
         attach: Callable[..., object],
         descriptor: Any,
+        options: RenderSessionAttachOptions,
         *args: object,
-    ) -> RenderSessionHandle:
+    ) -> tuple[RenderSessionHandle, Future[None]]:
         extent = descriptor.extent
-        native = attach(
+        native, completion = attach(
             self._native,
             extent.width,
             extent.height,
             extent.scale_factor,
             *args,
+            options.driver.native_code,
+            options.requested_texture_ring_depth,
         )
-        return RenderSessionHandle._from_native(native, self)
+        session = RenderSessionHandle._from_native(native, self)
+        # The session is retained until the attach completion is terminal: the
+        # native side keeps rendering into it until then.
+        return session, map_future(completion, lambda value: value, retained=session)
 
     def attach_metal_surface(
-        self, descriptor: MetalSurfaceDescriptor
-    ) -> RenderSessionHandle:
-        """Attach a Metal native surface render target to this map."""
+        self,
+        descriptor: MetalSurfaceDescriptor,
+        options: RenderSessionAttachOptions = _CORE_WORKER_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Future[None]]:
+        """Start attaching a Metal native surface render target."""
         return self._attach_render_session(
             _native.attach_metal_surface,
             descriptor,
+            options,
             descriptor.context.device.address,
             descriptor.layer.address,
         )
 
     def attach_vulkan_surface(
-        self, descriptor: VulkanSurfaceDescriptor
-    ) -> RenderSessionHandle:
-        """Attach a Vulkan native surface render target to this map."""
+        self,
+        descriptor: VulkanSurfaceDescriptor,
+        options: RenderSessionAttachOptions = _CORE_WORKER_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Future[None]]:
+        """Start attaching a Vulkan native surface render target."""
         return self._attach_render_session(
             _native.attach_vulkan_surface,
             descriptor,
+            options,
             descriptor.context.instance.address,
             descriptor.context.physical_device.address,
             descriptor.context.device.address,
@@ -1692,35 +1803,62 @@ class MapHandle(NativeHandleMixin):
             descriptor.surface.bits,
         )
 
+    def attach_webgpu_surface(
+        self,
+        descriptor: WebGPUSurfaceDescriptor,
+        options: RenderSessionAttachOptions = _CALLER_GRAPHICS_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Future[None]]:
+        """Start attaching a WebGPU native surface render target."""
+        context = descriptor.context
+        return self._attach_render_session(
+            _native.attach_webgpu_surface,
+            descriptor,
+            options,
+            context.instance.address,
+            context.device.address,
+            context.queue.address,
+            descriptor.surface.address,
+            descriptor.format,
+        )
+
     def attach_metal_owned_texture(
-        self, descriptor: MetalOwnedTextureDescriptor
-    ) -> RenderSessionHandle:
-        """Attach a Metal session-owned texture render target to this map."""
+        self,
+        descriptor: MetalOwnedTextureDescriptor,
+        options: RenderSessionAttachOptions = _CORE_WORKER_OWNED_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Future[None]]:
+        """Start attaching a Metal session-owned texture ring."""
         return self._attach_render_session(
             _native.attach_metal_owned_texture,
             descriptor,
+            options,
             descriptor.context.device.address,
         )
 
     def attach_metal_borrowed_texture(
-        self, descriptor: MetalBorrowedTextureDescriptor
-    ) -> RenderSessionHandle:
-        """Attach a Metal caller-owned texture render target to this map."""
+        self,
+        descriptor: MetalBorrowedTextureDescriptor,
+        options: RenderSessionAttachOptions = _CORE_WORKER_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Future[None]]:
+        """Start attaching a caller-owned Metal texture."""
         return self._attach_render_session(
             _native.attach_metal_borrowed_texture,
             descriptor,
+            options,
             descriptor.physical_width,
             descriptor.physical_height,
             descriptor.texture.address,
         )
 
     def attach_vulkan_owned_texture(
-        self, descriptor: VulkanOwnedTextureDescriptor
-    ) -> RenderSessionHandle:
-        """Attach a Vulkan session-owned texture render target to this map."""
+        self,
+        descriptor: VulkanOwnedTextureDescriptor,
+        options: RenderSessionAttachOptions = _CORE_WORKER_OWNED_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Future[None]]:
+        """Start attaching a Vulkan session-owned texture ring."""
         return self._attach_render_session(
             _native.attach_vulkan_owned_texture,
             descriptor,
+            options,
             descriptor.context.instance.address,
             descriptor.context.physical_device.address,
             descriptor.context.device.address,
@@ -1730,13 +1868,53 @@ class MapHandle(NativeHandleMixin):
             descriptor.context.get_device_proc_addr.address,
         )
 
+    def attach_webgpu_owned_texture(
+        self,
+        descriptor: WebGPUOwnedTextureDescriptor,
+        options: RenderSessionAttachOptions = _CALLER_GRAPHICS_OWNED_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Future[None]]:
+        """Start attaching a WebGPU session-owned texture ring."""
+        context = descriptor.context
+        return self._attach_render_session(
+            _native.attach_webgpu_owned_texture,
+            descriptor,
+            options,
+            context.instance.address,
+            context.device.address,
+            context.queue.address,
+        )
+
+    def attach_webgpu_borrowed_texture(
+        self,
+        descriptor: WebGPUBorrowedTextureDescriptor,
+        options: RenderSessionAttachOptions = _CALLER_GRAPHICS_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Future[None]]:
+        """Start attaching a caller-owned WebGPU texture."""
+        context = descriptor.context
+        return self._attach_render_session(
+            _native.attach_webgpu_borrowed_texture,
+            descriptor,
+            options,
+            descriptor.physical_width,
+            descriptor.physical_height,
+            context.instance.address,
+            context.device.address,
+            context.queue.address,
+            descriptor.texture.address,
+            descriptor.texture_view.address,
+            descriptor.format,
+        )
+
     def attach_vulkan_borrowed_texture(
-        self, descriptor: VulkanBorrowedTextureDescriptor
-    ) -> RenderSessionHandle:
-        """Attach a Vulkan caller-owned texture render target to this map."""
+        self,
+        descriptor: VulkanBorrowedTextureDescriptor,
+        options: RenderSessionAttachOptions = _CORE_WORKER_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Future[None]]:
+        """Start attaching a caller-owned Vulkan texture."""
         return self._attach_render_session(
             _native.attach_vulkan_borrowed_texture,
             descriptor,
+            options,
             descriptor.physical_width,
             descriptor.physical_height,
             descriptor.context.instance.address,
@@ -1754,15 +1932,18 @@ class MapHandle(NativeHandleMixin):
         )
 
     def attach_opengl_surface(
-        self, descriptor: OpenGLSurfaceDescriptor
-    ) -> RenderSessionHandle:
-        """Attach an OpenGL native surface render target to this map."""
+        self,
+        descriptor: OpenGLSurfaceDescriptor,
+        options: RenderSessionAttachOptions = _CALLER_GRAPHICS_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Future[None]]:
+        """Start attaching an OpenGL native surface render target."""
         platform, ownership, first, second, share, client_api, get_proc = (
             _opengl_context_parts(descriptor.context)
         )
         return self._attach_render_session(
             _native.attach_opengl_surface,
             descriptor,
+            options,
             platform,
             ownership,
             first,
@@ -1774,15 +1955,18 @@ class MapHandle(NativeHandleMixin):
         )
 
     def attach_opengl_owned_texture(
-        self, descriptor: OpenGLOwnedTextureDescriptor
-    ) -> RenderSessionHandle:
-        """Attach an OpenGL session-owned texture render target to this map."""
+        self,
+        descriptor: OpenGLOwnedTextureDescriptor,
+        options: RenderSessionAttachOptions = _CALLER_GRAPHICS_OWNED_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Future[None]]:
+        """Start attaching an OpenGL session-owned texture ring."""
         platform, ownership, first, second, share, client_api, get_proc = (
             _opengl_context_parts(descriptor.context)
         )
         return self._attach_render_session(
             _native.attach_opengl_owned_texture,
             descriptor,
+            options,
             platform,
             ownership,
             first,
@@ -1793,15 +1977,18 @@ class MapHandle(NativeHandleMixin):
         )
 
     def attach_opengl_borrowed_texture(
-        self, descriptor: OpenGLBorrowedTextureDescriptor
-    ) -> RenderSessionHandle:
-        """Attach an OpenGL caller-owned texture render target to this map."""
+        self,
+        descriptor: OpenGLBorrowedTextureDescriptor,
+        options: RenderSessionAttachOptions = _CALLER_GRAPHICS_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Future[None]]:
+        """Start attaching a caller-owned OpenGL texture."""
         platform, ownership, first, second, share, client_api, get_proc = (
             _opengl_context_parts(descriptor.context)
         )
         return self._attach_render_session(
             _native.attach_opengl_borrowed_texture,
             descriptor,
+            options,
             descriptor.physical_width,
             descriptor.physical_height,
             platform,
@@ -1817,12 +2004,14 @@ class MapHandle(NativeHandleMixin):
 
 
 __all__ = [
+    "CameraSnapshot",
     "ConstrainMode",
     "MapDebugOptions",
     "MapHandle",
     "MapMode",
     "MapOptions",
     "MapProjectionHandle",
+    "MapSnapshot",
     "MapTileOptions",
     "MapViewportOptions",
     "NorthOrientation",
@@ -1833,4 +2022,9 @@ __all__ = [
     "projected_meters_for_lat_lng",
 ]
 
-from .runtime import RuntimeEventMask, RuntimeHandle, _default_map_event_mask
+from .runtime import (
+    CommandCompletion,
+    RuntimeEventMask,
+    RuntimeHandle,
+    _default_map_event_mask,
+)

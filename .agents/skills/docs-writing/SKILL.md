@@ -57,12 +57,12 @@ A trailing `which` or `so` clause carries subordinate detail only.
 - Avoid: "A render session takes the thread that attached it, which need not be
   the map's."
 - Prefer: "A render session takes the thread that attached it. That thread can
-  differ from the map's owner thread."
+  differ from the runtime's thread."
 
 ### Use plain verbs
 
 Replace phrasal verbs and metaphors with the literal verb. A term of art defined
-once, such as **pump**, is fine; decoration is not.
+once, such as **drain**, is fine; decoration is not.
 
 - Avoid: "Queries hang off the render session." "State rides along with the
   renderer." "Light steers fill-extrusion shading." "Reach for the setter."
@@ -95,8 +95,8 @@ importance.
 
 Keep `that` after a verb, keep relative pronouns, and keep articles.
 
-- Avoid: "The runtime drains the work the owner thread queued."
-- Prefer: "The runtime drains the work that the owner thread queued."
+- Avoid: "The runtime drains the work the host queued."
+- Prefer: "The runtime drains the work that the host queued."
 
 ### Give each step one instruction
 
@@ -201,7 +201,7 @@ State the snippet's choices once, near the snippet, so a reader knows what they
 are looking at and what to substitute.
 
 - Prefer conceptual phrasing where it reads as clearly: "set the style URL",
-  "pump the runtime".
+  "service driver work".
 - Name a C function when the name earns its place, and write it in full:
   `mln_map_set_style_url`. A name earns its place when the reader is choosing
   between calls, or when a call is an exception to the pattern around it.
@@ -275,18 +275,21 @@ that each one binds.
 
 One term per concept, across every page.
 
-| Use            | For                                                | Avoid                         |
-| -------------- | -------------------------------------------------- | ----------------------------- |
-| runtime        | The scheduler and event store for one owner thread | context, engine               |
-| map            | Map state, independent of any render target        | map view, map object          |
-| render session | The object that renders one map to one target      | renderer                      |
-| render target  | The surface or texture that a session draws into   | render session as a synonym   |
-| pump           | Calling the runtime's pump function                | drive, tick, service          |
-| drain          | Reading queued events until none remain            | pump, poll as a synonym       |
-| owner thread   | The thread that a handle is affine to              | owning thread, calling thread |
-| handle         | An opaque object that the API returns              | pointer, object               |
-| host           | The application embedding the library              | client, user, consumer        |
-| binding        | A language wrapper over the C API                  | SDK, wrapper                  |
+| Use                | For                                                             | Avoid                       |
+| ------------------ | --------------------------------------------------------------- | --------------------------- |
+| runtime            | The native scheduler thread and event store                     | context, engine             |
+| map                | Map state, independent of any render target                     | map view, map object        |
+| render session     | The object that renders one map to one target                   | renderer                    |
+| render target      | The surface or texture that a session draws into                | render session as a synonym |
+| completion         | The one-shot callback that reports a submission's outcome       | promise, future             |
+| published snapshot | A synchronous copy of state that a live handle publishes        | getter, accessor            |
+| drain              | Reading queued events or results until none remain              | poll as a synonym           |
+| wake               | The callback that tells a receiver work is ready                | notify, signal              |
+| driver service     | Running a caller-driver session's queued graphics work          | tick, drive                 |
+| graphics thread    | The thread a caller-driver session's driver calls are affine to | owner thread                |
+| handle             | An opaque object that the API returns                           | pointer, object             |
+| host               | The application embedding the library                           | client, user, consumer      |
+| binding            | A language wrapper over the C API                               | SDK, wrapper                |
 
 ### Render targets
 

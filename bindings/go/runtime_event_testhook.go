@@ -112,17 +112,6 @@ func (event runtimeEventForTest) withOfflineRegionTileCountLimit(payload Runtime
 	return event
 }
 
-func (event runtimeEventForTest) withOfflineOperationCompleted(payload RuntimeEventOfflineOperationCompletedPayload) runtimeEventForTest {
-	event.raw = C.mln_go_runtime_event_with_offline_operation_completed(event.raw, C.mln_runtime_event_offline_operation_completed{
-		operation_id:   C.mln_offline_operation_id(payload.OperationID),
-		operation_kind: C.uint32_t(payload.OperationKind),
-		result_kind:    C.uint32_t(payload.ResultKind),
-		result_status:  C.int32_t(payload.ResultStatus),
-		found:          C.bool(payload.Found),
-	})
-	return event
-}
-
 // withRawPayload writes opaque bytes into this event's payload window, which is
 // how a test synthesizes a payload type this binding version does not define.
 func (event runtimeEventForTest) withRawPayload(payloadType RuntimeEventPayloadType, bytes []byte) runtimeEventForTest {
@@ -141,13 +130,13 @@ type runtimeEventBatchForTest struct {
 	events   unsafe.Pointer
 	messages unsafe.Pointer
 	stride   uintptr
-	raw      C.mln_runtime_event_batch
+	raw      C.mln_runtime_event_batch_view
 }
 
 // newRuntimeEventBatchForTest lays events out stride bytes apart. A stride wider
 // than this binding's compiled event size is what proves the decoder reads the
 // batch's own stride.
-func newRuntimeEventBatchForTest(stride uintptr, remainingCount uint64, events []runtimeEventForTest) *runtimeEventBatchForTest {
+func newRuntimeEventBatchForTest(stride uintptr, events []runtimeEventForTest) *runtimeEventBatchForTest {
 	if stride < runtimeEventSizeForTest() {
 		stride = runtimeEventSizeForTest()
 	}
@@ -159,7 +148,7 @@ func newRuntimeEventBatchForTest(stride uintptr, remainingCount uint64, events [
 	for index, event := range events {
 		raw := event.raw
 		if len(event.message) > 0 {
-			raw.message_offset = C.uint32_t(len(arena))
+			raw.message_offset = C.uint64_t(len(arena))
 			raw.message_size = C.uint32_t(len(event.message))
 			arena = append(arena, event.message...)
 			arena = append(arena, 0)
@@ -169,14 +158,13 @@ func newRuntimeEventBatchForTest(stride uintptr, remainingCount uint64, events [
 	if len(arena) > 0 {
 		batch.messages = C.CBytes(arena)
 	}
-	batch.raw = C.mln_runtime_event_batch{
-		size:            C.uint32_t(unsafe.Sizeof(C.mln_runtime_event_batch{})),
-		event_size:      C.uint32_t(stride),
-		events:          (*C.mln_runtime_event)(batch.events),
-		event_count:     C.size_t(len(events)),
-		messages:        (*C.char)(batch.messages),
-		messages_size:   C.size_t(len(arena)),
-		remaining_count: C.size_t(remainingCount),
+	batch.raw = C.mln_runtime_event_batch_view{
+		size:          C.uint32_t(unsafe.Sizeof(C.mln_runtime_event_batch_view{})),
+		event_size:    C.uint32_t(stride),
+		events:        (*C.mln_runtime_event)(batch.events),
+		event_count:   C.size_t(len(events)),
+		messages:      (*C.char)(batch.messages),
+		messages_size: C.size_t(len(arena)),
 	}
 	return batch
 }
@@ -200,8 +188,8 @@ func (batch *runtimeEventBatchForTest) payloadWindow(index int) []byte {
 }
 
 // decodeForTest runs the batch through the same copy path DrainEvents uses.
-func (runtime *RuntimeHandle) decodeForTest(batch *runtimeEventBatchForTest) RuntimeEventBatch {
-	return runtime.copyEventBatch(batch.raw)
+func (runtime *RuntimeHandle) decodeForTest(batch *runtimeEventBatchForTest) []RuntimeEvent {
+	return runtime.copyEvents(batch.raw)
 }
 
 // runtimeEventSizeForTest is this binding's compiled event size, which a layout

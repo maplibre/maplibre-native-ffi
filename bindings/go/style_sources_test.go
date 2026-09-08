@@ -2,35 +2,73 @@ package maplibre
 
 import (
 	"errors"
-	stdruntime "runtime"
+	"slices"
 	"testing"
 )
 
+func takeOptionalStyleOperationForTest[T any](future *Future[StyleOptional[T]], err error) (T, bool, error) {
+	result, err := awaitForTest(future, err)
+	return result.Value, result.Found, err
+}
+
+func awaitCommandCompletionForTest(t *testing.T, future *Future[CommandCompletion], err error) CommandCompletion {
+	t.Helper()
+	result, err := awaitForTest(future, err)
+	if err != nil {
+		t.Fatalf("command completion: %v", err)
+	}
+	return result
+}
+
+func requireStyleCommandFailed(t *testing.T, future *Future[CommandCompletion], err error) {
+	t.Helper()
+	completion, completionErr := awaitForTest(future, err)
+	if completionErr != nil {
+		t.Fatalf("command completion: %v", completionErr)
+	}
+	if completion.Disposition != CommandDispositionFailed {
+		t.Fatalf("command disposition = %v, want failed", completion.Disposition)
+	}
+}
+
+// requireCommandCommitted waits for completion's terminal event and returns the
+// map snapshot generation the commit published.
+func requireCommandCommitted(t *testing.T, future *Future[CommandCompletion], err error) uint64 {
+	t.Helper()
+	finished := awaitCommandCompletionForTest(t, future, err)
+	if finished.Disposition != CommandDispositionCommitted {
+		t.Fatalf("command disposition = %v, want committed", finished.Disposition)
+	}
+	if finished.Generation == 0 {
+		t.Fatal("command committed without publishing a generation")
+	}
+	return finished.Generation
+}
+
+// requireCommandFailedWith waits for completion's terminal event and asserts it
+// failed with the given binding error.
+func requireCommandFailedWith(t *testing.T, future *Future[CommandCompletion], err, want error) {
+	t.Helper()
+	completion, completionErr := awaitForTest(future, err)
+	if completionErr != nil {
+		t.Fatalf("command completion: %v", completionErr)
+	}
+	if completion.Disposition != CommandDispositionFailed {
+		t.Fatalf("command disposition = %v, want failed", completion.Disposition)
+	}
+	got := kindForStatus(completion.RawStatus)
+	if !errors.Is(got, want) {
+		t.Fatalf("command terminal status = %v, want %v", got, want)
+	}
+}
+
 func TestStyleSourceMetadataForMissingSources(t *testing.T) {
-	lockOSThreadForTest(t)
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
-	ids, err := m.StyleSourceIDs()
+	ids, err := awaitForTest(m.StyleSourceIDs())
 	if err != nil {
 		t.Fatalf("StyleSourceIDs(): %v", err)
 	}
@@ -39,78 +77,36 @@ func TestStyleSourceMetadataForMissingSources(t *testing.T) {
 			t.Fatalf("StyleSourceIDs() unexpectedly contains missing source: %v", ids)
 		}
 	}
-	exists, err := m.StyleSourceExists("missing")
-	if err != nil {
-		t.Fatalf("StyleSourceExists(): %v", err)
-	}
-	if exists {
-		t.Fatalf("StyleSourceExists(missing) = true, want false")
-	}
-	sourceType, found, err := m.StyleSourceType("missing")
-	if err != nil {
-		t.Fatalf("StyleSourceType(): %v", err)
-	}
-	if found || sourceType != StyleSourceTypeUnknown {
-		t.Fatalf("StyleSourceType(missing) = (%v, %v), want (unknown, false)", sourceType, found)
-	}
-	_, found, err = m.StyleSourceInfo("missing")
+	info, found, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("missing"))
 	if err != nil {
 		t.Fatalf("StyleSourceInfo(): %v", err)
 	}
-	if found {
-		t.Fatalf("StyleSourceInfo(missing) found = true, want false")
+	if found || info.Type != StyleSourceTypeUnknown {
+		t.Fatalf("StyleSourceInfo(missing) = (%#v, %v), want (unknown type, false)", info, found)
 	}
-	attribution, found, err := m.StyleSourceAttribution("missing")
-	if err != nil {
-		t.Fatalf("StyleSourceAttribution(): %v", err)
+	if info.Attribution != nil {
+		t.Fatalf("StyleSourceInfo(missing) attribution = %v, want absent", info.Attribution)
 	}
-	if found || attribution != "" {
-		t.Fatalf("StyleSourceAttribution(missing) = (%q, %v), want empty false", attribution, found)
+	completion, err := m.RemoveStyleSource("missing")
+	requireCommandFailedWith(t, completion, err, ErrNotFound)
+	if _, _, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("")); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("StyleSourceInfo(empty) error = %v, want ErrInvalidArgument", err)
 	}
-	removed, err := m.RemoveStyleSource("missing")
-	if err != nil {
-		t.Fatalf("RemoveStyleSource(): %v", err)
-	}
-	if removed {
-		t.Fatalf("RemoveStyleSource(missing) = true, want false")
-	}
-	if _, err := m.StyleSourceExists(""); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("StyleSourceExists(empty) error = %v, want ErrInvalidArgument", err)
-	}
-	if err := m.SetStyleSourceVolatile("missing", true); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("SetStyleSourceVolatile(missing) error = %v, want ErrInvalidArgument", err)
-	}
+	volatileCompletion, err := m.SetStyleSourceVolatile("missing", true)
+	requireCommandFailedWith(t, volatileCompletion, err, ErrNotFound)
 }
 
 func TestStyleSourceVolatilityRoundTripsThroughPublicAPI(t *testing.T) {
-	lockOSThreadForTest(t)
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
-	if err := m.AddVectorSourceURL("volatile-source", "https://example.invalid/tiles.json", nil); err != nil {
+	if _, err := m.AddVectorSourceURL("volatile-source", "https://example.invalid/tiles.json", nil); err != nil {
 		t.Fatalf("AddVectorSourceURL(): %v", err)
 	}
 
-	info, found, err := m.StyleSourceInfo("volatile-source")
+	info, found, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("volatile-source"))
 	if err != nil {
 		t.Fatalf("StyleSourceInfo(initial): %v", err)
 	}
@@ -121,10 +117,9 @@ func TestStyleSourceVolatilityRoundTripsThroughPublicAPI(t *testing.T) {
 		t.Fatal("StyleSourceInfo(initial).IsVolatile = true, want false")
 	}
 
-	if err := m.SetStyleSourceVolatile("volatile-source", true); err != nil {
-		t.Fatalf("SetStyleSourceVolatile(true): %v", err)
-	}
-	info, found, err = m.StyleSourceInfo("volatile-source")
+	enabled, err := m.SetStyleSourceVolatile("volatile-source", true)
+	requireCommandCommitted(t, enabled, err)
+	info, found, err = takeOptionalStyleOperationForTest(m.StyleSourceInfo("volatile-source"))
 	if err != nil {
 		t.Fatalf("StyleSourceInfo(true): %v", err)
 	}
@@ -132,10 +127,9 @@ func TestStyleSourceVolatilityRoundTripsThroughPublicAPI(t *testing.T) {
 		t.Fatalf("StyleSourceInfo(true) = (%#v, %v), want found and volatile", info, found)
 	}
 
-	if err := m.SetStyleSourceVolatile("volatile-source", false); err != nil {
-		t.Fatalf("SetStyleSourceVolatile(false): %v", err)
-	}
-	info, found, err = m.StyleSourceInfo("volatile-source")
+	disabled, err := m.SetStyleSourceVolatile("volatile-source", false)
+	requireCommandCommitted(t, disabled, err)
+	info, found, err = takeOptionalStyleOperationForTest(m.StyleSourceInfo("volatile-source"))
 	if err != nil {
 		t.Fatalf("StyleSourceInfo(false): %v", err)
 	}
@@ -145,52 +139,34 @@ func TestStyleSourceVolatilityRoundTripsThroughPublicAPI(t *testing.T) {
 }
 
 func TestStyleSourceURLAndTileBindings(t *testing.T) {
-	lockOSThreadForTest(t)
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	geoJSONOptions := StyleGeoJSONSourceOptions{}.
 		WithMinZoom(1).
 		WithTolerance(0.5).
 		WithBuffer(64)
-	if err := m.AddGeoJSONSourceURL("geojson-url", "asset://fixtures/points.geojson", &geoJSONOptions); err != nil {
+	if _, err := m.AddGeoJSONSourceURL("geojson-url", "asset://fixtures/points.geojson", &geoJSONOptions); err != nil {
 		t.Fatalf("AddGeoJSONSourceURL(): %v", err)
 	}
-	if err := m.SetGeoJSONSourceURL("geojson-url", "asset://fixtures/points-2.geojson"); err != nil {
+	if _, err := m.SetGeoJSONSourceURL("geojson-url", "asset://fixtures/points-2.geojson"); err != nil {
 		t.Fatalf("SetGeoJSONSourceURL(): %v", err)
 	}
 	tileOptions := StyleTileSourceOptions{}.
 		WithTileSize(256).
 		WithAttribution("unit attribution")
-	if err := m.AddVectorSourceTiles("vector-tiles", []string{"https://example.com/vector/{z}/{x}/{y}.pbf"}, &tileOptions); err != nil {
+	if _, err := m.AddVectorSourceTiles("vector-tiles", []string{"https://example.com/vector/{z}/{x}/{y}.pbf"}, &tileOptions); err != nil {
 		t.Fatalf("AddVectorSourceTiles(): %v", err)
 	}
-	if err := m.AddRasterSourceURL("raster-url", "https://example.com/raster.json", &tileOptions); err != nil {
+	if _, err := m.AddRasterSourceURL("raster-url", "https://example.com/raster.json", &tileOptions); err != nil {
 		t.Fatalf("AddRasterSourceURL(): %v", err)
 	}
 	demOptions := StyleTileSourceOptions{}.
 		WithTileSize(512).
 		WithRasterEncoding(StyleRasterDEMEncodingTerrarium)
-	if err := m.AddRasterDEMSourceTiles("dem-tiles", []string{"https://example.com/dem/{z}/{x}/{y}.png"}, &demOptions); err != nil {
+	if _, err := m.AddRasterDEMSourceTiles("dem-tiles", []string{"https://example.com/dem/{z}/{x}/{y}.png"}, &demOptions); err != nil {
 		t.Fatalf("AddRasterDEMSourceTiles(): %v", err)
 	}
 	checks := map[string]StyleSourceType{
@@ -200,44 +176,24 @@ func TestStyleSourceURLAndTileBindings(t *testing.T) {
 		"dem-tiles":    StyleSourceTypeRasterDEM,
 	}
 	for id, wantType := range checks {
-		gotType, found, err := m.StyleSourceType(id)
+		info, found, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo(id))
 		if err != nil {
-			t.Fatalf("StyleSourceType(%s): %v", id, err)
+			t.Fatalf("StyleSourceInfo(%s): %v", id, err)
 		}
-		if !found || gotType != wantType {
-			t.Fatalf("StyleSourceType(%s) = (%v, %v), want %v true", id, gotType, found, wantType)
+		if !found || info.Type != wantType {
+			t.Fatalf("StyleSourceInfo(%s) type = (%v, %v), want %v true", id, info.Type, found, wantType)
 		}
 	}
-	if err := m.AddVectorSourceTiles("bad-vector", nil, nil); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("AddVectorSourceTiles(nil) error = %v, want ErrInvalidArgument", err)
-	}
-	if err := m.AddGeoJSONSourceURL("", "asset://fixtures/points.geojson", nil); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("AddGeoJSONSourceURL(empty id) error = %v, want ErrInvalidArgument", err)
-	}
+	completion, err := m.AddVectorSourceTiles("bad-vector", nil, nil)
+	requireStyleCommandFailed(t, completion, err)
+	completion, err = m.AddGeoJSONSourceURL("", "asset://fixtures/points.geojson", nil)
+	requireStyleCommandFailed(t, completion, err)
 }
 
 func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
-	lockOSThreadForTest(t)
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	minZoom := 0.0
@@ -263,11 +219,11 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 		"https://example.com/first/{z}/{x}/{y}.mlt",
 		"https://example.com/second/{z}/{x}/{y}.mlt",
 	}
-	if err := m.AddVectorSourceTiles("inline-vector", tileURLs, &options); err != nil {
+	if _, err := m.AddVectorSourceTiles("inline-vector", tileURLs, &options); err != nil {
 		t.Fatalf("AddVectorSourceTiles(): %v", err)
 	}
 
-	info, found, err := m.StyleSourceInfo("inline-vector")
+	info, found, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("inline-vector"))
 	if err != nil {
 		t.Fatalf("StyleSourceInfo(inline-vector): %v", err)
 	}
@@ -307,11 +263,38 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 		t.Fatalf("StyleSourceInfo(inline-vector) raster encoding = %v, want absent", info.RasterEncoding)
 	}
 
-	removed, err := m.RemoveStyleSource("inline-vector")
-	if err != nil || !removed {
-		t.Fatalf("RemoveStyleSource(inline-vector) = (%v, %v), want true and nil", removed, err)
+	// The narrow copies report the same values the aggregate carries.
+	copiedAttribution, found, err := takeOptionalStyleOperationForTest(m.StyleSourceAttribution("inline-vector"))
+	if err != nil || !found || copiedAttribution != attribution {
+		t.Fatalf("StyleSourceAttribution(inline-vector) = (%q, %v, %v), want %q", copiedAttribution, found, err, attribution)
 	}
-	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, found, err := takeOptionalStyleOperationForTest(m.StyleSourceURL("inline-vector")); err != nil || found {
+		t.Fatalf("StyleSourceURL(inline-vector) = (%v, %v), want (false, nil) for an inline source", found, err)
+	}
+	if _, found, err := takeOptionalStyleOperationForTest(m.StyleSourceAttribution("missing")); err != nil || found {
+		t.Fatalf("StyleSourceAttribution(missing) = (%v, %v), want (false, nil)", found, err)
+	}
+	copiedTileURLs, found, err := takeOptionalStyleOperationForTest(m.StyleSourceTileURLs("inline-vector"))
+	if err != nil || !found || !slices.Equal(copiedTileURLs, tileURLs) {
+		t.Fatalf("StyleSourceTileURLs(inline-vector) = (%q, %v, %v), want %q and true", copiedTileURLs, found, err, tileURLs)
+	}
+	if missingTileURLs, found, err := takeOptionalStyleOperationForTest(m.StyleSourceTileURLs("missing")); err != nil || found {
+		t.Fatalf("StyleSourceTileURLs(missing) = (%q, %v, %v), want (false, nil)", missingTileURLs, found, err)
+	}
+
+	layerJSON := []byte(`{"id":"inline-vector-layer","type":"line","source":"inline-vector","source-layer":"lines"}`)
+	layerID, err := m.AddStyleLayerJSON(layerJSON, "")
+	requireCommandCommitted(t, layerID, err)
+	blockedID, err := m.RemoveStyleSource("inline-vector")
+	requireCommandFailedWith(t, blockedID, err, ErrInvalidState)
+	removeLayerID, err := m.RemoveStyleLayer("inline-vector-layer")
+	requireCommandCommitted(t, removeLayerID, err)
+	removeID, err := m.RemoveStyleSource("inline-vector")
+	requireCommandCommitted(t, removeID, err)
+	if _, found, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("inline-vector")); err != nil || found {
+		t.Fatalf("StyleSourceInfo(inline-vector) after removal = (%v, %v), want (false, nil)", found, err)
+	}
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON([]byte(replacement)): %v", err)
 	}
 	if *info.Attribution != attribution || info.TileJSON.TileURLs[1] != tileURLs[1] || *info.TileJSON.Bounds != bounds {
@@ -319,10 +302,10 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 	}
 
 	url := "https://example.invalid/vector-tilejson.json"
-	if err := m.AddVectorSourceURL("url-vector", url, nil); err != nil {
+	if _, err := m.AddVectorSourceURL("url-vector", url, nil); err != nil {
 		t.Fatalf("AddVectorSourceURL(): %v", err)
 	}
-	urlInfo, found, err := m.StyleSourceInfo("url-vector")
+	urlInfo, found, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("url-vector"))
 	if err != nil {
 		t.Fatalf("StyleSourceInfo(url-vector): %v", err)
 	}
@@ -331,6 +314,16 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 	}
 	if urlInfo.TileJSON != nil || urlInfo.Attribution != nil {
 		t.Fatalf("StyleSourceInfo(url-vector) optional loaded fields = (%v, %v), want absent", urlInfo.TileJSON, urlInfo.Attribution)
+	}
+	copiedURL, found, err := takeOptionalStyleOperationForTest(m.StyleSourceURL("url-vector"))
+	if err != nil || !found || copiedURL != url {
+		t.Fatalf("StyleSourceURL(url-vector) = (%q, %v, %v), want %q", copiedURL, found, err, url)
+	}
+	if _, found, err := takeOptionalStyleOperationForTest(m.StyleSourceURL("missing")); err != nil || found {
+		t.Fatalf("StyleSourceURL(missing) = (%v, %v), want (false, nil)", found, err)
+	}
+	if urlTileURLs, found, err := takeOptionalStyleOperationForTest(m.StyleSourceTileURLs("url-vector")); err != nil || !found || len(urlTileURLs) != 0 {
+		t.Fatalf("StyleSourceTileURLs(url-vector) = (%q, %v, %v), want an empty list and true for a URL-backed source", urlTileURLs, found, err)
 	}
 
 	data, err := NewGeoJSONSourceData([]byte(`{"type":"FeatureCollection","features":[]}`), nil)
@@ -342,10 +335,10 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 			t.Errorf("GeoJSONSourceDataHandle Close(): %v", err)
 		}
 	}()
-	if err := m.AddGeoJSONSourceData("inline-geojson", data); err != nil {
+	if _, err := m.AddGeoJSONSourceData("inline-geojson", data); err != nil {
 		t.Fatalf("AddGeoJSONSourceData(): %v", err)
 	}
-	geoJSONInfo, found, err := m.StyleSourceInfo("inline-geojson")
+	geoJSONInfo, found, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("inline-geojson"))
 	if err != nil {
 		t.Fatalf("StyleSourceInfo(inline-geojson): %v", err)
 	}
@@ -355,27 +348,9 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 }
 
 func TestGeoJSONSourceDataPrepareAndInstall(t *testing.T) {
-	lockOSThreadForTest(t)
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	document := []byte(`{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","geometry":{"type":"LineString","coordinates":[[2,1],[4,3]]},"properties":{"name":"before","rank":7}}]}`)
@@ -393,19 +368,19 @@ func TestGeoJSONSourceDataPrepareAndInstall(t *testing.T) {
 	// The document is copied at preparation, so mutating it afterward does not
 	// reach the prepared index.
 	document[0] = 'x'
-	if err := m.AddGeoJSONSourceData("geojson-data", data); err != nil {
+	if _, err := m.AddGeoJSONSourceData("geojson-data", data); err != nil {
 		t.Fatalf("AddGeoJSONSourceData(): %v", err)
 	}
-	sourceType, found, err := m.StyleSourceType("geojson-data")
+	info, found, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("geojson-data"))
 	if err != nil {
-		t.Fatalf("StyleSourceType(geojson-data): %v", err)
+		t.Fatalf("StyleSourceInfo(geojson-data): %v", err)
 	}
-	if !found || sourceType != StyleSourceTypeGeoJSON {
-		t.Fatalf("StyleSourceType(geojson-data) = (%v, %v), want GeoJSON true", sourceType, found)
+	if !found || info.Type != StyleSourceTypeGeoJSON {
+		t.Fatalf("StyleSourceInfo(geojson-data) type = (%v, %v), want GeoJSON true", info.Type, found)
 	}
 
 	// One prepared handle installs on any number of sources.
-	if err := m.AddGeoJSONSourceData("geojson-data-2", data); err != nil {
+	if _, err := m.AddGeoJSONSourceData("geojson-data-2", data); err != nil {
 		t.Fatalf("AddGeoJSONSourceData(reused handle): %v", err)
 	}
 
@@ -414,12 +389,10 @@ func TestGeoJSONSourceDataPrepareAndInstall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewGeoJSONSourceData(update): %v", err)
 	}
-	if err := m.SetGeoJSONSourceData("geojson-data", update); err != nil {
-		t.Fatalf("SetGeoJSONSourceData(): %v", err)
-	}
-	if err := m.SetGeoJSONSourceData("geojson-data-2", update); err != nil {
-		t.Fatalf("SetGeoJSONSourceData(reused handle): %v", err)
-	}
+	completion, err := m.SetGeoJSONSourceData("geojson-data", update)
+	requireCommandCommitted(t, completion, err)
+	completion, err = m.SetGeoJSONSourceData("geojson-data-2", update)
+	requireCommandCommitted(t, completion, err)
 	if err := update.Close(); err != nil {
 		t.Fatalf("update Close(): %v", err)
 	}
@@ -431,9 +404,8 @@ func TestGeoJSONSourceDataPrepareAndInstall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewGeoJSONSourceData(mismatched): %v", err)
 	}
-	if err := m.SetGeoJSONSourceData("geojson-data", mismatched); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("SetGeoJSONSourceData(mismatched options) error = %v, want ErrInvalidArgument", err)
-	}
+	completion, err = m.SetGeoJSONSourceData("geojson-data", mismatched)
+	requireCommandFailedWith(t, completion, err, ErrInvalidArgument)
 	if err := mismatched.Close(); err != nil {
 		t.Fatalf("mismatched Close(): %v", err)
 	}
@@ -447,22 +419,18 @@ func TestGeoJSONSourceDataPrepareAndInstall(t *testing.T) {
 	if err := data.Close(); err != nil {
 		t.Fatalf("second data Close(): %v", err)
 	}
-	if err := m.AddGeoJSONSourceData("closed-handle", data); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("AddGeoJSONSourceData(closed handle) error = %v, want ErrInvalidArgument", err)
+	if future, err := m.AddGeoJSONSourceData("closed-handle", data); future != nil || !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AddGeoJSONSourceData(closed handle) = (%v, %v), want nil and ErrInvalidArgument", future, err)
 	}
-	if err := m.SetGeoJSONSourceData("geojson-data", data); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("SetGeoJSONSourceData(closed handle) error = %v, want ErrInvalidArgument", err)
+	if future, err := m.SetGeoJSONSourceData("geojson-data", data); future != nil || !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetGeoJSONSourceData(closed handle) = (%v, %v), want nil and ErrInvalidArgument", future, err)
 	}
-	sourceType, found, err = m.StyleSourceType("geojson-data")
-	if err != nil || !found || sourceType != StyleSourceTypeGeoJSON {
-		t.Fatalf("StyleSourceType(geojson-data) after handle close = (%v, %v, %v), want GeoJSON true nil", sourceType, found, err)
+	info, found, err = takeOptionalStyleOperationForTest(m.StyleSourceInfo("geojson-data"))
+	if err != nil || !found || info.Type != StyleSourceTypeGeoJSON {
+		t.Fatalf("StyleSourceInfo(geojson-data) after handle close = (%v, %v, %v), want GeoJSON true nil", info.Type, found, err)
 	}
-	exists, err := m.StyleSourceExists("closed-handle")
-	if err != nil {
-		t.Fatalf("StyleSourceExists(closed-handle): %v", err)
-	}
-	if exists {
-		t.Fatalf("StyleSourceExists(closed-handle) = true, want false")
+	if _, found, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("closed-handle")); err != nil || found {
+		t.Fatalf("StyleSourceInfo(closed-handle) = (%v, %v), want (false, nil)", found, err)
 	}
 }
 
@@ -494,27 +462,9 @@ func TestGeoJSONSourceDataRejectsInvalidDocumentsAtPreparation(t *testing.T) {
 }
 
 func TestGeoJSONSourceClusterOptions(t *testing.T) {
-	lockOSThreadForTest(t)
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	points := []byte(`{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0,0]},"properties":{"rank":1}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.001,0.001]},"properties":{"rank":2}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.002,0.002]},"properties":{"rank":3}}]}`)
@@ -530,18 +480,18 @@ func TestGeoJSONSourceClusterOptions(t *testing.T) {
 		t.Fatalf("NewGeoJSONSourceData(clustered): %v", err)
 	}
 	clusterProperties[0] = 'x'
-	if err := m.AddGeoJSONSourceData("cluster-source", data); err != nil {
+	if _, err := m.AddGeoJSONSourceData("cluster-source", data); err != nil {
 		t.Fatalf("AddGeoJSONSourceData(clustered): %v", err)
 	}
 	if err := data.Close(); err != nil {
 		t.Fatalf("data Close(): %v", err)
 	}
-	sourceType, found, err := m.StyleSourceType("cluster-source")
+	info, found, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("cluster-source"))
 	if err != nil {
-		t.Fatalf("StyleSourceType(cluster-source): %v", err)
+		t.Fatalf("StyleSourceInfo(cluster-source): %v", err)
 	}
-	if !found || sourceType != StyleSourceTypeGeoJSON {
-		t.Fatalf("StyleSourceType(cluster-source) = (%v, %v), want GeoJSON true", sourceType, found)
+	if !found || info.Type != StyleSourceTypeGeoJSON {
+		t.Fatalf("StyleSourceInfo(cluster-source) type = (%v, %v), want GeoJSON true", info.Type, found)
 	}
 	// Different cluster aggregations would change cluster feature properties
 	// under the source's layers, so the options match rejects them.
@@ -550,9 +500,8 @@ func TestGeoJSONSourceClusterOptions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewGeoJSONSourceData(updated cluster properties): %v", err)
 	}
-	if err := m.SetGeoJSONSourceData("cluster-source", update); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("SetGeoJSONSourceData(updated cluster properties) error = %v, want ErrInvalidArgument", err)
-	}
+	completion, err := m.SetGeoJSONSourceData("cluster-source", update)
+	requireCommandFailedWith(t, completion, err, ErrInvalidArgument)
 	if err := update.Close(); err != nil {
 		t.Fatalf("update Close(): %v", err)
 	}
@@ -587,30 +536,12 @@ func TestGeoJSONSourceClusterOptions(t *testing.T) {
 	}
 }
 
-// Preparation touches no runtime or map, so a plain goroutine prepares data
-// that installs on the map owner thread, and another goroutine releases it.
+// Preparation touches no runtime or map, so one goroutine prepares data,
+// another installs it on the map, and a third releases it.
 func TestGeoJSONSourceDataPreparesOnAnotherGoroutine(t *testing.T) {
-	lockOSThreadForTest(t)
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 
@@ -627,9 +558,8 @@ func TestGeoJSONSourceDataPreparesOnAnotherGoroutine(t *testing.T) {
 	if result.err != nil {
 		t.Fatalf("NewGeoJSONSourceData() on a goroutine: %v", result.err)
 	}
-	if err := m.AddGeoJSONSourceData("worker-prepared", result.data); err != nil {
-		t.Fatalf("AddGeoJSONSourceData(worker prepared): %v", err)
-	}
+	completion, err := m.AddGeoJSONSourceData("worker-prepared", result.data)
+	requireCommandCommitted(t, completion, err)
 	closed := make(chan error)
 	go func() {
 		closed <- result.data.Close()
@@ -637,125 +567,70 @@ func TestGeoJSONSourceDataPreparesOnAnotherGoroutine(t *testing.T) {
 	if err := <-closed; err != nil {
 		t.Fatalf("Close() on a goroutine: %v", err)
 	}
-	sourceType, found, err := m.StyleSourceType("worker-prepared")
-	if err != nil || !found || sourceType != StyleSourceTypeGeoJSON {
-		t.Fatalf("StyleSourceType(worker-prepared) = (%v, %v, %v), want GeoJSON true nil", sourceType, found, err)
+	info, found, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("worker-prepared"))
+	if err != nil || !found || info.Type != StyleSourceTypeGeoJSON {
+		t.Fatalf("StyleSourceInfo(worker-prepared) = (%v, %v, %v), want GeoJSON true nil", info.Type, found, err)
 	}
 }
 
 func TestGeoJSONSourceSynchronousTilingOverride(t *testing.T) {
-	lockOSThreadForTest(t)
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	data, err := NewGeoJSONSourceData([]byte(`{"type":"FeatureCollection","features":[]}`), nil)
 	if err != nil {
 		t.Fatalf("NewGeoJSONSourceData(): %v", err)
 	}
-	if err := m.AddGeoJSONSourceData("tracked", data); err != nil {
+	if _, err := m.AddGeoJSONSourceData("tracked", data); err != nil {
 		t.Fatalf("AddGeoJSONSourceData(): %v", err)
 	}
-	if err := m.SetGeoJSONSourceSynchronousTiling("tracked", true); err != nil {
-		t.Fatalf("SetGeoJSONSourceSynchronousTiling(true): %v", err)
-	}
+	completion, err := m.SetGeoJSONSourceSynchronousTiling("tracked", true)
+	requireCommandCommitted(t, completion, err)
 	update, err := NewGeoJSONSourceData([]byte(`{"type":"Point","coordinates":[3,4]}`), nil)
 	if err != nil {
 		t.Fatalf("NewGeoJSONSourceData(update): %v", err)
 	}
-	if err := m.SetGeoJSONSourceData("tracked", update); err != nil {
-		t.Fatalf("SetGeoJSONSourceData() under the override: %v", err)
-	}
+	completion, err = m.SetGeoJSONSourceData("tracked", update)
+	requireCommandCommitted(t, completion, err)
 	if err := update.Close(); err != nil {
 		t.Fatalf("update Close(): %v", err)
 	}
-	if err := m.SetGeoJSONSourceSynchronousTiling("tracked", false); err != nil {
-		t.Fatalf("SetGeoJSONSourceSynchronousTiling(false): %v", err)
-	}
+	completion, err = m.SetGeoJSONSourceSynchronousTiling("tracked", false)
+	requireCommandCommitted(t, completion, err)
 	if err := data.Close(); err != nil {
 		t.Fatalf("data Close(): %v", err)
 	}
-	if err := m.SetGeoJSONSourceSynchronousTiling("missing", true); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("SetGeoJSONSourceSynchronousTiling(missing source) error = %v, want ErrInvalidArgument", err)
-	}
-	if err := m.AddVectorSourceURL("vector", "https://example.invalid/tiles.json", nil); err != nil {
+	// A missing source is not found, while a source of another type is a type
+	// mismatch the command reports as an invalid argument.
+	completion, err = m.SetGeoJSONSourceSynchronousTiling("missing", true)
+	requireCommandFailedWith(t, completion, err, ErrNotFound)
+	if _, err := m.AddVectorSourceURL("vector", "https://example.invalid/tiles.json", nil); err != nil {
 		t.Fatalf("AddVectorSourceURL(): %v", err)
 	}
-	if err := m.SetGeoJSONSourceSynchronousTiling("vector", true); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("SetGeoJSONSourceSynchronousTiling(non-GeoJSON source) error = %v, want ErrInvalidArgument", err)
-	}
+	completion, err = m.SetGeoJSONSourceSynchronousTiling("vector", true)
+	requireCommandFailedWith(t, completion, err, ErrInvalidArgument)
 }
 
 func TestAddStyleSourceJSONCopiesGoBuffer(t *testing.T) {
-	stdruntime.LockOSThread()
-	defer stdruntime.UnlockOSThread()
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	source := []byte(`{"type":"geojson","data":{"type":"FeatureCollection","features":[]},"attribution":"unit-test"}`)
-	if err := m.AddStyleSourceJSON("go-json-source", source); err != nil {
+	if _, err := m.AddStyleSourceJSON("go-json-source", source); err != nil {
 		t.Fatalf("AddStyleSourceJSON(): %v", err)
 	}
 	source[0] = 'x'
-	exists, err := m.StyleSourceExists("go-json-source")
-	if err != nil {
-		t.Fatalf("StyleSourceExists(): %v", err)
-	}
-	if !exists {
-		t.Fatalf("StyleSourceExists(go-json-source) = false, want true")
-	}
-	sourceType, found, err := m.StyleSourceType("go-json-source")
-	if err != nil {
-		t.Fatalf("StyleSourceType(): %v", err)
-	}
-	if !found || sourceType != StyleSourceTypeGeoJSON {
-		t.Fatalf("StyleSourceType(go-json-source) = (%v, %v), want GeoJSON true", sourceType, found)
-	}
-	info, found, err := m.StyleSourceInfo("go-json-source")
+	info, found, err := takeOptionalStyleOperationForTest(m.StyleSourceInfo("go-json-source"))
 	if err != nil {
 		t.Fatalf("StyleSourceInfo(): %v", err)
 	}
-	if !found || info.IDSize != uint64(len("go-json-source")) {
-		t.Fatalf("StyleSourceInfo(go-json-source) = (%#v, %v), want copied ID size", info, found)
+	if !found || info.Type != StyleSourceTypeGeoJSON {
+		t.Fatalf("StyleSourceInfo(go-json-source) type = (%v, %v), want GeoJSON true", info.Type, found)
 	}
-	if err := m.AddStyleSourceJSON("bad-json-source", []byte(`NaN`)); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("AddStyleSourceJSON(non-finite JSON double) error = %v, want ErrInvalidArgument", err)
-	}
+	completion, err := m.AddStyleSourceJSON("bad-json-source", []byte(`NaN`))
+	requireStyleCommandFailed(t, completion, err)
 }

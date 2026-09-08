@@ -136,6 +136,131 @@ impl AnimationOptions {
     }
 }
 
+/// Transition behavior for one atomic camera update.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum CameraUpdateMode {
+    #[default]
+    Jump,
+    Ease,
+    Fly,
+}
+
+impl CameraUpdateMode {
+    fn to_native(self) -> u32 {
+        match self {
+            Self::Jump => sys::MLN_CAMERA_UPDATE_MODE_JUMP,
+            Self::Ease => sys::MLN_CAMERA_UPDATE_MODE_EASE,
+            Self::Fly => sys::MLN_CAMERA_UPDATE_MODE_FLY,
+        }
+    }
+}
+
+/// Gesture boundary carried atomically with a camera update.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum GesturePhase {
+    #[default]
+    None,
+    Begin,
+    Update,
+    End,
+    Cancel,
+}
+
+impl GesturePhase {
+    fn to_native(self) -> u32 {
+        match self {
+            Self::None => sys::MLN_GESTURE_PHASE_NONE,
+            Self::Begin => sys::MLN_GESTURE_PHASE_BEGIN,
+            Self::Update => sys::MLN_GESTURE_PHASE_UPDATE,
+            Self::End => sys::MLN_GESTURE_PHASE_END,
+            Self::Cancel => sys::MLN_GESTURE_PHASE_CANCEL,
+        }
+    }
+}
+
+/// One copied, atomic camera command.
+#[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
+pub struct CameraUpdate {
+    pub mode: CameraUpdateMode,
+    pub camera: CameraOptions,
+    pub animation: AnimationOptions,
+    pub gesture_phase: GesturePhase,
+}
+
+impl CameraUpdate {
+    fn to_native(&self) -> sys::mln_camera_update {
+        // SAFETY: the default constructor initializes this ABI version's size.
+        let mut raw = unsafe { sys::mln_camera_update_default() };
+        raw.mode = self.mode.to_native();
+        raw.camera = self.camera.to_native();
+        raw.animation = self.animation.to_native();
+        raw.gesture_phase = self.gesture_phase.to_native();
+        raw
+    }
+}
+
+/// Relative camera operation kind.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum CameraDeltaKind {
+    #[default]
+    Move,
+    Scale,
+    Bearing,
+    Pitch,
+}
+
+/// One relative camera operation.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct CameraDelta {
+    pub kind: CameraDeltaKind,
+    pub offset: ScreenPoint,
+    pub amount: f64,
+    pub anchor: Option<ScreenPoint>,
+    pub animation: AnimationOptions,
+}
+
+impl Default for CameraDelta {
+    fn default() -> Self {
+        Self {
+            kind: CameraDeltaKind::Move,
+            offset: ScreenPoint::new(0.0, 0.0),
+            amount: 0.0,
+            anchor: None,
+            animation: AnimationOptions::default(),
+        }
+    }
+}
+
+impl CameraDelta {
+    fn to_native(&self) -> sys::mln_camera_delta {
+        // SAFETY: the default constructor initializes this ABI version's size.
+        let mut raw = unsafe { sys::mln_camera_delta_default() };
+        raw.kind = match self.kind {
+            CameraDeltaKind::Move => sys::MLN_CAMERA_DELTA_MOVE,
+            CameraDeltaKind::Scale => sys::MLN_CAMERA_DELTA_SCALE,
+            CameraDeltaKind::Bearing => sys::MLN_CAMERA_DELTA_BEARING,
+            CameraDeltaKind::Pitch => sys::MLN_CAMERA_DELTA_PITCH,
+        };
+        raw.offset = screen_point_to_native(self.offset);
+        raw.amount = self.amount;
+        if let Some(anchor) = self.anchor {
+            raw.has_anchor = true;
+            raw.anchor = screen_point_to_native(anchor);
+        }
+        raw.animation = self.animation.to_native();
+        raw
+    }
+}
+
+/// Camera and publication generation returned by a snapshot or ordered query.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CameraSnapshot {
+    pub generation: u64,
+    pub camera: CameraOptions,
+}
+
 /// Optional fitting controls for camera-for-viewport queries.
 #[derive(Debug, Clone, PartialEq, Default)]
 #[non_exhaustive]
@@ -352,6 +477,28 @@ pub fn projection_mode_to_native(mode: &ProjectionMode) -> sys::mln_projection_m
 
 pub fn projection_mode_from_native(raw: sys::mln_projection_mode) -> ProjectionMode {
     ProjectionMode::from_native(raw)
+}
+
+#[doc(hidden)]
+pub trait CameraUpdateNativeExt {
+    fn to_native(&self) -> sys::mln_camera_update;
+}
+
+#[doc(hidden)]
+pub trait CameraDeltaNativeExt {
+    fn to_native(&self) -> sys::mln_camera_delta;
+}
+
+impl CameraDeltaNativeExt for CameraDelta {
+    fn to_native(&self) -> sys::mln_camera_delta {
+        CameraDelta::to_native(self)
+    }
+}
+
+impl CameraUpdateNativeExt for CameraUpdate {
+    fn to_native(&self) -> sys::mln_camera_update {
+        CameraUpdate::to_native(self)
+    }
 }
 
 #[doc(hidden)]
@@ -583,5 +730,78 @@ mod tests {
             std::mem::size_of::<sys::mln_projection_mode>() as u32
         );
         assert_eq!(projection_mode_from_native(raw_projection), projection);
+    }
+
+    #[test]
+    // Spec coverage: BND-060 and BND-061.
+    fn camera_updates_and_deltas_map_every_mode_phase_and_kind() {
+        for (mode, raw_mode) in [
+            (CameraUpdateMode::Jump, sys::MLN_CAMERA_UPDATE_MODE_JUMP),
+            (CameraUpdateMode::Ease, sys::MLN_CAMERA_UPDATE_MODE_EASE),
+            (CameraUpdateMode::Fly, sys::MLN_CAMERA_UPDATE_MODE_FLY),
+        ] {
+            for (phase, raw_phase) in [
+                (GesturePhase::None, sys::MLN_GESTURE_PHASE_NONE),
+                (GesturePhase::Begin, sys::MLN_GESTURE_PHASE_BEGIN),
+                (GesturePhase::Update, sys::MLN_GESTURE_PHASE_UPDATE),
+                (GesturePhase::End, sys::MLN_GESTURE_PHASE_END),
+                (GesturePhase::Cancel, sys::MLN_GESTURE_PHASE_CANCEL),
+            ] {
+                let update = CameraUpdate {
+                    mode,
+                    gesture_phase: phase,
+                    animation: AnimationOptions {
+                        transition_id: Some(9),
+                        ..AnimationOptions::default()
+                    },
+                    ..CameraUpdate::default()
+                };
+                let raw = update.to_native();
+
+                assert_eq!(
+                    raw.size,
+                    std::mem::size_of::<sys::mln_camera_update>() as u32
+                );
+                assert_eq!(raw.mode, raw_mode);
+                assert_eq!(raw.gesture_phase, raw_phase);
+                assert_ne!(
+                    raw.animation.fields & sys::MLN_ANIMATION_OPTION_TRANSITION_ID,
+                    0
+                );
+                assert_eq!(raw.animation.transition_id, 9);
+            }
+        }
+
+        for (kind, raw_kind) in [
+            (CameraDeltaKind::Move, sys::MLN_CAMERA_DELTA_MOVE),
+            (CameraDeltaKind::Scale, sys::MLN_CAMERA_DELTA_SCALE),
+            (CameraDeltaKind::Bearing, sys::MLN_CAMERA_DELTA_BEARING),
+            (CameraDeltaKind::Pitch, sys::MLN_CAMERA_DELTA_PITCH),
+        ] {
+            let mut delta = CameraDelta {
+                kind,
+                offset: ScreenPoint::new(3.0, -4.0),
+                amount: 1.5,
+                ..CameraDelta::default()
+            };
+            let raw = delta.to_native();
+
+            assert_eq!(
+                raw.size,
+                std::mem::size_of::<sys::mln_camera_delta>() as u32
+            );
+            assert_eq!(raw.kind, raw_kind);
+            assert_eq!(raw.offset.x, 3.0);
+            assert_eq!(raw.offset.y, -4.0);
+            assert_eq!(raw.amount, 1.5);
+            // An absent anchor leaves the anchor field unread.
+            assert!(!raw.has_anchor);
+
+            delta.anchor = Some(ScreenPoint::new(8.0, 9.0));
+            let anchored = delta.to_native();
+            assert!(anchored.has_anchor);
+            assert_eq!(anchored.anchor.x, 8.0);
+            assert_eq!(anchored.anchor.y, 9.0);
+        }
     }
 }

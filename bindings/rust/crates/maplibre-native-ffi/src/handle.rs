@@ -1,140 +1,130 @@
-use std::marker::PhantomData;
-use std::rc::Rc;
-use std::sync::Mutex;
-
-use maplibre_native_ffi_core::{
-    self as maplibre_core,
-    handle::{NativeHandle, NativeHandleState},
-};
-use maplibre_native_ffi_sys as sys;
+use maplibre_native_ffi_core::{self as maplibre_core, handle::NativeHandle};
 
 use crate::{Error, Result};
 
 #[derive(Debug)]
-pub(crate) struct ThreadAffineNativeHandle<T: NativeHandle> {
-    state: NativeHandleState<T>,
-    destroy: unsafe extern "C" fn(T) -> sys::mln_status,
-    _thread_affine: PhantomData<Rc<()>>,
+enum ConcurrentHandleState<T> {
+    Live(T),
+    Closing,
+    Closed,
 }
 
 #[derive(Debug)]
 pub(crate) struct ConcurrentNativeHandle<T: NativeHandle> {
-    state: Mutex<NativeHandleState<T>>,
-    destroy: unsafe extern "C" fn(T) -> sys::mln_status,
+    state: std::sync::Mutex<ConcurrentHandleState<T>>,
+    /// Signalled when a close attempt leaves `Closing`. It pairs with `state`
+    /// alone: a `Condvar` may only ever be waited on with one mutex, so each
+    /// handle carries its own.
+    close_finished: std::sync::Condvar,
+    type_name: &'static str,
 }
 
 impl<T: NativeHandle> ConcurrentNativeHandle<T> {
-    /// Takes ownership of a native handle that the C API accepts from any thread.
+    /// Takes ownership of a native handle whose registry and control state are
+    /// safe to inspect from any thread.
     ///
     /// # Safety
     ///
-    /// `handle` must be a live handle of the matching native type owned by the
-    /// caller. `destroy` must release exactly that handle type.
-    pub(crate) unsafe fn from_handle(
-        handle: T,
-        destroy: unsafe extern "C" fn(T) -> sys::mln_status,
-        type_name: &'static str,
-    ) -> Result<Self> {
+    /// `handle` must be a live owned handle of the matching native type.
+    pub(crate) unsafe fn from_handle(handle: T, type_name: &'static str) -> Result<Self> {
+        if handle.to_raw() == 0 {
+            return Err(Error::invalid_argument(format!(
+                "{type_name} handle must not be zero"
+            )));
+        }
         Ok(Self {
-            // SAFETY: The caller promises handle is an owned live handle of the
-            // matching native type.
-            state: Mutex::new(unsafe { NativeHandleState::from_handle(handle, type_name) }?),
-            destroy,
+            state: std::sync::Mutex::new(ConcurrentHandleState::Live(handle)),
+            close_finished: std::sync::Condvar::new(),
+            type_name,
         })
     }
 
     pub(crate) fn live_handle(&self) -> Option<T> {
-        self.state
+        match *self
+            .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .live_handle()
+        {
+            ConcurrentHandleState::Live(handle) => Some(handle),
+            ConcurrentHandleState::Closing | ConcurrentHandleState::Closed => None,
+        }
     }
 
     pub(crate) fn is_closed(&self) -> bool {
-        self.state
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .is_closed()
+        matches!(
+            *self
+                .state
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            ConcurrentHandleState::Closed
+        )
     }
 
-    pub(crate) fn close(&self) -> Result<()> {
-        let state = self
-            .state
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        // SAFETY: from_handle binds this state to its matching destroy function.
-        unsafe { state.close_status(self.destroy) }
-    }
-}
-
-impl<T: NativeHandle> Drop for ConcurrentNativeHandle<T> {
-    fn drop(&mut self) {
-        let state = self
-            .state
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let id = state.id().unwrap_or_default();
-        // SAFETY: from_handle binds this state to its matching destroy function.
-        if unsafe { state.close_status(self.destroy) }.is_err() {
-            maplibre_core::handle::report_leak(maplibre_core::handle::NativeHandleLeak {
-                type_name: state.type_name(),
-                id,
-            });
+    pub(crate) fn close_with<R>(&self, close: impl FnOnce(T) -> Result<R>) -> Result<Option<R>> {
+        let mut close = Some(close);
+        loop {
+            let mut state = self
+                .state
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            match *state {
+                ConcurrentHandleState::Live(handle) => {
+                    *state = ConcurrentHandleState::Closing;
+                    drop(state);
+                    let result = close.take().expect("close callback runs once")(handle);
+                    let mut state = self
+                        .state
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner());
+                    *state = if result.is_ok() {
+                        ConcurrentHandleState::Closed
+                    } else {
+                        ConcurrentHandleState::Live(handle)
+                    };
+                    self.close_finished.notify_all();
+                    return result.map(Some);
+                }
+                ConcurrentHandleState::Closing => {
+                    state = self
+                        .close_finished
+                        .wait(state)
+                        .unwrap_or_else(|poisoned| poisoned.into_inner());
+                    drop(state);
+                }
+                ConcurrentHandleState::Closed => return Ok(None),
+            }
         }
     }
-}
 
-impl<T: NativeHandle> ThreadAffineNativeHandle<T> {
-    /// Takes ownership of a native thread-affine handle.
-    ///
-    /// # Safety
-    ///
-    /// `handle` must be a live handle of the matching native type owned by the
-    /// caller. `destroy` must be the C API function that releases exactly that
-    /// handle type and returns a status without taking ownership on failure.
-    pub(crate) unsafe fn from_handle(
-        handle: T,
-        destroy: unsafe extern "C" fn(T) -> sys::mln_status,
-        type_name: &'static str,
-    ) -> Result<Self> {
-        Ok(Self {
-            // SAFETY: The caller promises handle is an owned live handle of the
-            // matching native type.
-            state: unsafe { NativeHandleState::from_handle(handle, type_name) }?,
-            destroy,
-            _thread_affine: PhantomData,
-        })
-    }
-
-    pub(crate) fn live_handle(&self) -> Option<T> {
-        self.state.live_handle()
-    }
-
-    pub(crate) fn is_closed(&self) -> bool {
-        self.state.is_closed()
-    }
-
-    pub(crate) fn close(&self) -> Result<()> {
-        // SAFETY: from_handle binds this Rust handle to the matching C API
-        // destroy function for its owned native handle.
-        unsafe { self.state.close_status(self.destroy) }
+    pub(crate) fn leak_for_report(&self) {
+        let handle = {
+            let mut state = self
+                .state
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            match *state {
+                ConcurrentHandleState::Live(handle) => {
+                    *state = ConcurrentHandleState::Closed;
+                    Some(handle)
+                }
+                ConcurrentHandleState::Closing | ConcurrentHandleState::Closed => None,
+            }
+        };
+        let Some(handle) = handle else { return };
+        maplibre_core::handle::report_leak(maplibre_core::handle::NativeHandleLeak {
+            type_name: self.type_name,
+            id: handle.to_raw(),
+        });
     }
 }
 
-impl<T: NativeHandle> Drop for ThreadAffineNativeHandle<T> {
-    fn drop(&mut self) {
-        // Drop cannot return an error and must not panic, so a destroy that
-        // reports failure leaves the handle live and goes to the leak channel.
-        let id = self.state.id().unwrap_or_default();
-        // SAFETY: from_handle binds this Rust handle to the matching C API
-        // destroy function for its owned native handle.
-        if unsafe { self.state.close_status(self.destroy) }.is_err() {
-            maplibre_core::handle::report_leak(maplibre_core::handle::NativeHandleLeak {
-                type_name: self.state.type_name(),
-                id,
-            });
-        }
-    }
+/// Recovers a mutex guard after a panic poisoned the lock. The state these
+/// wrappers guard is a handle or a completion result, which stays consistent
+/// across a panic, so a poisoned lock is not a reason to fail a native call.
+pub(crate) fn lock<T>(mutex: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 pub(crate) fn closed_handle_error(type_name: &'static str) -> Error {
@@ -150,64 +140,54 @@ pub(crate) fn out_handle<T: NativeHandle>(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
-    use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Barrier, mpsc};
+    use std::time::Duration;
+
+    use maplibre_native_ffi_sys as sys;
 
     use super::*;
 
-    static DESTROY_COUNT: AtomicUsize = AtomicUsize::new(0);
-    static DESTROY_STATUS: AtomicI32 = AtomicI32::new(sys::MLN_STATUS_OK);
-    static DESTROY_TEST_LOCK: Mutex<()> = Mutex::new(());
-
-    /// A synthetic map handle for close-once tests. It reaches only
-    /// `count_destroy` below, never the C API. The kind byte matches a map so
-    /// a value escaping into a diagnostic reads as one.
-    const TEST_HANDLE: sys::mln_map = sys::mln_map(0x0200_0000_0000_002a);
-
-    unsafe extern "C" fn count_destroy(handle: sys::mln_map) -> sys::mln_status {
-        if handle.0 != 0 {
-            DESTROY_COUNT.fetch_add(1, Ordering::SeqCst);
-        }
-        DESTROY_STATUS.load(Ordering::SeqCst)
-    }
-
-    fn test_handle() -> ThreadAffineNativeHandle<sys::mln_map> {
-        DESTROY_COUNT.store(0, Ordering::SeqCst);
-        DESTROY_STATUS.store(sys::MLN_STATUS_OK, Ordering::SeqCst);
-
-        // SAFETY: count_destroy only records calls and never reaches native.
-        unsafe { ThreadAffineNativeHandle::from_handle(TEST_HANDLE, count_destroy, "test_handle") }
-            .unwrap()
-    }
-
     #[test]
-    // Spec coverage: BND-040.
-    fn close_is_internally_idempotent_after_success() {
-        let _guard = DESTROY_TEST_LOCK.lock().unwrap();
-        let handle = test_handle();
+    fn concurrent_close_calls_native_once_and_waits_for_the_winner() {
+        let handle = Arc::new(unsafe {
+            ConcurrentNativeHandle::from_handle(sys::mln_render_session(1), "test session").unwrap()
+        });
+        let entered = Arc::new(Barrier::new(2));
+        let finish = Arc::new(Barrier::new(2));
+        let calls = Arc::new(AtomicUsize::new(0));
 
-        handle.close().unwrap();
-        handle.close().unwrap();
+        let first_handle = Arc::clone(&handle);
+        let first_entered = Arc::clone(&entered);
+        let first_finish = Arc::clone(&finish);
+        let first_calls = Arc::clone(&calls);
+        let first = std::thread::spawn(move || {
+            first_handle
+                .close_with(|_| {
+                    first_calls.fetch_add(1, Ordering::Relaxed);
+                    first_entered.wait();
+                    first_finish.wait();
+                    Ok(())
+                })
+                .unwrap()
+        });
 
-        assert_eq!(DESTROY_COUNT.load(Ordering::SeqCst), 1);
+        entered.wait();
         assert!(handle.live_handle().is_none());
-    }
+        let second_handle = Arc::clone(&handle);
+        let (sender, receiver) = mpsc::channel();
+        let second = std::thread::spawn(move || {
+            sender
+                .send(second_handle.close_with(|_| Ok(())).unwrap())
+                .unwrap();
+        });
+        assert!(receiver.recv_timeout(Duration::from_millis(20)).is_err());
+        finish.wait();
 
-    #[test]
-    // Spec coverage: BND-041.
-    fn failed_close_leaves_handle_live_for_later_close() {
-        let _guard = DESTROY_TEST_LOCK.lock().unwrap();
-        let handle = test_handle();
-        DESTROY_STATUS.store(sys::MLN_STATUS_INVALID_STATE, Ordering::SeqCst);
-
-        let error = handle.close().unwrap_err();
-        assert_eq!(error.kind(), crate::ErrorKind::InvalidState);
-        assert_eq!(handle.live_handle().unwrap().0, TEST_HANDLE.0);
-
-        DESTROY_STATUS.store(sys::MLN_STATUS_OK, Ordering::SeqCst);
-        handle.close().unwrap();
-
-        assert_eq!(DESTROY_COUNT.load(Ordering::SeqCst), 2);
-        assert!(handle.live_handle().is_none());
+        assert_eq!(first.join().unwrap(), Some(()));
+        assert_eq!(receiver.recv_timeout(Duration::from_secs(1)).unwrap(), None);
+        second.join().unwrap();
+        assert_eq!(calls.load(Ordering::Relaxed), 1);
+        assert!(handle.is_closed());
     }
 }

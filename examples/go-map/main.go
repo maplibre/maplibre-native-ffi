@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"runtime"
+	stdruntime "runtime"
 	"strings"
 
 	"github.com/jfreymuth/go-sdl3/sdl"
@@ -13,8 +13,9 @@ import (
 )
 
 func main() {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
+	// SDL and OpenGL keep the render-session graphics calls on this thread.
+	stdruntime.LockOSThread()
+	defer stdruntime.UnlockOSThread()
 
 	mode, ok := parseArgs(os.Args[1:])
 	if !ok {
@@ -104,41 +105,27 @@ func run(mode renderTargetMode) (result error) {
 	}
 	_ = sdl.GL_SetSwapInterval(1)
 
-	shared := newSharedState()
-	commands := &commandQueue{}
-	published := make(chan runtimeLoopHandles, 1)
-	runtimeDone := make(chan struct{})
-	go func() {
-		defer close(runtimeDone)
-		runRuntimeLoop(view, commands, published, shared)
-	}()
-	handles, ok := <-published
-	if !ok {
-		<-runtimeDone
-		_ = graphics.Close()
-		if failure := shared.firstFailure(); failure != nil {
-			return fmt.Errorf("runtime loop startup failed: %w", failure)
-		}
-		return errors.New("runtime loop stopped before publishing the map")
-	}
-
-	state, err := newRenderMapState(graphics, handles.mapRef, view, mode)
+	mapState, err := newRuntimeMapState(view)
 	if err != nil {
-		shared.requestShutdown()
-		_ = handles.wake.Signal()
-		<-runtimeDone
+		_ = graphics.Close()
+		return err
+	}
+	state, err := newRenderMapState(graphics, mapState.mapRef, view, mode)
+	if err != nil {
 		return errors.Join(
 			fmt.Errorf("render target attach failed: %w", err),
-			shared.firstFailure(),
+			mapState.Close(),
 			graphics.Close(),
 		)
 	}
 	defer func() {
-		result = errors.Join(result, state.finishFrame(), state.closeTarget())
-		shared.requestShutdown()
-		_ = handles.wake.Signal()
-		<-runtimeDone
-		result = errors.Join(result, shared.firstFailure(), graphics.Close())
+		result = errors.Join(
+			result,
+			state.finishFrame(),
+			state.closeTarget(),
+			mapState.Close(),
+			graphics.Close(),
+		)
 	}()
 
 	fmt.Printf("render target: %s\n", mode)
@@ -146,6 +133,8 @@ func run(mode renderTargetMode) (result error) {
 	logControls()
 
 	running := true
+	renderRequested := true
+	viewportDirty := false
 	input := inputController{}
 	handleEvent := func(event *sdl.Event) error {
 		switch event.Type() {
@@ -157,27 +146,23 @@ func run(mode renderTargetMode) (result error) {
 			if view.empty() {
 				return nil
 			}
-			if err := state.resize(view); err != nil {
-				return err
-			}
-			shared.requestRender()
+			viewportDirty = true
+			renderRequested = true
 		default:
 			if view.empty() {
 				return nil
 			}
-			if input.handleEvent(event, commands, view) {
-				if err := handles.wake.Signal(); err != nil {
-					return fmt.Errorf("wake runtime loop failed: %w", err)
-				}
-				shared.requestRender()
+			changed, err := input.handleEvent(event, mapState, view)
+			if err != nil {
+				return err
+			}
+			if changed {
+				renderRequested = true
 			}
 		}
 		return nil
 	}
 	for running {
-		if failure := shared.firstFailure(); failure != nil {
-			return fmt.Errorf("runtime loop failed: %w", failure)
-		}
 		didWork := false
 		var event sdl.Event
 		for sdl.PollEvent(&event) {
@@ -186,16 +171,41 @@ func run(mode renderTargetMode) (result error) {
 				return err
 			}
 		}
+		requested, err := drainEvents(mapState.runtime, mapState.mapID)
+		if err != nil {
+			return err
+		}
+		if requested {
+			renderRequested = true
+			didWork = true
+		}
 
-		if shared.consumeRenderRequest() && !view.empty() && running {
-			rendered, err := state.renderUpdate()
+		targetPending, err := state.pollPending()
+		if err != nil {
+			return err
+		}
+		if !targetPending && viewportDirty && !view.empty() {
+			viewportDirty = false
+			// The session resize carries the new logical extent to the map, so
+			// this loop starts one and never resizes the map itself. Starting
+			// it here instead of from the resize event coalesces a live resize
+			// into one outstanding submission.
+			if err := state.resize(view); err != nil {
+				return err
+			}
+			targetPending = true
+		}
+		if !targetPending && renderRequested && !view.empty() && running {
+			renderRequested = false
+			outcome, err := state.driveFrame()
 			if err != nil {
 				return err
 			}
-			if rendered {
+			if outcome.rendered {
 				didWork = true
-			} else {
-				shared.requestRender()
+			}
+			if !outcome.rendered || outcome.needsRepaint {
+				renderRequested = true
 			}
 		}
 		if err := state.finishFrame(); err != nil {
@@ -244,7 +254,7 @@ func validateNativeRenderBackend() error {
 	}
 	providers := maplibre.SupportedOpenGLContextProviders()
 	required := maplibre.OpenGLContextProviderEGL
-	if runtime.GOOS == "windows" {
+	if stdruntime.GOOS == "windows" {
 		required = maplibre.OpenGLContextProviderWGL
 	}
 	if !providers.Has(required) {

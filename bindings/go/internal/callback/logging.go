@@ -7,36 +7,52 @@ package callback
 #include "../cgo_shim.h"
 
 extern uint32_t goMaplibreLogCallback(void* user_data, uint32_t severity, uint32_t event, int64_t code, const char* message);
+extern void goMaplibreReleaseCallbackState(void* user_data);
 */
 import "C"
 
 import (
+	"runtime/cgo"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 )
+
+// liveLogCallbacks counts the log callback states this package holds a cgo
+// handle for. LogCallbackLiveCountForTest reads it.
+var liveLogCallbacks atomic.Int64
+
+// LogCallbackLiveCountForTest reports how many log callback states are still
+// alive, which is how a test observes that the C API's release callback freed
+// one.
+func LogCallbackLiveCountForTest() int64 {
+	return liveLogCallbacks.Load()
+}
 
 // LogCallback is the internal shape for process-global log callbacks.
 type LogCallback func(severity uint32, event uint32, code int64, message string) bool
 
-var logState struct {
-	sync.Mutex
-	active   bool
+type LogCallbackState struct {
 	callback LogCallback
+	handle   cgo.Handle
+	once     sync.Once
 }
 
-var logInstallMu sync.Mutex
+func newLogCallbackState(callback LogCallback) *LogCallbackState {
+	state := &LogCallbackState{callback: callback}
+	state.handle = cgo.NewHandle(state)
+	liveLogCallbacks.Add(1)
+	return state
+}
 
-var (
-	setNativeLogCallback = func() int32 {
-		return int32(C.mln_log_set_callback(
-			C.mln_log_callback(C.goMaplibreLogCallback),
-			nil,
-		))
+func (state *LogCallbackState) Release() {
+	if state != nil {
+		state.once.Do(func() {
+			state.handle.Delete()
+			liveLogCallbacks.Add(-1)
+		})
 	}
-	clearNativeLogCallback = func() int32 {
-		return int32(C.mln_log_clear_callback())
-	}
-)
+}
 
 // SetLogCallback installs or replaces the process-global native log callback.
 func SetLogCallback(callback LogCallback) int32 {
@@ -44,13 +60,14 @@ func SetLogCallback(callback LogCallback) int32 {
 		return ClearLogCallback()
 	}
 
-	logInstallMu.Lock()
-	defer logInstallMu.Unlock()
-
-	oldCallback, oldActive := swapCurrentLogCallback(callback, true)
-	status := setNativeLogCallback()
+	state := newLogCallbackState(callback)
+	status := int32(C.mln_log_set_callback(
+		C.mln_log_callback(C.goMaplibreLogCallback),
+		C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
+		C.mln_log_callback_release(C.goMaplibreReleaseCallbackState),
+	))
 	if status != int32(C.MLN_STATUS_OK) {
-		swapCurrentLogCallback(oldCallback, oldActive)
+		state.Release()
 		return status
 	}
 	return int32(C.MLN_STATUS_OK)
@@ -58,16 +75,7 @@ func SetLogCallback(callback LogCallback) int32 {
 
 // ClearLogCallback clears the process-global native log callback.
 func ClearLogCallback() int32 {
-	logInstallMu.Lock()
-	defer logInstallMu.Unlock()
-
-	oldCallback, oldActive := swapCurrentLogCallback(nil, false)
-	status := clearNativeLogCallback()
-	if status != int32(C.MLN_STATUS_OK) {
-		swapCurrentLogCallback(oldCallback, oldActive)
-		return status
-	}
-	return int32(C.MLN_STATUS_OK)
+	return int32(C.mln_log_clear_callback())
 }
 
 // SetAsyncLogSeverityMask sets the native asynchronous logging severity mask.
@@ -75,35 +83,14 @@ func SetAsyncLogSeverityMask(mask uint32) int32 {
 	return int32(C.mln_log_set_async_severity_mask(C.uint32_t(mask)))
 }
 
-func currentLogCallback() LogCallback {
-	logState.Lock()
-	defer logState.Unlock()
-	if !logState.active {
-		return nil
-	}
-	return logState.callback
-}
-
-func swapCurrentLogCallback(callback LogCallback, active bool) (LogCallback, bool) {
-	logState.Lock()
-	defer logState.Unlock()
-	oldCallback := logState.callback
-	oldActive := logState.active
-	logState.callback = callback
-	logState.active = active
-	return oldCallback, oldActive
-}
-
 func invokeLogCallbackForTest(callback LogCallback) uint32 {
-	oldCallback, oldActive := swapCurrentLogCallback(callback, callback != nil)
-	defer func() {
-		swapCurrentLogCallback(oldCallback, oldActive)
-	}()
+	state := newLogCallbackState(callback)
+	defer state.Release()
 
 	message := C.CString("test message")
 	defer C.free(unsafe.Pointer(message))
 	return uint32(goMaplibreLogCallback(
-		nil,
+		C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
 		C.uint32_t(C.MLN_LOG_SEVERITY_INFO),
 		C.uint32_t(C.MLN_LOG_EVENT_GENERAL),
 		0,

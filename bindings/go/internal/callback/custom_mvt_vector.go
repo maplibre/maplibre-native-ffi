@@ -16,6 +16,7 @@ import (
 	"runtime/cgo"
 	"sync"
 	"sync/atomic"
+	"unsafe"
 )
 
 // liveCustomMVTVectorSources counts the callback states this package holds a
@@ -64,7 +65,7 @@ func newCustomMVTVectorSourceState(options CustomMVTVectorSourceOptions) *Custom
 // AddCustomMVTVectorSource installs a custom MVT vector source callback descriptor.
 // The C API owns the state from a successful add onwards and releases it through
 // the release callback, so a caller keeps nothing.
-func AddCustomMVTVectorSource(m uint64, sourceID string, options CustomMVTVectorSourceOptions) int32 {
+func AddCustomMVTVectorSource(m uint64, sourceID string, options CustomMVTVectorSourceOptions, completion unsafe.Pointer) int32 {
 	if options.FetchTile == nil {
 		return int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
@@ -85,7 +86,9 @@ func AddCustomMVTVectorSource(m uint64, sourceID string, options CustomMVTVector
 	raw.min_zoom = C.double(options.MinZoom)
 	raw.max_zoom = C.double(options.MaxZoom)
 
-	status := int32(C.mln_map_add_custom_mvt_vector_source(C.mln_map(m), sourceView, &raw))
+	status := int32(C.mln_map_add_custom_mvt_vector_source(
+		C.mln_map(m), sourceView, &raw, (*C.mln_completion)(completion),
+	))
 	if status != int32(C.MLN_STATUS_OK) {
 		// A failed add owes no release callback, so this call frees the state.
 		state.release()

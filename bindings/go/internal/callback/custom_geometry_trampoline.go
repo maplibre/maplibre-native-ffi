@@ -27,9 +27,8 @@ func goMaplibreCustomGeometryFetchTile(userData unsafe.Pointer, tileID C.mln_can
 }
 
 // goMaplibreCustomGeometryReleaseUserData frees one source's callback state. The
-// C API invokes it once, on the map owner thread, when it stops referencing the
-// state: on explicit removal, when a style load drops the source, or when the map
-// is destroyed.
+// C API invokes it once on native map execution: on explicit removal, when a
+// style load drops the source, or when the map closes.
 //
 //export goMaplibreCustomGeometryReleaseUserData
 func goMaplibreCustomGeometryReleaseUserData(userData unsafe.Pointer) {

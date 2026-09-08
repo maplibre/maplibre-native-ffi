@@ -37,17 +37,30 @@ extends = "ffi:preset"
 # GC.KeepAlive around a native call.
 dir = "../.."
 run = '''
+case "$usage_preset" in
+  ios-* | tvos-*)
+    echo "The .NET binding has no iOS or tvOS target." >&2
+    exit 2
+    ;;
+esac
 MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   dotnet build \
     Maplibre.NativeFfi.slnx \
     -c Release \
-    -p:Platform="Any CPU"
+    -p:Platform="Any CPU" \
+    -p:BaseOutputPath="$MISE_MONOREPO_ROOT/build/dotnet/$usage_preset/"
 '''
 
 [tasks.test]
 extends = "ffi:preset"
 dir = "../.."
 run = '''
+case "$usage_preset" in
+  ios-* | tvos-*)
+    echo "The .NET binding has no iOS or tvOS target." >&2
+    exit 2
+    ;;
+esac
 if [[ "$usage_preset" == linux-musl-* ]]; then
   exec python3 ci/dotnet_snapshot.py smoke-musl "$usage_preset"
 fi
@@ -56,5 +69,6 @@ MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   dotnet test \
     --project bindings/dotnet/tests/Maplibre.NativeFfi.Tests/Maplibre.NativeFfi.Tests.csproj \
     -c Release \
-    -p:Platform="Any CPU"
+    -p:Platform="Any CPU" \
+    -p:BaseOutputPath="$MISE_MONOREPO_ROOT/build/dotnet/$usage_preset/"
 '''

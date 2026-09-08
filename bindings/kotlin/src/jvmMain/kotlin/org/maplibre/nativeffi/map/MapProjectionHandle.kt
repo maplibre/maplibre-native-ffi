@@ -9,7 +9,11 @@ import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.NativeMapProjection
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 
-/** Any-thread JVM FFM standalone projection snapshot. */
+/**
+ * Owned JVM FFM standalone projection snapshot.
+ *
+ * See the common declaration for the projection's threading and lifetime rules.
+ */
 public actual class MapProjectionHandle
 internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
   private val core = HandleStateCore("MapProjectionHandle", handle.raw)
@@ -18,11 +22,10 @@ internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
     HandleLeakCleaner.register(this, core.leakReport)
   }
 
-  public actual val camera: CameraOptions
-    get() {
-      NativeAccess.ensureLoaded()
-      return withLiveHandle(NativeAccess::projectionCamera)
-    }
+  public actual fun camera(): CameraOptions {
+    NativeAccess.ensureLoaded()
+    return withLiveHandle { handle -> NativeAccess.projectionCamera(handle) }
+  }
 
   public actual fun setCamera(camera: CameraOptions) {
     NativeAccess.ensureLoaded()
@@ -63,8 +66,8 @@ internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
   public actual val isClosed: Boolean
     get() = core.isReleased()
 
-  public actual override fun close() {
-    core.closeOnce(destroy = { NativeAccess.destroyMapProjection(handle) })
+  actual override fun close() {
+    core.closeOnce(destroy = { NativeAccess.closeProjection(handle) })
   }
 
   private fun <T> withLiveHandle(block: (NativeMapProjection) -> T): T = core.withLive {

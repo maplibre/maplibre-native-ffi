@@ -8,8 +8,13 @@ import pytest
 from maplibre_native_ffi import render
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
+    assert_attached_session_shape,
+    close_session,
+    finish_render_operation,
+    map_extent,
     render_until,
     render_until_update,
+    request_and_finish_frame,
     skip_or_fail_fixture_setup,
 )
 
@@ -74,14 +79,6 @@ def _vulkan_borrowed_image(
         image.close()
 
 
-def _assert_public_session_shape(session: render.RenderSessionHandle) -> None:
-    assert isinstance(session, render.RenderSessionHandle)
-    assert session.closed is False
-    assert session.detached is False
-    assert callable(session.render_update)
-    assert callable(session.close)
-
-
 def _descriptor_snapshot(
     descriptor: render.VulkanBorrowedTextureDescriptor,
 ) -> tuple[object, ...]:
@@ -106,7 +103,10 @@ def _descriptor_snapshot(
 
 
 def test_invalid_vulkan_surface_attach_reports_native_status() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         with pytest.raises(
             (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
         ) as raised:
@@ -131,11 +131,12 @@ def test_vulkan_borrowed_texture_attach_reports_public_render_session_shape() ->
                     width=descriptor.extent.width,
                     height=descriptor.extent.height,
                 )
-            ) as map_handle,
+            ).result(timeout=5) as map_handle,
         ):
-            session = map_handle.attach_vulkan_borrowed_texture(descriptor)
+            session, attach = map_handle.attach_vulkan_borrowed_texture(descriptor)
             try:
-                _assert_public_session_shape(session)
+                finish_render_operation(session, attach)
+                assert_attached_session_shape(session)
 
                 map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
                 render_until_update(runtime, session)
@@ -144,7 +145,7 @@ def test_vulkan_borrowed_texture_attach_reports_public_render_session_shape() ->
                     session.acquire_vulkan_owned_texture_frame()
                 assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
             finally:
-                session.close()
+                close_session(session)
 
 
 def test_vulkan_borrowed_texture_session_close_preserves_caller_resources() -> None:
@@ -162,11 +163,12 @@ def test_vulkan_borrowed_texture_session_close_preserves_caller_resources() -> N
                     width=descriptor.extent.width,
                     height=descriptor.extent.height,
                 )
-            ) as map_handle,
+            ).result(timeout=5) as map_handle,
         ):
-            session = map_handle.attach_vulkan_borrowed_texture(descriptor)
-            _assert_public_session_shape(session)
-            session.close()
+            session, attach = map_handle.attach_vulkan_borrowed_texture(descriptor)
+            finish_render_operation(session, attach)
+            assert_attached_session_shape(session)
+            close_session(session)
 
         assert _descriptor_snapshot(descriptor) == before_descriptor
         assert (image.image, image.image_view, image.memory) == before_resources
@@ -180,9 +182,10 @@ def test_vulkan_borrowed_texture_set_target_hands_over_a_replacement() -> None:
 
     A caller-owned image is sized by its owner, so a host that follows a resize
     allocates an image at the new size and hands it over instead of resizing
-    this session. This verifies that the handoff is accepted, that the map takes
-    the extent handed with it, and that the session stays usable; the Vulkan
-    helper has no readback, so it does not check the replacement's pixels.
+    this session. This verifies that the handoff is accepted, that the session
+    renders at the replacement extent once a map resize follows the handoff, and
+    that the session stays usable; the Vulkan helper has no readback, so it does
+    not check the replacement's pixels.
     """
     _require_native_vulkan_support()
 
@@ -196,37 +199,48 @@ def test_vulkan_borrowed_texture_set_target_hands_over_a_replacement() -> None:
                     width=descriptor.extent.width,
                     height=descriptor.extent.height,
                 )
-            ) as map_handle,
+            ).result(timeout=5) as map_handle,
         ):
-            session = map_handle.attach_vulkan_borrowed_texture(descriptor)
+            session, attach = map_handle.attach_vulkan_borrowed_texture(descriptor)
+            finish_render_operation(session, attach)
             try:
                 map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
                 render_until_update(runtime, session)
 
                 with pytest.raises(mln.UnsupportedFeatureError) as raised:
-                    session.resize(48, 24, 1.0)
+                    session.resize(render.RenderTargetExtent(48, 24, 1.0))
                 assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
 
                 with _vulkan_borrowed_image(
                     context, width=48, height=24
                 ) as replacement:
                     replacement_descriptor = replacement.descriptor()
-                    session.set_vulkan_borrowed_texture_target(replacement_descriptor)
-
+                    finish_render_operation(
+                        session,
+                        session.set_vulkan_borrowed_texture_target(
+                            replacement_descriptor
+                        ),
+                    )
+                    # A retarget replaces the graphics resource only, and a
+                    # caller-owned texture has no session resize, so the map
+                    # takes the replacement extent from a map resize.
+                    map_handle.resize(48, 24, 1.0).result(timeout=5)
                     # The session kept its renderer and renders at the
-                    # extent it was handed, once the map catches up.
+                    # extent it was handed, once the map has caught up.
                     render_until(
                         runtime,
                         session,
-                        lambda: map_handle.get_size() == (48, 24, pytest.approx(1.0)),
+                        lambda: map_extent(map_handle) == (48, 24, pytest.approx(1.0)),
                         "the map never took the replacement image extent",
                     )
                     assert (
-                        session.render_update().result == render.RenderResult.RENDERED
+                        request_and_finish_frame(session).disposition
+                        == render.RenderResult.RENDERED
                     )
 
                     # A surface descriptor names a target this session
-                    # does not have.
+                    # does not have. The retarget kind is validated before the
+                    # descriptor's host handles are read.
                     with pytest.raises(mln.UnsupportedFeatureError) as raised:
                         session.set_vulkan_surface_target(
                             render.VulkanSurfaceDescriptor(
@@ -237,6 +251,6 @@ def test_vulkan_borrowed_texture_set_target_hands_over_a_replacement() -> None:
                         )
                     assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
                     # The rejection left the session usable.
-                    session.render_update()
+                    request_and_finish_frame(session)
             finally:
-                session.close()
+                close_session(session)

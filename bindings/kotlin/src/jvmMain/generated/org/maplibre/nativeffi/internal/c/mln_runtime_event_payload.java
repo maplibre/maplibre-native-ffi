@@ -21,7 +21,6 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     mln_runtime_event_offline_region_status offline_region_status;
  *     mln_runtime_event_offline_region_response_error offline_region_response_error;
  *     mln_runtime_event_offline_region_tile_count_limit offline_region_tile_count_limit;
- *     mln_runtime_event_offline_operation_completed offline_operation_completed;
  *     mln_runtime_event_camera_transition_finished camera_transition_finished;
  * }
  * }
@@ -39,7 +38,6 @@ public class mln_runtime_event_payload {
         mln_runtime_event_offline_region_status.layout().withName("offline_region_status"),
         mln_runtime_event_offline_region_response_error.layout().withName("offline_region_response_error"),
         mln_runtime_event_offline_region_tile_count_limit.layout().withName("offline_region_tile_count_limit"),
-        mln_runtime_event_offline_operation_completed.layout().withName("offline_operation_completed"),
         mln_runtime_event_camera_transition_finished.layout().withName("camera_transition_finished")
     ).withName("mln_runtime_event_payload");
 
@@ -312,50 +310,6 @@ public class mln_runtime_event_payload {
      */
     public static void offline_region_tile_count_limit(MemorySegment union, MemorySegment fieldValue) {
         MemorySegment.copy(fieldValue, 0L, union, offline_region_tile_count_limit$OFFSET, offline_region_tile_count_limit$LAYOUT.byteSize());
-    }
-
-    private static final GroupLayout offline_operation_completed$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("offline_operation_completed"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * mln_runtime_event_offline_operation_completed offline_operation_completed
-     * }
-     */
-    public static final GroupLayout offline_operation_completed$layout() {
-        return offline_operation_completed$LAYOUT;
-    }
-
-    private static final long offline_operation_completed$OFFSET = $LAYOUT.byteOffset(groupElement("offline_operation_completed"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * mln_runtime_event_offline_operation_completed offline_operation_completed
-     * }
-     */
-    public static final long offline_operation_completed$offset() {
-        return offline_operation_completed$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * mln_runtime_event_offline_operation_completed offline_operation_completed
-     * }
-     */
-    public static MemorySegment offline_operation_completed(MemorySegment union) {
-        return union.asSlice(offline_operation_completed$OFFSET, offline_operation_completed$LAYOUT.byteSize());
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * mln_runtime_event_offline_operation_completed offline_operation_completed
-     * }
-     */
-    public static void offline_operation_completed(MemorySegment union, MemorySegment fieldValue) {
-        MemorySegment.copy(fieldValue, 0L, union, offline_operation_completed$OFFSET, offline_operation_completed$LAYOUT.byteSize());
     }
 
     private static final GroupLayout camera_transition_finished$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("camera_transition_finished"));

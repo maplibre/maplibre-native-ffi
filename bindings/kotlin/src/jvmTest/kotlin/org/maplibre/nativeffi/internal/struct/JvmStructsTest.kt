@@ -23,7 +23,6 @@ import org.maplibre.nativeffi.map.TileOptions
 import org.maplibre.nativeffi.map.ViewportMode
 import org.maplibre.nativeffi.map.ViewportOptions
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
-import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.render.EglContextDescriptor
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
@@ -105,30 +104,6 @@ class JvmStructsTest {
   }
 
   @Test
-  fun featureStateSelectorEmbedsStringViewsByValue() {
-    val minimal = JvmStructs.featureStateSelectorSnapshot(FeatureStateSelector("point"))
-    assertEquals("point", minimal.sourceId)
-    assertEquals(0, minimal.fields)
-    assertEquals(null, minimal.sourceLayerId)
-    assertEquals(null, minimal.featureId)
-    assertEquals(null, minimal.stateKey)
-
-    val full =
-      JvmStructs.featureStateSelectorSnapshot(
-        FeatureStateSelector("point").apply {
-          sourceLayerId = "layer"
-          featureId = "feature-1"
-          stateKey = "hover"
-        }
-      )
-    assertEquals("point", full.sourceId)
-    assertEquals("layer", full.sourceLayerId)
-    assertEquals("feature-1", full.featureId)
-    assertEquals("hover", full.stateKey)
-    assertNotEquals(0, full.fields)
-  }
-
-  @Test
   fun offlineDefinitionsRoundTripBothVariants() {
     val tile =
       OfflineRegionDefinition.TilePyramid(
@@ -176,7 +151,6 @@ class JvmStructsTest {
     )
     assertFailsWith<IllegalArgumentException> { JvmStructs.textureImageInfoSnapshot(2, 3, 8, -1) }
     assertFailsWith<IllegalArgumentException> { JvmStructs.styleImageInfoSnapshot(-1) }
-    assertEquals(1, JvmStructs.styleStringListCleanupAfterCopyFailure())
     val source = JvmStructs.sourceInfoSnapshot(999, true)
     assertEquals(999, source.type.nativeValue)
     assertTrue(source.volatileSource)
@@ -222,9 +196,7 @@ class JvmStructsTest {
   }
 
   @Test
-  fun ownedBufferCleanupAndRuntimePayloadCopiesUseOwnedAdapterPaths() {
-    assertEquals(1, JvmStructs.ownedBufferCleanupAfterCopyFailure())
-    assertEquals(1, JvmStructs.offlineRegionListCleanupAfterCopyFailure())
+  fun unknownRuntimePayloadCopiesTheWholeUnionWindow() {
     val payload =
       JvmStructs.unknownRuntimePayload(999, byteArrayOf(1, 2, 3)) as RuntimeEventPayload.Unknown
     assertEquals(999, payload.rawPayloadType)

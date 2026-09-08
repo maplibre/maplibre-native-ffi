@@ -4,10 +4,8 @@ import os
 import QuartzCore
 import UIKit
 
-/// The display-paced render loop. This view runs on the main thread and owns
-/// the layer, gesture decoding, the Metal objects, and the render session. The
-/// runtime and the map live on the runtime loop thread it starts, reached
-/// through ``Channels``.
+/// The display-paced render loop. This view owns the layer, gesture decoding,
+/// runtime, map, Metal objects, and render session on the main thread.
 @MainActor
 final class MetalMapView: UIView {
   static let willTerminateMapViews = Notification
@@ -16,16 +14,21 @@ final class MetalMapView: UIView {
     subsystem: "org.maplibre.nativeffi.examples.swift-map-ios",
     category: "MapView"
   )
-  private let channels = Channels()
   private var graphics: MetalGraphicsContext?
+  private var mapState: MapState?
   private var renderTarget: MetalRenderTarget?
-  private var runtimeLoop: RuntimeLoopThread?
+  private var setupTask: Task<Void, Never>?
   private var displayLink: CADisplayLink?
+  private var frameTask: Task<Void, Never>?
+  private var shutdownTask: Task<Void, Never>?
+  private var pendingUpdates: Task<Void, Never>?
   private var currentViewport: Viewport?
+  private var renderRequested = true
   private var didLogStartupStatus = false
   private var viewVisible = false
   private var appForeground = true
   private var isShutDown = false
+  private var pendingResize = false
 
   /// The recognizers with a gesture still open. Pinch, rotation, and shove
   /// recognize simultaneously and report to the map as one gesture.
@@ -56,11 +59,14 @@ final class MetalMapView: UIView {
     nil
   }
 
+  /// Last resort only: a view released without leaving its window abandons the
+  /// session rather than closing it, because deinit cannot await teardown.
+  /// ``didMoveToWindow`` is the ordered path.
   deinit {
     NotificationCenter.default.removeObserver(self)
     MainActor.assumeIsolated {
       stopHostLoop()
-      teardown()
+      renderTarget?.abandon()
     }
   }
 
@@ -70,7 +76,9 @@ final class MetalMapView: UIView {
     if viewVisible {
       refreshAndStartIfNeeded()
     } else {
-      stopHostLoop()
+      // Leaving the window ends this view's map: release the session, then the
+      // map, then the runtime.
+      beginTeardown()
     }
   }
 
@@ -91,78 +99,98 @@ final class MetalMapView: UIView {
 
   @objc private func closeMap() {
     stopHostLoop()
-    teardown()
+    beginTeardown()
   }
 
-  /// Closes the session before the runtime loop closes the map; a map with an
+  /// Closes the session before closing the map; a map with an
   /// attached session cannot be destroyed.
-  private func teardown() {
+  private func beginTeardown() {
     guard !isShutDown else { return }
     isShutDown = true
-    do {
-      try renderTarget?.close()
-    } catch {
-      log.error("\(String(describing: error), privacy: .public)")
+    stopHostLoop()
+    if frameTask == nil {
+      finishTeardown()
     }
+  }
+
+  private func finishTeardown() {
+    guard shutdownTask == nil else { return }
+    let target = renderTarget
     renderTarget = nil
-    guard runtimeLoop != nil else { return }
-    channels.requestShutdown()
-    if !channels.waitForRuntimeLoopExit(timeout: 5.0) {
-      log.error("runtime loop did not finish before the shutdown deadline")
+    let setup = setupTask
+    // A failing update reaches here from inside the update chain, so the chain
+    // is dropped rather than awaited; `isShutDown` stops every queued update
+    // before it touches the map.
+    pendingUpdates = nil
+    shutdownTask = Task { @MainActor in
+      await setup?.value
+      do {
+        try await target?.close()
+        try await self.mapState?.close()
+      } catch {
+        self.log.error("\(String(describing: error), privacy: .public)")
+      }
+      self.mapState = nil
     }
-    runtimeLoop = nil
   }
 
   @objc private func displayLinkTick() {
-    guard !isShutDown else { return }
-    if let failureMessage = channels.failureMessage {
-      log.error("\(failureMessage, privacy: .public)")
-      // The runtime loop waits for the session to close before destroying the
-      // map, so tear down rather than only stopping the display link.
-      stopHostLoop()
-      teardown()
-      return
+    guard frameTask == nil, !isShutDown else { return }
+    frameTask = Task { @MainActor in
+      await renderDisplayFrame()
+      frameTask = nil
+      if isShutDown {
+        finishTeardown()
+      }
     }
-    attachIfNeeded()
-    guard let renderTarget,
+  }
+
+  private func renderDisplayFrame() async {
+    guard !isShutDown else { return }
+    await attachIfNeeded()
+    guard !isShutDown,
+          let renderTarget,
           let viewport = currentViewport,
           !viewport.isEmpty
     else { return }
 
     do {
-      // Consume first, so a request published during the render survives.
-      if channels.consumeRenderRequest() {
-        let rendered = try renderTarget.renderUpdate()
+      if pendingResize {
+        try await renderTarget.resize(viewport)
+        pendingResize = false
+      }
+      if renderRequested {
+        renderRequested = false
+        let rendered = try renderTarget.renderFrame()
         if !rendered {
-          channels.setRenderRequest()
+          renderRequested = true
         }
       }
-      try renderTarget.finishFrame()
     } catch {
       showError(error)
-      // Stopping the display link alone leaves the session attached, and the
-      // runtime loop would hold a map it can never destroy.
-      stopHostLoop()
-      teardown()
+      beginTeardown()
     }
   }
 
-  /// Attaches the render session on this thread. Attach records the calling
-  /// thread as the session's owner, and every later session call runs here.
-  private func attachIfNeeded() {
+  /// Attaches the render session on the graphics thread that services it.
+  private func attachIfNeeded() async {
     guard renderTarget == nil,
           let graphics,
           let viewport = currentViewport,
           !viewport.isEmpty,
-          let attachRef = channels.attachRef()
+          let renderMap = mapState?.mapHandle
     else { return }
 
     do {
-      renderTarget = try MetalRenderTarget.attach(
-        attachRef: attachRef,
+      renderTarget = try await MetalRenderTarget.attach(
+        map: renderMap,
         graphics: graphics,
         viewport: viewport
       )
+      // The viewport can change while the attach is in flight; the session
+      // was attached at the captured extent, so carry any later change into
+      // the next tick's session resize.
+      pendingResize = currentViewport != viewport
       if !didLogStartupStatus {
         log.info("render target: native-surface")
         log.info(
@@ -170,13 +198,10 @@ final class MetalMapView: UIView {
         )
         didLogStartupStatus = true
       }
-      channels.setRenderRequest()
+      renderRequested = true
     } catch {
       showError(error)
-      // The runtime loop waits for the session to close before destroying the
-      // map, so tear down rather than only stopping the display link.
-      stopHostLoop()
-      teardown()
+      beginTeardown()
     }
   }
 
@@ -184,7 +209,7 @@ final class MetalMapView: UIView {
     guard !isShutDown else { return }
     refreshViewport()
     if viewVisible, appForeground {
-      channels.setRenderRequest()
+      renderRequested = true
       startHostLoop()
     }
   }
@@ -201,13 +226,48 @@ final class MetalMapView: UIView {
     displayLink = nil
   }
 
-  /// Starts the runtime loop once a non-empty viewport is known, because the
-  /// map takes its initial extent from it.
-  private func startRuntimeLoopIfNeeded(viewport: Viewport) {
-    guard runtimeLoop == nil else { return }
-    let loop = RuntimeLoopThread(channels: channels, viewport: viewport)
-    runtimeLoop = loop
-    loop.start()
+  /// Creates the map once a non-empty viewport is known, because the map takes
+  /// its initial extent from it.
+  private func startMapStateIfNeeded(viewport: Viewport) {
+    guard mapState == nil, setupTask == nil, !isShutDown else { return }
+    setupTask = Task { @MainActor [weak self] in
+      guard let self else { return }
+      var setupFailure: Error?
+      do {
+        let state = try await MapState(viewport: viewport)
+        if self.isShutDown {
+          try await state.close()
+        } else {
+          if let latest = self.currentViewport, !latest.isEmpty,
+             latest != viewport
+          {
+            try await state.resize(MapLogicalExtent(
+              width: latest.logicalWidth,
+              height: latest.logicalHeight,
+              scaleFactor: latest.scaleFactor
+            ))
+          }
+          self.mapState = state
+          state.scheduleEventDrains(
+            onRenderRequested: { [weak self] in
+              self?.renderRequested = true
+            },
+            onFailure: { [weak self] error in
+              self?.showError(error)
+              self?.beginTeardown()
+            }
+          )
+          self.renderRequested = true
+        }
+      } catch {
+        setupFailure = error
+      }
+      self.setupTask = nil
+      if let setupFailure {
+        self.showError(setupFailure)
+        self.beginTeardown()
+      }
+    }
   }
 
   private func refreshViewport() {
@@ -221,21 +281,27 @@ final class MetalMapView: UIView {
       return
     }
 
-    do {
-      graphics.resize(viewport)
-      try renderTarget?.resize(viewport)
-      currentViewport = viewport
-      channels.setRenderRequest()
-      startRuntimeLoopIfNeeded(viewport: viewport)
-    } catch {
-      showError(error)
+    graphics.resize(viewport)
+    currentViewport = viewport
+    pendingResize = renderTarget != nil
+    if !pendingResize {
+      // With no session attached the map is the only extent authority; a live
+      // session carries the extent through its own resize on the next tick.
+      updateMap { state in
+        try await state.resize(MapLogicalExtent(
+          width: viewport.logicalWidth,
+          height: viewport.logicalHeight,
+          scaleFactor: viewport.scaleFactor
+        ))
+      }
     }
+    renderRequested = true
+    startMapStateIfNeeded(viewport: viewport)
   }
 
   private func readViewport() -> Viewport {
-    let scale = traitCollection.displayScale > 0 ? traitCollection
-      .displayScale :
-      UIScreen.main.scale
+    let displayScale = traitCollection.displayScale
+    let scale = displayScale > 0 ? displayScale : UIScreen.main.scale
     let rawLogicalWidth = bounds.width
     let rawLogicalHeight = bounds.height
     let rawPhysicalWidth = rawLogicalWidth * scale
@@ -310,145 +376,133 @@ final class MetalMapView: UIView {
     )
   }
 
-  /// Queues decoded camera commands and sets the render request when the
-  /// gesture changed the camera.
-  private func enqueue(_ decode: (Channels) -> Bool) {
-    if decode(channels) {
-      channels.setRenderRequest()
+  /// Submits one camera command. Each task awaits the one before it, so a
+  /// gesture-begin submission always reaches the map ahead of the deltas the
+  /// same gesture produces; main-actor isolation alone gives exclusion, not
+  /// order.
+  private func updateMap(
+    _ update: @escaping @MainActor (MapState) async throws -> Void
+  ) {
+    guard !isShutDown, mapState != nil else { return }
+    renderRequested = true
+    let previous = pendingUpdates
+    pendingUpdates = Task { @MainActor in
+      await previous?.value
+      guard !self.isShutDown, let state = self.mapState else { return }
+      do {
+        try await update(state)
+      } catch {
+        self.showError(error)
+        self.beginTeardown()
+      }
     }
   }
 
   /// Opens the gesture bracket for the first recognizer to begin.
-  private func beginGesture(
-    _ recognizer: UIGestureRecognizer,
-    _ commands: Channels
-  ) {
+  private func beginGesture(_ recognizer: UIGestureRecognizer) {
     if openGestures.isEmpty {
-      commands.push(.setGestureInProgress(true))
+      updateMap { state in
+        try await state.cancelTransitions()
+        try await state.setGestureInProgress(true)
+      }
     }
     openGestures.insert(ObjectIdentifier(recognizer))
   }
 
   /// Closes the bracket once the last recognizer ends or is cancelled, so each
   /// open is paired with a close.
-  private func endGesture(
-    _ recognizer: UIGestureRecognizer,
-    _ commands: Channels
-  ) {
+  private func endGesture(_ recognizer: UIGestureRecognizer) {
     guard openGestures.remove(ObjectIdentifier(recognizer)) != nil else {
       return
     }
     if openGestures.isEmpty {
-      commands.push(.setGestureInProgress(false))
+      updateMap { try await $0.setGestureInProgress(false) }
     }
   }
 
   @objc private func handlePan(_ recognizer: UIPanGestureRecognizer) {
-    enqueue { commands in
-      switch recognizer.state {
-      case .began:
-        commands.push(.cancelTransitions)
-        self.beginGesture(recognizer, commands)
-        recognizer.setTranslation(.zero, in: self)
-        return false
-      case .changed:
-        let translation = recognizer.translation(in: self)
-        recognizer.setTranslation(.zero, in: self)
-        guard translation != .zero else { return false }
-        commands.push(.moveBy(
+    switch recognizer.state {
+    case .began:
+      beginGesture(recognizer)
+      recognizer.setTranslation(.zero, in: self)
+    case .changed:
+      let translation = recognizer.translation(in: self)
+      recognizer.setTranslation(.zero, in: self)
+      guard translation != .zero else { return }
+      updateMap { state in
+        try await state.moveBy(
           dx: Double(translation.x),
           dy: Double(translation.y)
-        ))
-        return true
-      default:
-        self.endGesture(recognizer, commands)
-        return false
+        )
       }
+    default:
+      endGesture(recognizer)
     }
   }
 
   @objc private func handlePinch(_ recognizer: UIPinchGestureRecognizer) {
-    enqueue { commands in
-      switch recognizer.state {
-      case .began:
-        commands.push(.cancelTransitions)
-        self.beginGesture(recognizer, commands)
-        recognizer.scale = 1.0
-        return false
-      case .changed:
-        let scale = Double(recognizer.scale)
-        recognizer.scale = 1.0
-        guard scale.isFinite, scale > 0 else { return false }
-        let location = recognizer.location(in: self)
-        commands.push(.scaleBy(
-          scale: scale,
-          anchor: self.screenPoint(location)
-        ))
-        return true
-      default:
-        self.endGesture(recognizer, commands)
-        return false
-      }
+    switch recognizer.state {
+    case .began:
+      beginGesture(recognizer)
+      recognizer.scale = 1.0
+    case .changed:
+      let scale = Double(recognizer.scale)
+      recognizer.scale = 1.0
+      guard scale.isFinite, scale > 0 else { return }
+      let anchor = screenPoint(recognizer.location(in: self))
+      updateMap { try await $0.scaleBy(scale, anchor: anchor) }
+    default:
+      endGesture(recognizer)
     }
   }
 
   @objc private func handleRotation(_ recognizer: UIRotationGestureRecognizer) {
-    enqueue { commands in
-      switch recognizer.state {
-      case .began:
-        commands.push(.cancelTransitions)
-        self.beginGesture(recognizer, commands)
-        recognizer.rotation = 0
-        return false
-      case .changed:
-        let deltaRadians = recognizer.rotation
-        recognizer.rotation = 0
-        guard deltaRadians != 0 else { return false }
-        let location = recognizer.location(in: self)
-        commands.push(.adjustBearing(
+    switch recognizer.state {
+    case .began:
+      beginGesture(recognizer)
+      recognizer.rotation = 0
+    case .changed:
+      let deltaRadians = recognizer.rotation
+      recognizer.rotation = 0
+      guard deltaRadians != 0 else { return }
+      let anchor = screenPoint(recognizer.location(in: self))
+      updateMap {
+        try await $0.adjustBearing(
           delta: -Double(deltaRadians * 180 / .pi),
-          anchor: self.screenPoint(location)
-        ))
-        return true
-      default:
-        self.endGesture(recognizer, commands)
-        return false
+          anchor: anchor
+        )
       }
+    default:
+      endGesture(recognizer)
     }
   }
 
   @objc private func handleShove(_ recognizer: UIPanGestureRecognizer) {
-    enqueue { commands in
-      switch recognizer.state {
-      case .began:
-        guard recognizer.numberOfTouches == 2 else { return false }
-        commands.push(.cancelTransitions)
-        self.beginGesture(recognizer, commands)
-        recognizer.setTranslation(.zero, in: self)
-        return false
-      case .changed:
-        guard recognizer.numberOfTouches == 2 else { return false }
-        let translation = recognizer.translation(in: self)
-        recognizer.setTranslation(.zero, in: self)
-        guard translation.y != 0 else { return false }
-        commands.push(.adjustPitch(delta: -Double(translation.y) * 0.1))
-        return true
-      default:
-        self.endGesture(recognizer, commands)
-        return false
+    switch recognizer.state {
+    case .began:
+      guard recognizer.numberOfTouches == 2 else { return }
+      beginGesture(recognizer)
+      recognizer.setTranslation(.zero, in: self)
+    case .changed:
+      guard recognizer.numberOfTouches == 2 else { return }
+      let translation = recognizer.translation(in: self)
+      recognizer.setTranslation(.zero, in: self)
+      guard translation.y != 0 else { return }
+      updateMap {
+        try await $0.adjustPitch(delta: -Double(translation.y) * 0.1)
       }
+    default:
+      endGesture(recognizer)
     }
   }
 
   @objc private func handleDoubleTap(_ recognizer: UITapGestureRecognizer) {
-    enqueue { commands in
-      commands.push(.cancelTransitions)
-      let location = recognizer.location(in: self)
-      commands.push(.zoomToNextStep(
-        anchor: screenPoint(location),
+    let anchor = screenPoint(recognizer.location(in: self))
+    updateMap {
+      try await $0.zoomToNextStep(
+        anchor: anchor,
         animation: MaplibreNativeFFI.AnimationOptions(durationMilliseconds: 160)
-      ))
-      return true
+      )
     }
   }
 

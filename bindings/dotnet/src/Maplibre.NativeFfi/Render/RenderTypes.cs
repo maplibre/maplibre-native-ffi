@@ -12,40 +12,157 @@ public enum RenderMode : uint
 }
 
 /// <summary>
-/// Outcome of a successful render-update call. This is an open domain: a value may have no named
-/// member here, so a switch over it needs a default case. Unknown values keep their raw value.
+/// Terminal disposition of one accepted frame demand. Unknown values keep their raw value.
 /// </summary>
 public enum RenderResult : uint
 {
-    /// <summary>The call rendered a frame into the render target.</summary>
+    /// <summary>The session rendered a frame into the render target.</summary>
     Rendered = 0,
 
-    /// <summary>
-    /// The call produced no frame. Wait for a render-update-available event.
-    /// </summary>
+    /// <summary>No newer map update was available.</summary>
     NoUpdate = 1,
 
-    /// <summary>
-    /// The map has not applied the session's current size yet. Wait for the next
-    /// render-update-available event.
-    /// </summary>
+    /// <summary>An ordered extent change had not reached the driver.</summary>
     SizePending = 2,
 
-    /// <summary>
-    /// The render target had no frame to draw into. Wait for a host event that changes the render
-    /// target, or back off and retry.
-    /// </summary>
+    /// <summary>The target could not produce a frame.</summary>
     TargetNotReady = 3,
+
+    /// <summary>A newer demand replaced this demand in its coalescing boundary.</summary>
+    Superseded = 4,
+
+    /// <summary>The demand's timeout elapsed before work began.</summary>
+    DeadlineMissed = 5,
+}
+
+public enum RenderSessionState : uint
+{
+    Attaching = 1,
+    Attached = 2,
+    Detaching = 3,
+    Detached = 4,
+    TargetLost = 5,
+    Abandoned = 6,
+}
+
+public enum RenderDriverKind : uint
+{
+    CoreWorker = 1,
+    CallerGraphicsThread = 2,
+}
+
+[Flags]
+public enum RenderSessionCapabilities : uint
+{
+    None = 0,
+    FrameAcquisition = 1u << 0,
+    Readback = 1u << 1,
+    ConsumerSync = 1u << 2,
+    Presentation = 1u << 3,
+}
+
+/// <summary>Frame-demand policy bits.</summary>
+[Flags]
+public enum FrameDemandFlags : uint
+{
+    None = 0,
+
+    /// <summary>Render only when a newer map update exists.</summary>
+    IfNeeded = 1u << 0,
+
+    /// <summary>
+    /// Present the rendered frame on a target that supports presentation. A presenting target
+    /// whose demand clears this bit still renders and keeps whatever it presented last. Targets
+    /// without presentation ignore it.
+    /// </summary>
+    Present = 1u << 1,
+}
+
+public readonly record struct FrameDemand(
+    FrameDemandFlags Flags,
+    ulong Token,
+    ulong CoalescingBoundary,
+    ulong TimeoutNanoseconds
+);
+
+/// <summary>
+/// One frame demand's outcome. <see cref="NeedsRepaint"/> is meaningful only when
+/// <see cref="Disposition"/> is <see cref="RenderResult.Rendered"/>; it is true when the map
+/// asked for another frame while it rendered this one, as during an ongoing camera transition.
+/// </summary>
+public readonly record struct RenderFrameResult(
+    RenderResult Disposition,
+    ulong Token,
+    ulong MapUpdateGeneration,
+    ulong ExtentGeneration,
+    ulong FrameGeneration,
+    bool NeedsRepaint
+);
+
+public readonly record struct RenderSessionSnapshot(
+    RenderSessionState State,
+    RenderDriverKind Driver,
+    RenderResult LatestResult,
+    RenderTargetExtent Extent,
+    ulong Generation,
+    ulong MapUpdateGeneration,
+    ulong RenderedUpdateGeneration,
+    ulong ExtentGeneration,
+    ulong FrameGeneration,
+    ulong LatestDemandToken,
+    uint PendingDemandCount,
+    uint AcquiredFrameCount,
+    bool TargetReady,
+    bool PendingChanges
+);
+
+public readonly record struct RenderSessionCapabilityInfo(
+    RenderDriverKind Driver,
+    uint TextureRingDepth,
+    RenderSessionCapabilities Flags
+);
+
+public enum GpuSyncKind : uint
+{
+    CpuComplete = 0,
+    MetalSharedEvent = 1,
+    VulkanTimelineSemaphore = 2,
+    OpenGLFence = 3,
+    WebGpuToken = 4,
 }
 
 /// <summary>
-/// Outcome of a successful render-update call. <see cref="NeedsRepaint"/> is true only when
-/// <see cref="Result"/> is <see cref="RenderResult.Rendered"/> and the map asked for another
-/// frame while it rendered this one, as during an ongoing camera transition. This is the same
-/// signal that a map-render-frame-finished event carries in its repaint flag, delivered without
-/// the event round trip.
+/// Backend synchronization copied by frame access and release calls.
 /// </summary>
-public readonly record struct RenderUpdate(RenderResult Result, bool NeedsRepaint);
+/// <param name="Kind">Which backend primitive <paramref name="ObjectBits"/> names.</param>
+/// <param name="ObjectBits">
+/// Bit pattern of the backend object that <paramref name="Kind"/> names: the
+/// <c>id&lt;MTLSharedEvent&gt;</c> pointer, the <c>VkSemaphore</c> handle, the <c>GLsync</c>
+/// pointer, or the WebGPU token. A Vulkan handle stays 64 bits wide even where a pointer is not.
+/// Zero when <paramref name="Kind"/> is <see cref="GpuSyncKind.CpuComplete"/>.
+/// </param>
+/// <param name="Value">The signal or timeline value the backend primitive waits on.</param>
+public readonly record struct GpuSync(GpuSyncKind Kind, ulong ObjectBits, ulong Value)
+{
+    public static GpuSync CpuComplete => new(GpuSyncKind.CpuComplete, 0, 0);
+}
+
+public enum RenderAbandonDisposition : uint
+{
+    Clean = 0,
+    Quarantined = 1,
+}
+
+public readonly record struct RenderAbandonResult(
+    RenderAbandonDisposition Disposition,
+    uint QuarantinedResourceCount
+);
+
+public sealed record RenderSessionAttachOptions
+{
+    public RenderDriverKind Driver { get; init; } = RenderDriverKind.CoreWorker;
+    public uint RequestedTextureRingDepth { get; init; }
+}
 
 /// <summary>Render backend support flags reported by the native library.</summary>
 [Flags]
@@ -140,9 +257,9 @@ public sealed class VulkanContextDescriptor
 }
 
 /// <summary>
-/// How a render session's OpenGL context relates to the thread that attached it. This is an open
-/// domain: a value may have no named member here, so a switch over it needs a default case.
-/// Unknown values keep their raw value.
+/// How a render session's OpenGL context relates to its driver thread and host graphics state. This
+/// is an open domain: a value may have no named member here, so a switch over it needs a default
+/// case. Unknown values keep their raw value.
 /// </summary>
 public enum OpenGLContextOwnership : uint
 {
@@ -154,8 +271,9 @@ public enum OpenGLContextOwnership : uint
     Shared = 0,
 
     /// <summary>
-    /// The session owns its thread's OpenGL context. It makes its context current once and keeps
-    /// it current between renders, and it joins no share group.
+    /// The session owns its driver thread's OpenGL context. It keeps the context current between
+    /// renders and joins no share group. The driver may be a native core worker or a dedicated host
+    /// thread.
     /// </summary>
     Dedicated = 1,
 }
@@ -182,8 +300,8 @@ public abstract class OpenGLContextDescriptor
     private protected OpenGLContextDescriptor() { }
 
     /// <summary>
-    /// Whether the session shares its thread with host graphics work. WGL and EGL surface targets
-    /// support both. A texture target hands its texture to the host, so it is shared only.
+    /// Whether the session shares its driver thread and graphics objects with the host. A private
+    /// EGL owned texture target uses dedicated ownership and grants readback without acquisition.
     /// </summary>
     public OpenGLContextOwnership Ownership { get; set; } = OpenGLContextOwnership.Shared;
 }
@@ -222,6 +340,26 @@ public sealed class EglContextDescriptor : OpenGLContextDescriptor
     public NativePointer GetProcAddress { get; set; }
 }
 
+public enum WebGLContextKind : uint
+{
+    Existing = 0,
+    TransferredCanvas = 1,
+}
+
+public sealed class WebGLContextDescriptor : OpenGLContextDescriptor
+{
+    public WebGLContextKind Kind { get; set; }
+    public int Context { get; set; }
+    public string CanvasSelector { get; set; } = string.Empty;
+}
+
+public sealed class WebGpuContextDescriptor
+{
+    public NativePointer Instance { get; set; }
+    public NativePointer Device { get; set; }
+    public NativePointer Queue { get; set; }
+}
+
 public sealed class MetalSurfaceDescriptor
 {
     public RenderTargetExtent Extent { get; set; }
@@ -241,6 +379,14 @@ public sealed class OpenGLSurfaceDescriptor
     public RenderTargetExtent Extent { get; set; }
     public NativePointer Surface { get; set; }
     public OpenGLContextDescriptor? Context { get; set; }
+}
+
+public sealed class WebGpuSurfaceDescriptor
+{
+    public RenderTargetExtent Extent { get; set; }
+    public WebGpuContextDescriptor? Context { get; set; }
+    public NativePointer Surface { get; set; }
+    public uint Format { get; set; }
 }
 
 public sealed class MetalOwnedTextureDescriptor
@@ -307,6 +453,78 @@ public sealed class OpenGLBorrowedTextureDescriptor
     public uint Target { get; set; }
 }
 
+public sealed class WebGpuOwnedTextureDescriptor
+{
+    public RenderTargetExtent Extent { get; set; }
+    public WebGpuContextDescriptor? Context { get; set; }
+}
+
+public sealed class WebGpuBorrowedTextureDescriptor
+{
+    public RenderTargetExtent Extent { get; set; }
+    public uint PhysicalWidth { get; set; }
+    public uint PhysicalHeight { get; set; }
+    public WebGpuContextDescriptor? Context { get; set; }
+    public NativePointer Texture { get; set; }
+    public NativePointer TextureView { get; set; }
+    public uint Format { get; set; }
+}
+
+public sealed class WebGpuOwnedTextureFrame
+{
+    private readonly FrameScope scope;
+    private readonly ulong generation;
+    private readonly uint width;
+    private readonly uint height;
+    private readonly double scaleFactor;
+    private readonly ulong frameId;
+    private readonly NativePointer texture;
+    private readonly NativePointer textureView;
+    private readonly NativePointer device;
+    private readonly uint format;
+
+    internal WebGpuOwnedTextureFrame(
+        FrameScope scope,
+        ulong generation,
+        uint width,
+        uint height,
+        double scaleFactor,
+        ulong frameId,
+        NativePointer texture,
+        NativePointer textureView,
+        NativePointer device,
+        uint format
+    )
+    {
+        this.scope = scope;
+        this.generation = generation;
+        this.width = width;
+        this.height = height;
+        this.scaleFactor = scaleFactor;
+        this.frameId = frameId;
+        this.texture = texture;
+        this.textureView = textureView;
+        this.device = device;
+        this.format = format;
+    }
+
+    public ulong Generation => Guarded(generation);
+    public uint Width => Guarded(width);
+    public uint Height => Guarded(height);
+    public double ScaleFactor => Guarded(scaleFactor);
+    public ulong FrameId => Guarded(frameId);
+    public NativePointer Texture => Guarded(texture);
+    public NativePointer TextureView => Guarded(textureView);
+    public NativePointer Device => Guarded(device);
+    public uint Format => Guarded(format);
+
+    private T Guarded<T>(T value)
+    {
+        scope.EnsureActive();
+        return value;
+    }
+}
+
 public sealed class MetalOwnedTextureFrame
 {
     private readonly FrameScope scope;
@@ -342,69 +560,19 @@ public sealed class MetalOwnedTextureFrame
         this.pixelFormat = pixelFormat;
     }
 
-    public ulong Generation
+    public ulong Generation => Guarded(generation);
+    public uint Width => Guarded(width);
+    public uint Height => Guarded(height);
+    public double ScaleFactor => Guarded(scaleFactor);
+    public ulong FrameId => Guarded(frameId);
+    public NativePointer Texture => Guarded(texture);
+    public NativePointer Device => Guarded(device);
+    public ulong PixelFormat => Guarded(pixelFormat);
+
+    private T Guarded<T>(T value)
     {
-        get
-        {
-            scope.EnsureActive();
-            return generation;
-        }
-    }
-    public uint Width
-    {
-        get
-        {
-            scope.EnsureActive();
-            return width;
-        }
-    }
-    public uint Height
-    {
-        get
-        {
-            scope.EnsureActive();
-            return height;
-        }
-    }
-    public double ScaleFactor
-    {
-        get
-        {
-            scope.EnsureActive();
-            return scaleFactor;
-        }
-    }
-    public ulong FrameId
-    {
-        get
-        {
-            scope.EnsureActive();
-            return frameId;
-        }
-    }
-    public NativePointer Texture
-    {
-        get
-        {
-            scope.EnsureActive();
-            return texture;
-        }
-    }
-    public NativePointer Device
-    {
-        get
-        {
-            scope.EnsureActive();
-            return device;
-        }
-    }
-    public ulong PixelFormat
-    {
-        get
-        {
-            scope.EnsureActive();
-            return pixelFormat;
-        }
+        scope.EnsureActive();
+        return value;
     }
 }
 
@@ -449,85 +617,21 @@ public sealed class VulkanOwnedTextureFrame
         this.layout = layout;
     }
 
-    public ulong Generation
+    public ulong Generation => Guarded(generation);
+    public uint Width => Guarded(width);
+    public uint Height => Guarded(height);
+    public double ScaleFactor => Guarded(scaleFactor);
+    public ulong FrameId => Guarded(frameId);
+    public VulkanHandle Image => Guarded(image);
+    public VulkanHandle ImageView => Guarded(imageView);
+    public NativePointer Device => Guarded(device);
+    public uint Format => Guarded(format);
+    public uint Layout => Guarded(layout);
+
+    private T Guarded<T>(T value)
     {
-        get
-        {
-            scope.EnsureActive();
-            return generation;
-        }
-    }
-    public uint Width
-    {
-        get
-        {
-            scope.EnsureActive();
-            return width;
-        }
-    }
-    public uint Height
-    {
-        get
-        {
-            scope.EnsureActive();
-            return height;
-        }
-    }
-    public double ScaleFactor
-    {
-        get
-        {
-            scope.EnsureActive();
-            return scaleFactor;
-        }
-    }
-    public ulong FrameId
-    {
-        get
-        {
-            scope.EnsureActive();
-            return frameId;
-        }
-    }
-    public VulkanHandle Image
-    {
-        get
-        {
-            scope.EnsureActive();
-            return image;
-        }
-    }
-    public VulkanHandle ImageView
-    {
-        get
-        {
-            scope.EnsureActive();
-            return imageView;
-        }
-    }
-    public NativePointer Device
-    {
-        get
-        {
-            scope.EnsureActive();
-            return device;
-        }
-    }
-    public uint Format
-    {
-        get
-        {
-            scope.EnsureActive();
-            return format;
-        }
-    }
-    public uint Layout
-    {
-        get
-        {
-            scope.EnsureActive();
-            return layout;
-        }
+        scope.EnsureActive();
+        return value;
     }
 }
 
@@ -572,84 +676,20 @@ public sealed class OpenGLOwnedTextureFrame
         this.type = type;
     }
 
-    public ulong Generation
+    public ulong Generation => Guarded(generation);
+    public uint Width => Guarded(width);
+    public uint Height => Guarded(height);
+    public double ScaleFactor => Guarded(scaleFactor);
+    public ulong FrameId => Guarded(frameId);
+    public uint Texture => Guarded(texture);
+    public uint Target => Guarded(target);
+    public uint InternalFormat => Guarded(internalFormat);
+    public uint Format => Guarded(format);
+    public uint Type => Guarded(type);
+
+    private T Guarded<T>(T value)
     {
-        get
-        {
-            scope.EnsureActive();
-            return generation;
-        }
-    }
-    public uint Width
-    {
-        get
-        {
-            scope.EnsureActive();
-            return width;
-        }
-    }
-    public uint Height
-    {
-        get
-        {
-            scope.EnsureActive();
-            return height;
-        }
-    }
-    public double ScaleFactor
-    {
-        get
-        {
-            scope.EnsureActive();
-            return scaleFactor;
-        }
-    }
-    public ulong FrameId
-    {
-        get
-        {
-            scope.EnsureActive();
-            return frameId;
-        }
-    }
-    public uint Texture
-    {
-        get
-        {
-            scope.EnsureActive();
-            return texture;
-        }
-    }
-    public uint Target
-    {
-        get
-        {
-            scope.EnsureActive();
-            return target;
-        }
-    }
-    public uint InternalFormat
-    {
-        get
-        {
-            scope.EnsureActive();
-            return internalFormat;
-        }
-    }
-    public uint Format
-    {
-        get
-        {
-            scope.EnsureActive();
-            return format;
-        }
-    }
-    public uint Type
-    {
-        get
-        {
-            scope.EnsureActive();
-            return type;
-        }
+        scope.EnsureActive();
+        return value;
     }
 }

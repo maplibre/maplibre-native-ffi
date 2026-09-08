@@ -2,100 +2,93 @@ package maplibre
 
 import (
 	"errors"
-	stdruntime "runtime"
-	"sync/atomic"
+	"math"
 	"testing"
-	"time"
-
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 )
 
 func TestRuntimeMapLifecycle(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 
-	m, err := runtime.NewMap()
+	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
-	if err := runtime.Close(); !errors.Is(err, ErrInvalidState) {
-		_ = m.Close()
-		_ = runtime.Close()
+	if err := closeRuntimeForTest(runtime); !errors.Is(err, ErrInvalidState) {
+		_ = closeMapForTest(m)
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("Close() with live map error = %v, want ErrInvalidState", err)
 	} else {
 		var bindingErr *Error
-		if !errors.As(err, &bindingErr) || bindingErr.Diagnostic() != "RuntimeHandle has live child handles" {
-			_ = m.Close()
-			_ = runtime.Close()
+		if !errors.As(err, &bindingErr) ||
+			bindingErr.Diagnostic() != "handle still owns live or pending children" {
+			_ = closeMapForTest(m)
+			_ = closeRuntimeForTest(runtime)
 			t.Fatalf("Close() with live map diagnostic = %v", err)
 		}
 	}
-	if err := m.Close(); err != nil {
-		_ = runtime.Close()
+	if err := closeMapForTest(m); err != nil {
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("Map Close(): %v", err)
 	}
-	if err := m.Close(); err != nil {
-		_ = runtime.Close()
+	if err := closeMapForTest(m); err != nil {
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("second Map Close(): %v", err)
 	}
-	if err := runtime.Close(); err != nil {
+	if err := closeRuntimeForTest(runtime); err != nil {
 		t.Fatalf("Runtime Close(): %v", err)
 	}
 }
 
 func TestMapIDIdentifiesEachMapUntilClose(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
 
-	first, err := runtime.NewMap()
+	first, err := awaitForTest(runtime.NewMap())
 	if err != nil {
 		t.Fatalf("NewMap(): %v", err)
 	}
-	second, err := runtime.NewMap()
+	second, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = first.Close()
+		_ = closeMapForTest(first)
 		t.Fatalf("second NewMap(): %v", err)
 	}
 	defer func() {
-		if err := second.Close(); err != nil {
+		if err := closeMapForTest(second); err != nil {
 			t.Errorf("second Map Close(): %v", err)
 		}
 	}()
 
 	firstID, err := first.ID()
 	if err != nil {
-		_ = first.Close()
+		_ = closeMapForTest(first)
 		t.Fatalf("ID(): %v", err)
 	}
 	secondID, err := second.ID()
 	if err != nil {
-		_ = first.Close()
+		_ = closeMapForTest(first)
 		t.Fatalf("second ID(): %v", err)
 	}
 	if firstID == 0 || firstID == secondID {
-		_ = first.Close()
+		_ = closeMapForTest(first)
 		t.Fatalf("map IDs = %d and %d, want distinct nonzero IDs", firstID, secondID)
 	}
 	if repeated, err := first.ID(); err != nil || repeated != firstID {
-		_ = first.Close()
+		_ = closeMapForTest(first)
 		t.Fatalf("repeated ID() = %d, %v, want %d, nil", repeated, err, firstID)
 	}
 
-	if err := first.Close(); err != nil {
+	if err := closeMapForTest(first); err != nil {
 		t.Fatalf("Map Close(): %v", err)
 	}
 	if _, err := first.ID(); !errors.Is(err, ErrInvalidArgument) {
@@ -103,278 +96,200 @@ func TestMapIDIdentifiesEachMapUntilClose(t *testing.T) {
 	}
 }
 
-func TestMapCloseFailedDestroyLeavesHandleRetryable(t *testing.T) {
-	state, err := handle.New(nativeMap(0x0200_0000_0000_002a), "MapHandle")
-	if err != nil {
-		t.Fatal(err)
-	}
-	m := &MapHandle{state: state}
-
-	oldDestroy := destroyMapHandle
-	defer func() {
-		destroyMapHandle = oldDestroy
-	}()
-	var calls atomic.Int32
-	destroyMapHandle = func(nativeMap) int32 {
-		if calls.Add(1) == 1 {
-			return -3
-		}
-		return 0
-	}
-
-	if err := m.Close(); !errors.Is(err, ErrWrongThread) {
-		t.Fatalf("first Close() error = %v, want ErrWrongThread", err)
-	}
-	ptr, release, err := m.ptr()
-	if err != nil {
-		t.Fatalf("ptr() after failed Close(): %v", err)
-	}
-	if ptr == 0 {
-		t.Fatal("ptr() after failed Close() returned the null handle")
-	}
-	release()
-	if err := m.Close(); err != nil {
-		t.Fatalf("second Close(): %v", err)
-	}
-	if err := m.Close(); err != nil {
-		t.Fatalf("third Close(): %v", err)
-	}
-	if got := calls.Load(); got != 2 {
-		t.Fatalf("destroy calls = %d, want 2", got)
-	}
-}
-
-func TestMapCloseWaitsForActiveBorrow(t *testing.T) {
-	state, err := handle.New(nativeMap(0x0200_0000_0000_002a), "MapHandle")
-	if err != nil {
-		t.Fatal(err)
-	}
-	m := &MapHandle{state: state}
-
-	ptr, release, err := m.ptr()
-	if err != nil {
-		t.Fatalf("ptr(): %v", err)
-	}
-	if ptr == 0 {
-		t.Fatal("ptr() returned the null handle")
-	}
-
-	oldDestroy := destroyMapHandle
-	defer func() {
-		destroyMapHandle = oldDestroy
-	}()
-	destroyCalled := make(chan struct{})
-	destroyMapHandle = func(nativeMap) int32 {
-		close(destroyCalled)
-		return 0
-	}
-
-	closeDone := make(chan error, 1)
-	go func() {
-		closeDone <- m.Close()
-	}()
-
-	deadline := time.After(2 * time.Second)
-	for {
-		if _, extraRelease, err := m.ptr(); err == nil {
-			extraRelease()
-			select {
-			case <-destroyCalled:
-				t.Fatal("destroy ran before active borrow was released")
-			case <-deadline:
-				t.Fatal("Close did not enter releasing state")
-			case <-time.After(100 * time.Microsecond):
-				continue
-			}
-		}
-		break
-	}
-
-	release()
-	if err := <-closeDone; err != nil {
-		t.Fatalf("Close(): %v", err)
-	}
-	select {
-	case <-destroyCalled:
-	default:
-		t.Fatal("destroy did not run after borrow release")
-	}
-}
-
 func TestMapCommandsAndStyleLoadingUseNativeABI(t *testing.T) {
-	lockOSThreadForTest(t)
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	if err := m.RequestRepaint(); err != nil {
+	if _, err := m.RequestRepaint(); err != nil {
 		t.Fatalf("RequestRepaint(): %v", err)
 	}
-	if err := m.RequestStillImage(); !errors.Is(err, ErrInvalidState) {
+	if _, err := m.RequestStillImage(); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("RequestStillImage() on continuous map error = %v, want ErrInvalidState", err)
 	}
-	if err := m.SetStyleJSON([]byte(minimalStyleJSON)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(minimalStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(): %v", err)
 	}
-	if err := m.SetStyleURL("http://example.com/style.json"); err != nil {
+	if _, err := m.SetStyleURL("http://example.com/style.json"); err != nil {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
 }
 
 func TestMapReportsLoadedStyleDocumentAndURL(t *testing.T) {
-	lockOSThreadForTest(t)
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	if document, err := m.LoadedStyleJSON(); err != nil || len(document) != 0 {
+	if document, err := awaitForTest(m.LoadedStyleJSON()); err != nil || len(document) != 0 {
 		t.Fatalf("LoadedStyleJSON() before load = %q, %v, want \"\", nil", document, err)
 	}
-	if url, err := m.StyleURL(); err != nil || url != "" {
+	if url, err := awaitForTest(m.StyleURL()); err != nil || url != "" {
 		t.Fatalf("StyleURL() before load = %q, %v, want \"\", nil", url, err)
 	}
 
-	if err := m.SetStyleJSON([]byte(minimalStyleJSON)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(minimalStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(): %v", err)
 	}
-	document, err := m.LoadedStyleJSON()
+	document, err := awaitForTest(m.LoadedStyleJSON())
 	if err != nil {
 		t.Fatalf("LoadedStyleJSON(): %v", err)
 	}
 	if string(document) != minimalStyleJSON {
 		t.Fatalf("LoadedStyleJSON() = %q, want %q", document, minimalStyleJSON)
 	}
-	if url, err := m.StyleURL(); err != nil || url != "" {
+	if url, err := awaitForTest(m.StyleURL()); err != nil || url != "" {
 		t.Fatalf("StyleURL() after inline JSON = %q, %v, want \"\", nil", url, err)
 	}
 
 	// The URL is request state, recorded before the load can succeed, while the
 	// document still reports the style that last parsed.
 	const styleURL = "http://example.com/style.json"
-	if err := m.SetStyleURL(styleURL); err != nil {
+	if _, err := m.SetStyleURL(styleURL); err != nil {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
-	url, err := m.StyleURL()
+	url, err := awaitForTest(m.StyleURL())
 	if err != nil {
 		t.Fatalf("StyleURL(): %v", err)
 	}
 	if url != styleURL {
 		t.Fatalf("StyleURL() = %q, want %q", url, styleURL)
 	}
-	if document, err := m.LoadedStyleJSON(); err != nil || string(document) != minimalStyleJSON {
+	if document, err := awaitForTest(m.LoadedStyleJSON()); err != nil || string(document) != minimalStyleJSON {
 		t.Fatalf("LoadedStyleJSON() after URL request = %q, %v, want the previously parsed document", document, err)
 	}
 }
 
-func TestMapDebugAndStatusHelpersUseNativeABI(t *testing.T) {
-	lockOSThreadForTest(t)
-
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+// A committed command's terminal event carries the published map snapshot
+// generation, so a snapshot at or past that generation shows the committed
+// value.
+func TestMapSnapshotObservesCommittedCommands(t *testing.T) {
+	_, m := newRuntimeAndMap(t, nil)
 
 	options := MapDebugTileBorders | MapDebugCollision
-	if err := m.SetDebugOptions(options); err != nil {
-		t.Fatalf("SetDebugOptions(): %v", err)
-	}
-	got, err := m.DebugOptions()
+	completion, err := m.SetDebugOptions(options)
+	committed := requireCommandCommitted(t, completion, err)
+	snapshot, err := m.Snapshot()
 	if err != nil {
-		t.Fatalf("DebugOptions(): %v", err)
+		t.Fatalf("Snapshot(): %v", err)
 	}
-	if !got.Has(options) {
-		t.Fatalf("DebugOptions() = %v, want bits %v", got, options)
+	if snapshot.Generation < committed {
+		t.Fatalf("Snapshot() generation = %d, want at least the committed %d", snapshot.Generation, committed)
 	}
-	if err := m.SetRenderingStatsViewEnabled(true); err != nil {
-		t.Fatalf("SetRenderingStatsViewEnabled(true): %v", err)
+	if !snapshot.DebugOptions.Has(options) {
+		t.Fatalf("Snapshot() DebugOptions = %v, want bits %v", snapshot.DebugOptions, options)
 	}
-	if got, err := m.RenderingStatsViewEnabled(); err != nil || !got {
-		t.Fatalf("RenderingStatsViewEnabled() = %v, %v; want true, nil", got, err)
+
+	completion, err = m.SetRenderingStatsViewEnabled(true)
+	committed = requireCommandCommitted(t, completion, err)
+	snapshot, err = m.Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot(): %v", err)
 	}
-	if _, err := m.IsFullyLoaded(); err != nil {
-		t.Fatalf("IsFullyLoaded(): %v", err)
+	if snapshot.Generation < committed || !snapshot.RenderingStatsViewEnabled {
+		t.Fatalf("Snapshot() = (generation %d, stats view %v), want at least %d and true",
+			snapshot.Generation, snapshot.RenderingStatsViewEnabled, committed)
 	}
-	if err := m.DumpDebugLogs(); err != nil {
+	if _, err := m.DumpDebugLogs(); err != nil {
 		t.Fatalf("DumpDebugLogs(): %v", err)
 	}
 }
 
-func TestMapSizeReportsCreationExtentAndPixelRatio(t *testing.T) {
-	lockOSThreadForTest(t)
-
+// The tile, bounds, and free-camera snapshot fields round-trip through their
+// set commands.
+func TestMapSnapshotRoundTripsOptionCommands(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 256, 2))
+	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(256, 256, 1)))
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
 	defer func() {
-		if err := m.Close(); err != nil {
+		if err := closeMapForTest(m); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
 
-	width, height, scaleFactor, err := m.Size()
+	completion, err := m.SetTileOptions(TileOptions{}.WithPrefetchZoomDelta(3))
+	committed := requireCommandCommitted(t, completion, err)
+	snapshot, err := m.Snapshot()
 	if err != nil {
-		t.Fatalf("Size(): %v", err)
+		t.Fatalf("Snapshot(): %v", err)
 	}
-	if width != 512 || height != 256 || scaleFactor != 2 {
-		t.Fatalf("Size() = %d, %d, %v; want 512, 256, 2", width, height, scaleFactor)
+	if snapshot.Generation < committed {
+		t.Fatalf("Snapshot() generation = %d, want at least the committed %d", snapshot.Generation, committed)
+	}
+	if snapshot.Tile.PrefetchZoomDelta == nil || *snapshot.Tile.PrefetchZoomDelta != 3 {
+		t.Fatalf("Snapshot() Tile = %#v, want prefetch zoom delta 3", snapshot.Tile)
+	}
+
+	completion, err = m.SetBounds(BoundOptions{}.WithMinZoom(2).WithMaxZoom(15))
+	committed = requireCommandCommitted(t, completion, err)
+	snapshot, err = m.Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot(): %v", err)
+	}
+	if snapshot.Generation < committed ||
+		snapshot.Bounds.MinZoom == nil || *snapshot.Bounds.MinZoom != 2 ||
+		snapshot.Bounds.MaxZoom == nil || *snapshot.Bounds.MaxZoom != 15 {
+		t.Fatalf("Snapshot() Bounds = %#v, want zoom range 2 to 15", snapshot.Bounds)
+	}
+
+	position := Vec3{X: 0.25, Y: 0.25, Z: 0.1}
+	completion, err = m.SetFreeCameraOptions(FreeCameraOptions{}.WithPosition(position))
+	committed = requireCommandCommitted(t, completion, err)
+	snapshot, err = m.Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot(): %v", err)
+	}
+	if snapshot.Generation < committed || snapshot.FreeCamera.Position == nil {
+		t.Fatalf("Snapshot() FreeCamera = %#v, want a position", snapshot.FreeCamera)
+	}
+	got := *snapshot.FreeCamera.Position
+	if math.Abs(got.X-position.X) > 1e-6 || math.Abs(got.Y-position.Y) > 1e-6 || math.Abs(got.Z-position.Z) > 1e-6 {
+		t.Fatalf("Snapshot() FreeCamera position = %#v, want %#v", got, position)
+	}
+}
+
+func TestMapResizeChangesTheExtentAndKeepsTheCreationScaleFactor(t *testing.T) {
+	options := NewMapOptions(512, 256, 2)
+	_, m := newRuntimeAndMap(t, &options)
+
+	snapshot, err := m.Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot(): %v", err)
+	}
+	created := LogicalExtent{Width: 512, Height: 256, ScaleFactor: 2}
+	if snapshot.LogicalExtent != created {
+		t.Fatalf("MapSnapshot.LogicalExtent = %#v, want %#v", snapshot.LogicalExtent, created)
+	}
+
+	resized := LogicalExtent{Width: 640, Height: 480, ScaleFactor: 2}
+	completion, err := m.Resize(resized)
+	committed := requireCommandCommitted(t, completion, err)
+	if snapshot, err = m.Snapshot(); err != nil {
+		t.Fatalf("Snapshot(): %v", err)
+	}
+	if snapshot.Generation < committed || snapshot.LogicalExtent != resized {
+		t.Fatalf("MapSnapshot.LogicalExtent = %#v, want %#v", snapshot.LogicalExtent, resized)
+	}
+
+	// The scale factor is fixed at creation, because the renderer bakes its
+	// pixel ratio into compiled shaders.
+	rescale, err := m.Resize(LogicalExtent{Width: 640, Height: 480, ScaleFactor: 3})
+	if rescale != nil || !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("Resize(changed scale factor) = (%v, %v), want nil and ErrInvalidArgument", rescale, err)
+	}
+	if snapshot, err = m.Snapshot(); err != nil {
+		t.Fatalf("Snapshot(): %v", err)
+	}
+	if snapshot.LogicalExtent != resized {
+		t.Fatalf("rejected resize changed the extent to %#v", snapshot.LogicalExtent)
 	}
 }
 
 func TestMapAcceptsFastPFORDecoding(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -384,104 +299,58 @@ func TestMapAcceptsFastPFORDecoding(t *testing.T) {
 		t.Fatalf("NewMapOptions().FastPFOREnabled = true; want false")
 	}
 	options.FastPFOREnabled = true
-	m, err := runtime.NewMapWithOptions(options)
+	m, err := awaitForTest(runtime.NewMapWithOptions(options))
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
-	if err := m.Close(); err != nil {
+	if err := closeMapForTest(m); err != nil {
 		t.Errorf("Map Close(): %v", err)
 	}
-	if err := runtime.Close(); err != nil {
+	if err := closeRuntimeForTest(runtime); err != nil {
 		t.Errorf("Runtime Close(): %v", err)
 	}
 }
 
-func TestMapDebugOptionsRejectUnknownBits(t *testing.T) {
-	lockOSThreadForTest(t)
+func TestMapDebugOptionsRejectUnknownBitsBeforeSubmission(t *testing.T) {
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	if err := m.SetDebugOptions(MapDebugOptions(1 << 31)); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("SetDebugOptions(unknown) error = %v, want ErrInvalidArgument", err)
+	future, err := m.SetDebugOptions(MapDebugOptions(1 << 31))
+	if future != nil || !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetDebugOptions(unknown) = (%v, %v), want nil and ErrInvalidArgument", future, err)
 	}
 }
 
 func TestMapStyleStringsRejectEmbeddedNUL(t *testing.T) {
-	lockOSThreadForTest(t)
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	if err := m.SetStyleURL("http://example.com/\x00style.json"); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := m.SetStyleURL("http://example.com/\x00style.json"); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetStyleURL embedded NUL error = %v, want ErrInvalidArgument", err)
 	}
-	if err := m.SetStyleJSON([]byte("{\x00}")); err == nil {
+	if _, err := m.SetStyleJSON([]byte("{\x00}")); err == nil {
 		t.Fatal("SetStyleJSON embedded NUL error = nil")
 	}
 }
 
-func TestMapWrongThreadReturnsWrongThread(t *testing.T) {
-	stdruntime.LockOSThread()
-	defer stdruntime.UnlockOSThread()
+func TestMapCommandsCanMigrateAcrossGoroutines(t *testing.T) {
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	errCh := make(chan error, 1)
+	result := make(chan struct {
+		generation uint64
+		err        error
+	}, 1)
 	go func() {
-		errCh <- m.RequestRepaint()
+		completion, err := awaitForTest(m.RequestRepaint())
+		result <- struct {
+			generation uint64
+			err        error
+		}{generation: completion.Generation, err: err}
 	}()
-	if err := <-errCh; !errors.Is(err, ErrWrongThread) {
-		t.Fatalf("RequestRepaint() from another thread error = %v, want ErrWrongThread", err)
+	got := <-result
+	if got.err != nil {
+		t.Fatalf("RequestRepaint() from another goroutine: %v", got.err)
 	}
-	if err := m.RequestRepaint(); err != nil {
-		t.Fatalf("RequestRepaint() on owner thread after wrong-thread call: %v", err)
+	if got.generation == 0 {
+		t.Fatal("RequestRepaint() completed without a published generation")
 	}
 }

@@ -1,5 +1,5 @@
 use maplibre_native_ffi::{
-    Error as MaplibreError, ErrorKind, MetalOwnedTextureFrameHandle, NativePointer,
+    AcquiredFrameHandle, Error as MaplibreError, ErrorKind, MetalFrameTexture, NativePointer,
 };
 use objc2::ClassType;
 use objc2::rc::Retained;
@@ -110,16 +110,17 @@ impl MetalTextureCompositor {
 
     /// Samples the frame's texture into the layer's next drawable, and reports
     /// whether it presented.
-    pub fn draw(
-        &mut self,
-        frame: &MetalOwnedTextureFrameHandle,
-    ) -> maplibre_native_ffi::Result<bool> {
-        let metadata = frame.frame()?;
+    pub fn draw(&mut self, frame: &AcquiredFrameHandle) -> maplibre_native_ffi::Result<bool> {
+        let MetalFrameTexture {
+            frame: metadata,
+            texture,
+            ..
+        } = frame.metal_texture()?;
         if metadata.width == 0 || metadata.height == 0 {
             return Err(metal_error("owned Metal frame has an empty extent"));
         }
         // SAFETY: The frame keeps this texture pointer valid until frame release.
-        let texture = unsafe { frame.texture()?.as_ptr::<ProtocolObject<dyn MTLTexture>>() };
+        let texture = unsafe { texture.as_ptr::<ProtocolObject<dyn MTLTexture>>() };
         let texture = unsafe { texture.as_ref() }
             .ok_or_else(|| metal_error("owned Metal frame has a null texture"))?;
         self.draw_texture(texture)

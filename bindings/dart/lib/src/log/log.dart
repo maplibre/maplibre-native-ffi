@@ -136,7 +136,7 @@ final class LogRecord {
   final String message;
 }
 
-/// Log callback run asynchronously on Dart's owner isolate.
+/// Log callback run asynchronously on its receiver isolate.
 typedef LogCallback = void Function(LogRecord record);
 
 /// Log severity mask for asynchronous native log dispatch.

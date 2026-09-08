@@ -94,9 +94,11 @@ struct NativeMapOptionsInput: Equatable {
     _ body: (UnsafePointer<mln_map_options>) throws -> Result
   ) throws -> Result {
     var options = mln_map_options_default()
-    options.width = width
-    options.height = height
-    options.scale_factor = scaleFactor
+    options.initial_extent = mln_logical_extent(
+      width: width,
+      height: height,
+      scale_factor: scaleFactor
+    )
     options.map_mode = mapMode
     options.fast_pfor_enabled = fastPFOREnabled
     options.event_mask = eventMask

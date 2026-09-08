@@ -119,200 +119,197 @@ public struct OfflineRegionInfo: Equatable, Sendable {
 }
 
 public extension RuntimeHandle {
-  func runAmbientCacheOperationStart(_ operation: AmbientCacheOperation) throws
-    -> UInt64
-  {
-    try mapNativeFailure {
-      try NativeOffline.runAmbientCacheOperationStart(
-        requireLiveHandle(),
-        operation: operation.rawValue
-      )
+  /// Runs one maintenance operation over this runtime's ambient cache.
+  ///
+  /// The call validates its arguments on the calling thread and accepts
+  /// without waiting for the runtime worker; a database failure arrives
+  /// through the completion.
+  func runAmbientCacheOperation(
+    _ operation: AmbientCacheOperation
+  ) async throws {
+    try await offlineUnit {
+      mln_runtime_run_ambient_cache_operation($0, operation.rawValue, $1)
     }
   }
 
-  /// Starts a change to this runtime's maximum ambient cache size. MapLibre
-  /// evicts ambient resources to fit the new budget, so lowering it discards
-  /// cached resources. Offline regions are unaffected.
-  func setMaximumAmbientCacheSizeStart(_ size: UInt64) throws -> UInt64 {
-    try mapNativeFailure {
-      try NativeOffline.setMaximumAmbientCacheSizeStart(
-        requireLiveHandle(),
-        size: size
-      )
+  /// Changes this runtime's maximum ambient cache size. MapLibre evicts
+  /// ambient resources to fit the new budget; offline regions are unaffected.
+  func setMaximumAmbientCacheSize(_ size: UInt64) async throws {
+    try await offlineUnit {
+      mln_runtime_set_maximum_ambient_cache_size($0, size, $1)
     }
   }
 
-  func discardOfflineOperation(_ operationId: UInt64) throws {
-    try mapNativeFailure {
-      try checkStatus(mln_runtime_offline_operation_discard(
-        requireLiveHandle().raw,
-        operationId
-      ))
-    }
-  }
-
-  func offlineRegionCreateStart(
+  /// Creates one offline region and copies the record the completion borrows.
+  func createOfflineRegion(
     definition: OfflineRegionDefinition,
     metadata: Data = Data()
-  ) throws -> UInt64 {
-    try mapNativeFailure {
-      try definition.nativeDefinition.withNativeDefinition { definition in
-        try NativeOffline.regionCreateStart(
-          requireLiveHandle(),
-          definition: definition,
-          metadata: metadata
+  ) async throws -> OfflineRegionInfo {
+    try await awaitNative {
+      let runtime = try requireLiveHandle()
+      return try definition.nativeDefinition
+        .withNativeDefinition { definition in
+          try metadata.withUnsafeBytes { bytes in
+            try NativeCompletion.start(
+              { completion in
+                mln_runtime_offline_region_create(
+                  runtime.raw,
+                  definition,
+                  bytes.bindMemory(to: UInt8.self).baseAddress,
+                  bytes.count,
+                  completion
+                )
+              },
+              convert: Self.copyOfflineRegion
+            )
+          }
+        }
+    }
+  }
+
+  /// Reads one offline region, or nil when no region carries `id`.
+  func offlineRegion(id: Int64) async throws -> OfflineRegionInfo? {
+    try await awaitNative {
+      let runtime = try requireLiveHandle()
+      return try NativeCompletion.start(
+        { mln_runtime_offline_region_get(runtime.raw, id, $0) },
+        convert: Self.copyOptionalOfflineRegion
+      )
+    }
+  }
+
+  func offlineRegions() async throws -> [OfflineRegionInfo] {
+    try await awaitNative {
+      let runtime = try requireLiveHandle()
+      return try NativeCompletion.start(
+        { mln_runtime_offline_regions_list(runtime.raw, $0) },
+        convert: Self.copyOfflineRegions
+      )
+    }
+  }
+
+  /// Merges the regions of another offline database into this runtime's and
+  /// returns the records it took on.
+  func mergeOfflineRegionsDatabase(
+    at sideDatabasePath: String
+  ) async throws -> [OfflineRegionInfo] {
+    try await awaitNative {
+      let runtime = try requireLiveHandle()
+      return try NativeString.withCString(sideDatabasePath) { path in
+        try NativeCompletion.start(
+          { mln_runtime_offline_regions_merge_database(runtime.raw, path, $0) },
+          convert: Self.copyOfflineRegions
         )
       }
     }
   }
 
-  func offlineRegionGetStart(regionId: Int64) throws -> UInt64 {
-    try mapNativeFailure { try NativeOffline.regionGetStart(
-      requireLiveHandle(),
-      regionId: regionId
-    ) }
-  }
-
-  func offlineRegionsListStart() throws -> UInt64 {
-    try mapNativeFailure {
-      try NativeOffline.regionsListStart(requireLiveHandle())
+  /// Replaces one region's metadata. It reports
+  /// ``MaplibreErrorKind/notFound`` when no region carries `id`.
+  func updateOfflineRegionMetadata(
+    id: Int64,
+    metadata: Data
+  ) async throws -> OfflineRegionInfo {
+    try await awaitNative {
+      let runtime = try requireLiveHandle()
+      return try metadata.withUnsafeBytes { bytes in
+        try NativeCompletion.start(
+          { completion in
+            mln_runtime_offline_region_update_metadata(
+              runtime.raw,
+              id,
+              bytes.bindMemory(to: UInt8.self).baseAddress,
+              bytes.count,
+              completion
+            )
+          },
+          convert: Self.copyOfflineRegion
+        )
+      }
     }
   }
 
-  func offlineRegionsMergeDatabaseStart(sideDatabasePath: String) throws
-    -> UInt64
-  {
-    try mapNativeFailure { try NativeOffline.regionsMergeDatabaseStart(
-      requireLiveHandle(),
-      sideDatabasePath: sideDatabasePath
-    ) }
-  }
-
-  func offlineRegionUpdateMetadataStart(regionId: Int64,
-                                        metadata: Data) throws -> UInt64
-  {
-    try mapNativeFailure { try NativeOffline.regionUpdateMetadataStart(
-      requireLiveHandle(),
-      regionId: regionId,
-      metadata: metadata
-    ) }
-  }
-
-  func offlineRegionGetStatusStart(regionId: Int64) throws -> UInt64 {
-    try mapNativeFailure { try NativeOffline.regionGetStatusStart(
-      requireLiveHandle(),
-      regionId: regionId
-    ) }
-  }
-
-  func offlineRegionSetObservedStart(regionId: Int64,
-                                     observed: Bool) throws -> UInt64
-  {
-    try mapNativeFailure {
-      try NativeOffline.regionSetObservedStart(
-        requireLiveHandle(),
-        regionId: regionId,
-        observed: observed
-      )
+  /// Reads one region's download progress. It reports
+  /// ``MaplibreErrorKind/notFound`` when no region carries `id`.
+  func offlineRegionStatus(id: Int64) async throws -> OfflineRegionStatus {
+    try await awaitNative {
+      let runtime = try requireLiveHandle()
+      return try NativeCompletion.start(
+        { mln_runtime_offline_region_get_status(runtime.raw, id, $0) }
+      ) { result in
+        try OfflineRegionStatus(
+          native: NativeOfflineRegionStatus(NativeCompletion.value(result))
+        )
+      }
     }
   }
 
-  func offlineRegionSetDownloadStateStart(
-    regionId: Int64,
+  /// Selects whether this region reports progress through runtime events. It
+  /// reports ``MaplibreErrorKind/notFound`` when no region carries `id`.
+  func setOfflineRegionObserved(
+    id: Int64,
+    observed: Bool
+  ) async throws {
+    try await offlineUnit {
+      mln_runtime_offline_region_set_observed($0, id, observed, $1)
+    }
+  }
+
+  /// Starts or stops this region's download. It reports
+  /// ``MaplibreErrorKind/notFound`` when no region carries `id`.
+  func setOfflineRegionDownloadState(
+    id: Int64,
     state: OfflineRegionDownloadState
-  ) throws -> UInt64 {
-    try mapNativeFailure { try NativeOffline.regionSetDownloadStateStart(
-      requireLiveHandle(),
-      regionId: regionId,
-      state: state.rawValue
-    ) }
-  }
-
-  func offlineRegionInvalidateStart(regionId: Int64) throws -> UInt64 {
-    try mapNativeFailure { try NativeOffline.regionInvalidateStart(
-      requireLiveHandle(),
-      regionId: regionId
-    ) }
-  }
-
-  func offlineRegionDeleteStart(regionId: Int64) throws -> UInt64 {
-    try mapNativeFailure {
-      try NativeOffline.regionDeleteStart(
-        requireLiveHandle(),
-        regionId: regionId
-      )
+  ) async throws {
+    try await offlineUnit {
+      mln_runtime_offline_region_set_download_state($0, id, state.rawValue, $1)
     }
   }
 
-  func offlineRegionCreateTakeResult(operationId: UInt64) throws
-    -> OfflineRegionInfo
-  {
-    try mapNativeFailure {
-      let info = try NativeOffline.regionCreateTakeResult(
-        requireLiveHandle(),
-        operationId: operationId
-      )
-      return OfflineRegionInfo(native: info)
+  /// Marks this region's resources stale so the next download refetches them.
+  /// It reports ``MaplibreErrorKind/notFound`` when no region carries `id`.
+  func invalidateOfflineRegion(id: Int64) async throws {
+    try await offlineUnit {
+      mln_runtime_offline_region_invalidate($0, id, $1)
     }
   }
 
-  func offlineRegionGetTakeResult(operationId: UInt64) throws
-    -> OfflineRegionInfo?
-  {
-    try mapNativeFailure {
-      let info = try NativeOffline.regionGetTakeResult(
-        requireLiveHandle(),
-        operationId: operationId
-      )
-      return info.map(OfflineRegionInfo.init(native:))
+  /// Deletes this region and the resources only it required. It reports
+  /// ``MaplibreErrorKind/notFound`` when no region carries `id`.
+  func deleteOfflineRegion(id: Int64) async throws {
+    try await offlineUnit {
+      mln_runtime_offline_region_delete($0, id, $1)
     }
   }
 
-  func offlineRegionsListTakeResult(operationId: UInt64) throws
-    -> [OfflineRegionInfo]
-  {
-    try mapNativeFailure {
-      let regions = try NativeOffline.regionsListTakeResult(
-        requireLiveHandle(),
-        operationId: operationId
-      )
-      return regions.map(OfflineRegionInfo.init(native:))
+  private func offlineUnit(
+    _ call: (mln_runtime, UnsafePointer<mln_completion>) -> mln_status
+  ) async throws {
+    try await awaitNative {
+      let runtime = try requireLiveHandle()
+      return try NativeCompletion.startUnit { call(runtime.raw, $0) }
     }
   }
 
-  func offlineRegionsMergeDatabaseTakeResult(operationId: UInt64) throws
-    -> [OfflineRegionInfo]
-  {
-    try mapNativeFailure {
-      let regions = try NativeOffline.regionsMergeDatabaseTakeResult(
-        requireLiveHandle(),
-        operationId: operationId
-      )
-      return regions.map(OfflineRegionInfo.init(native:))
-    }
+  private static func copyOfflineRegion(
+    _ result: UnsafePointer<mln_completion_result>
+  ) throws -> OfflineRegionInfo {
+    let raw: mln_offline_region_info = try NativeCompletion.value(result)
+    return try OfflineRegionInfo(native: NativeOfflineRegionInfo(copying: raw))
   }
 
-  func offlineRegionUpdateMetadataTakeResult(operationId: UInt64) throws
-    -> OfflineRegionInfo
-  {
-    try mapNativeFailure {
-      let info = try NativeOffline.regionUpdateMetadataTakeResult(
-        requireLiveHandle(),
-        operationId: operationId
-      )
-      return OfflineRegionInfo(native: info)
-    }
+  private static func copyOptionalOfflineRegion(
+    _ result: UnsafePointer<mln_completion_result>
+  ) throws -> OfflineRegionInfo? {
+    guard result.pointee.value_count > 0 else { return nil }
+    return try copyOfflineRegion(result)
   }
 
-  func offlineRegionGetStatusTakeResult(operationId: UInt64) throws
-    -> OfflineRegionStatus
-  {
-    try mapNativeFailure {
-      let status = try NativeOffline.regionGetStatusTakeResult(
-        requireLiveHandle(),
-        operationId: operationId
-      )
-      return OfflineRegionStatus(native: status)
+  private static func copyOfflineRegions(
+    _ result: UnsafePointer<mln_completion_result>
+  ) throws -> [OfflineRegionInfo] {
+    try NativeCompletion.values(result, as: mln_offline_region_info.self).map {
+      try OfflineRegionInfo(native: NativeOfflineRegionInfo(copying: $0))
     }
   }
 }

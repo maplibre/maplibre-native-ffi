@@ -99,4 +99,39 @@ public sealed unsafe class QueryStructTests
             RuntimeStructs.CopyUtf8(source.Value.filter->data, source.Value.filter->size)
         );
     }
+
+    [BindingSpecTest("BND-061")]
+    [Fact]
+    public void FeatureStateSelectorMaterializesOptionalFields()
+    {
+        using var selector = NativeFeatureStateSelector.From(
+            new FeatureStateSelector
+            {
+                SourceId = "source",
+                SourceLayerId = "layer",
+                FeatureId = "feature",
+                StateKey = "hover",
+            }
+        );
+
+        var value = selector.Value;
+        Assert.Equal(
+            (uint)(
+                mln_feature_state_selector_field.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
+                | mln_feature_state_selector_field.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
+                | mln_feature_state_selector_field.MLN_FEATURE_STATE_SELECTOR_STATE_KEY
+            ),
+            value.fields
+        );
+        Assert.Equal("source", RuntimeStructs.CopyUtf8(value.source_id.data, value.source_id.size));
+        Assert.Equal(
+            "layer",
+            RuntimeStructs.CopyUtf8(value.source_layer_id.data, value.source_layer_id.size)
+        );
+        Assert.Equal(
+            "feature",
+            RuntimeStructs.CopyUtf8(value.feature_id.data, value.feature_id.size)
+        );
+        Assert.Equal("hover", RuntimeStructs.CopyUtf8(value.state_key.data, value.state_key.size));
+    }
 }

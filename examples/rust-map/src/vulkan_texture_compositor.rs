@@ -2,7 +2,7 @@ use std::io::Cursor;
 
 use ash::vk;
 use ash::vk::Handle;
-use maplibre_native_ffi::{Error, ErrorKind, VulkanOwnedTextureFrameHandle};
+use maplibre_native_ffi::{AcquiredFrameHandle, Error, ErrorKind, VulkanFrameTexture};
 
 use crate::viewport::Viewport;
 use crate::vulkan::VulkanContext;
@@ -108,11 +108,12 @@ impl VulkanTextureCompositor {
         Ok(())
     }
 
-    pub fn draw(
-        &mut self,
-        frame: &VulkanOwnedTextureFrameHandle,
-    ) -> maplibre_native_ffi::Result<bool> {
-        let metadata = frame.frame()?;
+    pub fn draw(&mut self, frame: &AcquiredFrameHandle) -> maplibre_native_ffi::Result<bool> {
+        let VulkanFrameTexture {
+            frame: metadata,
+            image_view,
+            ..
+        } = frame.vulkan_texture()?;
         if metadata.width == 0 || metadata.height == 0 {
             return Err(compositor_error("owned Vulkan frame has an empty extent"));
         }
@@ -122,7 +123,7 @@ impl VulkanTextureCompositor {
                 metadata.layout
             )));
         }
-        let image_view = unsafe { vk::ImageView::from_raw(frame.image_view()?.bits()) };
+        let image_view = vk::ImageView::from_raw(unsafe { image_view.bits() });
         if image_view == vk::ImageView::null() {
             return Err(compositor_error("owned Vulkan frame has a null image view"));
         }
@@ -603,7 +604,7 @@ impl VulkanTextureCompositor {
         }
     }
 
-    fn wait_idle(&self) -> Result<(), vk::Result> {
+    pub fn wait_idle(&self) -> Result<(), vk::Result> {
         unsafe { self.device.device_wait_idle() }
     }
 

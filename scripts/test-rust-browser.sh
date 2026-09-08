@@ -53,13 +53,101 @@ export CARGO_ENCODED_RUSTFLAGS="$encoded"
 # Shared memory requires an atomics-enabled standard library.
 export RUSTC_BOOTSTRAP=1
 export CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER="$MISE_MONOREPO_ROOT/scripts/run-browser-cargo-test.sh"
-cargo test \
-  -p maplibre-native-ffi-sys \
-  -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  --target wasm32-unknown-emscripten \
-  -Zbuild-std=std,panic_abort \
-  -- --test-threads=1
+cargo_support_tests() {
+  cargo test \
+    -p maplibre-native-ffi-sys \
+    -p maplibre-native-ffi-core \
+    --target wasm32-unknown-emscripten \
+    -Zbuild-std=std,panic_abort \
+    -- --test-threads=1
+}
+
+cargo_binding_test() {
+  cargo test \
+    -p maplibre-native-ffi \
+    --target wasm32-unknown-emscripten \
+    -Zbuild-std=std,panic_abort \
+    -- "$@" --test-threads=1
+}
+
+# Chromium retains GPU and pthread resources longer than their native handles.
+# Give every integration test a fresh process so otherwise independent tests
+# cannot inherit a context budget or worker-pool state from their predecessors.
+binding_source="$MISE_MONOREPO_ROOT/bindings/rust/crates/maplibre-native-ffi/src"
+
+# Each entry pairs a source file with the module path its tests are compiled
+# under. Tests live in indented `mod tests` blocks, so the names are read from
+# the first function declaration after each `#[test]` attribute at any depth.
+test_sources=(
+  "completion.rs completion::tests::"
+  "custom_geometry.rs custom_geometry::tests::"
+  "custom_mvt_vector.rs custom_mvt_vector::tests::"
+  "events.rs events::tests::"
+  "handle.rs handle::tests::"
+  "lib.rs tests::"
+  "logging.rs logging::tests::"
+  "map/tests.rs map::tests::"
+  "projection.rs projection::tests::"
+  "render/tests.rs render::tests::"
+  "resource.rs resource::tests::"
+  "runtime.rs runtime::tests::"
+)
+
+list_test_names() {
+  awk '
+    /#\[test\]/ { pending = 1; next }
+    pending && /^[[:space:]]*(pub[[:space:]]+)?(async[[:space:]]+)?fn[[:space:]]/ {
+      sub(/^[[:space:]]*(pub[[:space:]]+)?(async[[:space:]]+)?fn[[:space:]]+/, "")
+      sub(/[(<].*/, "")
+      print
+      pending = 0
+    }
+  ' "$1"
+}
+
+# A source file that grows tests without an entry here would otherwise be
+# skipped silently, and so would a file whose module path stopped matching.
+listed_files=()
+for entry in "${test_sources[@]}"; do
+  listed_files+=("${entry%% *}")
+done
+while IFS= read -r source; do
+  relative="${source#"$binding_source/"}"
+  for listed in "${listed_files[@]}"; do
+    if [[ "$listed" == "$relative" ]]; then
+      continue 2
+    fi
+  done
+  echo "$relative declares tests but is missing from test_sources in ${BASH_SOURCE[0]}" >&2
+  exit 1
+done < <(grep -rl $'#\[test\]' "$binding_source" | sort)
+
+for entry in "${test_sources[@]}"; do
+  relative="${entry%% *}"
+  prefix="${entry#* }"
+  source="$binding_source/$relative"
+  declared=$(grep -c $'#\[test\]' "$source")
+  enumerated=0
+  test_names=()
+  while IFS= read -r test_name; do
+    enumerated=$((enumerated + 1))
+    # A pair of `cfg` alternatives shares one name, and only one of them is
+    # compiled for this target.
+    case " ${test_names[*]:-} " in
+      *" $test_name "*) continue ;;
+    esac
+    test_names+=("$test_name")
+  done < <(list_test_names "$source")
+  if [[ "$enumerated" -ne "$declared" ]]; then
+    echo "enumerated $enumerated of $declared tests in $relative" >&2
+    exit 1
+  fi
+  for test_name in "${test_names[@]}"; do
+    cargo_binding_test "$prefix$test_name" --exact
+  done
+done
+
+cargo_support_tests
 cargo clippy \
   -p maplibre-native-ffi-sys \
   -p maplibre-native-ffi-core \

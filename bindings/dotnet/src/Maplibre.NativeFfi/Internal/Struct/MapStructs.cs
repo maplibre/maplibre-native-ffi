@@ -169,6 +169,33 @@ internal static class MapStructs
         return native;
     }
 
+    internal static mln_camera_update ToNative(CameraUpdate update)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        var native = NativeMethods.mln_camera_update_default();
+        native.mode = (uint)update.Mode;
+        native.camera = ToNative(update.Camera);
+        native.animation = ToNative(update.Animation);
+        native.gesture_phase = (uint)update.GesturePhase;
+        return native;
+    }
+
+    internal static mln_camera_delta ToNative(CameraDelta delta)
+    {
+        ArgumentNullException.ThrowIfNull(delta);
+        var native = NativeMethods.mln_camera_delta_default();
+        native.kind = (uint)delta.Kind;
+        native.offset = ToNative(delta.Offset);
+        native.amount = delta.Amount;
+        if (delta.Anchor is { } anchor)
+        {
+            native.has_anchor = 1;
+            native.anchor = ToNative(anchor);
+        }
+        native.animation = ToNative(delta.Animation);
+        return native;
+    }
+
     internal static CameraOptions CameraOptionsFromNative(mln_camera_options native)
     {
         var options = new CameraOptions();

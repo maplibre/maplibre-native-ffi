@@ -4,14 +4,15 @@
 # stops the batch.
 set -euo pipefail
 
-if [[ $# -lt 3 ]]; then
-  echo "usage: $0 <timeout-seconds> <native-library> [--api <api>] [test-argument ...] -- <test-executable ...>" >&2
+if [[ $# -lt 4 ]]; then
+  echo "usage: $0 <timeout-seconds> <abi> <native-library> [--api <api>] [test-argument ...] -- <test-executable ...>" >&2
   exit 2
 fi
 
 timeout_seconds=$1
-native_library=$2
-shift 2
+abi=$2
+native_library=$3
+shift 3
 emulator_api=
 if [[ ${1:-} == --api ]]; then
   emulator_api=${2:?--api requires an Android API level}
@@ -59,8 +60,10 @@ fi
 # failure.
 if [[ -n "$emulator_api" ]] || [[ ! -x "$adb" ]] ||
   ! "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
-  tr -d '\r' | grep -qx 1; then
-  emulator_args=(x86_64)
+  tr -d '\r' | grep -qx 1 ||
+  ! "$adb" -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null |
+  tr -d '\r' | grep -qx "$abi"; then
+  emulator_args=("$abi")
   if [[ -n "$emulator_api" ]]; then
     emulator_args+=(--api "$emulator_api")
   fi

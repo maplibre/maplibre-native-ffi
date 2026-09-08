@@ -5,7 +5,7 @@
 set -euo pipefail
 
 ohos_sdk_version=${1:?usage: boot-ohos-emulator.sh <ohos-sdk-version>}
-connect_key=127.0.0.1:55555
+connect_key=${MLN_FFI_OHOS_EMULATOR_CONNECT_KEY:-127.0.0.1:55555}
 state_dir="$MISE_MONOREPO_ROOT/build/ohos-emulator"
 pid_file="$state_dir/qemu.pid"
 log_file="$state_dir/qemu.log"

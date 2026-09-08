@@ -1,244 +1,260 @@
 package org.maplibre.nativeffi.render
 
-import kotlinx.cinterop.BooleanVar
-import kotlinx.cinterop.CPointer
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.UByteVar
-import kotlinx.cinterop.UIntVar
-import kotlinx.cinterop.ULongVar
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.nativeHeap
-import kotlinx.cinterop.pointed
-import kotlinx.cinterop.ptr
-import kotlinx.cinterop.rawValue
-import kotlinx.cinterop.reinterpret
-import kotlinx.cinterop.sizeOf
-import kotlinx.cinterop.toLong
-import kotlinx.cinterop.value
-import org.maplibre.nativeffi.internal.c.mln_metal_borrowed_texture_attach
-import org.maplibre.nativeffi.internal.c.mln_metal_borrowed_texture_set_target
-import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_acquire_frame
-import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_attach
-import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_frame
-import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_release_frame
-import org.maplibre.nativeffi.internal.c.mln_metal_surface_attach
-import org.maplibre.nativeffi.internal.c.mln_metal_surface_set_target
-import org.maplibre.nativeffi.internal.c.mln_opengl_borrowed_texture_attach
-import org.maplibre.nativeffi.internal.c.mln_opengl_borrowed_texture_set_target
-import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_acquire_frame
-import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_attach
-import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_frame
-import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_release_frame
-import org.maplibre.nativeffi.internal.c.mln_opengl_surface_attach
-import org.maplibre.nativeffi.internal.c.mln_opengl_surface_set_target
-import org.maplibre.nativeffi.internal.c.mln_render_session_clear_data
-import org.maplibre.nativeffi.internal.c.mln_render_session_destroy
-import org.maplibre.nativeffi.internal.c.mln_render_session_detach
-import org.maplibre.nativeffi.internal.c.mln_render_session_dump_debug_logs
-import org.maplibre.nativeffi.internal.c.mln_render_session_query_feature_extensions
-import org.maplibre.nativeffi.internal.c.mln_render_session_query_rendered_features
-import org.maplibre.nativeffi.internal.c.mln_render_session_query_source_features
-import org.maplibre.nativeffi.internal.c.mln_render_session_reduce_memory_use
-import org.maplibre.nativeffi.internal.c.mln_render_session_render_update
-import org.maplibre.nativeffi.internal.c.mln_render_session_resize
-import org.maplibre.nativeffi.internal.c.mln_texture_image_info_default
-import org.maplibre.nativeffi.internal.c.mln_texture_read_premultiplied_rgba8
-import org.maplibre.nativeffi.internal.c.mln_vulkan_borrowed_texture_attach
-import org.maplibre.nativeffi.internal.c.mln_vulkan_borrowed_texture_set_target
-import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_acquire_frame
-import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_attach
-import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_frame
-import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_release_frame
-import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_attach
-import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_set_target
-import org.maplibre.nativeffi.internal.lifecycle.HandleState
-import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
-import org.maplibre.nativeffi.internal.lifecycle.asHandle
-import org.maplibre.nativeffi.internal.lifecycle.ownedBufferHandle
-import org.maplibre.nativeffi.internal.lifecycle.queriedFeatureListHandle
-import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
-import org.maplibre.nativeffi.internal.lifecycle.renderSessionHandle
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlinx.cinterop.*
+import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.internal.async.CompletionBridge
+import org.maplibre.nativeffi.internal.c.*
+import org.maplibre.nativeffi.internal.lifecycle.*
+import org.maplibre.nativeffi.internal.memory.CSizeVar
 import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.ByteStructs
-import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.internal.struct.QueryStructs
 import org.maplibre.nativeffi.internal.struct.RenderStructs
 import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.query.QueriedFeature
-import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
-import org.maplibre.nativeffi.query.RenderedQueryGeometry
-import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
+import org.maplibre.nativeffi.query.*
+import org.maplibre.nativeffi.runtime.*
 
-/** Owned native render session handle. Close it on the thread that attached it. */
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
 public actual class RenderSessionHandle
 private constructor(private val map: MapHandle, handle: NativeRenderSession) : AutoCloseable {
-  private val mapRetention = map.retainChild("RenderSessionHandle")
   private val state = HandleState("RenderSessionHandle", handle, map)
-  private val activeFrame = ActiveFrameState()
+  private val acquiredFrameScopes = AtomicReference<List<FrameScope>>(emptyList())
 
-  public actual fun resize(width: Int, height: Int, scaleFactor: Double) {
-    activeFrame.ensureInactive("resize")
-    Status.requireArgument(width >= 0) { "width must be non-negative" }
-    Status.requireArgument(height >= 0) { "height must be non-negative" }
-    Status.check(
-      mln_render_session_resize(
-        state.requireLive().rawHandleValue,
-        width.toUInt(),
-        height.toUInt(),
-        scaleFactor,
-      )
+  public actual val isClosed: Boolean
+    get() = state.isReleased()
+
+  public actual fun map(): MapHandle = map
+
+  public actual fun capabilities(): RenderSessionCapabilities = memScoped {
+    val value = alloc<mln_render_session_capabilities>()
+    value.size = sizeOf<mln_render_session_capabilities>().toUInt()
+    Status.check(mln_render_session_get_capabilities(id(), value.ptr))
+    RenderSessionCapabilities(
+      RenderDriver.fromNative(value.driver.toInt()),
+      value.texture_ring_depth.toInt(),
+      value.flags and MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION != 0u,
+      value.flags and MLN_RENDER_SESSION_CAPABILITY_READBACK != 0u,
+      value.flags and MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC != 0u,
+      value.flags and MLN_RENDER_SESSION_CAPABILITY_PRESENTATION != 0u,
     )
   }
 
-  public actual fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor) {
-    activeFrame.ensureInactive("set target")
+  public actual fun snapshot(): RenderSessionSnapshot = memScoped {
+    val value = alloc<mln_render_session_snapshot>()
+    value.size = sizeOf<mln_render_session_snapshot>().toUInt()
+    Status.check(mln_render_session_get_snapshot(id(), value.ptr))
+    RenderSessionSnapshot(
+      RenderSessionState.fromNative(value.state.toInt()),
+      RenderDriver.fromNative(value.driver.toInt()),
+      RenderResult.fromNative(value.latest_result),
+      RenderTargetExtent(
+        value.extent.width.toInt(),
+        value.extent.height.toInt(),
+        value.extent.scale_factor,
+      ),
+      value.generation.toLong(),
+      value.map_update_generation.toLong(),
+      value.rendered_update_generation.toLong(),
+      value.extent_generation.toLong(),
+      value.frame_generation.toLong(),
+      value.latest_demand_token.toLong(),
+      value.pending_demand_count.toInt(),
+      value.acquired_frame_count.toInt(),
+      value.target_ready,
+      value.pending_changes,
+    )
+  }
+
+  public actual fun requestFrame(demand: FrameDemand) = memScoped {
+    val value = alloc<mln_frame_demand>()
+    mln_frame_demand_default().place(value.ptr)
+    value.flags =
+      (if (demand.ifNeeded) MLN_FRAME_DEMAND_IF_NEEDED else 0u) or
+        (if (demand.present) MLN_FRAME_DEMAND_PRESENT else 0u)
+    value.token = demand.token.toULong()
+    value.coalescing_boundary = demand.coalescingBoundary.toULong()
+    value.timeout_ns = demand.timeoutNanoseconds.toULong()
+    Status.check(mln_render_session_request_frame(id(), value.ptr))
+  }
+
+  public actual fun drainFrameResults(): List<RenderFrameResult> = memScoped {
+    val outBatch = alloc<ULongVar>()
+    outBatch.value = 0u
+    val drained = mln_render_session_drain_frame_results(id(), outBatch.ptr)
+    if (drained == MLN_STATUS_NOT_READY) return@memScoped emptyList()
+    Status.check(drained)
+    val batch = outBatch.value
+    try {
+      val outCount = alloc<CSizeVar>()
+      Status.check(mln_render_frame_batch_count(batch, outCount.ptr))
+      List(outCount.value.toInt()) { index ->
+        val value = alloc<mln_render_frame_result>()
+        value.size = sizeOf<mln_render_frame_result>().toUInt()
+        Status.check(mln_render_frame_batch_get(batch, index.toCSize(), value.ptr))
+        frameResult(value)
+      }
+    } finally {
+      if (batch != 0uL) mln_render_frame_batch_release(batch)
+    }
+  }
+
+  public actual fun serviceDriverWork(maxWork: Int): Int = memScoped {
+    Status.requireArgument(maxWork >= 0) { "maxWork must be non-negative" }
+    val serviced = alloc<CSizeVar>()
+    Status.check(mln_render_session_service_driver_work(id(), maxWork.toCSize(), serviced.ptr))
+    serviced.value.toInt()
+  }
+
+  public actual fun acquireFrame(): AcquiredFrameHandle? = memScoped {
+    val outFrame = alloc<ULongVar>()
+    outFrame.value = 0u
+    val status = mln_render_session_acquire_frame(id(), outFrame.ptr)
+    if (status == MLN_STATUS_NOT_READY) return@memScoped null
+    Status.check(status)
+    val scope = FrameScope()
+    retainFrameScope(scope)
+    AcquiredFrameHandle(this@RenderSessionHandle, outFrame.value, scope)
+  }
+
+  public actual fun resize(extent: RenderTargetExtent): Deferred<Unit> = memScoped {
+    val native = extent(extent, this)
+    CompletionBridge.unit { mln_render_session_resize(id(), native, it) }
+  }
+
+  public actual fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor): Deferred<Unit> =
     memScoped {
-      Status.check(
+      CompletionBridge.unit {
         mln_metal_surface_set_target(
-          state.requireLive().rawHandleValue,
+          id(),
           RenderStructs.metalSurfaceDescriptor(descriptor, this),
+          it,
         )
-      )
+      }
     }
-  }
 
-  public actual fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor) {
-    activeFrame.ensureInactive("set target")
+  public actual fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor): Deferred<Unit> =
     memScoped {
-      Status.check(
+      CompletionBridge.unit {
         mln_vulkan_surface_set_target(
-          state.requireLive().rawHandleValue,
+          id(),
           RenderStructs.vulkanSurfaceDescriptor(descriptor, this),
+          it,
         )
-      )
+      }
     }
-  }
 
-  public actual fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor) {
-    activeFrame.ensureInactive("set target")
+  public actual fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor): Deferred<Unit> =
     memScoped {
-      Status.check(
+      CompletionBridge.unit {
         mln_opengl_surface_set_target(
-          state.requireLive().rawHandleValue,
+          id(),
           RenderStructs.openglSurfaceDescriptor(descriptor, this),
+          it,
         )
+      }
+    }
+
+  public actual fun setMetalBorrowedTextureTarget(
+    descriptor: MetalBorrowedTextureDescriptor
+  ): Deferred<Unit> = memScoped {
+    CompletionBridge.unit {
+      mln_metal_borrowed_texture_set_target(
+        id(),
+        RenderStructs.metalBorrowedTextureDescriptor(descriptor, this),
+        it,
       )
     }
   }
 
-  public actual fun setMetalBorrowedTextureTarget(descriptor: MetalBorrowedTextureDescriptor) {
-    activeFrame.ensureInactive("set target")
-    memScoped {
-      Status.check(
-        mln_metal_borrowed_texture_set_target(
-          state.requireLive().rawHandleValue,
-          RenderStructs.metalBorrowedTextureDescriptor(descriptor, this),
-        )
+  public actual fun setVulkanBorrowedTextureTarget(
+    descriptor: VulkanBorrowedTextureDescriptor
+  ): Deferred<Unit> = memScoped {
+    CompletionBridge.unit {
+      mln_vulkan_borrowed_texture_set_target(
+        id(),
+        RenderStructs.vulkanBorrowedTextureDescriptor(descriptor, this),
+        it,
       )
     }
   }
 
-  public actual fun setVulkanBorrowedTextureTarget(descriptor: VulkanBorrowedTextureDescriptor) {
-    activeFrame.ensureInactive("set target")
-    memScoped {
-      Status.check(
-        mln_vulkan_borrowed_texture_set_target(
-          state.requireLive().rawHandleValue,
-          RenderStructs.vulkanBorrowedTextureDescriptor(descriptor, this),
-        )
+  public actual fun setOpenGLBorrowedTextureTarget(
+    descriptor: OpenGLBorrowedTextureDescriptor
+  ): Deferred<Unit> = memScoped {
+    CompletionBridge.unit {
+      mln_opengl_borrowed_texture_set_target(
+        id(),
+        RenderStructs.openglBorrowedTextureDescriptor(descriptor, this),
+        it,
       )
     }
   }
 
-  public actual fun setOpenGLBorrowedTextureTarget(descriptor: OpenGLBorrowedTextureDescriptor) {
-    activeFrame.ensureInactive("set target")
-    memScoped {
-      Status.check(
-        mln_opengl_borrowed_texture_set_target(
-          state.requireLive().rawHandleValue,
-          RenderStructs.openglBorrowedTextureDescriptor(descriptor, this),
-        )
-      )
-    }
+  public actual fun reduceMemoryUse(): Deferred<Unit> = CompletionBridge.unit {
+    mln_render_session_reduce_memory_use(id(), it)
   }
 
-  public actual fun renderUpdate(): RenderUpdate = memScoped {
-    activeFrame.ensureInactive("render")
-    val outResult = alloc<UIntVar>()
-    outResult.value = 0u
-    val outNeedsRepaint = alloc<BooleanVar>()
-    outNeedsRepaint.value = false
-    Status.check(
-      mln_render_session_render_update(
-        state.requireLive().rawHandleValue,
-        outResult.ptr,
-        outNeedsRepaint.ptr,
-      )
-    )
-    RenderUpdate(RenderResult.fromNative(outResult.value), outNeedsRepaint.value)
+  public actual fun clearData(): Deferred<Unit> = CompletionBridge.unit {
+    mln_render_session_clear_data(id(), it)
   }
 
-  public actual fun detach() {
-    activeFrame.ensureInactive("detach")
-    Status.check(mln_render_session_detach(state.requireLive().rawHandleValue))
-    mapRetention.close()
+  public actual fun dumpDebugLogs(): Deferred<Unit> = CompletionBridge.unit {
+    mln_render_session_dump_debug_logs(id(), it)
   }
 
-  public actual fun reduceMemoryUse() {
-    activeFrame.ensureInactive("reduce memory use")
-    Status.check(mln_render_session_reduce_memory_use(state.requireLive().rawHandleValue))
+  public actual fun barrier(): Deferred<Unit> = CompletionBridge.unit {
+    mln_render_session_barrier(id(), it)
   }
 
-  public actual fun clearData() {
-    activeFrame.ensureInactive("clear data")
-    Status.check(mln_render_session_clear_data(state.requireLive().rawHandleValue))
-  }
-
-  public actual fun dumpDebugLogs() {
-    activeFrame.ensureInactive("dump debug logs")
-    Status.check(mln_render_session_dump_debug_logs(state.requireLive().rawHandleValue))
+  public actual fun detach(): Deferred<Unit> = CompletionBridge.unit {
+    mln_render_session_detach(id(), it)
   }
 
   public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): List<QueriedFeature> = memScoped {
-    activeFrame.ensureInactive("query rendered features")
-    val outResult = alloc<ULongVar>()
-    outResult.value = 0uL
-    Status.check(
-      mln_render_session_query_rendered_features(
-        state.requireLive().rawHandleValue,
-        QueryStructs.renderedQueryGeometry(geometry, this),
-        QueryStructs.renderedFeatureQueryOptions(options, this),
-        outResult.ptr,
-      )
-    )
-    QueryStructs.queriedFeatureList(
-      outResult.value.asHandle("mln_queried_feature_list", ::queriedFeatureListHandle)
+  ): Deferred<List<QueriedFeature>> = memScoped {
+    CompletionBridge.submit(
+      { result ->
+        QueryStructs.queriedFeatures(
+          result.pointed.value?.reinterpret(),
+          result.pointed.value_count,
+        )
+      },
+      { completion ->
+        mln_render_session_query_rendered_features(
+          id(),
+          QueryStructs.renderedQueryGeometry(geometry, this),
+          QueryStructs.renderedFeatureQueryOptions(options, this),
+          completion,
+        )
+      },
     )
   }
 
   public actual fun querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): List<QueriedFeature> = memScoped {
-    activeFrame.ensureInactive("query source features")
-    val outResult = alloc<ULongVar>()
-    outResult.value = 0uL
-    Status.check(
-      mln_render_session_query_source_features(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(sourceId, this),
-        QueryStructs.sourceFeatureQueryOptions(options, this),
-        outResult.ptr,
-      )
-    )
-    QueryStructs.queriedFeatureList(
-      outResult.value.asHandle("mln_queried_feature_list", ::queriedFeatureListHandle)
+  ): Deferred<List<QueriedFeature>> = memScoped {
+    CompletionBridge.submit(
+      { result ->
+        QueryStructs.queriedFeatures(
+          result.pointed.value?.reinterpret(),
+          result.pointed.value_count,
+        )
+      },
+      { completion ->
+        mln_render_session_query_source_features(
+          id(),
+          ByteStructs.bufferView(sourceId.encodeToByteArray(), this),
+          QueryStructs.sourceFeatureQueryOptions(options, this),
+          completion,
+        )
+      },
     )
   }
 
@@ -248,427 +264,376 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     extension: String,
     extensionField: String,
     arguments: ByteArray?,
-  ): ByteArray = memScoped {
-    activeFrame.ensureInactive("query feature extension")
-    val outResult = alloc<ULongVar>()
-    outResult.value = 0uL
-    Status.check(
-      mln_render_session_query_feature_extensions(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(sourceId, this),
-        ByteStructs.bufferView(feature, this),
-        CoreStructs.stringView(extension, this),
-        CoreStructs.stringView(extensionField, this),
-        arguments?.let { ByteStructs.bufferViewPointer(it, this) },
-        outResult.ptr,
-      )
-    )
-    ByteStructs.ownedBuffer(outResult.value.asHandle("mln_buffer", ::ownedBufferHandle))
-  }
-
-  public actual fun textureImageInfo(): TextureImageInfo = memScoped {
-    activeFrame.ensureInactive("read texture data")
-    val outInfo = mln_texture_image_info_default().getPointer(this)
-    val status =
-      mln_texture_read_premultiplied_rgba8(
-        state.requireLive().rawHandleValue,
-        null,
-        0.toCSize(),
-        outInfo,
-      )
-    val info = RenderStructs.textureImageInfo(outInfo.pointed)
-    if (status == 0 || (status == -1 && info.byteLength > 0L)) {
-      info
-    } else {
-      Status.check(status)
-      error("unreachable")
-    }
-  }
-
-  public actual fun readPremultipliedRgba8(buffer: NativeBuffer): TextureImageInfo = memScoped {
-    activeFrame.ensureInactive("read texture data")
-    val outInfo = mln_texture_image_info_default().getPointer(this)
-    buffer.borrow { pointer, capacity ->
-      Status.check(
-        mln_texture_read_premultiplied_rgba8(
-          state.requireLive().rawHandleValue,
-          pointer?.reinterpret<UByteVar>(),
-          capacity.toCSize(),
-          outInfo,
+  ): Deferred<ByteArray> = memScoped {
+    val argument = arguments?.let { ByteStructs.bufferView(it, this) }
+    CompletionBridge.submit(
+      { result -> requiredBuffer(result) },
+      { completion ->
+        mln_render_session_query_feature_extensions(
+          id(),
+          ByteStructs.bufferView(sourceId.encodeToByteArray(), this),
+          ByteStructs.bufferView(feature, this),
+          ByteStructs.bufferView(extension.encodeToByteArray(), this),
+          ByteStructs.bufferView(extensionField.encodeToByteArray(), this),
+          argument?.getPointer(this),
+          completion,
         )
-      )
-    }
-    val info = RenderStructs.textureImageInfo(outInfo.pointed)
-    // Native reads an empty destination as a size probe rather than a copy, so the
-    // capacity is rechecked here.
-    buffer.ensureCapacity(info.byteLength.toULong())
-    info
+      },
+    )
   }
 
-  public actual fun acquireMetalOwnedTextureFrame(): MetalOwnedTextureFrameHandle {
-    val frame = nativeHeap.alloc<mln_metal_owned_texture_frame>()
-    var acquired = false
-    var borrowStarted = false
-    try {
-      activeFrame.beginAcquire()
-      borrowStarted = true
-      frame.size = sizeOf<mln_metal_owned_texture_frame>().toUInt()
-      Status.check(
-        mln_metal_owned_texture_acquire_frame(state.requireLive().rawHandleValue, frame.ptr)
-      )
-      acquired = true
-      val scope = FrameScope()
-      return MetalOwnedTextureFrameHandle(
-        this,
-        frame.ptr,
-        scope,
-        metalOwnedTextureFrame(frame, scope),
-      )
-    } catch (error: Throwable) {
-      FrameAcquirePolicy.cleanupAfterWrapperFailure(
-        acquired,
-        releaseNative = { releaseMetalFrame(frame.ptr) },
-        closeLocal = {
-          if (borrowStarted) activeFrame.endBorrow()
-          nativeHeap.free(frame.rawPtr)
-        },
-        failure = error,
-      )
-    }
-  }
+  public actual fun readPremultipliedRgba8(): Deferred<TextureReadback> =
+    CompletionBridge.submit(
+      { result ->
+        val raw = result.pointed.value!!.reinterpret<mln_texture_readback_result>().pointed
+        TextureReadback(
+          ByteStructs.copyBufferView(raw.data),
+          RenderStructs.textureImageInfo(raw.info),
+        )
+      },
+      { completion -> mln_texture_read_premultiplied_rgba8(id(), completion) },
+    )
 
-  public actual fun acquireVulkanOwnedTextureFrame(): VulkanOwnedTextureFrameHandle {
-    val frame = nativeHeap.alloc<mln_vulkan_owned_texture_frame>()
-    var acquired = false
-    var borrowStarted = false
-    try {
-      activeFrame.beginAcquire()
-      borrowStarted = true
-      frame.size = sizeOf<mln_vulkan_owned_texture_frame>().toUInt()
-      Status.check(
-        mln_vulkan_owned_texture_acquire_frame(state.requireLive().rawHandleValue, frame.ptr)
-      )
-      acquired = true
-      val scope = FrameScope()
-      return VulkanOwnedTextureFrameHandle(
-        this,
-        frame.ptr,
-        scope,
-        vulkanOwnedTextureFrame(frame, scope),
-      )
-    } catch (error: Throwable) {
-      FrameAcquirePolicy.cleanupAfterWrapperFailure(
-        acquired,
-        releaseNative = { releaseVulkanFrame(frame.ptr) },
-        closeLocal = {
-          if (borrowStarted) activeFrame.endBorrow()
-          nativeHeap.free(frame.rawPtr)
-        },
-        failure = error,
-      )
-    }
-  }
-
-  public actual fun acquireOpenGLOwnedTextureFrame(): OpenGLOwnedTextureFrameHandle {
-    val frame = nativeHeap.alloc<mln_opengl_owned_texture_frame>()
-    var acquired = false
-    var borrowStarted = false
-    try {
-      activeFrame.beginAcquire()
-      borrowStarted = true
-      frame.size = sizeOf<mln_opengl_owned_texture_frame>().toUInt()
-      Status.check(
-        mln_opengl_owned_texture_acquire_frame(state.requireLive().rawHandleValue, frame.ptr)
-      )
-      acquired = true
-      val scope = FrameScope()
-      return OpenGLOwnedTextureFrameHandle(
-        this,
-        frame.ptr,
-        scope,
-        openglOwnedTextureFrame(frame, scope),
-      )
-    } catch (error: Throwable) {
-      FrameAcquirePolicy.cleanupAfterWrapperFailure(
-        acquired,
-        releaseNative = { releaseOpenGLFrame(frame.ptr) },
-        closeLocal = {
-          if (borrowStarted) activeFrame.endBorrow()
-          nativeHeap.free(frame.rawPtr)
-        },
-        failure = error,
-      )
-    }
+  public actual fun abandon(): RenderAbandonResult = memScoped {
+    val value = alloc<mln_render_abandon_result>()
+    value.size = sizeOf<mln_render_abandon_result>().toUInt()
+    Status.check(mln_render_session_abandon(id(), value.ptr))
+    acquiredFrameScopes.load().forEach(FrameScope::close)
+    RenderAbandonResult(
+      RenderAbandonDisposition.fromNative(value.disposition.toInt()),
+      value.quarantined_resource_count.toInt(),
+    )
   }
 
   public actual override fun close() {
-    activeFrame.ensureInactive("destroy")
-    state.closeOnce({ handle -> mln_render_session_destroy(handle.rawHandleValue) }) {
-      mapRetention.close()
+    state.closeOnce(destroy = { mln_render_session_destroy(it.rawHandleValue) })
+  }
+
+  internal fun frameReleased(scope: FrameScope) {
+    while (true) {
+      val scopes = acquiredFrameScopes.load()
+      if (acquiredFrameScopes.compareAndSet(scopes, scopes - scope)) return
     }
   }
 
-  public actual val isClosed: Boolean
-    get() = state.isReleased()
-
-  public actual fun map(): MapHandle = map
-
-  internal fun nativeHandle(): NativeRenderSession = state.requireLive()
-
-  internal fun nativeHandleId(): Long = state.handleId()
-
-  internal fun releaseMetalFrame(frame: CPointer<mln_metal_owned_texture_frame>) {
-    Status.check(mln_metal_owned_texture_release_frame(state.requireLive().rawHandleValue, frame))
+  private fun retainFrameScope(scope: FrameScope) {
+    while (true) {
+      val scopes = acquiredFrameScopes.load()
+      if (acquiredFrameScopes.compareAndSet(scopes, scopes + scope)) return
+    }
   }
 
-  internal fun releaseVulkanFrame(frame: CPointer<mln_vulkan_owned_texture_frame>) {
-    Status.check(mln_vulkan_owned_texture_release_frame(state.requireLive().rawHandleValue, frame))
+  private fun id(): ULong = state.requireLive().rawHandleValue
+
+  private fun requiredBuffer(result: CPointer<mln_completion_result>): ByteArray {
+    require(result.pointed.value_count.toULong() == 1uL) {
+      "native completion omitted its byte result"
+    }
+    return ByteStructs.copyBufferView(result.pointed.value!!.reinterpret<mln_buffer_view>().pointed)
   }
-
-  internal fun releaseOpenGLFrame(frame: CPointer<mln_opengl_owned_texture_frame>) {
-    Status.check(mln_opengl_owned_texture_release_frame(state.requireLive().rawHandleValue, frame))
-  }
-
-  internal fun finishFrameBorrow() {
-    activeFrame.endBorrow()
-  }
-
-  private fun metalOwnedTextureFrame(
-    value: mln_metal_owned_texture_frame,
-    scope: FrameScope,
-  ): MetalOwnedTextureFrame =
-    MetalOwnedTextureFrame(
-      scope,
-      uint64BitsToLong(value.generation),
-      checkedInt(value.width, "Metal frame width"),
-      checkedInt(value.height, "Metal frame height"),
-      value.scale_factor,
-      uint64BitsToLong(value.frame_id),
-      scopedPointer(value.texture, scope),
-      scopedPointer(value.device, scope),
-      uint64BitsToLong(value.pixel_format),
-    )
-
-  private fun vulkanOwnedTextureFrame(
-    value: mln_vulkan_owned_texture_frame,
-    scope: FrameScope,
-  ): VulkanOwnedTextureFrame =
-    VulkanOwnedTextureFrame(
-      scope,
-      uint64BitsToLong(value.generation),
-      checkedInt(value.width, "Vulkan frame width"),
-      checkedInt(value.height, "Vulkan frame height"),
-      value.scale_factor,
-      uint64BitsToLong(value.frame_id),
-      VulkanHandle.scoped(value.image.toLong(), scope),
-      VulkanHandle.scoped(value.image_view.toLong(), scope),
-      scopedPointer(value.device, scope),
-      value.format.toInt(),
-      value.layout.toInt(),
-    )
-
-  private fun openglOwnedTextureFrame(
-    value: mln_opengl_owned_texture_frame,
-    scope: FrameScope,
-  ): OpenGLOwnedTextureFrame =
-    OpenGLOwnedTextureFrame(
-      scope,
-      uint64BitsToLong(value.generation),
-      checkedInt(value.width, "OpenGL frame width"),
-      checkedInt(value.height, "OpenGL frame height"),
-      value.scale_factor,
-      uint64BitsToLong(value.frame_id),
-      value.texture.toInt(),
-      value.target.toInt(),
-      value.internal_format.toInt(),
-      value.format.toInt(),
-      value.type.toInt(),
-    )
-
-  private fun checkedInt(value: UInt, name: String): Int {
-    require(value <= Int.MAX_VALUE.toUInt()) { "$name exceeds Int.MAX_VALUE" }
-    return value.toInt()
-  }
-
-  private fun uint64BitsToLong(value: ULong): Long = value.toLong()
-
-  private fun scopedPointer(
-    pointer: kotlinx.cinterop.COpaquePointer?,
-    scope: FrameScope,
-  ): NativePointer =
-    pointer?.rawValue?.toLong()?.let { NativePointer.scoped(it, scope) }
-      ?: NativePointer.NULL_POINTER
 
   internal companion object {
+    private fun attach(
+      map: MapHandle,
+      options: RenderSessionAttachOptions,
+      call:
+        (
+          CPointer<mln_render_session_attach_options>, CPointer<ULongVar>, CPointer<mln_completion>,
+        ) -> Int,
+    ): RenderSessionAttachment = memScoped {
+      val nativeOptions = alloc<mln_render_session_attach_options>()
+      mln_render_session_attach_options_default().place(nativeOptions.ptr)
+      nativeOptions.driver = options.driver.nativeValue.toUInt()
+      nativeOptions.requested_texture_ring_depth = options.requestedTextureRingDepth.toUInt()
+      val session = alloc<ULongVar>()
+      session.value = 0u
+      val completed = CompletionBridge.unitChecked { completion ->
+        call(nativeOptions.ptr, session.ptr, completion)
+      }
+      val handle =
+        RenderSessionHandle(
+          map,
+          session.value.asHandle("mln_render_session", ::renderSessionHandle),
+        )
+      RenderSessionAttachment(handle, completed)
+    }
+
     internal fun attachMetalOwnedTexture(
       map: MapHandle,
       descriptor: MetalOwnedTextureDescriptor,
-    ): RenderSessionHandle = memScoped {
-      val outSession = alloc<ULongVar>()
-      outSession.value = 0uL
-      Status.check(
+      options: RenderSessionAttachOptions,
+    ) = memScoped {
+      attach(map, options) { o, s, p ->
         mln_metal_owned_texture_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.metalOwnedTextureDescriptor(descriptor, this),
-          outSession.ptr,
+          o,
+          s,
+          p,
         )
-      )
-      RenderSessionHandle(
-        map,
-        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
-      )
+      }
     }
 
     internal fun attachMetalBorrowedTexture(
       map: MapHandle,
       descriptor: MetalBorrowedTextureDescriptor,
-    ): RenderSessionHandle = memScoped {
-      val outSession = alloc<ULongVar>()
-      outSession.value = 0uL
-      Status.check(
+      options: RenderSessionAttachOptions,
+    ) = memScoped {
+      attach(map, options) { o, s, p ->
         mln_metal_borrowed_texture_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.metalBorrowedTextureDescriptor(descriptor, this),
-          outSession.ptr,
+          o,
+          s,
+          p,
         )
-      )
-      RenderSessionHandle(
-        map,
-        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
-      )
+      }
     }
 
     internal fun attachVulkanOwnedTexture(
       map: MapHandle,
       descriptor: VulkanOwnedTextureDescriptor,
-    ): RenderSessionHandle = memScoped {
-      val outSession = alloc<ULongVar>()
-      outSession.value = 0uL
-      Status.check(
+      options: RenderSessionAttachOptions,
+    ) = memScoped {
+      attach(map, options) { o, s, p ->
         mln_vulkan_owned_texture_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.vulkanOwnedTextureDescriptor(descriptor, this),
-          outSession.ptr,
+          o,
+          s,
+          p,
         )
-      )
-      RenderSessionHandle(
-        map,
-        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
-      )
+      }
     }
 
     internal fun attachVulkanBorrowedTexture(
       map: MapHandle,
       descriptor: VulkanBorrowedTextureDescriptor,
-    ): RenderSessionHandle = memScoped {
-      val outSession = alloc<ULongVar>()
-      outSession.value = 0uL
-      Status.check(
+      options: RenderSessionAttachOptions,
+    ) = memScoped {
+      attach(map, options) { o, s, p ->
         mln_vulkan_borrowed_texture_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.vulkanBorrowedTextureDescriptor(descriptor, this),
-          outSession.ptr,
+          o,
+          s,
+          p,
         )
-      )
-      RenderSessionHandle(
-        map,
-        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
-      )
+      }
     }
 
     internal fun attachOpenGLOwnedTexture(
       map: MapHandle,
       descriptor: OpenGLOwnedTextureDescriptor,
-    ): RenderSessionHandle = memScoped {
-      val outSession = alloc<ULongVar>()
-      outSession.value = 0uL
-      Status.check(
+      options: RenderSessionAttachOptions,
+    ) = memScoped {
+      attach(map, options) { o, s, p ->
         mln_opengl_owned_texture_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.openglOwnedTextureDescriptor(descriptor, this),
-          outSession.ptr,
+          o,
+          s,
+          p,
         )
-      )
-      RenderSessionHandle(
-        map,
-        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
-      )
+      }
     }
 
     internal fun attachOpenGLBorrowedTexture(
       map: MapHandle,
       descriptor: OpenGLBorrowedTextureDescriptor,
-    ): RenderSessionHandle = memScoped {
-      val outSession = alloc<ULongVar>()
-      outSession.value = 0uL
-      Status.check(
+      options: RenderSessionAttachOptions,
+    ) = memScoped {
+      attach(map, options) { o, s, p ->
         mln_opengl_borrowed_texture_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.openglBorrowedTextureDescriptor(descriptor, this),
-          outSession.ptr,
+          o,
+          s,
+          p,
         )
-      )
-      RenderSessionHandle(
-        map,
-        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
-      )
+      }
     }
 
     internal fun attachMetalSurface(
       map: MapHandle,
       descriptor: MetalSurfaceDescriptor,
-    ): RenderSessionHandle = memScoped {
-      val outSession = alloc<ULongVar>()
-      outSession.value = 0uL
-      Status.check(
+      options: RenderSessionAttachOptions,
+    ) = memScoped {
+      attach(map, options) { o, s, p ->
         mln_metal_surface_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.metalSurfaceDescriptor(descriptor, this),
-          outSession.ptr,
+          o,
+          s,
+          p,
         )
-      )
-      RenderSessionHandle(
-        map,
-        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
-      )
+      }
     }
 
     internal fun attachVulkanSurface(
       map: MapHandle,
       descriptor: VulkanSurfaceDescriptor,
-    ): RenderSessionHandle = memScoped {
-      val outSession = alloc<ULongVar>()
-      outSession.value = 0uL
-      Status.check(
+      options: RenderSessionAttachOptions,
+    ) = memScoped {
+      attach(map, options) { o, s, p ->
         mln_vulkan_surface_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.vulkanSurfaceDescriptor(descriptor, this),
-          outSession.ptr,
+          o,
+          s,
+          p,
         )
-      )
-      RenderSessionHandle(
-        map,
-        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
-      )
+      }
     }
 
     internal fun attachOpenGLSurface(
       map: MapHandle,
       descriptor: OpenGLSurfaceDescriptor,
-    ): RenderSessionHandle = memScoped {
-      val outSession = alloc<ULongVar>()
-      outSession.value = 0uL
-      Status.check(
+      options: RenderSessionAttachOptions,
+    ) = memScoped {
+      attach(map, options) { o, s, p ->
         mln_opengl_surface_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.openglSurfaceDescriptor(descriptor, this),
-          outSession.ptr,
+          o,
+          s,
+          p,
         )
-      )
-      RenderSessionHandle(
-        map,
-        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
-      )
+      }
     }
   }
 }
+
+@OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
+public actual class AcquiredFrameHandle
+internal constructor(
+  private val session: RenderSessionHandle,
+  private var frame: ULong,
+  private val scope: FrameScope,
+) {
+  private val released = AtomicInt(0)
+  public actual val isReleased: Boolean
+    get() = released.load() != 0
+
+  public actual fun result(): RenderFrameResult = memScoped {
+    val v = alloc<mln_render_frame_result>()
+    v.size = sizeOf<mln_render_frame_result>().toUInt()
+    Status.check(mln_acquired_frame_get_result(requireFrame(), v.ptr))
+    frameResult(v)
+  }
+
+  public actual fun producerSync(): GpuSync = memScoped {
+    val v = alloc<mln_gpu_sync>()
+    mln_gpu_sync_default().place(v.ptr)
+    Status.check(mln_acquired_frame_get_producer_sync(requireFrame(), v.ptr))
+    GpuSync(GpuSyncKind.fromNative(v.kind.toInt()), v.`object`.toLong(), v.value.toLong())
+  }
+
+  public actual fun metalTexture(): MetalOwnedTextureFrame = memScoped {
+    val v = alloc<mln_metal_owned_texture_frame>()
+    v.size = sizeOf<mln_metal_owned_texture_frame>().toUInt()
+    Status.check(mln_acquired_frame_get_metal_texture(requireFrame(), v.ptr))
+    MetalOwnedTextureFrame(
+      scope,
+      v.generation.toLong(),
+      v.width.toInt(),
+      v.height.toInt(),
+      v.scale_factor,
+      v.frame_id.toLong(),
+      scoped(v.texture),
+      scoped(v.device),
+      v.pixel_format.toLong(),
+    )
+  }
+
+  public actual fun vulkanTexture(): VulkanOwnedTextureFrame = memScoped {
+    val v = alloc<mln_vulkan_owned_texture_frame>()
+    v.size = sizeOf<mln_vulkan_owned_texture_frame>().toUInt()
+    Status.check(mln_acquired_frame_get_vulkan_texture(requireFrame(), v.ptr))
+    VulkanOwnedTextureFrame(
+      scope,
+      v.generation.toLong(),
+      v.width.toInt(),
+      v.height.toInt(),
+      v.scale_factor,
+      v.frame_id.toLong(),
+      VulkanHandle.scoped(v.image.toLong(), scope),
+      VulkanHandle.scoped(v.image_view.toLong(), scope),
+      scoped(v.device),
+      v.format.toInt(),
+      v.layout.toInt(),
+    )
+  }
+
+  public actual fun openGLTexture(): OpenGLOwnedTextureFrame = memScoped {
+    val v = alloc<mln_opengl_owned_texture_frame>()
+    v.size = sizeOf<mln_opengl_owned_texture_frame>().toUInt()
+    Status.check(mln_acquired_frame_get_opengl_texture(requireFrame(), v.ptr))
+    OpenGLOwnedTextureFrame(
+      scope,
+      v.generation.toLong(),
+      v.width.toInt(),
+      v.height.toInt(),
+      v.scale_factor,
+      v.frame_id.toLong(),
+      v.texture.toInt(),
+      v.target.toInt(),
+      v.internal_format.toInt(),
+      v.format.toInt(),
+      v.type.toInt(),
+    )
+  }
+
+  public actual fun release(consumerCompletion: GpuSync): Unit = memScoped {
+    check(released.compareAndSet(0, 1)) { "AcquiredFrameHandle is already released" }
+    val native = alloc<mln_gpu_sync>()
+    mln_gpu_sync_default().place(native.ptr)
+    native.kind = consumerCompletion.kind.nativeValue.toUInt()
+    native.`object` = consumerCompletion.objectHandle.toULong()
+    native.value = consumerCompletion.value.toULong()
+    val holder = alloc<ULongVar>()
+    holder.value = frame
+    try {
+      Status.check(mln_acquired_frame_release(holder.ptr, native.ptr))
+      frame = 0u
+      scope.close()
+      session.frameReleased(scope)
+    } catch (e: Throwable) {
+      released.store(0)
+      throw e
+    }
+  }
+
+  private fun requireFrame(): ULong {
+    scope.ensureActive()
+    check(!isReleased) { "AcquiredFrameHandle is already released" }
+    return frame
+  }
+
+  private fun scoped(pointer: COpaquePointer?): NativePointer =
+    pointer?.rawValue?.toLong()?.let { NativePointer.scoped(it, scope) }
+      ?: NativePointer.NULL_POINTER
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun extent(value: RenderTargetExtent, scope: MemScope): CPointer<mln_render_target_extent> =
+  scope
+    .alloc<mln_render_target_extent>()
+    .apply {
+      size = sizeOf<mln_render_target_extent>().toUInt()
+      width = value.width.toUInt()
+      height = value.height.toUInt()
+      scale_factor = value.scaleFactor
+    }
+    .ptr
+
+@OptIn(ExperimentalForeignApi::class)
+private fun frameResult(value: mln_render_frame_result) =
+  RenderFrameResult(
+    RenderResult.fromNative(value.disposition),
+    value.token.toLong(),
+    value.map_update_generation.toLong(),
+    value.extent_generation.toLong(),
+    value.frame_generation.toLong(),
+    value.needs_repaint,
+  )

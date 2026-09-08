@@ -29,7 +29,6 @@ import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.c.mln_network_status_set
 import org.maplibre.nativeffi.internal.c.mln_resource_request
-import org.maplibre.nativeffi.internal.c.mln_runtime_destroy
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
@@ -269,7 +268,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
         ResourceRequestHandle(
           fakeHandle,
           completer = { _, _ -> mln_network_status_set(999_999U) },
-          releaser = { mln_runtime_destroy(0uL) },
+          releaser = {},
         )
 
       assertEquals(

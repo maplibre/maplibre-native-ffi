@@ -193,6 +193,16 @@ wheels = [
 ]
 
 [[package]]
+name = "lief"
+version = "0.17.6"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d9/b9/6b27bff4676de0db4231ca585ed35bc6e13f5430c1bbf0ad0e9d2e9f552f/lief-0.17.6.tar.gz", hash = "sha256:c2164243f152e82c49b0ccd606155b758644f4b1ee221f0dbd4da055469a922f", size = 7171, upload-time = "2026-03-18T06:59:43.351Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6b/2f/1a0a116cdf4f0e9f1846e34676deed3b1275c432cde8b3aafd4ff9a77175/lief-0.17.6-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:af39643ab79ae644d2063a2ef93de908e61a8f40e37b155683c477c1928e6c64", size = 2990571, upload-time = "2026-03-18T06:58:35.046Z" },
+    { url = "https://files.pythonhosted.org/packages/76/bd/1bc1c1e364c06b74b9f16089f05622a29ed995fa8b5aba86e0a9fe5500a0/lief-0.17.6-cp314-cp314-macosx_11_0_x86_64.whl", hash = "sha256:c8129a70bc73e04fd9db4f49f386d4336a3a78ceef07c83ca74f9cf464c03c22", size = 3108044, upload-time = "2026-03-18T06:58:36.871Z" },
+]
+
+[[package]]
 name = "maplibre-native-ffi"
 version = "0.0.0"
 source = { editable = "bindings/python" }
@@ -235,6 +245,7 @@ source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "lief", marker = "sys_platform == 'darwin'" },
     { name = "ruamel-yaml" },
     { name = "ruff" },
     { name = "ty" },
@@ -244,6 +255,7 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "lief", marker = "sys_platform == 'darwin'", specifier = "==0.17.6" },
     { name = "ruamel-yaml", specifier = "==0.19.1" },
     { name = "ruff", specifier = "==0.16.5" },
     { name = "ty", specifier = "==0.0.75" },
@@ -386,7 +398,7 @@ name = "pyobjc-framework-cocoa"
 version = "12.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core" },
+    { name = "pyobjc-core", marker = "sys_platform != 'linux'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/75/76/49c6da2c6a831020b4854ba20079d5a1030474bffc776b7b73c2eeff8c15/pyobjc_framework_cocoa-12.2.2.tar.gz", hash = "sha256:c96c0ef69a71afbbb0e6a7d594b455c5fe47d62e0db376ee7a2b4b828c16ace9", size = 3132831, upload-time = "2026-08-11T19:44:02.288Z" }
 wheels = [
@@ -401,8 +413,8 @@ name = "pyobjc-framework-metal"
 version = "12.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core" },
-    { name = "pyobjc-framework-cocoa" },
+    { name = "pyobjc-core", marker = "sys_platform != 'linux'" },
+    { name = "pyobjc-framework-cocoa", marker = "sys_platform != 'linux'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b8/1c/c15b606d805a392696806f119ad3ac42ff3bfbfa4b3a46aaebebffc99076/pyobjc_framework_metal-12.2.2.tar.gz", hash = "sha256:0e7289281cb44ac9f4379ad9c6a6602a7a15fd491acc35949cdc05c5b9790b94", size = 238970, upload-time = "2026-08-11T19:44:55.48Z" }
 wheels = [
@@ -417,8 +429,8 @@ name = "pyobjc-framework-quartz"
 version = "12.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core" },
-    { name = "pyobjc-framework-cocoa" },
+    { name = "pyobjc-core", marker = "sys_platform != 'linux'" },
+    { name = "pyobjc-framework-cocoa", marker = "sys_platform != 'linux'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/35/b1/426a37c7ae37280b3ffca2571fb48f211946aee2f4ca31a603ed1943c4a7/pyobjc_framework_quartz-12.2.2.tar.gz", hash = "sha256:810f97b210cfd93704d240860286dfd6df09f9f1c52525fc5c2166723aea3f9e", size = 3218295, upload-time = "2026-08-11T19:45:15.189Z" }
 wheels = [

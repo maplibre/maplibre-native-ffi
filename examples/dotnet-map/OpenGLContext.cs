@@ -436,6 +436,18 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
 
     public uint GetError() => gles ? (uint)glesGl!.GetError() : (uint)desktopGl!.GetError();
 
+    public void FinishGpuWork()
+    {
+        if (gles)
+        {
+            glesGl!.Finish();
+        }
+        else
+        {
+            desktopGl!.Finish();
+        }
+    }
+
     public void Dispose()
     {
         if (closed)

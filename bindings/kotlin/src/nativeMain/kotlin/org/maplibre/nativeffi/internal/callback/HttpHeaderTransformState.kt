@@ -33,6 +33,7 @@ internal class HttpHeaderTransformState(private val callback: HttpHeaderTransfor
     descriptor.size = kotlinx.cinterop.sizeOf<mln_http_header_transform>().toUInt()
     descriptor.callback = staticCFunction(::httpHeaderTransformCallback)
     descriptor.user_data = selfRef.asCPointer()
+    descriptor.release_user_data = staticCFunction(::releaseHttpHeaderTransform)
   }
 
   fun descriptor(): CPointer<mln_http_header_transform> = descriptor.ptr
@@ -78,8 +79,6 @@ internal class HttpHeaderTransformState(private val callback: HttpHeaderTransfor
     }
   }
 
-  fun checkCanClose() = gate.checkCanClose()
-
   override fun close() = gate.close()
 
   private fun closeNative() {
@@ -97,3 +96,8 @@ private fun httpHeaderTransformCallback(
 ): Int =
   userData?.asStableRef<HttpHeaderTransformState>()?.get()?.invoke(kind, url, response)
     ?: MaplibreStatus.INVALID_ARGUMENT.nativeCode
+
+@OptIn(ExperimentalForeignApi::class)
+private fun releaseHttpHeaderTransform(userData: COpaquePointer?) {
+  userData?.asStableRef<HttpHeaderTransformState>()?.get()?.close()
+}

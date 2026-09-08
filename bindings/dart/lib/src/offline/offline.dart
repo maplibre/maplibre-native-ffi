@@ -1,4 +1,4 @@
-/// Offline region definitions, status values, metadata, and operation handles.
+/// Offline region definitions, status values, metadata, and futures.
 library;
 
 import 'dart:typed_data';

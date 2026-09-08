@@ -14,8 +14,8 @@ public expect class ResourceRequestHandle : AutoCloseable {
    *
    * A request accepts one callback for its lifetime; a second registration throws
    * [org.maplibre.nativeffi.error.InvalidStateException], as does registration on a closed handle.
-   * The callback runs at most once, on the thread that cancels the request: the owner thread inside
-   * a map or runtime call, and a MapLibre thread otherwise. When MapLibre already cancelled the
+   * The callback runs at most once, on the MapLibre thread that cancels the request, such as the
+   * runtime worker that discards a closing map's requests. When MapLibre already cancelled the
    * request, the callback runs on the calling thread before this method returns, as part of this
    * call: a concurrent close on another thread does not wait for it. A request that this handle
    * completed never runs the callback.

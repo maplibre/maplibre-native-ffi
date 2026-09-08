@@ -37,19 +37,12 @@ class StatusTest {
   fun bindingOwnedDiagnosticsDoNotReadNativeDiagnostic() {
     val released = Status.released("TestHandle")
     val invalidState = Status.invalidState("bad state")
-    val liveChildren =
-      Status.liveChildren("ParentHandle", listOf("RenderSessionHandle", "RenderSessionHandle"))
     val invalidArgument = Status.invalidArgument("bad argument")
 
     assertEquals(MaplibreStatus.INVALID_STATE, released.status)
     assertEquals("TestHandle is already closed", released.diagnostic)
     assertEquals(MaplibreStatus.INVALID_STATE, invalidState.status)
     assertEquals("bad state", invalidState.diagnostic)
-    assertEquals(MaplibreStatus.INVALID_STATE, liveChildren.status)
-    assertEquals(
-      "ParentHandle has 2 live child handle(s): RenderSessionHandle x2",
-      liveChildren.diagnostic,
-    )
     assertEquals(MaplibreStatus.INVALID_ARGUMENT, invalidArgument.status)
     assertEquals("bad argument", invalidArgument.diagnostic)
   }

@@ -4,19 +4,30 @@ enum NativeRuntime {
   static func create(_ options: UnsafePointer<mln_runtime_options>) throws
     -> NativeRuntimeHandle
   {
-    try NativeHandleFactory
-      .create(nullDiagnostic: "mln_runtime_create returned a null runtime") { outHandle in
-        try checkStatus(mln_runtime_create(options, outHandle))
-      }
+    try NativeHandleFactory.create(
+      nullDiagnostic: "mln_runtime_create returned a null runtime"
+    ) { runtime in
+      try checkStatus(mln_runtime_create(options, runtime))
+    }
   }
 
-  static func drainEvents(
-    _ runtime: NativeRuntimeHandle,
-    maxEvents: Int
-  ) throws -> NativeRuntimeEventBatch {
-    var batch = mln_runtime_event_batch_default()
-    try checkStatus(mln_runtime_drain_events(runtime.raw, maxEvents, &batch))
-    return try NativeRuntimeEventBatch(copying: batch)
+  /// Releases a runtime and returns the future for its native teardown.
+  static func release(_ runtime: NativeRuntimeHandle) throws
+    -> NativeFuture<Void>
+  {
+    try NativeCompletion.startUnit { mln_runtime_release(runtime.raw, $0) }
+  }
+
+  static func drainEvents(_ runtime: NativeRuntimeHandle) throws
+    -> NativeRuntimeEventBatch
+  {
+    var batch: mln_event_batch = 0
+    try checkStatus(mln_runtime_drain_events(runtime.raw, &batch))
+    defer { mln_event_batch_release(batch) }
+    var view = mln_runtime_event_batch_view()
+    view.size = UInt32(MemoryLayout<mln_runtime_event_batch_view>.size)
+    try checkStatus(mln_event_batch_get(batch, &view))
+    return try NativeRuntimeEventBatch(copying: view)
   }
 
   static func setEventMask(

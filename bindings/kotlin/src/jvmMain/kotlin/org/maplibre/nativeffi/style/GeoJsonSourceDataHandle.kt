@@ -27,7 +27,7 @@ internal constructor(private val handle: NativeGeoJsonSourceData) : AutoCloseabl
     )
   }
 
-  /** Runs [block] with the live native handle and release held off for the borrow window. */
+  /** Runs [block] after checking that this wrapper still owns the native handle. */
   internal fun <R> withNativeHandle(block: (NativeGeoJsonSourceData) -> R): R = core.withLive {
     block(handle)
   }

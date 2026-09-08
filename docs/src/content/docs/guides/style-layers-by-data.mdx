@@ -48,6 +48,6 @@ the layer's filter. The snippet passes the complete filter expression.
 The host owns the byte storage. MapLibre parses or copies a property value or
 filter before the call returns.
 
-Both calls run on the map's owner thread and apply to the live style
-immediately. A host that pumps the runtime and renders on update draws the new
-appearance in its next frame.
+Both commands apply to the live style in runtime submission order. A host that
+drains render events and renders on update draws the new appearance in its next
+frame.

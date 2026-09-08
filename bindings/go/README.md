@@ -1,18 +1,13 @@
-# MapLibre Native Go Binding Status
+# MapLibre Native Go binding
 
-These bindings are draft low-level Go wrappers over the MapLibre Native C API.
+These draft low-level bindings expose the MapLibre Native C API through
+goroutine-safe runtime, map, and render-session handles. Native workers make
+progress on their own, so a command or an ordered query returns a future that
+carries the terminal disposition and the snapshot generation the work committed
+at.
 
-## Known draft deviations
-
-The owner-thread helper described by the binding specification is deferred.
-Until that helper lands, Go callers are responsible for pinning runtime/map
-lifecycles to one OS thread.
-
-Call `runtime.LockOSThread()` before creating a `RuntimeHandle`, keep the
-runtime and its child handles on that locked goroutine, and close those handles
-before unlocking the thread. Owner-thread-affine methods called from another OS
-thread return `ErrWrongThread` with the native diagnostic when the C API reports
-that status.
-
-TODO: add a binding-owned owner-thread helper that serializes create, pump,
-event draining, operations, and close on one native owner thread.
+Runtime creation is synchronous, and closing a runtime or a map returns the
+future for its native teardown. Render-session driver work stays thread-affine.
+Poll RuntimeHandle.DrainEvents and RenderSessionHandle.DrainFrameResults from a
+cadence the host already has, and keep servicing a caller-driver session while
+presentation is paused.

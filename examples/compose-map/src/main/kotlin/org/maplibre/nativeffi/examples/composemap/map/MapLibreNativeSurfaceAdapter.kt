@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.examples.composemap.map
 
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.examples.composemap.surface.EglContextHandles
 import org.maplibre.nativeffi.examples.composemap.surface.MetalTextureTarget
@@ -19,6 +20,9 @@ import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLContextDescriptor
 import org.maplibre.nativeffi.render.RenderBackend
+import org.maplibre.nativeffi.render.RenderDriver
+import org.maplibre.nativeffi.render.RenderSessionAttachOptions
+import org.maplibre.nativeffi.render.RenderSessionAttachment
 import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
@@ -51,7 +55,7 @@ internal object MapLibreNativeSurfaceAdapter {
     return BorrowedTarget(
       sessionKey = SessionKey.Metal(target.device, target.pixelFormat),
       targetKey = TargetKey(target.generation, extent),
-      attach = { map -> map.attachMetalBorrowedTexture(descriptor) },
+      attach = { map -> map.attachMetalBorrowedTexture(descriptor, callerDriverOptions) },
       setTarget = { session -> session.setMetalBorrowedTextureTarget(descriptor) },
     )
   }
@@ -78,7 +82,7 @@ internal object MapLibreNativeSurfaceAdapter {
           finalLayout = target.finalLayout,
         ),
       targetKey = TargetKey(target.generation, extent),
-      attach = { map -> map.attachVulkanBorrowedTexture(descriptor) },
+      attach = { map -> map.attachVulkanBorrowedTexture(descriptor, callerDriverOptions) },
       setTarget = { session -> session.setVulkanBorrowedTextureTarget(descriptor) },
     )
   }
@@ -96,7 +100,7 @@ internal object MapLibreNativeSurfaceAdapter {
     return BorrowedTarget(
       sessionKey = SessionKey.OpenGl(target.context),
       targetKey = TargetKey(target.generation, extent),
-      attach = { map -> map.attachOpenGLBorrowedTexture(descriptor) },
+      attach = { map -> map.attachOpenGLBorrowedTexture(descriptor, callerDriverOptions) },
       setTarget = { session -> session.setOpenGLBorrowedTextureTarget(descriptor) },
     )
   }
@@ -134,9 +138,12 @@ internal object MapLibreNativeSurfaceAdapter {
   class BorrowedTarget(
     val sessionKey: SessionKey,
     val targetKey: TargetKey,
-    val attach: (MapHandle) -> RenderSessionHandle,
-    val setTarget: (RenderSessionHandle) -> Unit,
+    val attach: (MapHandle) -> RenderSessionAttachment,
+    val setTarget: (RenderSessionHandle) -> Deferred<Unit>,
   )
+
+  private val callerDriverOptions =
+    RenderSessionAttachOptions(driver = RenderDriver.CALLER_GRAPHICS_THREAD)
 }
 
 private fun SurfaceExtent.toRenderTargetExtent(): RenderTargetExtent =

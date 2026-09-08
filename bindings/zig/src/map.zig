@@ -1,11 +1,13 @@
 const std = @import("std");
 
 const c = @import("c.zig").raw;
+const completion = @import("completion.zig");
 const diagnostics = @import("diagnostics.zig");
 const native_temp = @import("native_temp.zig");
 const runtime_module = @import("runtime.zig");
 const RuntimeHandle = runtime_module.RuntimeHandle;
 const status = @import("status.zig");
+const sync = @import("sync.zig");
 const values = @import("values.zig");
 
 const CustomGeometrySourceState = struct {
@@ -13,7 +15,7 @@ const CustomGeometrySourceState = struct {
     cancel_tile: ?CustomGeometrySourceTileCallback,
     release_context: ?CustomGeometrySourceReleaseCallback,
     context: ?*anyopaque,
-    active_upcalls: std.atomic.Value(usize),
+    upcalls: sync.UpcallGate = .{},
 };
 
 const CustomMvtVectorSourceState = struct {
@@ -21,7 +23,7 @@ const CustomMvtVectorSourceState = struct {
     cancel_tile: ?CustomMvtVectorSourceTileCallback,
     release_context: ?CustomMvtVectorSourceReleaseCallback,
     context: ?*anyopaque,
-    active_upcalls: std.atomic.Value(usize),
+    upcalls: sync.UpcallGate = .{},
 };
 
 const MapState = struct {
@@ -63,35 +65,156 @@ pub const MapMode = enum {
 
 /// Map creation options. A null field takes the C API default.
 pub const MapOptions = struct {
-    /// Initial logical width in UI pixels, replaced by the extent of the first
-    /// attached render session.
     width: ?u32 = null,
-    /// Initial logical height in UI pixels, replaced by the extent of the first
-    /// attached render session.
     height: ?u32 = null,
-    /// UI-to-device pixel scale, fixed for the lifetime of the map, selecting
-    /// sprites, glyphs, and raster tiles. A render session attached or resized
-    /// with a different scale factor logs a warning and still renders styled
-    /// imagery chosen for this density.
     scale_factor: ?f64 = null,
     mode: ?MapMode = null,
-    /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
-    /// encodings, fixed for the lifetime of the map. A map created with this
-    /// false decodes every other MLT encoding and logs a tile parse warning for
-    /// the FastPFOR ones.
     fast_pfor_enabled: ?bool = null,
-    /// Map-originated event types this map queues. A null takes the C API
-    /// default, which selects every type the library reports, including the types
-    /// this binding does not name. Set it to be narrow from the map's first style
-    /// load, which is the load that produces the most tile and frame events. See
-    /// `MapHandle.setEventMask`.
     event_mask: ?runtime_module.RuntimeEventMask = null,
+};
+
+pub const CameraUpdateMode = enum {
+    jump,
+    ease,
+    fly,
+
+    fn toRaw(self: CameraUpdateMode) u32 {
+        return switch (self) {
+            .jump => c.MLN_CAMERA_UPDATE_MODE_JUMP,
+            .ease => c.MLN_CAMERA_UPDATE_MODE_EASE,
+            .fly => c.MLN_CAMERA_UPDATE_MODE_FLY,
+        };
+    }
+};
+
+pub const GesturePhase = enum {
+    none,
+    begin,
+    update,
+    end,
+    cancel,
+
+    fn toRaw(self: GesturePhase) u32 {
+        return switch (self) {
+            .none => c.MLN_GESTURE_PHASE_NONE,
+            .begin => c.MLN_GESTURE_PHASE_BEGIN,
+            .update => c.MLN_GESTURE_PHASE_UPDATE,
+            .end => c.MLN_GESTURE_PHASE_END,
+            .cancel => c.MLN_GESTURE_PHASE_CANCEL,
+        };
+    }
+};
+
+pub const CameraUpdate = struct {
+    mode: CameraUpdateMode = .jump,
+    camera: values.CameraOptions = .{},
+    animation: values.AnimationOptions = .{},
+    gesture_phase: GesturePhase = .none,
+};
+
+pub const CameraDeltaKind = enum {
+    move,
+    scale,
+    bearing,
+    pitch,
+
+    fn toRaw(self: CameraDeltaKind) u32 {
+        return switch (self) {
+            .move => c.MLN_CAMERA_DELTA_MOVE,
+            .scale => c.MLN_CAMERA_DELTA_SCALE,
+            .bearing => c.MLN_CAMERA_DELTA_BEARING,
+            .pitch => c.MLN_CAMERA_DELTA_PITCH,
+        };
+    }
+};
+
+pub const CameraDelta = struct {
+    kind: CameraDeltaKind = .move,
+    offset: values.ScreenPoint = .{ .x = 0, .y = 0 },
+    amount: f64 = 0,
+    anchor: ?values.ScreenPoint = null,
+    animation: values.AnimationOptions = .{},
+};
+
+pub const CameraSnapshot = struct {
+    generation: u64,
+    camera: values.CameraOptions,
+};
+
+pub const ScreenPointList = struct {
+    allocator: std.mem.Allocator,
+    items: []values.ScreenPoint,
+
+    pub fn deinit(self: *ScreenPointList) void {
+        self.allocator.free(self.items);
+        self.items = &.{};
+    }
+};
+
+pub const LatLngList = struct {
+    allocator: std.mem.Allocator,
+    items: []values.LatLng,
+
+    pub fn deinit(self: *LatLngList) void {
+        self.allocator.free(self.items);
+        self.items = &.{};
+    }
+};
+
+/// Immutable map state copied from the latest published generation.
+///
+/// Every committed map command publishes a new generation in its completion,
+/// so a snapshot whose generation is at or past that value observes the
+/// commit.
+pub const MapSnapshot = struct {
+    generation: u64,
+    camera: values.CameraOptions,
+    width: u32,
+    height: u32,
+    scale_factor: f64,
+    debug_options: values.DebugOptions,
+    projection_mode: values.ProjectionMode,
+    viewport: values.ViewportOptions,
+    tile: values.TileOptions,
+    bounds: values.BoundOptions,
+    free_camera: values.FreeCameraOptions,
+    /// True once every requested style and tile resource finished loading.
+    fully_loaded: bool,
+    /// True between a gesture-phase begin and its end or cancel.
+    gesture_in_progress: bool,
+    rendering_stats_view_enabled: bool,
+    repaint_demand: bool,
+    event_mask: runtime_module.RuntimeEventMask,
+    latest_render_update_generation: u64,
 };
 
 pub const CanonicalTileId = struct {
     z: u32,
     x: u32,
     y: u32,
+};
+/// Fixed layer metadata copied by `MapHandle.getStyleLayerInfo`.
+pub const StyleLayerInfo = struct {
+    allocator: std.mem.Allocator,
+    /// Style-spec layer type name. It views a static native string that stays
+    /// valid for the life of the process.
+    layer_type: []const u8,
+    /// Lowest zoom at which the layer draws; -inf with no lower bound.
+    min_zoom: f64,
+    /// Highest zoom at which the layer draws; +inf with no upper bound.
+    max_zoom: f64,
+    visibility: values.StyleLayerVisibility,
+    /// Source ID, null for a layer type that takes no source.
+    source_id: ?[]const u8,
+    /// Source-layer ID, null when the layer sets none.
+    source_layer: ?[]const u8,
+
+    pub fn deinit(self: *StyleLayerInfo) void {
+        if (self.source_id) |value| self.allocator.free(value);
+        if (self.source_layer) |value| self.allocator.free(value);
+        self.source_id = null;
+        self.source_layer = null;
+    }
 };
 
 pub const CustomGeometrySourceTileCallback = *const fn (
@@ -107,7 +230,7 @@ pub const CustomGeometrySourceOptions = struct {
     cancel_tile: ?CustomGeometrySourceTileCallback = null,
     /// Invoked once with `context` after the map stops referencing this source:
     /// on an explicit removal, on a style load that leaves a style without the
-    /// source, and on the map's own destruction. It runs on the map owner thread,
+    /// source, and on the map's own destruction. It runs on the runtime worker
     /// after the last tile callback returns, and never runs for an add that
     /// failed. A host frees `context` here instead of tracking style loads.
     release_context: ?CustomGeometrySourceReleaseCallback = null,
@@ -134,7 +257,7 @@ pub const CustomMvtVectorSourceOptions = struct {
     cancel_tile: ?CustomMvtVectorSourceTileCallback = null,
     /// Invoked once with `context` after the map stops referencing this source:
     /// on an explicit removal, on a style load that leaves a style without the
-    /// source, and on the map's own destruction. It runs on the map owner thread,
+    /// source, and on the map's own destruction. It runs on the runtime worker
     /// after the last tile callback returns, and never runs for an add that
     /// failed. A host frees `context` here instead of tracking style loads.
     release_context: ?CustomMvtVectorSourceReleaseCallback = null,
@@ -201,11 +324,11 @@ pub const FeatureStateSelector = struct {
 pub const MapHandle = enum(c.mln_map) {
     _,
 
-    pub fn create(runtime: *RuntimeHandle, options: MapOptions) status.Error!MapHandle {
+    pub fn create(runtime: *RuntimeHandle, options: MapOptions) status.Error!completion.Future(MapHandle) {
         var native_options = c.mln_map_options_default();
-        if (options.width) |value| native_options.width = value;
-        if (options.height) |value| native_options.height = value;
-        if (options.scale_factor) |value| native_options.scale_factor = value;
+        if (options.width) |value| native_options.initial_extent.width = value;
+        if (options.height) |value| native_options.initial_extent.height = value;
+        if (options.scale_factor) |value| native_options.initial_extent.scale_factor = value;
         if (options.mode) |value| native_options.map_mode = value.toRaw();
         if (options.fast_pfor_enabled) |value| native_options.fast_pfor_enabled = value;
         if (options.event_mask) |value| {
@@ -214,135 +337,122 @@ pub const MapHandle = enum(c.mln_map) {
         const runtime_lease = try runtime_module.lease(runtime);
         defer runtime_lease.release();
 
-        var map: c.mln_map = 0;
         const diagnostic_store = runtime_lease.diagnostic_store;
-        try status.checkStatus(
-            c.mln_map_create(runtime_lease.native, &native_options, &map),
-            diagnostic_store,
-        );
-        errdefer _ = c.mln_map_destroy(map);
-
-        const map_registration = try runtime_module.registerMap(runtime, map);
-        errdefer runtime_module.unregisterMap(map_registration.registry, map);
-
-        const map_state = try std.heap.smp_allocator.create(MapState);
-        map_state.* = .{
-            .runtime_registry = map_registration.registry,
-            .id_value = map_registration.id,
-            .diagnostic_store = diagnostic_store,
-            .attached_render_sessions = std.atomic.Value(usize).init(0),
-            .closing = false,
+        const CopyContext = struct {
+            runtime: RuntimeHandle,
+            diagnostic_store: ?*diagnostics.DiagnosticStore,
         };
-        errdefer std.heap.smp_allocator.destroy(map_state);
-
-        return try registerMapState(map, map_state);
+        const StartContext = struct { runtime: c.mln_runtime, options: c.mln_map_options };
+        return completion.submitWithCopyContext(MapHandle, CopyContext, diagnostic_store, struct {
+            fn copyResult(result: *const c.mln_completion_result, context: *CopyContext) status.Error!MapHandle {
+                const map = try completion.value(c.mln_map)(result);
+                // A map this binding cannot track would otherwise stay live and
+                // hold its runtime open forever, so a failed registration
+                // releases it.
+                errdefer releaseUntrackedMap(map);
+                var runtime_handle = context.runtime;
+                const registration = try runtime_module.registerMap(&runtime_handle, map);
+                errdefer runtime_module.unregisterMap(registration.registry, map);
+                const state = try std.heap.smp_allocator.create(MapState);
+                state.* = .{
+                    .runtime_registry = registration.registry,
+                    .id_value = registration.id,
+                    .diagnostic_store = context.diagnostic_store,
+                    .attached_render_sessions = std.atomic.Value(usize).init(0),
+                    .closing = false,
+                };
+                errdefer std.heap.smp_allocator.destroy(state);
+                return registerMapState(map, state);
+            }
+        }.copyResult, .{
+            .runtime = runtime.*,
+            .diagnostic_store = diagnostic_store,
+        }, StartContext{
+            .runtime = runtime_lease.native,
+            .options = native_options,
+        }, struct {
+            fn start(context: StartContext, descriptor: *const c.mln_completion) c.mln_status {
+                return c.mln_map_create(context.runtime, &context.options, descriptor);
+            }
+        }.start);
     }
 
     pub fn id(self: *MapHandle) status.BindingError!values.MapId {
         return mapIdForHandle(self);
     }
 
-    /// Loads inline style JSON.
-    ///
-    /// Malformed JSON is reported twice: as a synchronous parse error here and
-    /// as a map-loading-failed runtime event. A well-formed style that MapLibre
-    /// rejects semantically produces neither; MapLibre logs it and renders what
-    /// it can.
     pub fn setStyleJson(
         self: *MapHandle,
-        allocator: std.mem.Allocator,
         json: []const u8,
-    ) status.Error!void {
-        const native_map = try native(self);
-        _ = allocator;
-        try status.checkStatus(c.mln_map_set_style_json(native_map, stringView(json)), diagnosticStore(self));
+    ) status.Error!completion.Future(completion.CommandCompletion) {
+        return submitCommand(self, c.mln_map_set_style_json, .{ try native(self), stringView(json) });
     }
 
+    /// The committed command requests a map repaint.
     pub fn setFeatureState(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         selector: FeatureStateSelector,
         feature_state: []const u8,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_selector = try featureStateSelectorToNative(&temp, selector);
-        const raw_state = try temp.stringView(feature_state);
-        try status.checkStatus(
-            c.mln_map_set_feature_state(try native(self), &raw_selector, raw_state),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_feature_state, .{
+            try native(self),
+            &raw_selector,
+            try temp.stringView(feature_state),
+        });
     }
 
+    /// Starts an ordered read of per-feature state. The read copies the map
+    /// store, not the last rendered frame; missing feature state resolves to an
+    /// empty JSON object.
     pub fn getFeatureState(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         selector: FeatureStateSelector,
-    ) status.Error!values.OwnedString {
+    ) status.Error!completion.Future(values.OwnedString) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_selector = try featureStateSelectorToNative(&temp, selector);
-        var buffer: c.mln_buffer = 0;
-        try status.checkStatus(
-            c.mln_map_get_feature_state(try native(self), &raw_selector, &buffer),
-            diagnosticStore(self),
-        );
-        return (try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self))) orelse error.NativeError;
+        return submitAllocatedQuery(values.OwnedString, self, allocator, copyOwnedStringResult, c.mln_map_get_feature_state, .{
+            try native(self),
+            &raw_selector,
+        });
     }
 
+    /// The committed command requests a map repaint.
     pub fn removeFeatureState(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         selector: FeatureStateSelector,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_selector = try featureStateSelectorToNative(&temp, selector);
-        try status.checkStatus(
-            c.mln_map_remove_feature_state(try native(self), &raw_selector),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_remove_feature_state, .{
+            try native(self),
+            &raw_selector,
+        });
     }
 
-    /// Loads a style URL.
-    ///
-    /// Loading is asynchronous: a missing, unreachable, or malformed style
-    /// still returns success here and reports through a map-loading-failed
-    /// runtime event. A well-formed style that MapLibre rejects semantically
-    /// produces neither; MapLibre logs it and renders what it can.
     pub fn setStyleUrl(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         url: []const u8,
-    ) status.Error!void {
-        const native_map = try native(self);
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         const url_z = try nulTerminated(allocator, url, diagnosticStore(self), "style URL contains embedded NUL");
         defer allocator.free(url_z);
-        try status.checkStatus(c.mln_map_set_style_url(native_map, url_z.ptr), diagnosticStore(self));
+        return submitCommand(self, c.mln_map_set_style_url, .{ try native(self), url_z.ptr });
     }
 
-    /// Copies the style document this map's style was last parsed from: the
-    /// bytes passed to `setStyleJson` or the response body fetched for
-    /// `setStyleUrl`, not a serialization of the live style. Runtime mutations
-    /// do not change it, and a failed parse leaves the previous document in
-    /// place. The value is empty when no document has been parsed.
-    pub fn copyLoadedStyleJson(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-    ) status.Error!values.OwnedString {
-        return self.copyMapText(allocator, c.mln_map_copy_loaded_style_json);
+    pub fn loadedStyleJson(self: *MapHandle, allocator: std.mem.Allocator) status.Error!completion.Future(values.OwnedString) {
+        return submitAllocatedQuery(values.OwnedString, self, allocator, copyOwnedStringResult, c.mln_map_loaded_style_json, .{try native(self)});
     }
 
-    /// Copies the URL this map's style was last requested from. `setStyleUrl`
-    /// records it when the request is made, before the response arrives, and
-    /// `setStyleJson` clears it, so it can disagree with `copyLoadedStyleJson`
-    /// while a load is in flight. The value is empty for an inline-JSON style,
-    /// a map with no style, and an empty URL alike.
-    pub fn copyStyleUrl(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-    ) status.Error!values.OwnedString {
-        return self.copyMapText(allocator, c.mln_map_copy_style_url);
+    pub fn styleUrl(self: *MapHandle, allocator: std.mem.Allocator) status.Error!completion.Future(values.OwnedString) {
+        return submitAllocatedQuery(values.OwnedString, self, allocator, copyOwnedStringResult, c.mln_map_style_url, .{try native(self)});
     }
 
     pub fn setLayerProperty(
@@ -351,18 +461,15 @@ pub const MapHandle = enum(c.mln_map) {
         layer_id: []const u8,
         property_name: []const u8,
         value: []const u8,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_layer_property(
-                try native(self),
-                try temp.stringView(layer_id),
-                try temp.stringView(property_name),
-                try temp.stringView(value),
-            ),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_layer_property, .{
+            try native(self),
+            try temp.stringView(layer_id),
+            try temp.stringView(property_name),
+            try temp.stringView(value),
+        });
     }
 
     pub fn getLayerProperty(
@@ -370,20 +477,12 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         layer_id: []const u8,
         property_name: []const u8,
-    ) status.Error!?values.OwnedString {
+    ) status.Error!completion.Future(?values.OwnedString) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var buffer: c.mln_buffer = 0;
-        try status.checkStatus(
-            c.mln_map_get_layer_property(
-                try native(self),
-                try temp.stringView(layer_id),
-                try temp.stringView(property_name),
-                &buffer,
-            ),
-            diagnosticStore(self),
-        );
-        return try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self));
+        return submitAllocatedQuery(?values.OwnedString, self, allocator, copyOptionalOwnedStringResult, c.mln_map_get_layer_property, .{
+            try native(self), try temp.stringView(layer_id), try temp.stringView(property_name),
+        });
     }
 
     pub fn setLayerFilter(
@@ -391,268 +490,121 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         layer_id: []const u8,
         filter: ?[]const u8,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var filter_view = if (filter) |value| try temp.stringView(value) else undefined;
         const filter_ptr = if (filter != null) &filter_view else null;
-        try status.checkStatus(
-            c.mln_map_set_layer_filter(try native(self), try temp.stringView(layer_id), filter_ptr),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_layer_filter, .{
+            try native(self),
+            try temp.stringView(layer_id),
+            filter_ptr,
+        });
     }
 
     pub fn getLayerFilter(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         layer_id: []const u8,
-    ) status.Error!?values.OwnedString {
+    ) status.Error!completion.Future(?values.OwnedString) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var buffer: c.mln_buffer = 0;
-        try status.checkStatus(
-            c.mln_map_get_layer_filter(try native(self), try temp.stringView(layer_id), &buffer),
-            diagnosticStore(self),
-        );
-        return try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self));
+        return submitAllocatedQuery(?values.OwnedString, self, allocator, copyOptionalOwnedStringResult, c.mln_map_get_layer_filter, .{ try native(self), try temp.stringView(layer_id) });
     }
 
-    /// Sets one layer's source-layer ID. Layer types that take no source, such as background, are
-    /// rejected.
     pub fn setLayerSourceLayer(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         layer_id: []const u8,
         source_layer: []const u8,
-    ) status.Error!void {
-        var temp = native_temp.TempStorage.init(allocator);
-        defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_layer_source_layer(
-                try native(self),
-                try temp.stringView(layer_id),
-                try temp.stringView(source_layer),
-            ),
-            diagnosticStore(self),
-        );
+    ) status.Error!completion.Future(completion.CommandCompletion) {
+        return self.setLayerStringCommand(allocator, layer_id, source_layer, c.mln_map_set_layer_source_layer);
     }
 
-    /// Copies one layer's source-layer ID. The value is empty when the layer carries none.
     pub fn copyLayerSourceLayer(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         layer_id: []const u8,
-    ) status.Error!values.OwnedString {
-        return self.copyLayerText(allocator, layer_id, c.mln_map_copy_layer_source_layer);
+    ) status.Error!completion.Future(values.OwnedString) {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        return submitAllocatedQuery(values.OwnedString, self, allocator, copyOwnedStringResult, c.mln_map_copy_layer_source_layer, .{ try native(self), try temp.stringView(layer_id) });
     }
 
-    /// Sets one layer's source ID. Layer types that take no source, such as background, are
-    /// rejected. The named source need not exist yet.
     pub fn setLayerSourceId(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         layer_id: []const u8,
         source_id: []const u8,
-    ) status.Error!void {
-        var temp = native_temp.TempStorage.init(allocator);
-        defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_layer_source_id(
-                try native(self),
-                try temp.stringView(layer_id),
-                try temp.stringView(source_id),
-            ),
-            diagnosticStore(self),
-        );
+    ) status.Error!completion.Future(completion.CommandCompletion) {
+        return self.setLayerStringCommand(allocator, layer_id, source_id, c.mln_map_set_layer_source_id);
     }
 
-    /// Copies one layer's source ID. The value is empty when the layer carries none.
     pub fn copyLayerSourceId(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         layer_id: []const u8,
-    ) status.Error!values.OwnedString {
-        return self.copyLayerText(allocator, layer_id, c.mln_map_copy_layer_source_id);
-    }
-
-    /// A null buffer with zero capacity is a size probe the C API answers with
-    /// OK.
-    fn copyMapText(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        copy: *const fn (c.mln_map, ?[*]u8, usize, *usize) callconv(.c) c.mln_status,
-    ) status.Error!values.OwnedString {
-        var required: usize = 0;
-        try status.checkStatus(
-            copy(try native(self), null, 0, &required),
-            diagnosticStore(self),
-        );
-        if (required == 0) {
-            return .{ .allocator = allocator, .value = try allocator.dupe(u8, "") };
-        }
-
-        const buffer = try allocator.alloc(u8, required);
-        errdefer allocator.free(buffer);
-        var copied: usize = 0;
-        try status.checkStatus(
-            copy(try native(self), buffer.ptr, buffer.len, &copied),
-            diagnosticStore(self),
-        );
-        if (copied != buffer.len) {
-            const exact = try allocator.dupe(u8, buffer[0..copied]);
-            allocator.free(buffer);
-            return .{ .allocator = allocator, .value = exact };
-        }
-        return .{ .allocator = allocator, .value = buffer };
-    }
-
-    fn copyLayerText(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        layer_id: []const u8,
-        copy: *const fn (c.mln_map, c.mln_buffer_view, ?[*]u8, usize, *usize) callconv(.c) c.mln_status,
-    ) status.Error!values.OwnedString {
+    ) status.Error!completion.Future(values.OwnedString) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        const layer_view = try temp.stringView(layer_id);
-
-        var required: usize = 0;
-        try status.checkStatus(
-            copy(try native(self), layer_view, null, 0, &required),
-            diagnosticStore(self),
-        );
-        if (required == 0) {
-            return .{ .allocator = allocator, .value = try allocator.dupe(u8, "") };
-        }
-
-        const buffer = try allocator.alloc(u8, required);
-        errdefer allocator.free(buffer);
-        var copied: usize = 0;
-        try status.checkStatus(
-            copy(try native(self), layer_view, buffer.ptr, buffer.len, &copied),
-            diagnosticStore(self),
-        );
-        if (copied != buffer.len) {
-            const exact = try allocator.dupe(u8, buffer[0..copied]);
-            allocator.free(buffer);
-            return .{ .allocator = allocator, .value = exact };
-        }
-        return .{ .allocator = allocator, .value = buffer };
+        return submitAllocatedQuery(values.OwnedString, self, allocator, copyOwnedStringResult, c.mln_map_copy_layer_source_id, .{ try native(self), try temp.stringView(layer_id) });
     }
 
-    /// Sets the lowest zoom at which one layer draws. Pass -inf for no lower bound.
-    pub fn setLayerMinZoom(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        layer_id: []const u8,
-        min_zoom: f64,
-    ) status.Error!void {
-        var temp = native_temp.TempStorage.init(allocator);
-        defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_layer_min_zoom(try native(self), try temp.stringView(layer_id), min_zoom),
-            diagnosticStore(self),
-        );
+    pub fn setLayerMinZoom(self: *MapHandle, allocator: std.mem.Allocator, layer_id: []const u8, value: f64) status.Error!completion.Future(completion.CommandCompletion) {
+        return self.setLayerNumberCommand(allocator, layer_id, value, c.mln_map_set_layer_min_zoom);
     }
 
-    /// Reads the lowest zoom at which one layer draws. A layer with no lower bound reports -inf.
-    pub fn getLayerMinZoom(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        layer_id: []const u8,
-    ) status.Error!f64 {
-        var temp = native_temp.TempStorage.init(allocator);
-        defer temp.deinit();
-        var min_zoom: f64 = 0;
-        try status.checkStatus(
-            c.mln_map_get_layer_min_zoom(try native(self), try temp.stringView(layer_id), &min_zoom),
-            diagnosticStore(self),
-        );
-        return min_zoom;
+    pub fn setLayerMaxZoom(self: *MapHandle, allocator: std.mem.Allocator, layer_id: []const u8, value: f64) status.Error!completion.Future(completion.CommandCompletion) {
+        return self.setLayerNumberCommand(allocator, layer_id, value, c.mln_map_set_layer_max_zoom);
     }
 
-    /// Sets the highest zoom at which one layer draws. Pass inf for no upper bound.
-    pub fn setLayerMaxZoom(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        layer_id: []const u8,
-        max_zoom: f64,
-    ) status.Error!void {
-        var temp = native_temp.TempStorage.init(allocator);
-        defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_layer_max_zoom(try native(self), try temp.stringView(layer_id), max_zoom),
-            diagnosticStore(self),
-        );
-    }
-
-    /// Reads the highest zoom at which one layer draws. A layer with no upper bound reports inf.
-    pub fn getLayerMaxZoom(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        layer_id: []const u8,
-    ) status.Error!f64 {
-        var temp = native_temp.TempStorage.init(allocator);
-        defer temp.deinit();
-        var max_zoom: f64 = 0;
-        try status.checkStatus(
-            c.mln_map_get_layer_max_zoom(try native(self), try temp.stringView(layer_id), &max_zoom),
-            diagnosticStore(self),
-        );
-        return max_zoom;
-    }
-
-    /// Sets whether one layer draws.
     pub fn setLayerVisibility(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         layer_id: []const u8,
         visibility: values.StyleLayerVisibility,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_layer_visibility(
-                try native(self),
-                try temp.stringView(layer_id),
-                visibility.toRaw(),
-            ),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_layer_visibility, .{
+            try native(self),
+            try temp.stringView(layer_id),
+            visibility.toRaw(),
+        });
     }
 
-    /// Reads whether one layer draws.
-    pub fn getLayerVisibility(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        layer_id: []const u8,
-    ) status.Error!values.StyleLayerVisibility {
+    /// Copies fixed layer metadata, completing with null when no layer has the
+    /// ID.
+    pub fn getStyleLayerInfo(self: *MapHandle, allocator: std.mem.Allocator, layer_id: []const u8) status.Error!completion.Future(?StyleLayerInfo) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var visibility: u32 = 0;
-        try status.checkStatus(
-            c.mln_map_get_layer_visibility(
-                try native(self),
-                try temp.stringView(layer_id),
-                &visibility,
-            ),
-            diagnosticStore(self),
-        );
-        return values.StyleLayerVisibility.fromRaw(visibility);
+        return submitAllocatedQuery(?StyleLayerInfo, self, allocator, struct {
+            fn copyResult(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?StyleLayerInfo {
+                const raw_result = (try optionalCompletionValue(c.mln_style_layer_result, result)) orelse return null;
+                const raw = raw_result.info;
+                const type_data: [*]const u8 = @ptrCast(raw.type.data orelse return error.NativeError);
+                const source_id = try copyPresentView(target.*, raw_result.source_id);
+                errdefer if (source_id) |owned| target.free(owned);
+                const source_layer = try copyPresentView(target.*, raw_result.source_layer);
+                return .{
+                    .allocator = target.*,
+                    .layer_type = type_data[0..raw.type.size],
+                    .min_zoom = raw.min_zoom,
+                    .max_zoom = raw.max_zoom,
+                    .visibility = values.StyleLayerVisibility.fromRaw(raw.visibility),
+                    .source_id = source_id,
+                    .source_layer = source_layer,
+                };
+            }
+        }.copyResult, c.mln_map_get_style_layer_info, .{ try native(self), try temp.stringView(layer_id) });
     }
 
-    pub fn listStyleSourceIds(self: *MapHandle, allocator: std.mem.Allocator) status.Error!values.StringList {
-        var list: c.mln_style_id_list = 0;
-        try status.checkStatus(c.mln_map_list_style_source_ids(try native(self), &list), diagnosticStore(self));
-        defer c.mln_style_id_list_destroy(list);
-        return try copyStyleIdList(allocator, list, diagnosticStore(self));
+    pub fn listStyleSourceIds(self: *MapHandle, allocator: std.mem.Allocator) status.Error!completion.Future(values.StringList) {
+        return submitAllocatedQuery(values.StringList, self, allocator, copyStringListResult, c.mln_map_list_style_source_ids, .{try native(self)});
     }
 
-    pub fn listStyleLayerIds(self: *MapHandle, allocator: std.mem.Allocator) status.Error!values.StringList {
-        var list: c.mln_style_id_list = 0;
-        try status.checkStatus(c.mln_map_list_style_layer_ids(try native(self), &list), diagnosticStore(self));
-        defer c.mln_style_id_list_destroy(list);
-        return try copyStyleIdList(allocator, list, diagnosticStore(self));
+    pub fn listStyleLayerIds(self: *MapHandle, allocator: std.mem.Allocator) status.Error!completion.Future(values.StringList) {
+        return submitAllocatedQuery(values.StringList, self, allocator, copyStringListResult, c.mln_map_list_style_layer_ids, .{try native(self)});
     }
 
     pub fn addStyleSourceJson(
@@ -660,238 +612,63 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         source_id: []const u8,
         source_json: []const u8,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_add_style_source_json(try native(self), try temp.stringView(source_id), try temp.stringView(source_json)),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_add_style_source_json, .{
+            try native(self),
+            try temp.stringView(source_id),
+            try temp.stringView(source_json),
+        });
     }
 
-    pub fn removeStyleSource(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!bool {
+    /// Accepts an ordered source-removal command. The completion reports a
+    /// committed removal, a `NotFound` failure when no source has the ID, and
+    /// an `InvalidState` failure when a layer still uses the source.
+    pub fn removeStyleSource(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+        return self.removeStyleObjectCommand(allocator, source_id, c.mln_map_remove_style_source);
+    }
+
+    /// Copies one source's metadata, attribution, URL, and inline TileJSON,
+    /// completing with null when no source has the ID.
+    pub fn getStyleSourceInfo(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!completion.Future(?values.StyleSourceInfo) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var removed = false;
-        try status.checkStatus(
-            c.mln_map_remove_style_source(try native(self), try temp.stringView(source_id), &removed),
-            diagnosticStore(self),
-        );
-        return removed;
+        return submitAllocatedQuery(?values.StyleSourceInfo, self, allocator, copyStyleSourceInfoResult, c.mln_map_get_style_source_info, .{ try native(self), try temp.stringView(source_id) });
     }
 
-    pub fn styleSourceExists(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!bool {
+    pub fn copyStyleSourceAttribution(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!completion.Future(?values.OwnedString) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var exists = false;
-        try status.checkStatus(
-            c.mln_map_style_source_exists(try native(self), try temp.stringView(source_id), &exists),
-            diagnosticStore(self),
-        );
-        return exists;
+        return submitAllocatedQuery(?values.OwnedString, self, allocator, copyOptionalOwnedStringResult, c.mln_map_copy_style_source_attribution, .{ try native(self), try temp.stringView(source_id) });
     }
 
-    pub fn getStyleSourceType(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        source_id: []const u8,
-    ) status.Error!?values.StyleSourceType {
+    pub fn copyStyleSourceUrl(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!completion.Future(?values.OwnedString) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var raw_type: u32 = c.MLN_STYLE_SOURCE_TYPE_UNKNOWN;
-        var found = false;
-        try status.checkStatus(
-            c.mln_map_get_style_source_type(try native(self), try temp.stringView(source_id), &raw_type, &found),
-            diagnosticStore(self),
-        );
-        if (!found) return null;
-        return values.styleSourceTypeFromNative(raw_type);
-    }
-
-    /// Copies one source's retained metadata into a value that stays valid
-    /// independently of the map.
-    pub fn getStyleSourceInfo(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        source_id: []const u8,
-    ) status.Error!?values.StyleSourceInfo {
-        const raw_info = (try self.getNativeStyleSourceInfo(allocator, source_id)) orelse return null;
-
-        var attribution: ?[]const u8 = null;
-        errdefer if (attribution) |value| allocator.free(value);
-        if (raw_info.has_attribution) {
-            const copied = (try self.copyStyleSourceText(
-                allocator,
-                source_id,
-                c.mln_map_copy_style_source_attribution,
-            )) orelse return error.UnknownStatus;
-            attribution = copied.value;
-        }
-
-        var url: ?[]const u8 = null;
-        errdefer if (url) |value| allocator.free(value);
-        if ((raw_info.fields & c.MLN_STYLE_SOURCE_INFO_URL) != 0) {
-            const copied = (try self.copyStyleSourceText(
-                allocator,
-                source_id,
-                c.mln_map_copy_style_source_url,
-            )) orelse return error.UnknownStatus;
-            url = copied.value;
-        }
-
-        var tile_urls: ?values.StringList = null;
-        errdefer if (tile_urls) |*list| list.deinit();
-        if ((raw_info.fields & c.MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-            var raw_list: c.mln_style_string_list = 0;
-            var found = false;
-            try status.checkStatus(
-                c.mln_map_get_style_source_tile_urls(
-                    try native(self),
-                    stringView(source_id),
-                    &raw_list,
-                    &found,
-                ),
-                diagnosticStore(self),
-            );
-            defer c.mln_style_string_list_destroy(raw_list);
-            if (!found) return error.UnknownStatus;
-            tile_urls = try copyStyleStringList(allocator, raw_list, diagnosticStore(self));
-        }
-
-        return .{
-            .allocator = allocator,
-            .source_type = values.styleSourceTypeFromNative(raw_info.type),
-            .id_size = raw_info.id_size,
-            .is_volatile = raw_info.is_volatile,
-            .attribution = attribution,
-            .url = url,
-            .tile_json = if (tile_urls) |list| .{
-                .tile_urls = list.items,
-                .min_zoom = raw_info.min_zoom,
-                .max_zoom = raw_info.max_zoom,
-                .scheme = values.StyleTileScheme.fromRaw(raw_info.scheme),
-                .bounds = if ((raw_info.fields & c.MLN_STYLE_SOURCE_INFO_BOUNDS) != 0)
-                    values.latLngBoundsFromNative(raw_info.bounds)
-                else
-                    null,
-            } else null,
-            .tile_size = if ((raw_info.fields & c.MLN_STYLE_SOURCE_INFO_TILE_SIZE) != 0) raw_info.tile_size else null,
-            .vector_encoding = if ((raw_info.fields & c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING) != 0)
-                values.StyleVectorTileEncoding.fromRaw(raw_info.vector_encoding)
-            else
-                null,
-            .raster_encoding = if ((raw_info.fields & c.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING) != 0)
-                values.StyleRasterDemEncoding.fromRaw(raw_info.raster_encoding)
-            else
-                null,
-        };
+        return submitAllocatedQuery(?values.OwnedString, self, allocator, copyOptionalOwnedStringResult, c.mln_map_copy_style_source_url, .{ try native(self), try temp.stringView(source_id) });
     }
 
     /// Sets whether one style source stores fetched tiles in persistent
-    /// storage.
+    /// storage. A missing source completes with `error.NotFound`.
     pub fn setStyleSourceVolatile(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         source_id: []const u8,
         is_volatile: bool,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_style_source_volatile(
-                try native(self),
-                try temp.stringView(source_id),
-                is_volatile,
-            ),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_style_source_volatile, .{ try native(self), try temp.stringView(source_id), is_volatile });
     }
 
-    pub fn copyStyleSourceAttribution(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        source_id: []const u8,
-    ) status.Error!?values.OwnedString {
-        const info = (try self.getNativeStyleSourceInfo(allocator, source_id)) orelse return null;
-        if (!info.has_attribution) return null;
-        return self.copyStyleSourceText(
-            allocator,
-            source_id,
-            c.mln_map_copy_style_source_attribution,
-        );
-    }
-
-    /// Copies one source's retained URL. A source without a URL returns null.
-    pub fn copyStyleSourceUrl(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        source_id: []const u8,
-    ) status.Error!?values.OwnedString {
-        const info = (try self.getNativeStyleSourceInfo(allocator, source_id)) orelse return null;
-        if ((info.fields & c.MLN_STYLE_SOURCE_INFO_URL) == 0) return null;
-        return self.copyStyleSourceText(allocator, source_id, c.mln_map_copy_style_source_url);
-    }
-
-    fn getNativeStyleSourceInfo(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        source_id: []const u8,
-    ) status.Error!?c.mln_style_source_info {
+    /// Copies one source's inline TileJSON tile URLs, completing with null when
+    /// no source has the ID and with an empty list when the source is
+    /// URL-backed or carries no inline TileJSON.
+    pub fn getStyleSourceTileUrls(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!completion.Future(?values.StringList) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var raw_info = std.mem.zeroes(c.mln_style_source_info);
-        raw_info.size = @sizeOf(c.mln_style_source_info);
-        var found = false;
-        try status.checkStatus(
-            c.mln_map_get_style_source_info(
-                try native(self),
-                try temp.stringView(source_id),
-                &raw_info,
-                &found,
-            ),
-            diagnosticStore(self),
-        );
-        return if (found) raw_info else null;
-    }
-
-    fn copyStyleSourceText(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        source_id: []const u8,
-        copy: *const fn (c.mln_map, c.mln_buffer_view, ?[*]u8, usize, *usize, *bool) callconv(.c) c.mln_status,
-    ) status.Error!?values.OwnedString {
-        var required: usize = 0;
-        var found = false;
-        try status.checkStatus(
-            copy(try native(self), stringView(source_id), null, 0, &required, &found),
-            diagnosticStore(self),
-        );
-        if (!found) return null;
-
-        const buffer = try allocator.alloc(u8, required);
-        errdefer allocator.free(buffer);
-        var copied_size: usize = 0;
-        try status.checkStatus(
-            copy(
-                try native(self),
-                stringView(source_id),
-                if (buffer.len == 0) null else buffer.ptr,
-                buffer.len,
-                &copied_size,
-                &found,
-            ),
-            diagnosticStore(self),
-        );
-        if (!found) {
-            allocator.free(buffer);
-            return null;
-        }
-        if (copied_size != buffer.len) {
-            const exact = try allocator.dupe(u8, buffer[0..copied_size]);
-            allocator.free(buffer);
-            return .{ .allocator = allocator, .value = exact };
-        }
-        return .{ .allocator = allocator, .value = buffer };
+        return submitAllocatedQuery(?values.StringList, self, allocator, copyStyleSourceTileUrlsResult, c.mln_map_get_style_source_tile_urls, .{ try native(self), try temp.stringView(source_id) });
     }
 
     pub fn addStyleLayerJson(
@@ -899,85 +676,40 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         layer_json: []const u8,
         before_layer_id: []const u8,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_add_style_layer_json(try native(self), try temp.stringView(layer_json), stringView(before_layer_id)),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_add_style_layer_json, .{
+            try native(self),
+            try temp.stringView(layer_json),
+            stringView(before_layer_id),
+        });
     }
 
-    pub fn removeStyleLayer(self: *MapHandle, layer_id: []const u8) status.Error!bool {
-        var removed = false;
-        try status.checkStatus(
-            c.mln_map_remove_style_layer(try native(self), stringView(layer_id), &removed),
-            diagnosticStore(self),
-        );
-        return removed;
+    /// Accepts an ordered layer-removal command. The completion reports a
+    /// committed removal, and a `NotFound` failure when no layer has the ID.
+    pub fn removeStyleLayer(self: *MapHandle, allocator: std.mem.Allocator, layer_id: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+        return self.removeStyleObjectCommand(allocator, layer_id, c.mln_map_remove_style_layer);
     }
 
-    pub fn styleLayerExists(self: *MapHandle, layer_id: []const u8) status.Error!bool {
-        var exists = false;
-        try status.checkStatus(
-            c.mln_map_style_layer_exists(try native(self), stringView(layer_id), &exists),
-            diagnosticStore(self),
-        );
-        return exists;
+    pub fn moveStyleLayer(self: *MapHandle, layer_id: []const u8, before_layer_id: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+        return submitCommand(self, c.mln_map_move_style_layer, .{
+            try native(self),
+            stringView(layer_id),
+            stringView(before_layer_id),
+        });
     }
 
-    pub fn moveStyleLayer(
-        self: *MapHandle,
-        layer_id: []const u8,
-        before_layer_id: []const u8,
-    ) status.Error!void {
-        try status.checkStatus(
-            c.mln_map_move_style_layer(try native(self), stringView(layer_id), stringView(before_layer_id)),
-            diagnosticStore(self),
-        );
-    }
-
-    pub fn getStyleLayerJson(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        layer_id: []const u8,
-    ) status.Error!?values.OwnedString {
-        var buffer: c.mln_buffer = 0;
-        var found = false;
-        try status.checkStatus(
-            c.mln_map_get_style_layer_json(try native(self), stringView(layer_id), &buffer, &found),
-            diagnosticStore(self),
-        );
-        if (!found) return null;
-        return try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self)) orelse error.NativeError;
-    }
-
-    pub fn getStyleLayerType(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        layer_id: []const u8,
-    ) status.Error!?values.OwnedString {
-        var layer_type = c.mln_buffer_view{ .data = null, .size = 0 };
-        var found = false;
-        try status.checkStatus(
-            c.mln_map_get_style_layer_type(try native(self), stringView(layer_id), &layer_type, &found),
-            diagnosticStore(self),
-        );
-        if (!found) return null;
-        const copied = if (layer_type.size == 0) try allocator.dupe(u8, "") else blk: {
-            const data: [*]const u8 = @ptrCast(layer_type.data orelse return error.NativeError);
-            break :blk try allocator.dupe(u8, data[0..layer_type.size]);
-        };
-        return .{ .allocator = allocator, .value = copied };
-    }
-
-    pub fn setStyleLightJson(self: *MapHandle, allocator: std.mem.Allocator, value: []const u8) status.Error!void {
+    pub fn getStyleLayerJson(self: *MapHandle, allocator: std.mem.Allocator, layer_id: []const u8) status.Error!completion.Future(?values.OwnedString) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_style_light_json(try native(self), try temp.stringView(value)),
-            diagnosticStore(self),
-        );
+        return submitAllocatedQuery(?values.OwnedString, self, allocator, copyOptionalOwnedStringResult, c.mln_map_get_style_layer_json, .{ try native(self), try temp.stringView(layer_id) });
+    }
+
+    pub fn setStyleLightJson(self: *MapHandle, allocator: std.mem.Allocator, value: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        return submitCommand(self, c.mln_map_set_style_light_json, .{ try native(self), try temp.stringView(value) });
     }
 
     pub fn setStyleLightProperty(
@@ -985,52 +717,33 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         property_name: []const u8,
         value: []const u8,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_style_light_property(try native(self), try temp.stringView(property_name), try temp.stringView(value)),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_style_light_property, .{
+            try native(self),
+            try temp.stringView(property_name),
+            try temp.stringView(value),
+        });
     }
 
-    pub fn getStyleLightProperty(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        property_name: []const u8,
-    ) status.Error!?values.OwnedString {
+    pub fn getStyleLightProperty(self: *MapHandle, allocator: std.mem.Allocator, property_name: []const u8) status.Error!completion.Future(?values.OwnedString) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var buffer: c.mln_buffer = 0;
-        try status.checkStatus(
-            c.mln_map_get_style_light_property(try native(self), try temp.stringView(property_name), &buffer),
-            diagnosticStore(self),
-        );
-        return try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self));
+        return submitAllocatedQuery(?values.OwnedString, self, allocator, copyOptionalOwnedStringResult, c.mln_map_get_style_light_property, .{ try native(self), try temp.stringView(property_name) });
     }
 
-    /// Sets the style's global transition options, replacing the whole
-    /// configuration: absent duration and delay clear the style-wide override.
-    /// Loading a style replaces these options, so apply an override afterwards.
-    pub fn setStyleTransitionOptions(
-        self: *MapHandle,
-        options: values.StyleTransitionOptions,
-    ) status.Error!void {
+    pub fn setStyleTransitionOptions(self: *MapHandle, options: values.StyleTransitionOptions) status.Error!completion.Future(completion.CommandCompletion) {
         const raw = values.styleTransitionOptionsToNative(options);
-        try status.checkStatus(
-            c.mln_map_set_style_transition_options(try native(self), &raw),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_style_transition_options, .{ try native(self), &raw });
     }
 
-    /// Reads the style's global transition options.
-    pub fn getStyleTransitionOptions(self: *MapHandle) status.Error!values.StyleTransitionOptions {
-        var raw = c.mln_style_transition_options_default();
-        try status.checkStatus(
-            c.mln_map_get_style_transition_options(try native(self), &raw),
-            diagnosticStore(self),
-        );
-        return values.styleTransitionOptionsFromNative(raw);
+    pub fn getStyleTransitionOptions(self: *MapHandle) status.Error!completion.Future(values.StyleTransitionOptions) {
+        return submitQuery(values.StyleTransitionOptions, self, struct {
+            fn copyResult(result: *const c.mln_completion_result) status.Error!values.StyleTransitionOptions {
+                return values.styleTransitionOptionsFromNative(try completion.value(c.mln_style_transition_options)(result));
+            }
+        }.copyResult, c.mln_map_get_style_transition_options, .{try native(self)});
     }
 
     pub fn addVectorSourceUrl(
@@ -1039,14 +752,11 @@ pub const MapHandle = enum(c.mln_map) {
         source_id: []const u8,
         url: []const u8,
         options: ?values.StyleTileSourceOptions,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_options = if (options) |value| try styleTileSourceOptionsToNative(&temp, value) else undefined;
-        try status.checkStatus(
-            c.mln_map_add_vector_source_url(try native(self), try temp.stringView(source_id), try temp.stringView(url), if (options != null) &raw_options else null),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_add_vector_source_url, .{ try native(self), try temp.stringView(source_id), try temp.stringView(url), if (options != null) &raw_options else null });
     }
 
     pub fn addVectorSourceTiles(
@@ -1055,15 +765,12 @@ pub const MapHandle = enum(c.mln_map) {
         source_id: []const u8,
         tiles: []const []const u8,
         options: ?values.StyleTileSourceOptions,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const raw_tiles = try temp.stringViews(tiles);
         var raw_options = if (options) |value| try styleTileSourceOptionsToNative(&temp, value) else undefined;
-        try status.checkStatus(
-            c.mln_map_add_vector_source_tiles(try native(self), try temp.stringView(source_id), raw_tiles.ptr, raw_tiles.len, if (options != null) &raw_options else null),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_add_vector_source_tiles, .{ try native(self), try temp.stringView(source_id), raw_tiles.ptr, raw_tiles.len, if (options != null) &raw_options else null });
     }
 
     pub fn addRasterSourceUrl(
@@ -1072,14 +779,11 @@ pub const MapHandle = enum(c.mln_map) {
         source_id: []const u8,
         url: []const u8,
         options: ?values.StyleTileSourceOptions,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_options = if (options) |value| try styleTileSourceOptionsToNative(&temp, value) else undefined;
-        try status.checkStatus(
-            c.mln_map_add_raster_source_url(try native(self), try temp.stringView(source_id), try temp.stringView(url), if (options != null) &raw_options else null),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_add_raster_source_url, .{ try native(self), try temp.stringView(source_id), try temp.stringView(url), if (options != null) &raw_options else null });
     }
 
     pub fn addRasterSourceTiles(
@@ -1088,15 +792,12 @@ pub const MapHandle = enum(c.mln_map) {
         source_id: []const u8,
         tiles: []const []const u8,
         options: ?values.StyleTileSourceOptions,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const raw_tiles = try temp.stringViews(tiles);
         var raw_options = if (options) |value| try styleTileSourceOptionsToNative(&temp, value) else undefined;
-        try status.checkStatus(
-            c.mln_map_add_raster_source_tiles(try native(self), try temp.stringView(source_id), raw_tiles.ptr, raw_tiles.len, if (options != null) &raw_options else null),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_add_raster_source_tiles, .{ try native(self), try temp.stringView(source_id), raw_tiles.ptr, raw_tiles.len, if (options != null) &raw_options else null });
     }
 
     pub fn addRasterDemSourceUrl(
@@ -1105,14 +806,11 @@ pub const MapHandle = enum(c.mln_map) {
         source_id: []const u8,
         url: []const u8,
         options: ?values.StyleTileSourceOptions,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_options = if (options) |value| try styleTileSourceOptionsToNative(&temp, value) else undefined;
-        try status.checkStatus(
-            c.mln_map_add_raster_dem_source_url(try native(self), try temp.stringView(source_id), try temp.stringView(url), if (options != null) &raw_options else null),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_add_raster_dem_source_url, .{ try native(self), try temp.stringView(source_id), try temp.stringView(url), if (options != null) &raw_options else null });
     }
 
     pub fn addRasterDemSourceTiles(
@@ -1121,15 +819,12 @@ pub const MapHandle = enum(c.mln_map) {
         source_id: []const u8,
         tiles: []const []const u8,
         options: ?values.StyleTileSourceOptions,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const raw_tiles = try temp.stringViews(tiles);
         var raw_options = if (options) |value| try styleTileSourceOptionsToNative(&temp, value) else undefined;
-        try status.checkStatus(
-            c.mln_map_add_raster_dem_source_tiles(try native(self), try temp.stringView(source_id), raw_tiles.ptr, raw_tiles.len, if (options != null) &raw_options else null),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_add_raster_dem_source_tiles, .{ try native(self), try temp.stringView(source_id), raw_tiles.ptr, raw_tiles.len, if (options != null) &raw_options else null });
     }
 
     pub fn addHillshadeLayer(
@@ -1138,13 +833,10 @@ pub const MapHandle = enum(c.mln_map) {
         layer_id: []const u8,
         source_id: []const u8,
         before_layer_id: []const u8,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_add_hillshade_layer(try native(self), try temp.stringView(layer_id), try temp.stringView(source_id), try temp.stringView(before_layer_id)),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_add_hillshade_layer, .{ try native(self), try temp.stringView(layer_id), try temp.stringView(source_id), try temp.stringView(before_layer_id) });
     }
 
     pub fn addColorReliefLayer(
@@ -1153,13 +845,10 @@ pub const MapHandle = enum(c.mln_map) {
         layer_id: []const u8,
         source_id: []const u8,
         before_layer_id: []const u8,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_add_color_relief_layer(try native(self), try temp.stringView(layer_id), try temp.stringView(source_id), try temp.stringView(before_layer_id)),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_add_color_relief_layer, .{ try native(self), try temp.stringView(layer_id), try temp.stringView(source_id), try temp.stringView(before_layer_id) });
     }
 
     pub fn setStyleImage(
@@ -1168,164 +857,78 @@ pub const MapHandle = enum(c.mln_map) {
         image_id: []const u8,
         image: values.PremultipliedRgba8Image,
         options: ?values.StyleImageOptions,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_image = values.premultipliedRgba8ImageToNative(image);
-        // Native borrows the stretch arrays for the call, so they live in this scope.
-        const stretch_x_count = if (options) |value|
-            if (value.stretch_x) |stretches| stretches.len else 0
-        else
-            0;
-        const stretch_y_count = if (options) |value|
-            if (value.stretch_y) |stretches| stretches.len else 0
-        else
-            0;
+        const stretch_x_count = if (options) |value| if (value.stretch_x) |stretches| stretches.len else 0 else 0;
+        const stretch_y_count = if (options) |value| if (value.stretch_y) |stretches| stretches.len else 0 else 0;
         const stretch_x = try allocator.alloc(c.mln_image_stretch, stretch_x_count);
         defer allocator.free(stretch_x);
         const stretch_y = try allocator.alloc(c.mln_image_stretch, stretch_y_count);
         defer allocator.free(stretch_y);
-        var raw_options = if (options) |value|
-            values.styleImageOptionsToNative(value, stretch_x, stretch_y)
-        else
-            undefined;
-        try status.checkStatus(
-            c.mln_map_set_style_image(try native(self), try temp.stringView(image_id), &raw_image, if (options != null) &raw_options else null),
-            diagnosticStore(self),
-        );
+        var raw_options = if (options) |value| values.styleImageOptionsToNative(value, stretch_x, stretch_y) else undefined;
+        return submitCommand(self, c.mln_map_set_style_image, .{
+            try native(self),
+            try temp.stringView(image_id),
+            &raw_image,
+            if (options != null) &raw_options else null,
+        });
     }
 
-    /// Copies one runtime style image's stretchable intervals, or null when no
-    /// image carries `image_id`.
     pub fn copyStyleImageStretches(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         image_id: []const u8,
-    ) status.Error!?values.OwnedImageStretches {
+    ) status.Error!completion.Future(?values.OwnedImageStretches) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        const image_view = try temp.stringView(image_id);
-
-        var x_count: usize = 0;
-        var y_count: usize = 0;
-        var found = false;
-        try status.checkStatus(
-            c.mln_map_copy_style_image_stretches(
-                try native(self),
-                image_view,
-                null,
-                0,
-                &x_count,
-                null,
-                0,
-                &y_count,
-                &found,
-            ),
-            diagnosticStore(self),
-        );
-        if (!found) return null;
-
-        const raw_x = try allocator.alloc(c.mln_image_stretch, x_count);
-        defer allocator.free(raw_x);
-        const raw_y = try allocator.alloc(c.mln_image_stretch, y_count);
-        defer allocator.free(raw_y);
-        try status.checkStatus(
-            c.mln_map_copy_style_image_stretches(
-                try native(self),
-                image_view,
-                if (raw_x.len == 0) null else raw_x.ptr,
-                raw_x.len,
-                &x_count,
-                if (raw_y.len == 0) null else raw_y.ptr,
-                raw_y.len,
-                &y_count,
-                &found,
-            ),
-            diagnosticStore(self),
-        );
-
-        const stretch_x = try allocator.alloc(values.ImageStretch, x_count);
-        errdefer allocator.free(stretch_x);
-        const stretch_y = try allocator.alloc(values.ImageStretch, y_count);
-        errdefer allocator.free(stretch_y);
-        for (raw_x, 0..) |stretch, index| {
-            stretch_x[index] = .{ .from = stretch.from, .to = stretch.to };
-        }
-        for (raw_y, 0..) |stretch, index| {
-            stretch_y[index] = .{ .from = stretch.from, .to = stretch.to };
-        }
-        return .{ .allocator = allocator, .stretch_x = stretch_x, .stretch_y = stretch_y };
+        return submitAllocatedQuery(?values.OwnedImageStretches, self, allocator, struct {
+            fn copyResult(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?values.OwnedImageStretches {
+                const raw = (try optionalCompletionValue(c.mln_style_image_stretches_result, result)) orelse return null;
+                const stretch_x = try target.alloc(values.ImageStretch, raw.stretch_x_count);
+                errdefer target.free(stretch_x);
+                const stretch_y = try target.alloc(values.ImageStretch, raw.stretch_y_count);
+                errdefer target.free(stretch_y);
+                if (raw.stretch_x_count != 0) {
+                    const source = raw.stretch_x orelse return error.NativeError;
+                    for (source[0..raw.stretch_x_count], stretch_x) |stretch, *copy| copy.* = .{ .from = stretch.from, .to = stretch.to };
+                }
+                if (raw.stretch_y_count != 0) {
+                    const source = raw.stretch_y orelse return error.NativeError;
+                    for (source[0..raw.stretch_y_count], stretch_y) |stretch, *copy| copy.* = .{ .from = stretch.from, .to = stretch.to };
+                }
+                return .{ .allocator = target.*, .stretch_x = stretch_x, .stretch_y = stretch_y };
+            }
+        }.copyResult, c.mln_map_copy_style_image_stretches, .{ try native(self), try temp.stringView(image_id) });
     }
 
-    pub fn removeStyleImage(self: *MapHandle, allocator: std.mem.Allocator, image_id: []const u8) status.Error!bool {
-        var temp = native_temp.TempStorage.init(allocator);
-        defer temp.deinit();
-        var removed = false;
-        try status.checkStatus(
-            c.mln_map_remove_style_image(try native(self), try temp.stringView(image_id), &removed),
-            diagnosticStore(self),
-        );
-        return removed;
+    /// Accepts an ordered image-removal command. The completion reports a
+    /// committed removal, and a `NotFound` failure when no runtime style image
+    /// has the ID.
+    pub fn removeStyleImage(self: *MapHandle, allocator: std.mem.Allocator, image_id: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+        return self.removeStyleObjectCommand(allocator, image_id, c.mln_map_remove_style_image);
     }
 
-    pub fn styleImageExists(self: *MapHandle, allocator: std.mem.Allocator, image_id: []const u8) status.Error!bool {
+    pub fn getStyleImageInfo(self: *MapHandle, allocator: std.mem.Allocator, image_id: []const u8) status.Error!completion.Future(?values.StyleImageInfo) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var exists = false;
-        try status.checkStatus(
-            c.mln_map_style_image_exists(try native(self), try temp.stringView(image_id), &exists),
-            diagnosticStore(self),
-        );
-        return exists;
-    }
-
-    pub fn getStyleImageInfo(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        image_id: []const u8,
-    ) status.Error!?values.StyleImageInfo {
-        var temp = native_temp.TempStorage.init(allocator);
-        defer temp.deinit();
-        var info = c.mln_style_image_info_default();
-        var found = false;
-        try status.checkStatus(
-            c.mln_map_get_style_image_info(try native(self), try temp.stringView(image_id), &info, &found),
-            diagnosticStore(self),
-        );
-        if (!found) return null;
-        return values.styleImageInfoFromNative(info);
+        return submitQuery(?values.StyleImageInfo, self, struct {
+            fn copyResult(result: *const c.mln_completion_result) status.Error!?values.StyleImageInfo {
+                const raw = (try optionalCompletionValue(c.mln_style_image_result, result)) orelse return null;
+                return values.styleImageInfoFromNative(raw.info);
+            }
+        }.copyResult, c.mln_map_get_style_image_info, .{ try native(self), try temp.stringView(image_id) });
     }
 
     pub fn copyStyleImagePremultipliedRgba8(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         image_id: []const u8,
-    ) status.Error!?values.OwnedStyleImage {
-        const info = (try self.getStyleImageInfo(allocator, image_id)) orelse return null;
-        const pixels = try allocator.alloc(u8, info.byte_length);
-        errdefer allocator.free(pixels);
-
+    ) status.Error!completion.Future(?values.OwnedString) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var copied_size: usize = 0;
-        var found = false;
-        try status.checkStatus(
-            c.mln_map_copy_style_image_premultiplied_rgba8(
-                try native(self),
-                try temp.stringView(image_id),
-                if (pixels.len == 0) null else pixels.ptr,
-                pixels.len,
-                &copied_size,
-                &found,
-            ),
-            diagnosticStore(self),
-        );
-        if (!found) {
-            allocator.free(pixels);
-            return null;
-        }
-        if (copied_size != pixels.len) return error.NativeError;
-        return .{ .allocator = allocator, .info = info, .pixels = pixels };
+        return submitAllocatedQuery(?values.OwnedString, self, allocator, copyOptionalOwnedStringResult, c.mln_map_copy_style_image_premultiplied_rgba8, .{ try native(self), try temp.stringView(image_id) });
     }
 
     pub fn addImageSourceUrl(
@@ -1334,20 +937,17 @@ pub const MapHandle = enum(c.mln_map) {
         source_id: []const u8,
         coordinates: [4]values.LatLng,
         url: []const u8,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const raw_coordinates = try temp.latLngs(&coordinates);
-        try status.checkStatus(
-            c.mln_map_add_image_source_url(
-                try native(self),
-                try temp.stringView(source_id),
-                raw_coordinates.ptr,
-                raw_coordinates.len,
-                try temp.stringView(url),
-            ),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_add_image_source_url, .{
+            try native(self),
+            try temp.stringView(source_id),
+            raw_coordinates.ptr,
+            raw_coordinates.len,
+            try temp.stringView(url),
+        });
     }
 
     pub fn addImageSourceImage(
@@ -1356,98 +956,66 @@ pub const MapHandle = enum(c.mln_map) {
         source_id: []const u8,
         coordinates: [4]values.LatLng,
         image: values.PremultipliedRgba8Image,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const raw_coordinates = try temp.latLngs(&coordinates);
         var raw_image = values.premultipliedRgba8ImageToNative(image);
-        try status.checkStatus(
-            c.mln_map_add_image_source_image(
-                try native(self),
-                try temp.stringView(source_id),
-                raw_coordinates.ptr,
-                raw_coordinates.len,
-                &raw_image,
-            ),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_add_image_source_image, .{
+            try native(self),
+            try temp.stringView(source_id),
+            raw_coordinates.ptr,
+            raw_coordinates.len,
+            &raw_image,
+        });
     }
 
-    pub fn setImageSourceUrl(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        source_id: []const u8,
-        url: []const u8,
-    ) status.Error!void {
+    pub fn setImageSourceUrl(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8, url: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_image_source_url(try native(self), try temp.stringView(source_id), try temp.stringView(url)),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_image_source_url, .{
+            try native(self),
+            try temp.stringView(source_id),
+            try temp.stringView(url),
+        });
     }
 
-    pub fn setImageSourceImage(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        source_id: []const u8,
-        image: values.PremultipliedRgba8Image,
-    ) status.Error!void {
+    pub fn setImageSourceImage(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8, image: values.PremultipliedRgba8Image) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_image = values.premultipliedRgba8ImageToNative(image);
-        try status.checkStatus(
-            c.mln_map_set_image_source_image(try native(self), try temp.stringView(source_id), &raw_image),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_image_source_image, .{
+            try native(self),
+            try temp.stringView(source_id),
+            &raw_image,
+        });
     }
 
-    pub fn setImageSourceCoordinates(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        source_id: []const u8,
-        coordinates: [4]values.LatLng,
-    ) status.Error!void {
+    pub fn setImageSourceCoordinates(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8, coordinates: [4]values.LatLng) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const raw_coordinates = try temp.latLngs(&coordinates);
-        try status.checkStatus(
-            c.mln_map_set_image_source_coordinates(
-                try native(self),
-                try temp.stringView(source_id),
-                raw_coordinates.ptr,
-                raw_coordinates.len,
-            ),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_image_source_coordinates, .{
+            try native(self),
+            try temp.stringView(source_id),
+            raw_coordinates.ptr,
+            raw_coordinates.len,
+        });
     }
 
-    pub fn getImageSourceCoordinates(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        source_id: []const u8,
-    ) status.Error!?[4]values.LatLng {
+    pub fn getImageSourceCoordinates(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!completion.Future(?[4]values.LatLng) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var raw_coordinates: [4]c.mln_lat_lng = undefined;
-        var coordinate_count: usize = 0;
-        var found = false;
-        try status.checkStatus(
-            c.mln_map_get_image_source_coordinates(
-                try native(self),
-                try temp.stringView(source_id),
-                &raw_coordinates,
-                raw_coordinates.len,
-                &coordinate_count,
-                &found,
-            ),
-            diagnosticStore(self),
-        );
-        if (!found) return null;
-        if (coordinate_count != raw_coordinates.len) return error.NativeError;
-        var coordinates: [4]values.LatLng = undefined;
-        for (raw_coordinates, &coordinates) |raw_coordinate, *coordinate| coordinate.* = values.latLngFromNative(raw_coordinate);
-        return coordinates;
+        return submitQuery(?[4]values.LatLng, self, struct {
+            fn copyResult(result: *const c.mln_completion_result) status.Error!?[4]values.LatLng {
+                if (result.value_count == 0) return null;
+                if (result.value_count != 4) return error.NativeError;
+                const raw_coordinates = @as([*]align(1) const c.mln_lat_lng, @ptrCast(result.value orelse return error.NativeError))[0..4];
+                var coordinates: [4]values.LatLng = undefined;
+                for (raw_coordinates, &coordinates) |raw, *coordinate| coordinate.* = values.latLngFromNative(raw);
+                return coordinates;
+            }
+        }.copyResult, c.mln_map_get_image_source_coordinates, .{ try native(self), try temp.stringView(source_id) });
     }
 
     pub fn addLocationIndicatorLayer(
@@ -1455,13 +1023,10 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         layer_id: []const u8,
         before_layer_id: []const u8,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_add_location_indicator_layer(try native(self), try temp.stringView(layer_id), try temp.stringView(before_layer_id)),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_add_location_indicator_layer, .{ try native(self), try temp.stringView(layer_id), try temp.stringView(before_layer_id) });
     }
 
     pub fn setLocationIndicatorLocation(
@@ -1470,18 +1035,15 @@ pub const MapHandle = enum(c.mln_map) {
         layer_id: []const u8,
         coordinate: values.LatLng,
         altitude: f64,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_location_indicator_location(
-                try native(self),
-                try temp.stringView(layer_id),
-                values.latLngToNative(coordinate),
-                altitude,
-            ),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_location_indicator_location, .{
+            try native(self),
+            try temp.stringView(layer_id),
+            values.latLngToNative(coordinate),
+            altitude,
+        });
     }
 
     pub fn setLocationIndicatorBearing(
@@ -1489,13 +1051,10 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         layer_id: []const u8,
         bearing: f64,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_location_indicator_bearing(try native(self), try temp.stringView(layer_id), bearing),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_location_indicator_bearing, .{ try native(self), try temp.stringView(layer_id), bearing });
     }
 
     pub fn setLocationIndicatorAccuracyRadius(
@@ -1503,13 +1062,10 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         layer_id: []const u8,
         radius: f64,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_location_indicator_accuracy_radius(try native(self), try temp.stringView(layer_id), radius),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_location_indicator_accuracy_radius, .{ try native(self), try temp.stringView(layer_id), radius });
     }
 
     pub fn setLocationIndicatorImageName(
@@ -1518,18 +1074,15 @@ pub const MapHandle = enum(c.mln_map) {
         layer_id: []const u8,
         kind: values.LocationIndicatorImageKind,
         image_id: []const u8,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_location_indicator_image_name(
-                try native(self),
-                try temp.stringView(layer_id),
-                values.locationIndicatorImageKindToNative(kind),
-                try temp.stringView(image_id),
-            ),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_location_indicator_image_name, .{
+            try native(self),
+            try temp.stringView(layer_id),
+            values.locationIndicatorImageKindToNative(kind),
+            try temp.stringView(image_id),
+        });
     }
 
     /// Adds a GeoJSON source with prepared inline data. The call borrows
@@ -1540,35 +1093,26 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         source_id: []const u8,
         data: GeoJsonSourceDataHandle,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_add_geojson_source_data(
-                try native(self),
-                try temp.stringView(source_id),
-                @intFromEnum(data),
-            ),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_add_geojson_source_data, .{ try native(self), try temp.stringView(source_id), @intFromEnum(data) });
     }
 
     /// Updates one GeoJSON source with prepared inline data. The call borrows
     /// `data`, which must have been prepared with options equal to the options
-    /// the source was added with, `cluster_properties` excepted; a mismatch is
-    /// rejected.
+    /// the source was added with; a mismatch is rejected. Cluster aggregation
+    /// expressions compare by parsed equality, so equivalent
+    /// `cluster_properties` JSON matches regardless of formatting.
     pub fn setGeoJsonSourceData(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         source_id: []const u8,
         data: GeoJsonSourceDataHandle,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_geojson_source_data(try native(self), try temp.stringView(source_id), @intFromEnum(data)),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_geojson_source_data, .{ try native(self), try temp.stringView(source_id), @intFromEnum(data) });
     }
 
     /// Overrides one GeoJSON source's synchronous tiling at runtime. While
@@ -1580,13 +1124,10 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         source_id: []const u8,
         enabled: bool,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_geojson_source_synchronous_tiling(try native(self), try temp.stringView(source_id), enabled),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_geojson_source_synchronous_tiling, .{ try native(self), try temp.stringView(source_id), enabled });
     }
 
     /// Adds a GeoJSON source that loads from a URL. The options are fixed at
@@ -1598,19 +1139,16 @@ pub const MapHandle = enum(c.mln_map) {
         source_id: []const u8,
         url: []const u8,
         options: ?values.StyleGeoJsonSourceOptions,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_options = if (options) |value| try styleGeoJsonSourceOptionsToNative(&temp, value) else undefined;
-        try status.checkStatus(
-            c.mln_map_add_geojson_source_url(
-                try native(self),
-                try temp.stringView(source_id),
-                try temp.stringView(url),
-                if (options != null) &raw_options else null,
-            ),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_add_geojson_source_url, .{
+            try native(self),
+            try temp.stringView(source_id),
+            try temp.stringView(url),
+            if (options != null) &raw_options else null,
+        });
     }
 
     pub fn setGeoJsonSourceUrl(
@@ -1618,13 +1156,10 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         source_id: []const u8,
         url: []const u8,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_geojson_source_url(try native(self), try temp.stringView(source_id), try temp.stringView(url)),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_geojson_source_url, .{ try native(self), try temp.stringView(source_id), try temp.stringView(url) });
     }
 
     pub fn addCustomGeometrySource(
@@ -1632,17 +1167,13 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         source_id: []const u8,
         options: CustomGeometrySourceOptions,
-    ) status.Error!void {
-        _ = try native(self);
-        const map_state = try mapStateForHandle(self);
-
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         const source_state = try std.heap.smp_allocator.create(CustomGeometrySourceState);
         source_state.* = .{
             .fetch_tile = options.fetch_tile,
             .cancel_tile = options.cancel_tile,
             .release_context = options.release_context,
             .context = options.context,
-            .active_upcalls = std.atomic.Value(usize).init(0),
         };
         errdefer std.heap.smp_allocator.destroy(source_state);
 
@@ -1653,10 +1184,7 @@ pub const MapHandle = enum(c.mln_map) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var native_options = customGeometrySourceOptionsToNative(options, source_state);
-        try status.checkStatus(
-            c.mln_map_add_custom_geometry_source(try native(self), try temp.stringView(source_id), &native_options),
-            map_state.diagnostic_store,
-        );
+        return submitCommand(self, c.mln_map_add_custom_geometry_source, .{ try native(self), try temp.stringView(source_id), &native_options });
     }
 
     pub fn setCustomGeometrySourceTileData(
@@ -1665,18 +1193,15 @@ pub const MapHandle = enum(c.mln_map) {
         source_id: []const u8,
         tile_id: CanonicalTileId,
         data: []const u8,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_custom_geometry_source_tile_data(
-                try native(self),
-                try temp.stringView(source_id),
-                canonicalTileIdToNative(tile_id),
-                try temp.stringView(data),
-            ),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_custom_geometry_source_tile_data, .{
+            try native(self),
+            try temp.stringView(source_id),
+            canonicalTileIdToNative(tile_id),
+            try temp.stringView(data),
+        });
     }
 
     pub fn invalidateCustomGeometrySourceTile(
@@ -1684,13 +1209,10 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         source_id: []const u8,
         tile_id: CanonicalTileId,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_invalidate_custom_geometry_source_tile(try native(self), try temp.stringView(source_id), canonicalTileIdToNative(tile_id)),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_invalidate_custom_geometry_source_tile, .{ try native(self), try temp.stringView(source_id), canonicalTileIdToNative(tile_id) });
     }
 
     pub fn invalidateCustomGeometrySourceRegion(
@@ -1698,13 +1220,10 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         source_id: []const u8,
         bounds: values.LatLngBounds,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_invalidate_custom_geometry_source_region(try native(self), try temp.stringView(source_id), values.latLngBoundsToNative(bounds)),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_invalidate_custom_geometry_source_region, .{ try native(self), try temp.stringView(source_id), values.latLngBoundsToNative(bounds) });
     }
 
     pub fn addCustomMvtVectorSource(
@@ -1712,30 +1231,24 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         source_id: []const u8,
         options: CustomMvtVectorSourceOptions,
-    ) status.Error!void {
-        _ = try native(self);
-        const map_state = try mapStateForHandle(self);
-
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         const source_state = try std.heap.smp_allocator.create(CustomMvtVectorSourceState);
         source_state.* = .{
             .fetch_tile = options.fetch_tile,
             .cancel_tile = options.cancel_tile,
             .release_context = options.release_context,
             .context = options.context,
-            .active_upcalls = std.atomic.Value(usize).init(0),
         };
         errdefer std.heap.smp_allocator.destroy(source_state);
 
         try registerLiveCustomMvtVectorSourceState(source_state);
+        // A failed add releases nothing, so this call owns the state it built.
         errdefer unregisterLiveCustomMvtVectorSourceState(source_state);
 
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var native_options = customMvtVectorSourceOptionsToNative(options, source_state);
-        try status.checkStatus(
-            c.mln_map_add_custom_mvt_vector_source(try native(self), try temp.stringView(source_id), &native_options),
-            map_state.diagnostic_store,
-        );
+        return submitCommand(self, c.mln_map_add_custom_mvt_vector_source, .{ try native(self), try temp.stringView(source_id), &native_options });
     }
 
     pub fn setCustomMvtVectorSourceTileData(
@@ -1744,18 +1257,15 @@ pub const MapHandle = enum(c.mln_map) {
         source_id: []const u8,
         tile_id: CanonicalTileId,
         data: []const u8,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_custom_mvt_vector_source_tile_data(
-                try native(self),
-                try temp.stringView(source_id),
-                canonicalTileIdToNative(tile_id),
-                try temp.stringView(data),
-            ),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_custom_mvt_vector_source_tile_data, .{
+            try native(self),
+            try temp.stringView(source_id),
+            canonicalTileIdToNative(tile_id),
+            try temp.stringView(data),
+        });
     }
 
     pub fn setCustomMvtVectorSourceTileError(
@@ -1764,18 +1274,15 @@ pub const MapHandle = enum(c.mln_map) {
         source_id: []const u8,
         tile_id: CanonicalTileId,
         message: []const u8,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_set_custom_mvt_vector_source_tile_error(
-                try native(self),
-                try temp.stringView(source_id),
-                canonicalTileIdToNative(tile_id),
-                try temp.stringView(message),
-            ),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_set_custom_mvt_vector_source_tile_error, .{
+            try native(self),
+            try temp.stringView(source_id),
+            canonicalTileIdToNative(tile_id),
+            try temp.stringView(message),
+        });
     }
 
     pub fn invalidateCustomMvtVectorSourceTile(
@@ -1783,338 +1290,226 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         source_id: []const u8,
         tile_id: CanonicalTileId,
-    ) status.Error!void {
+    ) status.Error!completion.Future(completion.CommandCompletion) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        try status.checkStatus(
-            c.mln_map_invalidate_custom_mvt_vector_source_tile(try native(self), try temp.stringView(source_id), canonicalTileIdToNative(tile_id)),
-            diagnosticStore(self),
-        );
+        return submitCommand(self, c.mln_map_invalidate_custom_mvt_vector_source_tile, .{ try native(self), try temp.stringView(source_id), canonicalTileIdToNative(tile_id) });
     }
 
-    pub fn requestRepaint(self: *MapHandle) status.Error!void {
-        try status.checkStatus(c.mln_map_request_repaint(try native(self)), diagnosticStore(self));
+    pub fn requestRepaint(self: *MapHandle) status.Error!completion.Future(completion.CommandCompletion) {
+        return submitCommand(self, c.mln_map_request_repaint, .{try native(self)});
     }
 
-    pub fn setDebugOptions(self: *MapHandle, options: values.DebugOptions) status.Error!void {
-        try status.checkStatus(c.mln_map_set_debug_options(try native(self), values.debugOptionsToNative(options)), diagnosticStore(self));
+    pub fn setDebugOptions(self: *MapHandle, options: values.DebugOptions) status.Error!completion.Future(completion.CommandCompletion) {
+        return submitCommand(self, c.mln_map_set_debug_options, .{ try native(self), values.debugOptionsToNative(options) });
     }
 
-    pub fn getDebugOptions(self: *MapHandle) status.Error!values.DebugOptions {
-        var options: u32 = 0;
-        try status.checkStatus(c.mln_map_get_debug_options(try native(self), &options), diagnosticStore(self));
-        return values.debugOptionsFromNative(options);
+    pub fn setRenderingStatsViewEnabled(self: *MapHandle, enabled: bool) status.Error!completion.Future(completion.CommandCompletion) {
+        return submitCommand(self, c.mln_map_set_rendering_stats_view_enabled, .{ try native(self), enabled });
     }
 
-    pub fn setRenderingStatsViewEnabled(self: *MapHandle, enabled: bool) status.Error!void {
-        try status.checkStatus(c.mln_map_set_rendering_stats_view_enabled(try native(self), enabled), diagnosticStore(self));
+    pub fn snapshot(self: *MapHandle) status.Error!MapSnapshot {
+        var raw = std.mem.zeroes(c.mln_map_snapshot);
+        raw.size = @sizeOf(c.mln_map_snapshot);
+        try status.checkStatus(c.mln_map_snapshot_get(try native(self), &raw), diagnosticStore(self));
+        return .{
+            .generation = raw.generation,
+            .camera = values.cameraOptionsFromNative(raw.camera),
+            .width = raw.logical_extent.width,
+            .height = raw.logical_extent.height,
+            .scale_factor = raw.logical_extent.scale_factor,
+            .debug_options = values.debugOptionsFromNative(raw.debug_options),
+            .projection_mode = values.projectionModeFromNative(raw.projection_mode),
+            .viewport = try values.viewportOptionsFromNative(raw.viewport),
+            .tile = try values.tileOptionsFromNative(raw.tile),
+            .bounds = values.boundOptionsFromNative(raw.bounds),
+            .free_camera = values.freeCameraOptionsFromNative(raw.free_camera),
+            .fully_loaded = raw.fully_loaded,
+            .gesture_in_progress = raw.gesture_in_progress,
+            .rendering_stats_view_enabled = raw.rendering_stats_view_enabled,
+            .repaint_demand = raw.repaint_demand,
+            .event_mask = runtime_module.eventMaskFromRaw(raw.event_mask),
+            .latest_render_update_generation = raw.latest_render_update_generation,
+        };
     }
 
-    pub fn getRenderingStatsViewEnabled(self: *MapHandle) status.Error!bool {
-        var enabled = false;
-        try status.checkStatus(c.mln_map_get_rendering_stats_view_enabled(try native(self), &enabled), diagnosticStore(self));
-        return enabled;
+    /// Accepts a new logical extent. `scale_factor` is fixed at map creation:
+    /// a different value is rejected with `error.InvalidArgument`, and only the
+    /// width and height change. While a render session is attached, resize
+    /// through `RenderSessionHandle.resize`, which submits this command itself.
+    pub fn resize(self: *MapHandle, width: u32, height: u32, scale_factor: f64) status.Error!completion.Future(completion.CommandCompletion) {
+        return submitCommand(self, c.mln_map_resize, .{ try native(self), c.mln_logical_extent{ .width = width, .height = height, .scale_factor = scale_factor } });
     }
 
-    pub fn isFullyLoaded(self: *MapHandle) status.Error!bool {
-        var loaded = false;
-        try status.checkStatus(c.mln_map_is_fully_loaded(try native(self), &loaded), diagnosticStore(self));
-        return loaded;
+    pub fn dumpDebugLogs(self: *MapHandle) status.Error!completion.Future(completion.CommandCompletion) {
+        return submitCommand(self, c.mln_map_dump_debug_logs, .{try native(self)});
     }
 
-    /// Returns the map's logical viewport size in UI pixels and its pixel
-    /// ratio. The scale factor is fixed for the lifetime of the map and is
-    /// independent of any render target's scale factor.
-    pub fn getSize(self: *MapHandle) status.Error!struct { width: u32, height: u32, scale_factor: f64 } {
-        var width: u32 = 0;
-        var height: u32 = 0;
-        var scale_factor: f64 = 0;
-        try status.checkStatus(c.mln_map_get_size(try native(self), &width, &height, &scale_factor), diagnosticStore(self));
-        return .{ .width = width, .height = height, .scale_factor = scale_factor };
-    }
-
-    pub fn dumpDebugLogs(self: *MapHandle) status.Error!void {
-        try status.checkStatus(c.mln_map_dump_debug_logs(try native(self)), diagnosticStore(self));
-    }
-
-    pub fn setViewportOptions(self: *MapHandle, options: values.ViewportOptions) status.Error!void {
+    pub fn setViewportOptions(self: *MapHandle, options: values.ViewportOptions) status.Error!completion.Future(completion.CommandCompletion) {
         var raw_options = values.viewportOptionsToNative(options);
-        try status.checkStatus(c.mln_map_set_viewport_options(try native(self), &raw_options), diagnosticStore(self));
+        return submitCommand(self, c.mln_map_set_viewport_options, .{ try native(self), &raw_options });
     }
 
-    pub fn getViewportOptions(self: *MapHandle) status.Error!values.ViewportOptions {
-        var options = c.mln_map_viewport_options_default();
-        try status.checkStatus(c.mln_map_get_viewport_options(try native(self), &options), diagnosticStore(self));
-        return try values.viewportOptionsFromNative(options);
-    }
-
-    pub fn setTileOptions(self: *MapHandle, options: values.TileOptions) status.Error!void {
+    pub fn setTileOptions(self: *MapHandle, options: values.TileOptions) status.Error!completion.Future(completion.CommandCompletion) {
         var raw_options = values.tileOptionsToNative(options);
-        try status.checkStatus(c.mln_map_set_tile_options(try native(self), &raw_options), diagnosticStore(self));
+        return submitCommand(self, c.mln_map_set_tile_options, .{ try native(self), &raw_options });
     }
 
-    pub fn getTileOptions(self: *MapHandle) status.Error!values.TileOptions {
-        var options = c.mln_map_tile_options_default();
-        try status.checkStatus(c.mln_map_get_tile_options(try native(self), &options), diagnosticStore(self));
-        return try values.tileOptionsFromNative(options);
-    }
-
-    pub fn getCamera(self: *MapHandle) status.Error!values.CameraOptions {
+    pub fn cameraSnapshot(self: *MapHandle) status.Error!CameraSnapshot {
         var camera = c.mln_camera_options_default();
-        try status.checkStatus(c.mln_map_get_camera(try native(self), &camera), diagnosticStore(self));
-        return values.cameraOptionsFromNative(camera);
-    }
-
-    pub fn jumpTo(self: *MapHandle, camera: values.CameraOptions) status.Error!void {
-        var raw_camera = values.cameraOptionsToNative(camera);
-        try status.checkStatus(c.mln_map_jump_to(try native(self), &raw_camera), diagnosticStore(self));
-    }
-
-    pub fn easeTo(self: *MapHandle, camera: values.CameraOptions, animation: ?values.AnimationOptions) status.Error!void {
-        var raw_camera = values.cameraOptionsToNative(camera);
-        var raw_animation = if (animation) |options| values.animationOptionsToNative(options) else undefined;
-        const animation_ptr = if (animation != null) &raw_animation else null;
-        try status.checkStatus(c.mln_map_ease_to(try native(self), &raw_camera, animation_ptr), diagnosticStore(self));
-    }
-
-    pub fn flyTo(self: *MapHandle, camera: values.CameraOptions, animation: ?values.AnimationOptions) status.Error!void {
-        var raw_camera = values.cameraOptionsToNative(camera);
-        var raw_animation = if (animation) |options| values.animationOptionsToNative(options) else undefined;
-        const animation_ptr = if (animation != null) &raw_animation else null;
-        try status.checkStatus(c.mln_map_fly_to(try native(self), &raw_camera, animation_ptr), diagnosticStore(self));
-    }
-
-    pub fn moveBy(self: *MapHandle, delta_x: f64, delta_y: f64) status.Error!void {
-        try status.checkStatus(c.mln_map_move_by(try native(self), delta_x, delta_y), diagnosticStore(self));
-    }
-
-    pub fn moveByAnimated(self: *MapHandle, delta_x: f64, delta_y: f64, animation: ?values.AnimationOptions) status.Error!void {
-        var raw_animation = if (animation) |options| values.animationOptionsToNative(options) else undefined;
-        const animation_ptr = if (animation != null) &raw_animation else null;
-        try status.checkStatus(c.mln_map_move_by_animated(try native(self), delta_x, delta_y, animation_ptr), diagnosticStore(self));
-    }
-
-    pub fn scaleBy(self: *MapHandle, scale: f64, anchor: ?values.ScreenPoint) status.Error!void {
-        var raw_anchor = if (anchor) |point| values.screenPointToNative(point) else undefined;
-        const anchor_ptr = if (anchor != null) &raw_anchor else null;
-        try status.checkStatus(c.mln_map_scale_by(try native(self), scale, anchor_ptr), diagnosticStore(self));
-    }
-
-    pub fn scaleByAnimated(self: *MapHandle, scale: f64, anchor: ?values.ScreenPoint, animation: ?values.AnimationOptions) status.Error!void {
-        var raw_anchor = if (anchor) |point| values.screenPointToNative(point) else undefined;
-        const anchor_ptr = if (anchor != null) &raw_anchor else null;
-        var raw_animation = if (animation) |options| values.animationOptionsToNative(options) else undefined;
-        const animation_ptr = if (animation != null) &raw_animation else null;
-        try status.checkStatus(c.mln_map_scale_by_animated(try native(self), scale, anchor_ptr, animation_ptr), diagnosticStore(self));
-    }
-
-    pub fn rotateBy(self: *MapHandle, first: values.ScreenPoint, second: values.ScreenPoint) status.Error!void {
+        var generation: u64 = 0;
         try status.checkStatus(
-            c.mln_map_rotate_by(try native(self), values.screenPointToNative(first), values.screenPointToNative(second)),
+            c.mln_map_camera_snapshot_get(try native(self), &camera, &generation),
             diagnosticStore(self),
         );
+        return .{ .generation = generation, .camera = values.cameraOptionsFromNative(camera) };
     }
 
-    pub fn rotateByAnimated(self: *MapHandle, first: values.ScreenPoint, second: values.ScreenPoint, animation: ?values.AnimationOptions) status.Error!void {
-        var raw_animation = if (animation) |options| values.animationOptionsToNative(options) else undefined;
-        const animation_ptr = if (animation != null) &raw_animation else null;
-        try status.checkStatus(
-            c.mln_map_rotate_by_animated(try native(self), values.screenPointToNative(first), values.screenPointToNative(second), animation_ptr),
-            diagnosticStore(self),
-        );
+    pub fn updateCamera(self: *MapHandle, update: CameraUpdate) status.Error!completion.Future(completion.CommandCompletion) {
+        var raw = c.mln_camera_update_default();
+        raw.mode = update.mode.toRaw();
+        raw.camera = values.cameraOptionsToNative(update.camera);
+        raw.animation = values.animationOptionsToNative(update.animation);
+        raw.gesture_phase = update.gesture_phase.toRaw();
+        return submitCommand(self, c.mln_map_update_camera, .{ try native(self), &raw });
     }
 
-    pub fn pitchBy(self: *MapHandle, pitch: f64) status.Error!void {
-        try status.checkStatus(c.mln_map_pitch_by(try native(self), pitch), diagnosticStore(self));
+    /// Stops any running camera transition where it is. A map with no running
+    /// transition commits the command anyway.
+    pub fn cancelTransitions(self: *MapHandle) status.Error!completion.Future(completion.CommandCompletion) {
+        return submitCommand(self, c.mln_map_cancel_transitions, .{try native(self)});
     }
 
-    pub fn pitchByAnimated(self: *MapHandle, pitch: f64, animation: ?values.AnimationOptions) status.Error!void {
-        var raw_animation = if (animation) |options| values.animationOptionsToNative(options) else undefined;
-        const animation_ptr = if (animation != null) &raw_animation else null;
-        try status.checkStatus(c.mln_map_pitch_by_animated(try native(self), pitch, animation_ptr), diagnosticStore(self));
+    pub fn applyCameraDelta(self: *MapHandle, delta: CameraDelta) status.Error!completion.Future(completion.CommandCompletion) {
+        var raw = c.mln_camera_delta_default();
+        raw.kind = delta.kind.toRaw();
+        raw.offset = .{ .x = delta.offset.x, .y = delta.offset.y };
+        raw.amount = delta.amount;
+        if (delta.anchor) |anchor| {
+            raw.has_anchor = true;
+            raw.anchor = .{ .x = anchor.x, .y = anchor.y };
+        }
+        raw.animation = values.animationOptionsToNative(delta.animation);
+        return submitCommand(self, c.mln_map_apply_camera_delta, .{ try native(self), &raw });
     }
 
-    pub fn cancelTransitions(self: *MapHandle) status.Error!void {
-        try status.checkStatus(c.mln_map_cancel_transitions(try native(self)), diagnosticStore(self));
+    pub fn cameraQuery(self: *MapHandle) status.Error!completion.Future(CameraSnapshot) {
+        return submitQuery(CameraSnapshot, self, struct {
+            fn copyResult(result: *const c.mln_completion_result) status.Error!CameraSnapshot {
+                const raw = try completion.value(c.mln_camera_query_result)(result);
+                return .{ .generation = raw.generation, .camera = values.cameraOptionsFromNative(raw.camera) };
+            }
+        }.copyResult, c.mln_map_camera_query, .{try native(self)});
     }
 
-    pub fn setGestureInProgress(self: *MapHandle, in_progress: bool) status.Error!void {
-        try status.checkStatus(c.mln_map_set_gesture_in_progress(try native(self), in_progress), diagnosticStore(self));
+    pub fn requestStillImage(self: *MapHandle) status.Error!completion.Future(void) {
+        return submitQuery(void, self, completion.unit, c.mln_map_request_still_image, .{try native(self)});
     }
-
-    pub fn isGestureInProgress(self: *MapHandle) status.Error!bool {
-        var in_progress = false;
-        try status.checkStatus(c.mln_map_is_gesture_in_progress(try native(self), &in_progress), diagnosticStore(self));
-        return in_progress;
-    }
-
-    pub fn requestStillImage(self: *MapHandle) status.Error!void {
-        try status.checkStatus(c.mln_map_request_still_image(try native(self)), diagnosticStore(self));
-    }
-
-    pub fn setProjectionMode(self: *MapHandle, mode: values.ProjectionMode) status.Error!void {
+    pub fn setProjectionMode(self: *MapHandle, mode: values.ProjectionMode) status.Error!completion.Future(completion.CommandCompletion) {
         var raw_mode = values.projectionModeToNative(mode);
-        try status.checkStatus(c.mln_map_set_projection_mode(try native(self), &raw_mode), diagnosticStore(self));
+        return submitCommand(self, c.mln_map_set_projection_mode, .{ try native(self), &raw_mode });
     }
 
-    pub fn getProjectionMode(self: *MapHandle) status.Error!values.ProjectionMode {
-        var mode = c.mln_projection_mode_default();
-        try status.checkStatus(c.mln_map_get_projection_mode(try native(self), &mode), diagnosticStore(self));
-        return values.projectionModeFromNative(mode);
+    pub fn pixelForLatLng(self: *MapHandle, coordinate: values.LatLng) status.Error!completion.Future(values.ScreenPoint) {
+        return submitQuery(values.ScreenPoint, self, struct {
+            fn copyResult(result: *const c.mln_completion_result) status.Error!values.ScreenPoint {
+                return values.screenPointFromNative(try completion.value(c.mln_screen_point)(result));
+            }
+        }.copyResult, c.mln_map_pixel_for_lat_lng, .{ try native(self), values.latLngToNative(coordinate) });
     }
 
-    pub fn pixelForLatLng(self: *MapHandle, coordinate: values.LatLng) status.Error!values.ScreenPoint {
-        var point: c.mln_screen_point = undefined;
-        try status.checkStatus(
-            c.mln_map_pixel_for_lat_lng(try native(self), values.latLngToNative(coordinate), &point),
-            diagnosticStore(self),
-        );
-        return values.screenPointFromNative(point);
-    }
-
-    /// Converts a screen point to a coordinate with longitude wrapped to -180 through 180.
-    pub fn latLngForPixel(self: *MapHandle, point: values.ScreenPoint) status.Error!values.LatLng {
-        var coordinate: c.mln_lat_lng = undefined;
-        try status.checkStatus(
-            c.mln_map_lat_lng_for_pixel(try native(self), values.screenPointToNative(point), &coordinate),
-            diagnosticStore(self),
-        );
-        return values.latLngFromNative(coordinate);
+    pub fn latLngForPixel(self: *MapHandle, point: values.ScreenPoint) status.Error!completion.Future(values.LatLng) {
+        return submitQuery(values.LatLng, self, struct {
+            fn copyResult(result: *const c.mln_completion_result) status.Error!values.LatLng {
+                return values.latLngFromNative(try completion.value(c.mln_lat_lng)(result));
+            }
+        }.copyResult, c.mln_map_lat_lng_for_pixel, .{ try native(self), values.screenPointToNative(point) });
     }
 
     /// Converts a screen point to an unwrapped geographic coordinate.
     /// The longitude preserves the visible world copy.
-    pub fn latLngForPixelUnwrapped(self: *MapHandle, point: values.ScreenPoint) status.Error!values.LatLng {
-        var coordinate: c.mln_lat_lng = undefined;
-        try status.checkStatus(
-            c.mln_map_lat_lng_for_pixel_unwrapped(try native(self), values.screenPointToNative(point), &coordinate),
-            diagnosticStore(self),
-        );
-        return values.latLngFromNative(coordinate);
+    pub fn latLngForPixelUnwrapped(self: *MapHandle, point: values.ScreenPoint) status.Error!completion.Future(values.LatLng) {
+        return submitQuery(values.LatLng, self, struct {
+            fn copyResult(result: *const c.mln_completion_result) status.Error!values.LatLng {
+                return values.latLngFromNative(try completion.value(c.mln_lat_lng)(result));
+            }
+        }.copyResult, c.mln_map_lat_lng_for_pixel_unwrapped, .{ try native(self), values.screenPointToNative(point) });
     }
 
-    pub fn pixelsForLatLngs(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        coordinates: []const values.LatLng,
-        out_points: []values.ScreenPoint,
-    ) status.Error!void {
-        if (coordinates.len != out_points.len) return error.InvalidArgument;
-        if (coordinates.len == 0) {
-            try status.checkStatus(c.mln_map_pixels_for_lat_lngs(try native(self), null, 0, null), diagnosticStore(self));
-            return;
-        }
+    pub fn pixelsForLatLngs(self: *MapHandle, allocator: std.mem.Allocator, coordinates: []const values.LatLng) status.Error!completion.Future(ScreenPointList) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const raw_coordinates = try temp.latLngs(coordinates);
-        const raw_points = try allocator.alloc(c.mln_screen_point, out_points.len);
-        defer allocator.free(raw_points);
-        try status.checkStatus(
-            c.mln_map_pixels_for_lat_lngs(try native(self), raw_coordinates.ptr, raw_coordinates.len, raw_points.ptr),
-            diagnosticStore(self),
-        );
-        for (raw_points, out_points) |raw_point, *out_point| out_point.* = values.screenPointFromNative(raw_point);
+        return submitAllocatedQuery(ScreenPointList, self, allocator, struct {
+            fn copyResult(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!ScreenPointList {
+                const items = try target.alloc(values.ScreenPoint, result.value_count);
+                errdefer target.free(items);
+                if (result.value_count != 0) {
+                    const raw = @as([*]align(1) const c.mln_screen_point, @ptrCast(result.value orelse return error.NativeError))[0..result.value_count];
+                    for (raw, items) |point, *item| item.* = values.screenPointFromNative(point);
+                }
+                return .{ .allocator = target.*, .items = items };
+            }
+        }.copyResult, c.mln_map_pixels_for_lat_lngs, .{ try native(self), if (raw_coordinates.len == 0) null else raw_coordinates.ptr, raw_coordinates.len });
     }
 
-    /// Converts screen points to coordinates with longitudes wrapped to -180 through 180.
-    pub fn latLngsForPixels(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        points: []const values.ScreenPoint,
-        out_coordinates: []values.LatLng,
-    ) status.Error!void {
-        if (points.len != out_coordinates.len) return error.InvalidArgument;
-        if (points.len == 0) {
-            try status.checkStatus(c.mln_map_lat_lngs_for_pixels(try native(self), null, 0, null), diagnosticStore(self));
-            return;
-        }
+    pub fn latLngsForPixels(self: *MapHandle, allocator: std.mem.Allocator, points: []const values.ScreenPoint) status.Error!completion.Future(LatLngList) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const raw_points = try temp.screenPoints(points);
-        const raw_coordinates = try allocator.alloc(c.mln_lat_lng, out_coordinates.len);
-        defer allocator.free(raw_coordinates);
-        try status.checkStatus(
-            c.mln_map_lat_lngs_for_pixels(try native(self), raw_points.ptr, raw_points.len, raw_coordinates.ptr),
-            diagnosticStore(self),
-        );
-        for (raw_coordinates, out_coordinates) |raw_coordinate, *out_coordinate| out_coordinate.* = values.latLngFromNative(raw_coordinate);
+        return submitAllocatedQuery(LatLngList, self, allocator, struct {
+            fn copyResult(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!LatLngList {
+                const items = try target.alloc(values.LatLng, result.value_count);
+                errdefer target.free(items);
+                if (result.value_count != 0) {
+                    const raw = @as([*]align(1) const c.mln_lat_lng, @ptrCast(result.value orelse return error.NativeError))[0..result.value_count];
+                    for (raw, items) |coordinate, *item| item.* = values.latLngFromNative(coordinate);
+                }
+                return .{ .allocator = target.*, .items = items };
+            }
+        }.copyResult, c.mln_map_lat_lngs_for_pixels, .{ try native(self), if (raw_points.len == 0) null else raw_points.ptr, raw_points.len });
     }
 
     /// Converts screen points to unwrapped geographic coordinates.
     /// Each longitude preserves its visible world copy.
-    pub fn latLngsForPixelsUnwrapped(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        points: []const values.ScreenPoint,
-        out_coordinates: []values.LatLng,
-    ) status.Error!void {
-        if (points.len != out_coordinates.len) return error.InvalidArgument;
-        if (points.len == 0) {
-            try status.checkStatus(c.mln_map_lat_lngs_for_pixels_unwrapped(try native(self), null, 0, null), diagnosticStore(self));
-            return;
-        }
+    pub fn latLngsForPixelsUnwrapped(self: *MapHandle, allocator: std.mem.Allocator, points: []const values.ScreenPoint) status.Error!completion.Future(LatLngList) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const raw_points = try temp.screenPoints(points);
-        const raw_coordinates = try allocator.alloc(c.mln_lat_lng, out_coordinates.len);
-        defer allocator.free(raw_coordinates);
-        try status.checkStatus(
-            c.mln_map_lat_lngs_for_pixels_unwrapped(try native(self), raw_points.ptr, raw_points.len, raw_coordinates.ptr),
-            diagnosticStore(self),
-        );
-        for (raw_coordinates, out_coordinates) |raw_coordinate, *out_coordinate| out_coordinate.* = values.latLngFromNative(raw_coordinate);
+        return submitAllocatedQuery(LatLngList, self, allocator, struct {
+            fn copyResult(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!LatLngList {
+                const items = try target.alloc(values.LatLng, result.value_count);
+                errdefer target.free(items);
+                if (result.value_count != 0) {
+                    const raw = @as([*]align(1) const c.mln_lat_lng, @ptrCast(result.value orelse return error.NativeError))[0..result.value_count];
+                    for (raw, items) |coordinate, *item| item.* = values.latLngFromNative(coordinate);
+                }
+                return .{ .allocator = target.*, .items = items };
+            }
+        }.copyResult, c.mln_map_lat_lngs_for_pixels_unwrapped, .{ try native(self), if (raw_points.len == 0) null else raw_points.ptr, raw_points.len });
     }
 
-    pub fn cameraForLatLngBounds(
-        self: *MapHandle,
-        bounds: values.LatLngBounds,
-        fit_options: ?values.CameraFitOptions,
-    ) status.Error!values.CameraOptions {
+    pub fn cameraForLatLngBounds(self: *MapHandle, bounds: values.LatLngBounds, fit_options: ?values.CameraFitOptions) status.Error!completion.Future(values.CameraOptions) {
         var raw_fit = if (fit_options) |options| values.cameraFitOptionsToNative(options) else undefined;
         const fit_ptr = if (fit_options != null) &raw_fit else null;
-        var camera = c.mln_camera_options_default();
-        try status.checkStatus(
-            c.mln_map_camera_for_lat_lng_bounds(try native(self), values.latLngBoundsToNative(bounds), fit_ptr, &camera),
-            diagnosticStore(self),
-        );
-        return values.cameraOptionsFromNative(camera);
+        return submitQuery(values.CameraOptions, self, copyCameraOptionsResult, c.mln_map_camera_for_lat_lng_bounds, .{ try native(self), values.latLngBoundsToNative(bounds), fit_ptr });
     }
 
-    pub fn cameraForLatLngs(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        coordinates: []const values.LatLng,
-        fit_options: ?values.CameraFitOptions,
-    ) status.Error!values.CameraOptions {
+    pub fn cameraForLatLngs(self: *MapHandle, allocator: std.mem.Allocator, coordinates: []const values.LatLng, fit_options: ?values.CameraFitOptions) status.Error!completion.Future(values.CameraOptions) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const raw_coordinates = try temp.latLngs(coordinates);
         var raw_fit = if (fit_options) |options| values.cameraFitOptionsToNative(options) else undefined;
         const fit_ptr = if (fit_options != null) &raw_fit else null;
-        var camera = c.mln_camera_options_default();
-        try status.checkStatus(
-            c.mln_map_camera_for_lat_lngs(try native(self), if (raw_coordinates.len == 0) null else raw_coordinates.ptr, raw_coordinates.len, fit_ptr, &camera),
-            diagnosticStore(self),
-        );
-        return values.cameraOptionsFromNative(camera);
+        return submitQuery(values.CameraOptions, self, copyCameraOptionsResult, c.mln_map_camera_for_lat_lngs, .{ try native(self), if (raw_coordinates.len == 0) null else raw_coordinates.ptr, raw_coordinates.len, fit_ptr });
     }
 
-    pub fn cameraForGeometry(
-        self: *MapHandle,
-        allocator: std.mem.Allocator,
-        geometry: []const u8,
-        fit_options: ?values.CameraFitOptions,
-    ) status.Error!values.CameraOptions {
+    pub fn cameraForGeometry(self: *MapHandle, allocator: std.mem.Allocator, geometry: []const u8, fit_options: ?values.CameraFitOptions) status.Error!completion.Future(values.CameraOptions) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_fit = if (fit_options) |options| values.cameraFitOptionsToNative(options) else undefined;
         const fit_ptr = if (fit_options != null) &raw_fit else null;
-        var camera = c.mln_camera_options_default();
-        try status.checkStatus(
-            c.mln_map_camera_for_geometry(try native(self), try temp.stringView(geometry), fit_ptr, &camera),
-            diagnosticStore(self),
-        );
-        return values.cameraOptionsFromNative(camera);
+        return submitQuery(values.CameraOptions, self, copyCameraOptionsResult, c.mln_map_camera_for_geometry, .{ try native(self), try temp.stringView(geometry), fit_ptr });
     }
 
     /// Computes geographic bounds for a camera from two viewport corners.
@@ -2123,11 +1518,9 @@ pub const MapHandle = enum(c.mln_map) {
     /// that camera in the current viewport. When bearing and pitch are zero, the
     /// box equals the visible area. Those corners are the northwest and
     /// southeast of the viewport. Longitudes stay in -180 to 180.
-    pub fn latLngBoundsForCamera(self: *MapHandle, camera: values.CameraOptions) status.Error!values.LatLngBounds {
+    pub fn latLngBoundsForCamera(self: *MapHandle, camera: values.CameraOptions) status.Error!completion.Future(values.LatLngBounds) {
         var raw_camera = values.cameraOptionsToNative(camera);
-        var bounds: c.mln_lat_lng_bounds = undefined;
-        try status.checkStatus(c.mln_map_lat_lng_bounds_for_camera(try native(self), &raw_camera, &bounds), diagnosticStore(self));
-        return values.latLngBoundsFromNative(bounds);
+        return submitQuery(values.LatLngBounds, self, copyLatLngBoundsResult, c.mln_map_lat_lng_bounds_for_camera, .{ try native(self), &raw_camera });
     }
 
     /// Computes geographic bounds for a camera from the four viewport corners.
@@ -2136,33 +1529,19 @@ pub const MapHandle = enum(c.mln_map) {
     /// encompasses the projected viewport. Longitudes unwrap onto the shortest
     /// path through the center. A viewport that crosses the antimeridian reports
     /// values outside -180 to 180.
-    pub fn latLngBoundsForCameraUnwrapped(self: *MapHandle, camera: values.CameraOptions) status.Error!values.LatLngBounds {
+    pub fn latLngBoundsForCameraUnwrapped(self: *MapHandle, camera: values.CameraOptions) status.Error!completion.Future(values.LatLngBounds) {
         var raw_camera = values.cameraOptionsToNative(camera);
-        var bounds: c.mln_lat_lng_bounds = undefined;
-        try status.checkStatus(c.mln_map_lat_lng_bounds_for_camera_unwrapped(try native(self), &raw_camera, &bounds), diagnosticStore(self));
-        return values.latLngBoundsFromNative(bounds);
+        return submitQuery(values.LatLngBounds, self, copyLatLngBoundsResult, c.mln_map_lat_lng_bounds_for_camera_unwrapped, .{ try native(self), &raw_camera });
     }
 
-    pub fn getBounds(self: *MapHandle) status.Error!values.BoundOptions {
-        var raw_options = c.mln_bound_options_default();
-        try status.checkStatus(c.mln_map_get_bounds(try native(self), &raw_options), diagnosticStore(self));
-        return values.boundOptionsFromNative(raw_options);
-    }
-
-    pub fn setBounds(self: *MapHandle, options: values.BoundOptions) status.Error!void {
+    pub fn setBounds(self: *MapHandle, options: values.BoundOptions) status.Error!completion.Future(completion.CommandCompletion) {
         var raw_options = values.boundOptionsToNative(options);
-        try status.checkStatus(c.mln_map_set_bounds(try native(self), &raw_options), diagnosticStore(self));
+        return submitCommand(self, c.mln_map_set_bounds, .{ try native(self), &raw_options });
     }
 
-    pub fn getFreeCameraOptions(self: *MapHandle) status.Error!values.FreeCameraOptions {
-        var raw_options = c.mln_free_camera_options_default();
-        try status.checkStatus(c.mln_map_get_free_camera_options(try native(self), &raw_options), diagnosticStore(self));
-        return values.freeCameraOptionsFromNative(raw_options);
-    }
-
-    pub fn setFreeCameraOptions(self: *MapHandle, options: values.FreeCameraOptions) status.Error!void {
+    pub fn setFreeCameraOptions(self: *MapHandle, options: values.FreeCameraOptions) status.Error!completion.Future(completion.CommandCompletion) {
         var raw_options = values.freeCameraOptionsToNative(options);
-        try status.checkStatus(c.mln_map_set_free_camera_options(try native(self), &raw_options), diagnosticStore(self));
+        return submitCommand(self, c.mln_map_set_free_camera_options, .{ try native(self), &raw_options });
     }
 
     /// Selects which map-originated event types this map queues.
@@ -2176,27 +1555,52 @@ pub const MapHandle = enum(c.mln_map) {
     ///
     /// Narrowing gates later events and keeps queued ones, so a host drains what
     /// it already caused.
-    pub fn setEventMask(self: *MapHandle, mask: runtime_module.RuntimeEventMask) status.Error!void {
-        const map_state = try mapStateForHandle(self);
-        try status.checkStatus(
-            c.mln_map_set_event_mask(try native(self), runtime_module.eventMaskToRaw(mask)),
-            map_state.diagnostic_store,
-        );
+    pub fn setEventMask(self: *MapHandle, mask: runtime_module.RuntimeEventMask) status.Error!completion.Future(completion.CommandCompletion) {
+        return submitCommand(self, c.mln_map_set_event_mask, .{ try native(self), runtime_module.eventMaskToRaw(mask) });
     }
 
-    /// Reports which map-originated event types this map queues. A map that has
-    /// not been narrowed reports `RuntimeEventMask.all`.
-    pub fn eventMask(self: *MapHandle) status.Error!runtime_module.RuntimeEventMask {
-        const map_state = try mapStateForHandle(self);
-        var raw: u64 = 0;
-        try status.checkStatus(
-            c.mln_map_get_event_mask(try native(self), &raw),
-            map_state.diagnostic_store,
-        );
-        return runtime_module.eventMaskFromRaw(raw);
+    fn removeStyleObjectCommand(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        object_id: []const u8,
+        comptime command: *const fn (c.mln_map, c.mln_buffer_view, [*c]const c.mln_completion) callconv(.c) c.mln_status,
+    ) status.Error!completion.Future(completion.CommandCompletion) {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        return submitCommand(self, command, .{ try native(self), try temp.stringView(object_id) });
     }
 
-    pub fn close(self: *MapHandle) status.Error!void {
+    fn setLayerStringCommand(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+        value: []const u8,
+        comptime command: *const fn (c.mln_map, c.mln_buffer_view, c.mln_buffer_view, [*c]const c.mln_completion) callconv(.c) c.mln_status,
+    ) status.Error!completion.Future(completion.CommandCompletion) {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        return submitCommand(self, command, .{ try native(self), try temp.stringView(layer_id), try temp.stringView(value) });
+    }
+
+    fn setLayerNumberCommand(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+        value: f64,
+        comptime command: *const fn (c.mln_map, c.mln_buffer_view, f64, [*c]const c.mln_completion) callconv(.c) c.mln_status,
+    ) status.Error!completion.Future(completion.CommandCompletion) {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        return submitCommand(self, command, .{ try native(self), try temp.stringView(layer_id), value });
+    }
+
+    /// Releases the map handle and returns the future for its native teardown.
+    ///
+    /// The future completes after the map's accepted commands reach a terminal
+    /// disposition and its native state is gone. A host that outlives its maps
+    /// deinitializes the future without waiting. Closing a map that still has
+    /// an attached render session reports `error.InvalidState`.
+    pub fn close(self: *MapHandle) status.Error!completion.Future(void) {
         const map_close = beginMapClose(self.*) catch |err| {
             if (err == error.InvalidState) {
                 if (diagnosticStore(self)) |store| {
@@ -2204,14 +1608,19 @@ pub const MapHandle = enum(c.mln_map) {
                 }
             }
             return err;
-        } orelse return;
-        status.checkStatus(c.mln_map_destroy(map_close.native), map_close.diagnostic_store) catch |err| {
+        } orelse return completion.completed(void, {});
+        const teardown = completion.submit(void, map_close.diagnostic_store, completion.unit, map_close.native, struct {
+            fn start(raw_map: c.mln_map, descriptor: *const c.mln_completion) c.mln_status {
+                return c.mln_map_release(raw_map, descriptor);
+            }
+        }.start) catch |err| {
             cancelMapClose(map_close.state);
             return err;
         };
         runtime_module.unregisterMap(map_close.runtime_registry, map_close.native);
         const map_state = finishMapClose(self.*) orelse map_close.state;
         std.heap.smp_allocator.destroy(map_state);
+        return teardown;
     }
 };
 
@@ -2374,7 +1783,7 @@ fn customMvtVectorSourceOptionsToNative(
 fn customGeometryFetchTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_canonical_tile_id) callconv(.c) void {
     const source_state: *CustomGeometrySourceState = @ptrCast(@alignCast(user_data orelse return));
     if (!beginCustomGeometryUpcall(source_state)) return;
-    defer endCustomGeometryUpcall(source_state);
+    defer source_state.upcalls.end();
 
     source_state.fetch_tile(source_state.context, canonicalTileIdFromNative(raw_tile_id));
 }
@@ -2382,7 +1791,7 @@ fn customGeometryFetchTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_
 fn customGeometryCancelTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_canonical_tile_id) callconv(.c) void {
     const source_state: *CustomGeometrySourceState = @ptrCast(@alignCast(user_data orelse return));
     if (!beginCustomGeometryUpcall(source_state)) return;
-    defer endCustomGeometryUpcall(source_state);
+    defer source_state.upcalls.end();
 
     const cancel_tile = source_state.cancel_tile orelse return;
     cancel_tile(source_state.context, canonicalTileIdFromNative(raw_tile_id));
@@ -2394,15 +1803,11 @@ fn beginCustomGeometryUpcall(source_state: *CustomGeometrySourceState) bool {
 
     for (custom_geometry_state_registry.items) |live_state| {
         if (live_state == source_state) {
-            _ = source_state.active_upcalls.fetchAdd(1, .seq_cst);
+            source_state.upcalls.begin();
             return true;
         }
     }
     return false;
-}
-
-fn endCustomGeometryUpcall(source_state: *CustomGeometrySourceState) void {
-    _ = source_state.active_upcalls.fetchSub(1, .seq_cst);
 }
 
 fn canonicalTileIdToNative(tile_id: CanonicalTileId) c.mln_canonical_tile_id {
@@ -2413,7 +1818,7 @@ fn canonicalTileIdFromNative(tile_id: c.mln_canonical_tile_id) CanonicalTileId {
     return .{ .z = tile_id.z, .x = tile_id.x, .y = tile_id.y };
 }
 
-// The C API invokes this once, on the map owner thread, after it stops
+// The C API invokes this once on the runtime worker after it stops
 // referencing the state: on an explicit removal, when a style load leaves a
 // style without the source, and when the map is destroyed.
 fn customGeometryReleaseTrampoline(user_data: ?*anyopaque) callconv(.c) void {
@@ -2423,7 +1828,7 @@ fn customGeometryReleaseTrampoline(user_data: ?*anyopaque) callconv(.c) void {
 
 fn freeCustomGeometrySourceState(source_state: *CustomGeometrySourceState) void {
     retireLiveCustomGeometrySourceState(source_state);
-    waitForCustomGeometryUpcalls(source_state);
+    source_state.upcalls.waitUntilIdle();
     if (source_state.release_context) |release| release(source_state.context);
     std.heap.smp_allocator.destroy(source_state);
 }
@@ -2455,16 +1860,10 @@ fn removeLiveCustomGeometrySourceStateLocked(source_state: *CustomGeometrySource
     }
 }
 
-fn waitForCustomGeometryUpcalls(source_state: *CustomGeometrySourceState) void {
-    while (source_state.active_upcalls.load(.seq_cst) != 0) {
-        std.Thread.yield() catch {};
-    }
-}
-
 fn customMvtVectorFetchTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_canonical_tile_id) callconv(.c) void {
     const source_state: *CustomMvtVectorSourceState = @ptrCast(@alignCast(user_data orelse return));
     if (!beginCustomMvtVectorUpcall(source_state)) return;
-    defer endCustomMvtVectorUpcall(source_state);
+    defer source_state.upcalls.end();
 
     source_state.fetch_tile(source_state.context, canonicalTileIdFromNative(raw_tile_id));
 }
@@ -2472,7 +1871,7 @@ fn customMvtVectorFetchTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln
 fn customMvtVectorCancelTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_canonical_tile_id) callconv(.c) void {
     const source_state: *CustomMvtVectorSourceState = @ptrCast(@alignCast(user_data orelse return));
     if (!beginCustomMvtVectorUpcall(source_state)) return;
-    defer endCustomMvtVectorUpcall(source_state);
+    defer source_state.upcalls.end();
 
     const cancel_tile = source_state.cancel_tile orelse return;
     cancel_tile(source_state.context, canonicalTileIdFromNative(raw_tile_id));
@@ -2484,15 +1883,11 @@ fn beginCustomMvtVectorUpcall(source_state: *CustomMvtVectorSourceState) bool {
 
     for (custom_mvt_vector_state_registry.items) |live_state| {
         if (live_state == source_state) {
-            _ = source_state.active_upcalls.fetchAdd(1, .seq_cst);
+            source_state.upcalls.begin();
             return true;
         }
     }
     return false;
-}
-
-fn endCustomMvtVectorUpcall(source_state: *CustomMvtVectorSourceState) void {
-    _ = source_state.active_upcalls.fetchSub(1, .seq_cst);
 }
 
 fn customMvtVectorReleaseTrampoline(user_data: ?*anyopaque) callconv(.c) void {
@@ -2502,7 +1897,7 @@ fn customMvtVectorReleaseTrampoline(user_data: ?*anyopaque) callconv(.c) void {
 
 fn freeCustomMvtVectorSourceState(source_state: *CustomMvtVectorSourceState) void {
     retireLiveCustomMvtVectorSourceState(source_state);
-    waitForCustomMvtVectorUpcalls(source_state);
+    source_state.upcalls.waitUntilIdle();
     if (source_state.release_context) |release| release(source_state.context);
     std.heap.smp_allocator.destroy(source_state);
 }
@@ -2534,10 +1929,18 @@ fn removeLiveCustomMvtVectorSourceStateLocked(source_state: *CustomMvtVectorSour
     }
 }
 
-fn waitForCustomMvtVectorUpcalls(source_state: *CustomMvtVectorSourceState) void {
-    while (source_state.active_upcalls.load(.seq_cst) != 0) {
-        std.Thread.yield() catch {};
-    }
+fn discardCompletion(_: ?*anyopaque, _: [*c]const c.mln_completion_result) callconv(.c) void {}
+
+// Releases a native map the binding never registered. Nothing is left to report
+// the teardown to, so the completion discards it.
+fn releaseUntrackedMap(map: c.mln_map) void {
+    const descriptor = c.mln_completion{
+        .size = @sizeOf(c.mln_completion),
+        .callback = discardCompletion,
+        .user_data = null,
+        .release_user_data = null,
+    };
+    _ = c.mln_map_release(map, &descriptor);
 }
 
 fn mapStateForHandle(handle: *MapHandle) status.BindingError!*MapState {
@@ -2618,6 +2021,169 @@ fn unlockMapRegistry() void {
     map_registry_lock.store(false, .seq_cst);
 }
 
+fn submitCommand(handle: *MapHandle, comptime command: anytype, arguments: anytype) status.Error!completion.Future(completion.CommandCompletion) {
+    const Arguments = @TypeOf(arguments);
+    return completion.submit(completion.CommandCompletion, diagnosticStore(handle), completion.command, arguments, struct {
+        fn start(args: Arguments, descriptor: *const c.mln_completion) c.mln_status {
+            return @call(.auto, command, args ++ .{descriptor});
+        }
+    }.start);
+}
+
+fn submitQuery(
+    comptime T: type,
+    handle: *MapHandle,
+    comptime copy: *const fn (*const c.mln_completion_result) status.Error!T,
+    comptime query: anytype,
+    arguments: anytype,
+) status.Error!completion.Future(T) {
+    const Arguments = @TypeOf(arguments);
+    return completion.submit(T, diagnosticStore(handle), copy, arguments, struct {
+        fn start(args: Arguments, descriptor: *const c.mln_completion) c.mln_status {
+            return @call(.auto, query, args ++ .{descriptor});
+        }
+    }.start);
+}
+
+fn submitAllocatedQuery(
+    comptime T: type,
+    handle: *MapHandle,
+    allocator: std.mem.Allocator,
+    comptime copy: *const fn (*const c.mln_completion_result, *std.mem.Allocator) status.Error!T,
+    comptime query: anytype,
+    arguments: anytype,
+) status.Error!completion.Future(T) {
+    const Arguments = @TypeOf(arguments);
+    return completion.submitWithCopyContext(T, std.mem.Allocator, diagnosticStore(handle), copy, allocator, arguments, struct {
+        fn start(args: Arguments, descriptor: *const c.mln_completion) c.mln_status {
+            return @call(.auto, query, args ++ .{descriptor});
+        }
+    }.start);
+}
+
+fn optionalCompletionValue(comptime T: type, result: *const c.mln_completion_result) status.Error!?T {
+    if (result.value_count == 0) return null;
+    return try completion.value(T)(result);
+}
+
+fn copyView(allocator: std.mem.Allocator, view: c.mln_buffer_view) status.Error![]const u8 {
+    if (view.size == 0) return allocator.dupe(u8, "");
+    const data = view.data orelse return error.NativeError;
+    return allocator.dupe(u8, @as([*]const u8, @ptrCast(data))[0..view.size]);
+}
+
+/// Copies a borrowed view the native result marks present, reporting null for
+/// an absent value, which the C API spells as an empty view.
+fn copyPresentView(allocator: std.mem.Allocator, view: c.mln_buffer_view) status.Error!?[]const u8 {
+    if (view.size == 0) return null;
+    return try copyView(allocator, view);
+}
+
+fn copyStyleSourceInfoResult(
+    result: *const c.mln_completion_result,
+    allocator: *std.mem.Allocator,
+) status.Error!?values.StyleSourceInfo {
+    const raw_result = (try optionalCompletionValue(c.mln_style_source_result, result)) orelse return null;
+    const raw = raw_result.info;
+    const attribution = if (raw.has_attribution) try copyView(allocator.*, raw_result.attribution) else null;
+    errdefer if (attribution) |owned| allocator.free(owned);
+    const url = if ((raw.fields & c.MLN_STYLE_SOURCE_INFO_URL) != 0) try copyView(allocator.*, raw_result.url) else null;
+    errdefer if (url) |owned| allocator.free(owned);
+
+    var tile_json: ?values.StyleTileJsonInfo = null;
+    errdefer if (tile_json) |json| {
+        for (json.tile_urls) |tile_url| allocator.free(tile_url);
+        allocator.free(json.tile_urls);
+    };
+    if ((raw.fields & c.MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
+        const tile_urls = try allocator.alloc([]const u8, raw_result.tile_url_count);
+        var initialized: usize = 0;
+        errdefer {
+            for (tile_urls[0..initialized]) |tile_url| allocator.free(tile_url);
+            allocator.free(tile_urls);
+        }
+        if (raw_result.tile_url_count != 0) {
+            if (raw_result.tile_urls == null) return error.NativeError;
+            const views = raw_result.tile_urls[0..raw_result.tile_url_count];
+            for (views, tile_urls) |view, *tile_url| {
+                tile_url.* = try copyView(allocator.*, view);
+                initialized += 1;
+            }
+        }
+        tile_json = .{
+            .tile_urls = tile_urls,
+            .min_zoom = raw.min_zoom,
+            .max_zoom = raw.max_zoom,
+            .scheme = values.StyleTileScheme.fromRaw(raw.scheme),
+            .bounds = if ((raw.fields & c.MLN_STYLE_SOURCE_INFO_BOUNDS) != 0) values.latLngBoundsFromNative(raw.bounds) else null,
+        };
+    }
+
+    return .{
+        .allocator = allocator.*,
+        .source_type = values.styleSourceTypeFromNative(raw.type),
+        .id_size = raw.id_size,
+        .is_volatile = raw.is_volatile,
+        .attribution = attribution,
+        .url = url,
+        .tile_json = tile_json,
+        .tile_size = if ((raw.fields & c.MLN_STYLE_SOURCE_INFO_TILE_SIZE) != 0) raw.tile_size else null,
+        .vector_encoding = if ((raw.fields & c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING) != 0) values.StyleVectorTileEncoding.fromRaw(raw.vector_encoding) else null,
+        .raster_encoding = if ((raw.fields & c.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING) != 0) values.StyleRasterDemEncoding.fromRaw(raw.raster_encoding) else null,
+    };
+}
+
+fn copyOwnedStringResult(result: *const c.mln_completion_result, allocator: *std.mem.Allocator) status.Error!values.OwnedString {
+    const view = try completion.value(c.mln_buffer_view)(result);
+    return .{ .allocator = allocator.*, .value = try copyView(allocator.*, view) };
+}
+
+fn copyOptionalOwnedStringResult(result: *const c.mln_completion_result, allocator: *std.mem.Allocator) status.Error!?values.OwnedString {
+    const view = (try optionalCompletionValue(c.mln_buffer_view, result)) orelse return null;
+    return .{ .allocator = allocator.*, .value = try copyView(allocator.*, view) };
+}
+
+fn copyStyleSourceTileUrlsResult(result: *const c.mln_completion_result, allocator: *std.mem.Allocator) status.Error!?values.StringList {
+    const raw = (try optionalCompletionValue(c.mln_style_source_tile_urls_result, result)) orelse return null;
+    const items = try allocator.alloc([]const u8, raw.tile_url_count);
+    errdefer allocator.free(items);
+    var initialized: usize = 0;
+    errdefer for (items[0..initialized]) |item| allocator.free(item);
+    if (raw.tile_url_count != 0) {
+        if (raw.tile_urls == null) return error.NativeError;
+        const views = raw.tile_urls[0..raw.tile_url_count];
+        for (views, items) |view, *item| {
+            item.* = try copyView(allocator.*, view);
+            initialized += 1;
+        }
+    }
+    return .{ .allocator = allocator.*, .items = items };
+}
+
+fn copyStringListResult(result: *const c.mln_completion_result, allocator: *std.mem.Allocator) status.Error!values.StringList {
+    const items = try allocator.alloc([]const u8, result.value_count);
+    errdefer allocator.free(items);
+    var initialized: usize = 0;
+    errdefer for (items[0..initialized]) |item| allocator.free(item);
+    if (result.value_count != 0) {
+        const pointer = result.value orelse return error.NativeError;
+        const views = @as([*]align(1) const c.mln_buffer_view, @ptrCast(pointer))[0..result.value_count];
+        for (views, items) |view, *item| {
+            item.* = try copyView(allocator.*, view);
+            initialized += 1;
+        }
+    }
+    return .{ .allocator = allocator.*, .items = items };
+}
+
+fn copyCameraOptionsResult(result: *const c.mln_completion_result) status.Error!values.CameraOptions {
+    return values.cameraOptionsFromNative(try completion.value(c.mln_camera_options)(result));
+}
+
+fn copyLatLngBoundsResult(result: *const c.mln_completion_result) status.Error!values.LatLngBounds {
+    return values.latLngBoundsFromNative(try completion.value(c.mln_lat_lng_bounds)(result));
+}
+
 fn featureStateSelectorToNative(
     temp: *native_temp.TempStorage,
     selector: FeatureStateSelector,
@@ -2688,56 +2254,6 @@ fn liveCustomMvtVectorSourceCountForTesting() usize {
     return custom_mvt_vector_state_registry.items.len;
 }
 
-fn copyStyleIdList(
-    allocator: std.mem.Allocator,
-    list: c.mln_style_id_list,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-) status.Error!values.StringList {
-    var count: usize = 0;
-    try status.checkStatus(c.mln_style_id_list_count(list, &count), diagnostic_store);
-    const items = try allocator.alloc([]const u8, count);
-    var initialized: usize = 0;
-    errdefer {
-        for (items[0..initialized]) |item| allocator.free(item);
-        allocator.free(items);
-    }
-    for (items, 0..) |*item, index| {
-        var view = c.mln_buffer_view{ .data = null, .size = 0 };
-        try status.checkStatus(c.mln_style_id_list_get(list, index, &view), diagnostic_store);
-        item.* = if (view.size == 0) try allocator.dupe(u8, "") else blk: {
-            const data: [*]const u8 = @ptrCast(view.data orelse return error.NativeError);
-            break :blk try allocator.dupe(u8, data[0..view.size]);
-        };
-        initialized += 1;
-    }
-    return .{ .allocator = allocator, .items = items };
-}
-
-fn copyStyleStringList(
-    allocator: std.mem.Allocator,
-    list: c.mln_style_string_list,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-) status.Error!values.StringList {
-    var count: usize = 0;
-    try status.checkStatus(c.mln_style_string_list_count(list, &count), diagnostic_store);
-    const items = try allocator.alloc([]const u8, count);
-    var initialized: usize = 0;
-    errdefer {
-        for (items[0..initialized]) |item| allocator.free(item);
-        allocator.free(items);
-    }
-    for (items, 0..) |*item, index| {
-        var view = c.mln_buffer_view{ .data = null, .size = 0 };
-        try status.checkStatus(c.mln_style_string_list_get(list, index, &view), diagnostic_store);
-        item.* = if (view.size == 0) try allocator.dupe(u8, "") else blk: {
-            const data: [*]const u8 = @ptrCast(view.data orelse return error.NativeError);
-            break :blk try allocator.dupe(u8, data[0..view.size]);
-        };
-        initialized += 1;
-    }
-    return .{ .allocator = allocator, .items = items };
-}
-
 fn stringView(value: []const u8) c.mln_buffer_view {
     return .{ .data = if (value.len == 0) null else value.ptr, .size = value.len };
 }
@@ -2786,7 +2302,7 @@ test "custom geometry trampolines route semantic tile ids" {
         .cancel_tile = testCancelCustomGeometryTile,
         .release_context = null,
         .context = &test_state,
-        .active_upcalls = std.atomic.Value(usize).init(0),
+        .upcalls = .{},
     };
     try registerLiveCustomGeometrySourceState(&source_state);
     defer unregisterLiveCustomGeometrySourceState(&source_state);
@@ -2806,7 +2322,7 @@ test "custom geometry trampolines route semantic tile ids" {
     retireLiveCustomGeometrySourceState(&source_state);
     customGeometryFetchTileTrampoline(&source_state, .{ .z = 12, .x = 13, .y = 14 });
     try std.testing.expectEqual(@as(usize, 1), test_state.fetch_count);
-    try std.testing.expectEqual(@as(usize, 0), source_state.active_upcalls.load(.seq_cst));
+    try std.testing.expectEqual(@as(usize, 0), source_state.upcalls.activeCount());
 }
 
 const test_style_json =
@@ -2826,44 +2342,43 @@ const test_style_json =
 ;
 
 fn createLoadedMapForTesting(runtime: *RuntimeHandle) !MapHandle {
-    var map = try MapHandle.create(runtime, .{});
-    errdefer map.close() catch {};
-    try map.setStyleJson(std.testing.allocator, test_style_json);
+    var map_future = try MapHandle.create(runtime, .{});
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
+    errdefer closeMapForTesting(&map) catch {};
+    try expectCommittedForTesting(try map.setStyleJson(test_style_json));
     try std.testing.expect(try waitForRuntimeEventForTesting(runtime, .map_style_loaded));
     return map;
+}
+
+fn closeMapForTesting(map: *MapHandle) !void {
+    var teardown = try map.close();
+    defer teardown.deinit();
+    try teardown.wait(null);
+}
+
+fn waitForCommandDispositionForTesting(future_value: completion.Future(completion.CommandCompletion)) !completion.CommandDisposition {
+    var future = future_value;
+    defer future.deinit();
+    return (try future.wait(null)).disposition;
+}
+
+fn expectCommittedForTesting(future_value: completion.Future(completion.CommandCompletion)) !void {
+    try std.testing.expect(std.meta.eql(
+        try waitForCommandDispositionForTesting(future_value),
+        completion.CommandDisposition.committed,
+    ));
 }
 
 fn waitForRuntimeEventForTesting(runtime: *RuntimeHandle, event_type: runtime_module.RuntimeEventType) !bool {
     var attempts: usize = 0;
     while (attempts < 200) : (attempts += 1) {
-        try runtime.pump(0, null);
-        // One event per drain, so an event this wait is not looking for stays
-        // queued rather than being dropped with the batch that carried it.
-        while (true) {
-            var batch = try runtime.drainEvents(std.testing.allocator, 1);
-            defer batch.deinit();
-            if (batch.len() == 0) break;
-            const event = try batch.at(0);
+        var batch = try runtime.drainEvents(std.testing.allocator);
+        defer batch.deinit();
+        for (0..batch.len()) |index| {
+            const event = try batch.at(index);
             if (std.meta.eql(event.event_type, event_type)) return true;
         }
-        try std.testing.io.sleep(.fromMilliseconds(10), .awake);
-    }
-    return false;
-}
-
-// A map whose mask clears style-loaded reaches a loaded style with no event to
-// wait for, so the style's own sources report the load instead.
-fn waitForStyleSourceForTesting(
-    runtime: *RuntimeHandle,
-    map: *MapHandle,
-    source_id: []const u8,
-) !bool {
-    var attempts: usize = 0;
-    while (attempts < 200) : (attempts += 1) {
-        try runtime.pump(0, null);
-        var batch = try runtime.drainEvents(std.testing.allocator, 0);
-        batch.deinit();
-        if (try map.styleSourceExists(std.testing.allocator, source_id)) return true;
         try std.testing.io.sleep(.fromMilliseconds(10), .awake);
     }
     return false;
@@ -2889,37 +2404,37 @@ fn testStyleJsonProvider(
 // the tests below watch the live-state count rather than a style load.
 test "an explicit source removal releases the callback state" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer runtime_module.closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
     var map = try createLoadedMapForTesting(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer closeMapForTesting(&map) catch @panic("map close failed");
 
     const baseline = liveCustomGeometrySourceCountForTesting();
     var state = TestCustomGeometryCallbackState{};
-    try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
+    try expectCommittedForTesting(try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
         .fetch_tile = testFetchCustomGeometryTile,
         .context = &state,
-    });
+    }));
     try std.testing.expectEqual(baseline + 1, liveCustomGeometrySourceCountForTesting());
 
-    try std.testing.expect(try map.removeStyleSource(std.testing.allocator, "custom"));
+    try expectCommittedForTesting(try map.removeStyleSource(std.testing.allocator, "custom"));
     try std.testing.expectEqual(baseline, liveCustomGeometrySourceCountForTesting());
 }
 
 test "an explicit custom MVT vector source removal releases the callback state" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer runtime_module.closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
     var map = try createLoadedMapForTesting(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer closeMapForTesting(&map) catch @panic("map close failed");
 
     const baseline = liveCustomMvtVectorSourceCountForTesting();
     var state = TestCustomGeometryCallbackState{};
-    try map.addCustomMvtVectorSource(std.testing.allocator, "custom-mvt", .{
+    try expectCommittedForTesting(try map.addCustomMvtVectorSource(std.testing.allocator, "custom-mvt", .{
         .fetch_tile = testFetchCustomGeometryTile,
         .context = &state,
-    });
+    }));
     try std.testing.expectEqual(baseline + 1, liveCustomMvtVectorSourceCountForTesting());
 
-    try std.testing.expect(try map.removeStyleSource(std.testing.allocator, "custom-mvt"));
+    try expectCommittedForTesting(try map.removeStyleSource(std.testing.allocator, "custom-mvt"));
     try std.testing.expectEqual(baseline, liveCustomMvtVectorSourceCountForTesting());
 }
 
@@ -2934,31 +2449,34 @@ test "a style load that drops a source releases the callback state unsubscribed"
     };
 
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-    try runtime.setResourceProvider(.{ .handler = testStyleJsonProvider });
+    defer runtime_module.closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
+    var provider_future = try runtime.setResourceProvider(.{ .handler = testStyleJsonProvider });
+    defer provider_future.deinit();
+    _ = try provider_future.wait(null);
 
-    var map = try MapHandle.create(&runtime, .{ .event_mask = narrowed });
-    defer map.close() catch @panic("map close failed");
-    try map.setStyleJson(std.testing.allocator, test_style_json);
-    try std.testing.expect(try waitForStyleSourceForTesting(&runtime, &map, "point"));
+    var map = try createLoadedMapForTesting(&runtime);
+    defer closeMapForTesting(&map) catch @panic("map close failed");
+    var mask_future = try map.setEventMask(narrowed);
+    defer mask_future.deinit();
+    _ = try mask_future.wait(null);
 
-    const baseline = liveCustomGeometrySourceCountForTesting();
     var state = TestCustomGeometryCallbackState{};
-    try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
+    try expectCommittedForTesting(try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
         .fetch_tile = testFetchCustomGeometryTile,
         .release_context = testReleaseCustomGeometryContext,
         .context = &state,
-    });
-    try std.testing.expectEqual(baseline + 1, liveCustomGeometrySourceCountForTesting());
+    }));
+    var add_barrier = try runtime.barrier();
+    defer add_barrier.deinit();
+    _ = try add_barrier.wait(null);
     try std.testing.expectEqual(@as(usize, 0), state.release_count);
     // The mask stays what the host set, because the binding adds nothing to it.
-    try std.testing.expectEqual(narrowed, try map.eventMask());
+    try std.testing.expectEqual(narrowed, (try map.snapshot()).event_mask);
 
-    try map.setStyleUrl(std.testing.allocator, "custom://style.json");
+    try expectCommittedForTesting(try map.setStyleUrl(std.testing.allocator, "custom://style.json"));
     var released = false;
     for (0..200) |_| {
-        try runtime.pump(0, null);
-        var batch = try runtime.drainEvents(std.testing.allocator, 0);
+        var batch = try runtime.drainEvents(std.testing.allocator);
         defer batch.deinit();
         for (0..batch.len()) |index| {
             const event = try batch.at(index);
@@ -2967,7 +2485,7 @@ test "a style load that drops a source releases the callback state unsubscribed"
                 runtime_module.RuntimeEventType.map_style_loaded,
             ));
         }
-        if (liveCustomGeometrySourceCountForTesting() == baseline) {
+        if (state.release_count == 1) {
             released = true;
             break;
         }
@@ -2981,30 +2499,32 @@ test "a style load that drops a source releases the callback state unsubscribed"
 
 test "closing a map releases its surviving source callback states" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer runtime_module.closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
     var map = try createLoadedMapForTesting(&runtime);
     var map_open = true;
-    defer if (map_open) map.close() catch @panic("map close failed");
+    defer if (map_open) closeMapForTesting(&map) catch @panic("map close failed");
 
-    const baseline = liveCustomGeometrySourceCountForTesting();
     var state = TestCustomGeometryCallbackState{};
-    try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
+    try expectCommittedForTesting(try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
         .fetch_tile = testFetchCustomGeometryTile,
+        .release_context = testReleaseCustomGeometryContext,
         .context = &state,
-    });
-    try std.testing.expectEqual(baseline + 1, liveCustomGeometrySourceCountForTesting());
+    }));
 
-    try map.close();
+    try closeMapForTesting(&map);
     map_open = false;
-    try std.testing.expectEqual(baseline, liveCustomGeometrySourceCountForTesting());
+    var close_barrier = try runtime.barrier();
+    defer close_barrier.deinit();
+    _ = try close_barrier.wait(null);
+    try std.testing.expectEqual(@as(usize, 1), state.release_count);
 }
 
 // A rejected add releases nothing, so the state belongs to the failing call.
 test "a rejected custom geometry source add releases its own callback state" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer runtime_module.closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
     var map = try createLoadedMapForTesting(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer closeMapForTesting(&map) catch @panic("map close failed");
 
     const baseline = liveCustomGeometrySourceCountForTesting();
     var state = TestCustomGeometryCallbackState{};
@@ -3022,86 +2542,43 @@ test "a rejected custom geometry source add releases its own callback state" {
     try std.testing.expectEqual(@as(usize, 0), state.release_count);
 }
 
-test "a released map id replayed after a new map is reported stale" {
+test "a released map id is stale and map snapshots work from another thread" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer runtime_module.closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
 
-    var first = try MapHandle.create(&runtime, .{});
+    var first_future = try MapHandle.create(&runtime, .{});
+
+    defer first_future.deinit();
+
+    var first = try first_future.wait(null);
     const released = @intFromEnum(first);
-    try first.close();
+    try closeMapForTesting(&first);
 
-    // The released slot is the one the next map takes, so the replayed id
-    // names a retired generation of a slot that is live again.
-    var second = try MapHandle.create(&runtime, .{});
-    defer second.close() catch @panic("map close failed");
-
-    var width: u32 = 0;
-    var height: u32 = 0;
-    var scale_factor: f64 = 0;
+    var stale_snapshot = std.mem.zeroes(c.mln_map_snapshot);
+    stale_snapshot.size = @sizeOf(c.mln_map_snapshot);
     try std.testing.expectError(
         error.InvalidArgument,
-        status.checkStatus(
-            c.mln_map_get_size(released, &width, &height, &scale_factor),
-            null,
-        ),
-    );
-    try std.testing.expect(
-        std.mem.indexOf(u8, std.mem.span(c.mln_thread_last_error_message()), "stale") != null,
+        status.checkStatus(c.mln_map_snapshot_get(released, &stale_snapshot), null),
     );
 
-    // The live map is unaffected by the replay.
-    _ = try second.getSize();
-}
+    var second_future = try MapHandle.create(&runtime, .{});
 
-test "a map id passed to a runtime operation is rejected on its kind" {
-    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-    var map = try MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    defer second_future.deinit();
 
-    // MapHandle and RuntimeHandle are distinct enums, so this call has no
-    // expression in the safe API and needs the raw id.
-    try std.testing.expectError(
-        error.InvalidArgument,
-        status.checkStatus(c.mln_runtime_pump(@intFromEnum(map), 0, -1), null),
-    );
-    const message = std.mem.span(c.mln_thread_last_error_message());
-    try std.testing.expect(std.mem.indexOf(u8, message, "map") != null);
-    try std.testing.expect(std.mem.indexOf(u8, message, "runtime") != null);
-}
-
-test "a live map id called from another thread reports wrong thread" {
-    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-    var map = try MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var second = try second_future.wait(null);
+    defer closeMapForTesting(&second) catch @panic("map close failed");
 
     const CrossThread = struct {
-        live: c.mln_map,
-        result: status.Error!void = {},
-        stale: bool = false,
+        map: *MapHandle,
+        result: status.Error!MapSnapshot = undefined,
 
         fn run(self: *@This()) void {
-            var width: u32 = 0;
-            var height: u32 = 0;
-            var scale_factor: f64 = 0;
-            self.result = status.checkStatus(
-                c.mln_map_get_size(self.live, &width, &height, &scale_factor),
-                null,
-            );
-            self.stale = std.mem.indexOf(
-                u8,
-                std.mem.span(c.mln_thread_last_error_message()),
-                "stale",
-            ) != null;
+            self.result = self.map.snapshot();
         }
     };
 
-    var context = CrossThread{ .live = @intFromEnum(map) };
+    var context = CrossThread{ .map = &second };
     const thread = try std.Thread.spawn(.{}, CrossThread.run, .{&context});
     thread.join();
-
-    // The id is live, so the owner-thread rule decides rather than identity.
-    try std.testing.expectError(error.WrongThread, context.result);
-    try std.testing.expect(!context.stale);
+    _ = try context.result;
 }

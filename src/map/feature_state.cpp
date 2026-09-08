@@ -35,6 +35,12 @@ auto string_from_view(mln_buffer_view string) -> std::string {
   return std::string{static_cast<const char*>(string.data), string.size};
 }
 
+auto selector_has_field(
+  const mln_feature_state_selector& selector, uint32_t field
+) -> bool {
+  return (selector.fields & field) != 0;
+}
+
 auto update_has_source(
   const mln::UpdateParameters& update, const std::string& source_id
 ) -> bool {
@@ -169,12 +175,6 @@ auto FeatureStateStore::snapshot() const
   -> std::shared_ptr<const FeatureStateSnapshot> {
   const std::scoped_lock lock{mutex_};
   return published_;
-}
-
-auto selector_has_field(
-  const mln_feature_state_selector& selector, uint32_t field
-) -> bool {
-  return (selector.fields & field) != 0;
 }
 
 auto validate_feature_state_selector(

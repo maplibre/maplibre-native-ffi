@@ -1,34 +1,26 @@
-//! The render loop: window, input decoding, graphics context, and the render
-//! session, all owned by the winit event-loop thread. The runtime and the map
-//! live on the spawned runtime loop thread, reached through [`crate::channel`].
+//! The winit event loop owns the window, graphics context, and render session.
+//! Runtime and map commands are safe to submit from its callbacks.
 
 use std::error::Error;
-use std::sync::Arc;
-use std::sync::mpsc::{self, Sender};
-use std::thread::{self, JoinHandle};
 
 use winit::event::WindowEvent;
 use winit::window::{Window, WindowId};
 
-use crate::channel::{CameraCommand, Shared};
 use crate::graphics::GraphicsContext;
 use crate::input::Controller;
-use crate::map_state;
-use crate::render_target::{Mode, RenderTarget};
+use crate::map_state::MapState;
+use crate::render_target::{FrameOutcome, Mode, RenderTarget};
 use crate::viewport::Viewport;
 
 pub struct App {
     target: Option<RenderTarget>,
-    /// Releases the runtime loop's parked pump so queued work is applied now.
-    wake: Arc<maplibre_native_ffi::WakeSource>,
-    runtime_thread: Option<JoinHandle<()>>,
-    commands: Sender<CameraCommand>,
-    shared: Arc<Shared>,
+    map: Option<MapState>,
     graphics: GraphicsContext,
     window: Window,
     viewport: Viewport,
     input: Controller,
     viewport_dirty: bool,
+    render_requested: bool,
     closed: bool,
     mode: Mode,
 }
@@ -45,48 +37,28 @@ impl App {
         }
         viewport.log("initial viewport");
 
-        let shared = Arc::new(Shared::new());
-        let (commands, command_queue) = mpsc::channel();
-        let (attach_sender, attach_queue) = mpsc::channel();
-        let runtime_thread = {
-            let shared = Arc::clone(&shared);
-            thread::Builder::new()
-                .name("maplibre-runtime".into())
-                .spawn(move || map_state::run(viewport, command_queue, attach_sender, shared))?
-        };
-
-        let handles = match attach_queue.recv() {
-            Ok(handles) => handles,
-            Err(_) => {
-                return Err(stop_runtime_loop(
-                    &shared,
-                    runtime_thread,
-                    "the runtime loop stopped before it published a map".to_string(),
-                ));
-            }
-        };
-        let target = match RenderTarget::attach(mode, &handles.attach_ref, &graphics, viewport) {
+        let map = MapState::new(viewport)?;
+        let target = match RenderTarget::attach(mode, map.map_handle(), &graphics, viewport) {
             Ok(target) => target,
             Err(error) => {
-                return Err(stop_runtime_loop(
-                    &shared,
-                    runtime_thread,
-                    format!("render target attachment failed: {error}"),
-                ));
+                let mut message = format!("render target attachment failed: {error}");
+                if let Err(error) = map.close() {
+                    message.push_str(&format!("; map state cleanup failed: {error}"));
+                }
+                return Err(message.into());
             }
         };
+        window.request_redraw();
 
         Ok(Self {
             target: Some(target),
-            wake: handles.wake,
-            runtime_thread: Some(runtime_thread),
-            commands,
-            shared,
+            map: Some(map),
             graphics,
             window,
             viewport,
             input: Controller::default(),
             viewport_dirty: false,
+            render_requested: true,
             closed: false,
             mode,
         })
@@ -113,29 +85,38 @@ impl App {
             }
             WindowEvent::RedrawRequested => self.render_or_exit(),
             event => {
-                if self.input.handle(&event, &self.commands, self.viewport) {
-                    // Release the parked pump so the queued command is applied
-                    // on this frame.
-                    let _ = self.wake.signal();
-                    self.shared.request_render();
-                    self.window.request_redraw();
+                let (input, map) = (&mut self.input, self.map.as_mut().expect("map is open"));
+                match input.handle(&event, self.viewport, map) {
+                    Ok(true) => {
+                        self.render_requested = true;
+                        self.window.request_redraw();
+                    }
+                    Ok(false) => {}
+                    Err(error) => {
+                        eprintln!("camera update failed: {error}");
+                        self.abort_process(1);
+                    }
                 }
             }
         }
     }
 
-    /// One render loop iteration. The runtime loop owns `pump` and the event
-    /// drain.
     pub fn step(&mut self) {
-        if let Some(error) = self.shared.failure() {
-            eprintln!("runtime loop failed: {error}");
-            self.abort_process(1);
-        }
         if let Err(error) = self.apply_pending_resize() {
             eprintln!("resize failed: {error}");
             self.abort_process(1);
         }
-        self.render_or_exit();
+        match self.map.as_ref().expect("map is open").drain_events() {
+            Ok(true) => {
+                self.render_requested = true;
+                self.window.request_redraw();
+            }
+            Ok(false) => {}
+            Err(error) => {
+                eprintln!("event drain failed: {error}");
+                self.abort_process(1);
+            }
+        }
     }
 
     fn apply_pending_resize(&mut self) -> Result<(), Box<dyn Error>> {
@@ -153,11 +134,19 @@ impl App {
             return Ok(());
         }
         self.graphics.resize(next)?;
+        // The attached session's resize is the extent authority, except on the
+        // paths that hand over a graphics resource instead; the render target
+        // resizes the map itself there.
         self.target
             .as_mut()
             .expect("render target is open")
-            .resize(&self.graphics, next)?;
-        self.shared.request_render();
+            .resize(
+                &self.graphics,
+                self.map.as_ref().expect("map is open"),
+                next,
+            )?;
+        self.render_requested = true;
+        self.window.request_redraw();
         Ok(())
     }
 
@@ -169,22 +158,21 @@ impl App {
     }
 
     fn render(&mut self) -> Result<(), Box<dyn Error>> {
-        if self.closed || self.viewport.is_empty() {
+        if self.closed || self.viewport.is_empty() || !self.render_requested {
             return Ok(());
         }
-        // Consume first, so a request published during the render survives.
-        if !self.shared.consume_render_request() {
-            return Ok(());
-        }
-        if !self
+        self.render_requested = false;
+        let FrameOutcome {
+            rendered,
+            needs_repaint,
+        } = self
             .target
             .as_mut()
             .expect("render target is open")
-            .render_update(&self.graphics)?
-        {
-            // Nothing reached the screen: the map applies a new logical size on
-            // the runtime loop's next pump, so retry.
-            self.shared.request_render();
+            .render_update(&self.graphics)?;
+        if !rendered || needs_repaint {
+            self.render_requested = true;
+            self.window.request_redraw();
         }
         Ok(())
     }
@@ -202,6 +190,7 @@ impl App {
         }
         self.closed = true;
         self.viewport_dirty = false;
+        self.render_requested = false;
 
         let mut first_error = self.graphics.wait_idle().err().map(|error| {
             format!(
@@ -210,26 +199,15 @@ impl App {
             )
         });
 
-        // Close the session before the runtime loop destroys the map, because a
-        // map with an attached session cannot be destroyed.
         if let Some(target) = self.target.take()
             && let Err(error) = target.close(&self.graphics)
         {
             append_error(&mut first_error, error.to_string());
         }
-        self.shared.request_shutdown();
-        // Release the pump so shutdown is observed now.
-        let _ = self.wake.signal();
-        if let Some(runtime_thread) = self.runtime_thread.take()
-            && runtime_thread.join().is_err()
+        if let Some(map) = self.map.take()
+            && let Err(error) = map.close()
         {
-            append_error(
-                &mut first_error,
-                "the runtime loop thread panicked".to_string(),
-            );
-        }
-        if let Some(error) = self.shared.failure() {
-            append_error(&mut first_error, error);
+            append_error(&mut first_error, error.to_string());
         }
 
         match first_error {
@@ -244,25 +222,12 @@ impl App {
     }
 }
 
-/// Stops a runtime loop that outlived a failed startup, and reports the failure
-/// it recorded in preference to the one that stopped it.
-fn stop_runtime_loop(
-    shared: &Shared,
-    runtime_thread: JoinHandle<()>,
-    message: String,
-) -> Box<dyn Error> {
-    shared.request_shutdown();
-    let panicked = runtime_thread.join().is_err();
-    let mut reported = shared.failure().unwrap_or(message);
-    if panicked {
-        reported.push_str("; the runtime loop thread panicked");
-    }
-    reported.into()
-}
-
 fn append_error(message: &mut Option<String>, error: String) {
     match message {
-        Some(message) => message.push_str(&format!("; {error}")),
+        Some(message) => {
+            message.push_str("; ");
+            message.push_str(&error);
+        }
         None => *message = Some(error),
     }
 }

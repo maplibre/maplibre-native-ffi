@@ -27,9 +27,10 @@ func goMaplibreCustomMVTVectorFetchTile(userData unsafe.Pointer, tileID C.mln_ca
 }
 
 // goMaplibreCustomMVTVectorReleaseUserData frees one source's callback state.
-// The C API invokes it once, on the map owner thread, when it stops
-// referencing the state: on explicit removal, when a style load drops the
-// source, or when the map is destroyed.
+// The C API invokes it once, on the runtime execution thread, when it stops
+// referencing the state: on explicit removal, when a style command replaces
+// the style that held the source, when the map is destroyed, or when
+// asynchronous application rejects the source.
 //
 //export goMaplibreCustomMVTVectorReleaseUserData
 func goMaplibreCustomMVTVectorReleaseUserData(userData unsafe.Pointer) {

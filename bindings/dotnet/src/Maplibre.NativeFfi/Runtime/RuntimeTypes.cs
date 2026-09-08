@@ -1,3 +1,5 @@
+using Maplibre.NativeFfi.Camera;
+using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Internal;
 using Maplibre.NativeFfi.Map;
@@ -15,29 +17,12 @@ public enum AmbientCacheOperation : uint
     Clear = 4,
 }
 
-public enum OfflineOperationKind : uint
+public enum CommandDisposition : uint
 {
-    AmbientCache = 1,
-    RegionCreate = 2,
-    RegionGet = 3,
-    RegionsList = 4,
-    RegionsMergeDatabase = 5,
-    RegionUpdateMetadata = 6,
-    RegionGetStatus = 7,
-    RegionSetObserved = 8,
-    RegionSetDownloadState = 9,
-    RegionInvalidate = 10,
-    RegionDelete = 11,
-    SetMaximumAmbientCacheSize = 12,
-}
-
-public enum OfflineOperationResultKind : uint
-{
-    None = 0,
-    Region = 1,
-    OptionalRegion = 2,
-    RegionList = 3,
-    RegionStatus = 4,
+    Committed = 0,
+    Superseded = 1,
+    Failed = 2,
+    Cancelled = 3,
 }
 
 public enum RuntimeEventSourceType : uint
@@ -69,8 +54,7 @@ public enum RuntimeEventType : uint
     OfflineRegionStatusChanged = 19,
     OfflineRegionResponseError = 20,
     OfflineRegionTileCountLimitExceeded = 21,
-    OfflineOperationCompleted = 22,
-    MapCameraTransitionFinished = 23,
+    MapCameraTransitionFinished = 22,
 }
 
 /// <summary>Event types a map or a runtime queues.</summary>
@@ -78,7 +62,7 @@ public enum RuntimeEventType : uint
 /// Each bit is <c>1</c> shifted left by the <see cref="RuntimeEventType" /> value it selects, so a
 /// mask a host computes from a decoded event type matches these constants.
 /// <para>
-/// <see cref="MapHandle.SetEventMask" /> reads the bits in <see cref="AllMapEvents" /> and
+/// <see cref="MapHandle.SetEventMaskAsync" /> reads the bits in <see cref="AllMapEvents" /> and
 /// <see cref="RuntimeHandle.SetEventMask" /> reads the bits in <see cref="AllRuntimeEvents" />, so
 /// both accept <see cref="All" /> and a host reads a mask, changes one bit, and writes it back.
 /// </para>
@@ -111,7 +95,6 @@ public enum RuntimeEventMask : ulong
     OfflineRegionResponseError = 1UL << (int)RuntimeEventType.OfflineRegionResponseError,
     OfflineRegionTileCountLimitExceeded =
         1UL << (int)RuntimeEventType.OfflineRegionTileCountLimitExceeded,
-    OfflineOperationCompleted = 1UL << (int)RuntimeEventType.OfflineOperationCompleted,
 
     /// <summary>Selects every map-originated event type this binding declares.</summary>
     AllMapEvents =
@@ -139,40 +122,10 @@ public enum RuntimeEventMask : ulong
     AllRuntimeEvents =
         OfflineRegionStatusChanged
         | OfflineRegionResponseError
-        | OfflineRegionTileCountLimitExceeded
-        | OfflineOperationCompleted,
+        | OfflineRegionTileCountLimitExceeded,
 
     /// <summary>Selects every event type this binding declares.</summary>
     All = AllMapEvents | AllRuntimeEvents,
-}
-
-/// <summary>One drained batch of copied runtime events.</summary>
-/// <remarks>
-/// Every value in the batch is a copy, so it stays readable after the next drain and after the map
-/// that produced it is closed.
-/// </remarks>
-/// <param name="Events">The copied events in queue order.</param>
-/// <param name="RemainingCount">
-/// Events still queued for the runtime after this batch. A nonzero value means another drain
-/// reports more events.
-/// </param>
-public sealed record RuntimeEventBatch(IReadOnlyList<RuntimeEvent> Events, ulong RemainingCount)
-{
-    private readonly IReadOnlyList<RuntimeEvent> events = ValueEquality.Snapshot(Events);
-
-    public IReadOnlyList<RuntimeEvent> Events
-    {
-        get => events;
-        init => events = ValueEquality.Snapshot(value);
-    }
-
-    public bool Equals(RuntimeEventBatch? other) =>
-        other is not null
-        && ValueEquality.SequenceEquals(events, other.events)
-        && RemainingCount == other.RemainingCount;
-
-    public override int GetHashCode() =>
-        HashCode.Combine(ValueEquality.SequenceHashCode(events), RemainingCount);
 }
 
 /// <summary>One copied runtime event from <see cref="RuntimeHandle.DrainEvents()" />.</summary>
@@ -201,7 +154,7 @@ public sealed record RuntimeEventBatch(IReadOnlyList<RuntimeEvent> Events, ulong
 /// <description>
 /// <see cref="RuntimeEventType.MapCameraWillChange" /> and
 /// <see cref="RuntimeEventType.MapCameraDidChange" />: a
-/// <see cref="Maplibre.NativeFfi.Camera.CameraChangeMode" /> value.
+/// <see cref="CameraChangeMode" /> value.
 /// </description>
 /// </item>
 /// <item>
@@ -209,12 +162,6 @@ public sealed record RuntimeEventBatch(IReadOnlyList<RuntimeEvent> Events, ulong
 /// <see cref="RuntimeEventType.MapLoadingFailed" />: the ordinal of MapLibre Native's internal map
 /// load error kind, which this binding does not name as an enum. Read
 /// <paramref name="Message" /> for the failure text.
-/// </description>
-/// </item>
-/// <item>
-/// <description>
-/// <see cref="RuntimeEventType.OfflineOperationCompleted" />: the operation result as a
-/// <c>MaplibreStatus</c> value.
 /// </description>
 /// </item>
 /// <item><description>Every other event kind: 0.</description></item>
@@ -281,16 +228,6 @@ public abstract record RuntimeEventPayload
 
     public sealed record OfflineRegionTileCountLimit(long RegionId, ulong Limit)
         : RuntimeEventPayload;
-
-    public sealed record OfflineOperationCompleted(
-        ulong OperationId,
-        OfflineOperationKind OperationKind,
-        uint RawOperationKind,
-        OfflineOperationResultKind ResultKind,
-        uint RawResultKind,
-        int ResultStatus,
-        bool Found
-    ) : RuntimeEventPayload;
 
     /// <summary>Payload for a map camera transition-finished event.</summary>
     /// <param name="TransitionId">

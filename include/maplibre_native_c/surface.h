@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "base.h"
+#include "completion.h"
 #include "render_target.h"
 
 #ifdef __cplusplus
@@ -100,270 +101,248 @@ MLN_API mln_webgpu_surface_descriptor
 mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
- * Attaches a Metal native surface render target to a map.
+ * Starts attachment of a Metal surface target.
  *
- * The map may have at most one live render session. The calling thread becomes
- * the session's owner thread, and every surface-session call is affine to it.
- * The map need only be live, so a host may attach on the thread that drives its
- * render loop while the map stays on the runtime loop thread. Attach creates
- * the session's graphics resources on the calling thread, so the host resources
- * named by descriptor must be usable there. The session retains
- * descriptor->layer and optional descriptor->context.device, and renders into
- * and presents through the layer. On success, *out_session receives a handle
- * the caller destroys with mln_render_session_destroy().
+ * The descriptor and options are copied before return. The completion runs
+ * only after the selected driver initializes the target. A core-worker driver
+ * retains the Metal layer and device on its worker. A caller driver performs
+ * initialization when the host services driver work with the Metal context
+ * usable on that thread.
+ *
+ * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
+ * ATTACHING session there and transfers it to the caller. A non-OK return
+ * leaves *out_session unchanged and never invokes the completion. A failed
+ * completion still requires mln_render_session_detach() or
+ * mln_render_session_abandon() before mln_render_session_destroy().
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
- *   null or invalid, out_session is null, or *out_session is not null.
- * - MLN_STATUS_INVALID_STATE when the map already has a render session.
- * - MLN_STATUS_UNSUPPORTED when Metal surface sessions are not supported by
- *   this build.
+ * - MLN_STATUS_OK when the attachment is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live; descriptor,
+ *   options, or completion is null or undersized; a required backend handle is
+ *   null; out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown.
+ * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK once the driver owns the target.
+ * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
+ * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_API mln_status mln_metal_surface_attach(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Attaches a Vulkan native surface render target to a map.
+ * Starts attachment of a Vulkan surface target.
  *
- * The map may have at most one live render session. The calling thread becomes
- * the session's owner thread, and every surface-session call is affine to it.
- * The map need only be live, so a host may attach on the thread that drives its
- * render loop while the map stays on the runtime loop thread. Attach creates
- * the session's graphics resources on the calling thread, so the host resources
- * named by descriptor must be usable there. The session renders to
- * descriptor->surface and presents through it. The Vulkan device must support
- * VK_KHR_swapchain, and the queue family must support graphics and presentation
- * to descriptor->surface. Vulkan handles are borrowed and must remain valid
- * until the session is detached or destroyed. On success, *out_session receives
- * a handle the caller destroys with mln_render_session_destroy().
+ * The descriptor and options are copied before return. The completion runs only
+ * after the selected driver creates the swapchain.
+ *
+ * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
+ * ATTACHING session there and transfers it to the caller. A non-OK return
+ * leaves *out_session unchanged and never invokes the completion. A failed
+ * completion still requires mln_render_session_detach() or
+ * mln_render_session_abandon() before mln_render_session_destroy().
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
- *   null or invalid, out_session is null, or *out_session is not null.
- * - MLN_STATUS_INVALID_STATE when the map already has a render session.
- * - MLN_STATUS_UNSUPPORTED when Vulkan surface sessions are not supported by
- *   this build.
+ * - MLN_STATUS_OK when the attachment is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live; descriptor,
+ *   options, or completion is null or undersized; a required backend handle is
+ *   null; out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown.
+ * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK once the driver owns the target.
+ * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
+ * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_API mln_status mln_vulkan_surface_attach(
   mln_map map, const mln_vulkan_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Attaches an OpenGL native surface render target to a map.
+ * Starts attachment of an OpenGL surface target.
  *
- * The map may have at most one live render session. The calling thread becomes
- * the session's owner thread, and every surface-session call is affine to it.
- * The map need only be live, so a host may attach on the thread that drives its
- * render loop while the map stays on the runtime loop thread. Attach creates
- * the session's graphics resources on the calling thread, so the host resources
- * named by descriptor must be usable there.
+ * WGL, EGL, and existing WebGL contexts require
+ * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD. A transferred WebGL canvas requires
+ * MLN_RENDER_DRIVER_CORE_WORKER. Context ownership remains independent.
  *
- * descriptor->context.ownership decides what the session does with the thread's
- * current context. A shared session builds its context in the share group of
- * the descriptor's share context, which must be current on this thread, and
- * every render restores whatever was current before it. A dedicated session
- * builds its context from the display or device context alone, makes it
- * current, and keeps it current between renders, so this session holds the
- * thread's context from attach until detach or destroy, either of which
- * releases it.
- *
- * The session renders to descriptor->surface and presents through the selected
- * context provider. WGL surfaces present with SwapBuffers(HDC), and EGL
- * surfaces present with eglSwapBuffers(EGLDisplay, EGLSurface). OpenGL context
- * handles are borrowed and must remain valid until detach or destroy. On
- * success, *out_session receives a handle the caller destroys with
- * mln_render_session_destroy().
+ * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
+ * ATTACHING session there and transfers it to the caller. A non-OK return
+ * leaves *out_session unchanged and never invokes the completion. A failed
+ * completion still requires mln_render_session_detach() or
+ * mln_render_session_abandon() before mln_render_session_destroy().
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
- *   null or invalid, out_session is null, or *out_session is not null.
- * - MLN_STATUS_INVALID_STATE when the map already has a render session.
- * - MLN_STATUS_UNSUPPORTED when OpenGL surface sessions are not supported by
- *   this build.
+ * - MLN_STATUS_OK when the attachment is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live; descriptor,
+ *   options, or completion is null or undersized; a required backend handle is
+ *   null; out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown.
+ * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, its
+ *   context provider is unavailable, or the requested driver does not match the
+ *   context placement.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK once the driver owns the target.
+ * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
+ * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_API mln_status mln_opengl_surface_attach(
   mln_map map, const mln_opengl_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Attaches a WebGPU native surface render target to a map.
+ * Starts attachment of a WebGPU surface target.
  *
- * The map may have at most one live render session. The calling thread becomes
- * the session's owner thread, and every surface-session call is affine to it.
- * The map need only be live, so a host may attach on the thread that drives its
- * render loop while the map stays on the runtime loop thread. Attach creates
- * the session's graphics resources on the calling thread, so the host resources
- * named by descriptor must be usable there; a WebGPU object belongs to the
- * agent that created it. The session configures descriptor->surface for this
- * device and extent, takes its current texture each frame, and presents through
- * it. The surface, device, and instance are borrowed and must remain valid
- * until detach or destroy. On success, *out_session receives a handle the
- * caller destroys with mln_render_session_destroy().
+ * Browser targets require MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD because
+ * WebGPU objects remain in their creating agent.
+ *
+ * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
+ * ATTACHING session there and transfers it to the caller. A non-OK return
+ * leaves *out_session unchanged and never invokes the completion. A failed
+ * completion still requires mln_render_session_detach() or
+ * mln_render_session_abandon() before mln_render_session_destroy().
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
- *   null or invalid, out_session is null, or *out_session is not null.
- * - MLN_STATUS_INVALID_STATE when the map already has a render session.
- * - MLN_STATUS_UNSUPPORTED when WebGPU surface sessions are not supported by
- *   this build.
+ * - MLN_STATUS_OK when the attachment is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live; descriptor,
+ *   options, or completion is null or undersized; a required backend handle is
+ *   null; out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown.
+ * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
+ *   requested driver is not MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK once the driver owns the target.
+ * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
+ * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_API mln_status mln_webgpu_surface_attach(
   mln_map map, const mln_webgpu_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Presents an attached Metal surface session through a new surface.
+ * Starts an ordered Metal surface replacement.
  *
- * Use this when a host destroys and recreates its surface while the map lives
- * on. The presentation surface is replaced in place, so the session keeps its
- * renderer along with the tile pyramid, glyph and image atlases, and symbol
- * placement. Map-owned feature state is unchanged.
- *
- * descriptor->context must name the graphics context or device the session
- * attached with; a null Metal device names none and is accepted. A target on a
- * different context, or a lost graphics context, requires destroying the
- * session with mln_render_session_destroy() and attaching again.
- *
- * The new extent applies exactly as mln_render_session_resize() applies one,
- * including how the next mln_render_session_render_update() waits for the map
- * to catch up to it. A scale_factor that differs from the session's current
- * value rebuilds the renderer, whose shaders are compiled for a fixed pixel
- * ratio; the surface is replaced either way.
- *
- * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
- * target is touched and leaves the session rendering into the one it had.
- * MLN_STATUS_NATIVE_ERROR may mean a replacement was already under way, which
- * cannot be unwound; destroy the session with mln_render_session_destroy().
+ * The descriptor is copied before return, and the session retains the
+ * replacement layer and device.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
- *   null or invalid, or descriptor->context names a device other than the
- *   session's.
- * - MLN_STATUS_UNSUPPORTED when descriptor->format differs from the session's;
- *   destroy the session and attach again to change it.
- * - MLN_STATUS_INVALID_STATE when the session is detached.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
- *   owner thread.
- * - MLN_STATUS_UNSUPPORTED when the session does not render through a Metal
- *   surface, or when Metal surface sessions are not supported by this build.
+ * - MLN_STATUS_OK when the replacement is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is not live; descriptor or
+ *   completion is null or undersized; or a required backend handle is null.
+ * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
+ *   frame is still acquired.
+ * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or the
+ *   session does not render through a native surface.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK once the driver renders through the new target.
+ * - MLN_STATUS_UNSUPPORTED when the backend cannot keep the GPU state it
+ *   compiled for the old one.
+ * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_API mln_status mln_metal_surface_set_target(
-  mln_render_session session, const mln_metal_surface_descriptor* descriptor
+  mln_render_session session, const mln_metal_surface_descriptor* descriptor,
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Presents an attached Vulkan surface session through a new surface.
+ * Starts an ordered Vulkan surface replacement.
  *
- * See mln_metal_surface_set_target() for what replacing a surface preserves,
- * when a host reaches for it, and how failures are reported.
- * descriptor->context must name the same instance, physical device, device, and
- * graphics queue the session attached with, and the new descriptor->surface
- * must be presentable from that queue family.
- *
- * The outgoing VkSurfaceKHR must still be valid when this is called, because
- * Vulkan requires the session's swapchain to be destroyed before its surface. A
- * host that has to release its surface first destroys the session with
- * mln_render_session_destroy() and attaches again afterward. Metal and OpenGL
- * carry no such requirement.
- *
- * The replacement must report the color format and the surface-transform
- * support this session already compiled a render pass and shaders for.
- * MLN_STATUS_UNSUPPORTED reports one that does not, with the session still
- * rendering into the surface it has; destroy the session and attach again to
- * change either.
+ * The descriptor is copied before return. The replacement must name the context
+ * this session attached with.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
- *   null or invalid, descriptor->context names handles other than the
- *   session's, or the surface is not usable by this session.
- * - MLN_STATUS_INVALID_STATE when the session is detached.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
- *   owner thread.
- * - MLN_STATUS_UNSUPPORTED when the session does not render through a Vulkan
- *   surface, when the replacement's color format or surface-transform support
- *   differs from the session's, or when Vulkan surface sessions are not
- *   supported by this build.
- * - MLN_STATUS_NATIVE_ERROR when a Vulkan query about the replacement fails, or
- *   when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the replacement is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is not live; descriptor or
+ *   completion is null or undersized; or a required backend handle is null.
+ * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
+ *   frame is still acquired.
+ * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend, the
+ *   session does not render through a native surface, or the replacement
+ * surface does not report the color format and transform this session compiled
+ * for.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK once the driver renders through the new target.
+ * - MLN_STATUS_UNSUPPORTED when the backend cannot keep the GPU state it
+ *   compiled for the old one.
+ * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_API mln_status mln_vulkan_surface_set_target(
-  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor
+  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor,
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Presents an attached OpenGL surface session through a new surface.
+ * Starts an ordered OpenGL surface replacement.
  *
- * See mln_metal_surface_set_target() for what replacing a surface preserves,
- * when a host reaches for it, and how failures are reported.
- * descriptor->context must name the context provider data the session attached
- * with. The new surface is made current on the next render, so a host may
- * replace a surface it has already destroyed. Under dedicated ownership the
- * session's context stays current on the previous surface until that render.
- *
- * Because nothing is made current here, a surface this call accepts can still
- * turn out to be unusable. An HDC whose pixel format does not match the
- * session's context, or an EGLSurface from another display, is reported by the
- * next mln_render_session_render_update() as MLN_STATUS_NATIVE_ERROR rather
- * than by this function. The session stays destroyable in that state.
- *
- * A lost OpenGL context requires destroying the session and attaching again.
+ * The descriptor is copied before return. The replacement must name the share
+ * group this session attached with.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
- *   null or invalid, or descriptor->context names context provider data other
- *   than the session's.
- * - MLN_STATUS_INVALID_STATE when the session is detached.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
- *   owner thread.
- * - MLN_STATUS_UNSUPPORTED when the session does not render through an OpenGL
- *   surface, or when OpenGL surface sessions are not supported by this build.
+ * - MLN_STATUS_OK when the replacement is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is not live; descriptor or
+ *   completion is null or undersized; or a required backend handle is null.
+ * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
+ *   frame is still acquired.
+ * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, or the
+ *   session does not render through a native surface.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK once the driver renders through the new target.
+ * - MLN_STATUS_UNSUPPORTED when the backend cannot keep the GPU state it
+ *   compiled for the old one.
+ * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_API mln_status mln_opengl_surface_set_target(
-  mln_render_session session, const mln_opengl_surface_descriptor* descriptor
+  mln_render_session session, const mln_opengl_surface_descriptor* descriptor,
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Presents an attached WebGPU surface session through a new surface.
+ * Starts an ordered WebGPU surface replacement.
  *
- * The replacement must name the device and format the session attached with.
- * The session unconfigures the surface it had and configures the replacement
- * for this extent.
- *
- * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
- * target is touched and leaves the session rendering into the one it had.
+ * The descriptor is copied before return. The replacement must name the device
+ * and queue this session attached with.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
- *   null or invalid, or descriptor->context names a device other than the
- *   session's.
- * - MLN_STATUS_INVALID_STATE when the session is detached.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
- *   owner thread.
- * - MLN_STATUS_UNSUPPORTED when the session does not render through a WebGPU
- *   surface, or when WebGPU surface sessions are not supported by this build.
+ * - MLN_STATUS_OK when the replacement is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is not live; descriptor or
+ *   completion is null or undersized; or a required backend handle is null.
+ * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
+ *   frame is still acquired.
+ * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
+ *   session does not render through a native surface.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK once the driver renders through the new target.
+ * - MLN_STATUS_UNSUPPORTED when the backend cannot keep the GPU state it
+ *   compiled for the old one.
+ * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_API mln_status mln_webgpu_surface_set_target(
-  mln_render_session session, const mln_webgpu_surface_descriptor* descriptor
+  mln_render_session session, const mln_webgpu_surface_descriptor* descriptor,
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

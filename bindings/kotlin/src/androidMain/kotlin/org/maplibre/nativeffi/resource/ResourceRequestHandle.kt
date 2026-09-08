@@ -176,9 +176,8 @@ internal constructor(
   /**
    * Releases the native request once the wrapper becomes unreachable.
    *
-   * Request handles carry no owner-thread affinity, so the cleanup thread may reclaim one. This
-   * holds the ownership state alone; holding the wrapper would keep it reachable and suppress every
-   * reclaim.
+   * Request handles carry no thread affinity, so the cleanup thread may reclaim one. This holds the
+   * ownership state alone; holding the wrapper would keep it reachable and suppress every reclaim.
    */
   private class CloseWhenUnreachableAction(private val core: ResourceRequestHandleCore) : Runnable {
     override fun run() {

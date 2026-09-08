@@ -12,13 +12,25 @@ public struct ProjectedMeters: Equatable, Sendable {
   }
 }
 
-/// An any-thread projection snapshot whose native calls are serialized.
+/// A standalone projection copied from a map transform at creation.
+///
+/// Every call after creation, including close, is synchronous, runs on the
+/// calling thread, and is serialized by a native lock, so a projection is
+/// usable from any thread. A projection never observes map changes made after
+/// its creation and remains usable after its source map and runtime close.
 public final class MapProjectionHandle: @unchecked Sendable {
   private let handle: NativeHandleBox<NativeMapProjectionHandle>
 
-  public init(map: MapHandle) throws {
-    let projection = try mapNativeFailure {
-      try NativeProjection.create(map.requireLiveHandle())
+  public init(map: MapHandle) async throws {
+    let projection = try await awaitNative {
+      let nativeMap = try map.requireLiveHandle()
+      return try NativeCompletion.start(
+        { mln_map_projection_create(nativeMap.raw, $0) }
+      ) { result in
+        try NativeMapProjectionHandle(
+          raw: NativeCompletion.value(result, as: mln_map_projection.self)
+        )
+      }
     }
     handle = try NativeHandleBox(
       typeName: "MapProjectionHandle",
@@ -30,28 +42,39 @@ public final class MapProjectionHandle: @unchecked Sendable {
     handle.isClosed
   }
 
+  /// Closes this projection. The native call waits for calls already running
+  /// on other threads before it retires the handle.
   public func close() throws {
-    try handle.closeOnce { projection in
-      try checkStatus(mln_map_projection_destroy(projection.raw))
-    }
-  }
-
-  public func camera() throws -> CameraOptions {
     try mapNativeFailure {
-      try handle.withLive { projection in
-        try CameraOptions(native: NativeCameraOptionsInput(NativeProjection
-            .camera(projection)))
+      try handle.closeOnce { projection in
+        try checkStatus(mln_map_projection_close(projection.raw))
       }
     }
   }
 
+  /// Copies the projection camera, observing every earlier setter.
+  public func camera() throws -> CameraOptions {
+    try mapNativeFailure {
+      let native = try handle.withLive { projection in
+        try NativeMemory
+          .withTemporary(mln_camera_options_default()) { camera in
+            try checkStatus(mln_map_projection_get_camera(
+              projection.raw, camera
+            ))
+          }.value
+      }
+      return CameraOptions(native: NativeCameraOptionsInput(native))
+    }
+  }
+
+  /// Applies a camera update before returning. The source map's camera is
+  /// unaffected.
   public func setCamera(_ camera: CameraOptions) throws {
     try mapNativeFailure {
       try camera.nativeInput.withNativeOptions { nativeCamera in
         try handle.withLive { projection in
           try checkStatus(mln_map_projection_set_camera(
-            projection.raw,
-            nativeCamera
+            projection.raw, nativeCamera
           ))
         }
       }
@@ -62,21 +85,16 @@ public final class MapProjectionHandle: @unchecked Sendable {
     _ coordinates: [LatLng],
     padding: EdgeInsets = EdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
   ) throws {
+    guard !coordinates.isEmpty else {
+      throw MaplibreError.invalidArgument("visible coordinates cannot be empty")
+    }
     try mapNativeFailure {
-      guard !coordinates.isEmpty else {
-        throw MaplibreError
-          .invalidArgument("visible coordinates cannot be empty")
-      }
       let nativeCoordinates = coordinates.map(\.nativeInput.native)
       try nativeCoordinates.withUnsafeBufferPointer { buffer in
-        guard let baseAddress = buffer.baseAddress else {
-          throw MaplibreError
-            .invalidArgument("visible coordinates cannot be empty")
-        }
         try handle.withLive { projection in
           try checkStatus(mln_map_projection_set_visible_coordinates(
             projection.raw,
-            baseAddress,
+            buffer.baseAddress,
             buffer.count,
             padding.nativeInput.native
           ))
@@ -104,43 +122,43 @@ public final class MapProjectionHandle: @unchecked Sendable {
 
   public func pixel(for coordinate: LatLng) throws -> ScreenPoint {
     try mapNativeFailure {
-      try handle.withLive { projection in
-        try ScreenPoint(native: NativeScreenPoint(NativeProjection
-            .pixelForLatLng(
-              projection,
-              coordinate: coordinate.nativeInput.native
-            )))
+      let point = try handle.withLive { projection in
+        try NativeMemory
+          .withTemporary(mln_screen_point()) { point in
+            try checkStatus(mln_map_projection_pixel_for_lat_lng(
+              projection.raw, coordinate.nativeInput.native, point
+            ))
+          }.value
       }
+      return ScreenPoint(native: NativeScreenPoint(point))
     }
   }
 
   /// Converts a screen point to a geographic coordinate.
   ///
-  /// The longitude is wrapped to the range from -180 to 180 degrees.
-  public func latLng(for point: ScreenPoint) throws -> LatLng {
+  /// The longitude is wrapped to the range from -180 to 180 degrees unless
+  /// `unwrapped` is `true`, in which case it preserves the visible world copy
+  /// and may fall outside that range.
+  public func latLng(
+    for point: ScreenPoint,
+    unwrapped: Bool = false
+  ) throws -> LatLng {
     try mapNativeFailure {
-      try handle.withLive { projection in
-        try LatLng(native: NativeLatLng(NativeProjection.latLngForPixel(
-          projection,
-          point: point.nativeInput.native
-        )))
+      let coordinate = try handle.withLive { projection in
+        if unwrapped {
+          return try NativeProjection.latLngForPixelUnwrapped(
+            projection,
+            point: point.nativeInput.native
+          )
+        }
+        return try NativeMemory
+          .withTemporary(mln_lat_lng()) { coordinate in
+            try checkStatus(mln_map_projection_lat_lng_for_pixel(
+              projection.raw, point.nativeInput.native, coordinate
+            ))
+          }.value
       }
-    }
-  }
-
-  /// Converts a screen point to an unwrapped geographic coordinate.
-  ///
-  /// The longitude preserves the visible world copy and may fall outside
-  /// -180 to 180.
-  public func latLngUnwrapped(for point: ScreenPoint) throws -> LatLng {
-    try mapNativeFailure {
-      try handle.withLive { projection in
-        try LatLng(native: NativeLatLng(NativeProjection
-            .latLngForPixelUnwrapped(
-              projection,
-              point: point.nativeInput.native
-            )))
-      }
+      return LatLng(native: NativeLatLng(coordinate))
     }
   }
 }

@@ -45,13 +45,6 @@ mln_go_runtime_event_offline_region_tile_count_limit(
   return event->payload.offline_region_tile_count_limit;
 }
 
-static inline mln_runtime_event_offline_operation_completed
-mln_go_runtime_event_offline_operation_completed(
-  const mln_runtime_event* event
-) {
-  return event->payload.offline_operation_completed;
-}
-
 static inline mln_runtime_event_camera_transition_finished
 mln_go_runtime_event_camera_transition_finished(
   const mln_runtime_event* event
@@ -109,15 +102,6 @@ mln_go_runtime_event_with_offline_region_tile_count_limit(
   event.payload_type =
     MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT;
   event.payload.offline_region_tile_count_limit = payload;
-  return event;
-}
-
-static inline mln_runtime_event
-mln_go_runtime_event_with_offline_operation_completed(
-  mln_runtime_event event, mln_runtime_event_offline_operation_completed payload
-) {
-  event.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED;
-  event.payload.offline_operation_completed = payload;
   return event;
 }
 

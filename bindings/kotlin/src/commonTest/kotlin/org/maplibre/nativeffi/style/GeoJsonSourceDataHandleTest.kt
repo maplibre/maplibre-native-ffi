@@ -7,11 +7,14 @@ import kotlin.test.assertTrue
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
+import org.maplibre.nativeffi.runtime.CommandDisposition
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class GeoJsonSourceDataHandleTest {
   @Test
@@ -37,93 +40,112 @@ class GeoJsonSourceDataHandleTest {
   }
 
   @Test
-  fun onePreparedHandleInstallsOnManySources() {
-    withMap { map ->
+  fun onePreparedHandleInstallsOnManySources(): Unit = runSuspendTest {
+    withMap { _, map ->
       GeoJsonSourceDataHandle.create(featureCollection(), baseOptions()).use { data ->
-        map.addGeoJsonSourceData("places-a", data)
-        map.addGeoJsonSourceData("places-b", data)
-        assertEquals(SourceType.GEOJSON, map.styleSourceType("places-a"))
-        assertEquals(SourceType.GEOJSON, map.styleSourceType("places-b"))
-        map.setGeoJsonSourceData("places-a", data)
+        map.addGeoJsonSourceData("places-a", data).await()
+        map.addGeoJsonSourceData("places-b", data).await()
+        assertEquals(SourceType.GEOJSON, map.styleSourceInfo("places-a").await()?.type)
+        assertEquals(SourceType.GEOJSON, map.styleSourceInfo("places-b").await()?.type)
+        map.setGeoJsonSourceData("places-a", data).await()
       }
     }
   }
 
   @Test
-  fun releaseNeverInvalidatesAnInstalledSource() {
-    withMap { map ->
+  fun releaseNeverInvalidatesAnInstalledSource(): Unit = runSuspendTest {
+    withMap { _, map ->
       val data = GeoJsonSourceDataHandle.create(featureCollection())
-      map.addGeoJsonSourceData("places", data)
+      map.addGeoJsonSourceData("places", data).await()
       data.close()
 
       // The source keeps its own reference and remains usable after the handle is gone.
-      assertEquals(SourceType.GEOJSON, map.styleSourceType("places"))
+      assertEquals(SourceType.GEOJSON, map.styleSourceInfo("places").await()?.type)
       GeoJsonSourceDataHandle.create(featureCollection()).use { replacement ->
-        map.setGeoJsonSourceData("places", replacement)
+        map.setGeoJsonSourceData("places", replacement).await()
       }
 
       // A released handle is no longer installable.
-      assertFailsWith<InvalidStateException> { map.addGeoJsonSourceData("more-places", data) }
+      assertFailsWith<InvalidStateException> {
+        map.addGeoJsonSourceData("more-places", data).await()
+      }
     }
   }
 
   @Test
-  fun setRejectsDataPreparedWithMismatchedOptions() {
-    withMap { map ->
+  fun setRejectsDataPreparedWithMismatchedOptions(): Unit = runSuspendTest {
+    withMap { _, map ->
       GeoJsonSourceDataHandle.create(featureCollection(), baseOptions()).use { data ->
-        map.addGeoJsonSourceData("places", data)
+        map.addGeoJsonSourceData("places", data).await()
       }
 
-      assertFailsWith<InvalidArgumentException> {
-        GeoJsonSourceDataHandle.create(featureCollection(), baseOptions().copy { buffer = 32 })
-          .use { mismatched -> map.setGeoJsonSourceData("places", mismatched) }
+      GeoJsonSourceDataHandle.create(featureCollection(), baseOptions().copy { buffer = 32 }).use {
+        mismatched ->
+        assertCommandFailed(
+          map.setGeoJsonSourceData("places", mismatched).await(),
+          MaplibreStatus.INVALID_ARGUMENT,
+        )
       }
 
       // Cluster aggregations are part of the options comparison, so data
       // prepared with different clusterProperties is rejected too.
-      assertFailsWith<InvalidArgumentException> {
-        GeoJsonSourceDataHandle.create(
-            featureCollection(),
-            baseOptions().copy {
-              clusterProperties = "{\"total\":[\"+\",[\"get\",\"rank\"]]}".encodeToByteArray()
-            },
+      GeoJsonSourceDataHandle.create(
+          featureCollection(),
+          baseOptions().copy {
+            clusterProperties = "{\"total\":[\"+\",[\"get\",\"rank\"]]}".encodeToByteArray()
+          },
+        )
+        .use { mismatched ->
+          assertCommandFailed(
+            map.setGeoJsonSourceData("places", mismatched).await(),
+            MaplibreStatus.INVALID_ARGUMENT,
           )
-          .use { mismatched -> map.setGeoJsonSourceData("places", mismatched) }
-      }
+        }
     }
   }
 
   @Test
-  fun synchronousTilingOverridesALiveSource() {
-    withMap { map ->
+  fun synchronousTilingOverridesALiveSource(): Unit = runSuspendTest {
+    withMap { _, map ->
       GeoJsonSourceDataHandle.create(featureCollection()).use { data ->
-        map.addGeoJsonSourceData("places", data)
-        map.setGeoJsonSourceSynchronousTiling("places", true)
+        map.addGeoJsonSourceData("places", data).await()
+        map.setGeoJsonSourceSynchronousTiling("places", true).await()
         GeoJsonSourceDataHandle.create(featureCollection()).use { update ->
-          map.setGeoJsonSourceData("places", update)
+          map.setGeoJsonSourceData("places", update).await()
         }
-        map.setGeoJsonSourceSynchronousTiling("places", false)
+        map.setGeoJsonSourceSynchronousTiling("places", false).await()
       }
-      assertFailsWith<InvalidArgumentException> {
-        map.setGeoJsonSourceSynchronousTiling("missing", true)
-      }
+      assertCommandFailed(
+        map.setGeoJsonSourceSynchronousTiling("missing", true).await(),
+        MaplibreStatus.NOT_FOUND,
+      )
     }
   }
 
-  private fun withMap(block: (MapHandle) -> Unit) {
+  private fun assertCommandFailed(
+    completion: org.maplibre.nativeffi.runtime.CommandCompletion,
+    status: MaplibreStatus,
+  ) {
+    assertEquals(CommandDisposition.FAILED, completion.disposition)
+    assertEquals(status, completion.status)
+    assertTrue(completion.diagnostic.isNotEmpty())
+  }
+
+  private suspend fun withMap(block: suspend (RuntimeHandle, MapHandle) -> Unit) {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     val map =
       MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          mapMode = MapMode.STATIC
-        },
-      )
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+            mapMode = MapMode.STATIC
+          },
+        )
+        .await()
     try {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
-      block(map)
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
+      block(runtime, map)
     } finally {
       map.close()
       runtime.close()

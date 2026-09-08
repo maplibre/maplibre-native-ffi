@@ -1,76 +1,17 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"runtime"
-	"time"
 
 	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
 )
-
-const runtimeParkTimeout = 100 * time.Millisecond
-
-// runtimeLoopHandles is published once after the runtime loop creates the map.
-// The render loop uses the map only to attach its own render session and uses
-// the wake source to release a parked pump after queuing work.
-type runtimeLoopHandles struct {
-	mapRef *maplibre.MapHandle
-	wake   *maplibre.WakeSource
-}
-
-// runRuntimeLoop owns the runtime, map, pump, event queue, and every camera
-// mutation on one stable native thread for their whole lifetime.
-func runRuntimeLoop(v viewport, commands *commandQueue, published chan<- runtimeLoopHandles, shared *sharedState) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-	defer close(published)
-
-	state, err := newRuntimeMapState(v)
-	if err != nil {
-		shared.fail(err)
-		return
-	}
-	defer func() { shared.fail(state.Close()) }()
-
-	wake, err := state.runtime.WakeSource()
-	if err != nil {
-		shared.fail(fmt.Errorf("wake source acquire failed: %w", err))
-		return
-	}
-	defer wake.Close()
-	published <- runtimeLoopHandles{mapRef: state.mapRef, wake: wake}
-
-	for !shared.shutdownRequested() {
-		if err := state.applyCommands(commands); err != nil {
-			shared.fail(err)
-			break
-		}
-		if err := state.runtime.Pump(runtimeParkTimeout, -1); err != nil {
-			shared.fail(fmt.Errorf("runtime pump failed: %w", err))
-			break
-		}
-		renderRequested, err := drainEvents(state.runtime, state.mapID)
-		if err != nil {
-			shared.fail(err)
-			break
-		}
-		if renderRequested {
-			shared.requestRender()
-		}
-	}
-	// Destroying a map with an attached session is invalid, so keep the map
-	// alive until the render loop signals shutdown.
-	for !shared.shutdownRequested() {
-		time.Sleep(time.Millisecond)
-	}
-}
 
 type runtimeMapState struct {
 	runtime *maplibre.RuntimeHandle
 	mapRef  *maplibre.MapHandle
 	mapID   maplibre.MapID
-	batch   []cameraCommand
 }
 
 func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
@@ -79,26 +20,28 @@ func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
 		return nil, fmt.Errorf("runtime create failed: %w", err)
 	}
 	state := &runtimeMapState{runtime: runtimeHandle}
-
 	mapOptions := maplibre.NewMapOptions(v.logicalWidth, v.logicalHeight, v.scaleFactor)
-	// The two event types the runtime loop reads. A map queues no event of an
-	// unselected type, so the first style load already queues nothing else.
-	mapOptions.EventMask = maplibre.RuntimeEventMaskMapRenderUpdateAvailable |
-		maplibre.RuntimeEventMaskMapRenderFrameFinished
-	mapHandle, err := runtimeHandle.NewMapWithOptions(mapOptions)
+	// The render loop re-arms from the frame result's repaint flag, so the map
+	// only has to report updates that arrive between frames.
+	mapOptions.EventMask = maplibre.RuntimeEventMaskMapRenderUpdateAvailable
+	mapFuture, err := runtimeHandle.NewMapWithOptions(mapOptions)
+	if err != nil {
+		_ = state.Close()
+		return nil, fmt.Errorf("map create failed: %w", err)
+	}
+	mapHandle, err := mapFuture.Await(context.Background())
 	if err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("map create failed: %w", err)
 	}
 	state.mapRef = mapHandle
-	mapID, err := mapHandle.ID()
+	state.mapID, err = mapHandle.ID()
 	if err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("map identity read failed: %w", err)
 	}
-	state.mapID = mapID
-
-	if err := mapHandle.SetStyleURL("https://tiles.openfreemap.org/styles/bright"); err != nil {
+	_, err = mapHandle.SetStyleURL("https://tiles.openfreemap.org/styles/bright")
+	if err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("style load failed: %w", err)
 	}
@@ -107,11 +50,13 @@ func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
 		WithZoom(13).
 		WithBearing(12).
 		WithPitch(30)
-	if err := mapHandle.JumpTo(initialCamera); err != nil {
+	_, err = mapHandle.JumpTo(initialCamera)
+	if err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("camera jump failed: %w", err)
 	}
-	if err := mapHandle.RequestRepaint(); err != nil {
+	_, err = mapHandle.RequestRepaint()
+	if err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("initial repaint request failed: %w", err)
 	}
@@ -120,113 +65,117 @@ func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
 
 func (state *runtimeMapState) Close() error {
 	var result error
+	// Awaiting both release completions keeps process exit ordered after
+	// native teardown.
 	if state.mapRef != nil {
-		result = errors.Join(result, state.mapRef.Close())
+		teardown, err := state.mapRef.Close()
+		result = errors.Join(result, err)
+		if err == nil {
+			_, waitErr := teardown.Await(context.Background())
+			result = errors.Join(result, waitErr)
+		}
 		state.mapRef = nil
 	}
 	if state.runtime != nil {
-		result = errors.Join(result, state.runtime.Close())
+		teardown, err := state.runtime.Close()
+		result = errors.Join(result, err)
+		if err == nil {
+			_, waitErr := teardown.Await(context.Background())
+			result = errors.Join(result, waitErr)
+		}
 		state.runtime = nil
 	}
 	return result
 }
 
-func (state *runtimeMapState) applyCommands(commands *commandQueue) error {
-	state.batch = commands.drain(state.batch)
-	for _, command := range state.batch {
-		if err := state.applyCommand(command); err != nil {
-			return err
-		}
+// cancelTransitions ends any running camera transition, so a starting gesture
+// takes over from it rather than fighting it.
+func (state *runtimeMapState) cancelTransitions() error {
+	if _, err := state.mapRef.CancelTransitions(); err != nil {
+		return fmt.Errorf("camera transition cancel failed: %w", err)
 	}
 	return nil
 }
 
-func (state *runtimeMapState) applyCommand(command cameraCommand) error {
-	m := state.mapRef
-	animation := maplibre.AnimationOptions{}.WithDurationMS(command.durationMS)
-	var err error
-	switch command.kind {
-	case commandCancelTransitions:
-		err = m.CancelTransitions()
-	case commandSetGestureInProgress:
-		err = m.SetGestureInProgress(command.inProgress)
-	case commandMoveBy:
-		err = m.MoveBy(maplibre.ScreenPoint{X: command.deltaX, Y: command.deltaY})
-	case commandMoveByAnimated:
-		err = m.MoveByAnimated(maplibre.ScreenPoint{X: command.deltaX, Y: command.deltaY}, &animation)
-	case commandScaleBy:
-		err = m.ScaleBy(command.scale, &command.anchor)
-	case commandScaleByAnimated:
-		err = m.ScaleByAnimated(command.scale, &command.anchor, &animation)
-	case commandPitchBy:
-		err = m.PitchBy(command.deltaY)
-	case commandAdjustBearing:
-		err = state.adjustBearing(command.deltaX, nil)
-	case commandAdjustBearingAnimated:
-		err = state.adjustBearing(command.deltaX, &animation)
-	case commandAdjustPitchAnimated:
-		err = state.adjustPitch(command.deltaY, &animation)
-	case commandResetOrientation:
-		err = m.EaseTo(maplibre.CameraOptions{}.WithBearing(0).WithPitch(0), &animation)
-	default:
-		err = fmt.Errorf("unknown camera command: %d", command.kind)
+func (state *runtimeMapState) setGestureInProgress(inProgress bool) error {
+	phase := maplibre.GesturePhaseEnd
+	if inProgress {
+		phase = maplibre.GesturePhaseBegin
 	}
-	if err != nil {
-		return fmt.Errorf("camera command failed: %w", err)
+	return state.updateCamera(maplibre.CameraUpdate{GesturePhase: phase})
+}
+
+func (state *runtimeMapState) moveBy(dx, dy float64, durationMS *float64) error {
+	_, err := state.mapRef.ApplyCameraDelta(maplibre.CameraDelta{
+		Offset: maplibre.ScreenPoint{X: dx, Y: dy}, Animation: animationOptions(durationMS),
+	})
+	return err
+}
+
+func (state *runtimeMapState) scaleBy(scale float64, anchor maplibre.ScreenPoint, durationMS *float64) error {
+	_, err := state.mapRef.ApplyCameraDelta(maplibre.CameraDelta{
+		Kind: maplibre.CameraDeltaKindScale, Amount: scale, Anchor: &anchor, Animation: animationOptions(durationMS),
+	})
+	return err
+}
+
+func (state *runtimeMapState) adjustPitch(delta float64, durationMS *float64) error {
+	_, err := state.mapRef.ApplyCameraDelta(maplibre.CameraDelta{
+		Kind: maplibre.CameraDeltaKindPitch, Amount: delta, Animation: animationOptions(durationMS),
+	})
+	return err
+}
+
+func (state *runtimeMapState) adjustBearing(delta float64, durationMS *float64) error {
+	_, err := state.mapRef.ApplyCameraDelta(maplibre.CameraDelta{
+		Kind: maplibre.CameraDeltaKindBearing, Amount: delta, Animation: animationOptions(durationMS),
+	})
+	return err
+}
+
+func (state *runtimeMapState) resetOrientation(durationMS float64) error {
+	return state.updateCamera(cameraUpdate(maplibre.CameraOptions{}.WithBearing(0).WithPitch(0), &durationMS))
+}
+
+func (state *runtimeMapState) updateCamera(update maplibre.CameraUpdate) error {
+	if _, err := state.mapRef.UpdateCamera(update); err != nil {
+		return fmt.Errorf("camera update failed: %w", err)
 	}
 	return nil
 }
 
-func (state *runtimeMapState) adjustBearing(delta float64, animation *maplibre.AnimationOptions) error {
-	camera, err := state.mapRef.Camera()
-	if err != nil {
-		return err
+func cameraUpdate(options maplibre.CameraOptions, durationMS *float64) maplibre.CameraUpdate {
+	update := maplibre.CameraUpdate{Camera: options}
+	if durationMS != nil {
+		animation := maplibre.AnimationOptions{}.WithDurationMS(*durationMS)
+		update.Mode = maplibre.CameraUpdateModeEase
+		update.Animation = &animation
 	}
-	bearing := delta
-	if camera.Bearing != nil {
-		bearing += *camera.Bearing
-	}
-	options := maplibre.CameraOptions{}.WithBearing(bearing)
-	if animation == nil {
-		return state.mapRef.JumpTo(options)
-	}
-	return state.mapRef.EaseTo(options, animation)
+	return update
 }
 
-func (state *runtimeMapState) adjustPitch(delta float64, animation *maplibre.AnimationOptions) error {
-	camera, err := state.mapRef.Camera()
-	if err != nil {
-		return err
+func animationOptions(durationMS *float64) *maplibre.AnimationOptions {
+	if durationMS == nil {
+		return nil
 	}
-	pitch := delta
-	if camera.Pitch != nil {
-		pitch += *camera.Pitch
-	}
-	return state.mapRef.EaseTo(maplibre.CameraOptions{}.WithPitch(clamp(pitch, 0, 60)), animation)
+	animation := maplibre.AnimationOptions{}.WithDurationMS(*durationMS)
+	return &animation
 }
 
 func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID maplibre.MapID) (bool, error) {
-	renderRequested := false
-	// One drain takes every event the pump produced.
-	batch, err := runtimeHandle.DrainEvents(0)
+	events, err := runtimeHandle.DrainEvents()
 	if err != nil {
-		return renderRequested, fmt.Errorf("runtime event drain failed: %w", err)
+		return false, fmt.Errorf("runtime event drain failed: %w", err)
 	}
-	for _, event := range batch.Events {
+	for _, event := range events {
 		if event.Source.Type != maplibre.RuntimeEventSourceMap || event.Source.MapID != mapID {
 			continue
 		}
-		switch event.Type {
-		case maplibre.RuntimeEventMapRenderUpdateAvailable:
-			renderRequested = true
-		case maplibre.RuntimeEventMapRenderFrameFinished:
-			payload, ok := event.Payload.(maplibre.RuntimeEventRenderFramePayload)
-			if ok && payload.NeedsRepaint {
-				renderRequested = true
-			}
+		if event.Type == maplibre.RuntimeEventMapRenderUpdateAvailable {
+			return true, nil
 		}
 	}
-	return renderRequested, nil
+	return false, nil
 }
 
 // renderMapState owns the render target on the SDL render loop thread.
@@ -265,9 +214,16 @@ func (state *renderMapState) finishFrame() error {
 	return state.target.FinishFrame()
 }
 
-func (state *renderMapState) renderUpdate() (bool, error) {
+func (state *renderMapState) pollPending() (bool, error) {
 	if state.target == nil {
 		return false, nil
 	}
-	return state.target.RenderUpdate()
+	return state.target.PollPending()
+}
+
+func (state *renderMapState) driveFrame() (frameOutcome, error) {
+	if state.target == nil {
+		return frameOutcome{}, nil
+	}
+	return state.target.DriveFrame()
 }

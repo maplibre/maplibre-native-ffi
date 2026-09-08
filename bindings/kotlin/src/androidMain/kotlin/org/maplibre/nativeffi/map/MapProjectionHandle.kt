@@ -11,7 +11,11 @@ import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
 
-/** Any-thread Android JNI standalone projection snapshot. */
+/**
+ * Owned Android JNI standalone projection snapshot.
+ *
+ * See the common declaration for the projection's threading and lifetime rules.
+ */
 public actual class MapProjectionHandle internal constructor(private val handleId: Long) :
   AutoCloseable {
   private val core = HandleStateCore("MapProjectionHandle", handleId)
@@ -20,16 +24,15 @@ public actual class MapProjectionHandle internal constructor(private val handleI
     HandleLeakCleaner.register(this, core.leakReport)
   }
 
-  public actual val camera: CameraOptions
-    get() {
-      NativeAccess.ensureLoaded()
-      MaplibreNativeC.mln_camera_options_default().use { outCamera ->
-        withLiveHandle { handle ->
-          Status.check(MaplibreNativeC.mln_map_projection_get_camera(handle, outCamera))
-        }
-        return projectionCameraOptions(outCamera)
+  public actual fun camera(): CameraOptions {
+    NativeAccess.ensureLoaded()
+    MaplibreNativeC.mln_camera_options_default().use { outCamera ->
+      return withLiveHandle { handle ->
+        Status.check(MaplibreNativeC.mln_map_projection_get_camera(handle, outCamera))
+        projectionCameraOptions(outCamera)
       }
     }
+  }
 
   public actual fun setCamera(camera: CameraOptions) {
     NativeAccess.ensureLoaded()
@@ -138,8 +141,8 @@ public actual class MapProjectionHandle internal constructor(private val handleI
   public actual val isClosed: Boolean
     get() = core.isReleased()
 
-  public actual override fun close() {
-    core.closeOnce(destroy = { MaplibreNativeC.mln_map_projection_destroy(handleId) })
+  actual override fun close() {
+    core.closeOnce(destroy = { MaplibreNativeC.mln_map_projection_close(handleId) })
   }
 
   private fun <T> withLiveHandle(block: (Long) -> T): T = core.withLive { block(handleId) }

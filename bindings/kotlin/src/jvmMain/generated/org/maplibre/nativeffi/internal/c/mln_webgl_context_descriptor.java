@@ -16,7 +16,9 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  * {@snippet lang=c :
  * struct mln_webgl_context_descriptor {
  *     uint32_t size;
+ *     uint32_t kind;
  *     int32_t context;
+ *     mln_buffer_view canvas_selector;
  * }
  * }
  */
@@ -28,7 +30,10 @@ public class mln_webgl_context_descriptor {
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
         MapLibreNativeC.C_INT.withName("size"),
-        MapLibreNativeC.C_INT.withName("context")
+        MapLibreNativeC.C_INT.withName("kind"),
+        MapLibreNativeC.C_INT.withName("context"),
+        MemoryLayout.paddingLayout(4),
+        mln_buffer_view.layout().withName("canvas_selector")
     ).withName("mln_webgl_context_descriptor");
 
     /**
@@ -82,6 +87,50 @@ public class mln_webgl_context_descriptor {
         struct.set(size$LAYOUT, size$OFFSET, fieldValue);
     }
 
+    private static final OfInt kind$LAYOUT = (OfInt)$LAYOUT.select(groupElement("kind"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * uint32_t kind
+     * }
+     */
+    public static final OfInt kind$layout() {
+        return kind$LAYOUT;
+    }
+
+    private static final long kind$OFFSET = $LAYOUT.byteOffset(groupElement("kind"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * uint32_t kind
+     * }
+     */
+    public static final long kind$offset() {
+        return kind$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * uint32_t kind
+     * }
+     */
+    public static int kind(MemorySegment struct) {
+        return struct.get(kind$LAYOUT, kind$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * uint32_t kind
+     * }
+     */
+    public static void kind(MemorySegment struct, int fieldValue) {
+        struct.set(kind$LAYOUT, kind$OFFSET, fieldValue);
+    }
+
     private static final OfInt context$LAYOUT = (OfInt)$LAYOUT.select(groupElement("context"));
 
     /**
@@ -124,6 +173,50 @@ public class mln_webgl_context_descriptor {
      */
     public static void context(MemorySegment struct, int fieldValue) {
         struct.set(context$LAYOUT, context$OFFSET, fieldValue);
+    }
+
+    private static final GroupLayout canvas_selector$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("canvas_selector"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * mln_buffer_view canvas_selector
+     * }
+     */
+    public static final GroupLayout canvas_selector$layout() {
+        return canvas_selector$LAYOUT;
+    }
+
+    private static final long canvas_selector$OFFSET = $LAYOUT.byteOffset(groupElement("canvas_selector"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * mln_buffer_view canvas_selector
+     * }
+     */
+    public static final long canvas_selector$offset() {
+        return canvas_selector$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * mln_buffer_view canvas_selector
+     * }
+     */
+    public static MemorySegment canvas_selector(MemorySegment struct) {
+        return struct.asSlice(canvas_selector$OFFSET, canvas_selector$LAYOUT.byteSize());
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * mln_buffer_view canvas_selector
+     * }
+     */
+    public static void canvas_selector(MemorySegment struct, MemorySegment fieldValue) {
+        MemorySegment.copy(fieldValue, 0L, struct, canvas_selector$OFFSET, canvas_selector$LAYOUT.byteSize());
     }
 
     /**

@@ -1,6 +1,6 @@
 ---
 title: Run the render loop
-description: Choose the runtime owner thread, then pump it and draw frames.
+description: Submit frame demand, service graphics work when required, and drain owned results.
 sidebar:
   order: 4
 ---
@@ -8,100 +8,85 @@ sidebar:
 import { Code } from "@astrojs/starlight/components";
 import { region } from "../../../snippets";
 
-import frameLoop from "../../../../snippets/c/frame-loop.c?raw";
-import pumpThread from "../../../../snippets/c/pump-thread.c?raw";
+import frameLoopSnippet from "../../../../snippets/c/frame-loop.c?raw";
 
-Pumping the runtime advances MapLibre Native. A pump drains queued map work and
-services network and database work. Drawing is separate: the map publishes a
-render update, and the render session draws it.
+MapLibre Native advances runtime and map work on its native scheduler. A render
+session advances through either a native graphics worker or a narrow service
+call on the host graphics thread. Unlike the MapLibre Android and iOS SDKs' map
+view, no host thread pumps the runtime. The snippets on this page come from one
+turn of a display-paced host loop over a caller-driver session.
 
-Pump the runtime and drain its events on the runtime owner thread. Both
-operations report a wrong-thread status from another thread. Choose the owner
-thread before creating the runtime.
+## Submit frame demand
 
-## Choose the runtime owner thread
+Submit a nonblocking frame demand from any thread. It carries a host token, an
+optional timeout, flags, and a coalescing boundary. Matching demands may
+coalesce before work starts, but every accepted demand produces one terminal
+result record. A positive timeout starts when native code accepts the demand;
+when it expires before work begins, the demand terminates as deadline missed.
+The timeout does not supply cadence.
 
-Pump from the display thread when the host already has a frame callback and the
-map is the main work on that thread. The runtime, map, and render session then
-share one thread, and the loop needs no shared state. Pass a drain budget so
-one busy pump spreads its work across frames instead of spanning an entire
-style parse inside one callback. A single task still runs to completion, so
-keep headroom in the frame for the longest one.
+A core-worker session wakes its serial graphics worker. A caller-driver session
+invokes its driver-work wake callback. Map updates use the same paths, so
+progress does not depend on runtime-event drains or display callbacks.
 
-Use a dedicated thread when a long pump would stall the display, the map must
-load while the display is idle, or the host draws no frames. That thread parks
-inside the pump, and runtime work sets the loop cadence. The display thread
-attaches the render session and draws. This design needs shared state and a wake
-source.
+The host may submit demand from a display source, after an earlier result, or
+from another scheduler. A demand captures the current extent generation. Its
+result identifies the token and the map-update, extent, and frame generations
+that the driver used.
 
-## Pump from the frame callback
+A host that renders on demand derives that demand from runtime events: an
+update-available event, or a frame-finished event whose repaint flag is set.
 
-Pass a timeout of zero. The call drains what is queued and returns, because the
-display already sets the pace. Pass a budget of a few milliseconds so the pump
-leaves the rest of the frame to drawing; work that the budget defers re-arms
-the pump, so the next callback continues it. One drain then takes the events
-that the pump produced.
+<Code code={region(frameLoopSnippet, "wants")} lang="c" title="frame-loop.c" />
 
-This loop reads two event types, render-update-available and
-render-frame-finished. It selects them before the map loads a style, as
-[Handle events](/maplibre-native-ffi/guides/handle-events/) describes.
+While a frame is pending, each loop turn submits one demand with the if-needed
+and present flags and a fresh host token. A demand that clears the present flag
+still renders, and a presenting target keeps whatever it presented last.
 
-<Code code={region(frameLoop, "pump")} lang="c" title="frame-loop.c" />
+<Code code={region(frameLoopSnippet, "render")} lang="c" title="frame-loop.c" />
 
-The helper compares each event's source against the map before interpreting the
-event. Every map in one runtime shares the queue. It requests a frame after a
-render update and after a finished frame with its repaint flag set. Repaint
-frames advance camera animations and label placement.
+## Service a caller driver
 
-A display-paced host stops pumping when it stops requesting frames. Request a
-frame after every map change. This lets an idle loop process the change.
+When the driver-work callback wakes the host, schedule the driver-service call on the
+thread or realm where the target's graphics context is usable. The first
+successful call fixes that graphics-thread identity. Service calls run one at a
+time, and a work limit of zero drains the mailbox in one call. Continue service
+while presentation callbacks are paused, because attach, resize, queries,
+readback, barriers, and detach also use the mailbox.
 
-Draw a pending frame after draining events. The render call reports which
-outcome it reached. A no-update result and a pending-size result both mean that
-the map has not published an update for the session's extent, which is expected
-at startup and after an attach or resize. A target-not-ready result means that
-the render target had no frame to draw into, so the next turn tries again.
+<Code code={region(frameLoopSnippet, "service")} lang="c" title="frame-loop.c" />
 
-A rendered frame clears the pending flag, unless the map asked for another
-frame while rendering this one, as during a camera transition. The render call
-returns that repaint flag directly, so the loop re-arms in the same turn
-instead of waiting for the frame's events to arrive.
+A core-worker session rejects the service call because its native worker already
+owns execution. The
+[render session concepts](/maplibre-native-ffi/concepts/#render-session) table
+gives the driver that each target kind accepts.
 
-<Code code={region(frameLoop, "render")} lang="c" title="frame-loop.c" />
+If the graphics owner cannot run again, abandon the target. Leaving ready work
+unserviced can leave operations pending indefinitely.
 
-## Pump on a thread of your own
+## Drain results and present
 
-The pump thread owns the runtime and map. The display thread owns the render
-session. Each operation reports a wrong-thread status when called from the
-other thread.
+Frame readiness is level-triggered. Drain an owned frame-result batch from any
+thread after the frame wake runs. Each batch remains stable until release. Keep
+draining until the queue is empty, which the drain reports with a not-ready
+status and no batch.
 
-The two threads share a flag that the pump thread sets when a frame is due, a
-flag that the display thread sets to stop the loop, and a wake source.
+A rendered result means that a frame was presented or became available for
+acquisition or readback. No update and size pending wait for a newer map update.
+Target not ready waits for host target readiness or paced retry. Superseded
+means that a newer demand replaced this demand within the same coalescing
+boundary. Deadline missed means that work did not begin within the positive
+timeout. These outcomes have different retry conditions, so preserve them in
+host pacing.
 
-<Code code={region(pumpThread, "channel")} lang="c" title="pump-thread.c" />
+<Code code={region(frameLoopSnippet, "results")} lang="c" title="frame-loop.c" />
 
-Acquire the wake source and select the event types the loop reads, both on the
-runtime owner thread before the loop starts.
+Owned texture acquisition is nonblocking and leases the oldest completed slot
+that is not already acquired. Wait for or submit work after its producer sync.
+Release the acquired handle with consumer-completion sync when host GPU work
+reads the texture. CPU-complete sync is valid only when that work completed
+before release. The session retires the slot through its selected driver before
+reusing it.
 
-<Code code={region(pumpThread, "acquire")} lang="c" title="pump-thread.c" />
-
-Any thread may signal the source, and the signal releases a parked pump. The
-display thread signals it after it queues work for the map or asks the loop to
-stop.
-
-<Code code={region(pumpThread, "signal")} lang="c" title="pump-thread.c" />
-
-The loop parks until owner-thread work, a selected event, or the wake source
-signals it. Use a positive timeout to reach the stop check even when no wake
-arrives. The runtime registers no timers of its own. This snippet parks for 100
-ms and checks for a stop at least ten times a second.
-
-<Code code={region(pumpThread, "loop")} lang="c" title="pump-thread.c" />
-
-Call a parking pump outside any lock that a signalling thread also acquires. The
-display thread reads the pending flag on its next frame and draws.
-
-Use a dedicated operating-system thread. The runtime records that specific
-thread at creation. Serial dispatch queues, actors, and pooled executors provide
-serialization but can move work between threads. Calls that move report a
-wrong-thread status.
+Use a session barrier when later work must wait for every preceding render item
+to become terminal. A barrier orders work; it does not request a frame.

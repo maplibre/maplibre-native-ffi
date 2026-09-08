@@ -36,15 +36,22 @@ const FIXTURE_STYLE_LAYER_IDS = {
   "/__fixture/original-after-clear.json": "original-after-clear",
 };
 
-// Enable software graphics in headless Chromium.
+// Headless Chromium can use Metal on macOS. Forcing its Linux SwiftShader
+// Vulkan stack there prevents WebGPU device creation.
+const WEBGPU_BROWSER_ARGS =
+  process.platform === "darwin"
+    ? ["--enable-unsafe-webgpu"]
+    : [
+        "--enable-unsafe-webgpu",
+        "--enable-features=Vulkan",
+        "--enable-unsafe-swiftshader",
+        "--use-angle=swiftshader",
+        "--use-vulkan=swiftshader",
+      ];
+
+// Enable software graphics where the host cannot use its native graphics API.
 const BACKEND_BROWSER_ARGS = {
-  webgpu: [
-    "--enable-unsafe-webgpu",
-    "--enable-features=Vulkan",
-    "--enable-unsafe-swiftshader",
-    "--use-angle=swiftshader",
-    "--use-vulkan=swiftshader",
-  ],
+  webgpu: WEBGPU_BROWSER_ARGS,
   opengl: ["--enable-unsafe-swiftshader"],
 };
 
@@ -284,6 +291,9 @@ const child = spawn(
   browser,
   [
     "--headless=new",
+    // Temporary test profiles must not access the host's credential store.
+    "--password-store=basic",
+    "--use-mock-keychain",
     // Chromium's own logging carries the page console, so a run that hangs
     // still shows how far the suite got instead of only reporting the timeout.
     "--enable-logging=stderr",

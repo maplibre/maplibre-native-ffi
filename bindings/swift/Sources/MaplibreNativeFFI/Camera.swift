@@ -1,3 +1,4 @@
+internal import CMaplibreNativeC
 
 public struct CameraOptions: Equatable, Sendable {
   public var center: LatLng?
@@ -6,9 +7,8 @@ public struct CameraOptions: Equatable, Sendable {
   public var pitch: Double?
   public var centerAltitude: Double?
   public var padding: EdgeInsets?
-  /// Input-only screen point the camera pivots around. `jumpTo`, `easeTo`, and
-  /// `flyTo` honor it; MapLibre leaves it `nil` on every read path, including
-  /// camera snapshots and the camera-for-bounds helpers.
+  /// Input-only screen point the camera pivots around. Camera updates honor it;
+  /// MapLibre leaves it `nil` on camera reads.
   public var anchor: ScreenPoint?
   public var roll: Double?
   public var fieldOfView: Double?
@@ -116,5 +116,105 @@ public struct AnimationOptions: Equatable, Sendable {
       easing: easing?.nativeInput,
       transitionId: transitionId
     )
+  }
+}
+
+public enum CameraUpdateMode: UInt32, Sendable, Hashable {
+  case jump = 0
+  case ease = 1
+  case fly = 2
+}
+
+public enum GesturePhase: UInt32, Sendable, Hashable {
+  case none = 0
+  case begin = 1
+  case update = 2
+  case end = 3
+  case cancel = 4
+}
+
+/// One camera command copied atomically by the runtime worker.
+public struct CameraUpdate: Equatable, Sendable {
+  public var mode: CameraUpdateMode
+  public var camera: CameraOptions
+  public var animation: AnimationOptions
+  public var gesturePhase: GesturePhase
+
+  public init(
+    mode: CameraUpdateMode = .jump,
+    camera: CameraOptions,
+    animation: AnimationOptions = AnimationOptions(),
+    gesturePhase: GesturePhase = .none
+  ) {
+    self.mode = mode
+    self.camera = camera
+    self.animation = animation
+    self.gesturePhase = gesturePhase
+  }
+
+  func withNativeUpdate<Result>(
+    _ body: (UnsafePointer<mln_camera_update>) throws -> Result
+  ) throws -> Result {
+    try camera.nativeInput.withNativeOptions { camera in
+      try animation.nativeInput.withOptionalNativeOptions { animation in
+        var update = mln_camera_update_default()
+        update.mode = mode.rawValue
+        update.camera = camera.pointee
+        if let animation {
+          update.animation = animation.pointee
+        }
+        update.gesture_phase = gesturePhase.rawValue
+        return try withUnsafePointer(to: &update, body)
+      }
+    }
+  }
+}
+
+public enum CameraDeltaKind: UInt32, Sendable, Hashable {
+  case move = 0
+  case scale = 1
+  case bearing = 2
+  case pitch = 3
+}
+
+/// One relative camera operation.
+public struct CameraDelta: Equatable, Sendable {
+  public var kind: CameraDeltaKind
+  public var offset: ScreenPoint
+  public var amount: Double
+  public var anchor: ScreenPoint?
+  public var animation: AnimationOptions
+
+  public init(
+    kind: CameraDeltaKind = .move,
+    offset: ScreenPoint = ScreenPoint(x: 0, y: 0),
+    amount: Double = 0,
+    anchor: ScreenPoint? = nil,
+    animation: AnimationOptions = AnimationOptions()
+  ) {
+    self.kind = kind
+    self.offset = offset
+    self.amount = amount
+    self.anchor = anchor
+    self.animation = animation
+  }
+
+  func withNativeDelta<Result>(
+    _ body: (UnsafePointer<mln_camera_delta>) throws -> Result
+  ) throws -> Result {
+    try animation.nativeInput.withOptionalNativeOptions { animation in
+      var delta = mln_camera_delta_default()
+      delta.kind = kind.rawValue
+      delta.offset = offset.nativeInput.native
+      delta.amount = amount
+      if let anchor {
+        delta.has_anchor = true
+        delta.anchor = anchor.nativeInput.native
+      }
+      if let animation {
+        delta.animation = animation.pointee
+      }
+      return try withUnsafePointer(to: &delta, body)
+    }
   }
 }

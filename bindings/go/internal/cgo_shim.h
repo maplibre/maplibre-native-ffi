@@ -32,17 +32,16 @@ static inline void mln_go_opengl_context_set_egl(
   descriptor->data.egl.client_api = client_api;
   descriptor->data.egl.get_proc_address = get_proc_address;
 }
-
-static inline mln_wgl_context_descriptor* mln_go_opengl_context_wgl(
-  mln_opengl_context_descriptor* descriptor
+static inline void mln_go_opengl_context_set_webgl(
+  mln_opengl_context_descriptor* descriptor, mln_webgl_context_kind kind,
+  int32_t context, const char* canvas_selector, size_t canvas_selector_size
 ) {
-  return &descriptor->data.wgl;
-}
-
-static inline mln_egl_context_descriptor* mln_go_opengl_context_egl(
-  mln_opengl_context_descriptor* descriptor
-) {
-  return &descriptor->data.egl;
+  descriptor->platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
+  descriptor->data.webgl.size = sizeof(mln_webgl_context_descriptor);
+  descriptor->data.webgl.kind = kind;
+  descriptor->data.webgl.context = context;
+  descriptor->data.webgl.canvas_selector.data = canvas_selector;
+  descriptor->data.webgl.canvas_selector.size = canvas_selector_size;
 }
 
 #endif

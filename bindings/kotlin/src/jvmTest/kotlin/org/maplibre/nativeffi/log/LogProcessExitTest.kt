@@ -4,7 +4,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.system.exitProcess
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,6 +13,8 @@ import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.runtime.runSuspendTest
+import org.maplibre.nativeffi.runtime.use
 
 class LogProcessExitTest {
   @Test fun jvmExitsWithNativeLogCallbackInstalled() = assertProcessExits("installed")
@@ -70,28 +71,38 @@ object LogProcessExitProbe {
   fun main(args: Array<String>) {
     val callbackState = args.single()
     require(callbackState == "installed" || callbackState == "cleared")
-    val caller = Thread.currentThread()
-    val callbackThread = AtomicReference<Thread>()
     val received = CountDownLatch(1)
     Maplibre.loadNativeLibrary()
     Maplibre.setAsyncLogSeverities(setOf(LogSeverity.WARNING))
     Maplibre.setLogCallback(
       LogCallback { record ->
         if (record.event == LogEvent.PARSE_STYLE && record.severity == LogSeverity.WARNING) {
-          callbackThread.set(Thread.currentThread())
           received.countDown()
         }
         true
       }
     )
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      MapHandle.create(runtime, MapOptions()).use { map ->
-        // An invalid center emits a native parser warning without network or rendering work.
-        map.setStyleJson(
-          """{"version":8,"center":false,"sources":{},"layers":[]}""".encodeToByteArray()
-        )
-        check(received.await(10, TimeUnit.SECONDS)) { "Native parser warning never reached Java" }
-        check(callbackThread.get() !== caller) { "Log callback ran synchronously" }
+    runSuspendTest {
+      RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+        MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+            },
+          )
+          .await()
+          .use { map ->
+            // An invalid center emits a native parser warning without network or rendering work.
+            map
+              .setStyleJson(
+                """{"version":8,"center":false,"sources":{},"layers":[]}""".encodeToByteArray()
+              )
+              .await()
+            check(received.await(10, TimeUnit.SECONDS)) {
+              "Native parser warning never reached Java"
+            }
+          }
       }
     }
     if (callbackState == "cleared") {

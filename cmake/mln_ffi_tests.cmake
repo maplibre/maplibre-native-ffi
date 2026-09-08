@@ -73,6 +73,13 @@ function(mln_ffi_configure_browser_c_api_test)
 endfunction()
 
 function(mln_ffi_add_c_api_test)
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  add_test(
+    NAME execution-conventions
+    COMMAND
+      ${Python3_EXECUTABLE}
+      ${PROJECT_SOURCE_DIR}/scripts/check-execution-conventions.py
+      ${PROJECT_SOURCE_DIR}/include/maplibre_native_c)
   get_target_property(test_supported mln_ffi_platform_dependencies
                       MLN_FFI_TEST_SUPPORTED)
   if(NOT test_supported)
@@ -133,8 +140,17 @@ function(mln_ffi_add_c_api_test)
   # here; CONFIGURE_DEPENDS reruns the glob when the directory changes.
   file(GLOB test_abi_sources CONFIGURE_DEPENDS
        ${PROJECT_SOURCE_DIR}/src/c_api/tests/*_abi.c)
-  set(test_sources ${PROJECT_SOURCE_DIR}/src/c_api/tests/main.c
-      ${PROJECT_SOURCE_DIR}/src/c_api/tests/test_support.c ${test_abi_sources})
+  set(test_sources
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/main.c
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/test_support.c
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/test_support.cpp ${test_abi_sources})
+  if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
+    list(APPEND test_sources
+         ${PROJECT_SOURCE_DIR}/src/c_api/tests/metal_surface_test_support.mm)
+    set_source_files_properties(
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/metal_surface_test_support.mm
+      PROPERTIES COMPILE_OPTIONS -fobjc-arc)
+  endif()
 
   # Each *_abi.c reaches the runner through one run_<file>_tests() call in
   # main.c. main.c carries no preprocessor guards, so a plain text match is
@@ -164,7 +180,26 @@ function(mln_ffi_add_c_api_test)
   add_executable(mln_ffi_c_api_tests ${test_sources})
   set_target_properties(
     mln_ffi_c_api_tests
-    PROPERTIES C_STANDARD 23 C_STANDARD_REQUIRED YES C_EXTENSIONS OFF)
+    PROPERTIES
+      C_STANDARD
+      23
+      C_STANDARD_REQUIRED
+      YES
+      C_EXTENSIONS
+      OFF
+      CXX_STANDARD
+      23
+      CXX_STANDARD_REQUIRED
+      YES
+      CXX_EXTENSIONS
+      OFF)
+  # The suite links the shipped library so it exercises the same export
+  # boundary hosts link against. The one symbol it needs beyond the public API
+  # is the blocking driver hook, which the library exports under
+  # MLN_FFI_ENABLE_TEST_HOOKS and only in a test build.
+  target_compile_definitions(
+    maplibre_native_c_objects
+    PRIVATE MLN_FFI_ENABLE_TEST_HOOKS)
   target_link_libraries(
     mln_ffi_c_api_tests
     PRIVATE
@@ -172,7 +207,15 @@ function(mln_ffi_add_c_api_test)
       ${dependency_test_libraries})
   target_include_directories(
     mln_ffi_c_api_tests
-    PRIVATE ${PROJECT_SOURCE_DIR}/src/c_api/tests ${dependency_include_dirs})
+    PRIVATE
+      ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/src/c_api/tests
+      ${dependency_include_dirs})
+  target_include_directories(
+    mln_ffi_c_api_tests
+    SYSTEM
+    PRIVATE
+      ${MLN_FFI_SOURCE_DIR}/include
+      ${MLN_FFI_SOURCE_DIR}/vendor/maplibre-native-base/include)
 
   # Enforce the registration contract at compile time. A test that no RUN_TEST
   # references is an unused static function, and dropping `static` to dodge that
@@ -223,6 +266,13 @@ function(mln_ffi_add_c_api_test)
     find_package(Threads REQUIRED)
     target_link_libraries(mln_ffi_c_api_tests PRIVATE Threads::Threads)
   endif()
+  # The Metal test support defines an Objective-C class, which the iOS and
+  # tvOS test app links against the runtime and Foundation directly.
+  if(APPLE AND MLN_FFI_RENDER_BACKEND STREQUAL "metal")
+    target_link_libraries(
+      mln_ffi_c_api_tests
+      PRIVATE "-framework Foundation" objc)
+  endif()
 
   get_target_property(test_link_options mln_ffi_platform_dependencies
                       MLN_FFI_TEST_LINK_OPTIONS)
@@ -244,6 +294,9 @@ function(mln_ffi_add_c_api_test)
   else()
     add_test(NAME c-api COMMAND mln_ffi_c_api_tests)
   endif()
+  # The suite's own waits are bounded and name what never arrived, so a run
+  # that reaches this timeout has stalled somewhere they do not cover.
+  set_property(TEST c-api PROPERTY TIMEOUT 900)
 
   get_target_property(test_library_path_variable mln_ffi_platform_dependencies
                       MLN_FFI_TEST_LIBRARY_PATH_VARIABLE)

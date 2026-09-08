@@ -1,15 +1,16 @@
 #include <memory>
 
-#include <Metal/MTLBlitPass.hpp>
-#include <Metal/MTLCommandBuffer.hpp>
-#include <Metal/MTLCommandQueue.hpp>
-#include <Metal/MTLRenderPass.hpp>
-#include <TargetConditionals.h>
 #include <mln/gfx/backend_scope.hpp>
 #include <mln/gfx/offscreen_texture.hpp>
 #include <mln/mtl/context.hpp>
 #include <mln/mtl/renderable_resource.hpp>
 #include <mln/mtl/texture2d.hpp>
+
+#include <Metal/MTLBlitPass.hpp>
+#include <Metal/MTLCommandBuffer.hpp>
+#include <Metal/MTLCommandQueue.hpp>
+#include <Metal/MTLRenderPass.hpp>
+#include <TargetConditionals.h>
 
 #include "render/metal/metal_texture_backend.inc"
 
@@ -205,10 +206,11 @@ class MetalTextureBackend::MetalTextureRenderableResource final
 };
 
 MetalTextureBackend::MetalTextureBackend(
-  MTL::Device* host_device, mln::Size size
+  MTL::Device* host_device, mln::Size size, std::size_t ring_depth
 )
     : mln::mtl::RendererBackend(mln::gfx::ContextMode::Unique),
-      mln::gfx::HeadlessBackend(size) {
+      mln::gfx::HeadlessBackend(size),
+      ring_(ring_depth) {
   device = NS::RetainPtr(host_device);
   commandQueue = NS::TransferPtr(device->newCommandQueue());
 }
@@ -219,7 +221,8 @@ MetalTextureBackend::MetalTextureBackend(
     : mln::mtl::RendererBackend(mln::gfx::ContextMode::Unique),
       mln::gfx::HeadlessBackend(size),
       borrowed_texture_(borrowed_texture),
-      borrowed_pixel_format_(borrowed_texture->pixelFormat()) {
+      borrowed_pixel_format_(borrowed_texture->pixelFormat()),
+      ring_(0) {
   device = NS::RetainPtr(borrowed_texture->device());
   commandQueue = NS::TransferPtr(device->newCommandQueue());
 }
@@ -227,6 +230,7 @@ MetalTextureBackend::MetalTextureBackend(
 MetalTextureBackend::~MetalTextureBackend() {
   auto guard = mln::gfx::BackendScope{*this};
   resource.reset();
+  ring_.clear();
   context.reset();
 }
 
@@ -238,11 +242,17 @@ auto MetalTextureBackend::getDefaultRenderable() -> mln::gfx::Renderable& {
       *this, static_cast<mln::mtl::Context&>(getContext()), size,
       borrowed_texture_
     );
+    // Recorded with the resource it describes, so a slot that keeps an older
+    // resource keeps the size that resource was built for.
+    ring_.record_size(size);
   }
   return *this;
 }
 
 auto MetalTextureBackend::readStillImage() -> mln::PremultipliedImage {
+  // A render that aborted before it asked for the renderable leaves no
+  // resource behind, so build it here rather than dereference nothing.
+  getDefaultRenderable();
   return getResource<MetalTextureRenderableResource>().readStillImage();
 }
 
@@ -260,6 +270,12 @@ auto MetalTextureBackend::metal_texture() -> MTL::Texture* {
   getDefaultRenderable();
   return getResource<MetalTextureRenderableResource>().metal_texture();
 }
+
+auto MetalTextureBackend::select_slot(std::size_t slot) -> bool {
+  return ring_.select(slot, size, resource);
+}
+
+void MetalTextureBackend::set_ring_size(mln::Size new_size) { size = new_size; }
 
 auto MetalTextureBackend::has_device(const MTL::Device* other) const -> bool {
   return other == device.get();

@@ -16,8 +16,9 @@ style expressions read while the map draws. One styling rule then covers
 selection, hover, a live value, or a computed status, because each feature
 supplies its own input to that rule.
 
-Feature state belongs to the [map](/maplibre-native-ffi/concepts/). Set or
-remove it on the map's owner thread. A render session pushes it into the
+Feature state belongs to the [map](/maplibre-native-ffi/concepts/). Its set,
+get, and remove calls are callable from any thread, execute in order, and
+report through a completion. A render session pushes the map's store into the
 renderer on the next render update, including the first presented frame that
 contains the source.
 
@@ -52,20 +53,19 @@ with neither one removes the state of every feature in the source layer.
 
 ## Read state back
 
-Reading state copies the map's store into a snapshot handle that the host owns.
-The snapshot contains an empty object when the source or feature has no state.
-The copy does not require a render session or a loaded source.
+Reading state copies the map's store and reports the copy through the
+completion. The read does not require a render session or a loaded source.
 
 <Code code={region(featureStateRead, "get")} lang="c" title="feature-state-read.c" />
 
-The snapshot's root is a JSON object with one member per state key. Reading one
-value iterates over those members and compares each key against the one that you
-want.
+The result is UTF-8 bytes holding one JSON object with one member per state
+key, or an empty object when the source or feature has no state. Parse it with
+the host's JSON library to read the value that you want.
 
 <Code code={region(featureStateRead, "member")} lang="c" title="feature-state-read.c" />
 
-The root value and everything under it point into the snapshot. Copy any value
-that you keep, because destroying the snapshot invalidates those pointers.
+Copy any value that you keep, because the result bytes stay valid only for the
+completion callback.
 
 <Code code={region(featureStateRead, "read")} lang="c" title="feature-state-read.c" />
 

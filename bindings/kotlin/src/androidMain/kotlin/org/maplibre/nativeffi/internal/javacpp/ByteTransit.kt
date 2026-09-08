@@ -1,7 +1,6 @@
 package org.maplibre.nativeffi.internal.javacpp
 
 import org.bytedeco.javacpp.BytePointer
-import org.maplibre.nativeffi.internal.status.Status
 
 internal class ByteArrayViewScope(bytes: ByteArray) : AutoCloseable {
   private val data =
@@ -16,26 +15,5 @@ internal class ByteArrayViewScope(bytes: ByteArray) : AutoCloseable {
   override fun close() {
     view.close()
     data.close()
-  }
-}
-
-internal fun ownedBuffer(handle: Long): ByteArray =
-  ownedBuffer(handle, MaplibreNativeC::mln_buffer_get, MaplibreNativeC::mln_buffer_destroy)
-
-internal fun ownedBuffer(
-  handle: Long,
-  getter: (Long, MaplibreNativeC.mln_buffer_view) -> Int,
-  destroyer: (Long) -> Unit,
-): ByteArray {
-  require(handle != 0L) { "native buffer handle is null" }
-  try {
-    MaplibreNativeC.mln_buffer_view().use { bytes ->
-      Status.check(getter(handle, bytes))
-      val size = Math.toIntExact(bytes.size())
-      if (size == 0) return byteArrayOf()
-      return ByteArray(size).also { output -> BytePointer(bytes.data()).position(0).get(output) }
-    }
-  } finally {
-    destroyer(handle)
   }
 }
