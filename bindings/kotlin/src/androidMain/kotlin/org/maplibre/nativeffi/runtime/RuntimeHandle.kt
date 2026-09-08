@@ -338,8 +338,7 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
           MaplibreNativeC.mln_runtime_release(handleId, completion)
         }
       } catch (error: Throwable) {
-        core.abortClose()
-        core.abandonRetirement(claim)
+        core.rejectRetirement(claim, error)
         throw error
       }
     core.completeClose { liveMaps.clear() }

@@ -39,13 +39,11 @@ internal class HandleState<T : NativeHandle>(
 
   fun handleForClose(): T = handle ?: throw Status.released(typeName)
 
-  fun abortClose() = core.abortClose()
-
   fun claimRetirement(claim: CompletableDeferred<Unit>): Deferred<Unit> =
     core.claimRetirement(claim)
 
-  fun abandonRetirement(claim: CompletableDeferred<Unit>) {
-    core.abandonRetirement(claim)
+  fun rejectRetirement(claim: CompletableDeferred<Unit>, failure: Throwable) {
+    core.rejectRetirement(claim, failure)
   }
 
   fun completeClose(afterSuccess: () -> Unit = {}) {

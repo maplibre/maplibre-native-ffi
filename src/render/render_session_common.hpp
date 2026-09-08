@@ -683,11 +683,9 @@ auto enqueue_driver_operation(
   mln_render_session session, RenderDriverCallable work,
   const mln_completion* completion
 ) -> mln_status;
-using RenderCompletionTransfer = std::function<
-  void(const std::shared_ptr<Completion>&, mln_status, std::string, std::any)>;
 auto enqueue_driver_result_operation(
   mln_render_session session, RenderDriverResultCallable work,
-  const mln_completion* completion, RenderCompletionTransfer transfer
+  const mln_completion* completion, CompletionOperation::Delivery transfer
 ) -> mln_status;
 auto validate_render_session_attach_request(
   const mln_render_session_attach_options* options,

@@ -4,12 +4,44 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.NativeErrorException
 
 class HandleStateCoreTest {
+  @Test
+  fun rejectedRetirementCompletesConcurrentWaitersAndPermitsRetry(): Unit = runBlocking {
+    val state = HandleStateCore("TestHandle", 0x1234)
+    val first = CompletableDeferred<Unit>()
+    assertSame(first, state.claimRetirement(first))
+    val waiter =
+      async(start = CoroutineStart.UNDISPATCHED) {
+        runCatching { state.claimRetirement(CompletableDeferred()).await() }.exceptionOrNull()
+      }
+    val rejection = IllegalStateException("live child prevents close")
+
+    state.rejectRetirement(first, rejection)
+
+    val reported = withTimeout(1000) { waiter.await() }
+    assertIs<IllegalStateException>(reported)
+    assertEquals(rejection.message, reported.message)
+    state.requireLive()
+    val retry = CompletableDeferred<Unit>()
+    assertSame(retry, state.claimRetirement(retry))
+    state.completeClose()
+    retry.complete(Unit)
+    state.claimRetirement(CompletableDeferred()).await()
+    assertTrue(state.isReleased())
+  }
+
   @Test
   fun failedNativeDestroyLeavesHandleLiveAndRetryable() {
     val state = HandleStateCore("TestHandle", 0x1234)

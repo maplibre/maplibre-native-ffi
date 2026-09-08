@@ -25,14 +25,16 @@ def map_future[T, U](
     result.set_running_or_notify_cancel()
 
     def complete(completed: Future[T]) -> None:
+        nonlocal retained
         try:
-            result.set_result(transform(completed.result()))
-        except Exception as error:  # noqa: BLE001 - preserve the source failure.
+            value = transform(completed.result())
+        except BaseException as error:  # noqa: BLE001 - preserve every terminal failure.
             result.set_exception(error)
+        else:
+            result.set_result(value)
         finally:
-            # Reading the capture here is what keeps the retained owner alive
-            # until this callback runs.
-            _ = retained
+            # Future keeps its callbacks after completion; release the owner now.
+            retained = None
 
     source.add_done_callback(complete)
     return result

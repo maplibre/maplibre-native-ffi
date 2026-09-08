@@ -109,6 +109,17 @@ mln_status mln_test_render_session_blocking_operation_create(
   const mln_completion* completion
 );
 
+mln_status mln_test_pending_runtime_operation(
+  mln_runtime runtime, atomic_bool* entered, void** out_operation,
+  const mln_completion* completion
+);
+
+void mln_test_complete_runtime_operation(void* operation);
+
+mln_status mln_test_block_map_cleanup(
+  mln_map map, atomic_bool* entered, const atomic_bool* release
+);
+
 // These helpers track what they create per calling thread so the suite can
 // reclaim handles a test left behind. The matching destroy helpers untrack.
 mln_runtime mln_test_create_runtime(void);

@@ -58,21 +58,27 @@ auto OperationObject::complete(
 }
 
 auto create_completion_operation(
-  const mln_completion* descriptor, OperationObject::ResultCallback result,
+  const mln_completion* descriptor, CompletionOperation::Delivery deliver,
   CompletionOperation& out
 ) -> mln_status {
   const auto status = validate_completion(descriptor);
   if (status != MLN_STATUS_OK) return status;
   try {
     out.completion = std::make_shared<Completion>(*descriptor);
-    if (!result) {
-      result = [completion = out.completion](
-                 mln_status completion_status, std::string diagnostic, std::any
-               ) {
-        complete(completion, completion_status, std::move(diagnostic));
-      };
-    }
-    out.operation = std::make_shared<OperationObject>(std::move(result));
+    out.operation = std::make_shared<OperationObject>(
+      [completion = out.completion, deliver = std::move(deliver)](
+        mln_status completion_status, std::string diagnostic, std::any result
+      ) {
+        if (deliver) {
+          deliver(
+            completion, completion_status, std::move(diagnostic),
+            std::move(result)
+          );
+        } else {
+          complete(completion, completion_status, std::move(diagnostic));
+        }
+      }
+    );
   } catch (...) {
     out = {};
     set_thread_error("asynchronous completion state could not be allocated");

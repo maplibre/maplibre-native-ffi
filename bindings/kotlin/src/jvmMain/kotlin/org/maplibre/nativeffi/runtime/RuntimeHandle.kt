@@ -180,8 +180,7 @@ public actual class RuntimeHandle private constructor(private val handle: Native
       try {
         NativeAccess.releaseRuntime(handle)
       } catch (error: Throwable) {
-        core.abortClose()
-        core.abandonRetirement(claim)
+        core.rejectRetirement(claim, error)
         throw error
       }
     core.completeClose { liveMaps.clear() }

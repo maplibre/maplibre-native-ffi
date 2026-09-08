@@ -2744,6 +2744,10 @@ auto create_map(
   auto retain_guard = RuntimeMapRetainGuard{runtime};
 
   auto owned_map = std::make_shared<MapObject>();
+  if (!live_runtime->control.acquire()) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  owned_map->runtime_cleanup_lease = ControlLease{&live_runtime->control};
   // Every allocation this function owns happens before the handle is published,
   // so a throw here cannot leave a registered map the caller has no handle to
   // destroy.
@@ -3106,6 +3110,9 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
       }
       try {
         map_teardown_lane().submit([owned]() mutable {
+#if defined(MLN_FFI_ENABLE_TEST_HOOKS)
+          if (owned->before_pool_shutdown) owned->before_pool_shutdown();
+#endif
           owned->frontend->shutdown_thread_pool();
           owned.reset();
         });

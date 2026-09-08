@@ -2760,8 +2760,8 @@ fn owned_texture_session_renders_acquires_resizes_and_reads_back() {
         Ok(operation) => {
             wait_until_completed(&session, &operation);
             assert_eq!(
-                operation.terminal_status().unwrap(),
-                sys::MLN_STATUS_UNSUPPORTED
+                operation.take().unwrap_err().raw_status(),
+                Some(sys::MLN_STATUS_UNSUPPORTED)
             );
         }
         Err(error) => {
@@ -3438,8 +3438,8 @@ fn texture_readback_before_a_frame_reports_invalid_state() {
             std::thread::yield_now();
         }
         assert_eq!(
-            operation.terminal_status().unwrap(),
-            sys::MLN_STATUS_INVALID_STATE
+            operation.take().unwrap_err().raw_status(),
+            Some(sys::MLN_STATUS_INVALID_STATE)
         );
     }
 

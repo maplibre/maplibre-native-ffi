@@ -53,27 +53,41 @@ final class _PendingCompletion<T> implements _PendingCompletionBase {
 final _pendingCompletions = <int, _PendingCompletionBase>{};
 var _nextCompletionToken = 1;
 
-final NativeCallable<raw.mln_adapter_completion_listenerFunction>
-_completionListener =
+NativeCallable<raw.mln_adapter_completion_listenerFunction>?
+_completionListener;
+
+NativeCallable<raw.mln_adapter_completion_listenerFunction>
+_createCompletionListener() =>
     NativeCallable<raw.mln_adapter_completion_listenerFunction>.listener((
       Pointer<Void> userData,
       Pointer<raw.mln_adapter_completion_record> record,
     ) {
       final pending = _pendingCompletions.remove(userData.address);
-      if (pending == null) {
-        if (record != nullptr) {
-          raw.mln_adapter_completion_record_destroy(record);
+      try {
+        if (pending == null) {
+          if (record != nullptr) {
+            raw.mln_adapter_completion_record_destroy(record);
+          }
+          return;
         }
-        return;
+        if (record == nullptr) {
+          pending.fail(
+            StateError('native completion adapter could not copy the result'),
+          );
+          return;
+        }
+        pending.finish(record);
+      } finally {
+        _closeIdleCompletionListener();
       }
-      if (record == nullptr) {
-        pending.fail(
-          StateError('native completion adapter could not copy the result'),
-        );
-        return;
-      }
-      pending.finish(record);
     });
+
+void _closeIdleCompletionListener() {
+  if (_pendingCompletions.isEmpty) {
+    _completionListener?.close();
+    _completionListener = null;
+  }
+}
 
 Future<T> startNativeCompletion<T>({
   required raw.mln_adapter_completion_copy_kind copyKind,
@@ -100,7 +114,7 @@ Future<T> startNativeCompletion<T>({
         raw.mln_adapter_completion_create(
           copyKind.value,
           elementSize,
-          _completionListener.nativeFunction,
+          (_completionListener ??= _createCompletionListener()).nativeFunction,
           userData,
           completion,
         ),
@@ -124,6 +138,7 @@ Future<T> startNativeCompletion<T>({
     });
   } catch (_) {
     _pendingCompletions.remove(token);
+    _closeIdleCompletionListener();
     onRejected?.call();
     rethrow;
   }

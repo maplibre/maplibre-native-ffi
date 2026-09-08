@@ -344,8 +344,7 @@ public actual class RuntimeHandle internal constructor(handle: NativeRuntime) {
       try {
         CompletionBridge.unitChecked { completion -> mln_runtime_release(handle, completion) }
       } catch (error: Throwable) {
-        state.abortClose()
-        state.abandonRetirement(claim)
+        state.rejectRetirement(claim, error)
         throw error
       }
     state.completeClose { liveMaps.store(emptyMap()) }

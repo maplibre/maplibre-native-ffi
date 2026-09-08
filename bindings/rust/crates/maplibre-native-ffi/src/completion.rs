@@ -22,7 +22,6 @@ pub struct CommandCompletion {
 
 struct State<T> {
     result: Mutex<Option<Result<T>>>,
-    terminal: Mutex<Option<(i32, String)>>,
     ready: Condvar,
     waker: Mutex<Option<Waker>>,
 }
@@ -81,32 +80,6 @@ impl<T> NativeFuture<T> {
             )
         })?
     }
-
-    #[cfg(test)]
-    pub(crate) fn terminal_status(&self) -> Result<sys::mln_status> {
-        let terminal = lock(&self.state.terminal);
-        match terminal.as_ref() {
-            Some((status, _)) => Ok(*status),
-            None => Err(Error::new(
-                crate::ErrorKind::NotReady,
-                None,
-                "native future has not completed",
-            )),
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn diagnostic(&self) -> Result<String> {
-        let terminal = lock(&self.state.terminal);
-        match terminal.as_ref() {
-            Some((_, diagnostic)) => Ok(diagnostic.clone()),
-            None => Err(Error::new(
-                crate::ErrorKind::NotReady,
-                None,
-                "native future has not completed",
-            )),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -144,8 +117,6 @@ unsafe extern "C" fn complete<T>(
     let bridge = unsafe { &*user_data.cast::<Bridge<T>>() };
     // SAFETY: completion result is borrowed for this callback.
     let raw = unsafe { &*result };
-    let diagnostic = copy_diagnostic(raw);
-    *lock(&bridge.state.terminal) = Some((raw.status, diagnostic.clone()));
     let converted = if raw.status == sys::MLN_STATUS_OK || bridge.accept_error_status {
         match lock(&bridge.convert).take() {
             Some(convert) => convert(raw),
@@ -156,7 +127,10 @@ unsafe extern "C" fn complete<T>(
             )),
         }
     } else {
-        Err(Error::from_status_and_diagnostic(raw.status, diagnostic))
+        Err(Error::from_status_and_diagnostic(
+            raw.status,
+            copy_diagnostic(raw),
+        ))
     };
     *lock(&bridge.state.result) = Some(converted);
     bridge.state.ready.notify_all();
@@ -202,7 +176,6 @@ where
 {
     let state = Arc::new(State {
         result: Mutex::new(None),
-        terminal: Mutex::new(None),
         ready: Condvar::new(),
         waker: Mutex::new(None),
     });
@@ -232,7 +205,6 @@ pub(crate) fn ready<T>(value: T) -> NativeFuture<T> {
     NativeFuture {
         state: Arc::new(State {
             result: Mutex::new(Some(Ok(value))),
-            terminal: Mutex::new(None),
             ready: Condvar::new(),
             waker: Mutex::new(None),
         }),

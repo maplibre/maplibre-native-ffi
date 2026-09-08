@@ -900,8 +900,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       try {
         NativeAccess.releaseMap(handle)
       } catch (error: Throwable) {
-        core.abortClose()
-        core.abandonRetirement(claim)
+        core.rejectRetirement(claim, error)
         throw error
       }
     core.completeClose { runtime.unregisterMap(this) }

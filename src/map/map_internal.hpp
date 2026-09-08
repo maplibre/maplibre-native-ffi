@@ -33,6 +33,12 @@ struct MapObject {
   mln_map self = MLN_HANDLE_NULL;
   mln_runtime runtime = MLN_HANDLE_NULL;
   std::shared_ptr<RuntimeObject> runtime_state;
+  // Runtime release waits until all map resources and worker pools retire.
+  // Member order keeps the runtime alive until this lease releases.
+  ControlLease runtime_cleanup_lease;
+#if defined(MLN_FFI_ENABLE_TEST_HOOKS)
+  std::function<void()> before_pool_shutdown;
+#endif
   uint32_t map_mode = MLN_MAP_MODE_CONTINUOUS;
   // Width and height follow resize on the runtime worker; scale_factor is
   // fixed at creation, so map_scale_factor() may read it from any thread.

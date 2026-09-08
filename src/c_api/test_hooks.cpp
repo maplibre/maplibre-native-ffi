@@ -11,7 +11,10 @@
 #include <thread>
 
 #include "completion/completion.hpp"
+#include "map/map_internal.hpp"
+#include "operation/operation.hpp"
 #include "render/render_session_common.hpp"
+#include "runtime/runtime.hpp"
 
 namespace {
 
@@ -156,6 +159,52 @@ extern "C" auto mln_test_hook_enqueue_blocking_render_operation(
   return mln::core::enqueue_blocking_test_render_operation(
     session, entered, release, completion
   );
+}
+
+extern "C" auto mln_test_hook_enqueue_pending_runtime_operation(
+  mln_runtime runtime, std::atomic_bool* entered, void** out_operation,
+  const mln_completion* completion
+) -> mln_status {
+  auto live = mln::core::lease_runtime(runtime);
+  if (!live || !entered || !out_operation || *out_operation)
+    return MLN_STATUS_INVALID_ARGUMENT;
+  mln::core::CompletionOperation pending;
+  auto status = mln::core::create_completion_operation(completion, {}, pending);
+  if (status != MLN_STATUS_OK) return status;
+  auto retained = std::make_unique<std::shared_ptr<mln::core::OperationObject>>(
+    pending.operation
+  );
+  status = mln::core::submit_runtime_operation(
+    live, pending.operation, [entered] { entered->store(true); }
+  );
+  if (status == MLN_STATUS_OK) {
+    *out_operation = retained.release();
+    pending.completion->accept();
+  } else {
+    pending.completion->reject();
+  }
+  return status;
+}
+
+extern "C" auto mln_test_hook_complete_runtime_operation(void* operation)
+  -> void {
+  const auto retained =
+    std::unique_ptr<std::shared_ptr<mln::core::OperationObject>>{
+      static_cast<std::shared_ptr<mln::core::OperationObject>*>(operation)
+    };
+  (*retained)->complete(MLN_STATUS_OK, {}, {});
+}
+
+extern "C" auto mln_test_hook_block_map_cleanup(
+  mln_map map, std::atomic_bool* entered, const std::atomic_bool* release
+) -> mln_status {
+  auto owned = mln::core::handle_table<mln::core::MapObject>().lease(map);
+  if (!owned || !entered || !release) return MLN_STATUS_INVALID_ARGUMENT;
+  owned->before_pool_shutdown = [entered, release] {
+    entered->store(true);
+    while (!release->load()) std::this_thread::yield();
+  };
+  return MLN_STATUS_OK;
 }
 
 #endif  // MLN_FFI_ENABLE_TEST_HOOKS

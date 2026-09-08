@@ -660,8 +660,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        Error, ErrorKind, ResourceErrorReason, ResourceKind, ResourceProviderDecision,
-        ResourceResponse, RuntimeEvent, RuntimeEventSource, RuntimeEventType,
+        ErrorKind, ResourceErrorReason, ResourceKind, ResourceProviderDecision, ResourceResponse,
+        RuntimeEvent, RuntimeEventSource, RuntimeEventType,
     };
 
     const PROVIDER_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
@@ -836,26 +836,6 @@ mod tests {
         )
     }
 
-    /// Blocks until one runtime operation completes, reporting a failed
-    /// completion as this crate's error so a test can assert on it.
-    fn wait_for_operation<T>(operation: &NativeFuture<T>) -> Result<()> {
-        if !operation.wait(Duration::from_secs(30))? {
-            return Err(Error::new(
-                ErrorKind::InvalidState,
-                None,
-                "timed out waiting for native completion",
-            ));
-        }
-        let status = operation.terminal_status()?;
-        if status != sys::MLN_STATUS_OK {
-            return Err(Error::from_status_and_diagnostic(
-                status,
-                operation.diagnostic()?,
-            ));
-        }
-        Ok(())
-    }
-
     #[test]
     // Spec coverage: BND-084.
     fn runtime_ambient_cache_operations_use_real_c_abi() {
@@ -872,9 +852,7 @@ mod tests {
             AmbientCacheOperation::Clear,
             AmbientCacheOperation::ResetDatabase,
         ] {
-            let operation = runtime.ambient_cache_operation(operation).unwrap();
-            wait_for_operation(&operation).unwrap();
-            operation.take().unwrap();
+            crate::completion::blocking(runtime.ambient_cache_operation(operation));
         }
 
         runtime.close_and_wait();
@@ -892,9 +870,7 @@ mod tests {
 
         // Raising then lowering the budget exercises the same operation API.
         for size in [8 * 1024 * 1024, 0] {
-            let operation = runtime.set_maximum_ambient_cache_size(size).unwrap();
-            wait_for_operation(&operation).unwrap();
-            operation.take().unwrap();
+            crate::completion::blocking(runtime.set_maximum_ambient_cache_size(size));
         }
 
         runtime.close_and_wait();
@@ -923,9 +899,8 @@ mod tests {
         let runtime = RuntimeHandle::with_options(&options).unwrap();
         let definition = test_offline_region_definition("custom://offline-style.json");
 
-        let create = runtime.create_offline_region(&definition, b"abc").unwrap();
-        wait_for_operation(&create).unwrap();
-        let created = create.take().unwrap();
+        let created =
+            crate::completion::blocking(runtime.create_offline_region(&definition, b"abc"));
         assert_eq!(created.definition, definition);
         assert_eq!(created.metadata, b"abc");
 
@@ -937,76 +912,48 @@ mod tests {
             pixel_ratio: 1.0,
             include_ideographs: false,
         };
-        let create_geometry = runtime
-            .create_offline_region(&geometry_definition, b"geo")
-            .unwrap();
-        wait_for_operation(&create_geometry).unwrap();
-        let geometry_region = create_geometry.take().unwrap();
+        let geometry_region = crate::completion::blocking(
+            runtime.create_offline_region(&geometry_definition, b"geo"),
+        );
         assert_eq!(geometry_region.definition, geometry_definition);
         assert_eq!(geometry_region.metadata, b"geo");
 
-        let get = runtime.offline_region(created.id).unwrap();
-        wait_for_operation(&get).unwrap();
-        let fetched = get.take().unwrap().unwrap();
+        let fetched = crate::completion::blocking(runtime.offline_region(created.id)).unwrap();
         assert_eq!(fetched, created);
 
-        let list = runtime.offline_regions().unwrap();
-        wait_for_operation(&list).unwrap();
-        let listed = list.take().unwrap();
+        let listed = crate::completion::blocking(runtime.offline_regions());
         assert!(listed.iter().any(|region| region.id == created.id));
 
-        let update = runtime
-            .update_offline_region_metadata(created.id, b"")
-            .unwrap();
-        wait_for_operation(&update).unwrap();
-        let updated = update.take().unwrap();
+        let updated =
+            crate::completion::blocking(runtime.update_offline_region_metadata(created.id, b""));
         assert_eq!(updated.id, created.id);
         assert!(updated.metadata.is_empty());
 
-        let status_operation = runtime.offline_region_status(created.id).unwrap();
-        wait_for_operation(&status_operation).unwrap();
-        let status = status_operation.take().unwrap();
+        let status = crate::completion::blocking(runtime.offline_region_status(created.id));
         assert!(matches!(
             status.download_state,
             OfflineRegionDownloadState::Inactive | OfflineRegionDownloadState::Active
         ));
 
-        let set_inactive = runtime
-            .set_offline_region_download_state(created.id, OfflineRegionDownloadState::Inactive)
-            .unwrap();
-        wait_for_operation(&set_inactive).unwrap();
-        set_inactive.take().unwrap();
+        crate::completion::blocking(
+            runtime.set_offline_region_download_state(
+                created.id,
+                OfflineRegionDownloadState::Inactive,
+            ),
+        );
         let error = runtime
             .set_offline_region_download_state(created.id, OfflineRegionDownloadState::Unknown(99))
             .unwrap_err();
         assert_eq!(error.kind(), ErrorKind::InvalidArgument);
 
-        let observe = runtime
-            .set_offline_region_observed(created.id, true)
-            .unwrap();
-        wait_for_operation(&observe).unwrap();
-        observe.take().unwrap();
-        let unobserve = runtime
-            .set_offline_region_observed(created.id, false)
-            .unwrap();
-        wait_for_operation(&unobserve).unwrap();
-        unobserve.take().unwrap();
-        let invalidate = runtime.invalidate_offline_region(created.id).unwrap();
-        wait_for_operation(&invalidate).unwrap();
-        invalidate.take().unwrap();
-        let delete = runtime.delete_offline_region(created.id).unwrap();
-        wait_for_operation(&delete).unwrap();
-        delete.take().unwrap();
-        let delete_geometry = runtime.delete_offline_region(geometry_region.id).unwrap();
-        wait_for_operation(&delete_geometry).unwrap();
-        delete_geometry.take().unwrap();
+        crate::completion::blocking(runtime.set_offline_region_observed(created.id, true));
+        crate::completion::blocking(runtime.set_offline_region_observed(created.id, false));
+        crate::completion::blocking(runtime.invalidate_offline_region(created.id));
+        crate::completion::blocking(runtime.delete_offline_region(created.id));
+        crate::completion::blocking(runtime.delete_offline_region(geometry_region.id));
 
-        let missing_created = runtime.offline_region(created.id).unwrap();
-        wait_for_operation(&missing_created).unwrap();
-        assert!(missing_created.take().unwrap().is_none());
-        let missing_geometry = runtime.offline_region(geometry_region.id).unwrap();
-        wait_for_operation(&missing_geometry).unwrap();
-        assert!(missing_geometry.take().unwrap().is_none());
+        assert!(crate::completion::blocking(runtime.offline_region(created.id)).is_none());
+        assert!(crate::completion::blocking(runtime.offline_region(geometry_region.id)).is_none());
 
         runtime.close_and_wait();
     }
@@ -1023,11 +970,7 @@ mod tests {
             let mut side_options = RuntimeOptions::default();
             side_options.cache_path = Some(side_cache.to_string_lossy().into_owned());
             let side_runtime = RuntimeHandle::with_options(&side_options).unwrap();
-            let create = side_runtime
-                .create_offline_region(&definition, b"merge")
-                .unwrap();
-            wait_for_operation(&create).unwrap();
-            create.take().unwrap();
+            crate::completion::blocking(side_runtime.create_offline_region(&definition, b"merge"));
             side_runtime.close_and_wait();
         }
         let side_database_before = std::fs::read(&side_cache).unwrap();
@@ -1044,11 +987,9 @@ mod tests {
         let mut main_options = RuntimeOptions::default();
         main_options.cache_path = Some(main_cache.to_string_lossy().into_owned());
         let main_runtime = RuntimeHandle::with_options(&main_options).unwrap();
-        let merge = main_runtime
-            .merge_offline_regions_database(&side_cache.to_string_lossy())
-            .unwrap();
-        wait_for_operation(&merge).unwrap();
-        let merged = merge.take().unwrap();
+        let merged = crate::completion::blocking(
+            main_runtime.merge_offline_regions_database(&side_cache.to_string_lossy()),
+        );
         assert_eq!(merged.len(), 1);
         assert_eq!(merged[0].definition, definition);
         assert_eq!(merged[0].metadata, b"merge");
@@ -1250,7 +1191,6 @@ mod tests {
             let second = scope.spawn(|| runtime.barrier().unwrap());
             for operation in [first.join().unwrap(), second.join().unwrap()] {
                 assert!(operation.wait(Duration::from_secs(5)).unwrap());
-                assert_eq!(operation.terminal_status().unwrap(), sys::MLN_STATUS_OK);
                 operation.take().unwrap();
             }
         });

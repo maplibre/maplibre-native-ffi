@@ -89,11 +89,10 @@ auto RuntimeExecutor::stop() noexcept -> void {
     loop->invoke([loop]() noexcept -> void { loop->stop(); });
   }
   if (worker_.joinable()) {
-    if (worker_.is_current()) {
-      worker_.detach();
-    } else {
-      worker_.join();
-    }
+    // The owner joins from outside the worker before destroying this object.
+    // The worker still accesses executor state after its run loop stops.
+    if (worker_.is_current()) std::terminate();
+    worker_.join();
   }
 }
 

@@ -7,9 +7,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 /**
  * Wraps an eager deferred native handle in its public wrapper.
  *
- * The wrap runs as soon as the source completes, whether or not the caller still awaits the result,
- * so a cancelled await hands the wrapper to [closeDropped] instead of leaking the native handle it
- * owns.
+ * The transform runs when the source completes. If the caller cancelled the returned deferred
+ * before completion, [closeDropped] releases the new wrapper.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal fun <T, R> Deferred<T>.mapHandleDeferred(

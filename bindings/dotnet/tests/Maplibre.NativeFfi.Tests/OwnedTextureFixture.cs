@@ -6,16 +6,33 @@ using Xunit;
 namespace Maplibre.NativeFfi.Tests;
 
 /// <summary>
-/// Attaches a session-owned offscreen texture over whichever backend the loaded native library
-/// compiled, so one render-session suite covers every preset.
+/// Attaches a core-worker session to an owned texture using Metal or private EGL.
 /// </summary>
 /// <remarks>
-/// Metal takes the system default device; OpenGL takes an EGL display and pbuffer config and lets
-/// the core worker own the context, matching the C suite's dedicated-EGL texture fixture.
+/// Metal supports frame acquisition and readback. Private EGL supports readback.
 /// </remarks>
 internal abstract partial class OwnedTextureFixture : IDisposable
 {
+    static OwnedTextureFixture()
+    {
+        NativeLibrary.SetDllImportResolver(
+            typeof(OwnedTextureFixture).Assembly,
+            (name, assembly, path) =>
+                name == "EGL"
+                    ? NativeLibrary.Load(
+                        OperatingSystem.IsMacOS() ? "libEGL.dylib"
+                            : OperatingSystem.IsWindows() ? "libEGL.dll"
+                            : "libEGL.so.1",
+                        assembly,
+                        path
+                    )
+                    : 0
+        );
+    }
+
     internal static bool IsAvailable => MetalDevice.IsSupported || EglDisplay.IsSupported;
+
+    internal abstract bool SupportsFrameAcquisition { get; }
 
     /// <summary>Attaches a session over an offscreen texture the session owns.</summary>
     internal abstract RenderSessionHandle Attach(MapHandle map, RenderTargetExtent extent);
@@ -43,6 +60,8 @@ internal abstract partial class OwnedTextureFixture : IDisposable
     private sealed partial class MetalDevice : OwnedTextureFixture
     {
         private readonly nint device = MetalCreateSystemDefaultDevice();
+
+        internal override bool SupportsFrameAcquisition => true;
 
         internal static bool IsSupported =>
             OperatingSystem.IsMacOS()
@@ -120,6 +139,13 @@ internal abstract partial class OwnedTextureFixture : IDisposable
         private const int EglStencilSize = 0x3026;
         private const int EglOpenGLEsApi = 0x30A0;
         private const int EglPlatformSurfacelessMesa = 0x31DD;
+        private const int EglPlatformAngle = 0x3202;
+        private const int EglPlatformAngleType = 0x3203;
+        private const int EglPlatformAngleTypeMetal = 0x3489;
+        private const int EglPlatformAngleDeviceType = 0x3209;
+        private const int EglPlatformAngleDeviceTypeHardware = 0x320A;
+
+        internal override bool SupportsFrameAcquisition => false;
 
         private readonly nint display;
         private readonly nint config;
@@ -131,11 +157,19 @@ internal abstract partial class OwnedTextureFixture : IDisposable
             {
                 throw new InvalidOperationException("No EGL display initialized.");
             }
-            if (!eglBindAPI(EglOpenGLEsApi))
+            try
             {
-                throw new InvalidOperationException("EGL rejected the OpenGL ES API.");
+                if (!eglBindAPI(EglOpenGLEsApi))
+                {
+                    throw new InvalidOperationException("EGL rejected the OpenGL ES API.");
+                }
+                config = ChooseConfig(display);
             }
-            config = ChooseConfig(display);
+            catch
+            {
+                eglTerminate(display);
+                throw;
+            }
         }
 
         internal static bool IsSupported =>
@@ -186,8 +220,26 @@ internal abstract partial class OwnedTextureFixture : IDisposable
             }
         }
 
-        private static nint OpenDisplay()
+        private static unsafe nint OpenDisplay()
         {
+            if (OperatingSystem.IsMacOS())
+            {
+                // ANGLE renders through the system Metal device on macOS.
+                nint[] attributes =
+                [
+                    EglPlatformAngleType,
+                    EglPlatformAngleTypeMetal,
+                    EglPlatformAngleDeviceType,
+                    EglPlatformAngleDeviceTypeHardware,
+                    EglNone,
+                ];
+                fixed (nint* values = attributes)
+                {
+                    var angle = eglGetPlatformDisplay(EglPlatformAngle, 0, (nint)values);
+                    return angle != 0 && eglInitialize(angle, 0, 0) ? angle : 0;
+                }
+            }
+
             // A headless CI host has no X11 display, so the surfaceless platform comes first and
             // the default display is the fallback for hosts whose EGL lacks it.
             var surfaceless = eglGetPlatformDisplay(EglPlatformSurfacelessMesa, 0, 0);
@@ -242,25 +294,25 @@ internal abstract partial class OwnedTextureFixture : IDisposable
             return chosen;
         }
 
-        [LibraryImport("libEGL.so.1")]
+        [LibraryImport("EGL")]
         [return: MarshalAs(UnmanagedType.I1)]
         private static partial bool eglBindAPI(int api);
 
-        [LibraryImport("libEGL.so.1")]
+        [LibraryImport("EGL")]
         private static partial nint eglGetDisplay(nint displayId);
 
-        [LibraryImport("libEGL.so.1")]
+        [LibraryImport("EGL")]
         private static partial nint eglGetPlatformDisplay(
             int platform,
             nint nativeDisplay,
             nint attributes
         );
 
-        [LibraryImport("libEGL.so.1")]
+        [LibraryImport("EGL")]
         [return: MarshalAs(UnmanagedType.I1)]
         private static partial bool eglInitialize(nint display, nint major, nint minor);
 
-        [LibraryImport("libEGL.so.1")]
+        [LibraryImport("EGL")]
         [return: MarshalAs(UnmanagedType.I1)]
         private static partial bool eglChooseConfig(
             nint display,
@@ -270,7 +322,7 @@ internal abstract partial class OwnedTextureFixture : IDisposable
             ref int configCount
         );
 
-        [LibraryImport("libEGL.so.1")]
+        [LibraryImport("EGL")]
         [return: MarshalAs(UnmanagedType.I1)]
         private static partial bool eglTerminate(nint display);
     }

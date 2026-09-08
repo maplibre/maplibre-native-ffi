@@ -277,3 +277,22 @@ extern "C" mln_status mln_test_render_session_blocking_operation_create(
     session, entered, release, completion
   );
 }
+
+extern "C" mln_status mln_test_block_map_cleanup(
+  mln_map map, atomic_bool* entered, const atomic_bool* release
+) {
+  return mln_test_hook_block_map_cleanup(map, entered, release);
+}
+
+extern "C" mln_status mln_test_pending_runtime_operation(
+  mln_runtime runtime, atomic_bool* entered, void** out_operation,
+  const mln_completion* completion
+) {
+  return mln_test_hook_enqueue_pending_runtime_operation(
+    runtime, entered, out_operation, completion
+  );
+}
+
+extern "C" void mln_test_complete_runtime_operation(void* operation) {
+  mln_test_hook_complete_runtime_operation(operation);
+}

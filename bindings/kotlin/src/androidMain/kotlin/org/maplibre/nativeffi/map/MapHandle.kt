@@ -1776,8 +1776,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           MaplibreNativeC.mln_map_release(handleId, completion)
         }
       } catch (error: Throwable) {
-        core.abortClose()
-        core.abandonRetirement(claim)
+        core.rejectRetirement(claim, error)
         throw error
       }
     core.completeClose { runtime.unregisterMap(this) }

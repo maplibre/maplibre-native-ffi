@@ -112,9 +112,18 @@ public sealed class RenderSessionTests
         Assert.Throws<ObjectDisposedException>(() => frame.ImageView);
     }
 
-    [BindingSpecTest("BND-162", "BND-163", "BND-164", "BND-167", "BND-168", "BND-169", "BND-178")]
+    [BindingSpecTest(
+        "BND-162",
+        "BND-163",
+        "BND-164",
+        "BND-166",
+        "BND-167",
+        "BND-168",
+        "BND-169",
+        "BND-178"
+    )]
     [Fact]
-    public async Task OwnedTextureSessionRendersAcquiresAndDetaches()
+    public async Task OwnedTextureSessionRendersReadsBackAndDetaches()
     {
         Assert.SkipUnless(
             OwnedTextureFixture.IsAvailable,
@@ -134,37 +143,83 @@ public sealed class RenderSessionTests
             }
         );
 
-        using var session = fixture.Attach(map, extent);
-        Assert.Empty(session.DrainFrameResults());
-        await session.Attachment.WaitAsync(
-            TimeSpan.FromSeconds(30),
+        await map.SetStyleJsonAsync(
+            """
+            {"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#ff0000"}}]}
+            """u8.ToArray(),
             TestContext.Current.CancellationToken
         );
-        Assert.Equal(RenderSessionState.Attached, session.GetSnapshot().State);
-        Assert.Equal(RenderDriverKind.CoreWorker, session.GetCapabilities().Driver);
-        Assert.True(
-            session.GetCapabilities().Flags.HasFlag(RenderSessionCapabilities.FrameAcquisition)
+
+        using var session = fixture.Attach(map, extent);
+        await WithDetachAsync(
+            session,
+            async () =>
+            {
+                Assert.Empty(session.DrainFrameResults());
+                await session.Attachment.WaitAsync(
+                    TimeSpan.FromSeconds(30),
+                    TestContext.Current.CancellationToken
+                );
+                Assert.Equal(RenderSessionState.Attached, session.GetSnapshot().State);
+                var capabilities = session.GetCapabilities();
+                Assert.Equal(RenderDriverKind.CoreWorker, capabilities.Driver);
+                Assert.Equal(
+                    fixture.SupportsFrameAcquisition,
+                    capabilities.Flags.HasFlag(RenderSessionCapabilities.FrameAcquisition)
+                );
+                Assert.True(capabilities.Flags.HasFlag(RenderSessionCapabilities.Readback));
+
+                var second = Assert.Throws<InvalidStateException>(() =>
+                    fixture.Attach(map, extent)
+                );
+                Assert.Contains(
+                    "render session",
+                    second.Message,
+                    StringComparison.OrdinalIgnoreCase
+                );
+
+                session.RequestFrame(new FrameDemand(FrameDemandFlags.None, 7, 0, 0));
+                var result = Assert.Single(
+                    PollFor(() => session.DrainFrameResults(), results => results.Count > 0)
+                );
+                Assert.Equal(7ul, result.Token);
+                Assert.Equal(RenderResult.Rendered, result.Disposition);
+
+                var image = await session.ReadPremultipliedRgba8Async(
+                    TestContext.Current.CancellationToken
+                );
+                Assert.Equal(32u, image.Info.Width);
+                Assert.Equal(16u, image.Info.Height);
+                var pixels = image.Bytes;
+                Assert.Equal(image.Info.ByteLength, (ulong)pixels.Length);
+                Assert.True(image.Info.Stride >= image.Info.Width * 4);
+                for (var y = 0; y < image.Info.Height; y++)
+                {
+                    for (var x = 0; x < image.Info.Width; x++)
+                    {
+                        var offset = checked((int)(y * image.Info.Stride + x * 4));
+                        Assert.Equal(new byte[] { 255, 0, 0, 255 }, pixels[offset..(offset + 4)]);
+                    }
+                }
+
+                if (fixture.SupportsFrameAcquisition)
+                {
+                    Assert.True(session.TryAcquireFrame(out var frame));
+                    try
+                    {
+                        Assert.Equal(result.FrameGeneration, frame.Result.FrameGeneration);
+                    }
+                    finally
+                    {
+                        frame.Release(null);
+                    }
+                    Assert.Throws<ObjectDisposedException>(() => frame.Result);
+                }
+
+                var closeWhileAttached = Assert.Throws<InvalidStateException>(session.Close);
+                Assert.NotEmpty(closeWhileAttached.Message);
+            }
         );
-
-        var second = Assert.Throws<InvalidStateException>(() => fixture.Attach(map, extent));
-        Assert.Contains("render session", second.Message, StringComparison.OrdinalIgnoreCase);
-
-        session.RequestFrame(new FrameDemand(FrameDemandFlags.None, 7, 0, 0));
-        var result = Assert.Single(
-            PollFor(() => session.DrainFrameResults(), results => results.Count > 0)
-        );
-        Assert.Equal(7ul, result.Token);
-        Assert.Equal(RenderResult.Rendered, result.Disposition);
-
-        Assert.True(session.TryAcquireFrame(out var frame));
-        Assert.Equal(result.FrameGeneration, frame.Result.FrameGeneration);
-        frame.Release(null);
-        Assert.Throws<ObjectDisposedException>(() => frame.Result);
-
-        var closeWhileAttached = Assert.Throws<InvalidStateException>(session.Close);
-        Assert.NotEmpty(closeWhileAttached.Message);
-
-        await session.DetachAsync(TestContext.Current.CancellationToken);
         Assert.Equal(RenderSessionState.Detached, session.GetSnapshot().State);
         session.Close();
         Assert.True(session.IsClosed);
@@ -193,37 +248,75 @@ public sealed class RenderSessionTests
         );
 
         using var session = fixture.Attach(map, extent);
-        await session.Attachment.WaitAsync(
-            TimeSpan.FromSeconds(30),
-            TestContext.Current.CancellationToken
+        await WithDetachAsync(
+            session,
+            async () =>
+            {
+                await session.Attachment.WaitAsync(
+                    TimeSpan.FromSeconds(30),
+                    TestContext.Current.CancellationToken
+                );
+
+                await Assert.ThrowsAsync<UnsupportedFeatureException>(async () =>
+                    await fixture.SetTargetAsync(session, extent)
+                );
+
+                Assert.Throws<InvalidArgumentException>(() =>
+                {
+                    _ = session.ResizeAsync(
+                        new RenderTargetExtent(64, 32, 2.0),
+                        TestContext.Current.CancellationToken
+                    );
+                });
+
+                Assert.Throws<InvalidArgumentException>(() =>
+                    session.RequestFrame(new FrameDemand((FrameDemandFlags)0x8000u, 0, 0, 0))
+                );
+
+                await session.ResizeAsync(
+                    new RenderTargetExtent(64, 32, 1.0),
+                    TestContext.Current.CancellationToken
+                );
+                var resized = session.GetSnapshot();
+                Assert.Equal(64u, resized.Extent.Width);
+                Assert.Equal(32u, resized.Extent.Height);
+            }
         );
-
-        await Assert.ThrowsAsync<UnsupportedFeatureException>(async () =>
-            await fixture.SetTargetAsync(session, extent)
-        );
-
-        Assert.Throws<InvalidArgumentException>(() =>
-        {
-            _ = session.ResizeAsync(
-                new RenderTargetExtent(64, 32, 2.0),
-                TestContext.Current.CancellationToken
-            );
-        });
-
-        Assert.Throws<InvalidArgumentException>(() =>
-            session.RequestFrame(new FrameDemand((FrameDemandFlags)0x8000u, 0, 0, 0))
-        );
-
-        await session.ResizeAsync(
-            new RenderTargetExtent(64, 32, 1.0),
-            TestContext.Current.CancellationToken
-        );
-        var resized = session.GetSnapshot();
-        Assert.Equal(64u, resized.Extent.Width);
-        Assert.Equal(32u, resized.Extent.Height);
-
-        await session.DetachAsync(TestContext.Current.CancellationToken);
         session.Close();
+    }
+
+    private static async Task WithDetachAsync(RenderSessionHandle session, Func<Task> test)
+    {
+        Exception? failure = null;
+        try
+        {
+            await test();
+        }
+        catch (Exception error)
+        {
+            failure = error;
+            throw;
+        }
+        finally
+        {
+            try
+            {
+                // Cleanup remains required after test cancellation.
+                await session.DetachAsync().WaitAsync(TimeSpan.FromSeconds(30));
+            }
+            catch (Exception cleanupError) when (failure is not null)
+            {
+                failure.Data["DetachFailure"] = cleanupError;
+                try
+                {
+                    session.Abandon();
+                }
+                catch (Exception abandonError)
+                {
+                    failure.Data["AbandonFailure"] = abandonError;
+                }
+            }
+        }
     }
 
     /// <summary>Polls a nonblocking read until it satisfies the predicate or the deadline passes.</summary>

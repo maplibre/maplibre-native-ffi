@@ -7,12 +7,23 @@ import '../c/maplibre_native_c.g.dart' as raw;
 
 final _wakeStates = <int, NativeWakeState>{};
 
-final NativeCallable<raw.mln_wake_releaseFunction> _wakeReleaseListener =
+NativeCallable<raw.mln_wake_releaseFunction>? _wakeReleaseListener;
+
+NativeCallable<raw.mln_wake_releaseFunction> _createWakeReleaseListener() =>
     NativeCallable<raw.mln_wake_releaseFunction>.listener((
       Pointer<Void> userData,
     ) {
-      _wakeStates.remove(userData.address)?._releasedByNative();
+      _removeWakeState(userData.address)?._releasedByNative();
     });
+
+NativeWakeState? _removeWakeState(int token) {
+  final state = _wakeStates.remove(token);
+  if (_wakeStates.isEmpty) {
+    _wakeReleaseListener?.close();
+    _wakeReleaseListener = null;
+  }
+  return state;
+}
 
 /// Owns one Dart wake callback until native code reports it quiescent.
 final class NativeWakeState {
@@ -39,14 +50,15 @@ final class NativeWakeState {
     wake.size = sizeOf<raw.mln_wake>();
     wake.callback = _listener.nativeFunction;
     wake.user_data = _token.cast<Void>();
-    wake.release_user_data = _wakeReleaseListener.nativeFunction;
+    wake.release_user_data =
+        (_wakeReleaseListener ??= _createWakeReleaseListener()).nativeFunction;
   }
 
   /// Releases a descriptor that its owning C call rejected.
   void reject() {
     if (_retired) return;
     _retired = true;
-    _wakeStates.remove(_token.address);
+    _removeWakeState(_token.address);
     _listener.close();
     calloc.free(_token);
     _released.complete();

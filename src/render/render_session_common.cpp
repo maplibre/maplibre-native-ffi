@@ -1110,26 +1110,6 @@ auto enqueue_work_if_attached(
   return true;
 }
 
-// Registers a completion whose delivery needs the completion itself, which
-// create_completion_operation only hands back once the callback is in place.
-template <typename Deliver>
-auto create_delivered_operation(
-  const mln_completion* completion, Deliver deliver, CompletionOperation& out
-) -> mln_status {
-  auto state = std::make_shared<std::shared_ptr<Completion>>();
-  const auto status = create_completion_operation(
-    completion,
-    [state, deliver = std::move(deliver)](
-      mln_status work_status, std::string diagnostic, std::any result
-    ) mutable {
-      deliver(*state, work_status, std::move(diagnostic), std::move(result));
-    },
-    out
-  );
-  if (status == MLN_STATUS_OK) *state = out.completion;
-  return status;
-}
-
 using RenderDriverWorkFactory = std::function<RenderDriverWork(
   const std::shared_ptr<mln_render_session_object>&,
   const std::shared_ptr<OperationObject>&
@@ -1140,7 +1120,8 @@ using RenderDriverWorkFactory = std::function<RenderDriverWork(
 // `deliver` takes the plain committed completion.
 auto submit_driver_work(
   mln_render_session session, const mln_completion* completion,
-  RenderCompletionTransfer deliver, const RenderDriverWorkFactory& make_work
+  CompletionOperation::Delivery deliver,
+  const RenderDriverWorkFactory& make_work
 ) -> mln_status {
   const auto completion_status = validate_completion(completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
@@ -1158,8 +1139,7 @@ auto submit_driver_work(
   }
   auto async = CompletionOperation{};
   const auto registered =
-    deliver ? create_delivered_operation(completion, std::move(deliver), async)
-            : create_completion_operation(completion, {}, async);
+    create_completion_operation(completion, std::move(deliver), async);
   if (registered != MLN_STATUS_OK) return registered;
   if (!enqueue_work_if_attached(live, make_work(live, async.operation))) {
     async.completion->reject();
@@ -1203,7 +1183,7 @@ auto enqueue_driver_operation(
 
 auto enqueue_driver_result_operation(
   mln_render_session session, RenderDriverResultCallable work,
-  const mln_completion* completion, RenderCompletionTransfer transfer
+  const mln_completion* completion, CompletionOperation::Delivery transfer
 ) -> mln_status {
   return submit_driver_work(
     session, completion, std::move(transfer),
@@ -3130,7 +3110,7 @@ auto render_session_resize_start(
     }
   }
   auto async = CompletionOperation{};
-  const auto registered = create_delivered_operation(
+  const auto registered = create_completion_operation(
     completion,
     [](
       const std::shared_ptr<Completion>& state, mln_status status,

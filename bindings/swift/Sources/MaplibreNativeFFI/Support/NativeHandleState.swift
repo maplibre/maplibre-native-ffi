@@ -8,7 +8,7 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
   }
 
   private let typeName: String
-  private let lock = NSCondition()
+  private let lock = NSLock()
   private var state: State
 
   init(typeName: String, handle: Handle) throws {

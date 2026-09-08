@@ -1742,8 +1742,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) {
           mln_map_release(state.handleForClose().rawHandleValue, completion)
         }
       } catch (error: Throwable) {
-        state.abortClose()
-        state.abandonRetirement(claim)
+        state.rejectRetirement(claim, error)
         throw error
       }
     state.completeClose { runtime.unregisterMap(this) }

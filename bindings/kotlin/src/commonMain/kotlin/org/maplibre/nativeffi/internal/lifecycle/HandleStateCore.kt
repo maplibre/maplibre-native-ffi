@@ -73,14 +73,22 @@ internal class HandleStateCore(
    * first one published, so a repeated or concurrent close awaits the same native teardown.
    */
   fun claimRetirement(claim: CompletableDeferred<Unit>): Deferred<Unit> {
-    if (!retirement.compareAndSet(null, claim)) return checkNotNull(retirement.load())
-    check(beginClose()) { "$typeName retired without a claim" }
-    return claim
+    while (true) {
+      retirement.load()?.let {
+        return it
+      }
+      if (retirement.compareAndSet(null, claim)) {
+        check(beginClose()) { "$typeName retired without a claim" }
+        return claim
+      }
+    }
   }
 
-  /** Releases a claim whose close was rejected before it started, so a later close can retry. */
-  fun abandonRetirement(claim: CompletableDeferred<Unit>) {
-    retirement.compareAndSet(claim, null)
+  /** Reports a rejected close to its waiters and leaves the handle available for a retry. */
+  fun rejectRetirement(claim: CompletableDeferred<Unit>, failure: Throwable) {
+    abortClose()
+    check(retirement.compareAndSet(claim, null))
+    claim.completeExceptionally(failure)
   }
 
   fun closeOnce(destroy: () -> Int, afterSuccess: () -> Unit = {}) {
