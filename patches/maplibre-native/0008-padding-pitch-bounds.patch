@@ -1,0 +1,54 @@
+diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
+index c91a20a..94a7833 100644
+--- a/src/mln/map/transform.cpp
++++ b/src/mln/map/transform.cpp
+@@ -739,7 +739,10 @@ double Transform::getMaxPitchForEdgeInsets(const EdgeInsets& insets) const {
+     // Half of fov is the field of view above perspective center.
+     const double tangentOfFovAboveCenterAngle = (0.5 + centerOffsetY / height) * 2.0 * tan(getFieldOfView() / 2.0);
+     const double fovAboveCenter = std::atan(tangentOfFovAboveCenterAngle);
+-    return state.getMaxPitch() + getFieldOfView() / 2.0 - fovAboveCenter;
++    // Large padding relative to the viewport can put the calculated limit below the minimum pitch.
++    return util::clamp(state.getMaxPitch() + getFieldOfView() / 2.0 - fovAboveCenter,
++                       state.getMinPitch(),
++                       state.getMaxPitch());
+ }
+ 
+ FreeCameraOptions Transform::getFreeCameraOptions() const {
+diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
+index 809ef63..04d6ed1 100644
+--- a/test/map/transform.test.cpp
++++ b/test/map/transform.test.cpp
+@@ -925,6 +925,33 @@ TEST(Transform, InvalidPitch) {
+     ASSERT_DOUBLE_EQ(util::deg2rad(60), transform.getPitch());
+ }
+ 
++TEST(Transform, PaddingPreservesMinimumPitch) {
++    for (const uint32_t size : {1u, 64u}) {
++        for (const double minPitch : {0.0, 15.0}) {
++            SCOPED_TRACE(::testing::Message() << "size=" << size << ", minPitch=" << minPitch);
++            Transform transform;
++            transform.resize({size, size});
++            transform.setMinPitch(minPitch);
++            transform.setMaxPitch(60);
++            transform.jumpTo(CameraOptions().withCenter(LatLng{40.7128, -74.006}).withZoom(9.5).withPitch(minPitch));
++
++            transform.jumpTo(CameraOptions().withPadding(EdgeInsets{size * 28.0, 392, 0, 0}));
++            EXPECT_DOUBLE_EQ(util::deg2rad(minPitch), transform.getPitch());
++
++            transform.setMinPitch(minPitch);
++            transform.setMaxPitch(60);
++            transform.jumpTo(CameraOptions().withPadding(EdgeInsets{size * 24.0, 392, 0, 0}));
++            EXPECT_DOUBLE_EQ(util::deg2rad(minPitch), transform.getPitch());
++            EXPECT_DOUBLE_EQ(size * 24.0, transform.getState().getEdgeInsets().top());
++
++            transform.resize({800, 600});
++            EXPECT_DOUBLE_EQ(util::deg2rad(minPitch), transform.getPitch());
++            transform.jumpTo(CameraOptions().withPadding(EdgeInsets{}).withPitch(45));
++            EXPECT_DOUBLE_EQ(util::deg2rad(45), transform.getPitch());
++        }
++    }
++}
++
+ TEST(Transform, MinMaxPitch) {
+     Transform transform;
+     transform.resize({1, 1});
