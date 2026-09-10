@@ -32,6 +32,10 @@
 #include <mln/util/size.hpp>
 #include <mln/util/string.hpp>
 
+#if defined(MLN_RENDER_BACKEND_VULKAN)
+#include <mln/vulkan/renderable_resource.hpp>
+#endif
+
 #include "bytes/buffer.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "geojson/geojson.hpp"
@@ -1335,9 +1339,15 @@ auto render_session_render_update(
     }
   }
 
+  auto frame_ready = true;
   const auto render_once = [&]() -> mln_status {
     try {
       live->renderer->render(update);
+#if defined(MLN_RENDER_BACKEND_VULKAN)
+    } catch (const mln::vulkan::SurfaceNotReady&) {
+      frame_ready = false;
+      *out_result = MLN_RENDER_RESULT_TARGET_NOT_READY;
+#endif
     } catch (const std::exception& exception) {
       set_native_stage_error("rendering update", exception);
       return MLN_STATUS_NATIVE_ERROR;
@@ -1352,7 +1362,8 @@ auto render_session_render_update(
     {
       const UnpresentedRender unpresented{live->frame_observer};
       if (
-        const auto warmup_status = render_once(); warmup_status != MLN_STATUS_OK
+        const auto warmup_status = render_once();
+        warmup_status != MLN_STATUS_OK || !frame_ready
       ) {
         return warmup_status;
       }
@@ -1371,7 +1382,8 @@ auto render_session_render_update(
   remember_rendered_sources(live->rendered_source_ids, *update);
 
   if (
-    const auto render_status = render_once(); render_status != MLN_STATUS_OK
+    const auto render_status = render_once();
+    render_status != MLN_STATUS_OK || !frame_ready
   ) {
     return render_status;
   }
