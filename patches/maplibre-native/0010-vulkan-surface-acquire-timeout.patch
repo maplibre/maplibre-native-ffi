@@ -1,0 +1,224 @@
+diff --git a/include/mln/vulkan/renderable_resource.hpp b/include/mln/vulkan/renderable_resource.hpp
+index 39b80ea..b0ea9d0 100644
+--- a/include/mln/vulkan/renderable_resource.hpp
++++ b/include/mln/vulkan/renderable_resource.hpp
+@@ -1,5 +1,8 @@
+ #pragma once
+ 
++#include <limits>
++#include <stdexcept>
++
+ #include <mln/gfx/renderable.hpp>
+ #include <mln/vulkan/renderer_backend.hpp>
+ #include <mln/vulkan/texture2d.hpp>
+@@ -33,6 +36,12 @@ protected:
+     vk::UniqueRenderPass renderPass;
+ };
+ 
++// A bounded acquire expired before the frame recorded or submitted GPU work.
++class SurfaceNotReady final : public std::runtime_error {
++public:
++    SurfaceNotReady() : std::runtime_error("Vulkan surface image is not available") {}
++};
++
+ class SurfaceRenderableResource : public RenderableResource {
+ protected:
+     explicit SurfaceRenderableResource(RendererBackend& backend_, vk::PresentModeKHR mode = vk::PresentModeKHR::eFifo)
+@@ -51,6 +60,9 @@ protected:
+     void copySurfaceToReadTexture();
+ 
+ public:
++    // Hosts using a finite timeout must handle SurfaceNotReady and retry the frame.
++    virtual uint64_t getAcquireTimeout() const { return std::numeric_limits<uint64_t>::max(); }
++
+     virtual void createPlatformSurface() = 0;
+     virtual std::vector<const char*> getDeviceExtensions() { return {}; }
+ 
+diff --git a/src/mln/vulkan/context.cpp b/src/mln/vulkan/context.cpp
+index 174a168..b7019d9 100644
+--- a/src/mln/vulkan/context.cpp
++++ b/src/mln/vulkan/context.cpp
+@@ -302,10 +302,7 @@ void Context::beginFrame() {
+         }
+     }
+ 
+-    backend.startFrameCapture();
+-
+     auto& frame = frameResources[frameResourceIndex];
+-    constexpr uint64_t timeout = std::numeric_limits<uint64_t>::max();
+ 
+     if (!waitFrame()) {
+         return;
+@@ -318,7 +315,7 @@ void Context::beginFrame() {
+         try {
+             const vk::ResultValue acquireImageResult = device->acquireNextImageKHR(
+                 renderableResource.getSwapchain().get(),
+-                timeout,
++                renderableResource.getAcquireTimeout(),
+                 renderableResource.getAcquireSemaphore(),
+                 nullptr,
+                 dispatcher);
+@@ -328,6 +325,11 @@ void Context::beginFrame() {
+             } else if (acquireImageResult.result == vk::Result::eSuboptimalKHR) {
+                 renderableResource.setAcquiredImageIndex(acquireImageResult.value);
+                 requestSurfaceUpdate();
++            } else if (acquireImageResult.result == vk::Result::eTimeout ||
++                       acquireImageResult.result == vk::Result::eNotReady) {
++                // No image or semaphore signal belongs to this frame. Leave its fence
++                // signaled and abort before recording or submitting any commands.
++                throw SurfaceNotReady();
+             } else {
+                 mln::Log::Error(
+                     mln::Event::Render,
+@@ -344,6 +346,8 @@ void Context::beginFrame() {
+         renderableResource.setAcquiredImageIndex(frameResourceIndex);
+     }
+ 
++    backend.startFrameCapture();
++
+     frame.commandBuffer->reset(vk::CommandBufferResetFlagBits::eReleaseResources, dispatcher);
+     frame.commandBuffer->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit), dispatcher);
+ 
+diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
+index 50e4265..5802520 100644
+--- a/test/CMakeLists.txt
++++ b/test/CMakeLists.txt
+@@ -160,6 +160,7 @@ if(MLN_WITH_VULKAN)
+             ${PROJECT_SOURCE_DIR}/test/api/custom_layer.test.cpp
+             ${PROJECT_SOURCE_DIR}/test/api/custom_drawable_layer.test.cpp
+             ${PROJECT_SOURCE_DIR}/test/renderer/backend_scope.test.cpp
++            ${PROJECT_SOURCE_DIR}/test/renderer/vulkan_acquire.test.cpp
+             ${PROJECT_SOURCE_DIR}/test/util/offscreen_texture.test.cpp
+     )
+ endif()
+diff --git a/test/renderer/vulkan_acquire.test.cpp b/test/renderer/vulkan_acquire.test.cpp
+new file mode 100644
+--- /dev/null
++++ b/test/renderer/vulkan_acquire.test.cpp
+@@ -0,0 +1,126 @@
++#if MLN_RENDER_BACKEND_VULKAN
++#include <gtest/gtest.h>
++
++#include <cstdint>
++#include <type_traits>
++
++#include <mln/gfx/backend_scope.hpp>
++#include <mln/vulkan/context.hpp>
++#include <mln/vulkan/headless_backend.hpp>
++#include <mln/vulkan/renderable_resource.hpp>
++
++namespace {
++
++template <typename T>
++T fakeHandle() {
++    if constexpr (std::is_pointer_v<T>)
++        return reinterpret_cast<T>(uintptr_t{1});
++    else
++        return T{1};
++}
++
++// Keep real device resources and frame fences, replacing only WSI acquisition.
++class TestSurfaceResource final : public mln::vulkan::SurfaceRenderableResource {
++public:
++    explicit TestSurfaceResource(mln::vulkan::RendererBackend& backend_)
++        : SurfaceRenderableResource(backend_) {
++        init(64, 64);
++        acquireSemaphores.emplace_back(
++            backend.getDevice()->createSemaphoreUnique({}, nullptr, backend.getDispatcher()));
++        surface = vk::UniqueSurfaceKHR(vk::SurfaceKHR(fakeHandle<VkSurfaceKHR>()), {});
++    }
++    ~TestSurfaceResource() override { surface.release(); }
++    void createPlatformSurface() override {}
++    void bind() override {}
++    uint64_t getAcquireTimeout() const override { return 16'000'000; }
++    void makeHeadless() { surface.release(); }
++};
++
++struct AcquireProbe {
++    VkResult result = VK_TIMEOUT;
++    uint64_t timeout = 0;
++    unsigned acquisitions = 0;
++    unsigned recordings = 0;
++    unsigned fenceResets = 0;
++    unsigned submissions = 0;
++    PFN_vkBeginCommandBuffer begin = nullptr;
++    PFN_vkResetFences reset = nullptr;
++    PFN_vkQueueSubmit submit = nullptr;
++};
++thread_local AcquireProbe* probe = nullptr;
++
++VKAPI_ATTR VkResult VKAPI_CALL acquire(VkDevice, VkSwapchainKHR, uint64_t timeout, VkSemaphore, VkFence, uint32_t*) {
++    probe->timeout = timeout;
++    ++probe->acquisitions;
++    return probe->result;
++}
++VKAPI_ATTR VkResult VKAPI_CALL begin(VkCommandBuffer buffer, const VkCommandBufferBeginInfo* info) {
++    ++probe->recordings;
++    return probe->begin(buffer, info);
++}
++VKAPI_ATTR VkResult VKAPI_CALL reset(VkDevice device, uint32_t count, const VkFence* fences) {
++    ++probe->fenceResets;
++    return probe->reset(device, count, fences);
++}
++VKAPI_ATTR VkResult VKAPI_CALL submit(VkQueue queue, uint32_t count, const VkSubmitInfo* info, VkFence fence) {
++    ++probe->submissions;
++    return probe->submit(queue, count, info, fence);
++}
++
++TEST(VulkanAcquire, UnavailableImagePreservesFrameResources) {
++    mln::vulkan::HeadlessBackend backend({64, 64});
++    mln::gfx::BackendScope scope(backend);
++    auto& context = backend.getContext<mln::vulkan::Context>();
++    auto resource = std::make_unique<TestSurfaceResource>(backend);
++    auto* surface = resource.get();
++    backend.setResource(std::move(resource));
++
++    auto& dispatcher = const_cast<mln::vulkan::DispatchLoaderDynamic&>(backend.getDispatcher());
++    const auto saved = dispatcher;
++    AcquireProbe state;
++    state.begin = dispatcher.vkBeginCommandBuffer;
++    state.reset = dispatcher.vkResetFences;
++    state.submit = dispatcher.vkQueueSubmit;
++    probe = &state;
++    dispatcher.vkAcquireNextImageKHR = acquire;
++    dispatcher.vkBeginCommandBuffer = begin;
++    dispatcher.vkResetFences = reset;
++    dispatcher.vkQueueSubmit = submit;
++    struct Restore {
++        mln::vulkan::DispatchLoaderDynamic& dispatcher;
++        mln::vulkan::DispatchLoaderDynamic saved;
++        ~Restore() {
++            dispatcher = saved;
++            probe = nullptr;
++        }
++    } restore{dispatcher, saved};
++
++    for (const auto result : {VK_TIMEOUT, VK_NOT_READY, VK_TIMEOUT}) {
++        state.result = result;
++        EXPECT_THROW(context.beginFrame(), mln::vulkan::SurfaceNotReady);
++        EXPECT_EQ(state.timeout, 16'000'000u);
++        EXPECT_EQ(state.recordings, 0u);
++        EXPECT_EQ(state.fenceResets, 0u);
++        EXPECT_EQ(state.submissions, 0u);
++        EXPECT_TRUE(context.waitFrame());
++    }
++    EXPECT_EQ(state.acquisitions, 3u);
++
++    state.result = VK_ERROR_SURFACE_LOST_KHR;
++    EXPECT_THROW(context.beginFrame(), vk::SurfaceLostKHRError);
++    EXPECT_EQ(state.recordings, 0u);
++
++    // Reuse the same context and fences for real GPU submissions after the stalls.
++    surface->makeHeadless();
++    for (unsigned frame = 0; frame < 3; ++frame) {
++        context.beginFrame();
++        context.submitFrame();
++        EXPECT_TRUE(context.waitFrame());
++    }
++    EXPECT_EQ(state.recordings, 3u);
++    EXPECT_EQ(state.fenceResets, 3u);
++    EXPECT_EQ(state.submissions, 3u);
++}
++
++} // namespace
++#endif

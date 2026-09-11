@@ -201,6 +201,15 @@ class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
       return {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
     }
 
+#if defined(__ANDROID__)
+    auto getAcquireTimeout() const -> uint64_t override {
+      // A finite timeout lets Android's app-owned BufferQueue wait for HWUI
+      // instead of translating WOULD_BLOCK into VK_ERROR_SURFACE_LOST_KHR.
+      // https://github.com/maplibre/maplibre-compose/issues/1370
+      return 16'000'000;
+    }
+#endif
+
     void bind() override {}
 
     void swap() override {

@@ -43,6 +43,14 @@ includes a Native map regression test that checks icon and label pixels across
 zoom changes with a cached glyph range. See
 [issue #698](https://github.com/maplibre/maplibre-native-ffi/issues/698).
 
+`0010-vulkan-surface-acquire-timeout.patch` lets a surface host bound image
+acquisition and reports temporary unavailability before recording GPU commands.
+Android uses a 16 ms timeout; the C API returns `TARGET_NOT_READY` so the host
+can retry with the same render session. The Native regression injects
+acquisition stalls and checks that frame fences remain usable for later GPU
+submissions. See
+[Compose issue #1370](https://github.com/maplibre/maplibre-compose/issues/1370).
+
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
 before applying the list again. A pin bump, an edit to a patch, and a dropped
