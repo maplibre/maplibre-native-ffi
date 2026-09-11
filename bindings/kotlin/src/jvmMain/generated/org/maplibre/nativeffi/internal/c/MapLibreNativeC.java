@@ -9344,14 +9344,14 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     public static int MLN_LOG_EVENT_IMAGE() {
         return MLN_LOG_EVENT_IMAGE;
     }
-    private static final int MLN_LOG_EVENT_OPENGL = (int)11L;
+    private static final int MLN_LOG_EVENT_GRAPHICS_BACKEND = (int)11L;
     /**
      * {@snippet lang=c :
-     * enum mln_log_event.MLN_LOG_EVENT_OPENGL = 11
+     * enum mln_log_event.MLN_LOG_EVENT_GRAPHICS_BACKEND = 11
      * }
      */
-    public static int MLN_LOG_EVENT_OPENGL() {
-        return MLN_LOG_EVENT_OPENGL;
+    public static int MLN_LOG_EVENT_GRAPHICS_BACKEND() {
+        return MLN_LOG_EVENT_GRAPHICS_BACKEND;
     }
     private static final int MLN_LOG_EVENT_JNI = (int)12L;
     /**

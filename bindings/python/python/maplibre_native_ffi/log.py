@@ -44,7 +44,7 @@ class LogEvent(UnknownIntEnum):
     HTTP_REQUEST = 8
     SPRITE = 9
     IMAGE = 10
-    OPENGL = 11
+    GRAPHICS_BACKEND = 11
     JNI = 12
     ANDROID = 13
     CRASH = 14

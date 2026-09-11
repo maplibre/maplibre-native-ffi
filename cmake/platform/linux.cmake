@@ -183,6 +183,7 @@ function(mln_ffi_configure_platform target)
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/bidi.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/local_glyph_rasterizer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/i18n.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/async_task.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/png_writer.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/run_loop.cpp

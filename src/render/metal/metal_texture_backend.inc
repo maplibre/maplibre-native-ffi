@@ -27,7 +27,6 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   auto getRendererBackend() -> mln::gfx::RendererBackend* override;
   void activate() override;
   void deactivate() override;
-  void updateAssumedState() override;
 
   auto metal_texture() -> MTL::Texture*;
 

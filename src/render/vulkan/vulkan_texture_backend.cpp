@@ -462,7 +462,7 @@ void VulkanTextureBackend::set_borrowed_target(
     descriptor, new_size.width, new_size.height
   );
   borrowed_descriptor_ = descriptor;
-  size = new_size;
+  setRenderableSize(new_size);
 }
 
 void VulkanTextureBackend::resize(mln::Size new_size) {
@@ -473,7 +473,7 @@ void VulkanTextureBackend::resize(mln::Size new_size) {
     setSize(new_size);
     return;
   }
-  size = new_size;
+  setRenderableSize(new_size);
   getResource<VulkanTextureRenderableResource>().resize_sampled(
     vk::Extent2D{new_size.width, new_size.height}
   );
@@ -482,6 +482,7 @@ void VulkanTextureBackend::resize(mln::Size new_size) {
 auto VulkanTextureBackend::readStillImage() -> mln::PremultipliedImage {
   prepareRenderResources();
 
+  const auto size = getSize();
   auto image = mln::PremultipliedImage(size);
   const auto image_size = image.bytes();
   const auto& allocator = getAllocator();

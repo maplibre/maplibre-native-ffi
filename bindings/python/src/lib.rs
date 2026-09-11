@@ -5602,7 +5602,7 @@ fn log_event_raw(event: LogEvent) -> u32 {
         LogEvent::HttpRequest => sys::MLN_LOG_EVENT_HTTP_REQUEST,
         LogEvent::Sprite => sys::MLN_LOG_EVENT_SPRITE,
         LogEvent::Image => sys::MLN_LOG_EVENT_IMAGE,
-        LogEvent::OpenGl => sys::MLN_LOG_EVENT_OPENGL,
+        LogEvent::GraphicsBackend => sys::MLN_LOG_EVENT_GRAPHICS_BACKEND,
         LogEvent::Jni => sys::MLN_LOG_EVENT_JNI,
         LogEvent::Android => sys::MLN_LOG_EVENT_ANDROID,
         LogEvent::Crash => sys::MLN_LOG_EVENT_CRASH,

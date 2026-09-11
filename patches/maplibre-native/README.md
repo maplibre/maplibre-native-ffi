@@ -15,11 +15,10 @@ resources whose paths contain spaces or non-ASCII characters.
 uses it to bound one pump's drain; the budget logic stays on the C API side, and
 an unset gate keeps upstream behavior.
 
-`0004-opengl-valid-api-calls.patch` uses indexed extension enumeration on OpenGL
-ES, allocates storage before copying a uniform buffer, and isolates allocation
-errors from earlier OpenGL calls. This prevents strict implementations and the
-API 26 Android emulator from turning stale errors into false allocation
-failures.
+`0004-opengl-valid-api-calls.patch` allocates storage before copying a uniform
+buffer and isolates allocation errors from earlier OpenGL calls. This prevents
+strict implementations and the API 26 Android emulator from turning stale errors
+into false allocation failures.
 
 `0005-unwrapped-unprojection.patch` adds wrap-mode overloads to map and
 standalone projection coordinate conversion. The C API uses them to expose
@@ -36,11 +35,6 @@ registered to their requestor when the same request also needs missing images.
 This prevents cache cleanup from evicting active tile dependencies. The patch
 includes an ImageManager regression test for retention, delivery, and
 reclamation after the requestor releases its images.
-
-`0008-padding-pitch-bounds.patch` clamps the padding-dependent pitch limit to
-the configured pitch range. This keeps camera padding on small viewports from
-lowering the pitch below its minimum. See
-[issue #693](https://github.com/maplibre/maplibre-native-ffi/issues/693).
 
 `0009-synchronous-symbol-dependencies.patch` registers glyph and image
 dependencies before requesting either set. Cached glyphs can return inline for
