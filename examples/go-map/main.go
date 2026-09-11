@@ -296,8 +296,8 @@ func logSeverity(severity maplibre.LogSeverity) string {
 
 func logEvent(event maplibre.LogEvent) string {
 	switch event {
-	case maplibre.LogEventOpenGL:
-		return "opengl"
+	case maplibre.LogEventGraphicsBackend:
+		return "graphics-backend"
 	case maplibre.LogEventRender:
 		return "render"
 	case maplibre.LogEventHTTPRequest:
