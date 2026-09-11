@@ -62,6 +62,7 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0006-process-lifetime-logging.patch"
   "$repo_root/patches/maplibre-native/0007-retain-active-on-demand-images.patch"
   "$repo_root/patches/maplibre-native/0009-synchronous-symbol-dependencies.patch"
+  "$repo_root/patches/maplibre-native/0010-background-drawable-replacement.patch"
 )
 
 # A patch counts as applied when it reverses cleanly, which is also what makes
