@@ -746,7 +746,7 @@ class WebGPUSurfaceBackend final : public mln::webgpu::RendererBackend,
     if (size_ == getSize()) {
       return;
     }
-    size = size_;
+    setRenderableSize(size_);
     releaseFrame();
     configureSurface();
   }
@@ -775,14 +775,16 @@ class WebGPUSurfaceBackend final : public mln::webgpu::RendererBackend,
       wgpuSurfaceRelease(surface_);
     }
     surface_ = replacement;
-    size = mln::Size{
-      mln::core::physical_dimension(
-        descriptor.extent.width, descriptor.extent.scale_factor
-      ),
-      mln::core::physical_dimension(
-        descriptor.extent.height, descriptor.extent.scale_factor
-      )
-    };
+    setRenderableSize(
+      mln::Size{
+        mln::core::physical_dimension(
+          descriptor.extent.width, descriptor.extent.scale_factor
+        ),
+        mln::core::physical_dimension(
+          descriptor.extent.height, descriptor.extent.scale_factor
+        )
+      }
+    );
     configureSurface();
   }
 

@@ -1,5 +1,5 @@
 diff --git a/src/mln/tile/geometry_tile_worker.cpp b/src/mln/tile/geometry_tile_worker.cpp
-index 459142d..8052f27 100644
+index 459142dd286..8052f270110 100644
 --- a/src/mln/tile/geometry_tile_worker.cpp
 +++ b/src/mln/tile/geometry_tile_worker.cpp
 @@ -374,7 +374,8 @@ void GeometryTileWorker::onImagesAvailable(ImageMap newIconMap,
@@ -44,7 +44,7 @@ index 459142d..8052f27 100644
      MBGL_TIMING_FINISH(watch,
                         " Action: " << "Parsing,"
 diff --git a/src/mln/tile/geometry_tile_worker.hpp b/src/mln/tile/geometry_tile_worker.hpp
-index 6717251..fce3fd0 100644
+index 67172512e87..fce3fd042c8 100644
 --- a/src/mln/tile/geometry_tile_worker.hpp
 +++ b/src/mln/tile/geometry_tile_worker.hpp
 @@ -73,8 +73,7 @@ private:
@@ -58,7 +58,7 @@ index 6717251..fce3fd0 100644
      void symbolDependenciesChanged();
      bool hasPendingDependencies() const;
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index 5d67d35..9cd32fe 100644
+index 3efba2345da..077b57528c7 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
 @@ -44,6 +44,7 @@
@@ -69,9 +69,9 @@ index 5d67d35..9cd32fe 100644
  
  using namespace mln;
  using namespace mln::style;
-@@ -2039,3 +2040,79 @@ TEST(Map, SetFrustumOffset) {
- 
-     test::checkImage("test/fixtures/map/setFrustumOffset/after", test.frontend.render(test.map).image, 0.0006, 0.1);
+@@ -2112,3 +2113,79 @@ TEST(Map, FeatureStateChangesRenderedStyle) {
+         EXPECT_GT(centerChannel(result.image, 2), 200) << "blue channel (removed)";
+     }
  }
 +
 +class GeoJSONSymbolTest : public testing::TestWithParam<std::tuple<bool, bool>> {};

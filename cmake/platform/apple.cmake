@@ -131,6 +131,7 @@ function(mln_ffi_configure_platform target)
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/async_task.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/collator.mm
       ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../../src/platform/apple/http_file_source.mm
+      ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../../src/platform/apple/i18n.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/image.mm
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/local_glyph_rasterizer.mm
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/logging_nslog.mm

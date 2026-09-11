@@ -43,7 +43,7 @@ public enum LogEvent: Sendable, Hashable {
   case httpRequest
   case sprite
   case image
-  case openGL
+  case graphicsBackend
   case jni
   case android
   case crash
@@ -64,7 +64,7 @@ public enum LogEvent: Sendable, Hashable {
     case 8: .httpRequest
     case 9: .sprite
     case 10: .image
-    case 11: .openGL
+    case 11: .graphicsBackend
     case 12: .jni
     case 13: .android
     case 14: .crash

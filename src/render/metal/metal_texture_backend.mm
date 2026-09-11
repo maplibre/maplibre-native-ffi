@@ -235,7 +235,7 @@ auto MetalTextureBackend::getDefaultRenderable() -> mln::gfx::Renderable& {
     resource = std::make_unique<MetalTextureRenderableResource>(
       // MetalTextureBackend always creates a Metal context.
       // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-      *this, static_cast<mln::mtl::Context&>(getContext()), size,
+      *this, static_cast<mln::mtl::Context&>(getContext()), getSize(),
       borrowed_texture_
     );
   }
@@ -253,8 +253,6 @@ auto MetalTextureBackend::getRendererBackend() -> mln::gfx::RendererBackend* {
 void MetalTextureBackend::activate() {}
 
 void MetalTextureBackend::deactivate() {}
-
-void MetalTextureBackend::updateAssumedState() {}
 
 auto MetalTextureBackend::metal_texture() -> MTL::Texture* {
   getDefaultRenderable();
@@ -281,7 +279,7 @@ void MetalTextureBackend::set_borrowed_texture(
   MTL::Texture* texture, mln::Size new_size
 ) {
   borrowed_texture_ = texture;
-  size = new_size;
+  setRenderableSize(new_size);
   // Drop the renderable rather than patch it: its depth and stencil textures
   // are sized with the color attachment, and any command buffer in hand was
   // opened against the texture being replaced.

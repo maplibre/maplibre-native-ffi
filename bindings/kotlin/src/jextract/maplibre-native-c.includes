@@ -94,7 +94,7 @@
 --include-constant MLN_LOG_EVENT_HTTP_REQUEST
 --include-constant MLN_LOG_EVENT_IMAGE
 --include-constant MLN_LOG_EVENT_JNI
---include-constant MLN_LOG_EVENT_OPENGL
+--include-constant MLN_LOG_EVENT_GRAPHICS_BACKEND
 --include-constant MLN_LOG_EVENT_PARSE_STYLE
 --include-constant MLN_LOG_EVENT_PARSE_TILE
 --include-constant MLN_LOG_EVENT_RENDER
