@@ -411,16 +411,37 @@ public expect class MapHandle : AutoCloseable {
    */
   public var isGestureInProgress: Boolean
 
+  /**
+   * Computes a camera that fits geographic bounds in the current viewport.
+   *
+   * A null [fitOptions] uses zero padding with no bearing or pitch override. Invalid bounds throw
+   * [org.maplibre.nativeffi.error.InvalidArgumentException].
+   */
   public fun cameraForLatLngBounds(
     bounds: LatLngBounds,
     fitOptions: CameraFitOptions?,
   ): CameraOptions
 
+  /**
+   * Computes a camera that fits geographic coordinates in the current viewport.
+   *
+   * [coordinates] is read only for the duration of the call. A null [fitOptions] uses zero padding
+   * with no bearing or pitch override. An empty list or an invalid coordinate throws
+   * [org.maplibre.nativeffi.error.InvalidArgumentException].
+   */
   public fun cameraForLatLngs(
     coordinates: List<LatLng>,
     fitOptions: CameraFitOptions?,
   ): CameraOptions
 
+  /**
+   * Computes a camera that fits a geometry in the current viewport.
+   *
+   * [geometry] holds UTF-8 GeoJSON Geometry bytes and is read only for the duration of the call. A
+   * null [fitOptions] uses zero padding with no bearing or pitch override. Empty or malformed
+   * geometry, and geometry with no coordinates, throw
+   * [org.maplibre.nativeffi.error.InvalidArgumentException].
+   */
   public fun cameraForGeometry(geometry: ByteArray, fitOptions: CameraFitOptions?): CameraOptions
 
   /**
