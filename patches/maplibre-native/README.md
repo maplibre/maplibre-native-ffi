@@ -68,6 +68,8 @@ incorrect paint values and renders symbols, dashed lines, and patterned
 backgrounds transparently on Android x86_64. Native map pixel-readback
 regressions cover all five shaders using the existing glyph fixture. See
 [issue #713](https://github.com/maplibre/maplibre-native-ffi/issues/713).
+Upstream:
+[maplibre-native#4625](https://github.com/maplibre/maplibre-native/pull/4625).
 
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
