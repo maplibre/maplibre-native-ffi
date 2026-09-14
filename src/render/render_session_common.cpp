@@ -32,6 +32,10 @@
 #include <mln/util/size.hpp>
 #include <mln/util/string.hpp>
 
+#if defined(MLN_RENDER_BACKEND_VULKAN)
+#include <mln/vulkan/renderable_resource.hpp>
+#endif
+
 #include "bytes/buffer.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "geojson/geojson.hpp"
@@ -1335,14 +1339,22 @@ auto render_session_render_update(
     }
   }
 
-  const auto render_once = [&]() -> mln_status {
+  // Returns the status to report early, or nothing once a frame rendered.
+  const auto render_once = [&]() -> std::optional<mln_status> {
     try {
       live->renderer->render(update);
+#if defined(MLN_RENDER_BACKEND_VULKAN)
+    } catch (const mln::vulkan::SurfaceNotReady&) {
+      // The swapchain had no free image within the acquire bound. The frame
+      // recorded nothing, so the host retries with this session.
+      *out_result = MLN_RENDER_RESULT_TARGET_NOT_READY;
+      return MLN_STATUS_OK;
+#endif
     } catch (const std::exception& exception) {
       set_native_stage_error("rendering update", exception);
       return MLN_STATUS_NATIVE_ERROR;
     }
-    return MLN_STATUS_OK;
+    return std::nullopt;
   };
 
   auto desired = map_feature_state_snapshot(live->map);
@@ -1351,10 +1363,8 @@ auto render_session_render_update(
   if (warmup) {
     {
       const UnpresentedRender unpresented{live->frame_observer};
-      if (
-        const auto warmup_status = render_once(); warmup_status != MLN_STATUS_OK
-      ) {
-        return warmup_status;
+      if (const auto early = render_once()) {
+        return *early;
       }
     }
     if (const auto early = wait_surface()) {
@@ -1370,10 +1380,8 @@ auto render_session_render_update(
   }
   remember_rendered_sources(live->rendered_source_ids, *update);
 
-  if (
-    const auto render_status = render_once(); render_status != MLN_STATUS_OK
-  ) {
-    return render_status;
+  if (const auto early = render_once()) {
+    return *early;
   }
   // Absorb results that landed from worker threads during the render.
   live->scheduler.drain();

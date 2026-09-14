@@ -64,6 +64,7 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0009-synchronous-symbol-dependencies.patch"
   "$repo_root/patches/maplibre-native/0010-background-drawable-replacement.patch"
   "$repo_root/patches/maplibre-native/0011-opengl-uniform-block-order.patch"
+  "$repo_root/patches/maplibre-native/0012-vulkan-surface-acquire-timeout.patch"
 )
 
 # A patch counts as applied when it reverses cleanly, which is also what makes
@@ -79,10 +80,16 @@ mln_patches_applied() {
   done
 }
 
+# The forced checkout below resets tracked files but leaves a file that a patch
+# adds in place, so remove those before the patch goes back on.
 apply_mln_patches() {
-  local patch
+  local patch path
   for patch in "${mln_patches[@]}"; do
     if ! mln_patch_applied "$patch"; then
+      git -C "$mln_path" apply --numstat "$patch" | cut -f3 |
+        while read -r path; do
+          git -C "$mln_path" clean -fq -- "$path"
+        done
       git -C "$mln_path" apply "$patch"
     fi
   done

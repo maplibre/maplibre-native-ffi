@@ -1858,7 +1858,7 @@ impl RenderSessionHandle {
     /// wake to wait for: [`RenderResult::NoUpdate`] and
     /// [`RenderResult::SizePending`] resolve on a render-update-available
     /// event, and [`RenderResult::TargetNotReady`] resolves when the host
-    /// changes the render target.
+    /// changes the render target or on a later retry after a backoff.
     ///
     /// The returned [`RenderUpdate::needs_repaint`] reports whether the map
     /// asked for another frame while rendering this one, so a frame loop can
