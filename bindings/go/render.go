@@ -963,7 +963,8 @@ func (session *RenderSessionHandle) setTarget(call func(nativeRenderSession) int
 // RenderResultRendered again. Every other result names the wake to wait for:
 // RenderResultNoUpdate and RenderResultSizePending resolve on a
 // RuntimeEventMapRenderUpdateAvailable event, and RenderResultTargetNotReady
-// resolves when the host changes the render target.
+// resolves when the host changes the render target or on a later retry after
+// a backoff.
 func (session *RenderSessionHandle) RenderUpdate() (RenderUpdate, error) {
 	ptr, release, err := session.ptr()
 	if err != nil {

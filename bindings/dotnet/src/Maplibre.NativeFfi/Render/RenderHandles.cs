@@ -456,7 +456,8 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     /// <see cref="RenderResult.Rendered"/> again. Every other result names the wake to wait for:
     /// <see cref="RenderResult.NoUpdate"/> and <see cref="RenderResult.SizePending"/> resolve on a
     /// render-update-available event, and <see cref="RenderResult.TargetNotReady"/> resolves when
-    /// the host changes the render target. The returned <see cref="RenderUpdate.NeedsRepaint"/>
+    /// the host changes the render target or on a later retry after a backoff. The returned
+    /// <see cref="RenderUpdate.NeedsRepaint"/>
     /// flag tells whether the map asked for another frame while it rendered this one.
     /// </summary>
     public RenderUpdate RenderUpdate()

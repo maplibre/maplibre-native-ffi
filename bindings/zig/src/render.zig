@@ -580,7 +580,8 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
     /// latest update, so repeated calls re-render it and report `.rendered`
     /// again. Every other result names the wake to wait for: `.no_update` and
     /// `.size_pending` resolve on a render-update-available event, and
-    /// `.target_not_ready` resolves when the host changes the render target.
+    /// `.target_not_ready` resolves when the host changes the render target
+    /// or on a later retry after a backoff.
     pub fn renderUpdate(self: *RenderSessionHandle) status.Error!RenderUpdate {
         const lease = try renderSessionLease(self.*);
         defer lease.release();
