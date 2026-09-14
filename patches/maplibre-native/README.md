@@ -71,6 +71,17 @@ regressions cover all five shaders using the existing glyph fixture. See
 Upstream:
 [maplibre-native#4625](https://github.com/maplibre/maplibre-native/pull/4625).
 
+`0012-vulkan-surface-acquire-timeout.patch` lets a surface resource bound
+swapchain image acquisition. When the bound expires, the frame aborts with
+`SurfaceNotReady` before it records or submits GPU work. Android's Vulkan loader
+tells an app-owned BufferQueue to wait for a free buffer only when the timeout
+is finite, and it reports buffer starvation under an unbounded acquire as a lost
+surface. The Android native surface target uses a 16 ms bound, and the C API
+reports the target as not ready, so the host retries with the same render
+session. The patch includes a Native regression that injects acquisition stalls
+and checks that frame fences remain usable for later GPU submissions. See
+[maplibre-compose#1370](https://github.com/maplibre/maplibre-compose/issues/1370).
+
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
 before applying the list again. A pin bump, an edit to a patch, and a dropped
@@ -81,4 +92,5 @@ Local edits to the submodule worktree, including edits inside a nested vendor
 submodule, are discarded by the same checkout, and a sync runs it whenever the
 worktree carries a tracked change that no listed patch accounts for. The sync
 prints those paths first. A forced checkout also removes an untracked file that
-sits where a new pin adds a tracked one.
+sits where a new pin adds a tracked one, and the sync removes a file that a
+listed patch adds before applying that patch again.

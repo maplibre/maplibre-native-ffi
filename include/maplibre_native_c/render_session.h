@@ -92,9 +92,10 @@ typedef enum mln_render_result : uint32_t {
  *   publishes an update for the new size on its own, so wait for the next
  *   MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
  * - MLN_RENDER_RESULT_TARGET_NOT_READY means the render target had no frame
- *   available, such as a Metal surface whose next drawable is nil. No map
- *   update resolves this, so wait for a host event that changes the target,
- *   or back off and retry.
+ *   available, such as a Metal surface whose next drawable is nil or an
+ *   Android Vulkan surface whose swapchain had no free image within the
+ *   acquire bound. No map update resolves this, so wait for a host event that
+ *   changes the target, or back off and retry.
  *
  * In MLN_MAP_MODE_STATIC, pump a resize through the map before requesting the
  * still image. The session applies its extent on the map's owner thread, and a
