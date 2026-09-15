@@ -309,8 +309,9 @@ the parent. Releasing a parent while children are live MUST fail without
 consuming or destroying the parent.
 
 `MapProjectionHandle` is the exception: after creation it owns a standalone
-projection snapshot. It MUST remain valid after the source map closes, MUST be
-usable from any thread, and MUST release with `mln_map_projection_destroy()`.
+projection snapshot. It MUST remain valid after the source map or render session
+closes, MUST be usable from any thread, and MUST release with
+`mln_map_projection_destroy()`.
 
 ### Handle copying
 
@@ -926,6 +927,9 @@ The public handle exposes:
 - `render_update` for the latest available map render update, reporting a public
   `RenderUpdate` value that pairs the render result enum with the frame's
   repaint flag;
+- projection creation from the last successfully rendered update, returning an
+  independent `MapProjectionHandle` through
+  `mln_render_session_projection_create`;
 - `detach`, which keeps the public handle live after backend resources detach;
 - `close` or `destroy`, using the owned-handle release operation, on the thread
   that attached the session.
@@ -937,6 +941,12 @@ and `mln_*_borrowed_texture_set_target()` functions, and it is bound to the
 thread that attached the session like every other session operation. The C API
 rejects a descriptor whose graphics context differs from the session's, so
 bindings pass the descriptor through.
+
+Projection creation MUST run on the session owner thread and MUST remain
+available while an owned texture frame is acquired. Bindings MUST preserve the C
+API's snapshot lifetime and invalidation rules. Hosts pair the projection with
+the rendered image and its presentation extent, using the render target's GPU
+synchronization contract.
 
 ### Texture frames
 
@@ -1161,6 +1171,7 @@ When the binding routes provider requests through
 | BND-172 | Bindings with fallible owned-frame wrapper construction release the native frame when construction fails after native frame acquisition.                  |
 | BND-173 | Stale frame handles cannot expose backend handles after release or reuse.                                                                                 |
 | BND-174 | Closing a map whose render session was attached on another thread reports the C API's invalid-state error and leaves both handles live.                   |
+| BND-177 | Projection creation snapshots the rendered update, works during frame acquisition, and returns a helper that survives session/map closure.                |
 
 ### Conditional tests
 

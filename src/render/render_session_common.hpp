@@ -15,6 +15,7 @@
 #include <mln/actor/scheduler.hpp>
 #include <mln/gfx/headless_backend.hpp>
 #include <mln/gfx/renderer_backend.hpp>
+#include <mln/map/transform_state.hpp>
 #include <mln/renderer/renderer.hpp>
 #include <mln/renderer/renderer_observer.hpp>
 #include <mln/util/feature.hpp>
@@ -322,6 +323,15 @@ class SessionFrameObserver final : public mln::RendererObserver {
 
   [[nodiscard]] auto needs_repaint() const -> bool { return needs_repaint_; }
 
+  auto begin_render() -> void {
+    frame_completed_ = false;
+    needs_repaint_ = false;
+  }
+
+  [[nodiscard]] auto frame_completed() const -> bool {
+    return frame_completed_;
+  }
+
   auto suppress_frame_callbacks(bool suppress) -> void {
     suppress_frame_callbacks_ = suppress;
   }
@@ -360,6 +370,7 @@ class SessionFrameObserver final : public mln::RendererObserver {
       return;
     }
     needs_repaint_ = repaint;
+    frame_completed_ = true;
     if (delegate_ != nullptr) {
       delegate_->onDidFinishRenderingFrame(
         mode, repaint, placement_changed, stats
@@ -458,6 +469,7 @@ class SessionFrameObserver final : public mln::RendererObserver {
  private:
   mln::RendererObserver* delegate_ = nullptr;
   bool needs_repaint_ = false;
+  bool frame_completed_ = false;
   bool suppress_frame_callbacks_ = false;
 };
 
@@ -488,6 +500,7 @@ struct mln_render_session_object {
   double scale_factor = 1.0;
   uint64_t generation = 1;
   uint64_t rendered_generation = 0;
+  std::optional<mln::TransformState> rendered_transform;
   bool attached = true;
 
   // Declared before `renderer` so reverse-order destruction tears the renderer
@@ -725,6 +738,9 @@ auto surface_session_set_target(
 auto render_session_render_update(
   mln_render_session session, mln_render_result* out_result,
   bool* out_needs_repaint
+) -> mln_status;
+auto render_session_projection_create(
+  mln_render_session session, mln_map_projection* out_projection
 ) -> mln_status;
 auto render_session_detach(mln_render_session session) -> mln_status;
 auto render_session_destroy(mln_render_session session) -> mln_status;

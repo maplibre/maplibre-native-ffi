@@ -7582,6 +7582,25 @@ auto map_projection_create(mln_map map, mln_map_projection* out_projection)
   return MLN_STATUS_OK;
 }
 
+auto map_projection_create_from_transform(
+  const mln::TransformState& transform, mln_map_projection* out_projection
+) -> mln_status {
+  if (out_projection == nullptr) {
+    set_thread_error("out_projection must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (*out_projection != MLN_HANDLE_NULL) {
+    set_thread_error("out_projection must point to the null handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto owned_projection = std::make_shared<MapProjectionObject>();
+  owned_projection->projection =
+    std::make_unique<mln::MapProjection>(transform);
+  *out_projection =
+    handle_table<MapProjectionObject>().insert(std::move(owned_projection));
+  return MLN_STATUS_OK;
+}
+
 auto map_projection_destroy(mln_map_projection projection) -> mln_status {
   auto& table = handle_table<MapProjectionObject>();
   std::shared_ptr<MapProjectionObject> owned;

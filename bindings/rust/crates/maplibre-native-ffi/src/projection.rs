@@ -19,7 +19,7 @@ pub(crate) struct MapProjectionState {
 
 impl MapProjectionState {
     fn new(native: sys::mln_map_projection) -> Result<Self> {
-        // SAFETY: native came from successful mln_map_projection_create and is
+        // SAFETY: native came from successful projection creation and is
         // paired with the matching projection destroy function.
         let handle = unsafe {
             ConcurrentNativeHandle::from_handle(
@@ -48,7 +48,7 @@ impl MapProjectionState {
 
 /// Standalone projection snapshot created from a map transform.
 ///
-/// The projection does not retain the source map after creation. It remains
+/// The projection does not retain its source after creation. It remains
 /// usable from any thread, and native calls serialize access to its transform.
 pub struct MapProjectionHandle {
     inner: MapProjectionState,
@@ -70,6 +70,10 @@ impl MapProjectionHandle {
         // out-pointer owned by this call.
         maplibre_core::check(unsafe { sys::mln_map_projection_create(map_ptr, out.as_mut_ptr()) })?;
         let ptr = out_handle(out, "mln_map_projection")?;
+        Self::from_native(ptr)
+    }
+
+    pub(crate) fn from_native(ptr: sys::mln_map_projection) -> Result<Self> {
         Ok(Self {
             inner: MapProjectionState::new(ptr)?,
         })

@@ -1681,6 +1681,20 @@ impl RenderSessionHandle {
         })
     }
 
+    /// Copies the last rendered transform into an independent, any-thread projection.
+    ///
+    /// Call on the session owner thread, including while a texture frame is acquired.
+    /// Creation requires a rendered update after attachment, resize, or retargeting.
+    pub fn create_projection(&self) -> Result<crate::MapProjectionHandle> {
+        let session = self.inner.native()?;
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map_projection>::new();
+        // SAFETY: session is live and out is a valid output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_projection_create(session, out.as_mut_ptr())
+        })?;
+        crate::MapProjectionHandle::from_native(out_handle(out, "mln_map_projection")?)
+    }
+
     /// Explicitly destroys the render session.
     ///
     /// Native destruction errors are returned. When destruction fails, the

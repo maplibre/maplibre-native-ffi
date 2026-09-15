@@ -84,8 +84,8 @@ typedef enum mln_render_result : uint32_t {
  *   surface expose and gates a frame loop on
  *   MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
  * - MLN_RENDER_RESULT_NO_UPDATE means the call produced no frame. The map
- *   either has no update yet, or the Metal backend has not created an owned
- *   texture because content is not ready. Wait for
+ *   has no update yet, a static map is waiting for style or tile data, or the
+ *   Metal backend has not created an owned texture. Wait for
  *   MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
  * - MLN_RENDER_RESULT_SIZE_PENDING means the session resized and the map,
  *   which applies its size on its own thread, is still behind. The map
@@ -124,6 +124,40 @@ typedef enum mln_render_result : uint32_t {
 MLN_API mln_status mln_render_session_render_update(
   mln_render_session session, mln_render_result* out_result,
   bool* out_needs_repaint
+) MLN_NOEXCEPT;
+
+/**
+ * Creates a standalone projection from the session's last rendered update.
+ *
+ * Call on the session owner thread after mln_render_session_render_update()
+ * reports MLN_RENDER_RESULT_RENDERED, before rendering another frame or
+ * changing the target. Creation is also allowed while an owned texture frame
+ * is acquired. Pair the projection with that frame and its presentation extent.
+ * The snapshot describes render coordinates; GPU completion and presentation
+ * follow the render target's synchronization contract.
+ *
+ * The session captures the full transform of the update passed to the renderer.
+ * Later live-map changes and render calls that produce no frame preserve this
+ * snapshot. Resize and target replacement invalidate it until a frame renders
+ * into the new target.
+ *
+ * The returned helper owns a separate copy of the transform. It remains usable
+ * after later renders, target changes, detach, and destruction of the session
+ * or map. Its projection and camera operations are synchronous and serialized
+ * across threads, as for mln_map_projection_create(). Destroy it with
+ * mln_map_projection_destroy().
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success; *out_projection receives an owned handle.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live,
+ *   out_projection is null, or *out_projection is not null.
+ * - MLN_STATUS_INVALID_STATE when the session is detached or its current target
+ *   has no rendered projection.
+ * - MLN_STATUS_WRONG_THREAD when called outside the session owner thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_render_session_projection_create(
+  mln_render_session session, mln_map_projection* out_projection
 ) MLN_NOEXCEPT;
 
 /**

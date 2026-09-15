@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi.render
 
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -9,6 +11,7 @@ import kotlin.test.assertTrue
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
+import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
@@ -20,8 +23,15 @@ import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.map.MapMode
+import org.maplibre.nativeffi.map.MapProjectionHandle
 import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
+import org.maplibre.nativeffi.resource.ResourceProviderCallback
+import org.maplibre.nativeffi.resource.ResourceProviderDecision
+import org.maplibre.nativeffi.resource.ResourceRequestHandle
+import org.maplibre.nativeffi.resource.ResourceResponse
+import org.maplibre.nativeffi.resource.ResourceResponseStatus
+import org.maplibre.nativeffi.runOnBackgroundThread
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.sleepMillis
 
@@ -29,6 +39,153 @@ class RenderSessionHandleTest {
   // BND-160, BND-161, BND-163, BND-164, BND-165, BND-166, BND-167, BND-168,
   // BND-169, BND-170: owned-texture rendering, readback, frames, and
   // owner-thread checks.
+
+  @OptIn(ExperimentalAtomicApi::class)
+  @Test
+  fun staticRenderWaitingForStyleKeepsThePreviousProjection() {
+    withOwnedTextureSession(mapMode = MapMode.STATIC) { runtime, map, owned ->
+      val session = owned.session
+      val pending = AtomicReference<ResourceRequestHandle?>(null)
+      runtime.setResourceProvider(
+        ResourceProviderCallback { _, handle ->
+          pending.store(handle)
+          ResourceProviderDecision.HANDLE
+        }
+      )
+      try {
+        runtime.pump(0)
+        map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray())
+        assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED))
+        map.jumpTo(CameraOptions().apply { zoom = 3.0 })
+        map.requestStillImage()
+        var result = RenderResult.NO_UPDATE
+        var finished = false
+        for (attempt in 0 until 500) {
+          runtime.pump(0)
+          finished =
+            runtime.drainEvents().events.any {
+              it.type == RuntimeEventType.MAP_STILL_IMAGE_FINISHED
+            }
+          if (finished) break
+          result = session.renderUpdate().result
+          sleepMillis(1)
+        }
+        assertTrue(finished)
+        assertEquals(RenderResult.RENDERED, result)
+        map.setStyleUrl("test://pending-style.json")
+        map.jumpTo(CameraOptions().apply { zoom = 6.0 })
+        map.requestStillImage()
+        for (attempt in 0 until 500) {
+          runtime.pump(0)
+          if (pending.load() != null) break
+          sleepMillis(1)
+        }
+        assertTrue(pending.load() != null)
+        val skipped = session.renderUpdate()
+        session.createProjection().use { assertEquals(3.0, it.camera.zoom) }
+        assertEquals(RenderResult.NO_UPDATE, skipped.result)
+        assertFalse(skipped.needsRepaint)
+        pending
+          .load()!!
+          .complete(
+            ResourceResponse(ResourceResponseStatus.OK).apply {
+              bytes = BACKGROUND_STYLE_JSON.encodeToByteArray()
+            }
+          )
+        for (attempt in 0 until 500) {
+          runtime.pump(0)
+          result = session.renderUpdate().result
+          if (result == RenderResult.RENDERED) break
+          sleepMillis(1)
+        }
+        assertEquals(RenderResult.RENDERED, result)
+        session.createProjection().use { assertEquals(6.0, it.camera.zoom) }
+      } finally {
+        pending.load()?.close()
+      }
+    }
+  }
+
+  @Test
+  fun renderedProjectionFollowsRenderedUpdatesAndOutlivesTheSession() {
+    val coordinate = LatLng(37.78, -122.41)
+    var retained: MapProjectionHandle? = null
+    var expected = ScreenPoint(0.0, 0.0)
+    try {
+      withOwnedTextureSession(width = 128, height = 64) { runtime, map, owned ->
+        val session = owned.session
+        assertFailsWith<InvalidStateException> { session.createProjection() }
+        map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray())
+        runtime.pump(0)
+        map.jumpTo(
+          CameraOptions().apply {
+            center = LatLng(37.7749, -122.4194)
+            zoom = 12.0
+            bearing = 23.0
+            pitch = 40.0
+            padding = EdgeInsets(3.0, 7.0, 5.0, 11.0)
+          }
+        )
+        assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
+        map.createProjection().use { expected = it.pixelForLatLng(coordinate) }
+        assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
+
+        // Advance and publish the live camera while the target still contains the previous frame.
+        map.jumpTo(CameraOptions().apply { center = LatLng(37.80, -122.45) })
+        runtime.pump(0)
+        val first = session.createProjection()
+        retained = first
+        assertPointNear(expected, first.pixelForLatLng(coordinate))
+        val current = map.pixelForLatLng(coordinate)
+        assertTrue(kotlin.math.abs(current.x - expected.x) > 1.0)
+        val unprojected = first.latLngForPixel(expected)
+        assertEquals(coordinate.latitude, unprojected.latitude, 1e-6)
+        assertEquals(coordinate.longitude, unprojected.longitude, 1e-6)
+
+        val wrongThread = failureFromBackgroundThread { session.createProjection().close() }
+        assertTrue(wrongThread is WrongThreadException)
+        owned.acquireFrame().use {
+          session.createProjection().use { projection ->
+            assertPointNear(expected, projection.pixelForLatLng(coordinate))
+          }
+          assertFailsWith<InvalidStateException> { session.renderUpdate() }
+        }
+        session.createProjection().use { assertPointNear(expected, it.pixelForLatLng(coordinate)) }
+
+        assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
+        session.createProjection().use {
+          assertPointNear(current, it.pixelForLatLng(coordinate))
+          it.setCamera(CameraOptions().apply { zoom = 2.0 })
+        }
+        session.createProjection().use { assertPointNear(current, it.pixelForLatLng(coordinate)) }
+        assertPointNear(expected, first.pixelForLatLng(coordinate))
+
+        session.resize(96, 48, 2.0)
+        assertEquals(RenderResult.SIZE_PENDING, session.renderUpdate().result)
+        assertFailsWith<InvalidStateException> { session.createProjection() }
+        assertPointNear(expected, first.pixelForLatLng(coordinate))
+        runtime.pump(0)
+        assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
+        session.createProjection().use {
+          assertPointNear(map.pixelForLatLng(coordinate), it.pixelForLatLng(coordinate))
+        }
+        session.detach()
+        assertFailsWith<InvalidStateException> { session.createProjection() }
+        session.close()
+        map.close()
+        runtime.close()
+        assertPointNear(expected, first.pixelForLatLng(coordinate))
+        runOnBackgroundThread { assertPointNear(expected, first.pixelForLatLng(coordinate)) }
+      }
+    } finally {
+      retained?.close()
+    }
+  }
+
+  private fun assertPointNear(expected: ScreenPoint, actual: ScreenPoint) {
+    assertEquals(expected.x, actual.x, 1e-6)
+    assertEquals(expected.y, actual.y, 1e-6)
+  }
 
   @Test
   fun renderUpdateWithoutPendingUpdateReportsNoUpdateAndKeepsSessionLive() {

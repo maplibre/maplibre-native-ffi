@@ -1109,6 +1109,7 @@ auto render_session_resize(
     reset_pushed_feature_state(*live);
   }
   live->rendered_generation = 0;
+  live->rendered_transform.reset();
   live->width = width;
   live->height = height;
   live->physical_width = physical_width;
@@ -1202,6 +1203,7 @@ auto render_session_set_target(
     reset_pushed_feature_state(*live);
   }
   live->rendered_generation = 0;
+  live->rendered_transform.reset();
   live->width = extent.width;
   live->height = extent.height;
   live->physical_width = physical_width;
@@ -1339,9 +1341,10 @@ auto render_session_render_update(
     }
   }
 
-  // Returns the status to report early, or nothing once a frame rendered.
+  // Returns an early status, or nothing once the render attempt returns.
   const auto render_once = [&]() -> std::optional<mln_status> {
     try {
+      live->frame_observer.begin_render();
       live->renderer->render(update);
 #if defined(MLN_RENDER_BACKEND_VULKAN)
     } catch (const mln::vulkan::SurfaceNotReady&) {
@@ -1385,6 +1388,11 @@ auto render_session_render_update(
   }
   // Absorb results that landed from worker threads during the render.
   live->scheduler.drain();
+  // Static maps can return without drawing while style or tile data is pending.
+  // Only a completed frame replaces the target's projection and backend state.
+  if (!live->frame_observer.frame_completed()) {
+    return MLN_STATUS_OK;
+  }
   if (live->kind == RenderSessionKind::Texture) {
     auto frame_rendered = true;
     const auto after_status =
@@ -1400,10 +1408,30 @@ auto render_session_render_update(
       return MLN_STATUS_OK;
     }
   }
+  live->rendered_transform = update->transformState;
   live->rendered_generation = live->generation;
   *out_result = MLN_RENDER_RESULT_RENDERED;
   *out_needs_repaint = live->frame_observer.needs_repaint();
   return MLN_STATUS_OK;
+}
+
+auto render_session_projection_create(
+  mln_render_session session, mln_map_projection* out_projection
+) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_render_session(session, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (
+    live->rendered_generation != live->generation || !live->rendered_transform
+  ) {
+    set_thread_error("render session target has no rendered projection");
+    return MLN_STATUS_INVALID_STATE;
+  }
+  return map_projection_create_from_transform(
+    *live->rendered_transform, out_projection
+  );
 }
 
 auto render_session_detach(mln_render_session session) -> mln_status {
@@ -1440,6 +1468,7 @@ auto render_session_detach(mln_render_session session) -> mln_status {
   }
   live->attached = false;
   live->rendered_generation = 0;
+  live->rendered_transform.reset();
   live->texture.rendered_native_texture = nullptr;
   live->texture.acquired_native_texture = nullptr;
   live->texture.acquired_frame_kind = TextureSessionFrameKind::None;

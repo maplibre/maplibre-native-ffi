@@ -101,3 +101,85 @@ import Testing
     Issue.record("unexpected error: \(error)")
   }
 }
+
+#if canImport(Metal)
+  import Foundation
+  import Metal
+
+  @Test func sessionProjectionKeepsTheRenderedCameraAfterMapChanges() throws {
+    guard Maplibre.supportedRenderBackends().contains(.metal) else { return }
+    let device = try #require(MTLCreateSystemDefaultDevice())
+    let runtime =
+      try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    defer { try? runtime.close() }
+    let map = try MapHandle(
+      runtime: runtime,
+      options: MapOptions(width: 128, height: 64)
+    )
+    defer { try? map.close() }
+    let session = try map.attachRef()
+      .attachMetalOwnedTexture(MetalOwnedTextureDescriptor(
+        extent: RenderTargetExtent(width: 128, height: 64, scaleFactor: 1),
+        context: MetalContextDescriptor(device: NativePointer(
+          bitPattern: UInt(bitPattern: Unmanaged
+            .passUnretained(device as AnyObject).toOpaque())
+        ))
+      ))
+    defer { try? session.close() }
+    #expect(throws: MaplibreError.self) {
+      try MapProjectionHandle(session: session)
+    }
+    try map
+      .setStyleJSON(
+        Data(#"{"version":8,"sources":{},"layers":[{"id":"bg","type":"background"}]}"#
+          .utf8)
+      )
+    let coordinate = LatLng(latitude: 37.78, longitude: -122.41)
+    try map.jump(to: CameraOptions(
+      center: LatLng(latitude: 37.7749, longitude: -122.4194),
+      zoom: 12
+    ))
+    var rendered = false
+    for _ in 0 ..< 500 {
+      try runtime.pump()
+      if try session.renderUpdate().result == .rendered {
+        rendered = true
+        break
+      }
+      Thread.sleep(forTimeInterval: 0.001)
+    }
+    #expect(rendered)
+    let liveProjection = try MapProjectionHandle(map: map)
+    defer { try? liveProjection.close() }
+    let expected = try liveProjection.pixel(for: coordinate)
+    try map.jump(to: CameraOptions(center: LatLng(
+      latitude: 37.80,
+      longitude: -122.45
+    )))
+    try runtime.pump()
+    let projection = try MapProjectionHandle(session: session)
+    defer { try? projection.close() }
+    #expect(try projection.pixel(for: coordinate) == expected)
+    let newer = try MapProjectionHandle(map: map)
+    defer { try? newer.close() }
+    #expect(try newer.pixel(for: coordinate) != expected)
+    let frame = try session.acquireMetalOwnedTextureFrame()
+    let acquiredProjection = try MapProjectionHandle(session: session)
+    defer { try? acquiredProjection.close() }
+    #expect(try acquiredProjection.pixel(for: coordinate) == expected)
+    try frame.close()
+    #expect(try session.renderUpdate().result == .rendered)
+    let next = try MapProjectionHandle(session: session)
+    defer { try? next.close() }
+    #expect(try next.pixel(for: coordinate) == newer.pixel(for: coordinate))
+    try session.resize(width: 96, height: 48, scaleFactor: 1)
+    #expect(throws: MaplibreError.self) {
+      try MapProjectionHandle(session: session)
+    }
+    try session.close()
+    try map.close()
+    try runtime.close()
+    #expect(try projection.pixel(for: coordinate) == expected)
+    withExtendedLifetime(device) {}
+  }
+#endif

@@ -1,6 +1,19 @@
 internal import CMaplibreNativeC
 
 enum NativeProjection {
+  static func create(_ session: NativeRenderSessionHandle) throws
+    -> NativeMapProjectionHandle
+  {
+    try NativeHandleFactory.create(
+      nullDiagnostic: "mln_render_session_projection_create returned a null projection"
+    ) { outHandle in
+      try checkStatus(mln_render_session_projection_create(
+        session.raw,
+        outHandle
+      ))
+    }
+  }
+
   static func create(_ map: NativeMapHandle) throws
     -> NativeMapProjectionHandle
   {

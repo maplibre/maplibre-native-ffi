@@ -325,6 +325,7 @@
 --include-function mln_render_session_dump_debug_logs
 --include-function mln_render_session_reduce_memory_use
 --include-function mln_render_session_render_update
+--include-function mln_render_session_projection_create
 --include-function mln_render_session_resize
 
 # include/maplibre_native_c/render_target.h

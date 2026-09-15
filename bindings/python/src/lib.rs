@@ -4427,6 +4427,30 @@ impl RenderSessionHandle {
         })
     }
 
+    fn create_projection(&self) -> PyResult<MapProjectionHandle> {
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map_projection>::new();
+        // SAFETY: The C API validates the session handle, owner-thread affinity, and
+        // output pointer. out starts null and is consumed immediately on success.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_projection_create(state.native(), out.as_mut_ptr())
+        })
+        .map_err(map_error)?;
+        let native = out.into_live("mln_map_projection").map_err(map_error)?;
+        // SAFETY: ptr came from mln_render_session_projection_create and is paired with
+        // mln_map_projection_destroy in close.
+        let handle = unsafe {
+            maplibre_core::handle::NativeHandleState::from_handle(native, "mln_map_projection")
+        }
+        .map_err(map_error)?;
+        Ok(MapProjectionHandle {
+            state: Mutex::new(handle),
+        })
+    }
+
     fn render_update(&self) -> PyResult<(u32, bool)> {
         let state = self
             .state

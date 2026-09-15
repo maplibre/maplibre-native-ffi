@@ -223,6 +223,21 @@ final class RenderSessionHandle {
   /// invalid-state status for destroying a map that still has a session.
   NativeRenderSession get _handle => _state.handle;
 
+  /// Creates an independent, any-thread projection from the last rendered update.
+  ///
+  /// Call on the session owner isolate, including while a texture frame is acquired.
+  /// Resize and target replacement require another rendered frame before creation.
+  MapProjectionHandle createProjection() {
+    return withNativeArena((arena) {
+      final outProjection = arena<Uint64>();
+      outProjection.value = 0;
+      _check(
+        raw.mln_render_session_projection_create(_handle.raw, outProjection),
+      );
+      return MapProjectionHandle._(NativeMapProjection(outProjection.value));
+    });
+  }
+
   /// Resizes an attached render session.
   ///
   /// Surface and session-owned texture targets resize in place. A caller-owned
@@ -385,9 +400,9 @@ final class RenderSessionHandle {
   ///   its latest update, so a host redraws on demand after a resize or a
   ///   surface expose, and gates a frame loop on
   ///   [RuntimeEventType.mapRenderUpdateAvailable].
-  /// - [RenderResult.noUpdate]: the call produced no frame. The map either has
-  ///   no update yet, or the Metal backend has not created an owned texture
-  ///   because content is not ready. Wait for
+  /// - [RenderResult.noUpdate]: the call produced no frame. The map has no update
+  ///   yet, a static map is waiting for style or tile data, or the Metal backend
+  ///   has not created an owned texture. Wait for
   ///   [RuntimeEventType.mapRenderUpdateAvailable].
   /// - [RenderResult.sizePending]: this session resized and the map, which
   ///   applies its size on its own thread, is still behind. The map publishes

@@ -82,6 +82,10 @@ session. The patch includes a Native regression that injects acquisition stalls
 and checks that frame fences remain usable for later GPU submissions. See
 [maplibre-compose#1370](https://github.com/maplibre/maplibre-compose/issues/1370).
 
+`0013-projection-from-transform-state.patch` adds a standalone projection
+constructor that copies a transform state. The C API uses it to expose the
+projection of the update that a render session rendered.
+
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
 before applying the list again. A pin bump, an edit to a patch, and a dropped

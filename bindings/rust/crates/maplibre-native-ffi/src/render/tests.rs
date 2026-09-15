@@ -327,6 +327,7 @@ impl OwnedTextureTestContext {
                 let Ok(frame) = session.acquire_metal_owned_texture_frame() else {
                     return false;
                 };
+                session.create_projection().unwrap().close().unwrap();
                 let metadata = frame.frame().unwrap();
                 let matches = (metadata.width, metadata.height)
                     == (expected.width, expected.height)
@@ -339,6 +340,7 @@ impl OwnedTextureTestContext {
                 let Ok(frame) = session.acquire_webgpu_owned_texture_frame() else {
                     return false;
                 };
+                session.create_projection().unwrap().close().unwrap();
                 let metadata = frame.frame().unwrap();
                 let matches = metadata.width == expected.width
                     && metadata.height == expected.height
@@ -351,6 +353,7 @@ impl OwnedTextureTestContext {
                 let Ok(frame) = session.acquire_vulkan_owned_texture_frame() else {
                     return false;
                 };
+                session.create_projection().unwrap().close().unwrap();
                 let metadata = frame.frame().unwrap();
                 let matches = (metadata.width, metadata.height)
                     == (expected.width, expected.height)
@@ -362,6 +365,7 @@ impl OwnedTextureTestContext {
                 let Ok(frame) = session.acquire_opengl_owned_texture_frame() else {
                     return false;
                 };
+                session.create_projection().unwrap().close().unwrap();
                 let metadata = frame.frame().unwrap();
                 let matches = (metadata.width, metadata.height)
                     == (expected.width, expected.height)
@@ -4418,4 +4422,53 @@ fn identified_camera_transition_reports_its_end_once_when_it_runs_to_completion(
     session.close().unwrap();
     map.close().unwrap();
     runtime.close().unwrap();
+}
+
+#[test]
+fn projection_captures_last_rendered_update_and_survives_session() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let (_context, session) = create_owned_texture_session(
+        &map.attach_ref().unwrap(),
+        RenderTargetExtent::new(64, 64, 1.0),
+    )
+    .unwrap();
+    assert_eq!(
+        session.create_projection().unwrap_err().kind(),
+        ErrorKind::InvalidState
+    );
+    load_query_style(&mut runtime, &map, &session);
+    let camera_a = session.create_projection().unwrap().camera().unwrap();
+    let mut camera_b = CameraOptions::default();
+    camera_b.center = Some(LatLng::new(10.0, 20.0));
+    camera_b.zoom = Some(3.0);
+    map.jump_to(&camera_b).unwrap();
+    runtime.pump(Some(Duration::ZERO), None).unwrap();
+    let projection = session.create_projection().unwrap();
+    assert_eq!(projection.camera().unwrap(), camera_a);
+    assert_eq!(
+        session.render_update().unwrap().result,
+        RenderResult::Rendered
+    );
+    assert_eq!(
+        session.create_projection().unwrap().camera().unwrap().zoom,
+        Some(3.0)
+    );
+    session.resize(80, 40, 1.0).unwrap();
+    assert_eq!(
+        session.create_projection().unwrap_err().kind(),
+        ErrorKind::InvalidState
+    );
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+    std::thread::spawn(move || {
+        assert_eq!(projection.camera().unwrap(), camera_a);
+        projection.close().unwrap();
+    })
+    .join()
+    .unwrap();
 }

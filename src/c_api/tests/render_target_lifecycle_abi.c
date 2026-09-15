@@ -48,6 +48,38 @@ static bool has_renderer(mln_render_session session) {
   return true;
 }
 
+static void rendered_projection_preserves_output_ownership(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  mln_map_projection projection = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_STATE,
+    mln_render_session_projection_create(fixture.session, &projection)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, projection);
+  TEST_ASSERT_TRUE(render_until_frame(runtime, fixture.session));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_render_session_projection_create(fixture.session, NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_render_session_projection_create(fixture.session, &projection)
+  );
+  const mln_map_projection original = projection;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_render_session_projection_create(fixture.session, &projection)
+  );
+  TEST_ASSERT_EQUAL_UINT64(original, projection);
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_destroy(projection));
+}
+
 static void resize_keeps_the_session_renderer(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -198,6 +230,7 @@ static void set_target_rejects_a_stale_session(void) {
 
 void run_render_target_lifecycle_abi_tests(void) {
   UnitySetTestFile(__FILE__);
+  RUN_TEST(rendered_projection_preserves_output_ownership);
   RUN_TEST(resize_keeps_the_session_renderer);
   RUN_TEST(scale_factor_change_rebuilds_the_session_renderer);
   RUN_TEST(set_target_rejects_a_session_owned_texture);

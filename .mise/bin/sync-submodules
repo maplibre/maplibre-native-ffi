@@ -65,6 +65,7 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0010-background-drawable-replacement.patch"
   "$repo_root/patches/maplibre-native/0011-opengl-uniform-block-order.patch"
   "$repo_root/patches/maplibre-native/0012-vulkan-surface-acquire-timeout.patch"
+  "$repo_root/patches/maplibre-native/0013-projection-from-transform-state.patch"
 )
 
 # A patch counts as applied when it reverses cleanly, which is also what makes

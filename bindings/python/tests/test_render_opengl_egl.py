@@ -218,6 +218,7 @@ def wait_for_opengl_frame(
     iterations: int = 5000,
 ) -> render.OpenGLOwnedTextureFrameHandle:
     request_still_image_if_needed(fixture.map)
+    still_image_finished = False
     last_frame: render.OpenGLOwnedTextureFrame | None = None
     for _ in range(iterations):
         fixture.runtime.pump()
@@ -227,6 +228,13 @@ def wait_for_opengl_frame(
                     fixture.session.render_update()
                 except mln.InvalidStateError:
                     pass
+            elif event.event_type == mln.RuntimeEventType.MAP_STILL_IMAGE_FINISHED:
+                still_image_finished = True
+        # The map processes completion after the texture becomes available.
+        # Finish this request before the caller can resize and request another.
+        if not still_image_finished:
+            time.sleep(0.001)
+            continue
         try:
             frame = fixture.session.acquire_opengl_owned_texture_frame()
         except mln.InvalidStateError:
