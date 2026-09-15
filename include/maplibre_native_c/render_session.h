@@ -84,8 +84,8 @@ typedef enum mln_render_result : uint32_t {
  *   surface expose and gates a frame loop on
  *   MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
  * - MLN_RENDER_RESULT_NO_UPDATE means the call produced no frame. The map
- *   either has no update yet, or the Metal backend has not created an owned
- *   texture because content is not ready. Wait for
+ *   has no update yet, a static map is waiting for style or tile data, or the
+ *   Metal backend has not created an owned texture. Wait for
  *   MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
  * - MLN_RENDER_RESULT_SIZE_PENDING means the session resized and the map,
  *   which applies its size on its own thread, is still behind. The map

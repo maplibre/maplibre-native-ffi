@@ -1341,9 +1341,10 @@ auto render_session_render_update(
     }
   }
 
-  // Returns the status to report early, or nothing once a frame rendered.
+  // Returns an early status, or nothing once the render attempt returns.
   const auto render_once = [&]() -> std::optional<mln_status> {
     try {
+      live->frame_observer.begin_render();
       live->renderer->render(update);
 #if defined(MLN_RENDER_BACKEND_VULKAN)
     } catch (const mln::vulkan::SurfaceNotReady&) {
@@ -1387,6 +1388,11 @@ auto render_session_render_update(
   }
   // Absorb results that landed from worker threads during the render.
   live->scheduler.drain();
+  // Static maps can return without drawing while style or tile data is pending.
+  // Only a completed frame replaces the target's projection and backend state.
+  if (!live->frame_observer.frame_completed()) {
+    return MLN_STATUS_OK;
+  }
   if (live->kind == RenderSessionKind::Texture) {
     auto frame_rendered = true;
     const auto after_status =

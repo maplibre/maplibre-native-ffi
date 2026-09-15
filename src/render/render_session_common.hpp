@@ -323,6 +323,15 @@ class SessionFrameObserver final : public mln::RendererObserver {
 
   [[nodiscard]] auto needs_repaint() const -> bool { return needs_repaint_; }
 
+  auto begin_render() -> void {
+    frame_completed_ = false;
+    needs_repaint_ = false;
+  }
+
+  [[nodiscard]] auto frame_completed() const -> bool {
+    return frame_completed_;
+  }
+
   auto suppress_frame_callbacks(bool suppress) -> void {
     suppress_frame_callbacks_ = suppress;
   }
@@ -361,6 +370,7 @@ class SessionFrameObserver final : public mln::RendererObserver {
       return;
     }
     needs_repaint_ = repaint;
+    frame_completed_ = true;
     if (delegate_ != nullptr) {
       delegate_->onDidFinishRenderingFrame(
         mode, repaint, placement_changed, stats
@@ -459,6 +469,7 @@ class SessionFrameObserver final : public mln::RendererObserver {
  private:
   mln::RendererObserver* delegate_ = nullptr;
   bool needs_repaint_ = false;
+  bool frame_completed_ = false;
   bool suppress_frame_callbacks_ = false;
 };
 

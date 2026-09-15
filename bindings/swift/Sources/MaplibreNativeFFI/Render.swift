@@ -738,9 +738,10 @@ public final class RenderSessionHandle {
   ///   its latest update, so a host redraws on demand after a resize or a
   ///   surface expose, and paces a frame loop on the map
   ///   render-update-available event.
-  /// - ``RenderResult/noUpdate``: the call produced no frame. The map either
-  ///   has no update yet, or the Metal backend has not created an owned texture
-  ///   because content is not ready. Wait for the map render-update-available
+  /// - ``RenderResult/noUpdate``: the call produced no frame. The map has no
+  /// update yet,
+  ///   a static map is waiting for style or tile data, or the Metal backend has
+  ///   not created an owned texture. Wait for the map render-update-available
   ///   event.
   /// - ``RenderResult/sizePending``: the session resized and the map, which
   ///   applies its size on its own thread, is still behind. The map publishes

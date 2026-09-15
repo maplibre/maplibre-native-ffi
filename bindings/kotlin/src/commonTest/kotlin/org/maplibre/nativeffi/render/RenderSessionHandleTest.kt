@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi.render
 
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -24,6 +26,11 @@ import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapProjectionHandle
 import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
+import org.maplibre.nativeffi.resource.ResourceProviderCallback
+import org.maplibre.nativeffi.resource.ResourceProviderDecision
+import org.maplibre.nativeffi.resource.ResourceRequestHandle
+import org.maplibre.nativeffi.resource.ResourceResponse
+import org.maplibre.nativeffi.resource.ResourceResponseStatus
 import org.maplibre.nativeffi.runOnBackgroundThread
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.sleepMillis
@@ -32,6 +39,72 @@ class RenderSessionHandleTest {
   // BND-160, BND-161, BND-163, BND-164, BND-165, BND-166, BND-167, BND-168,
   // BND-169, BND-170: owned-texture rendering, readback, frames, and
   // owner-thread checks.
+
+  @OptIn(ExperimentalAtomicApi::class)
+  @Test
+  fun staticRenderWaitingForStyleKeepsThePreviousProjection() {
+    withOwnedTextureSession(mapMode = MapMode.STATIC) { runtime, map, owned ->
+      val session = owned.session
+      val pending = AtomicReference<ResourceRequestHandle?>(null)
+      runtime.setResourceProvider(
+        ResourceProviderCallback { _, handle ->
+          pending.store(handle)
+          ResourceProviderDecision.HANDLE
+        }
+      )
+      try {
+        runtime.pump(0)
+        map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray())
+        assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED))
+        map.jumpTo(CameraOptions().apply { zoom = 3.0 })
+        map.requestStillImage()
+        var result = RenderResult.NO_UPDATE
+        var finished = false
+        for (attempt in 0 until 500) {
+          runtime.pump(0)
+          finished =
+            runtime.drainEvents().events.any {
+              it.type == RuntimeEventType.MAP_STILL_IMAGE_FINISHED
+            }
+          if (finished) break
+          result = session.renderUpdate().result
+          sleepMillis(1)
+        }
+        assertTrue(finished)
+        assertEquals(RenderResult.RENDERED, result)
+        map.setStyleUrl("test://pending-style.json")
+        map.jumpTo(CameraOptions().apply { zoom = 6.0 })
+        map.requestStillImage()
+        for (attempt in 0 until 500) {
+          runtime.pump(0)
+          if (pending.load() != null) break
+          sleepMillis(1)
+        }
+        assertTrue(pending.load() != null)
+        val skipped = session.renderUpdate()
+        session.createProjection().use { assertEquals(3.0, it.camera.zoom) }
+        assertEquals(RenderResult.NO_UPDATE, skipped.result)
+        assertFalse(skipped.needsRepaint)
+        pending
+          .load()!!
+          .complete(
+            ResourceResponse(ResourceResponseStatus.OK).apply {
+              bytes = BACKGROUND_STYLE_JSON.encodeToByteArray()
+            }
+          )
+        for (attempt in 0 until 500) {
+          runtime.pump(0)
+          result = session.renderUpdate().result
+          if (result == RenderResult.RENDERED) break
+          sleepMillis(1)
+        }
+        assertEquals(RenderResult.RENDERED, result)
+        session.createProjection().use { assertEquals(6.0, it.camera.zoom) }
+      } finally {
+        pending.load()?.close()
+      }
+    }
+  }
 
   @Test
   fun renderedProjectionFollowsRenderedUpdatesAndOutlivesTheSession() {
