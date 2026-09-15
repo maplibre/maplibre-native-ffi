@@ -469,6 +469,18 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderUpdate((RenderResult)result, needsRepaint);
     }
 
+    /// <summary>
+    /// Creates an independent, any-thread projection from the last rendered update.
+    /// Call on the session owner thread, including while a texture frame is acquired.
+    /// Resize and target replacement require another rendered frame before creation.
+    /// </summary>
+    public MapProjectionHandle CreateProjection()
+    {
+        MlnMapProjection projection = default;
+        NativeStatus.Check(NativeMethods.mln_render_session_projection_create(Handle, &projection));
+        return new MapProjectionHandle(projection);
+    }
+
     public void Detach()
     {
         ThrowIfTextureFrameActive(nameof(Detach));

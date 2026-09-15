@@ -1953,6 +1953,14 @@ external int mln_render_session_detach(int session);
 external int mln_render_session_dump_debug_logs(int session);
 
 @ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_map_projection>)
+>()
+external int mln_render_session_projection_create(
+  int session,
+  ffi.Pointer<mln_map_projection> out_projection,
+);
+
+@ffi.Native<
   ffi.Int32 Function(
     mln_render_session,
     mln_buffer_view,

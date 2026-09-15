@@ -223,6 +223,21 @@ final class RenderSessionHandle {
   /// invalid-state status for destroying a map that still has a session.
   NativeRenderSession get _handle => _state.handle;
 
+  /// Creates an independent, any-thread projection from the last rendered update.
+  ///
+  /// Call on the session owner isolate, including while a texture frame is acquired.
+  /// Resize and target replacement require another rendered frame before creation.
+  MapProjectionHandle createProjection() {
+    return withNativeArena((arena) {
+      final outProjection = arena<Uint64>();
+      outProjection.value = 0;
+      _check(
+        raw.mln_render_session_projection_create(_handle.raw, outProjection),
+      );
+      return MapProjectionHandle._(NativeMapProjection(outProjection.value));
+    });
+  }
+
   /// Resizes an attached render session.
   ///
   /// Surface and session-owned texture targets resize in place. A caller-owned

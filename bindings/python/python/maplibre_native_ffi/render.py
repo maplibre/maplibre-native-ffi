@@ -558,6 +558,15 @@ class RenderSessionHandle(NativeHandleMixin):
         """Return whether backend resources have been detached."""
         return bool(self._native.detached)
 
+    def create_projection(self) -> MapProjectionHandle:
+        """Snapshot the last rendered update on this session's owner thread.
+
+        Creation is allowed while a frame is acquired and requires a rendered
+        update after attaching, resizing, or replacing the target. The any-thread
+        snapshot remains usable after this session and its map close.
+        """
+        return MapProjectionHandle._from_native(self._native.create_projection())
+
     def resize(self, width: int, height: int, scale_factor: float) -> None:
         """Resize this attached render session.
 
@@ -1037,4 +1046,4 @@ __all__ = [
     "WglContextDescriptor",
 ]
 
-from .map import MapHandle
+from .map import MapHandle, MapProjectionHandle

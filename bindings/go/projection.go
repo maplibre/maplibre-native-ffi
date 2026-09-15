@@ -44,6 +44,37 @@ func (m *MapHandle) NewProjection() (*MapProjectionHandle, error) {
 	return &MapProjectionHandle{state: state}, nil
 }
 
+// NewProjection snapshots the last rendered update on the session owner thread.
+// It is allowed while a frame is acquired. Creation requires a rendered update
+// after attaching, resizing, or replacing the target. The any-thread snapshot
+// remains usable after the session and map close.
+func (session *RenderSessionHandle) NewProjection() (*MapProjectionHandle, error) {
+	ptr, release, err := session.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	defer session.state.KeepAlive()
+	defer session.parent.state.KeepAlive()
+
+	var projection nativeProjection
+	if err := checkNative(func() int32 {
+		var raw C.mln_map_projection
+		status := int32(C.mln_render_session_projection_create(C.mln_render_session(ptr), &raw))
+		if status == int32(C.MLN_STATUS_OK) {
+			projection = nativeProjection(raw)
+		}
+		return status
+	}); err != nil {
+		return nil, err
+	}
+	state, err := handle.New(projection, "MapProjectionHandle")
+	if err != nil {
+		return nil, newBindingError(ErrInvalidArgument, err.Error())
+	}
+	return &MapProjectionHandle{state: state}, nil
+}
+
 func (projection *MapProjectionHandle) ptr() (nativeProjection, func(), error) {
 	if projection == nil || projection.state == nil {
 		return 0, nil, newBindingError(ErrInvalidArgument, "MapProjectionHandle is nil")

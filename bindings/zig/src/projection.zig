@@ -39,13 +39,7 @@ pub const MapProjectionHandle = enum(c.mln_map_projection) {
             c.mln_map_projection_create(try map_module.native(map), &projection),
             diagnostic_store,
         );
-        errdefer _ = c.mln_map_projection_destroy(projection);
-
-        const projection_state = try std.heap.smp_allocator.create(ProjectionState);
-        projection_state.* = .{ .diagnostic_store = diagnostic_store };
-        errdefer std.heap.smp_allocator.destroy(projection_state);
-
-        return try registerProjectionState(projection, projection_state);
+        return fromNative(projection, diagnostic_store);
     }
 
     pub fn getCamera(self: *MapProjectionHandle) status.Error!values.CameraOptions {
@@ -240,4 +234,14 @@ pub fn latLngForProjectedMeters(
     var coordinate: c.mln_lat_lng = undefined;
     try status.checkStatus(c.mln_lat_lng_for_projected_meters(values.projectedMetersToNative(meters), &coordinate), diagnostic_store);
     return values.latLngFromNative(coordinate);
+}
+
+pub fn fromNative(projection: c.mln_map_projection, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!MapProjectionHandle {
+    errdefer _ = c.mln_map_projection_destroy(projection);
+
+    const projection_state = try std.heap.smp_allocator.create(ProjectionState);
+    projection_state.* = .{ .diagnostic_store = diagnostic_store };
+    errdefer std.heap.smp_allocator.destroy(projection_state);
+
+    return try registerProjectionState(projection, projection_state);
 }

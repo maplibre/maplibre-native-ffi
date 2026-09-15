@@ -26,6 +26,23 @@ public final class MapProjectionHandle: @unchecked Sendable {
     )
   }
 
+  /// Creates a projection from the last successfully rendered update.
+  ///
+  /// Call on the session owner thread, including while a texture frame is
+  /// acquired. Keep the projection with that frame and its presentation extent.
+  /// Creation requires a rendered update after attachment, resize, or target
+  /// replacement. The returned projection remains usable from any thread after
+  /// later renders and after the session or map closes.
+  public init(session: RenderSessionHandle) throws {
+    let projection = try mapNativeFailure {
+      try NativeProjection.create(session.requireLiveHandle())
+    }
+    handle = try NativeHandleBox(
+      typeName: "MapProjectionHandle",
+      handle: projection
+    )
+  }
+
   public var isClosed: Bool {
     handle.isClosed
   }

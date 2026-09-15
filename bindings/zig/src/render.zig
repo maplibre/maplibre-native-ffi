@@ -496,6 +496,17 @@ pub const OpenGLOwnedTextureFrameInfo = struct {
 pub const RenderSessionHandle = enum(c.mln_render_session) {
     _,
 
+    /// Copies the last rendered transform into an independent, any-thread projection.
+    /// Call on the session owner thread, including while a texture frame is acquired.
+    /// Creation requires a rendered update after attachment, resize, or retargeting.
+    pub fn createProjection(self: *RenderSessionHandle) status.Error!@import("projection.zig").MapProjectionHandle {
+        const lease = try renderSessionLease(self.*);
+        defer lease.release();
+        var projection: c.mln_map_projection = 0;
+        try status.checkStatus(c.mln_render_session_projection_create(lease.native, &projection), lease.diagnostic_store);
+        return @import("projection.zig").fromNative(projection, lease.diagnostic_store);
+    }
+
     /// Resizes this attached render session. Borrowed texture targets are sized
     /// by their owner and return `error.Unsupported`; hand over a new texture
     /// with the backend's `set*BorrowedTextureTarget` method instead.
