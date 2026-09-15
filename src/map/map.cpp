@@ -3807,6 +3807,42 @@ auto map_request_repaint(mln_map map) -> mln_status {
   return MLN_STATUS_OK;
 }
 
+auto map_set_global_state_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (!validate_string_view(property_name, "property_name")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto native_value = to_native_json_value(value);
+  if (!native_value) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto& style = live->map->getStyle();
+  if (!style.isLoaded()) {
+    set_thread_error("style JSON has not loaded");
+    return MLN_STATUS_INVALID_STATE;
+  }
+  style.setGlobalStateProperty(string_from_view(property_name), *native_value);
+  return MLN_STATUS_OK;
+}
+
+auto map_get_global_state(mln_map map, mln_buffer* out_state) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  return create_buffer(
+    serialize_json_value(mln::Value{live->map->getStyle().getGlobalState()}),
+    out_state
+  );
+}
+
 auto map_set_feature_state(
   mln_map map, const mln_feature_state_selector* selector, mln_buffer_view state
 ) -> mln_status {

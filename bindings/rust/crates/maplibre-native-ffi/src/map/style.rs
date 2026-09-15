@@ -54,6 +54,27 @@ impl super::MapHandle {
         maplibre_core::check(unsafe { sys::mln_map_set_style_json(map, json) })
     }
 
+    /// Sets a global-state JSON value. JSON null restores its style default.
+    pub fn set_global_state_property(&self, property_name: &str, value: &[u8]) -> Result<()> {
+        let map = self.inner.native()?;
+        let property_name = maplibre_core::string::string_view(property_name);
+        let value = maplibre_core::string::buffer_view(value);
+        // SAFETY: map is live, and property_name and value remain valid for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_global_state_property(map, property_name.raw(), value)
+        })
+    }
+
+    /// Copies the current global-state JSON object, including defaults.
+    pub fn get_global_state(&self) -> Result<Vec<u8>> {
+        let map = self.inner.native()?;
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
+        // SAFETY: map is live and out is a null-initialized writable handle.
+        maplibre_core::check(unsafe { sys::mln_map_get_global_state(map, out.as_mut_ptr()) })?;
+        // SAFETY: Success transfers the owned buffer to this call.
+        unsafe { maplibre_core::string::copy_owned_buffer(out.get()) }
+    }
+
     /// Sets per-feature state on this map.
     pub fn set_feature_state(&self, selector: &FeatureStateSelector, state: &[u8]) -> Result<()> {
         let map = self.inner.native()?;

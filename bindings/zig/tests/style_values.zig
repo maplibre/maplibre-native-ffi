@@ -382,3 +382,35 @@ test "style transition options round trip through the C API" {
         map.setStyleTransitionOptions(.{ .delay_ms = -1.0 }),
     );
 }
+
+// BND-110: global-state lifetime and copied JSON values.
+test "global state defaults updates and style replacement" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+    try testing.expectError(error.InvalidState, map.setGlobalStateProperty(testing.allocator, "theme", "true"));
+    try map.setStyleJson(testing.allocator,
+        \\{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}
+    );
+    var defaults = try map.getGlobalState(testing.allocator);
+    defer defaults.deinit();
+    try testing.expectEqualStrings("{\"theme\":\"light\"}", defaults.value);
+    try map.setGlobalStateProperty(testing.allocator, "theme", "[\"dark\",{\"enabled\":true}]");
+    var snapshot = try map.getGlobalState(testing.allocator);
+    defer snapshot.deinit();
+    try map.setGlobalStateProperty(testing.allocator, "theme", "null");
+    var reset = try map.getGlobalState(testing.allocator);
+    defer reset.deinit();
+    try testing.expectEqualStrings(defaults.value, reset.value);
+    try testing.expectEqualStrings("{\"theme\":[\"dark\",{\"enabled\":true}]}", snapshot.value);
+    try map.setStyleJson(testing.allocator, "{\"version\":8,\"sources\":{},\"layers\":[]}");
+    var replaced = try map.getGlobalState(testing.allocator);
+    defer replaced.deinit();
+    try testing.expectEqualStrings("{}", replaced.value);
+    try map.setGlobalStateProperty(testing.allocator, "theme", "true");
+    try map.setGlobalStateProperty(testing.allocator, "theme", "null");
+    var cleared = try map.getGlobalState(testing.allocator);
+    defer cleared.deinit();
+    try testing.expectEqualStrings("{\"theme\":null}", cleared.value);
+}

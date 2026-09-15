@@ -579,6 +579,25 @@ internal object NativeAccess {
     }
   }
 
+  internal fun setGlobalStateProperty(map: NativeMap, propertyName: String, value: ByteArray) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_set_global_state_property")
+          .invokeNative(map, stringView(arena, propertyName), byteArrayView(arena, value)) as Int
+      )
+    }
+  }
+
+  internal fun getGlobalState(map: NativeMap): ByteArray =
+    Arena.ofConfined().use { arena ->
+      val outState = arena.allocate(ValueLayout.JAVA_LONG)
+      outState.set(ValueLayout.JAVA_LONG, 0, 0L)
+      Status.check(
+        mapAddressStatusFunction("mln_map_get_global_state").invokeNative(map, outState) as Int
+      )
+      ownedBuffer(NativeOwnedBuffer(outState.get(ValueLayout.JAVA_LONG, 0)))!!
+    }
+
   internal fun setMapFeatureState(
     map: NativeMap,
     selector: FeatureStateSelector,

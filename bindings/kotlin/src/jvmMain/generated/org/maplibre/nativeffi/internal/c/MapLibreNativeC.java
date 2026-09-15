@@ -11723,6 +11723,129 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
            throw new AssertionError("should not reach here", ex$);
         }
     }
+
+    private static class mln_map_set_global_state_property {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_buffer_view.layout(),
+            mln_buffer_view.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_set_global_state_property");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_global_state_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value)
+     * }
+     */
+    public static FunctionDescriptor mln_map_set_global_state_property$descriptor() {
+        return mln_map_set_global_state_property.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_global_state_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value)
+     * }
+     */
+    public static MethodHandle mln_map_set_global_state_property$handle() {
+        return mln_map_set_global_state_property.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_global_state_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value)
+     * }
+     */
+    public static MemorySegment mln_map_set_global_state_property$address() {
+        return mln_map_set_global_state_property.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_set_global_state_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value)
+     * }
+     */
+    public static int mln_map_set_global_state_property(long map, MemorySegment property_name, MemorySegment value) {
+        var mh$ = mln_map_set_global_state_property.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_set_global_state_property", map, property_name, value);
+            }
+            return (int)mh$.invokeExact(map, property_name, value);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_get_global_state {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_get_global_state");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_get_global_state(mln_map map, mln_buffer *out_state)
+     * }
+     */
+    public static FunctionDescriptor mln_map_get_global_state$descriptor() {
+        return mln_map_get_global_state.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_get_global_state(mln_map map, mln_buffer *out_state)
+     * }
+     */
+    public static MethodHandle mln_map_get_global_state$handle() {
+        return mln_map_get_global_state.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_get_global_state(mln_map map, mln_buffer *out_state)
+     * }
+     */
+    public static MemorySegment mln_map_get_global_state$address() {
+        return mln_map_get_global_state.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_get_global_state(mln_map map, mln_buffer *out_state)
+     * }
+     */
+    public static int mln_map_get_global_state(long map, MemorySegment out_state) {
+        var mh$ = mln_map_get_global_state.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_get_global_state", map, out_state);
+            }
+            return (int)mh$.invokeExact(map, out_state);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
     private static final int MLN_STYLE_SOURCE_TYPE_UNKNOWN = (int)0L;
     /**
      * {@snippet lang=c :

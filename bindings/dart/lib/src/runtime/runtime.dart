@@ -1849,6 +1849,31 @@ final class MapHandle {
     });
   }
 
+  /// Sets a global-state JSON value; JSON null restores its style default.
+  void setGlobalStateProperty(String propertyName, Uint8List value) {
+    withNativeArena((arena) {
+      final nativePropertyName = nativeStringView(propertyName, arena);
+      final nativeValue = nativeBufferView(value, arena);
+      _check(
+        raw.mln_map_set_global_state_property(
+          _handle.raw,
+          nativePropertyName.value,
+          nativeValue,
+        ),
+      );
+    });
+  }
+
+  /// Copies the current global-state JSON object, including defaults.
+  Uint8List getGlobalState() {
+    return withNativeArena((arena) {
+      final outState = arena<Uint64>();
+      outState.value = 0;
+      _check(raw.mln_map_get_global_state(_handle.raw, outState));
+      return copyOwnedBuffer(NativeOwnedBufferHandle(outState.value));
+    });
+  }
+
   /// Sets per-feature state on this map.
   void setFeatureState(FeatureStateSelector selector, Uint8List state) {
     withNativeArena((arena) {

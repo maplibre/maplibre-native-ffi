@@ -78,6 +78,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_event_mask
 import org.maplibre.nativeffi.internal.c.mln_map_get_feature_state
 import org.maplibre.nativeffi.internal.c.mln_map_get_free_camera_options
+import org.maplibre.nativeffi.internal.c.mln_map_get_global_state
 import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_max_zoom
@@ -143,6 +144,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_data
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_synchronous_tiling
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_set_gesture_in_progress
+import org.maplibre.nativeffi.internal.c.mln_map_set_global_state_property
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_image
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_url
@@ -264,6 +266,25 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         )
       )
     }
+  }
+
+  public actual fun setGlobalStateProperty(propertyName: String, value: ByteArray) {
+    memScoped {
+      Status.check(
+        mln_map_set_global_state_property(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(propertyName, this),
+          ByteStructs.bufferView(value, this),
+        )
+      )
+    }
+  }
+
+  public actual fun getGlobalState(): ByteArray = memScoped {
+    val outState = alloc<ULongVar>()
+    outState.value = 0uL
+    Status.check(mln_map_get_global_state(state.requireLive().rawHandleValue, outState.ptr))
+    ByteStructs.ownedBuffer(outState.value.asHandle("mln_buffer", ::ownedBufferHandle))
   }
 
   public actual fun setFeatureState(selector: FeatureStateSelector, value: ByteArray) {

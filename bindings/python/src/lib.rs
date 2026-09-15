@@ -1782,6 +1782,32 @@ impl MapHandle {
         Ok(())
     }
 
+    fn set_global_state_property(
+        &self,
+        property_name: String,
+        value: &Bound<'_, PyBytes>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let property_name = maplibre_core::string::string_view(&property_name);
+        let value = maplibre_core::string::buffer_view(value.as_bytes());
+        // SAFETY: The C API validates the map pointer, property name, and JSON buffer view.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_global_state_property(state.handle(), property_name.raw(), value)
+        })
+        .map_err(map_error)
+    }
+
+    fn get_global_state(&self, py: Python<'_>) -> PyResult<Py<PyBytes>> {
+        let state = self.state();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
+        // SAFETY: The C API validates the map and null-initialized output handle.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_global_state(state.handle(), out.as_mut_ptr())
+        })
+        .map_err(map_error)?;
+        owned_buffer_to_py(py, out.get())
+    }
+
     fn set_feature_state(
         &self,
         source_id: String,

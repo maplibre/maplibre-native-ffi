@@ -86,6 +86,15 @@ and checks that frame fences remain usable for later GPU submissions. See
 constructor that copies a transform state. The C API uses it to expose the
 projection of the update that a render session rendered.
 
+`0014-global-state.patch` adds the `global-state` expression, root `state`
+defaults, and Native's runtime state APIs. State changes update dependent paint
+properties, filters, layout, and color ramps. The patch includes the upstream
+tests and render fixtures. It carries Taiyu Yoshizawa's (NEKOYASAN) existing
+[maplibre-native#4516](https://github.com/maplibre/maplibre-native/pull/4516),
+at commit `cf1e6ec24755d433958d667379a16f33b583dfb5`, as an unmodified diff from
+base `9ee6f1c3b5b97fc2cba1c1042cadef87fa158476`. The C API exposes the runtime
+state setter and snapshot getter.
+
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
 before applying the list again. A pin bump, an edit to a patch, and a dropped

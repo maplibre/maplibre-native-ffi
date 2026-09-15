@@ -485,3 +485,50 @@ func TestMapWrongThreadReturnsWrongThread(t *testing.T) {
 		t.Fatalf("RequestRepaint() on owner thread after wrong-thread call: %v", err)
 	}
 }
+
+// BND-110: global-state lifetime and copied JSON values.
+func TestGlobalStateDefaultsUpdatesAndStyleReplacement(t *testing.T) {
+	lockOSThreadForTest(t)
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer runtime.Close()
+	m, err := runtime.NewMap()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Close()
+	if err := m.SetGlobalStateProperty("theme", []byte("true")); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("before style: %v", err)
+	}
+	check := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	state := func(want string) []byte {
+		t.Helper()
+		got, err := m.GetGlobalState()
+		check(err)
+		if string(got) != want {
+			t.Fatalf("state = %s, want %s", got, want)
+		}
+		return got
+	}
+	check(m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}`)))
+	state(`{"theme":"light"}`)
+	check(m.SetGlobalStateProperty("theme", []byte(`["dark",{"enabled":true}]`)))
+	snapshot := state(`{"theme":["dark",{"enabled":true}]}`)
+	check(m.SetGlobalStateProperty("theme", []byte("null")))
+	state(`{"theme":"light"}`)
+	if string(snapshot) != `{"theme":["dark",{"enabled":true}]}` {
+		t.Fatal("snapshot changed")
+	}
+	check(m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)))
+	state(`{}`)
+	check(m.SetGlobalStateProperty("theme", []byte("true")))
+	check(m.SetGlobalStateProperty("theme", []byte("null")))
+	state(`{"theme":null}`)
+}

@@ -2086,6 +2086,40 @@ func (m *MapHandle) StyleLayerJSON(layerID string) ([]byte, bool, error) {
 	return value, true, nil
 }
 
+// SetGlobalStateProperty sets a JSON value; JSON null restores its style default.
+func (m *MapHandle) SetGlobalStateProperty(propertyName string, value []byte) error {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	propertyView := newCStringView(propertyName)
+	defer propertyView.free()
+	rawValue := newCBufferView(value)
+	defer rawValue.free()
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_global_state_property(C.mln_map(ptr), propertyView.raw(), rawValue.raw()))
+	})
+}
+
+// GetGlobalState copies the current global-state JSON object, including defaults.
+func (m *MapHandle) GetGlobalState() ([]byte, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	var buffer C.mln_buffer
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_get_global_state(C.mln_map(ptr), &buffer))
+	}); err != nil {
+		return nil, err
+	}
+	return goOwnedBuffer(buffer)
+}
+
 // SetStyleLightJSON sets the style light from a style-spec light JSON object.
 func (m *MapHandle) SetStyleLightJSON(lightJSON []byte) error {
 	ptr, release, err := m.ptr()

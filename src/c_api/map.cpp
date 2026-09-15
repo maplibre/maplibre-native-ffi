@@ -104,6 +104,21 @@ auto mln_map_request_repaint(mln_map map) noexcept -> mln_status {
   });
 }
 
+auto mln_map_set_global_state_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_set_global_state_property(map, property_name, value);
+  });
+}
+
+auto mln_map_get_global_state(mln_map map, mln_buffer* out_state) noexcept
+  -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_get_global_state(map, out_state);
+  });
+}
+
 auto mln_map_set_feature_state(
   mln_map map, const mln_feature_state_selector* selector, mln_buffer_view state
 ) noexcept -> mln_status {

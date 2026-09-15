@@ -1220,6 +1220,40 @@ void main() {
     }
   });
 
+  // BND-110: global-state lifetime and copied JSON values.
+  test('global state defaults updates and style replacement', () {
+    final runtime = RuntimeHandle.create();
+    final map = runtime.createMap();
+    try {
+      expect(
+        () => map.setGlobalStateProperty('theme', _jsonBytes('true')),
+        throwsA(isA<InvalidStateException>()),
+      );
+      map.setStyleJson(
+        _jsonBytes(
+          '{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}',
+        ),
+      );
+      expect(map.getGlobalState(), _jsonBytes('{"theme":"light"}'));
+      map.setGlobalStateProperty(
+        'theme',
+        _jsonBytes('["dark",{"enabled":true}]'),
+      );
+      final snapshot = map.getGlobalState();
+      map.setGlobalStateProperty('theme', _jsonBytes('null'));
+      expect(map.getGlobalState(), _jsonBytes('{"theme":"light"}'));
+      expect(snapshot, _jsonBytes('{"theme":["dark",{"enabled":true}]}'));
+      map.setStyleJson(_jsonBytes(_emptyStyleJson));
+      expect(map.getGlobalState(), _jsonBytes('{}'));
+      map.setGlobalStateProperty('theme', _jsonBytes('true'));
+      map.setGlobalStateProperty('theme', _jsonBytes('null'));
+      expect(map.getGlobalState(), _jsonBytes('{"theme":null}'));
+    } finally {
+      map.close();
+      runtime.close();
+    }
+  });
+
   test('style transition options round-trip through the native C ABI', () {
     const transitionStyleJson =
         '{"version":8,"transition":{"duration":750,"delay":100},'

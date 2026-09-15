@@ -757,6 +757,12 @@ external int mln_map_get_free_camera_options(
   ffi.Pointer<mln_free_camera_options> out_options,
 );
 
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_buffer>)>()
+external int mln_map_get_global_state(
+  int map,
+  ffi.Pointer<mln_buffer> out_state,
+);
+
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
@@ -1438,6 +1444,13 @@ external int mln_map_set_geojson_source_url(
 
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Bool)>()
 external int mln_map_set_gesture_in_progress(int map, bool in_progress);
+
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
+external int mln_map_set_global_state_property(
+  int map,
+  mln_buffer_view property_name,
+  mln_buffer_view value,
+);
 
 @ffi.Native<
   ffi.Int32 Function(

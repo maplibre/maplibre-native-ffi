@@ -1573,3 +1573,30 @@ fn a_live_map_id_called_from_another_thread_reports_wrong_thread() {
     map.close().unwrap();
     runtime.close().unwrap();
 }
+
+#[test]
+// BND-110: global-state lifetime and copied JSON values.
+fn global_state_defaults_updates_and_style_replacement() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    assert_eq!(
+        map.set_global_state_property("theme", b"true")
+            .unwrap_err()
+            .kind(),
+        ErrorKind::InvalidState
+    );
+    let style = br#"{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}"#;
+    map.set_style_json(style).unwrap();
+    assert_eq!(map.get_global_state().unwrap(), br#"{"theme":"light"}"#);
+    map.set_global_state_property("theme", br#"["dark",{"enabled":true}]"#)
+        .unwrap();
+    let snapshot = map.get_global_state().unwrap();
+    map.set_global_state_property("theme", b"null").unwrap();
+    assert_eq!(map.get_global_state().unwrap(), br#"{"theme":"light"}"#);
+    assert_eq!(snapshot, br#"{"theme":["dark",{"enabled":true}]}"#);
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    assert_eq!(map.get_global_state().unwrap(), b"{}");
+    map.set_global_state_property("theme", b"true").unwrap();
+    map.set_global_state_property("theme", b"null").unwrap();
+    assert_eq!(map.get_global_state().unwrap(), br#"{"theme":null}"#);
+}

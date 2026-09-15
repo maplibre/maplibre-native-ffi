@@ -46,6 +46,11 @@ auto create_map(
 ) -> mln_status;
 auto destroy_map(mln_map map) -> mln_status;
 auto map_request_repaint(mln_map map) -> mln_status;
+auto map_set_global_state_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value
+) -> mln_status;
+auto map_get_global_state(mln_map map, mln_buffer* out_state) -> mln_status;
+
 auto map_set_feature_state(
   mln_map map, const mln_feature_state_selector* selector, mln_buffer_view state
 ) -> mln_status;

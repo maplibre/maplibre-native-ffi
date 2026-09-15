@@ -50,6 +50,41 @@ import org.maplibre.nativeffi.style.VectorTileEncoding
 
 class MapHandleTest {
 
+  // BND-110: global-state lifetime and copied JSON values.
+  @Test
+  fun globalStateUsesStyleDefaultsAndResetsOnStyleReplacement() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      MapHandle.create(runtime, MapOptions()).use { map ->
+        assertEquals("{}", map.getGlobalState().decodeToString())
+        assertFailsWith<InvalidStateException> {
+          map.setGlobalStateProperty("theme", "true".encodeToByteArray())
+        }
+        val style =
+          """{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}"""
+            .encodeToByteArray()
+        map.setStyleJson(style)
+        assertEquals("""{"theme":"light"}""", map.getGlobalState().decodeToString())
+        val input = """["dark",{"enabled":true}]""".encodeToByteArray()
+        map.setGlobalStateProperty("theme", input)
+        input.fill(0)
+        val snapshot = map.getGlobalState()
+        assertEquals("""{"theme":["dark",{"enabled":true}]}""", snapshot.decodeToString())
+        assertFailsWith<InvalidArgumentException> {
+          map.setGlobalStateProperty("theme", "[".encodeToByteArray())
+        }
+        map.setGlobalStateProperty("theme", "null".encodeToByteArray())
+        assertEquals("""{"theme":"light"}""", map.getGlobalState().decodeToString())
+        assertEquals("""{"theme":["dark",{"enabled":true}]}""", snapshot.decodeToString())
+        assertIs<WrongThreadException>(failureFromBackgroundThread { map.getGlobalState() })
+        map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
+        assertEquals("{}", map.getGlobalState().decodeToString())
+        map.setGlobalStateProperty("theme", "false".encodeToByteArray())
+        map.setGlobalStateProperty("theme", "null".encodeToByteArray())
+        assertEquals("""{"theme":null}""", map.getGlobalState().decodeToString())
+      }
+    }
+  }
+
   @Test
   fun layerBaseAccessorsReachNativeThroughDowncalls() {
     RuntimeHandle.create(RuntimeOptions()).use { runtime ->

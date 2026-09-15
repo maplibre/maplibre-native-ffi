@@ -72,6 +72,12 @@ public expect class MapHandle : AutoCloseable {
    */
   public fun setStyleJson(json: ByteArray)
 
+  /** Sets a JSON value in the loaded style. JSON null restores its style default. */
+  public fun setGlobalStateProperty(propertyName: String, value: ByteArray)
+
+  /** Copies the current global-state JSON object, including style defaults. */
+  public fun getGlobalState(): ByteArray
+
   public fun setFeatureState(selector: FeatureStateSelector, value: ByteArray)
 
   public fun getFeatureState(selector: FeatureStateSelector): ByteArray
