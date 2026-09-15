@@ -10,6 +10,7 @@
 namespace mln {
 class Map;
 class RendererObserver;
+class TransformState;
 class UpdateParameters;
 }  // namespace mln
 
@@ -392,6 +393,9 @@ auto map_lat_lngs_for_pixels_unwrapped(
 ) -> mln_status;
 auto map_projection_create(mln_map map, mln_map_projection* out_projection)
   -> mln_status;
+auto map_projection_create_from_transform(
+  const mln::TransformState& transform, mln_map_projection* out_projection
+) -> mln_status;
 auto map_projection_destroy(mln_map_projection projection) -> mln_status;
 auto map_projection_get_camera(
   mln_map_projection projection, mln_camera_options* out_camera

@@ -15,6 +15,7 @@
 #include <mln/actor/scheduler.hpp>
 #include <mln/gfx/headless_backend.hpp>
 #include <mln/gfx/renderer_backend.hpp>
+#include <mln/map/transform_state.hpp>
 #include <mln/renderer/renderer.hpp>
 #include <mln/renderer/renderer_observer.hpp>
 #include <mln/util/feature.hpp>
@@ -488,6 +489,7 @@ struct mln_render_session_object {
   double scale_factor = 1.0;
   uint64_t generation = 1;
   uint64_t rendered_generation = 0;
+  std::optional<mln::TransformState> rendered_transform;
   bool attached = true;
 
   // Declared before `renderer` so reverse-order destruction tears the renderer
@@ -725,6 +727,9 @@ auto surface_session_set_target(
 auto render_session_render_update(
   mln_render_session session, mln_render_result* out_result,
   bool* out_needs_repaint
+) -> mln_status;
+auto render_session_projection_create(
+  mln_render_session session, mln_map_projection* out_projection
 ) -> mln_status;
 auto render_session_detach(mln_render_session session) -> mln_status;
 auto render_session_destroy(mln_render_session session) -> mln_status;

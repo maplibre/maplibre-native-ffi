@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.render
 
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.map.MapProjectionHandle
 import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
@@ -101,6 +102,23 @@ public expect class RenderSessionHandle : AutoCloseable {
    * this one, so a host can re-arm its frame loop before it drains events.
    */
   public fun renderUpdate(): RenderUpdate
+
+  /**
+   * Copies the full projection of the last update that this session rendered.
+   *
+   * Call on the session owner thread after [renderUpdate] reports [RenderResult.RENDERED], before
+   * another render or target change. This is also allowed while an owned texture frame is acquired.
+   * Keep the projection with that frame and its presentation extent; GPU synchronization follows
+   * the render target's contract.
+   *
+   * Live-map changes and calls that produce no frame preserve the session snapshot. Resize and
+   * target replacement invalidate it until another frame renders. A detached session or a target
+   * without a rendered snapshot throws `InvalidStateException`.
+   *
+   * The returned helper owns an independent copy, usable from any thread after later renders,
+   * target changes, or session and map closure. Close it when finished.
+   */
+  public fun createProjection(): MapProjectionHandle
 
   public fun detach()
 

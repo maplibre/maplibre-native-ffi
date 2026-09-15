@@ -18,6 +18,7 @@ import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.map.MapProjectionHandle
 import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
@@ -130,6 +131,19 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       )
     )
     return RenderUpdate(RenderResult.fromNative(outResult[0]), outNeedsRepaint[0])
+  }
+
+  public actual fun createProjection(): MapProjectionHandle {
+    NativeAccess.ensureLoaded()
+    LongPointer(1).use { outProjection ->
+      outProjection.put(0, 0L)
+      Status.check(
+        MaplibreNativeC.mln_render_session_projection_create(requireLiveHandle(), outProjection)
+      )
+      val address = outProjection.get()
+      require(address != 0L) { "mln_render_session_projection_create returned a null projection" }
+      return MapProjectionHandle(address)
+    }
   }
 
   public actual fun detach() {

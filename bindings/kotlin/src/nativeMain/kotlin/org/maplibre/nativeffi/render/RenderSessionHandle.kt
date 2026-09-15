@@ -36,6 +36,7 @@ import org.maplibre.nativeffi.internal.c.mln_render_session_clear_data
 import org.maplibre.nativeffi.internal.c.mln_render_session_destroy
 import org.maplibre.nativeffi.internal.c.mln_render_session_detach
 import org.maplibre.nativeffi.internal.c.mln_render_session_dump_debug_logs
+import org.maplibre.nativeffi.internal.c.mln_render_session_projection_create
 import org.maplibre.nativeffi.internal.c.mln_render_session_query_feature_extensions
 import org.maplibre.nativeffi.internal.c.mln_render_session_query_rendered_features
 import org.maplibre.nativeffi.internal.c.mln_render_session_query_source_features
@@ -55,6 +56,7 @@ import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_set_target
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
 import org.maplibre.nativeffi.internal.lifecycle.asHandle
+import org.maplibre.nativeffi.internal.lifecycle.mapProjectionHandle
 import org.maplibre.nativeffi.internal.lifecycle.ownedBufferHandle
 import org.maplibre.nativeffi.internal.lifecycle.queriedFeatureListHandle
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
@@ -66,6 +68,7 @@ import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.internal.struct.QueryStructs
 import org.maplibre.nativeffi.internal.struct.RenderStructs
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.map.MapProjectionHandle
 import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
@@ -179,6 +182,17 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
       )
     )
     RenderUpdate(RenderResult.fromNative(outResult.value), outNeedsRepaint.value)
+  }
+
+  public actual fun createProjection(): MapProjectionHandle = memScoped {
+    val outProjection = alloc<ULongVar>()
+    outProjection.value = 0uL
+    Status.check(
+      mln_render_session_projection_create(state.requireLive().rawHandleValue, outProjection.ptr)
+    )
+    MapProjectionHandle(
+      outProjection.value.asHandle("mln_render_session_projection_create", ::mapProjectionHandle)
+    )
   }
 
   public actual fun detach() {

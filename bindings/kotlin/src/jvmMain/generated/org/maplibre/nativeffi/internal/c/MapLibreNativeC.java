@@ -11180,6 +11180,67 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
+    private static class mln_render_session_projection_create {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_render_session_projection_create");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_render_session_projection_create(mln_render_session session, mln_map_projection *out_projection)
+     * }
+     */
+    public static FunctionDescriptor mln_render_session_projection_create$descriptor() {
+        return mln_render_session_projection_create.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_render_session_projection_create(mln_render_session session, mln_map_projection *out_projection)
+     * }
+     */
+    public static MethodHandle mln_render_session_projection_create$handle() {
+        return mln_render_session_projection_create.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_render_session_projection_create(mln_render_session session, mln_map_projection *out_projection)
+     * }
+     */
+    public static MemorySegment mln_render_session_projection_create$address() {
+        return mln_render_session_projection_create.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_render_session_projection_create(mln_render_session session, mln_map_projection *out_projection)
+     * }
+     */
+    public static int mln_render_session_projection_create(long session, MemorySegment out_projection) {
+        var mh$ = mln_render_session_projection_create.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_render_session_projection_create", session, out_projection);
+            }
+            return (int)mh$.invokeExact(session, out_projection);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mln_render_session_detach {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,

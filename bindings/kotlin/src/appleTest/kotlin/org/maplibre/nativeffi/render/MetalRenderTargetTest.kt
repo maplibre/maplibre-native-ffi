@@ -14,7 +14,9 @@ import kotlinx.cinterop.toLong
 import kotlinx.cinterop.useContents
 import kotlinx.cinterop.usePinned
 import org.maplibre.nativeffi.Maplibre
+import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.UnsupportedFeatureException
+import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
@@ -232,10 +234,17 @@ class MetalRenderTargetTest {
               "a freshly allocated replacement should start blank",
             )
             session.setMetalBorrowedTextureTarget(replacement)
+            assertFailsWith<InvalidStateException> { session.createProjection() }
             assertSame(borrowedMap, session.map())
             assertEquals(RenderResult.SIZE_PENDING, session.renderUpdate().result)
             runtime.pump(0)
             assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
+            session.createProjection().use {
+              assertEquals(
+                borrowedMap.pixelForLatLng(LatLng(0.0, 0.0)),
+                it.pixelForLatLng(LatLng(0.0, 0.0)),
+              )
+            }
             // The session paints the texture it was handed, not the one it had.
             assertTrue(
               readMetalTextureRgba(device, replacementTexture, 16, 8).any { it != 0.toByte() },

@@ -2570,6 +2570,21 @@ internal object NativeAccess {
       mln_opengl_owned_texture_frame.type(segment),
     )
 
+  internal fun createRenderSessionProjection(session: NativeRenderSession): NativeMapProjection =
+    Arena.ofConfined().use { arena ->
+      val outProjection = arena.allocate(ValueLayout.JAVA_LONG)
+      outProjection.set(ValueLayout.JAVA_LONG, 0, 0L)
+      Status.check(
+        renderSessionAddressStatusFunction("mln_render_session_projection_create")
+          .invokeNative(session, outProjection) as Int
+      )
+      NativeMapProjection(outProjection.get(ValueLayout.JAVA_LONG, 0)).also { projection ->
+        require(!projection.isNull) {
+          "mln_render_session_projection_create returned the null handle"
+        }
+      }
+    }
+
   internal fun createMapProjection(map: NativeMap): NativeMapProjection =
     Arena.ofConfined().use { arena ->
       val outProjection = arena.allocate(ValueLayout.JAVA_LONG)
