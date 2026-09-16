@@ -258,6 +258,28 @@ pub const MapHandle = enum(c.mln_map) {
         try status.checkStatus(c.mln_map_set_style_json(native_map, stringView(json)), diagnosticStore(self));
     }
 
+    /// Sets a JSON value; JSON null restores its style default.
+    pub fn setGlobalStateProperty(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        property_name: []const u8,
+        value: []const u8,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_global_state_property(try native(self), try temp.stringView(property_name), try temp.stringView(value)),
+            diagnosticStore(self),
+        );
+    }
+
+    /// Copies the current global-state JSON object, including defaults.
+    pub fn getGlobalState(self: *MapHandle, allocator: std.mem.Allocator) status.Error!values.OwnedString {
+        var buffer: c.mln_buffer = 0;
+        try status.checkStatus(c.mln_map_get_global_state(try native(self), &buffer), diagnosticStore(self));
+        return (try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self))) orelse error.NativeError;
+    }
+
     pub fn setFeatureState(
         self: *MapHandle,
         allocator: std.mem.Allocator,

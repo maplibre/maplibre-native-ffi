@@ -470,6 +470,12 @@ namespace Maplibre.NativeFfi.Internal.C
     internal static unsafe partial class NativeMethods
     {
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_set_global_state_property([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view property_name, mln_buffer_view value);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_get_global_state([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("mln_buffer *")] MlnBuffer* out_state);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_style_tile_source_options mln_style_tile_source_options_default();
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

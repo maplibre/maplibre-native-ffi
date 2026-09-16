@@ -114,6 +114,30 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     }
   }
 
+  public actual fun setGlobalStateProperty(propertyName: String, value: ByteArray) {
+    NativeAccess.ensureLoaded()
+    StringViewScope(propertyName).use { nativePropertyName ->
+      ByteArrayViewScope(value).use { nativeValue ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_global_state_property(
+            requireLiveHandle(),
+            nativePropertyName.view,
+            nativeValue.view,
+          )
+        )
+      }
+    }
+  }
+
+  public actual fun getGlobalState(): ByteArray {
+    NativeAccess.ensureLoaded()
+    LongPointer(1).use { outState ->
+      outState.put(0, 0L)
+      Status.check(MaplibreNativeC.mln_map_get_global_state(requireLiveHandle(), outState))
+      return ownedBuffer(outState.get())
+    }
+  }
+
   public actual fun setFeatureState(selector: FeatureStateSelector, value: ByteArray) {
     NativeAccess.ensureLoaded()
     FeatureStateSelectorScope(selector).use { nativeSelector ->

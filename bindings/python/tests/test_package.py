@@ -4558,3 +4558,24 @@ def test_live_map_id_called_from_another_thread_reports_wrong_thread() -> None:
         assert "stale" not in str(failures[0])
 
         map_handle.close()
+
+
+# BND-110: global-state lifetime and copied JSON values.
+def test_global_state_defaults_updates_and_style_replacement() -> None:
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        with pytest.raises(mln.InvalidStateError):
+            map_handle.set_global_state_property("theme", b"true")
+        map_handle.set_style_json(
+            b'{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}'
+        )
+        assert json.loads(map_handle.get_global_state()) == {"theme": "light"}
+        map_handle.set_global_state_property("theme", b'["dark",{"enabled":true}]')
+        snapshot = map_handle.get_global_state()
+        map_handle.set_global_state_property("theme", b"null")
+        assert json.loads(map_handle.get_global_state()) == {"theme": "light"}
+        assert json.loads(snapshot) == {"theme": ["dark", {"enabled": True}]}
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        assert json.loads(map_handle.get_global_state()) == {}
+        map_handle.set_global_state_property("theme", b"true")
+        map_handle.set_global_state_property("theme", b"null")
+        assert json.loads(map_handle.get_global_state()) == {"theme": None}

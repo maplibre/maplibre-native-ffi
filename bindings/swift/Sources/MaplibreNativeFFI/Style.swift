@@ -1461,6 +1461,31 @@ public extension MapHandle {
     }
   }
 
+  /// Sets a JSON value; JSON null restores its style default.
+  func setGlobalStateProperty(_ propertyName: String, value: Data) throws {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      try checkStatus(mln_map_set_global_state_property(
+        requireLiveHandle().raw,
+        arena.view(propertyName),
+        arena.view(value)
+      ))
+    }
+  }
+
+  /// Copies the current global-state JSON object, including defaults.
+  func globalState() throws -> Data {
+    try mapNativeFailure {
+      var buffer: mln_buffer = 0
+      try checkStatus(mln_map_get_global_state(
+        requireLiveHandle().raw,
+        &buffer
+      ))
+      return try NativeMemory.copyBuffer(NativeBufferHandle(raw: buffer))
+    }
+  }
+
   func setStyleLightJSON(_ lightJSON: Data) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()

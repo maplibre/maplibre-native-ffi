@@ -36,6 +36,30 @@ import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.sleepMillis
 
 class RenderSessionHandleTest {
+  @Test
+  fun globalStateChangesRenderedPaint() {
+    withOwnedTextureSession { runtime, map, owned ->
+      map.setStyleJson(
+        """{"version":8,"transition":{"duration":0},"state":{"color":{"default":"#ff0000"}},"sources":{},"layers":[{"id":"bg","type":"background","paint":{"background-color":["global-state","color"]}}]}"""
+          .encodeToByteArray()
+      )
+      fun renderColor(): List<Int> {
+        assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
+        assertEquals(RenderResult.RENDERED, owned.session.renderUpdate().result)
+        val info = owned.session.textureImageInfo()
+        return NativeBuffer.allocate(info.byteLength).use { buffer ->
+          owned.session.readPremultipliedRgba8(buffer)
+          buffer.toByteArray().take(4).map { it.toInt() and 255 }
+        }
+      }
+      assertEquals(listOf(255, 0, 0, 255), renderColor())
+      map.setGlobalStateProperty("color", "\"#0000ff\"".encodeToByteArray())
+      assertEquals(listOf(0, 0, 255, 255), renderColor())
+      map.setGlobalStateProperty("color", "null".encodeToByteArray())
+      assertEquals(listOf(255, 0, 0, 255), renderColor())
+    }
+  }
+
   // BND-160, BND-161, BND-163, BND-164, BND-165, BND-166, BND-167, BND-168,
   // BND-169, BND-170: owned-texture rendering, readback, frames, and
   // owner-thread checks.

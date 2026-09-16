@@ -1691,8 +1691,34 @@ static void style_transition_options_reject_unsafe_raw_headers(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static void global_state_preserves_output_ownership_and_checks_views(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_buffer state = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_get_global_state(map, &state));
+  const mln_buffer original = state;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_get_global_state(map, &state)
+  );
+  TEST_ASSERT_EQUAL_UINT64(original, state);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_get_global_state(map, NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_global_state_property(
+      map, (mln_buffer_view){.data = NULL, .size = 1},
+      MLN_BUFFER_LITERAL("true")
+    )
+  );
+  mln_buffer_destroy(state);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_style_values_abi_tests(void) {
   UnitySetTestFile(__FILE__);
+  RUN_TEST(global_state_preserves_output_ownership_and_checks_views);
   RUN_TEST(style_value_helpers_reject_unsafe_raw_descriptors);
   RUN_TEST(geojson_source_options_reject_unsafe_raw_values);
   RUN_TEST(clustered_geojson_data_reports_non_point_geometry);

@@ -83,6 +83,16 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     NativeAccess.setMapStyleJson(requireLiveHandle(), json)
   }
 
+  public actual fun setGlobalStateProperty(propertyName: String, value: ByteArray) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setGlobalStateProperty(requireLiveHandle(), propertyName, value)
+  }
+
+  public actual fun getGlobalState(): ByteArray {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.getGlobalState(requireLiveHandle())
+  }
+
   public actual fun setFeatureState(selector: FeatureStateSelector, value: ByteArray) {
     NativeAccess.ensureLoaded()
     NativeAccess.setMapFeatureState(requireLiveHandle(), selector, value)

@@ -1882,6 +1882,28 @@ public sealed unsafe class MapHandle : IDisposable
         return found ? ValueStructs.ReadBuffer(buffer) : null;
     }
 
+    /// <summary>Sets a global-state JSON value; JSON null restores its style default.</summary>
+    public void SetGlobalStateProperty(string propertyName, byte[] value)
+    {
+        using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
+        using var nativeValue = NativeStringView.From(value, nameof(value));
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_global_state_property(
+                Handle,
+                nativePropertyName.Value,
+                nativeValue.Value
+            )
+        );
+    }
+
+    /// <summary>Copies the current global-state JSON object, including defaults.</summary>
+    public byte[] GetGlobalState()
+    {
+        MlnBuffer buffer = default;
+        NativeStatus.Check(NativeMethods.mln_map_get_global_state(Handle, &buffer));
+        return ValueStructs.ReadBuffer(buffer);
+    }
+
     /// <summary>Sets the style light document from UTF-8 JSON bytes.</summary>
     public void SetStyleLightJson(byte[] lightJson)
     {

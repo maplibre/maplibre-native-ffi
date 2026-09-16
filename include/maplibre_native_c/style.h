@@ -24,6 +24,50 @@ typedef uint64_t mln_style_id_list;
 typedef uint64_t mln_style_string_list;
 typedef uint64_t mln_geojson_source_data;
 
+/**
+ * Sets one global-state property in the loaded style.
+ *
+ * property_name is UTF-8 text and value contains one JSON value. Both views
+ * are borrowed for the call; accepted data is copied before return. JSON null
+ * resets the property to its root state default, or null without a default.
+ * Arrays and objects are stored as data. A successful style replacement
+ * resets global state to the new style's defaults.
+ *
+ * The style JSON must be loaded; the map-style-loaded event signals readiness.
+ * Accepted changes update the state immediately and schedule normal rendering
+ * updates. A render session is optional.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT for an invalid map, invalid views, or empty
+ *   or invalid JSON.
+ * - MLN_STATUS_INVALID_STATE when the style JSON has not loaded.
+ * - MLN_STATUS_WRONG_THREAD when called outside the map owner thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_set_global_state_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value
+) MLN_NOEXCEPT;
+
+/**
+ * Copies the style's current global state, including defaults, as a JSON
+ * object.
+ *
+ * On success, *out_state receives an owned UTF-8 JSON buffer. Destroy it with
+ * mln_buffer_destroy(). The result is initially {}. During replacement-style
+ * loading, it retains the previous state until the new style parses
+ * successfully. It reports current state independently of rendering.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT for an invalid map, null out_state, or a
+ *   non-null *out_state.
+ * - MLN_STATUS_WRONG_THREAD when called outside the map owner thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status
+mln_map_get_global_state(mln_map map, mln_buffer* out_state) MLN_NOEXCEPT;
+
 /** Style source type values returned by mln_map_get_style_source_type(). */
 typedef enum mln_style_source_type : uint32_t {
   MLN_STYLE_SOURCE_TYPE_UNKNOWN = 0,

@@ -215,6 +215,8 @@
 --include-function mln_map_request_repaint
 --include-function mln_map_request_still_image
 --include-function mln_map_set_event_mask
+--include-function mln_map_set_global_state_property
+--include-function mln_map_get_global_state
 --include-function mln_map_set_feature_state
 --include-function mln_map_get_feature_state
 --include-function mln_map_remove_feature_state
