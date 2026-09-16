@@ -10,7 +10,7 @@ import 'dart:io';
 import 'package:ffigen/ffigen.dart';
 import 'package:maplibre_native_ffi/src/internal/c/native_asset.dart';
 
-void main(List<String> args) {
+Future<void> main(List<String> args) async {
   final packageRoot = Platform.script.resolve('../');
   final repoRoot = packageRoot.resolve('../../');
 
@@ -21,9 +21,9 @@ void main(List<String> args) {
   // its own entry point.
   final adapterHeader = publicHeaderDir.resolve('callback_adapter.h');
 
-  FfiGenerator(
+  await FfiGenerator(
     output: Output(
-      dartFile: _outputFile(args, packageRoot),
+      dart: DartOutput(path: _outputFile(args, packageRoot)),
       commentType: const CommentType.none(),
       // A code asset is resolved by asset id, which only `@Native` reaches, so
       // the declarations are static rather than a DynamicLibrary wrapper.
@@ -36,7 +36,7 @@ void main(List<String> args) {
 // ignore_for_file: unused_field
 ''',
     ),
-    headers: Headers(
+    input: Input(
       entryPoints: [publicHeader, adapterHeader],
       // Keep generation to the repository's own headers so that transitively
       // included system and Vulkan declarations stay out of the bindings.
@@ -52,24 +52,27 @@ void main(List<String> args) {
         '${_clangResourceDir()}/include',
       ],
     ),
-    enums: Enums(
-      include: Declarations.includeAll,
-      silenceWarning: true,
-      // Status stays an integer: a Dart enum makes ffigen wrap every
-      // status-returning function in a converting call, which hides the
-      // `@Native` declaration and puts the function's address out of reach.
-      style: (declaration, suggested) =>
-          declaration.originalName == 'mln_status'
-          ? EnumStyle.intConstants
-          : (suggested ?? EnumStyle.dartEnum),
-    ),
-    functions: Functions.includeAll,
-    globals: Globals.includeAll,
-    macros: Macros.includeAll,
-    structs: Structs.includeAll,
-    typedefs: Typedefs.includeAll,
-    unions: Unions.includeAll,
-    unnamedEnums: UnnamedEnums.includeAll,
+    visitors: [
+      Visitor(
+        func: (node) => node.isIncluded = true,
+        global: (node) => node.isIncluded = true,
+        macroConstant: (node) => node.isIncluded = true,
+        struct: (node) => node.isIncluded = true,
+        union: (node) => node.isIncluded = true,
+        unnamedEnumConstant: (node) => node.isIncluded = true,
+        typealias: (node) => node.isIncluded = TypealiasInclude.always,
+        enumClass: (node) {
+          node.isIncluded = true;
+          node.silenceWarning = true;
+          // Status stays an integer: a Dart enum makes ffigen wrap every
+          // status-returning function in a converting call, which hides the
+          // `@Native` declaration and puts the function's address out of reach.
+          if (node.originalName == 'mln_status') {
+            node.style = EnumStyle.intConstants;
+          }
+        },
+      ),
+    ],
   ).generate();
 }
 
