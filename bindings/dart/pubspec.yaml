@@ -18,9 +18,11 @@ dependencies:
   code_assets: ^1.2.1
   crypto: ^3.0.7
   ffi: ^2.1.4
-  hooks: ^2.0.2
+  # hooks 2.2 requires record_use 1.0 / meta 1.19. Flutter 3.47 still pins
+  # meta 1.18, so the mobile smoke host cannot resolve 2.2.
+  hooks: ">=2.0.2 <2.2.0"
 
 dev_dependencies:
   ffigen: ^21.0.0
   lints: ^6.0.0
-  test: ^1.26.3
+  test: ^1.32.0
