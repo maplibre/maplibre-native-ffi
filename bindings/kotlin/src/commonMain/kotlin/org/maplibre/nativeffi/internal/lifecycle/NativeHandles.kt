@@ -22,20 +22,6 @@ internal sealed interface NativeHandle {
 
 @JvmInline internal value class NativeRenderSession(override val raw: Long) : NativeHandle
 
-@JvmInline internal value class NativeOfflineRegionSnapshot(override val raw: Long) : NativeHandle
-
-@JvmInline internal value class NativeOfflineRegionList(override val raw: Long) : NativeHandle
-
-@JvmInline internal value class NativeOwnedBuffer(override val raw: Long) : NativeHandle
-
-@JvmInline internal value class NativeStyleIdList(override val raw: Long) : NativeHandle
-
-@JvmInline internal value class NativeStyleStringList(override val raw: Long) : NativeHandle
-
-@JvmInline internal value class NativeQueriedFeatureList(override val raw: Long) : NativeHandle
-
-@JvmInline internal value class NativeWakeSource(override val raw: Long) : NativeHandle
-
 @JvmInline internal value class NativeResourceRequest(override val raw: Long) : NativeHandle
 
 @JvmInline internal value class NativeGeoJsonSourceData(override val raw: Long) : NativeHandle

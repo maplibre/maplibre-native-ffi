@@ -1,3 +1,4 @@
+import Foundation
 @testable import MaplibreNativeFFI
 import Testing
 
@@ -10,36 +11,53 @@ import Testing
   #expect(abs(roundTripped.longitude - coordinate.longitude) < 0.000001)
 }
 
-@Test func mapProjectionCameraAndCoordinateConversion() async throws {
+/// A projection created after a camera command observes that command, every
+/// later call is synchronous, a setter changes later conversions, and close is
+/// synchronous.
+@Test func mapProjectionIsSynchronousAfterCreation() async throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  defer { try? runtime.close() }
-  let map = try MapHandle(
-    runtime: runtime,
-    options: MapOptions(width: 256, height: 256)
-  )
-  defer { try? map.close() }
-  try map.jump(to: CameraOptions(
-    center: LatLng(latitude: 0, longitude: 0),
-    zoom: 1
-  ))
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(runtime: runtime,
+                                options: MapOptions(width: 256, height: 256))
+  defer { try? map.closeBlockingForTests() }
+  _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions(
+    center: LatLng(latitude: 10, longitude: 20),
+    zoom: 3
+  )))
 
-  let projection = try MapProjectionHandle(map: map)
+  // Creation is ordered after the accepted camera command, so the copied
+  // transform observes it without a barrier.
+  let projection = try await MapProjectionHandle(map: map)
+  let created = try projection.camera()
+  #expect(abs((created.center?.latitude ?? 0) - 10) < 0.000001)
+  #expect(abs((created.center?.longitude ?? 0) - 20) < 0.000001)
+  #expect(abs((created.zoom ?? 0) - 3) < 0.000001)
+
+  // A synchronous conversion round-trips within tolerance.
+  let point = try projection.pixel(for: LatLng(latitude: 10, longitude: 20))
+  let coordinate = try projection.latLng(for: point)
+  #expect(abs(coordinate.latitude - 10) < 0.000001)
+  #expect(abs(coordinate.longitude - 20) < 0.000001)
+
+  // A setter applies before returning and changes later conversions.
   try projection.setCamera(CameraOptions(
     center: LatLng(latitude: 1, longitude: 2),
-    zoom: 2
+    zoom: 5
   ))
-  let camera = try projection.camera()
-  #expect(abs((camera.center?.latitude ?? 0) - 1) < 0.000001)
-  #expect(abs((camera.center?.longitude ?? 0) - 2) < 0.000001)
+  let updated = try projection.camera()
+  #expect(abs((updated.center?.latitude ?? 0) - 1) < 0.000001)
+  #expect(abs((updated.center?.longitude ?? 0) - 2) < 0.000001)
+  let moved = try projection.pixel(for: LatLng(latitude: 10, longitude: 20))
+  #expect(abs(moved.x - point.x) > 1 || abs(moved.y - point.y) > 1)
 
-  let point = try projection.pixel(for: LatLng(latitude: 1, longitude: 2))
-  let coordinate = try projection.latLng(for: point)
-  #expect(abs(coordinate.latitude - 1) < 0.000001)
-  #expect(abs(coordinate.longitude - 2) < 0.000001)
+  try await map.close()
+  try await runtime.close()
+  let detached = try projection.latLng(for: moved)
+  #expect(abs(detached.latitude - 10) < 0.000001)
+  #expect(abs(detached.longitude - 20) < 0.000001)
 
-  try map.close()
-  try runtime.close()
+  // Close is synchronous and works from any thread.
   try await Task.detached {
     _ = try projection.camera()
     try projection.close()
@@ -47,48 +65,68 @@ import Testing
   #expect(projection.isClosed)
 }
 
-@Test func unwrappedCoordinateConversionsPreserveVisibleWorldCopies() throws {
+/// Unwrapped conversions keep the visible world copy that wrapped
+/// conversions fold back into -180 to 180.
+@Test func unwrappedCoordinateConversionsPreserveVisibleWorldCopies(
+) async throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  defer { try? runtime.close() }
-  let map = try MapHandle(
-    runtime: runtime,
-    options: MapOptions(width: 1024, height: 512)
-  )
-  defer { try? map.close() }
-  try map.jump(to: CameraOptions(
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(runtime: runtime,
+                                options: MapOptions(width: 1024, height: 512))
+  defer { try? map.closeBlockingForTests() }
+  _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions(
     center: LatLng(latitude: 0, longitude: 180),
     zoom: 0
-  ))
+  )))
   let points = [ScreenPoint(x: 0, y: 256), ScreenPoint(x: 1024, y: 256)]
 
-  let wrapped = try map.latLngs(for: points)
-  let unwrapped = try map.latLngsUnwrapped(for: points)
+  let wrapped = try await map.latLngs(for: points)
+  let unwrapped = try await map.latLngs(for: points, unwrapped: true)
   #expect(wrapped.allSatisfy { (-180 ... 180).contains($0.longitude) })
   #expect(unwrapped[1].longitude - unwrapped[0].longitude > 360)
-  #expect(try (-180 ... 180).contains(map.latLng(for: points[1]).longitude))
-  let right = try map.latLngUnwrapped(for: points[1])
+  let wrappedRight = try await map.latLng(for: points[1])
+  #expect((-180 ... 180).contains(wrappedRight.longitude))
+  let right = try await map.latLng(for: points[1], unwrapped: true)
   #expect(abs(right.longitude - unwrapped[1].longitude) < 0.0000000001)
 
-  let projection = try MapProjectionHandle(map: map)
+  let projection = try await MapProjectionHandle(map: map)
   defer { try? projection.close() }
   #expect(try (-180 ... 180)
     .contains(projection.latLng(for: points[1]).longitude))
-  let projectedRight = try projection.latLngUnwrapped(for: points[1])
+  let projectedRight = try projection.latLng(for: points[1], unwrapped: true)
   #expect(abs(projectedRight.longitude - right.longitude) < 0.0000000001)
 }
 
-@Test func mapProjectionSetVisibleCoordinatesRejectsEmptyInputBeforeCallingC(
-) throws {
+/// Projection calls are internally serialized, so a second thread converts
+/// through the same live handle.
+@Test func mapProjectionIsUsableFromASecondThread() async throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  defer { try? runtime.close() }
-  let map = try MapHandle(
-    runtime: runtime,
-    options: MapOptions(width: 256, height: 256)
-  )
-  defer { try? map.close() }
-  let projection = try MapProjectionHandle(map: map)
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(runtime: runtime,
+                                options: MapOptions(width: 256, height: 256))
+  defer { try? map.closeBlockingForTests() }
+  let projection = try await MapProjectionHandle(map: map)
+  defer { try? projection.close() }
+
+  let expected = try projection.pixel(for: LatLng(latitude: 5, longitude: 6))
+  let result = try await Task.detached {
+    try projection.pixel(for: LatLng(latitude: 5, longitude: 6))
+  }.value
+  #expect(abs(result.x - expected.x) < 0.000001)
+  #expect(abs(result.y - expected.y) < 0.000001)
+}
+
+@Test func mapProjectionSetVisibleCoordinatesRejectsEmptyInputBeforeCallingC(
+) async throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(runtime: runtime,
+                                options: MapOptions(width: 256, height: 256))
+  defer { try? map.closeBlockingForTests() }
+  let projection = try await MapProjectionHandle(map: map)
   defer { try? projection.close() }
 
   do {
@@ -103,83 +141,67 @@ import Testing
 }
 
 #if canImport(Metal)
-  import Foundation
   import Metal
 
-  @Test func sessionProjectionKeepsTheRenderedCameraAfterMapChanges() throws {
+  @Test func sessionProjectionKeepsTheRenderedCameraAfterMapChanges(
+  ) async throws {
     guard Maplibre.supportedRenderBackends().contains(.metal) else { return }
     let device = try #require(MTLCreateSystemDefaultDevice())
     let runtime =
       try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-    defer { try? runtime.close() }
-    let map = try MapHandle(
+    defer { try? runtime.closeBlockingForTests() }
+    let map = try await MapHandle(
       runtime: runtime,
-      options: MapOptions(width: 128, height: 64)
+      options: MapOptions(width: 32, height: 32)
     )
-    defer { try? map.close() }
-    let session = try map.attachRef()
-      .attachMetalOwnedTexture(MetalOwnedTextureDescriptor(
-        extent: RenderTargetExtent(width: 128, height: 64, scaleFactor: 1),
-        context: MetalContextDescriptor(device: NativePointer(
-          bitPattern: UInt(bitPattern: Unmanaged
-            .passUnretained(device as AnyObject).toOpaque())
-        ))
-      ))
-    defer { try? session.close() }
+    defer { try? map.closeBlockingForTests() }
+    let attachment = try map.attachMetalOwnedTexture(
+      MetalOwnedTextureDescriptor(
+        extent: RenderTargetExtent(width: 32, height: 32, scaleFactor: 1),
+        context: MetalContextDescriptor(
+          device: NativePointer(bitPattern: UInt(bitPattern: Unmanaged
+              .passUnretained(device as AnyObject).toOpaque()))
+        )
+      ), options: RenderSessionAttachOptions(driver: .coreWorker)
+    )
+    let session = attachment.session
+    defer {
+      if !session.isClosed { _ = try? session.abandon(); try? session.close() }
+    }
+    try await attachment.completion.value
     #expect(throws: MaplibreError.self) {
       try MapProjectionHandle(session: session)
     }
-    try map
-      .setStyleJSON(
-        Data(#"{"version":8,"sources":{},"layers":[{"id":"bg","type":"background"}]}"#
-          .utf8)
-      )
-    let coordinate = LatLng(latitude: 37.78, longitude: -122.41)
-    try map.jump(to: CameraOptions(
-      center: LatLng(latitude: 37.7749, longitude: -122.4194),
-      zoom: 12
-    ))
-    var rendered = false
-    for _ in 0 ..< 500 {
-      try runtime.pump()
-      if try session.renderUpdate().result == .rendered {
-        rendered = true
-        break
-      }
-      Thread.sleep(forTimeInterval: 0.001)
-    }
-    #expect(rendered)
-    let liveProjection = try MapProjectionHandle(map: map)
-    defer { try? liveProjection.close() }
-    let expected = try liveProjection.pixel(for: coordinate)
-    try map.jump(to: CameraOptions(center: LatLng(
-      latitude: 37.80,
-      longitude: -122.45
-    )))
-    try runtime.pump()
+    _ = try await map
+      .setStyleJSON(Data(#"{"version":8,"sources":{},"layers":[]}"#.utf8))
+    _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions(zoom: 3)))
+    try session.requestFrame(FrameDemand(options: [], token: 1))
+    try await session.barrier()
+    #expect(try session.drainFrameResults().first?.result == .rendered)
+    _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions(zoom: 6)))
     let projection = try MapProjectionHandle(session: session)
     defer { try? projection.close() }
-    #expect(try projection.pixel(for: coordinate) == expected)
-    let newer = try MapProjectionHandle(map: map)
-    defer { try? newer.close() }
-    #expect(try newer.pixel(for: coordinate) != expected)
-    let frame = try session.acquireMetalOwnedTextureFrame()
-    let acquiredProjection = try MapProjectionHandle(session: session)
-    defer { try? acquiredProjection.close() }
-    #expect(try acquiredProjection.pixel(for: coordinate) == expected)
-    try frame.close()
-    #expect(try session.renderUpdate().result == .rendered)
-    let next = try MapProjectionHandle(session: session)
-    defer { try? next.close() }
-    #expect(try next.pixel(for: coordinate) == newer.pixel(for: coordinate))
-    try session.resize(width: 96, height: 48, scaleFactor: 1)
+    #expect(try projection.camera().zoom == 3)
+    let frame = try #require(try session.acquireFrame())
+    let captured = try MapProjectionHandle(session: session)
+    #expect(try captured.camera().zoom == 3)
+    try captured.close()
+    try frame.release()
+    try await session.resize(RenderTargetExtent(
+      width: 16,
+      height: 16,
+      scaleFactor: 1
+    ))
     #expect(throws: MaplibreError.self) {
       try MapProjectionHandle(session: session)
     }
+    try await session.detach()
     try session.close()
-    try map.close()
-    try runtime.close()
-    #expect(try projection.pixel(for: coordinate) == expected)
+    try await map.close()
+    try await runtime.close()
+    let retainedZoom = try await Task.detached { try projection.camera().zoom }
+      .value
+    #expect(retainedZoom == 3)
     withExtendedLifetime(device) {}
   }
 #endif

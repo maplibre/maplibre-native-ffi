@@ -3,10 +3,11 @@ package org.maplibre.nativeffi.map
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class CustomGeometrySourceRegistryTest {
   @Test
-  fun failedReplacementPreservesExistingCallbackState() {
+  fun failedReplacementPreservesExistingCallbackState(): Unit = runSuspendTest {
     val released = mutableListOf<String>()
     val registry = registry(released)
     registry.install("source", State("existing")) {}
@@ -20,7 +21,7 @@ class CustomGeometrySourceRegistryTest {
   }
 
   @Test
-  fun clearingReleasesEveryRemainingCallbackState() {
+  fun clearingReleasesEveryRemainingCallbackState(): Unit = runSuspendTest {
     val released = mutableListOf<String>()
     val registry = registry(released)
     registry.install("first", State("first")) {}

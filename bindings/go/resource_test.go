@@ -21,18 +21,15 @@ func countingResourceProvider(calls *atomic.Int64) ResourceProviderCallback {
 // event naming that URL proves the request reached the network file source.
 func loadProbeStyle(t *testing.T, runtime *RuntimeHandle, m *MapHandle, styleURL string) {
 	t.Helper()
-	if err := m.SetStyleURL(styleURL); err != nil {
+	if _, err := m.SetStyleURL(styleURL); err != nil {
 		t.Fatalf("SetStyleURL(%q): %v", styleURL, err)
 	}
 	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0, -1); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
-		batch, err := runtime.DrainEvents(0)
+		drained, err := runtime.DrainEvents()
 		if err != nil {
 			t.Fatalf("DrainEvents(): %v", err)
 		}
-		for _, event := range batch.Events {
+		for _, event := range drained {
 			if event.Type == RuntimeEventMapLoadingFailed && strings.Contains(event.Message, styleURL) {
 				return
 			}
@@ -43,28 +40,10 @@ func loadProbeStyle(t *testing.T, runtime *RuntimeHandle, m *MapHandle, styleURL
 }
 
 func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
-	lockOSThreadForTest(t)
-
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
+	runtime, m := newRuntimeAndMap(t, nil)
 
 	var firstCalls, secondCalls atomic.Int64
-	if err := runtime.SetResourceProvider(countingResourceProvider(&firstCalls)); err != nil {
+	if _, err := runtime.SetResourceProvider(countingResourceProvider(&firstCalls)); err != nil {
 		t.Fatalf("SetResourceProvider(): %v", err)
 	}
 	loadProbeStyle(t, runtime, m, "jar:file:/packaged/first.json")
@@ -72,7 +51,7 @@ func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
 		t.Fatalf("installed provider calls = %d, want at least 1", got)
 	}
 
-	if err := runtime.SetResourceProvider(countingResourceProvider(&secondCalls)); err != nil {
+	if _, err := runtime.SetResourceProvider(countingResourceProvider(&secondCalls)); err != nil {
 		t.Fatalf("SetResourceProvider(replace): %v", err)
 	}
 	firstCallsAfterReplace := firstCalls.Load()
@@ -84,7 +63,7 @@ func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
 		t.Fatalf("replaced provider calls = %d, want %d", got, firstCallsAfterReplace)
 	}
 
-	if err := runtime.ClearResourceProvider(); err != nil {
+	if _, err := runtime.ClearResourceProvider(); err != nil {
 		t.Fatalf("ClearResourceProvider(): %v", err)
 	}
 	secondCallsAfterClear := secondCalls.Load()
@@ -96,7 +75,7 @@ func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
 		t.Fatalf("cleared provider calls = %d, want %d", got, secondCallsAfterClear)
 	}
 
-	if err := runtime.ClearResourceProvider(); err != nil {
+	if _, err := runtime.ClearResourceProvider(); err != nil {
 		t.Fatalf("second ClearResourceProvider(): %v", err)
 	}
 }
@@ -105,43 +84,40 @@ func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
 // reaches the provider as the alias, alongside the HTTPS URL the built-in
 // network path would have fetched.
 func TestResourceProviderSeesSchemeAliasAndItsResolvedURL(t *testing.T) {
-	lockOSThreadForTest(t)
-
-	const emptyStyle = `{"version":8,"sources":{},"layers":[]}`
 	var resolvedURL atomic.Value
 
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	if err := runtime.SetResourceProvider(func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+	if _, err := runtime.SetResourceProvider(func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
 		if request.RequestedURL != "maplibre://maps/style" {
 			return ResourceProviderDecisionPassThrough
 		}
 		resolvedURL.Store(request.ResolvedURL)
-		if err := handle.Complete(ResourceResponse{Status: ResourceResponseStatusOK, Bytes: []byte(emptyStyle)}); err != nil {
+		if err := handle.Complete(ResourceResponse{Status: ResourceResponseStatusOK, Bytes: []byte(emptyStyleJSON)}); err != nil {
 			return ResourceProviderDecisionPassThrough
 		}
 		return ResourceProviderDecisionHandle
 	}); err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("SetResourceProvider(): %v", err)
 	}
-	m, err := runtime.NewMap()
+	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
-		if err := m.Close(); err != nil {
+		if err := closeMapForTest(m); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
 
-	if err := m.SetStyleURL("maplibre://maps/style"); err != nil {
+	if _, err := m.SetStyleURL("maplibre://maps/style"); err != nil {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
 	waitForRuntimeEvent(t, runtime, RuntimeEventMapStyleLoaded)
@@ -172,94 +148,64 @@ func TestResourceResponseAllowsUnknownEnumsForNativeValidation(t *testing.T) {
 	}
 }
 
-func TestResourceResponseAcceptsKnownEnums(t *testing.T) {
-	statuses := []ResourceResponseStatus{
-		ResourceResponseStatusOK,
-		ResourceResponseStatusError,
-		ResourceResponseStatusNoContent,
-		ResourceResponseStatusNotModified,
-	}
-	reasons := []ResourceErrorReason{
-		ResourceErrorReasonNone,
-		ResourceErrorReasonNotFound,
-		ResourceErrorReasonServer,
-		ResourceErrorReasonConnection,
-		ResourceErrorReasonRateLimit,
-		ResourceErrorReasonOther,
-	}
-	for _, status := range statuses {
-		for _, reason := range reasons {
-			if err := validateResourceResponse(ResourceResponse{Status: status, ErrorReason: reason}); err != nil {
-				t.Fatalf("validateResourceResponse(%v, %v) error = %v", status, reason, err)
-			}
-		}
-	}
-}
-
 func TestRuntimeResourceProviderRejectsNilCallback(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Close(): %v", err)
 		}
 	}()
 
-	if err := runtime.SetResourceProvider(nil); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := runtime.SetResourceProvider(nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetResourceProvider(nil) error = %v, want ErrInvalidArgument", err)
 	}
 }
 
 func TestRuntimeResourceTransformLifecycle(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	if err := runtime.SetResourceTransform(func(request ResourceTransformRequest) (string, bool) {
+	if _, err := runtime.SetResourceTransform(func(request ResourceTransformRequest) (string, bool) {
 		return request.URL + "?first", true
 	}); err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("SetResourceTransform(): %v", err)
 	}
-	if err := runtime.SetResourceTransform(func(request ResourceTransformRequest) (string, bool) {
+	if _, err := runtime.SetResourceTransform(func(request ResourceTransformRequest) (string, bool) {
 		return "", false
 	}); err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("SetResourceTransform(replace): %v", err)
 	}
-	if err := runtime.ClearResourceTransform(); err != nil {
-		_ = runtime.Close()
+	if _, err := runtime.ClearResourceTransform(); err != nil {
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("ClearResourceTransform(): %v", err)
 	}
-	if err := runtime.ClearResourceTransform(); err != nil {
-		_ = runtime.Close()
+	if _, err := runtime.ClearResourceTransform(); err != nil {
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("second ClearResourceTransform(): %v", err)
 	}
-	if err := runtime.Close(); err != nil {
+	if err := closeRuntimeForTest(runtime); err != nil {
 		t.Fatalf("Close(): %v", err)
 	}
 }
 
 func TestRuntimeResourceTransformRejectsNilCallback(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Close(): %v", err)
 		}
 	}()
 
-	if err := runtime.SetResourceTransform(nil); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := runtime.SetResourceTransform(nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetResourceTransform(nil) error = %v, want ErrInvalidArgument", err)
 	}
 }
@@ -269,8 +215,6 @@ func TestRuntimeResourceTransformRejectsNilCallback(t *testing.T) {
 // close that request from inside itself, and a second registration on the same
 // request reports invalid state.
 func TestResourceRequestCancelCallbackReportsDiscardedRequest(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	const styleURL = "jar:file:/packaged/cancelled-style.json"
 	requested := make(chan struct{}, 1)
 	cancelled := make(chan struct{}, 4)
@@ -282,11 +226,11 @@ func TestResourceRequestCancelCallbackReportsDiscardedRequest(t *testing.T) {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
-	if err := runtime.SetResourceProvider(func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+	if _, err := runtime.SetResourceProvider(func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
 		if request.RequestedURL != styleURL {
 			return ResourceProviderDecisionPassThrough
 		}
@@ -307,21 +251,28 @@ func TestResourceRequestCancelCallbackReportsDiscardedRequest(t *testing.T) {
 		// The request stays open, so only cancellation retires it.
 		return ResourceProviderDecisionHandle
 	}); err != nil {
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("SetResourceProvider(): %v", err)
 	}
 
-	m, err := runtime.NewMap()
+	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
 		t.Fatalf("NewMap(): %v", err)
 	}
-	if err := m.SetStyleURL(styleURL); err != nil {
+	if _, err := m.SetStyleURL(styleURL); err != nil {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
-	waitForResourceSignal(t, runtime, requested, "the provider to receive the style request")
-	if err := m.Close(); err != nil {
+	waitForResourceSignalValue(t, requested, "the provider to receive the style request")
+	// Map teardown discards the request the provider never completed, and the
+	// cancel callback runs on the thread that discards it.
+	teardown, err := m.Close()
+	if err != nil {
 		t.Fatalf("Map Close(): %v", err)
 	}
-	waitForResourceSignal(t, runtime, cancelled, "the cancel callback to run")
+	waitForResourceSignalValue(t, cancelled, "the cancel callback to run")
+	if _, err := awaitForTest(teardown, nil); err != nil {
+		t.Fatalf("map teardown: %v", err)
+	}
 
 	if err, ok := registerErr.Load().(error); ok {
 		t.Fatalf("SetCancelCallback(): %v", err)
@@ -329,7 +280,9 @@ func TestResourceRequestCancelCallbackReportsDiscardedRequest(t *testing.T) {
 	if err, ok := secondRegisterErr.Load().(error); !ok || !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("second SetCancelCallback() error = %v, want ErrInvalidState", err)
 	}
-	pumpRuntimeFor(t, runtime, 200)
+	if _, err := awaitForTest(runtime.Barrier()); err != nil {
+		t.Fatalf("Barrier(): %v", err)
+	}
 	if got := cancelCalls.Load(); got != 1 {
 		t.Fatalf("cancel callback calls = %d, want 1", got)
 	}
@@ -339,8 +292,6 @@ func TestResourceRequestCancelCallbackReportsDiscardedRequest(t *testing.T) {
 // callback before SetCancelCallback returns, and a closed request rejects
 // registration as closed.
 func TestResourceRequestCancelCallbackRunsForAlreadyCancelledRequest(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	const styleURL = "jar:file:/packaged/late-cancel-style.json"
 	handles := make(chan *ResourceRequestHandle, 1)
 
@@ -349,11 +300,11 @@ func TestResourceRequestCancelCallbackRunsForAlreadyCancelledRequest(t *testing.
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
-	if err := runtime.SetResourceProvider(func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+	if _, err := runtime.SetResourceProvider(func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
 		if request.RequestedURL != styleURL {
 			return ResourceProviderDecisionPassThrough
 		}
@@ -363,22 +314,22 @@ func TestResourceRequestCancelCallbackRunsForAlreadyCancelledRequest(t *testing.
 		}
 		return ResourceProviderDecisionHandle
 	}); err != nil {
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("SetResourceProvider(): %v", err)
 	}
 
-	m, err := runtime.NewMap()
+	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
 		t.Fatalf("NewMap(): %v", err)
 	}
-	if err := m.SetStyleURL(styleURL); err != nil {
+	if _, err := m.SetStyleURL(styleURL); err != nil {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
-	var handle *ResourceRequestHandle
-	waitForResourceSignalValue(t, runtime, handles, &handle, "the provider to receive the style request")
-	if err := m.Close(); err != nil {
+	handle := waitForResourceSignalValue(t, handles, "the provider to receive the style request")
+	if err := closeMapForTest(m); err != nil {
 		t.Fatalf("Map Close(): %v", err)
 	}
-	waitForResourceRequestCancelled(t, runtime, handle)
+	waitForResourceRequestCancelled(t, handle)
 
 	var calls int
 	if err := handle.SetCancelCallback(func() { calls++ }); err != nil {
@@ -400,8 +351,6 @@ func TestResourceRequestCancelCallbackRunsForAlreadyCancelledRequest(t *testing.
 // BND-198: a request the provider completed is not reported as cancelled, even
 // once the map that asked for it goes away.
 func TestResourceRequestCancelCallbackSkipsCompletedRequest(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	const styleURL = "jar:file:/packaged/completed-style.json"
 	var cancelCalls atomic.Int64
 	var providerErr atomic.Value
@@ -411,11 +360,11 @@ func TestResourceRequestCancelCallbackSkipsCompletedRequest(t *testing.T) {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
-	if err := runtime.SetResourceProvider(func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+	if _, err := runtime.SetResourceProvider(func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
 		if request.RequestedURL != styleURL {
 			return ResourceProviderDecisionPassThrough
 		}
@@ -430,21 +379,25 @@ func TestResourceRequestCancelCallbackSkipsCompletedRequest(t *testing.T) {
 		}
 		return ResourceProviderDecisionHandle
 	}); err != nil {
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("SetResourceProvider(): %v", err)
 	}
 
-	m, err := runtime.NewMap()
+	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
 		t.Fatalf("NewMap(): %v", err)
 	}
-	if err := m.SetStyleURL(styleURL); err != nil {
+	if _, err := m.SetStyleURL(styleURL); err != nil {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
 	waitForRuntimeEvent(t, runtime, RuntimeEventMapStyleLoaded)
-	if err := m.Close(); err != nil {
+	teardown, err := m.Close()
+	if err != nil {
 		t.Fatalf("Map Close(): %v", err)
 	}
-	pumpRuntimeFor(t, runtime, 200)
+	if _, err := awaitForTest(teardown, nil); err != nil {
+		t.Fatalf("map teardown: %v", err)
+	}
 
 	if err, ok := providerErr.Load().(error); ok {
 		t.Fatalf("provider error: %v", err)
@@ -454,36 +407,25 @@ func TestResourceRequestCancelCallbackSkipsCompletedRequest(t *testing.T) {
 	}
 }
 
-// waitForResourceSignal pumps the runtime until the provider signals, so
-// callbacks that native code delivers on the runtime's thread can arrive.
-func waitForResourceSignal(t *testing.T, runtime *RuntimeHandle, signal <-chan struct{}, what string) {
+// waitForResourceSignalValue waits for a signal that native code raises from a
+// MapLibre thread.
+func waitForResourceSignalValue[T any](t *testing.T, signal <-chan T, what string) T {
 	t.Helper()
-	var ignored struct{}
-	waitForResourceSignalValue(t, runtime, signal, &ignored, what)
-}
-
-func waitForResourceSignalValue[T any](t *testing.T, runtime *RuntimeHandle, signal <-chan T, out *T, what string) {
-	t.Helper()
-	for range make([]struct{}, 5000) {
-		select {
-		case value := <-signal:
-			*out = value
-			return
-		default:
-		}
-		if err := runtime.Pump(0, -1); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
-		time.Sleep(time.Millisecond)
+	select {
+	case value := <-signal:
+		return value
+	case <-time.After(30 * time.Second):
+		t.Fatalf("timed out waiting for %s", what)
 	}
-	t.Fatalf("timed out waiting for %s", what)
+	var zero T
+	return zero
 }
 
-// waitForResourceRequestCancelled pumps the runtime until native code reports
-// the request as cancelled.
-func waitForResourceRequestCancelled(t *testing.T, runtime *RuntimeHandle, handle *ResourceRequestHandle) {
+// waitForResourceRequestCancelled polls until native code reports the request
+// as cancelled.
+func waitForResourceRequestCancelled(t *testing.T, handle *ResourceRequestHandle) {
 	t.Helper()
-	for range make([]struct{}, 5000) {
+	for range make([]struct{}, 30000) {
 		cancelled, err := handle.Cancelled()
 		if err != nil {
 			t.Fatalf("Cancelled(): %v", err)
@@ -491,21 +433,7 @@ func waitForResourceRequestCancelled(t *testing.T, runtime *RuntimeHandle, handl
 		if cancelled {
 			return
 		}
-		if err := runtime.Pump(0, -1); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
 		time.Sleep(time.Millisecond)
 	}
-	t.Fatalf("timed out waiting for the request to be cancelled")
-}
-
-// pumpRuntimeFor drains work that a late callback would arrive with.
-func pumpRuntimeFor(t *testing.T, runtime *RuntimeHandle, iterations int) {
-	t.Helper()
-	for range make([]struct{}, iterations) {
-		if err := runtime.Pump(0, -1); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
-		time.Sleep(time.Millisecond)
-	}
+	t.Fatal("timed out waiting for the request to be cancelled")
 }

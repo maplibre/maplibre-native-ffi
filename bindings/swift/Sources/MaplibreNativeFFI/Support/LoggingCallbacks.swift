@@ -14,10 +14,6 @@ private final class LogCallbackBox: @unchecked Sendable {
   init(_ callback: @escaping @Sendable (NativeLogRecord) -> Bool) {
     self.callback = callback
   }
-
-  func invoke(_ record: NativeLogRecord) -> Bool {
-    callback(record)
-  }
 }
 
 private func logCallbackTrampoline(
@@ -35,46 +31,32 @@ private func logCallbackTrampoline(
     code: code,
     message: message.map { String(cString: $0) } ?? ""
   )
-  return box.invoke(record) ? 1 : 0
+  return box.callback(record) ? 1 : 0
+}
+
+private func releaseLogCallback(_ userData: UnsafeMutableRawPointer?) {
+  guard let userData else { return }
+  Unmanaged<LogCallbackBox>.fromOpaque(userData).release()
 }
 
 enum LoggingCallbackState {
-  private static let lock = NSLock()
-  private nonisolated(unsafe) static var retainedBox: Unmanaged<LogCallbackBox>?
-
   static func set(_ callback: @escaping @Sendable (NativeLogRecord)
     -> Bool) throws
   {
     let replacement = Unmanaged.passRetained(LogCallbackBox(callback))
-    var old: Unmanaged<LogCallbackBox>?
     do {
-      try lock.withLock {
-        try checkStatus(mln_log_set_callback(
-          logCallbackTrampoline,
-          replacement.toOpaque()
-        ))
-        old = retainedBox
-        retainedBox = replacement
-      }
+      try checkStatus(mln_log_set_callback(
+        logCallbackTrampoline,
+        replacement.toOpaque(),
+        releaseLogCallback
+      ))
     } catch {
       replacement.release()
       throw error
     }
-    old?.release()
   }
 
   static func clear() throws {
-    var old: Unmanaged<LogCallbackBox>?
-    try lock.withLock {
-      try checkStatus(mln_log_clear_callback())
-      old = retainedBox
-      retainedBox = nil
-    }
-    old?.release()
-  }
-
-  static func invokeForTesting(_ record: NativeLogRecord) -> Bool? {
-    let box = lock.withLock { retainedBox?.takeUnretainedValue() }
-    return box?.invoke(record)
+    try checkStatus(mln_log_clear_callback())
   }
 }

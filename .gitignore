@@ -35,3 +35,4 @@ bindings/openharmony/library/BuildProfile.ets
 .kotlin
 .devcontainer/mise-oci/
 .devcontainer/mise-oci.tar
+does-not-exist.db

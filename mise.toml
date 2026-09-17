@@ -68,7 +68,7 @@ cargo_about_version = "0.9.1"
 cmake_version = "4.3.3"
 dart_version = "3.12.2"
 dotnet_version = "10.0.203"
-doxygen_version = "1.13.2"
+doxygen_version = "1.18.0"
 dprint_version = "0.53.2"
 emsdk_version = "4.0.10"
 go_version = "1.26.3"
@@ -319,7 +319,7 @@ elif [[ "$usage_preset" == ios-simulator-* ]]; then
   mise run //:apple-simulator:boot iOS
 elif [[ "$usage_preset" == tvos-simulator-* ]]; then
   mise run //:apple-simulator:boot tvOS
-elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-x64-* ]]; then
+elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-arm64-* || "$usage_preset" == android-x64-* ]]; then
   # An emulator target runs the suite through a device shell rather than ctest,
   # so the fixtures ctest would name by absolute source path are staged
   # into a directory the runner pushes to the device.
@@ -344,13 +344,18 @@ elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-x64-* ]]; 
       "$OHOS_SDK_NATIVE/llvm/lib/x86_64-linux-ohos/libc++_shared.so" \
       -- "$MISE_MONOREPO_ROOT/build/$usage_preset/mln_ffi_c_api_tests"
   fi
+  case "$usage_preset" in
+    android-arm64-*) abi=arm64-v8a ;;
+    android-x64-*) abi=x86_64 ;;
+  esac
   emulator_args=()
   if [[ "$usage_preset" == android-x64-egl ]]; then
-    mise run //:android-emulator:boot x86_64 --api 26
+    mise run //:android-emulator:boot "$abi" --api 26
     emulator_args+=(--api 26)
   fi
   exec "$MISE_MONOREPO_ROOT/scripts/run-android-emulator-test.sh" \
     300 \
+    "$abi" \
     "$MISE_MONOREPO_ROOT/build/$usage_preset/install/lib/libmaplibre-native-c.so" \
     ${emulator_args[@]+"${emulator_args[@]}"} \
     -- "$MISE_MONOREPO_ROOT/build/$usage_preset/mln_ffi_c_api_tests"

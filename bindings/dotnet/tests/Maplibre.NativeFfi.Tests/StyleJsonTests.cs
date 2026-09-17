@@ -11,15 +11,27 @@ public sealed class StyleJsonTests
 {
     [BindingSpecTest("BND-105")]
     [Fact]
-    public void UrlAndTileSourceApisAdaptThroughNativeMap()
+    public async Task UrlAndTileSourceApisAdaptThroughNativeMap()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson(EmptyStyle());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
 
-        map.AddGeoJsonSourceUrl("geo-url", "https://example.test/data.geojson", null);
-        map.SetGeoJsonSourceUrl("geo-url", "https://example.test/other.geojson");
-        map.AddVectorSourceTiles(
+        _ = map.AddGeoJsonSourceUrlAsync(
+            "geo-url",
+            "https://example.test/data.geojson",
+            null,
+            TestContext.Current.CancellationToken
+        );
+        _ = map.SetGeoJsonSourceUrlAsync(
+            "geo-url",
+            "https://example.test/other.geojson",
+            TestContext.Current.CancellationToken
+        );
+        _ = map.AddVectorSourceTilesAsync(
             "vector-tiles",
             ["https://example.test/vector/{z}/{x}/{y}.pbf"],
             new TileSourceOptions
@@ -29,62 +41,151 @@ public sealed class StyleJsonTests
                 Attribution = "Vector attribution",
                 Scheme = TileScheme.Xyz,
                 VectorEncoding = VectorTileEncoding.Mvt,
-            }
+            },
+            TestContext.Current.CancellationToken
         );
-        map.AddRasterSourceTiles(
+        _ = map.AddRasterSourceTilesAsync(
             "raster-tiles",
             ["https://example.test/raster/{z}/{x}/{y}.png"],
-            new TileSourceOptions { TileSize = 256 }
+            new TileSourceOptions { TileSize = 256 },
+            TestContext.Current.CancellationToken
         );
-        map.AddRasterDemSourceTiles(
+        _ = map.AddRasterDemSourceTilesAsync(
             "dem-tiles",
             ["https://example.test/dem/{z}/{x}/{y}.png"],
-            new TileSourceOptions { RasterEncoding = RasterDemEncoding.Mapbox }
+            new TileSourceOptions { RasterEncoding = RasterDemEncoding.Mapbox },
+            TestContext.Current.CancellationToken
         );
 
-        Assert.Equal(SourceType.GeoJson, map.StyleSourceType("geo-url"));
-        Assert.Equal(SourceType.Vector, map.StyleSourceType("vector-tiles"));
-        Assert.Equal(SourceType.Raster, map.StyleSourceType("raster-tiles"));
-        Assert.Equal(SourceType.RasterDem, map.StyleSourceType("dem-tiles"));
-        Assert.Equal("https://example.test/other.geojson", map.StyleSourceInfo("geo-url")?.Url);
-        Assert.Equal("Vector attribution", map.StyleSourceInfo("vector-tiles")?.Attribution);
-        Assert.Equal(256u, map.StyleSourceInfo("raster-tiles")?.TileSize);
-        Assert.Equal(RasterDemEncoding.Mapbox, map.StyleSourceInfo("dem-tiles")?.RasterDemEncoding);
         Assert.Equal(
-            (uint)RasterDemEncoding.Mapbox,
-            map.StyleSourceInfo("dem-tiles")?.RawRasterDemEncoding
+            SourceType.GeoJson,
+            (await map.StyleSourceInfoAsync("geo-url", TestContext.Current.CancellationToken))?.Type
         );
+        Assert.Equal(
+            SourceType.Vector,
+            (
+                await map.StyleSourceInfoAsync(
+                    "vector-tiles",
+                    TestContext.Current.CancellationToken
+                )
+            )?.Type
+        );
+        Assert.Equal(
+            SourceType.Raster,
+            (
+                await map.StyleSourceInfoAsync(
+                    "raster-tiles",
+                    TestContext.Current.CancellationToken
+                )
+            )?.Type
+        );
+        Assert.Equal(
+            SourceType.RasterDem,
+            (
+                await map.StyleSourceInfoAsync("dem-tiles", TestContext.Current.CancellationToken)
+            )?.Type
+        );
+        Assert.Equal(
+            "https://example.test/other.geojson",
+            (await map.StyleSourceInfoAsync("geo-url", TestContext.Current.CancellationToken))?.Url
+        );
+        Assert.Equal(
+            "Vector attribution",
+            (
+                await map.StyleSourceInfoAsync(
+                    "vector-tiles",
+                    TestContext.Current.CancellationToken
+                )
+            )?.Attribution
+        );
+        Assert.Equal(
+            256u,
+            (
+                await map.StyleSourceInfoAsync(
+                    "raster-tiles",
+                    TestContext.Current.CancellationToken
+                )
+            )?.TileSize
+        );
+        var demInfo = await map.StyleSourceInfoAsync(
+            "dem-tiles",
+            TestContext.Current.CancellationToken
+        );
+        Assert.Equal(RasterDemEncoding.Mapbox, demInfo?.RasterDemEncoding);
+        Assert.Equal((uint)RasterDemEncoding.Mapbox, demInfo?.RawRasterDemEncoding);
     }
 
     [BindingSpecTest("BND-105")]
     [Fact]
-    public void StyleSourceVolatilityReadsBackAndRejectsMissingSource()
+    public async Task StyleSourceVolatilityReadsBackAndRejectsMissingSource()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson(EmptyStyle());
-        map.AddVectorSourceTiles(
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
+        _ = map.AddVectorSourceTilesAsync(
             "volatile-source",
             ["https://example.test/vector/{z}/{x}/{y}.pbf"],
-            new TileSourceOptions()
+            new TileSourceOptions(),
+            TestContext.Current.CancellationToken
         );
 
-        Assert.False(map.StyleSourceInfo("volatile-source")!.IsVolatile);
+        Assert.False(
+            (
+                await map.StyleSourceInfoAsync(
+                    "volatile-source",
+                    TestContext.Current.CancellationToken
+                )
+            )!.IsVolatile
+        );
 
-        map.SetStyleSourceVolatile("volatile-source", true);
-        Assert.True(map.StyleSourceInfo("volatile-source")!.IsVolatile);
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.SetStyleSourceVolatileAsync(
+                "volatile-source",
+                true,
+                TestContext.Current.CancellationToken
+            )
+        );
+        Assert.True(
+            (
+                await map.StyleSourceInfoAsync(
+                    "volatile-source",
+                    TestContext.Current.CancellationToken
+                )
+            )!.IsVolatile
+        );
 
-        map.SetStyleSourceVolatile("volatile-source", false);
-        Assert.False(map.StyleSourceInfo("volatile-source")!.IsVolatile);
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.SetStyleSourceVolatileAsync(
+                "volatile-source",
+                false,
+                TestContext.Current.CancellationToken
+            )
+        );
+        Assert.False(
+            (
+                await map.StyleSourceInfoAsync(
+                    "volatile-source",
+                    TestContext.Current.CancellationToken
+                )
+            )!.IsVolatile
+        );
 
-        Assert.Throws<InvalidArgumentException>(() =>
-            map.SetStyleSourceVolatile("missing-source", true)
+        RuntimeEventTestHelpers.AssertFailed(
+            map.SetStyleSourceVolatileAsync(
+                "missing-source",
+                true,
+                TestContext.Current.CancellationToken
+            ),
+            MaplibreStatus.NotFound
         );
     }
 
     [BindingSpecTest("BND-109")]
     [Fact]
-    public void SourceInspectionCopiesUrlAndInlineTileJsonAfterSourceRelease()
+    public async Task SourceInspectionCopiesUrlAndInlineTileJsonAfterSourceRelease()
     {
         SourceInfo urlInfo;
         SourceInfo inlineInfo;
@@ -96,11 +197,18 @@ public sealed class StyleJsonTests
         };
 
         using (var runtime = RuntimeHandle.Create(new RuntimeOptions()))
-        using (var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 }))
+        using (
+            var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 512, Height = 512 })
+        )
         {
-            map.SetStyleJson(EmptyStyle());
-            map.AddVectorSourceUrl("url-vector", "https://example.test/vector.json", null);
-            map.AddVectorSourceTiles(
+            _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
+            _ = map.AddVectorSourceUrlAsync(
+                "url-vector",
+                "https://example.test/vector.json",
+                null,
+                TestContext.Current.CancellationToken
+            );
+            _ = map.AddVectorSourceTilesAsync(
                 "inline-vector",
                 tileUrls,
                 new TileSourceOptions
@@ -111,11 +219,19 @@ public sealed class StyleJsonTests
                     Scheme = TileScheme.Tms,
                     VectorEncoding = VectorTileEncoding.Mlt,
                     Bounds = bounds,
-                }
+                },
+                TestContext.Current.CancellationToken
             );
 
-            urlInfo = Assert.IsType<SourceInfo>(map.StyleSourceInfo("url-vector"));
-            inlineInfo = Assert.IsType<SourceInfo>(map.StyleSourceInfo("inline-vector"));
+            urlInfo = Assert.IsType<SourceInfo>(
+                await map.StyleSourceInfoAsync("url-vector", TestContext.Current.CancellationToken)
+            );
+            inlineInfo = Assert.IsType<SourceInfo>(
+                await map.StyleSourceInfoAsync(
+                    "inline-vector",
+                    TestContext.Current.CancellationToken
+                )
+            );
 
             Assert.Equal("https://example.test/vector.json", urlInfo.Url);
             Assert.Null(urlInfo.TileJson);
@@ -136,8 +252,18 @@ public sealed class StyleJsonTests
             Assert.Null(inlineInfo.RasterDemEncoding);
             Assert.Null(inlineInfo.RawRasterDemEncoding);
 
-            Assert.True(map.RemoveStyleSource("url-vector"));
-            Assert.True(map.RemoveStyleSource("inline-vector"));
+            RuntimeEventTestHelpers.AssertCommitted(
+                map.RemoveStyleSourceAsync("url-vector", TestContext.Current.CancellationToken)
+            );
+            RuntimeEventTestHelpers.AssertCommitted(
+                map.RemoveStyleSourceAsync("inline-vector", TestContext.Current.CancellationToken)
+            );
+            Assert.Null(
+                await map.StyleSourceInfoAsync(
+                    "inline-vector",
+                    TestContext.Current.CancellationToken
+                )
+            );
         }
 
         Assert.Equal("https://example.test/vector.json", urlInfo.Url);
@@ -145,12 +271,12 @@ public sealed class StyleJsonTests
         Assert.Equal(bounds, inlineInfo.TileJson?.Bounds);
 
         using var rebuiltRuntime = RuntimeHandle.Create(new RuntimeOptions());
-        using var rebuiltMap = MapHandle.Create(
+        using var rebuiltMap = TestHandles.CreateMap(
             rebuiltRuntime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        rebuiltMap.SetStyleJson(EmptyStyle());
-        rebuiltMap.AddVectorSourceTiles(
+        _ = rebuiltMap.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
+        _ = rebuiltMap.AddVectorSourceTilesAsync(
             "rebuilt",
             inlineInfo.TileJson!.TileUrls,
             new TileSourceOptions
@@ -162,34 +288,130 @@ public sealed class StyleJsonTests
                 TileSize = inlineInfo.TileSize,
                 Attribution = inlineInfo.Attribution,
                 VectorEncoding = inlineInfo.VectorEncoding,
-            }
+            },
+            TestContext.Current.CancellationToken
         );
-        Assert.True(rebuiltMap.StyleSourceExists("rebuilt"));
+        Assert.NotNull(
+            await rebuiltMap.StyleSourceInfoAsync("rebuilt", TestContext.Current.CancellationToken)
+        );
+    }
+
+    // The narrow copies read the same values the aggregate reports, one field at a time.
+    [BindingSpecTest("BND-101")]
+    [Fact]
+    public async Task NarrowSourceCopiesReadTheSameValuesAsTheAggregate()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 64, Height = 64 });
+        var tileUrls = new[]
+        {
+            "https://example.test/tiles/{z}/{x}/{y}.pbf",
+            "https://example.test/mirror/{z}/{x}/{y}.pbf",
+        };
+
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
+        _ = map.AddVectorSourceUrlAsync(
+            "url-vector",
+            "https://example.test/vector.json",
+            null,
+            TestContext.Current.CancellationToken
+        );
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.AddVectorSourceTilesAsync(
+                "inline-vector",
+                tileUrls,
+                new TileSourceOptions { Attribution = "Inline attribution" },
+                TestContext.Current.CancellationToken
+            )
+        );
+
+        Assert.Equal(
+            "https://example.test/vector.json",
+            await map.GetStyleSourceUrlAsync("url-vector", TestContext.Current.CancellationToken)
+        );
+        Assert.Null(
+            await map.GetStyleSourceUrlAsync("inline-vector", TestContext.Current.CancellationToken)
+        );
+        Assert.Equal(
+            "Inline attribution",
+            await map.GetStyleSourceAttributionAsync(
+                "inline-vector",
+                TestContext.Current.CancellationToken
+            )
+        );
+        Assert.Null(
+            await map.GetStyleSourceAttributionAsync(
+                "url-vector",
+                TestContext.Current.CancellationToken
+            )
+        );
+        Assert.Equal(
+            tileUrls,
+            await map.GetStyleSourceTileUrlsAsync(
+                "inline-vector",
+                TestContext.Current.CancellationToken
+            )
+        );
+        var urlBackedTileUrls = await map.GetStyleSourceTileUrlsAsync(
+            "url-vector",
+            TestContext.Current.CancellationToken
+        );
+        Assert.NotNull(urlBackedTileUrls);
+        Assert.Empty(urlBackedTileUrls);
+
+        // A missing source is not an error for these queries.
+        Assert.Null(
+            await map.GetStyleSourceUrlAsync("missing", TestContext.Current.CancellationToken)
+        );
+        Assert.Null(
+            await map.GetStyleSourceTileUrlsAsync("missing", TestContext.Current.CancellationToken)
+        );
     }
 
     [BindingSpecTest("BND-101")]
     [Fact]
-    public void LoadedStyleDocumentAndUrlReadBackWhatWasLoaded()
+    public async Task LoadedStyleDocumentAndUrlReadBackWhatWasLoaded()
     {
-        var styleJson = EmptyStyle();
+        var styleJson = TestStyles.Empty;
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
 
         // Nothing parsed and nothing requested yet.
-        Assert.Empty(map.GetLoadedStyleJson());
-        Assert.Equal(string.Empty, map.GetStyleUrl());
+        Assert.Empty(await map.GetLoadedStyleJsonAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(
+            string.Empty,
+            await map.GetStyleUrlAsync(TestContext.Current.CancellationToken)
+        );
 
         // The document reads back byte-for-byte, so it can be reloaded unchanged.
-        map.SetStyleJson(styleJson);
-        Assert.Equal(styleJson, map.GetLoadedStyleJson());
+        _ = map.SetStyleJsonAsync(styleJson, TestContext.Current.CancellationToken);
+        Assert.Equal(
+            styleJson,
+            await map.GetLoadedStyleJsonAsync(TestContext.Current.CancellationToken)
+        );
         // Inline JSON clears the URL.
-        Assert.Equal(string.Empty, map.GetStyleUrl());
+        Assert.Equal(
+            string.Empty,
+            await map.GetStyleUrlAsync(TestContext.Current.CancellationToken)
+        );
 
         // The URL is request state, recorded before the load can succeed, while the
         // document still reports the style that last parsed.
-        map.SetStyleUrl("https://example.test/style.json");
-        Assert.Equal("https://example.test/style.json", map.GetStyleUrl());
-        Assert.Equal(styleJson, map.GetLoadedStyleJson());
+        _ = map.SetStyleUrlAsync(
+            "https://example.test/style.json",
+            TestContext.Current.CancellationToken
+        );
+        Assert.Equal(
+            "https://example.test/style.json",
+            await map.GetStyleUrlAsync(TestContext.Current.CancellationToken)
+        );
+        Assert.Equal(
+            styleJson,
+            await map.GetLoadedStyleJsonAsync(TestContext.Current.CancellationToken)
+        );
     }
 
     [BindingSpecTest("BND-081", "BND-101")]
@@ -197,9 +419,12 @@ public sealed class StyleJsonTests
     public void SetStyleJsonReturnsCopiedStyleLoadedEventWithMapIdentity()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
 
-        map.SetStyleJson(EmptyStyle());
+        map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
         var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
             runtime,
             map,
@@ -217,53 +442,187 @@ public sealed class StyleJsonTests
 
     [BindingSpecTest("BND-105")]
     [Fact]
-    public void LayerJsonPropertiesAndFiltersAdaptThroughNativeMap()
+    public async Task LayerJsonPropertiesAndFiltersAdaptThroughNativeMap()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson(EmptyStyle());
-        map.AddStyleSourceJson("geo", GeoJsonSource());
-        map.AddStyleLayerJson("""{"id":"fill","type":"fill","source":"geo"}"""u8.ToArray(), "");
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.AddStyleSourceJsonAsync(
+                "geo",
+                GeoJsonSource(),
+                TestContext.Current.CancellationToken
+            )
+        );
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.AddStyleLayerJsonAsync(
+                """{"id":"fill","type":"fill","source":"geo"}"""u8.ToArray(),
+                "",
+                TestContext.Current.CancellationToken
+            )
+        );
 
-        map.SetLayerProperty("fill", "fill-opacity", "0.5"u8.ToArray());
-        map.SetLayerFilter("fill", """["==","kind","park"]"""u8.ToArray());
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.SetLayerPropertyAsync(
+                "fill",
+                "fill-opacity",
+                "0.5"u8.ToArray(),
+                TestContext.Current.CancellationToken
+            )
+        );
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.SetLayerFilterAsync(
+                "fill",
+                """["==","kind","park"]"""u8.ToArray(),
+                TestContext.Current.CancellationToken
+            )
+        );
 
-        Assert.Equal("0.5"u8.ToArray(), map.GetLayerProperty("fill", "fill-opacity"));
-        Assert.NotEmpty(Assert.IsType<byte[]>(map.GetStyleLayerJson("fill")));
-        Assert.Equal("""["==","kind","park"]"""u8.ToArray(), map.GetLayerFilter("fill"));
+        Assert.Equal(
+            "0.5"u8.ToArray(),
+            await map.GetLayerPropertyAsync(
+                "fill",
+                "fill-opacity",
+                TestContext.Current.CancellationToken
+            )
+        );
+        Assert.NotEmpty(
+            Assert.IsType<byte[]>(
+                await map.GetStyleLayerJsonAsync("fill", TestContext.Current.CancellationToken)
+            )
+        );
+        Assert.Equal(
+            """["==","kind","park"]"""u8.ToArray(),
+            await map.GetLayerFilterAsync("fill", TestContext.Current.CancellationToken)
+        );
 
-        map.SetLayerFilter("fill", null);
-        Assert.Null(map.GetLayerFilter("fill"));
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.SetLayerFilterAsync("fill", null, TestContext.Current.CancellationToken)
+        );
+        Assert.Null(await map.GetLayerFilterAsync("fill", TestContext.Current.CancellationToken));
     }
 
     [BindingSpecTest("BND-105")]
     [Fact]
-    public void StyleSourceAndLayerJsonAdaptThroughNativeMap()
+    public async Task StyleSourceAndLayerJsonAdaptThroughNativeMap()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson(EmptyStyle());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
 
-        map.AddStyleSourceJson("geo", GeoJsonSource());
-        Assert.True(map.StyleSourceExists("geo"));
-        Assert.Equal(SourceType.GeoJson, map.StyleSourceType("geo"));
-        Assert.Contains("geo", map.StyleSourceIds());
-        var sourceInfo = map.StyleSourceInfo("geo");
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.AddStyleSourceJsonAsync(
+                "geo",
+                GeoJsonSource(),
+                TestContext.Current.CancellationToken
+            )
+        );
+        Assert.Contains(
+            "geo",
+            await map.StyleSourceIdsAsync(TestContext.Current.CancellationToken)
+        );
+        var sourceInfo = await map.StyleSourceInfoAsync(
+            "geo",
+            TestContext.Current.CancellationToken
+        );
         Assert.NotNull(sourceInfo);
         Assert.Equal("geo", sourceInfo.Id);
         Assert.Equal(SourceType.GeoJson, sourceInfo.Type);
         Assert.Null(sourceInfo.Attribution);
 
-        map.AddStyleLayerJson("""{"id":"background","type":"background"}"""u8.ToArray(), "");
-        Assert.True(map.StyleLayerExists("background"));
-        Assert.Equal("background", map.StyleLayerType("background"));
-        Assert.Contains("background", map.StyleLayerIds());
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.AddStyleLayerJsonAsync(
+                """{"id":"background","type":"background"}"""u8.ToArray(),
+                "",
+                TestContext.Current.CancellationToken
+            )
+        );
+        Assert.Equal(
+            "background",
+            (
+                await map.StyleLayerInfoAsync("background", TestContext.Current.CancellationToken)
+            )?.Type
+        );
+        Assert.Contains(
+            "background",
+            await map.StyleLayerIdsAsync(TestContext.Current.CancellationToken)
+        );
 
-        Assert.True(map.RemoveStyleLayer("background"));
-        Assert.True(map.RemoveStyleSource("geo"));
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.RemoveStyleLayerAsync("background", TestContext.Current.CancellationToken)
+        );
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.RemoveStyleSourceAsync("geo", TestContext.Current.CancellationToken)
+        );
+        Assert.Null(
+            await map.StyleLayerInfoAsync("background", TestContext.Current.CancellationToken)
+        );
+        Assert.Null(await map.StyleSourceInfoAsync("geo", TestContext.Current.CancellationToken));
     }
 
-    private static byte[] EmptyStyle() => """{"version":8,"sources":{},"layers":[]}"""u8.ToArray();
+    [BindingSpecTest("BND-105")]
+    [Fact]
+    public async Task StyleRemovalCommandsReportNotFoundAndInUseFailures()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
+
+        // Removing a missing layer, source, or image finishes FAILED with NOT_FOUND.
+        RuntimeEventTestHelpers.AssertFailed(
+            map.RemoveStyleLayerAsync("missing", TestContext.Current.CancellationToken),
+            MaplibreStatus.NotFound
+        );
+        RuntimeEventTestHelpers.AssertFailed(
+            map.RemoveStyleSourceAsync("missing", TestContext.Current.CancellationToken),
+            MaplibreStatus.NotFound
+        );
+        RuntimeEventTestHelpers.AssertFailed(
+            map.RemoveStyleImageAsync("missing", TestContext.Current.CancellationToken),
+            MaplibreStatus.NotFound
+        );
+
+        // Removing a source a layer still uses finishes FAILED with INVALID_STATE.
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.AddStyleSourceJsonAsync(
+                "geo",
+                GeoJsonSource(),
+                TestContext.Current.CancellationToken
+            )
+        );
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.AddStyleLayerJsonAsync(
+                """{"id":"fill","type":"fill","source":"geo"}"""u8.ToArray(),
+                "",
+                TestContext.Current.CancellationToken
+            )
+        );
+        RuntimeEventTestHelpers.AssertFailed(
+            map.RemoveStyleSourceAsync("geo", TestContext.Current.CancellationToken),
+            MaplibreStatus.InvalidState
+        );
+        Assert.NotNull(
+            await map.StyleSourceInfoAsync("geo", TestContext.Current.CancellationToken)
+        );
+
+        // After the layer goes away the removal commits and the found flag clears.
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.RemoveStyleLayerAsync("fill", TestContext.Current.CancellationToken)
+        );
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.RemoveStyleSourceAsync("geo", TestContext.Current.CancellationToken)
+        );
+        Assert.Null(await map.StyleSourceInfoAsync("geo", TestContext.Current.CancellationToken));
+    }
 
     private static byte[] GeoJsonSource() =>
         """{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}"""u8.ToArray();

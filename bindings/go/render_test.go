@@ -2,309 +2,232 @@ package maplibre
 
 import (
 	"errors"
-	"sync/atomic"
+	"math"
 	"testing"
-
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 )
 
-func TestRenderSessionNilHandleAndInvalidSurfaceDescriptor(t *testing.T) {
-	lockOSThreadForTest(t)
-
-	var nilSession *RenderSessionHandle
-	if err := nilSession.Close(); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("nil RenderSessionHandle Close() error = %v, want ErrInvalidArgument", err)
-	}
-	if _, err := nilSession.RenderUpdate(); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("nil RenderSessionHandle RenderUpdate() error = %v, want ErrInvalidArgument", err)
-	}
-	if _, err := nilSession.ReadPremultipliedRGBA8Into(nil); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("nil RenderSessionHandle ReadPremultipliedRGBA8Into() error = %v, want ErrInvalidArgument", err)
-	}
-	var nilMetalFrame *MetalOwnedTextureFrame
-	if err := nilMetalFrame.Close(); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("nil MetalOwnedTextureFrame Close() error = %v, want ErrInvalidArgument", err)
-	}
-	var nilVulkanFrame *VulkanOwnedTextureFrame
-	if err := nilVulkanFrame.Close(); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("nil VulkanOwnedTextureFrame Close() error = %v, want ErrInvalidArgument", err)
-	}
-	var nilOpenGLFrame *OpenGLOwnedTextureFrame
-	if err := nilOpenGLFrame.Close(); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("nil OpenGLOwnedTextureFrame Close() error = %v, want ErrInvalidArgument", err)
-	}
-
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMapWithOptions(NewMapOptions(64, 64, 1))
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMapWithOptions(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	_, err = m.AttachMetalSurface(MetalSurfaceDescriptor{
-		Extent: RenderTargetExtent{Width: 64, Height: 64, ScaleFactor: 1},
-	})
-	if !errors.Is(err, ErrInvalidArgument) && !errors.Is(err, ErrUnsupported) {
-		t.Fatalf("AttachMetalSurface(invalid descriptor) error = %v, want ErrInvalidArgument or ErrUnsupported", err)
-	}
-	_, err = m.AttachMetalOwnedTexture(MetalOwnedTextureDescriptor{
-		Extent: RenderTargetExtent{Width: 64, Height: 64, ScaleFactor: 1},
-	})
-	if !errors.Is(err, ErrInvalidArgument) && !errors.Is(err, ErrUnsupported) {
-		t.Fatalf("AttachMetalOwnedTexture(invalid descriptor) error = %v, want ErrInvalidArgument or ErrUnsupported", err)
-	}
-	_, err = m.AttachMetalBorrowedTexture(MetalBorrowedTextureDescriptor{
-		Extent: RenderTargetExtent{Width: 64, Height: 64, ScaleFactor: 1},
-	})
-	if !errors.Is(err, ErrInvalidArgument) && !errors.Is(err, ErrUnsupported) {
-		t.Fatalf("AttachMetalBorrowedTexture(invalid descriptor) error = %v, want ErrInvalidArgument or ErrUnsupported", err)
-	}
-	_, err = m.AttachVulkanOwnedTexture(VulkanOwnedTextureDescriptor{
-		Extent: RenderTargetExtent{Width: 64, Height: 64, ScaleFactor: 1},
-	})
-	if !errors.Is(err, ErrInvalidArgument) && !errors.Is(err, ErrUnsupported) {
-		t.Fatalf("AttachVulkanOwnedTexture(invalid descriptor) error = %v, want ErrInvalidArgument or ErrUnsupported", err)
-	}
-	_, err = m.AttachVulkanBorrowedTexture(VulkanBorrowedTextureDescriptor{
-		Extent: RenderTargetExtent{Width: 64, Height: 64, ScaleFactor: 1},
-	})
-	if !errors.Is(err, ErrInvalidArgument) && !errors.Is(err, ErrUnsupported) {
-		t.Fatalf("AttachVulkanBorrowedTexture(invalid descriptor) error = %v, want ErrInvalidArgument or ErrUnsupported", err)
-	}
-	_, err = m.AttachOpenGLSurface(OpenGLSurfaceDescriptor{
-		Extent: RenderTargetExtent{Width: 64, Height: 64, ScaleFactor: 1},
-	})
-	if !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("AttachOpenGLSurface(invalid descriptor) error = %v, want ErrInvalidArgument", err)
-	}
-	_, err = m.AttachOpenGLOwnedTexture(OpenGLOwnedTextureDescriptor{
-		Extent: RenderTargetExtent{Width: 64, Height: 64, ScaleFactor: 1},
-	})
-	if !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("AttachOpenGLOwnedTexture(invalid descriptor) error = %v, want ErrInvalidArgument", err)
-	}
-	_, err = m.AttachOpenGLBorrowedTexture(OpenGLBorrowedTextureDescriptor{
-		Extent: RenderTargetExtent{Width: 64, Height: 64, ScaleFactor: 1},
-	})
-	if !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("AttachOpenGLBorrowedTexture(invalid descriptor) error = %v, want ErrInvalidArgument", err)
-	}
-}
-
-func TestMapCloseFailsWhileRenderSessionIsLive(t *testing.T) {
-	mapState, err := handle.New(nativeMap(0x0200_0000_0000_002a), "MapHandle")
-	if err != nil {
-		t.Fatal(err)
-	}
-	m := &MapHandle{state: mapState}
-	session, err := newRenderSessionHandle(m, nativeRenderSession(0x0400_0000_0000_002a))
-	if err != nil {
-		t.Fatalf("newRenderSessionHandle(): %v", err)
-	}
-
-	oldDestroyMap := destroyMapHandle
-	oldDestroySession := destroyRenderSessionHandle
-	defer func() {
-		destroyMapHandle = oldDestroyMap
-		destroyRenderSessionHandle = oldDestroySession
-	}()
-	var mapDestroyCalls atomic.Int32
-	var sessionDestroyCalls atomic.Int32
-	destroyMapHandle = func(nativeMap) int32 {
-		mapDestroyCalls.Add(1)
-		return 0
-	}
-	destroyRenderSessionHandle = func(nativeRenderSession) int32 {
-		sessionDestroyCalls.Add(1)
-		return 0
-	}
-
-	if err := m.Close(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("Map Close() with live render session error = %v, want ErrInvalidState", err)
-	}
-	if got := mapDestroyCalls.Load(); got != 0 {
-		t.Fatalf("map destroy calls before session close = %d, want 0", got)
-	}
-	if err := session.Close(); err != nil {
-		t.Fatalf("RenderSession Close(): %v", err)
-	}
-	if err := m.Close(); err != nil {
-		t.Fatalf("Map Close() after render session close: %v", err)
-	}
-	if got := sessionDestroyCalls.Load(); got != 1 {
-		t.Fatalf("render session destroy calls = %d, want 1", got)
-	}
-	if got := mapDestroyCalls.Load(); got != 1 {
-		t.Fatalf("map destroy calls = %d, want 1", got)
-	}
-}
-
-func TestMapCloseSucceedsAfterRenderSessionDetach(t *testing.T) {
-	mapState, err := handle.New(nativeMap(0x0200_0000_0000_002a), "MapHandle")
-	if err != nil {
-		t.Fatal(err)
-	}
-	m := &MapHandle{state: mapState}
-	session, err := newRenderSessionHandle(m, nativeRenderSession(0x0400_0000_0000_002a))
-	if err != nil {
-		t.Fatalf("newRenderSessionHandle(): %v", err)
-	}
-
-	oldDestroyMap := destroyMapHandle
-	oldDestroySession := destroyRenderSessionHandle
-	oldDetachSession := detachRenderSessionHandle
-	defer func() {
-		destroyMapHandle = oldDestroyMap
-		destroyRenderSessionHandle = oldDestroySession
-		detachRenderSessionHandle = oldDetachSession
-	}()
-	var mapDestroyCalls atomic.Int32
-	var sessionDestroyCalls atomic.Int32
-	var detachCalls atomic.Int32
-	destroyMapHandle = func(nativeMap) int32 {
-		mapDestroyCalls.Add(1)
-		return 0
-	}
-	destroyRenderSessionHandle = func(nativeRenderSession) int32 {
-		sessionDestroyCalls.Add(1)
-		return 0
-	}
-	detachRenderSessionHandle = func(nativeRenderSession) int32 {
-		detachCalls.Add(1)
-		return 0
-	}
-
-	if err := session.Detach(); err != nil {
-		t.Fatalf("RenderSession Detach(): %v", err)
-	}
-	// Detaching releases the map, so the map closes while the session is open.
-	if err := m.Close(); err != nil {
-		t.Fatalf("Map Close() after detach: %v", err)
-	}
-	if got := mapDestroyCalls.Load(); got != 1 {
-		t.Fatalf("map destroy calls after detach = %d, want 1", got)
-	}
-	if err := session.Close(); err != nil {
-		t.Fatalf("RenderSession Close() after map close: %v", err)
-	}
-	if got := sessionDestroyCalls.Load(); got != 1 {
-		t.Fatalf("render session destroy calls = %d, want 1", got)
-	}
-	if got := detachCalls.Load(); got != 1 {
-		t.Fatalf("detach calls = %d, want 1", got)
-	}
-}
-
-func newActiveFrameTestSession(t *testing.T) *RenderSessionHandle {
-	t.Helper()
-
-	mapState, err := handle.New(nativeMap(0x0200_0000_0000_002a), "MapHandle")
-	if err != nil {
-		t.Fatal(err)
-	}
-	m := &MapHandle{state: mapState}
-	session, err := newRenderSessionHandle(m, nativeRenderSession(0x0400_0000_0000_002a))
-	if err != nil {
-		t.Fatalf("newRenderSessionHandle(): %v", err)
-	}
-	session.frame = true
-
-	oldDestroyMap := destroyMapHandle
-	oldDestroySession := destroyRenderSessionHandle
-	destroyMapHandle = func(nativeMap) int32 { return 0 }
-	destroyRenderSessionHandle = func(nativeRenderSession) int32 { return 0 }
-	t.Cleanup(func() {
-		session.frame = false
-		if err := session.Close(); err != nil {
-			t.Errorf("RenderSession Close(): %v", err)
-		}
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		destroyMapHandle = oldDestroyMap
-		destroyRenderSessionHandle = oldDestroySession
-	})
-
-	return session
-}
-
-// activeFrameTestExtent is a valid extent, so the active-frame guard is what
-// rejects each operation rather than descriptor validation ahead of it.
-var activeFrameTestExtent = RenderTargetExtent{Width: 1, Height: 1, ScaleFactor: 1}
-
-func TestRenderSessionOperationsRejectActiveFrame(t *testing.T) {
-	session := newActiveFrameTestSession(t)
-
-	for _, tt := range []struct {
-		name string
-		call func() error
+// The binding validates a render target extent before it reaches native, so a
+// scale factor that cannot describe a device-pixel size is rejected without a
+// backend.
+func TestRenderTargetExtentRejectsUnusableScaleFactors(t *testing.T) {
+	for _, testCase := range []struct {
+		name        string
+		scaleFactor float64
 	}{
-		{name: "Resize", call: func() error { return session.Resize(RenderTargetExtent{Width: 1, Height: 1, ScaleFactor: 1}) }},
-		{name: "SetMetalSurfaceTarget", call: func() error {
-			return session.SetMetalSurfaceTarget(MetalSurfaceDescriptor{Extent: activeFrameTestExtent})
-		}},
-		{name: "SetVulkanSurfaceTarget", call: func() error {
-			return session.SetVulkanSurfaceTarget(VulkanSurfaceDescriptor{Extent: activeFrameTestExtent})
-		}},
-		{name: "SetOpenGLSurfaceTarget", call: func() error {
-			return session.SetOpenGLSurfaceTarget(OpenGLSurfaceDescriptor{
-				Extent:  activeFrameTestExtent,
-				Context: OpenGLContextDescriptor{EGL: &EGLContextDescriptor{}},
-			})
-		}},
-		{name: "SetMetalBorrowedTextureTarget", call: func() error {
-			return session.SetMetalBorrowedTextureTarget(MetalBorrowedTextureDescriptor{
-				Extent:         activeFrameTestExtent,
-				PhysicalWidth:  1,
-				PhysicalHeight: 1,
-			})
-		}},
-		{name: "SetVulkanBorrowedTextureTarget", call: func() error {
-			return session.SetVulkanBorrowedTextureTarget(VulkanBorrowedTextureDescriptor{
-				Extent:         activeFrameTestExtent,
-				PhysicalWidth:  1,
-				PhysicalHeight: 1,
-			})
-		}},
-		{name: "SetOpenGLBorrowedTextureTarget", call: func() error {
-			return session.SetOpenGLBorrowedTextureTarget(OpenGLBorrowedTextureDescriptor{
-				Extent:         activeFrameTestExtent,
-				PhysicalWidth:  1,
-				PhysicalHeight: 1,
-				Context:        OpenGLContextDescriptor{EGL: &EGLContextDescriptor{}},
-			})
-		}},
-		{name: "RenderUpdate", call: func() error {
-			_, err := session.RenderUpdate()
-			return err
-		}},
-		{name: "Detach", call: session.Detach},
-		{name: "ReduceMemoryUse", call: session.ReduceMemoryUse},
-		{name: "ClearData", call: session.ClearData},
-		{name: "DumpDebugLogs", call: session.DumpDebugLogs},
-		{name: "ReadPremultipliedRGBA8", call: func() error {
-			_, _, err := session.ReadPremultipliedRGBA8()
-			return err
-		}},
-		{name: "ReadPremultipliedRGBA8Into", call: func() error {
-			_, err := session.ReadPremultipliedRGBA8Into(make([]byte, 4))
-			return err
-		}},
-		{name: "Close", call: session.Close},
+		{name: "zero", scaleFactor: 0},
+		{name: "negative", scaleFactor: -1},
+		{name: "not a number", scaleFactor: math.NaN()},
+		{name: "infinite", scaleFactor: math.Inf(1)},
 	} {
-		if err := tt.call(); !errors.Is(err, ErrInvalidState) {
-			t.Fatalf("%s() error = %v, want ErrInvalidState", tt.name, err)
+		t.Run(testCase.name, func(t *testing.T) {
+			extent := RenderTargetExtent{Width: 64, Height: 32, ScaleFactor: testCase.scaleFactor}
+			if err := extent.validate(); !errors.Is(err, ErrInvalidArgument) {
+				t.Fatalf("validate() error = %v, want ErrInvalidArgument", err)
+			}
+			if _, _, err := extent.PhysicalSize(); err == nil {
+				t.Fatal("PhysicalSize() accepted an unusable scale factor")
+			}
+		})
+	}
+
+	extent := RenderTargetExtent{Width: 64, Height: 32, ScaleFactor: 2}
+	if err := extent.validate(); err != nil {
+		t.Fatalf("validate() on a usable extent: %v", err)
+	}
+	width, height, err := extent.PhysicalSize()
+	if err != nil || width != 128 || height != 64 {
+		t.Fatalf("PhysicalSize() = (%d, %d, %v), want 128, 64", width, height, err)
+	}
+}
+
+// An OpenGL context descriptor names exactly one platform, because the session
+// takes its context from that platform's provider data.
+func TestOpenGLContextDescriptorNamesExactlyOnePlatform(t *testing.T) {
+	wgl := &WGLContextDescriptor{DeviceContext: NativePointer(0x10)}
+	egl := &EGLContextDescriptor{Display: NativePointer(0x20)}
+
+	for _, testCase := range []struct {
+		name    string
+		context OpenGLContextDescriptor
+		wantErr bool
+	}{
+		{name: "empty", context: OpenGLContextDescriptor{}, wantErr: true},
+		{name: "two platforms", context: OpenGLContextDescriptor{WGL: wgl, EGL: egl}, wantErr: true},
+		{name: "wgl", context: OpenGLContextDescriptor{WGL: wgl}},
+		{name: "egl", context: OpenGLContextDescriptor{EGL: egl}},
+		{name: "webgl", context: OpenGLContextDescriptor{WebGL: &WebGLContextDescriptor{}}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := testCase.context.validate()
+			if testCase.wantErr && !errors.Is(err, ErrInvalidArgument) {
+				t.Fatalf("validate() error = %v, want ErrInvalidArgument", err)
+			}
+			if !testCase.wantErr && err != nil {
+				t.Fatalf("validate() error = %v, want nil", err)
+			}
+		})
+	}
+}
+
+// Every attach entry point validates its descriptor before it submits, so a
+// bad extent is rejected on any platform and against any backend.
+func TestRenderAttachRejectsAnUnusableExtent(t *testing.T) {
+	_, m := newRuntimeAndMap(t, nil)
+
+	bad := RenderTargetExtent{Width: 64, Height: 32, ScaleFactor: 0}
+	options := NewRenderSessionAttachOptions()
+	attaches := map[string]func() (*RenderSessionHandle, *Future[struct{}], error){
+		"metal surface": func() (*RenderSessionHandle, *Future[struct{}], error) {
+			return m.AttachMetalSurface(MetalSurfaceDescriptor{Extent: bad}, options)
+		},
+		"vulkan surface": func() (*RenderSessionHandle, *Future[struct{}], error) {
+			return m.AttachVulkanSurface(VulkanSurfaceDescriptor{Extent: bad}, options)
+		},
+		"opengl surface": func() (*RenderSessionHandle, *Future[struct{}], error) {
+			return m.AttachOpenGLSurface(OpenGLSurfaceDescriptor{
+				Extent:  bad,
+				Context: OpenGLContextDescriptor{EGL: &EGLContextDescriptor{}},
+			}, options)
+		},
+		"webgpu surface": func() (*RenderSessionHandle, *Future[struct{}], error) {
+			return m.AttachWebGPUSurface(WebGPUSurfaceDescriptor{Extent: bad}, options)
+		},
+		"metal owned texture": func() (*RenderSessionHandle, *Future[struct{}], error) {
+			return m.AttachMetalOwnedTexture(MetalOwnedTextureDescriptor{Extent: bad}, options)
+		},
+		"metal borrowed texture": func() (*RenderSessionHandle, *Future[struct{}], error) {
+			return m.AttachMetalBorrowedTexture(MetalBorrowedTextureDescriptor{Extent: bad}, options)
+		},
+		"vulkan owned texture": func() (*RenderSessionHandle, *Future[struct{}], error) {
+			return m.AttachVulkanOwnedTexture(VulkanOwnedTextureDescriptor{Extent: bad}, options)
+		},
+		"vulkan borrowed texture": func() (*RenderSessionHandle, *Future[struct{}], error) {
+			return m.AttachVulkanBorrowedTexture(VulkanBorrowedTextureDescriptor{Extent: bad}, options)
+		},
+		"opengl owned texture": func() (*RenderSessionHandle, *Future[struct{}], error) {
+			return m.AttachOpenGLOwnedTexture(OpenGLOwnedTextureDescriptor{
+				Extent:  bad,
+				Context: OpenGLContextDescriptor{EGL: &EGLContextDescriptor{}},
+			}, options)
+		},
+		"opengl borrowed texture": func() (*RenderSessionHandle, *Future[struct{}], error) {
+			return m.AttachOpenGLBorrowedTexture(OpenGLBorrowedTextureDescriptor{
+				Extent:  bad,
+				Context: OpenGLContextDescriptor{EGL: &EGLContextDescriptor{}},
+			}, options)
+		},
+		"webgpu owned texture": func() (*RenderSessionHandle, *Future[struct{}], error) {
+			return m.AttachWebGPUOwnedTexture(WebGPUOwnedTextureDescriptor{Extent: bad}, options)
+		},
+		"webgpu borrowed texture": func() (*RenderSessionHandle, *Future[struct{}], error) {
+			return m.AttachWebGPUBorrowedTexture(WebGPUBorrowedTextureDescriptor{Extent: bad}, options)
+		},
+	}
+	for name, attach := range attaches {
+		t.Run(name, func(t *testing.T) {
+			session, completion, err := attach()
+			if !errors.Is(err, ErrInvalidArgument) {
+				t.Fatalf("attach error = %v, want ErrInvalidArgument", err)
+			}
+			if session != nil || completion != nil {
+				t.Fatalf("rejected attach published session %v and completion %v", session, completion)
+			}
+		})
+	}
+}
+
+// An OpenGL attach that names no platform is rejected the same way, so the
+// context descriptor never reaches native half-filled.
+func TestOpenGLRenderAttachRejectsAnAmbiguousContext(t *testing.T) {
+	_, m := newRuntimeAndMap(t, nil)
+
+	extent := RenderTargetExtent{Width: 64, Height: 32, ScaleFactor: 1}
+	options := NewRenderSessionAttachOptions()
+	if _, _, err := m.AttachOpenGLSurface(OpenGLSurfaceDescriptor{Extent: extent}, options); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AttachOpenGLSurface(no platform) error = %v, want ErrInvalidArgument", err)
+	}
+	ambiguous := OpenGLContextDescriptor{
+		WGL: &WGLContextDescriptor{},
+		EGL: &EGLContextDescriptor{},
+	}
+	if _, _, err := m.AttachOpenGLOwnedTexture(
+		OpenGLOwnedTextureDescriptor{Extent: extent, Context: ambiguous}, options,
+	); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AttachOpenGLOwnedTexture(two platforms) error = %v, want ErrInvalidArgument", err)
+	}
+}
+
+// Every render-session entry point rejects a handle that owns no session,
+// rather than passing the null handle to native.
+func TestRenderSessionHandleGuardsAHandleWithoutASession(t *testing.T) {
+	extent := RenderTargetExtent{Width: 64, Height: 32, ScaleFactor: 1}
+	for _, session := range []*RenderSessionHandle{nil, {}} {
+		if _, err := session.Capabilities(); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("Capabilities() error = %v, want ErrInvalidArgument", err)
+		}
+		if _, err := session.Snapshot(); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("Snapshot() error = %v, want ErrInvalidArgument", err)
+		}
+		if err := session.RequestFrame(NewFrameDemand()); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("RequestFrame() error = %v, want ErrInvalidArgument", err)
+		}
+		if _, err := session.DrainFrameResults(); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("DrainFrameResults() error = %v, want ErrInvalidArgument", err)
+		}
+		if _, err := session.AcquireFrame(); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("AcquireFrame() error = %v, want ErrInvalidArgument", err)
+		}
+		if _, err := session.ServiceDriverWork(1); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("ServiceDriverWork() error = %v, want ErrInvalidArgument", err)
+		}
+		if _, err := session.Resize(extent); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("Resize() error = %v, want ErrInvalidArgument", err)
+		}
+		if _, err := session.Barrier(); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("Barrier() error = %v, want ErrInvalidArgument", err)
+		}
+		if _, err := session.Detach(); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("Detach() error = %v, want ErrInvalidArgument", err)
+		}
+		if _, err := session.ReadPremultipliedRGBA8(); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("ReadPremultipliedRGBA8() error = %v, want ErrInvalidArgument", err)
+		}
+		if _, err := session.QueryRenderedFeatures(RenderedQueryPoint(ScreenPoint{}), nil); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("QueryRenderedFeatures() error = %v, want ErrInvalidArgument", err)
+		}
+		if _, err := session.Abandon(); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("Abandon() error = %v, want ErrInvalidArgument", err)
+		}
+		if err := session.Close(); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("Close() error = %v, want ErrInvalidArgument", err)
+		}
+	}
+}
+
+// Reading a frame that leases no ring slot reports an argument error for every
+// backend accessor, so a released or unset frame never reaches native.
+func TestAcquiredFrameGuardsAFrameWithoutALease(t *testing.T) {
+	for _, frame := range []*AcquiredFrame{nil, {}} {
+		if _, err := frame.Result(); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("Result() error = %v, want ErrInvalidArgument", err)
+		}
+		if _, err := frame.ProducerSync(); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("ProducerSync() error = %v, want ErrInvalidArgument", err)
+		}
+		if _, err := frame.MetalTexture(); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("MetalTexture() error = %v, want ErrInvalidArgument", err)
+		}
+		if _, err := frame.VulkanTexture(); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("VulkanTexture() error = %v, want ErrInvalidArgument", err)
+		}
+		if _, err := frame.OpenGLTexture(); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("OpenGLTexture() error = %v, want ErrInvalidArgument", err)
+		}
+		if _, err := frame.WebGPUTexture(); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("WebGPUTexture() error = %v, want ErrInvalidArgument", err)
+		}
+		if err := frame.Release(GPUSync{Kind: GPUSyncCPUComplete}); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("Release() error = %v, want ErrInvalidArgument", err)
 		}
 	}
 }

@@ -42,7 +42,7 @@ static uint32_t forward_to_host(
 mln_status capture_logs(void) {
   // #region install
   // The process-global callback remains valid for every runtime's lifetime.
-  return mln_log_set_callback(forward_to_host, NULL);
+  return mln_log_set_callback(forward_to_host, NULL, NULL);
   // #endregion install
 }
 

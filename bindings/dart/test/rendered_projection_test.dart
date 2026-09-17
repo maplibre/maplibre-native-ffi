@@ -8,7 +8,7 @@ import 'package:test/test.dart';
 void main() {
   test(
     'projection captures rendered camera and outlives session',
-    () {
+    () async {
       final metal = DynamicLibrary.open(
         '/System/Library/Frameworks/Metal.framework/Metal',
       );
@@ -26,28 +26,38 @@ void main() {
       addTearDown(() => release(device));
       final runtime = RuntimeHandle.create();
       addTearDown(runtime.close);
-      final map = runtime.createMap(
+      final map = await runtime.createMap(
         options: const MapOptions(width: 128, height: 64),
       );
       addTearDown(map.close);
-      final session = map.attachRef().attachMetalOwnedTexture(
+      final attachment = map.attachMetalOwnedTexture(
         MetalOwnedTextureDescriptor(
           extent: const RenderTargetExtent(width: 128, height: 64),
           context: MetalContextDescriptor(
             device: NativePointer(device.address),
           ),
         ),
+        options: const RenderSessionAttachOptions(
+          driver: RenderDriver.coreWorker,
+        ),
       );
-      addTearDown(session.close);
+      final session = attachment.session;
+      addTearDown(() {
+        if (!session.isClosed) {
+          session.abandon();
+          session.close();
+        }
+      });
+      await attachment.completed;
       expect(session.createProjection, throwsA(isA<InvalidStateException>()));
-      map.setStyleJson(
+      await map.setStyleJson(
         Uint8List.fromList(
           utf8.encode('{"version":8,"sources":{},"layers":[]}'),
         ),
       );
-      runtime.pump();
+      await runtime.barrier();
       const coordinate = LatLng(37.78, -122.41);
-      map.jumpTo(
+      await map.updateCamera(
         const CameraOptions(
           center: LatLng(37.7749, -122.4194),
           zoom: 12,
@@ -55,19 +65,26 @@ void main() {
           pitch: 40,
         ),
       );
-      runtime.pump();
-      final expected = map.pixelForLatLng(coordinate);
-      expect(session.renderUpdate().result, RenderResult.rendered);
-      map.jumpTo(const CameraOptions(center: LatLng(37.80, -122.45)));
-      runtime.pump();
+      await runtime.barrier();
+      final expected = await map.pixelForLatLng(coordinate);
+      session.requestFrame(const FrameDemand(renderIfNeeded: false, token: 1));
+      await session.barrier();
+      expect(
+        session.drainFrameResults().single.disposition,
+        RenderResult.rendered,
+      );
+      await map.updateCamera(
+        const CameraOptions(center: LatLng(37.80, -122.45)),
+      );
+      await runtime.barrier();
       final projection = session.createProjection();
       addTearDown(projection.close);
       _expectPoint(expected, projection.pixelForLatLng(coordinate));
       expect(
-        (map.pixelForLatLng(coordinate).x - expected.x).abs(),
+        ((await map.pixelForLatLng(coordinate)).x - expected.x).abs(),
         greaterThan(1),
       );
-      final frame = session.acquireMetalTextureFrame();
+      final frame = session.acquireFrame()!;
       try {
         final captured = session.createProjection();
         try {
@@ -76,24 +93,30 @@ void main() {
           captured.close();
         }
       } finally {
-        frame.close();
+        frame.release();
       }
-      session.resize(96, 48, scaleFactor: 2);
+      await session.resize(const RenderTargetExtent(width: 96, height: 48));
       expect(session.createProjection, throwsA(isA<InvalidStateException>()));
-      runtime.pump();
-      expect(session.renderUpdate().result, RenderResult.rendered);
+      await runtime.barrier();
+      session.requestFrame(const FrameDemand(renderIfNeeded: false, token: 1));
+      await session.barrier();
+      expect(
+        session.drainFrameResults().single.disposition,
+        RenderResult.rendered,
+      );
       final resized = session.createProjection();
       try {
         _expectPoint(
-          map.pixelForLatLng(coordinate),
+          await map.pixelForLatLng(coordinate),
           resized.pixelForLatLng(coordinate),
         );
       } finally {
         resized.close();
       }
+      await session.detach();
       session.close();
-      map.close();
-      runtime.close();
+      await map.close();
+      await runtime.close();
       _expectPoint(expected, projection.pixelForLatLng(coordinate));
     },
     skip: Maplibre.supportedRenderBackends().contains(RenderBackendMask.metal)

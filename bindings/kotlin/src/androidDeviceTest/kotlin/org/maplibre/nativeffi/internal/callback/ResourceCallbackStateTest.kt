@@ -16,10 +16,11 @@ import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceProviderDecision
 import org.maplibre.nativeffi.resource.ResourceRequest
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class ResourceCallbackStateTest {
   @Test
-  fun providerCopiesResourceRequestAndUnknownRawEnums() {
+  fun providerCopiesResourceRequestAndUnknownRawEnums(): Unit = runSuspendTest {
     var copied: ResourceRequest? = null
     ResourceProviderState(
         ResourceProviderCallback { request, _ ->
@@ -39,7 +40,7 @@ class ResourceCallbackStateTest {
   }
 
   @Test
-  fun providerClosureDuringAndConcurrentWithCallbacksRejectsLaterEntry() {
+  fun providerClosureDuringAndConcurrentWithCallbacksRejectsLaterEntry(): Unit = runSuspendTest {
     lateinit var reentrant: ResourceProviderState
     reentrant =
       ResourceProviderState(
@@ -81,26 +82,27 @@ class ResourceCallbackStateTest {
   }
 
   @Test
-  fun resourceTransformCopiesUnknownKindsContainsFailuresAndClosesDuringCallback() {
-    var copiedKind: ResourceKind? = null
-    lateinit var state: ResourceTransformState
-    state =
-      ResourceTransformState(
-        ResourceTransformCallback { request ->
-          copiedKind = request.kind
-          state.close()
-          throw IllegalStateException("contained")
+  fun resourceTransformCopiesUnknownKindsContainsFailuresAndClosesDuringCallback(): Unit =
+    runSuspendTest {
+      var copiedKind: ResourceKind? = null
+      lateinit var state: ResourceTransformState
+      state =
+        ResourceTransformState(
+          ResourceTransformCallback { request ->
+            copiedKind = request.kind
+            state.close()
+            throw IllegalStateException("contained")
+          }
+        )
+      JavaCppSupport.cString("https://example.com/style.json").use { url ->
+        MaplibreNativeC.mln_resource_transform_response().use { response ->
+          assertEquals(MaplibreStatus.NATIVE_ERROR.nativeCode, state.invoke(991, url, response))
+          assertEquals(991, copiedKind?.nativeValue)
+          assertTrue(state.isClosedForTesting())
+          assertEquals(MaplibreStatus.INVALID_ARGUMENT.nativeCode, state.invoke(991, url, response))
         }
-      )
-    JavaCppSupport.cString("https://example.com/style.json").use { url ->
-      MaplibreNativeC.mln_resource_transform_response().use { response ->
-        assertEquals(MaplibreStatus.NATIVE_ERROR.nativeCode, state.invoke(991, url, response))
-        assertEquals(991, copiedKind?.nativeValue)
-        assertTrue(state.isClosedForTesting())
-        assertEquals(MaplibreStatus.INVALID_ARGUMENT.nativeCode, state.invoke(991, url, response))
       }
     }
-  }
 
   @Test
   fun elevenLiveCallbackStatesKeepNonNullThunksAndDispatchByUserData() {

@@ -16,10 +16,6 @@
 #include <utility>
 #include <vector>
 
-#include <emscripten.h>
-#include <emscripten/fetch.h>
-#include <emscripten/proxying.h>
-#include <emscripten/threading.h>
 #include <mln/storage/http_file_source.hpp>
 #include <mln/storage/resource.hpp>
 #include <mln/storage/resource_options.hpp>
@@ -31,6 +27,11 @@
 #include <mln/util/http_header.hpp>
 #include <mln/util/string.hpp>
 #include <mln/util/util.hpp>
+
+#include <emscripten.h>
+#include <emscripten/fetch.h>
+#include <emscripten/proxying.h>
+#include <emscripten/threading.h>
 #include <pthread.h>
 
 #include "../offline_url.hpp"
@@ -645,8 +646,8 @@ void FetchRequestState::cancel() {
     }
     canceled_ = true;
     // Dropping the task also removes any delivery it already queued from the
-    // run loop, so a response cannot sit in the wasm heap awaiting a pump that
-    // will never come.
+    // run loop, so a response cannot remain in the wasm heap after
+    // cancellation.
     callback_ = nullptr;
     delivery = std::move(delivery_);
     if (transport_ == Transport::Callback) {

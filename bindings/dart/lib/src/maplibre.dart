@@ -13,48 +13,78 @@ import 'log/log.dart';
 import 'render/targets.dart';
 
 final class _LogCallbackState extends RetainedCallbackState {
-  _LogCallbackState(LogCallback callback, {required bool consume}) {
-    listener =
-        NativeCallable<raw.mln_adapter_log_record_listenerFunction>.listener((
-          Pointer<Void> record,
-        ) {
-          if (record == nullptr) {
-            close();
-            return;
-          }
-          final ran = runUpcall(() {
-            try {
-              final copied = record.cast<raw.mln_adapter_log_record>().ref;
-              if (copied.retire_callback) {
-                close();
-                return;
-              }
-              try {
-                callback(_copyLogRecord(copied));
-              } catch (_) {
-                // An exception must not escape into native callback delivery.
-              }
-            } finally {
-              Maplibre._c.adapterLogRecordDestroy(record);
-            }
-          });
-          if (!ran) {
-            Maplibre._c.adapterLogRecordDestroy(record);
-          }
-        });
+  _LogCallbackState(LogCallback callback, {required bool consume})
+    : _callback = callback {
+    listener = NativeCallable<raw.mln_wake_callbackFunction>.listener((
+      Pointer<Void> _,
+    ) {
+      runUpcall(_drain);
+    });
+    final outQueue = calloc<Uint64>();
+    final wake = calloc<raw.mln_wake>();
+    try {
+      wake.ref.size = sizeOf<raw.mln_wake>();
+      wake.ref.callback = listener.nativeFunction;
+      wake.ref.user_data = nullptr;
+      wake.ref.release_user_data = nullptr;
+      Maplibre._checkStatus(raw.mln_adapter_log_queue_create(wake, outQueue));
+      queue = outQueue.value;
+    } catch (_) {
+      listener.close();
+      rethrow;
+    } finally {
+      calloc.free(wake);
+      calloc.free(outQueue);
+    }
     pointer = calloc<raw.mln_adapter_log_callback_state>();
-    pointer.ref.listener = listener.nativeFunction;
+    pointer.ref.queue = queue;
     pointer.ref.consume = consume ? 1 : 0;
+    releaseListener =
+        NativeCallable<raw.mln_log_callback_releaseFunction>.listener((
+          Pointer<Void> context,
+        ) {
+          Maplibre._releaseLogCallbackState(context);
+        });
+    pointer.ref.release_user_data = releaseListener.nativeFunction;
+    pointer.ref.release_context = pointer.cast<Void>();
   }
 
+  final LogCallback _callback;
   late final Pointer<raw.mln_adapter_log_callback_state> pointer;
-  late final NativeCallable<raw.mln_adapter_log_record_listenerFunction>
-  listener;
+  late final NativeCallable<raw.mln_wake_callbackFunction> listener;
+  late final NativeCallable<raw.mln_log_callback_releaseFunction>
+  releaseListener;
+  late final int queue;
+
+  void _drain() {
+    withNativeArena((arena) {
+      final outRecord = arena<Pointer<raw.mln_adapter_log_record>>();
+      while (true) {
+        outRecord.value = nullptr;
+        Maplibre._checkStatus(
+          raw.mln_adapter_log_queue_acquire(queue, outRecord),
+        );
+        final record = outRecord.value;
+        if (record == nullptr) {
+          return;
+        }
+        try {
+          _callback(_copyLogRecord(record.ref));
+        } catch (_) {
+          // An exception must not escape into notification delivery.
+        } finally {
+          raw.mln_adapter_log_record_destroy(record.cast<Void>());
+        }
+      }
+    });
+  }
 
   @override
   void closeResources() {
+    raw.mln_adapter_log_queue_close(queue);
     calloc.free(pointer);
     listener.close();
+    releaseListener.close();
   }
 }
 
@@ -79,9 +109,19 @@ Pointer<raw.mln_adapter_log_callback_state> logCallbackStateForTesting() =>
 final class Maplibre {
   Maplibre._();
 
-  static final MaplibreNativeCApi _c = MaplibreNativeCApi.open();
-  // Retains the Dart listener while native code owns its callback pointer.
+  static final _logCallbackRoots = <int, _LogCallbackState>{};
   static _LogCallbackState? _logCallbackState;
+
+  static void _releaseLogCallbackState(Pointer<Void> context) {
+    final state = _logCallbackRoots.remove(context.address);
+    if (state == null) {
+      return;
+    }
+    if (identical(_logCallbackState, state)) {
+      _logCallbackState = null;
+    }
+    state.close();
+  }
 
   /// Returns the native C ABI contract version.
   ///
@@ -125,10 +165,12 @@ final class Maplibre {
     // native callback would still point at.
     ensureAbiVersion();
     final state = _LogCallbackState(callback, consume: consume);
+    _logCallbackRoots[state.pointer.address] = state;
     try {
       _checkStatus(raw.mln_adapter_log_set_callback(state.pointer));
       _logCallbackState = state;
     } catch (_) {
+      _logCallbackRoots.remove(state.pointer.address);
       state.close();
       rethrow;
     }
@@ -184,7 +226,7 @@ final class Maplibre {
 
   static void _checkStatus(int status) {
     ensureAbiVersion();
-    checkNativeStatus(status, _c.threadLastErrorMessage);
+    checkNativeStatus(status, threadLastErrorMessage);
   }
 }
 

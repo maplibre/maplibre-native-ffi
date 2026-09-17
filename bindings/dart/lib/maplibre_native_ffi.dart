@@ -19,6 +19,6 @@ export 'src/runtime/runtime.dart'
         CustomMvtVectorCallbackLifecycleProbe,
         customMvtVectorCallbackProbeForTesting,
         decodeRuntimeEventBatchForTesting,
-        mapAttachRefIdForTesting,
+        mapHandleIdForTesting,
         runtimeHandleIdForTesting;
 export 'src/style/style.dart';

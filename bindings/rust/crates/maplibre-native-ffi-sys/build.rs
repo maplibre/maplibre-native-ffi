@@ -33,6 +33,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("cargo:rustc-link-search=native={}", aliases.display());
     }
     println!("cargo:rustc-link-search=native={}", link_dir.display());
+    if target_os == "macos" {
+        // ld64 resolves a library name to the shared library when both forms
+        // sit in one directory, so this crate's own test binary needs that
+        // directory on its run-time search path. The argument reaches only
+        // this package's own targets, not the crates that depend on it.
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{}", link_dir.display());
+    }
     print_rerun_if_changed(&link_dir);
     let descriptor_path = install_dir.join("share/maplibre-native-c/artifact.json");
     println!("cargo:rerun-if-changed={}", descriptor_path.display());
@@ -67,7 +74,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .header(header.display().to_string())
         .clang_arg("-xc")
         .clang_arg("-std=c23")
-        .clang_arg(format!("-I{}", include_dir.display()));
+        .clang_arg(format!("-I{}", include_dir.display()))
+        .prepend_enum_name(false);
 
     // Cross-build frontends such as cibuildwheel expose the NDK compiler but
     // do not know bindgen's target-specific environment variable. Derive the
@@ -113,11 +121,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Every C handle is the same uint64_t; a transparent newtype per handle
         // keeps a map from being passed where a runtime is expected.
         .new_type_alias(concat!(
-            "^mln_(buffer|runtime|map|map_projection|render_session|wake_source",
+            "^mln_(buffer|runtime|map|map_projection|render_session",
+            "|event_batch|render_frame_batch|acquired_frame",
             "|resource_request_handle|geojson_source_data|offline_region_snapshot",
             "|offline_region_list|style_id_list|style_string_list|queried_feature_list)$"
         ))
-        .prepend_enum_name(false)
         .layout_tests(true)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .generate()?;

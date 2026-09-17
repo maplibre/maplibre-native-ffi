@@ -250,11 +250,13 @@ pub type ResourceProviderCallbackFn = unsafe extern "C" fn(
 pub fn resource_provider_descriptor(
     callback: Option<ResourceProviderCallbackFn>,
     user_data: *mut c_void,
+    release_user_data: sys::mln_runtime_callback_release,
 ) -> sys::mln_resource_provider {
     sys::mln_resource_provider {
         size: std::mem::size_of::<sys::mln_resource_provider>() as u32,
         callback,
         user_data,
+        release_user_data,
     }
 }
 
@@ -268,11 +270,13 @@ pub type ResourceTransformCallbackFn = unsafe extern "C" fn(
 pub fn resource_transform_descriptor(
     callback: Option<ResourceTransformCallbackFn>,
     user_data: *mut c_void,
+    release_user_data: sys::mln_runtime_callback_release,
 ) -> sys::mln_resource_transform {
     sys::mln_resource_transform {
         size: std::mem::size_of::<sys::mln_resource_transform>() as u32,
         callback,
         user_data,
+        release_user_data,
     }
 }
 
@@ -286,11 +290,13 @@ pub type HttpHeaderTransformCallbackFn = unsafe extern "C" fn(
 pub fn http_header_transform_descriptor(
     callback: Option<HttpHeaderTransformCallbackFn>,
     user_data: *mut c_void,
+    release_user_data: sys::mln_runtime_callback_release,
 ) -> sys::mln_http_header_transform {
     sys::mln_http_header_transform {
         size: std::mem::size_of::<sys::mln_http_header_transform>() as u32,
         callback,
         user_data,
+        release_user_data,
     }
 }
 
@@ -342,6 +348,11 @@ pub fn status_for_error(error: &Error) -> sys::mln_status {
         ErrorKind::InvalidState => sys::MLN_STATUS_INVALID_STATE,
         ErrorKind::WrongThread => sys::MLN_STATUS_WRONG_THREAD,
         ErrorKind::Unsupported => sys::MLN_STATUS_UNSUPPORTED,
+        ErrorKind::Cancelled => sys::MLN_STATUS_CANCELLED,
+        ErrorKind::Busy => sys::MLN_STATUS_BUSY,
+        ErrorKind::TargetLost => sys::MLN_STATUS_TARGET_LOST,
+        ErrorKind::NotReady => sys::MLN_STATUS_NOT_READY,
+        ErrorKind::NotFound => sys::MLN_STATUS_NOT_FOUND,
         ErrorKind::NativeError | ErrorKind::AbiVersionMismatch | ErrorKind::UnknownStatus => {
             sys::MLN_STATUS_NATIVE_ERROR
         }

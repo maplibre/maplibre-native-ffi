@@ -1,9 +1,8 @@
-const builtin = @import("builtin");
 const c = @import("c.zig").raw;
+const completion = @import("completion.zig");
 const diagnostics = @import("diagnostics.zig");
 const logging = @import("logging.zig");
 const map = @import("map.zig");
-const native_temp = @import("native_temp.zig");
 const projection = @import("projection.zig");
 const render = @import("render.zig");
 const runtime = @import("runtime.zig");
@@ -15,16 +14,14 @@ pub const DiagnosticStore = diagnostics.DiagnosticStore;
 pub const NativeStatusError = status.NativeStatusError;
 pub const BindingError = status.BindingError;
 pub const Error = status.Error;
+pub const Future = completion.Future;
+pub const CommandCompletion = completion.CommandCompletion;
 
 pub const RuntimeHandle = runtime.RuntimeHandle;
 pub const RuntimeOptions = runtime.RuntimeOptions;
 pub const NetworkStatus = runtime.NetworkStatus;
 pub const AmbientCacheOperation = runtime.AmbientCacheOperation;
 pub const OfflineRegionId = runtime.OfflineRegionId;
-pub const OfflineOperationId = runtime.OfflineOperationId;
-pub const OfflineOperationKind = runtime.OfflineOperationKind;
-pub const OfflineOperationResultKind = runtime.OfflineOperationResultKind;
-pub const OfflineOperationHandle = runtime.OfflineOperationHandle;
 pub const OfflineTilePyramidRegionDefinition = runtime.OfflineTilePyramidRegionDefinition;
 pub const OfflineGeometryRegionDefinition = runtime.OfflineGeometryRegionDefinition;
 pub const OfflineRegionDefinition = runtime.OfflineRegionDefinition;
@@ -56,7 +53,6 @@ pub const ResourceProvider = runtime.ResourceProvider;
 pub const ResourceRequestHandle = runtime.ResourceRequestHandle;
 pub const ResourceRequestCancelHandler = runtime.ResourceRequestCancelHandler;
 pub const ResourceRequestCancelCallback = runtime.ResourceRequestCancelCallback;
-pub const WakeSourceHandle = runtime.WakeSourceHandle;
 pub const EventBatch = runtime.EventBatch;
 pub const RuntimeEvent = runtime.RuntimeEvent;
 pub const RuntimeEventPayload = runtime.RuntimeEventPayload;
@@ -65,8 +61,10 @@ pub const RuntimeEventType = runtime.RuntimeEventType;
 pub const RuntimeEventSourceType = runtime.RuntimeEventSourceType;
 pub const RuntimeEventSourceId = runtime.RuntimeEventSourceId;
 pub const RuntimeEventPayloadType = runtime.RuntimeEventPayloadType;
+pub const WakeCallback = runtime.WakeCallback;
 pub const CameraChangeMode = runtime.CameraChangeMode;
 pub const CameraTransitionFinishedPayload = runtime.CameraTransitionFinishedPayload;
+pub const CommandDisposition = completion.CommandDisposition;
 pub const RenderMode = runtime.RenderMode;
 pub const RenderingStats = runtime.RenderingStats;
 pub const RenderFramePayload = runtime.RenderFramePayload;
@@ -80,7 +78,6 @@ pub const OfflineRegionStatusPayload = runtime.OfflineRegionStatusPayload;
 pub const ResourceErrorReason = runtime.ResourceErrorReason;
 pub const OfflineRegionResponseErrorPayload = runtime.OfflineRegionResponseErrorPayload;
 pub const OfflineRegionTileCountLimitPayload = runtime.OfflineRegionTileCountLimitPayload;
-pub const OfflineOperationCompletedPayload = runtime.OfflineOperationCompletedPayload;
 pub const UnknownPayload = runtime.UnknownPayload;
 
 pub const LogSeverity = logging.LogSeverity;
@@ -91,28 +88,46 @@ pub const LogHandler = logging.LogHandler;
 pub const LogCallback = logging.LogCallback;
 
 pub const NativePointer = render.NativePointer;
+pub const RenderDriver = render.RenderDriver;
+pub const RenderSessionAttachOptions = render.RenderSessionAttachOptions;
+pub const RenderSessionAttachment = render.RenderSessionAttachment;
 pub const VulkanHandle = render.VulkanHandle;
 pub const RenderResult = render.RenderResult;
-pub const RenderUpdate = render.RenderUpdate;
+pub const FrameDemand = render.FrameDemand;
+pub const FrameResult = render.FrameResult;
+pub const RenderSessionCapabilities = render.RenderSessionCapabilities;
+pub const RenderSessionSnapshot = render.RenderSessionSnapshot;
+pub const RenderSessionLifecycle = render.RenderSessionLifecycle;
+pub const GpuSync = render.GpuSync;
+pub const AbandonResult = render.AbandonResult;
+pub const RenderFrameBatch = render.RenderFrameBatch;
+pub const AbandonDisposition = render.AbandonDisposition;
+pub const AcquiredFrame = render.AcquiredFrame;
+pub const OwnedReadback = render.OwnedReadback;
 pub const RenderBackendSupport = render.RenderBackendSupport;
 pub const OpenGLContextProviderSupport = render.OpenGLContextProviderSupport;
 pub const RenderTargetExtent = render.RenderTargetExtent;
 pub const MetalContextDescriptor = render.MetalContextDescriptor;
 pub const VulkanContextDescriptor = render.VulkanContextDescriptor;
+pub const WebGPUContextDescriptor = render.WebGPUContextDescriptor;
 pub const OpenGLContextOwnership = render.OpenGLContextOwnership;
 pub const OpenGLClientApi = render.OpenGLClientApi;
 pub const WglContextDescriptor = render.WglContextDescriptor;
 pub const EglContextDescriptor = render.EglContextDescriptor;
+pub const WebGLContextDescriptor = render.WebGLContextDescriptor;
 pub const OpenGLContextDescriptor = render.OpenGLContextDescriptor;
 pub const MetalOwnedTextureDescriptor = render.MetalOwnedTextureDescriptor;
 pub const MetalBorrowedTextureDescriptor = render.MetalBorrowedTextureDescriptor;
 pub const VulkanOwnedTextureDescriptor = render.VulkanOwnedTextureDescriptor;
 pub const VulkanBorrowedTextureDescriptor = render.VulkanBorrowedTextureDescriptor;
+pub const WebGPUOwnedTextureDescriptor = render.WebGPUOwnedTextureDescriptor;
+pub const WebGPUBorrowedTextureDescriptor = render.WebGPUBorrowedTextureDescriptor;
 pub const OpenGLOwnedTextureDescriptor = render.OpenGLOwnedTextureDescriptor;
 pub const OpenGLBorrowedTextureDescriptor = render.OpenGLBorrowedTextureDescriptor;
 pub const MetalSurfaceDescriptor = render.MetalSurfaceDescriptor;
 pub const VulkanSurfaceDescriptor = render.VulkanSurfaceDescriptor;
 pub const OpenGLSurfaceDescriptor = render.OpenGLSurfaceDescriptor;
+pub const WebGPUSurfaceDescriptor = render.WebGPUSurfaceDescriptor;
 pub const TextureImageInfo = render.TextureImageInfo;
 pub const FeatureStateSelector = map.FeatureStateSelector;
 pub const ScreenBox = render.ScreenBox;
@@ -124,15 +139,22 @@ pub const QueriedFeatureList = render.QueriedFeatureList;
 pub const MetalOwnedTextureFrameInfo = render.MetalOwnedTextureFrameInfo;
 pub const VulkanOwnedTextureFrameInfo = render.VulkanOwnedTextureFrameInfo;
 pub const OpenGLOwnedTextureFrameInfo = render.OpenGLOwnedTextureFrameInfo;
+pub const WebGPUOwnedTextureFrameInfo = render.WebGPUOwnedTextureFrameInfo;
 pub const RenderSessionHandle = render.RenderSessionHandle;
-pub const MetalOwnedTextureFrameHandle = render.MetalOwnedTextureFrameHandle;
-pub const VulkanOwnedTextureFrameHandle = render.VulkanOwnedTextureFrameHandle;
-pub const OpenGLOwnedTextureFrameHandle = render.OpenGLOwnedTextureFrameHandle;
 
 pub const GeoJsonSourceDataHandle = map.GeoJsonSourceDataHandle;
 pub const MapHandle = map.MapHandle;
 pub const MapOptions = map.MapOptions;
 pub const MapMode = map.MapMode;
+pub const CameraUpdateMode = map.CameraUpdateMode;
+pub const GesturePhase = map.GesturePhase;
+pub const CameraUpdate = map.CameraUpdate;
+pub const CameraDeltaKind = map.CameraDeltaKind;
+pub const CameraDelta = map.CameraDelta;
+pub const CameraSnapshot = map.CameraSnapshot;
+pub const ScreenPointList = map.ScreenPointList;
+pub const LatLngList = map.LatLngList;
+pub const MapSnapshot = map.MapSnapshot;
 pub const CanonicalTileId = map.CanonicalTileId;
 pub const CustomGeometrySourceTileCallback = map.CustomGeometrySourceTileCallback;
 pub const CustomGeometrySourceReleaseCallback = map.CustomGeometrySourceReleaseCallback;
@@ -186,6 +208,7 @@ pub const StringList = values.StringList;
 pub const StyleSourceType = values.StyleSourceType;
 pub const StyleTileJsonInfo = values.StyleTileJsonInfo;
 pub const StyleSourceInfo = values.StyleSourceInfo;
+pub const StyleLayerInfo = map.StyleLayerInfo;
 pub const OwnedString = values.OwnedString;
 
 pub const projectedMetersForLatLng = projection.projectedMetersForLatLng;
@@ -200,6 +223,9 @@ pub const supportedOpenGLContextProviders = render.supportedOpenGLContextProvide
 pub const attachMetalOwnedTexture = render.attachMetalOwnedTexture;
 pub const attachMetalBorrowedTexture = render.attachMetalBorrowedTexture;
 pub const attachVulkanOwnedTexture = render.attachVulkanOwnedTexture;
+pub const attachWebGPUOwnedTexture = render.attachWebGPUOwnedTexture;
+pub const attachWebGPUBorrowedTexture = render.attachWebGPUBorrowedTexture;
+pub const attachWebGPUSurface = render.attachWebGPUSurface;
 pub const attachVulkanBorrowedTexture = render.attachVulkanBorrowedTexture;
 pub const attachOpenGLOwnedTexture = render.attachOpenGLOwnedTexture;
 pub const attachOpenGLBorrowedTexture = render.attachOpenGLBorrowedTexture;
@@ -216,30 +242,4 @@ pub fn cAbiVersion() u32 {
 /// by this Zig package.
 pub fn validateAbiVersion(diagnostic_store: ?*DiagnosticStore) Error!void {
     return status.validateAbiVersion(diagnostic_store);
-}
-
-comptime {
-    _ = c.MLN_STATUS_OK;
-    if (builtin.is_test) {
-        @export(&testFailNextOwnedTextureFrameWrapperAllocation, .{ .name = "mln_zig_test_fail_next_owned_texture_frame_wrapper_allocation" });
-        @export(&testUseCountingBufferDestroy, .{ .name = "mln_zig_test_use_counting_buffer_destroy" });
-        @export(&testRestoreBufferDestroy, .{ .name = "mln_zig_test_restore_buffer_destroy" });
-        @export(&testBufferDestroyCount, .{ .name = "mln_zig_test_buffer_destroy_count" });
-    }
-}
-
-fn testFailNextOwnedTextureFrameWrapperAllocation() callconv(.c) void {
-    render.failNextOwnedTextureFrameWrapperAllocationForTesting();
-}
-
-fn testUseCountingBufferDestroy() callconv(.c) void {
-    native_temp.useCountingBufferDestroyForTesting();
-}
-
-fn testRestoreBufferDestroy() callconv(.c) void {
-    native_temp.restoreBufferDestroyForTesting();
-}
-
-fn testBufferDestroyCount() callconv(.c) usize {
-    return native_temp.bufferDestroyCountForTesting();
 }

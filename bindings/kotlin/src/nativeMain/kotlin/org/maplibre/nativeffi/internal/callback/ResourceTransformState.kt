@@ -34,6 +34,7 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
     descriptor.size = kotlinx.cinterop.sizeOf<mln_resource_transform>().toUInt()
     descriptor.callback = staticCFunction(::resourceTransformCallback)
     descriptor.user_data = selfRef.asCPointer()
+    descriptor.release_user_data = staticCFunction(::releaseResourceTransform)
   }
 
   fun descriptor(): CPointer<mln_resource_transform> = descriptor.ptr
@@ -69,8 +70,6 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
 
   override fun close() = gate.close()
 
-  internal fun checkCanClose() = gate.checkCanClose()
-
   internal fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
 
   private fun closeNative() {
@@ -100,3 +99,8 @@ private fun resourceTransformCallback(
 ): Int =
   userData?.asStableRef<ResourceTransformState>()?.get()?.invoke(kind, url, outResponse)
     ?: MaplibreStatus.INVALID_ARGUMENT.nativeCode
+
+@OptIn(ExperimentalForeignApi::class)
+private fun releaseResourceTransform(userData: COpaquePointer?) {
+  userData?.asStableRef<ResourceTransformState>()?.get()?.close()
+}

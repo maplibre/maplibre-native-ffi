@@ -14,52 +14,40 @@ internal actual object OwnedTextureTestSupport {
     if (RenderBackend.METAL !in Maplibre.supportedRenderBackends()) return null
     val device =
       MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
-    val session =
+    val attachment =
       map.attachMetalOwnedTexture(
         MetalOwnedTextureDescriptor(
           extent = RenderTargetExtent(width, height, 1.0),
           context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
-        )
+        ),
+        OWNED_TEXTURE_ATTACH_OPTIONS,
       )
-    return AppleOwnedTextureSession(device.address(), session)
+    return AppleOwnedTextureSession(device.address(), attachment)
   }
 }
 
 private class AppleOwnedTextureSession(
   private val deviceAddress: Long,
-  override val session: RenderSessionHandle,
+  override val attachment: RenderSessionAttachment,
 ) : OwnedTextureTestSession {
-  override fun attachAnotherOwnedTexture(width: Int, height: Int): RenderSessionHandle =
+  override fun attachAnotherOwnedTexture(width: Int, height: Int): RenderSessionAttachment =
     session
       .map()
       .attachMetalOwnedTexture(
         MetalOwnedTextureDescriptor(
           extent = RenderTargetExtent(width, height, 1.0),
           context = MetalContextDescriptor(NativePointer.ofAddress(deviceAddress)),
-        )
+        ),
+        OWNED_TEXTURE_ATTACH_OPTIONS,
       )
 
-  override fun acquireFrame(): OwnedTextureTestFrame {
-    val handle = session.acquireMetalOwnedTextureFrame()
-    val frame = handle.frame()
-    return object : OwnedTextureTestFrame {
-      override val width: Int
-        get() = frame.width()
-
-      override val height: Int
-        get() = frame.height()
-
-      override val isClosed: Boolean
-        get() = handle.isClosed
-
-      override fun close() {
-        handle.close()
-      }
-    }
+  override fun frameSize(frame: AcquiredFrameHandle): OwnedTextureFrameSize {
+    val texture = frame.metalTexture()
+    return OwnedTextureFrameSize(texture.width(), texture.height())
   }
 
   override fun close() {
-    session.close()
+    session.abandonAndClose()
   }
 }
 

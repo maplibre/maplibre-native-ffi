@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ._enum import NativeIntEnum
 from .geo import LatLng, LatLngBounds
 
 
@@ -104,6 +105,68 @@ class AnimationOptions:
     min_zoom: float | None = None
     easing: UnitBezier | None = None
     transition_id: int | None = None
+
+
+class CameraUpdateMode(NativeIntEnum):
+    """Camera transition behavior for one camera update."""
+
+    JUMP = 0
+    EASE = 1
+    FLY = 2
+
+
+class GesturePhase(NativeIntEnum):
+    """Gesture boundary carried atomically with a camera update.
+
+    The phase applies around the camera write and is reported by
+    :attr:`MapSnapshot.gesture_in_progress`.
+    """
+
+    NONE = 0
+    """Carries no gesture boundary and leaves the flag as it is."""
+    BEGIN = 1
+    """Marks a gesture as in progress before the camera write. It does not
+    cancel running transitions; use :meth:`MapHandle.cancel_transitions` for
+    that."""
+    UPDATE = 2
+    """Keeps the gesture marked as in progress before the camera write."""
+    END = 3
+    """Clears the gesture flag after the camera write."""
+    CANCEL = 4
+    """Cancels transitions running after the camera write, then clears the
+    gesture flag."""
+
+
+@dataclass(frozen=True, slots=True)
+class CameraUpdate:
+    """One atomic absolute camera update."""
+
+    camera: CameraOptions
+    mode: CameraUpdateMode = CameraUpdateMode.JUMP
+    animation: AnimationOptions | None = None
+    """Animation controls, which a jump ignores."""
+    gesture_phase: GesturePhase = GesturePhase.NONE
+
+
+class CameraDeltaKind(NativeIntEnum):
+    """Relative camera operation kind."""
+
+    MOVE = 0
+    SCALE = 1
+    BEARING = 2
+    PITCH = 3
+    """Adds to the current pitch."""
+
+
+@dataclass(frozen=True, slots=True)
+class CameraDelta:
+    """One relative camera operation."""
+
+    kind: CameraDeltaKind = CameraDeltaKind.MOVE
+    offset: ScreenPoint = ScreenPoint(0.0, 0.0)
+    amount: float = 0.0
+    anchor: ScreenPoint | None = None
+    animation: AnimationOptions = AnimationOptions()
 
 
 @dataclass(frozen=True, slots=True)
@@ -209,10 +272,15 @@ __all__ = [
     "BoundOptions",
     "Bounded",
     "BoundsConstraint",
+    "CameraDelta",
+    "CameraDeltaKind",
     "CameraFitOptions",
     "CameraOptions",
+    "CameraUpdate",
+    "CameraUpdateMode",
     "EdgeInsets",
     "FreeCameraOptions",
+    "GesturePhase",
     "ProjectionMode",
     "Quaternion",
     "ScreenPoint",

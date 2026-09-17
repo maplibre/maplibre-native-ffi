@@ -6,124 +6,97 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.Maplibre
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
-import org.maplibre.nativeffi.camera.EdgeInsets
+import org.maplibre.nativeffi.camera.CameraUpdate
+import org.maplibre.nativeffi.camera.CameraUpdateMode
 import org.maplibre.nativeffi.error.InvalidArgumentException
-import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.error.UnsupportedFeatureException
-import org.maplibre.nativeffi.error.WrongThreadException
-import org.maplibre.nativeffi.failureFromBackgroundThread
-import org.maplibre.nativeffi.geo.LatLng
-import org.maplibre.nativeffi.geo.ScreenBox
-import org.maplibre.nativeffi.geo.ScreenPoint
-import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.map.MapMode
-import org.maplibre.nativeffi.map.MapProjectionHandle
-import org.maplibre.nativeffi.query.FeatureStateSelector
-import org.maplibre.nativeffi.query.RenderedQueryGeometry
-import org.maplibre.nativeffi.resource.ResourceProviderCallback
-import org.maplibre.nativeffi.resource.ResourceProviderDecision
-import org.maplibre.nativeffi.resource.ResourceRequestHandle
-import org.maplibre.nativeffi.resource.ResourceResponse
-import org.maplibre.nativeffi.resource.ResourceResponseStatus
-import org.maplibre.nativeffi.runOnBackgroundThread
-import org.maplibre.nativeffi.runtime.RuntimeEventType
+import org.maplibre.nativeffi.runtime.runSuspendTest
 import org.maplibre.nativeffi.sleepMillis
 
 class RenderSessionHandleTest {
   @Test
-  fun globalStateChangesRenderedPaint() {
+  fun globalStateChangesRenderedPaint(): Unit = runSuspendTest {
     withOwnedTextureSession { runtime, map, owned ->
-      map.setStyleJson(
-        """{"version":8,"transition":{"duration":0},"state":{"color":{"default":"#ff0000"}},"sources":{},"layers":[{"id":"bg","type":"background","paint":{"background-color":["global-state","color"]}}]}"""
-          .encodeToByteArray()
+      val session = owned.session
+      session.completeOnDriver(
+        map.setStyleJson(
+          """{"version":8,"transition":{"duration":0},"state":{"color":{"default":"#ff0000"}},"sources":{},"layers":[{"id":"bg","type":"background","paint":{"background-color":["global-state","color"]}}]}"""
+            .encodeToByteArray()
+        )
       )
-      fun renderColor(): List<Int> {
-        assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
-        assertEquals(RenderResult.RENDERED, owned.session.renderUpdate().result)
-        val info = owned.session.textureImageInfo()
-        return NativeBuffer.allocate(info.byteLength).use { buffer ->
-          owned.session.readPremultipliedRgba8(buffer)
-          buffer.toByteArray().take(4).map { it.toInt() and 255 }
+      suspend fun renderColor(): List<Int> {
+        session.completeOnDriver(runtime.barrier())
+        session.renderUntilSettled()
+        return session.completeOnDriver(session.readPremultipliedRgba8()).bytes.take(4).map {
+          it.toInt() and 255
         }
       }
       assertEquals(listOf(255, 0, 0, 255), renderColor())
-      map.setGlobalStateProperty("color", "\"#0000ff\"".encodeToByteArray())
+      session.completeOnDriver(
+        map.setGlobalStateProperty("color", "\"#0000ff\"".encodeToByteArray())
+      )
       assertEquals(listOf(0, 0, 255, 255), renderColor())
-      map.setGlobalStateProperty("color", "null".encodeToByteArray())
+      session.completeOnDriver(map.setGlobalStateProperty("color", "null".encodeToByteArray()))
       assertEquals(listOf(255, 0, 0, 255), renderColor())
+      session.completeOnDriver(session.detach())
     }
   }
 
-  // BND-160, BND-161, BND-163, BND-164, BND-165, BND-166, BND-167, BND-168,
-  // BND-169, BND-170: owned-texture rendering, readback, frames, and
-  // owner-thread checks.
-
   @OptIn(ExperimentalAtomicApi::class)
   @Test
-  fun staticRenderWaitingForStyleKeepsThePreviousProjection() {
+  fun staticRenderWaitingForStyleKeepsThePreviousProjection(): Unit = runSuspendTest {
     withOwnedTextureSession(mapMode = MapMode.STATIC) { runtime, map, owned ->
       val session = owned.session
-      val pending = AtomicReference<ResourceRequestHandle?>(null)
-      runtime.setResourceProvider(
-        ResourceProviderCallback { _, handle ->
-          pending.store(handle)
-          ResourceProviderDecision.HANDLE
-        }
+      val pending = AtomicReference<org.maplibre.nativeffi.resource.ResourceRequestHandle?>(null)
+      session.completeOnDriver(
+        runtime.setResourceProvider(
+          org.maplibre.nativeffi.resource.ResourceProviderCallback { _, handle ->
+            pending.store(handle)
+            org.maplibre.nativeffi.resource.ResourceProviderDecision.HANDLE
+          }
+        )
       )
       try {
-        runtime.pump(0)
-        map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray())
-        assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED))
-        map.jumpTo(CameraOptions().apply { zoom = 3.0 })
-        map.requestStillImage()
-        var result = RenderResult.NO_UPDATE
-        var finished = false
+        session.completeOnDriver(map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray()))
+        session.completeOnDriver(
+          map.updateCamera(CameraUpdate(camera = CameraOptions().apply { zoom = 3.0 }))
+        )
+        val first = map.requestStillImage()
+        session.renderUntilSettled()
+        session.completeOnDriver(first)
+        session.completeOnDriver(map.setStyleUrl("test://pending-style.json"))
+        session.completeOnDriver(
+          map.updateCamera(CameraUpdate(camera = CameraOptions().apply { zoom = 6.0 }))
+        )
+        val second = map.requestStillImage()
         for (attempt in 0 until 500) {
-          runtime.pump(0)
-          finished =
-            runtime.drainEvents().events.any {
-              it.type == RuntimeEventType.MAP_STILL_IMAGE_FINISHED
-            }
-          if (finished) break
-          result = session.renderUpdate().result
-          sleepMillis(1)
-        }
-        assertTrue(finished)
-        assertEquals(RenderResult.RENDERED, result)
-        map.setStyleUrl("test://pending-style.json")
-        map.jumpTo(CameraOptions().apply { zoom = 6.0 })
-        map.requestStillImage()
-        for (attempt in 0 until 500) {
-          runtime.pump(0)
           if (pending.load() != null) break
           sleepMillis(1)
         }
-        assertTrue(pending.load() != null)
-        val skipped = session.renderUpdate()
-        session.createProjection().use { assertEquals(3.0, it.camera.zoom) }
-        assertEquals(RenderResult.NO_UPDATE, skipped.result)
+        assertNotNull(pending.load())
+        val skipped = session.renderOneFrame()
+        assertEquals(RenderResult.NO_UPDATE, skipped.disposition)
         assertFalse(skipped.needsRepaint)
+        session.createProjection().use { assertEquals(3.0, it.camera().zoom) }
         pending
           .load()!!
           .complete(
-            ResourceResponse(ResourceResponseStatus.OK).apply {
-              bytes = BACKGROUND_STYLE_JSON.encodeToByteArray()
-            }
+            org.maplibre.nativeffi.resource
+              .ResourceResponse(org.maplibre.nativeffi.resource.ResourceResponseStatus.OK)
+              .apply { bytes = BACKGROUND_STYLE_JSON.encodeToByteArray() }
           )
-        for (attempt in 0 until 500) {
-          runtime.pump(0)
-          result = session.renderUpdate().result
-          if (result == RenderResult.RENDERED) break
-          sleepMillis(1)
-        }
-        assertEquals(RenderResult.RENDERED, result)
-        session.createProjection().use { assertEquals(6.0, it.camera.zoom) }
+        session.renderUntilSettled()
+        session.completeOnDriver(second)
+        session.createProjection().use { assertEquals(6.0, it.camera().zoom) }
+        session.completeOnDriver(session.detach())
       } finally {
         pending.load()?.close()
       }
@@ -131,284 +104,181 @@ class RenderSessionHandleTest {
   }
 
   @Test
-  fun renderedProjectionFollowsRenderedUpdatesAndOutlivesTheSession() {
-    val coordinate = LatLng(37.78, -122.41)
-    var retained: MapProjectionHandle? = null
-    var expected = ScreenPoint(0.0, 0.0)
+  fun renderedProjectionFollowsRenderedUpdatesAndOutlivesTheSession(): Unit = runSuspendTest {
+    var retained: org.maplibre.nativeffi.map.MapProjectionHandle? = null
     try {
-      withOwnedTextureSession(width = 128, height = 64) { runtime, map, owned ->
+      withOwnedTextureSession { runtime, map, owned ->
         val session = owned.session
-        assertFailsWith<InvalidStateException> { session.createProjection() }
-        map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray())
-        runtime.pump(0)
-        map.jumpTo(
-          CameraOptions().apply {
-            center = LatLng(37.7749, -122.4194)
-            zoom = 12.0
-            bearing = 23.0
-            pitch = 40.0
-            padding = EdgeInsets(3.0, 7.0, 5.0, 11.0)
-          }
+        assertFailsWith<org.maplibre.nativeffi.error.InvalidStateException> {
+          session.createProjection()
+        }
+        session.completeOnDriver(map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray()))
+        session.completeOnDriver(
+          map.updateCamera(CameraUpdate(camera = CameraOptions().apply { zoom = 3.0 }))
         )
-        assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
-        map.createProjection().use { expected = it.pixelForLatLng(coordinate) }
-        assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
-
-        // Advance and publish the live camera while the target still contains the previous frame.
-        map.jumpTo(CameraOptions().apply { center = LatLng(37.80, -122.45) })
-        runtime.pump(0)
-        val first = session.createProjection()
-        retained = first
-        assertPointNear(expected, first.pixelForLatLng(coordinate))
-        val current = map.pixelForLatLng(coordinate)
-        assertTrue(kotlin.math.abs(current.x - expected.x) > 1.0)
-        val unprojected = first.latLngForPixel(expected)
-        assertEquals(coordinate.latitude, unprojected.latitude, 1e-6)
-        assertEquals(coordinate.longitude, unprojected.longitude, 1e-6)
-
-        val wrongThread = failureFromBackgroundThread { session.createProjection().close() }
-        assertTrue(wrongThread is WrongThreadException)
-        owned.acquireFrame().use {
-          session.createProjection().use { projection ->
-            assertPointNear(expected, projection.pixelForLatLng(coordinate))
-          }
-          assertFailsWith<InvalidStateException> { session.renderUpdate() }
+        session.completeOnDriver(runtime.barrier())
+        session.renderUntilSettled()
+        session.completeOnDriver(
+          map.updateCamera(CameraUpdate(camera = CameraOptions().apply { zoom = 6.0 }))
+        )
+        val projection = session.createProjection()
+        retained = projection
+        assertEquals(3.0, projection.camera().zoom)
+        val frame = assertNotNull(session.acquireFrame())
+        session.createProjection().use { assertEquals(3.0, it.camera().zoom) }
+        frame.release()
+        assertEquals(RenderResult.RENDERED, session.renderOneFrame().disposition)
+        session.createProjection().use { assertEquals(6.0, it.camera().zoom) }
+        session.completeOnDriver(session.resize(RenderTargetExtent(16, 8, 1.0)))
+        assertFailsWith<org.maplibre.nativeffi.error.InvalidStateException> {
+          session.createProjection()
         }
-        session.createProjection().use { assertPointNear(expected, it.pixelForLatLng(coordinate)) }
-
-        assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
-        session.createProjection().use {
-          assertPointNear(current, it.pixelForLatLng(coordinate))
-          it.setCamera(CameraOptions().apply { zoom = 2.0 })
-        }
-        session.createProjection().use { assertPointNear(current, it.pixelForLatLng(coordinate)) }
-        assertPointNear(expected, first.pixelForLatLng(coordinate))
-
-        session.resize(96, 48, 2.0)
-        assertEquals(RenderResult.SIZE_PENDING, session.renderUpdate().result)
-        assertFailsWith<InvalidStateException> { session.createProjection() }
-        assertPointNear(expected, first.pixelForLatLng(coordinate))
-        runtime.pump(0)
-        assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
-        session.createProjection().use {
-          assertPointNear(map.pixelForLatLng(coordinate), it.pixelForLatLng(coordinate))
-        }
-        session.detach()
-        assertFailsWith<InvalidStateException> { session.createProjection() }
-        session.close()
-        map.close()
-        runtime.close()
-        assertPointNear(expected, first.pixelForLatLng(coordinate))
-        runOnBackgroundThread { assertPointNear(expected, first.pixelForLatLng(coordinate)) }
+        session.completeOnDriver(session.detach())
       }
+      retained?.let { assertEquals(3.0, it.camera().zoom) }
     } finally {
       retained?.close()
     }
   }
 
-  private fun assertPointNear(expected: ScreenPoint, actual: ScreenPoint) {
-    assertEquals(expected.x, actual.x, 1e-6)
-    assertEquals(expected.y, actual.y, 1e-6)
-  }
-
   @Test
-  fun renderUpdateWithoutPendingUpdateReportsNoUpdateAndKeepsSessionLive() {
-    withOwnedTextureSession(mapMode = MapMode.STATIC) { _, _, owned ->
+  fun ownedTextureSessionRendersReadsBackAcquiresAFrameAndDetaches(): Unit = runSuspendTest {
+    withOwnedTextureSession { runtime, map, owned ->
       val session = owned.session
-      assertEquals(RenderResult.NO_UPDATE, session.renderUpdate().result)
-      session.resize(32, 16, 1.0)
+      assertSame(map, session.map())
+      assertEquals(RenderDriver.CALLER_GRAPHICS_THREAD, session.capabilities().driver)
+      assertTrue(session.capabilities().readback)
+      assertEquals(RenderSessionState.ATTACHED, session.snapshot().state)
+
+      session.completeOnDriver(map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray()))
+      session.completeOnDriver(runtime.barrier())
+
+      // A second owned texture on the same map is rejected while this one is attached.
+      val secondFailure =
+        runCatching {
+            val second = owned.attachAnotherOwnedTexture(16, 8)
+            try {
+              session.completeOnDriver(second.completed)
+            } finally {
+              second.session.abandonAndClose()
+            }
+          }
+          .exceptionOrNull()
+      assertTrue(secondFailure is MaplibreException, "second attach must fail: $secondFailure")
+
+      val rendered = session.renderUntilSettled()
+      assertEquals(RenderResult.RENDERED, rendered.disposition)
+
+      val readback = session.completeOnDriver(session.readPremultipliedRgba8())
+      assertEquals(32, readback.info.width)
+      assertEquals(16, readback.info.height)
+      assertEquals(32 * 4, readback.info.stride)
+      assertEquals(
+        readback.info.stride.toLong() * readback.info.height.toLong(),
+        readback.info.byteLength,
+      )
+      assertEquals(readback.info.byteLength.toInt(), readback.bytes.size)
+
+      val frame = assertNotNull(session.acquireFrame())
+      assertEquals(rendered.frameGeneration, frame.result().frameGeneration)
+      assertEquals(OwnedTextureFrameSize(32, 16), owned.frameSize(frame))
+      frame.release()
+      assertTrue(frame.isReleased)
+
+      // BND-183: the scale factor is fixed at attachment, so only width and height may change.
+      assertFailsWith<InvalidArgumentException> {
+        session.resize(RenderTargetExtent(16, 8, 2.0)).await()
+      }
+
+      // Resizing hands the new logical size to the map, so the next frames report
+      // SIZE_PENDING until the map publishes an update matching the new target.
+      session.completeOnDriver(session.resize(RenderTargetExtent(16, 8, 1.0)))
+      session.renderUntilSettled()
+      val resized = session.snapshot().extent
+      assertEquals(16, resized.width)
+      assertEquals(8, resized.height)
+      assertEquals(1.0, resized.scaleFactor)
+
+      session.completeOnDriver(session.barrier())
+      session.completeOnDriver(session.detach())
+      assertEquals(RenderSessionState.DETACHED, session.snapshot().state)
+      assertFalse(session.isClosed)
     }
   }
 
   @Test
-  fun renderUpdateReportsNeedsRepaintDuringCameraTransition() {
-    Maplibre.setLogCallback(LogCallback { true })
-    Maplibre.setAsyncLogSeverities(emptySet())
-    try {
-      withOwnedTextureSession { runtime, map, owned ->
-        val session = owned.session
-        map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray())
+  fun renderedFrameResultsReportNeedsRepaintDuringCameraTransition(): Unit = runSuspendTest {
+    withOwnedTextureSession { runtime, map, owned ->
+      val session = owned.session
+      session.completeOnDriver(map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray()))
+      session.completeOnDriver(runtime.barrier())
+      session.renderUntilSettled()
 
-        // The session owns this thread, which is also the map's, so the map
-        // only reaches the style when this loop pumps the runtime. Render until
-        // the map settles: the last frame asks for no repaint.
-        var update = session.renderUpdate()
-        for (attempt in 0 until 500) {
-          if (update.result == RenderResult.RENDERED && !update.needsRepaint) break
-          runtime.pump(0)
-          update = session.renderUpdate()
-          if (update.result != RenderResult.RENDERED || update.needsRepaint) {
-            sleepMillis(1)
-          }
-        }
-        assertEquals(RenderResult.RENDERED, update.result)
-        assertFalse(update.needsRepaint)
-
-        map.easeTo(
-          CameraOptions().apply { zoom = 4.0 },
-          AnimationOptions().apply { durationMs = 60_000.0 },
+      session.completeOnDriver(
+        map.updateCamera(
+          CameraUpdate(
+            mode = CameraUpdateMode.EASE,
+            camera = CameraOptions().apply { zoom = 4.0 },
+            animation = AnimationOptions().apply { durationMs = 60_000.0 },
+          )
         )
+      )
+      session.completeOnDriver(runtime.barrier())
 
-        var sawRepaintRequest = false
-        for (attempt in 0 until 500) {
-          runtime.pump(0)
-          update = session.renderUpdate()
-          if (update.result == RenderResult.RENDERED && update.needsRepaint) {
-            sawRepaintRequest = true
-            break
-          }
-          sleepMillis(1)
+      var sawRepaintRequest = false
+      for (attempt in 0 until 500) {
+        val result = session.renderOneFrame()
+        sleepMillis(1)
+        if (result.disposition == RenderResult.RENDERED && result.needsRepaint) {
+          sawRepaintRequest = true
+          break
         }
-        assertTrue(sawRepaintRequest)
       }
-    } finally {
-      Maplibre.clearLogCallback()
-      Maplibre.restoreDefaultAsyncLogSeverities()
+      assertTrue(sawRepaintRequest)
+
+      session.completeOnDriver(session.detach())
     }
   }
 
   @Test
-  fun ownedTextureSessionRendersReadsBackAcquiresFrameAndDetaches() {
-    Maplibre.setLogCallback(LogCallback { true })
-    Maplibre.setAsyncLogSeverities(emptySet())
-    try {
-      withOwnedTextureSession { runtime, map, owned ->
-        val session = owned.session
-        val featureCoordinate = LatLng(37.7749, -122.4194)
-        map.jumpTo(CameraOptions().apply { center = featureCoordinate })
-        assertSame(map, session.map())
-        assertFailsWith<InvalidStateException> { session.textureImageInfo() }
-        map.setFeatureState(featureStateSelector(), featureState())
-        val queuedState = map.getFeatureState(featureStateSelector())
-        assertEquals("true", rawMember(queuedState, "hover")?.decodeToString())
-        assertEquals(20.0, numberMember(queuedState, "radius"))
-        assertFailsWith<InvalidStateException> { map.close() }
-        assertFailsWith<InvalidStateException> { owned.attachAnotherOwnedTexture(16, 8).close() }
+  fun aSettledMapReportsNoUpdateForAnIfNeededDemand(): Unit = runSuspendTest {
+    withOwnedTextureSession { runtime, map, owned ->
+      val session = owned.session
+      session.completeOnDriver(map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray()))
+      session.completeOnDriver(runtime.barrier())
+      session.renderUntilSettled()
 
-        assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
-        session.renderUpdate()
-        val beforeStyle = map.getFeatureState(featureStateSelector())
-        assertEquals("true", rawMember(beforeStyle, "hover")?.decodeToString())
-        assertEquals(20.0, numberMember(beforeStyle, "radius"))
+      // The map published nothing after the settled frame, so the session skips the render.
+      assertEquals(RenderResult.NO_UPDATE, session.renderOneFrame(FrameDemand()).disposition)
+      assertEquals(RenderSessionState.ATTACHED, session.snapshot().state)
 
-        map.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
-        assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
-        assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
+      session.completeOnDriver(session.detach())
+    }
+  }
 
-        val sessionCallWrongThread = failureFromBackgroundThread { session.renderUpdate() }
-        if (sessionCallWrongThread !is WrongThreadException) throw sessionCallWrongThread
-        val sessionCallDiagnostic = sessionCallWrongThread.diagnostic
-        assertEquals(MaplibreStatus.WRONG_THREAD, sessionCallWrongThread.status)
-        assertTrue(sessionCallDiagnostic.isNotBlank())
+  @Test
+  fun abandonReportsItsDispositionAndFailsPendingDriverWorkAsTargetLost(): Unit = runSuspendTest {
+    withOwnedTextureSession(width = 8, height = 8) { runtime, map, owned ->
+      val session = owned.session
+      session.completeOnDriver(map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray()))
+      session.completeOnDriver(runtime.barrier())
+      session.renderUntilSettled()
 
-        assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
-        assertEquals(sessionCallDiagnostic, sessionCallWrongThread.diagnostic)
-
-        val sessionCloseWrongThread = failureFromBackgroundThread { session.close() }
-        if (sessionCloseWrongThread !is WrongThreadException) throw sessionCloseWrongThread
-        assertEquals(MaplibreStatus.WRONG_THREAD, sessionCloseWrongThread.status)
-        assertFalse(session.isClosed)
-
-        val info = session.textureImageInfo()
-        assertEquals(32, info.width)
-        assertEquals(16, info.height)
-        assertEquals(32 * 4, info.stride)
-        assertEquals(info.stride.toLong() * info.height.toLong(), info.byteLength)
-
-        NativeBuffer.allocate(4).use { small ->
-          assertFailsWith<InvalidArgumentException> { session.readPremultipliedRgba8(small) }
-        }
-        NativeBuffer.allocate(info.byteLength).use { buffer ->
-          assertEquals(info, session.readPremultipliedRgba8(buffer))
-          assertEquals(info.byteLength.toInt(), buffer.toByteArray().size)
-        }
-
-        assertFailsWith<InvalidArgumentException> {
-          map.setFeatureState(featureStateSelector(), jsonBytes("[]"))
-        }
-        map.setFeatureState(featureStateSelector(), featureState())
-        val copiedState = map.getFeatureState(featureStateSelector())
-        assertEquals("true", rawMember(copiedState, "hover")?.decodeToString())
-        assertEquals(20.0, numberMember(copiedState, "radius"))
-
-        renderIfAvailable(runtime, map, session)
-        map.removeFeatureState(
-          FeatureStateSelector("point").apply {
-            featureId = "feature-1"
-            stateKey = "hover"
-          }
-        )
-        renderIfAvailable(runtime, map, session)
-        val afterRemove = map.getFeatureState(featureStateSelector())
-        assertEquals(null, rawMember(afterRemove, "hover"))
-        assertEquals(20.0, numberMember(afterRemove, "radius"))
-
-        val queryGeometry =
-          RenderedQueryGeometry.Box(ScreenBox(ScreenPoint(0.0, 0.0), ScreenPoint(1.0, 1.0)))
-        val frame = owned.acquireFrame()
-        try {
-          assertEquals(32, frame.width)
-          assertEquals(16, frame.height)
-          assertFalse(frame.isClosed)
-          assertFailsWith<InvalidStateException> { session.renderUpdate() }
-          assertFailsWith<InvalidStateException> { session.resize(16, 8, 2.0) }
-          assertFailsWith<InvalidStateException> {
-            session.setMetalBorrowedTextureTarget(dummyMetalBorrowedTexture())
-          }
-          assertFailsWith<InvalidStateException> {
-            session.setVulkanBorrowedTextureTarget(dummyVulkanBorrowedTexture())
-          }
-          assertFailsWith<InvalidStateException> {
-            session.setOpenGLBorrowedTextureTarget(dummyOpenGLBorrowedTexture())
-          }
-          assertFailsWith<InvalidStateException> { session.detach() }
-          assertFailsWith<InvalidStateException> { session.reduceMemoryUse() }
-          assertFailsWith<InvalidStateException> { session.clearData() }
-          assertFailsWith<InvalidStateException> { session.dumpDebugLogs() }
-          assertFailsWith<InvalidStateException> {
-            session.queryRenderedFeatures(queryGeometry, null)
-          }
-          assertFailsWith<InvalidStateException> { session.querySourceFeatures("point", null) }
-          assertFailsWith<InvalidStateException> {
-            session.queryFeatureExtension(
-              "point",
-              jsonBytes("""{"type":"Feature","geometry":{"type":"Point","coordinates":[0,0]}}"""),
-              "supercluster",
-              "children",
-              null,
-            )
-          }
-          assertFailsWith<InvalidStateException> { session.textureImageInfo() }
-          NativeBuffer.allocate(1).use { buffer ->
-            assertFailsWith<InvalidStateException> { session.readPremultipliedRgba8(buffer) }
-          }
-          assertFailsWith<InvalidStateException> { owned.acquireFrame() }
-          assertFailsWith<InvalidStateException> { session.close() }
-
-          val closeError = failureFromBackgroundThread { frame.close() }
-          assertTrue(closeError is WrongThreadException)
-          assertFalse(frame.isClosed)
-          assertFailsWith<InvalidStateException> { session.renderUpdate() }
-        } finally {
-          frame.close()
-        }
-        assertTrue(frame.isClosed)
-        assertFailsWith<IllegalStateException> { frame.width }
-
-        // Resizing hands the new logical size to the map's owner thread, so
-        // the map publishes an update matching the new target only once
-        // pumped.
-        session.resize(16, 8, 2.0)
-        assertEquals(RenderResult.SIZE_PENDING, session.renderUpdate().result)
-        runtime.pump(0)
-        assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
-        session.detach()
-        assertFailsWith<InvalidStateException> { session.renderUpdate() }
-        assertFalse(session.isClosed)
-      }
-    } finally {
-      Maplibre.clearLogCallback()
-      Maplibre.restoreDefaultAsyncLogSeverities()
+      val frame = assertNotNull(session.acquireFrame())
+      val pending = session.reduceMemoryUse()
+      // An attached session that rendered always leaves its renderer and target behind.
+      val abandoned = session.abandon()
+      assertEquals(RenderAbandonDisposition.QUARANTINED, abandoned.disposition)
+      assertTrue(
+        abandoned.quarantinedResourceCount > 0,
+        "expected quarantined resources, got ${abandoned.quarantinedResourceCount}",
+      )
+      val failure = runCatching { pending.await() }.exceptionOrNull()
+      assertTrue(failure is MaplibreException, "expected a target-lost failure: $failure")
+      assertEquals(MaplibreStatus.TARGET_LOST, failure.status)
+      frame.release()
+      assertTrue(frame.isReleased)
+      assertEquals(RenderSessionState.ABANDONED, session.snapshot().state)
     }
   }
 
@@ -417,36 +287,38 @@ class RenderSessionHandleTest {
   // before it reads GPU objects.
 
   @Test
-  fun ownedTextureSetTargetReportsUnsupportedForOtherTargetKinds() {
+  fun ownedTextureSetTargetReportsUnsupportedForOtherTargetKinds(): Unit = runSuspendTest {
     withOwnedTextureSession(mapMode = MapMode.STATIC) { _, _, owned ->
       val session = owned.session
-      val error =
-        assertFailsWith<UnsupportedFeatureException> {
-          session.setMetalBorrowedTextureTarget(dummyMetalBorrowedTexture())
-        }
-      assertEquals(MaplibreStatus.UNSUPPORTED, error.status)
-      assertFailsWith<UnsupportedFeatureException> {
-        session.setVulkanBorrowedTextureTarget(dummyVulkanBorrowedTexture())
+      assertUnsupported(session, "metal texture") {
+        session.setMetalBorrowedTextureTarget(metalBorrowedTexture())
       }
-      assertFailsWith<UnsupportedFeatureException> {
-        session.setOpenGLBorrowedTextureTarget(dummyOpenGLBorrowedTexture())
+      assertUnsupported(session, "vulkan texture") {
+        session.setVulkanBorrowedTextureTarget(vulkanBorrowedTexture())
       }
-      assertFailsWith<UnsupportedFeatureException> {
-        session.setMetalSurfaceTarget(dummyMetalSurface())
+      assertUnsupported(session, "opengl texture") {
+        session.setOpenGLBorrowedTextureTarget(openGLBorrowedTexture())
       }
-      assertFailsWith<UnsupportedFeatureException> {
-        session.setVulkanSurfaceTarget(dummyVulkanSurface())
+      assertUnsupported(session, "metal surface") { session.setMetalSurfaceTarget(metalSurface()) }
+      assertUnsupported(session, "vulkan surface") {
+        session.setVulkanSurfaceTarget(vulkanSurface())
       }
-      assertFailsWith<UnsupportedFeatureException> {
-        session.setOpenGLSurfaceTarget(dummyOpenGLSurface())
+      assertUnsupported(session, "opengl surface") {
+        session.setOpenGLSurfaceTarget(openGLSurface())
       }
     }
   }
 
-  private fun featureStateSelector(): FeatureStateSelector =
-    FeatureStateSelector("point").apply { featureId = "feature-1" }
-
-  private fun featureState(): ByteArray = jsonBytes("""{"hover":true,"radius":20}""")
+  /** A target-kind mismatch fails either at submission or at completion. */
+  private suspend fun assertUnsupported(
+    session: RenderSessionHandle,
+    label: String,
+    submit: () -> Deferred<Unit>,
+  ) {
+    val failure = runCatching { session.completeOnDriver(submit()) }.exceptionOrNull()
+    assertTrue(failure is MaplibreException, "$label: expected an unsupported failure: $failure")
+    assertEquals(MaplibreStatus.UNSUPPORTED, failure.status, "$label: ${failure.diagnostic}")
+  }
 
   private companion object {
     private const val BACKGROUND_STYLE_JSON =
@@ -458,17 +330,17 @@ private fun dummyPointer(): NativePointer = NativePointer.ofAddress(1)
 
 private fun dummyVulkanHandle(): VulkanHandle = VulkanHandle.ofBits(1)
 
-private fun dummyMetalBorrowedTexture(): MetalBorrowedTextureDescriptor =
+private fun metalBorrowedTexture(): MetalBorrowedTextureDescriptor =
   MetalBorrowedTextureDescriptor(RenderTargetExtent(16, 8, 1.0), 16, 8, dummyPointer())
 
-private fun dummyMetalSurface(): MetalSurfaceDescriptor =
+private fun metalSurface(): MetalSurfaceDescriptor =
   MetalSurfaceDescriptor(
     RenderTargetExtent(16, 8, 1.0),
     MetalContextDescriptor(dummyPointer()),
     dummyPointer(),
   )
 
-private fun dummyVulkanContext(): VulkanContextDescriptor =
+private fun vulkanContext(): VulkanContextDescriptor =
   VulkanContextDescriptor(
     dummyPointer(),
     dummyPointer(),
@@ -479,33 +351,27 @@ private fun dummyVulkanContext(): VulkanContextDescriptor =
     dummyPointer(),
   )
 
-private fun dummyVulkanBorrowedTexture(): VulkanBorrowedTextureDescriptor =
+private fun vulkanBorrowedTexture(): VulkanBorrowedTextureDescriptor =
   VulkanBorrowedTextureDescriptor(
     RenderTargetExtent(16, 8, 1.0),
     16,
     8,
-    dummyVulkanContext(),
+    vulkanContext(),
     dummyVulkanHandle(),
     dummyVulkanHandle(),
-    0,
-    0,
+    // VK_FORMAT_R8G8B8A8_UNORM and VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
+    37,
+    5,
   )
 
-private fun dummyVulkanSurface(): VulkanSurfaceDescriptor =
-  VulkanSurfaceDescriptor(RenderTargetExtent(16, 8, 1.0), dummyVulkanContext(), dummyVulkanHandle())
+private fun vulkanSurface(): VulkanSurfaceDescriptor =
+  VulkanSurfaceDescriptor(RenderTargetExtent(16, 8, 1.0), vulkanContext(), dummyVulkanHandle())
 
-private fun dummyEglContext(): EglContextDescriptor =
+private fun eglContext(): EglContextDescriptor =
   EglContextDescriptor(dummyPointer(), dummyPointer(), dummyPointer(), NativePointer.NULL_POINTER)
 
-private fun dummyOpenGLBorrowedTexture(): OpenGLBorrowedTextureDescriptor =
-  OpenGLBorrowedTextureDescriptor(
-    RenderTargetExtent(16, 8, 1.0),
-    16,
-    8,
-    dummyEglContext(),
-    1,
-    0x0DE1,
-  )
+private fun openGLBorrowedTexture(): OpenGLBorrowedTextureDescriptor =
+  OpenGLBorrowedTextureDescriptor(RenderTargetExtent(16, 8, 1.0), 16, 8, eglContext(), 1, 0x0DE1)
 
-private fun dummyOpenGLSurface(): OpenGLSurfaceDescriptor =
-  OpenGLSurfaceDescriptor(RenderTargetExtent(16, 8, 1.0), dummyEglContext(), dummyPointer())
+private fun openGLSurface(): OpenGLSurfaceDescriptor =
+  OpenGLSurfaceDescriptor(RenderTargetExtent(16, 8, 1.0), eglContext(), dummyPointer())

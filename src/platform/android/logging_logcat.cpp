@@ -1,8 +1,9 @@
 #include <string>
 
-#include <android/log.h>
 #include <mln/util/enum.hpp>
 #include <mln/util/logging.hpp>
+
+#include <android/log.h>
 
 namespace mln {
 namespace {

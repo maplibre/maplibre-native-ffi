@@ -13,8 +13,8 @@ use crate::{GeoJsonSourceOptions, Result};
 /// [`Self::new`] parses one complete UTF-8 GeoJSON document and tiles or
 /// clusters it into the index a GeoJSON source consumes, which is the
 /// expensive part of a data update. It needs no runtime or map and runs on
-/// any thread, so a host prepares data on a worker thread and installs it on
-/// the map owner thread through
+/// any thread, so a host can prepare data concurrently with map work and
+/// install it through
 /// [`crate::MapHandle::add_geojson_source_data`] or
 /// [`crate::MapHandle::set_geojson_source_data`].
 ///

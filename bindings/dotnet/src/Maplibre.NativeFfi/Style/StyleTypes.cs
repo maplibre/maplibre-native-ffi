@@ -123,6 +123,27 @@ public sealed record TileSourceOptions
     public LatLngBounds? Bounds { get; set; }
 }
 
+/// <summary>Copied metadata that MapLibre currently retains for a style layer.</summary>
+/// <remarks>
+/// <see cref="SourceId" /> and <see cref="SourceLayer" /> are present when the layer carries them.
+/// <see cref="RawVisibility" /> preserves a visibility value that has no named
+/// <see cref="StyleLayerVisibility" /> member. The value remains valid after its layer or map
+/// closes.
+/// </remarks>
+/// <param name="Type">Style-spec layer type string, for example <c>"fill"</c>.</param>
+/// <param name="MinZoom">Lowest zoom at which the layer draws; negative infinity with no lower bound.</param>
+/// <param name="MaxZoom">Highest zoom at which the layer draws; positive infinity with no upper bound.</param>
+public sealed record LayerInfo(
+    string Id,
+    string Type,
+    double MinZoom,
+    double MaxZoom,
+    StyleLayerVisibility Visibility,
+    uint RawVisibility,
+    string? SourceId,
+    string? SourceLayer
+);
+
 /// <summary>Whether a style layer draws.</summary>
 /// <remarks>
 /// This is an open domain: MapLibre Native may report a value with no named member here, so a

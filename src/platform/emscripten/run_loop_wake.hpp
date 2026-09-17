@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <condition_variable>
-#include <functional>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -29,23 +28,10 @@ struct RunLoopWake {
   std::mutex runnables_mutex;
   std::list<std::shared_ptr<Runnable>> runnables;
 
-  // Reports readiness to whatever hosts this loop, beyond the condition
-  // variable run() parks on. A host driving runOnce() parks on the runtime's
-  // wake state, where only RunLoop::push() reports queued work; timers and
-  // async tasks arrive as runnables and would otherwise leave it asleep.
-  std::function<void()> platform_wake;
-
   void notify() {
-    {
-      std::lock_guard lock(wake_mutex);
-      notified = true;
-      cv.notify_one();
-    }
-    // Outside the wake lock: this ends up taking the host's own wake lock, and
-    // push() reaches it while holding the run loop mutex.
-    if (platform_wake) {
-      platform_wake();
-    }
+    const std::lock_guard lock(wake_mutex);
+    notified = true;
+    cv.notify_one();
   }
 
   void addRunnable(std::shared_ptr<Runnable> runnable) {

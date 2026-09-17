@@ -6,6 +6,7 @@ import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.resource.ResourceKind
 import org.maplibre.nativeffi.resource.ResourceLoadingMethod
 import org.maplibre.nativeffi.resource.ResourcePriority
@@ -26,6 +27,7 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
     provider.size(provider.sizeof())
     provider.callback(NATIVE_CALLBACK)
     provider.user_data(JavaCppSupport.addressPointer(token))
+    provider.release_user_data(NATIVE_RELEASE)
     STATES[token] = this
   }
 
@@ -45,8 +47,6 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
       lease.close()
     }
   }
-
-  fun checkCanClose() = gate.checkCanClose()
 
   fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
 
@@ -93,6 +93,16 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
           request: MaplibreNativeC.mln_resource_request?,
           handle: Long,
         ): Int = STATES[userData?.address() ?: 0L]?.invoke(request, handle) ?: UNKNOWN_DECISION
+      }
+
+    /** One process-wide release thunk; per-state thunks would exhaust the same pool. */
+    private val NATIVE_RELEASE =
+      object : MaplibreNativeC.mln_runtime_callback_release() {
+        override fun call(userData: Pointer?) {
+          val state = STATES[userData?.address() ?: 0L] ?: return
+          HandleLeakCleaner.releaseNativeCallbackRoot(state)
+          state.close()
+        }
       }
   }
 }

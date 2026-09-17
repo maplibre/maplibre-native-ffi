@@ -6,6 +6,50 @@ import '../geo/geo.dart';
 export '../geo/geo.dart'
     show EdgeInsets, LatLng, LatLngBounds, Quaternion, ScreenPoint, Vec3;
 
+/// Native execution mode for one atomic camera update.
+enum CameraUpdateMode {
+  /// Applies the camera immediately.
+  jump(0),
+
+  /// Animates with easing.
+  ease(1),
+
+  /// Animates along a flight path.
+  fly(2);
+
+  const CameraUpdateMode(this.rawValue);
+
+  /// Native camera update mode value.
+  final int rawValue;
+}
+
+/// Gesture boundary carried atomically with a camera update.
+///
+/// The phase is applied around the camera write and is reported by
+/// [MapSnapshot.gestureInProgress].
+enum GesturePhase {
+  /// Carries no gesture boundary and leaves the flag as it is.
+  none(0),
+
+  /// Marks a gesture as in progress before the camera write. It does not
+  /// cancel running transitions; use [MapHandle.cancelTransitions] for that.
+  begin(1),
+
+  /// Keeps the gesture marked as in progress before the camera write.
+  update(2),
+
+  /// Clears the gesture flag after the camera write.
+  end(3),
+
+  /// Cancels the running camera transitions and clears the gesture flag.
+  cancel(4);
+
+  const GesturePhase(this.rawValue);
+
+  /// Native gesture phase value.
+  final int rawValue;
+}
+
 /// Cubic easing curve for animated camera transitions.
 final class UnitBezier {
   /// Creates a cubic unit bezier.
@@ -146,6 +190,67 @@ final class AnimationOptions {
   @override
   int get hashCode =>
       Object.hash(durationMs, velocity, minZoom, easing, transitionId);
+}
+
+/// Relative camera operation kind.
+enum CameraDeltaKind {
+  /// Pans the camera by [CameraDelta.offset] in logical pixels.
+  move(0),
+
+  /// Multiplies the camera scale by [CameraDelta.amount], which is positive.
+  scale(1),
+
+  /// Adds [CameraDelta.amount] degrees to the current bearing.
+  bearing(2),
+
+  /// Adds [CameraDelta.amount] degrees to the current pitch, so a positive
+  /// amount tilts the camera further from straight down.
+  pitch(3);
+
+  const CameraDeltaKind(this.rawValue);
+
+  /// Native camera delta kind value.
+  final int rawValue;
+}
+
+/// One relative camera operation.
+final class CameraDelta {
+  /// Creates a relative camera operation.
+  const CameraDelta({
+    this.kind = CameraDeltaKind.move,
+    this.offset = const ScreenPoint(0, 0),
+    this.amount = 0,
+    this.anchor,
+    this.animation = const AnimationOptions(),
+  });
+
+  /// Which relative operation to apply.
+  final CameraDeltaKind kind;
+
+  /// Pan distance in logical pixels, read by [CameraDeltaKind.move].
+  final ScreenPoint offset;
+
+  /// Scalar read by every kind except [CameraDeltaKind.move].
+  final double amount;
+
+  /// Optional viewport anchor held fixed, read by [CameraDeltaKind.scale] and
+  /// [CameraDeltaKind.bearing].
+  final ScreenPoint? anchor;
+
+  /// Transition behavior for this operation.
+  final AnimationOptions animation;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CameraDelta &&
+      other.kind == kind &&
+      other.offset == offset &&
+      other.amount == amount &&
+      other.anchor == anchor &&
+      other.animation == animation;
+
+  @override
+  int get hashCode => Object.hash(kind, offset, amount, anchor, animation);
 }
 
 /// Optional fitting controls for camera-for-viewport queries.

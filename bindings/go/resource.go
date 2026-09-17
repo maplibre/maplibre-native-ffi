@@ -171,11 +171,13 @@ type HttpHeaderTransformCallback func(HttpHeaderTransformRequest) []HttpHeader
 type ResourceProviderCallback func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision
 
 // ResourceRequestCancelCallback reports that MapLibre cancelled a handled
-// resource request. Native code invokes it on the thread that discards the
-// request: the runtime owner thread inside a map or runtime call, and a MapLibre
-// thread otherwise. The callback must not call MapLibre map or runtime APIs. It
-// may complete or close the cancelled request. Panics are contained and
-// discarded.
+// resource request. Native code invokes it at most once per request, on the
+// thread that discards the request: the runtime's native worker thread when a
+// committed map or runtime command discards it, and a MapLibre worker thread
+// otherwise, never on a host thread. SetCancelCallback runs it on the calling
+// goroutine instead when the request was already cancelled. The callback must
+// not call MapLibre map or runtime APIs. It may complete or close the cancelled
+// request. Panics are contained and discarded.
 type ResourceRequestCancelCallback func()
 
 // ResourceRequestHandle owns a provider-selected native request handle.

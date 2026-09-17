@@ -152,14 +152,13 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
     /// Registers a callback that runs once when MapLibre cancels this request.
     /// </summary>
     /// <remarks>
-    /// The callback runs on the thread that discards the request: the runtime
-    /// owner thread inside a map or runtime call, and a MapLibre thread
-    /// otherwise. It runs only for a request the provider has not completed,
-    /// and it may complete or close this handle. When the request is already
-    /// cancelled, the callback runs on the calling thread before this method
-    /// returns, as part of this call: a concurrent <see cref="Close" /> on
-    /// another thread does not wait for it. A request accepts one
-    /// registration, and a second registration throws
+    /// The callback runs once, on the thread that discards the request: the runtime's native
+    /// scheduler thread when a committed map or runtime command discards it, and a MapLibre worker
+    /// thread otherwise, never a host thread. The one exception is a request that is already
+    /// cancelled, whose callback this method runs on the calling thread before returning; a
+    /// concurrent <see cref="Close" /> on another thread does not wait for that one. The callback
+    /// runs only for a request the provider has not completed, and it may complete or close this
+    /// handle. A request accepts one registration, and a second registration throws
     /// <see cref="InvalidStateException" />.
     /// </remarks>
     public void SetCancelCallback(Action callback)

@@ -1,5 +1,6 @@
-#include <CoreFoundation/CoreFoundation.h>
 #include <mln/util/i18n.hpp>
+
+#include <CoreFoundation/CoreFoundation.h>
 
 namespace mln::util::i18n {
 

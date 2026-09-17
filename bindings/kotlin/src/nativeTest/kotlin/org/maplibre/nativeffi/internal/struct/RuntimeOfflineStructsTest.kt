@@ -10,8 +10,6 @@ import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.alloc
-import kotlinx.cinterop.allocArray
-import kotlinx.cinterop.cstr
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
@@ -20,13 +18,11 @@ import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toCValues
 import org.maplibre.nativeffi.error.InvalidArgumentException
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
-import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION
 import org.maplibre.nativeffi.internal.c.mln_offline_region_definition
@@ -34,14 +30,11 @@ import org.maplibre.nativeffi.internal.c.mln_offline_region_info
 import org.maplibre.nativeffi.internal.c.mln_offline_tile_pyramid_region_definition
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_payload
-import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.internal.memory.CSize
 import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.map.TileOperation
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.render.RenderMode
-import org.maplibre.nativeffi.runtime.OfflineOperationKind
-import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 
 @OptIn(ExperimentalForeignApi::class)
@@ -123,112 +116,6 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   }
 
   @Test
-  fun offlineRegionSnapshotCopiesInfoAndDestroysNativeHandle() {
-    memScoped {
-      var destroys = 0
-      val metadata = allocArray<UByteVar>(2)
-      metadata[0] = 4U
-      metadata[1] = 5U
-      val snapshot = SyntheticHandles.offlineRegionSnapshot()
-      val styleUrl = "asset://offline-style.json".cstr.getPointer(this)
-
-      val info =
-        RuntimeStructs.offlineRegionSnapshot(
-          snapshot,
-          getter = { _, outInfo ->
-            fillValidOfflineRegionInfo(outInfo.pointed, styleUrl, metadata, 2.toCSize())
-            MaplibreStatus.OK.nativeCode
-          },
-          destroyer = { destroys++ },
-        )
-
-      assertEquals(7, info.id)
-      assertEquals(validTilePyramidDefinition(), info.definition)
-      assertContentEquals(byteArrayOf(4, 5), info.metadata)
-      assertEquals(1, destroys)
-    }
-  }
-
-  @Test
-  fun offlineRegionSnapshotDestroysNativeHandleWhenCopyFails() {
-    memScoped {
-      var destroys = 0
-      val metadata = alloc<UByteVar>()
-      val snapshot = SyntheticHandles.offlineRegionSnapshot()
-
-      assertFailsWith<IllegalArgumentException> {
-        RuntimeStructs.offlineRegionSnapshot(
-          snapshot,
-          getter = { _, outInfo ->
-            fillOfflineRegionInfoWithOversizedMetadata(outInfo.pointed, metadata.ptr)
-            MaplibreStatus.OK.nativeCode
-          },
-          destroyer = { destroys++ },
-        )
-      }
-
-      assertEquals(1, destroys)
-    }
-  }
-
-  @Test
-  fun offlineRegionListCopiesInfoAndDestroysNativeHandle() {
-    memScoped {
-      var destroys = 0
-      val metadata = allocArray<UByteVar>(1)
-      metadata[0] = 6U
-      val list = SyntheticHandles.offlineRegionList()
-      val styleUrl = "asset://offline-style.json".cstr.getPointer(this)
-
-      val regions =
-        RuntimeStructs.offlineRegionList(
-          list,
-          counter = { _, outCount ->
-            outCount[0] = 1.toCSize()
-            MaplibreStatus.OK.nativeCode
-          },
-          getter = { _, _, outInfo ->
-            fillValidOfflineRegionInfo(outInfo.pointed, styleUrl, metadata, 1.toCSize())
-            MaplibreStatus.OK.nativeCode
-          },
-          destroyer = { destroys++ },
-        )
-
-      assertEquals(1, regions.size)
-      assertEquals(7, regions.single().id)
-      assertEquals(validTilePyramidDefinition(), regions.single().definition)
-      assertContentEquals(byteArrayOf(6), regions.single().metadata)
-      assertEquals(1, destroys)
-    }
-  }
-
-  @Test
-  fun offlineRegionListDestroysNativeHandleWhenCopyFails() {
-    memScoped {
-      var destroys = 0
-      val metadata = alloc<UByteVar>()
-      val list = SyntheticHandles.offlineRegionList()
-
-      assertFailsWith<IllegalArgumentException> {
-        RuntimeStructs.offlineRegionList(
-          list,
-          counter = { _, outCount ->
-            outCount[0] = 1.toCSize()
-            MaplibreStatus.OK.nativeCode
-          },
-          getter = { _, _, outInfo ->
-            fillOfflineRegionInfoWithOversizedMetadata(outInfo.pointed, metadata.ptr)
-            MaplibreStatus.OK.nativeCode
-          },
-          destroyer = { destroys++ },
-        )
-      }
-
-      assertEquals(1, destroys)
-    }
-  }
-
-  @Test
   fun unknownRuntimePayloadCopiesTheWholeUnionWindow() {
     memScoped {
       val event = alloc<mln_runtime_event>()
@@ -304,26 +191,6 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(2L, tilePayload.tileId.canonicalZ)
       assertEquals(3L, tilePayload.tileId.canonicalX)
       assertEquals(4L, tilePayload.tileId.canonicalY)
-    }
-  }
-
-  @Test
-  fun offlineOperationCompletedPreservesOperationIdBitPattern() {
-    memScoped {
-      val event = alloc<mln_runtime_event>()
-      event.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
-      event.payload.offline_operation_completed.operation_id = Long.MAX_VALUE.toULong() + 1UL
-      event.payload.offline_operation_completed.operation_kind = 902U
-      event.payload.offline_operation_completed.result_kind = 903U
-
-      val result =
-        RuntimeStructs.payload(event, eventSize) as RuntimeEventPayload.OfflineOperationCompleted
-
-      assertEquals((Long.MAX_VALUE.toULong() + 1UL).toLong(), result.operationId)
-      assertEquals(OfflineOperationKind(902), result.operationKind)
-      assertEquals(902, result.operationKind.nativeValue)
-      assertEquals(OfflineOperationResultKind(903), result.resultKind)
-      assertEquals(903, result.resultKind.nativeValue)
     }
   }
 

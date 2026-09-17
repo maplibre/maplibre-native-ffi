@@ -5,7 +5,6 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 
 import '../c/maplibre_native_c.g.dart' as raw;
-import '../lifecycle/native_handles.dart';
 import '../status/status.dart';
 
 /// Runs [body] with native allocations that are released when [body] returns.
@@ -61,26 +60,6 @@ raw.mln_buffer_view nativeBufferView(Uint8List value, Allocator allocator) {
   view.ref.data = data.cast<Void>();
   view.ref.size = value.length;
   return view.ref;
-}
-
-/// Copies and destroys an owned native buffer.
-Uint8List copyOwnedBuffer(NativeOwnedBufferHandle buffer) {
-  if (buffer.isNull) return Uint8List(0);
-  try {
-    return withNativeArena((arena) {
-      final view = arena<raw.mln_buffer_view>();
-      checkNativeStatus(
-        raw.mln_buffer_get(buffer.raw, view),
-        () => 'failed to read native buffer',
-      );
-      if (view.ref.size == 0) return Uint8List(0);
-      return Uint8List.fromList(
-        view.ref.data.cast<Uint8>().asTypedList(view.ref.size),
-      );
-    });
-  } finally {
-    raw.mln_buffer_destroy(buffer.raw);
-  }
 }
 
 /// Encodes [value] as an explicit-length UTF-8 string view for one native call.

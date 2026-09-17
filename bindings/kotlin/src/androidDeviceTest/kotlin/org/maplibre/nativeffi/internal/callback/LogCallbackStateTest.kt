@@ -1,99 +1,87 @@
 package org.maplibre.nativeffi.internal.callback
 
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.log.LogRecord
+import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.map.MapOptions
+import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.runtime.runSuspendTest
+import org.maplibre.nativeffi.runtime.use
 
 class LogCallbackStateTest {
   @Test
-  fun callbackClosureWaitsForEnteredCallbacksAndSupportsClosureFromCallback() {
-    val entered = CountDownLatch(1)
-    val release = CountDownLatch(1)
-    val state =
-      install(
-        LogCallback {
-          entered.countDown()
-          release.await(5, TimeUnit.SECONDS)
-          true
-        }
-      )
-    val invocation = thread { state.invoke(0, 0, 0, null) }
-    assertTrue(entered.await(5, TimeUnit.SECONDS))
-    val closed = CountDownLatch(1)
-    val closer = thread {
-      state.close()
-      closed.countDown()
-    }
-    assertFalse(closed.await(50, TimeUnit.MILLISECONDS))
-    release.countDown()
-    invocation.join()
-    closer.join()
+  fun callbackContainsFailuresAndStopsAfterClose() {
+    val state = LogCallbackState(LogCallback { true })
+    assertEquals(1, state.invoke(1, 0, 0, null))
+    state.close()
+    assertEquals(0, state.invoke(1, 0, 0, null))
     assertTrue(state.isClosedForTesting())
 
-    lateinit var reentrant: LogCallbackState
-    reentrant =
-      install(
+    val throwing = LogCallbackState(LogCallback { error("contained") })
+    assertEquals(0, throwing.invoke(1, 0, 0, null))
+    throwing.close()
+  }
+
+  @Test
+  fun callbackKeepsRawSeverityAndEventValues() {
+    var copied: LogRecord? = null
+    val state =
+      LogCallbackState(
         LogCallback {
-          reentrant.close()
+          copied = it
           true
         }
       )
-    assertEquals(1, reentrant.invoke(0, 0, 0, null))
-    assertTrue(reentrant.isClosedForTesting())
-    LogCallbackState.clearForTesting()
-  }
-
-  @Test
-  fun replacementPreservesRawEnumsAndFailedReplacementKeepsPreviousState() {
-    var copied: LogRecord? = null
     try {
-      val previous =
-        install(
-          LogCallback {
-            copied = it
-            false
-          }
-        )
-      assertFailsWith<IllegalStateException> {
-        LogCallbackState.setForTesting(LogCallback { true }) { error("registration failed") }
-      }
-      assertSame(previous, LogCallbackState.currentForTesting())
-      assertFalse(previous.isClosedForTesting())
-      previous.invoke(991, 992, 7, null)
-      assertEquals(991, copied?.severity?.nativeValue)
-      assertEquals(992, copied?.event?.nativeValue)
-
-      LogCallbackState.setForTesting(LogCallback { true })
-      assertTrue(previous.isClosedForTesting())
+      assertEquals(1, state.invoke(991, 992, 7, null))
     } finally {
-      LogCallbackState.clearForTesting()
+      state.close()
     }
+    assertEquals(991, copied?.severity?.nativeValue)
+    assertEquals(992, copied?.event?.nativeValue)
+    assertEquals(7, copied?.code)
   }
 
   @Test
-  fun elevenReplacementsKeepTheSharedThunkCallable() {
+  fun elevenRegistrationsKeepTheSharedThunkCallable(): Unit = runSuspendTest {
+    var dispatched = -1
     try {
       repeat(11) { index ->
-        LogCallbackState.setForTesting(LogCallback { it.code == index.toLong() })
-        val state = assertNotNull(LogCallbackState.currentForTesting())
-        assertEquals(1, state.invoke(0, 0, index.toLong(), null))
+        Maplibre.setLogCallback(
+          LogCallback {
+            dispatched = index
+            true
+          }
+        )
       }
+      // JavaCPP shares one upcall thunk across registrations, so the eleventh must still
+      // dispatch to the callback it installed.
+      RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+        MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+            },
+          )
+          .await()
+          .use { map ->
+            map
+              .setStyleJson(
+                """{"version":8,"center":false,"sources":{},"layers":[]}""".encodeToByteArray()
+              )
+              .await()
+            runtime.barrier().await()
+          }
+      }
+      assertEquals(10, dispatched)
     } finally {
-      LogCallbackState.clearForTesting()
+      Maplibre.clearLogCallback()
     }
-  }
-
-  private fun install(callback: LogCallback): LogCallbackState {
-    LogCallbackState.setForTesting(callback)
-    return assertNotNull(LogCallbackState.currentForTesting())
   }
 }

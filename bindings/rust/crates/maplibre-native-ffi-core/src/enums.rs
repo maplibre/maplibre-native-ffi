@@ -25,16 +25,17 @@ bitflags::bitflags! {
     }
 }
 
-/// How a session's OpenGL context relates to the thread that attached it.
+/// How a session's OpenGL context relates to its driver thread and host graphics
+/// state.
 ///
 /// A shared session leaves the thread as it found it: every render makes the
 /// session context current and restores whatever was current before. The
 /// session context joins the host share group the descriptor names, so a host
 /// may hand the session a texture and sample it from its own context.
 ///
-/// A dedicated session owns the thread. It makes its context current once and
-/// keeps it current between renders, and it joins no share group. Use this when
-/// a thread exists to drive one render session and runs no other graphics work.
+/// A dedicated session owns its driver thread's context. It keeps the context
+/// current between renders and joins no share group. The driver may be a native
+/// core worker or a dedicated host thread.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum OpenGLContextOwnership {
@@ -162,8 +163,6 @@ bitflags::bitflags! {
             sys::MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR;
         const OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED =
             sys::MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED;
-        const OFFLINE_OPERATION_COMPLETED =
-            sys::MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED;
         /// Selects every map-originated event type this version defines.
         const ALL_MAP_EVENTS = sys::MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS;
         /// Selects every runtime-originated event type this version defines.
@@ -195,103 +194,6 @@ impl AmbientCacheOperation {
 
     pub const fn to_native(self) -> u32 {
         self.raw_value()
-    }
-}
-
-/// Offline database operation kind reported by completion events.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum OfflineOperationKind {
-    AmbientCache,
-    RegionCreate,
-    RegionGet,
-    RegionsList,
-    RegionsMergeDatabase,
-    RegionUpdateMetadata,
-    RegionGetStatus,
-    RegionSetObserved,
-    RegionSetDownloadState,
-    RegionInvalidate,
-    RegionDelete,
-    SetMaximumAmbientCacheSize,
-    Unknown(u32),
-}
-
-impl OfflineOperationKind {
-    pub fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_OFFLINE_OPERATION_AMBIENT_CACHE => Self::AmbientCache,
-            sys::MLN_OFFLINE_OPERATION_REGION_CREATE => Self::RegionCreate,
-            sys::MLN_OFFLINE_OPERATION_REGION_GET => Self::RegionGet,
-            sys::MLN_OFFLINE_OPERATION_REGIONS_LIST => Self::RegionsList,
-            sys::MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE => Self::RegionsMergeDatabase,
-            sys::MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA => Self::RegionUpdateMetadata,
-            sys::MLN_OFFLINE_OPERATION_REGION_GET_STATUS => Self::RegionGetStatus,
-            sys::MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED => Self::RegionSetObserved,
-            sys::MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE => Self::RegionSetDownloadState,
-            sys::MLN_OFFLINE_OPERATION_REGION_INVALIDATE => Self::RegionInvalidate,
-            sys::MLN_OFFLINE_OPERATION_REGION_DELETE => Self::RegionDelete,
-            sys::MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE => {
-                Self::SetMaximumAmbientCacheSize
-            }
-            _ => Self::Unknown(raw),
-        }
-    }
-
-    pub fn raw_value(self) -> u32 {
-        match self {
-            Self::AmbientCache => sys::MLN_OFFLINE_OPERATION_AMBIENT_CACHE,
-            Self::RegionCreate => sys::MLN_OFFLINE_OPERATION_REGION_CREATE,
-            Self::RegionGet => sys::MLN_OFFLINE_OPERATION_REGION_GET,
-            Self::RegionsList => sys::MLN_OFFLINE_OPERATION_REGIONS_LIST,
-            Self::RegionsMergeDatabase => sys::MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE,
-            Self::RegionUpdateMetadata => sys::MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA,
-            Self::RegionGetStatus => sys::MLN_OFFLINE_OPERATION_REGION_GET_STATUS,
-            Self::RegionSetObserved => sys::MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED,
-            Self::RegionSetDownloadState => sys::MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE,
-            Self::RegionInvalidate => sys::MLN_OFFLINE_OPERATION_REGION_INVALIDATE,
-            Self::RegionDelete => sys::MLN_OFFLINE_OPERATION_REGION_DELETE,
-            Self::SetMaximumAmbientCacheSize => {
-                sys::MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE
-            }
-            Self::Unknown(raw) => raw,
-        }
-    }
-}
-
-/// Offline database operation result kind reported by completion events.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum OfflineOperationResultKind {
-    None,
-    Region,
-    OptionalRegion,
-    RegionList,
-    RegionStatus,
-    Unknown(u32),
-}
-
-impl OfflineOperationResultKind {
-    pub fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_OFFLINE_OPERATION_RESULT_NONE => Self::None,
-            sys::MLN_OFFLINE_OPERATION_RESULT_REGION => Self::Region,
-            sys::MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION => Self::OptionalRegion,
-            sys::MLN_OFFLINE_OPERATION_RESULT_REGION_LIST => Self::RegionList,
-            sys::MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS => Self::RegionStatus,
-            _ => Self::Unknown(raw),
-        }
-    }
-
-    pub fn raw_value(self) -> u32 {
-        match self {
-            Self::None => sys::MLN_OFFLINE_OPERATION_RESULT_NONE,
-            Self::Region => sys::MLN_OFFLINE_OPERATION_RESULT_REGION,
-            Self::OptionalRegion => sys::MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION,
-            Self::RegionList => sys::MLN_OFFLINE_OPERATION_RESULT_REGION_LIST,
-            Self::RegionStatus => sys::MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS,
-            Self::Unknown(raw) => raw,
-        }
     }
 }
 
@@ -681,7 +583,6 @@ pub enum RuntimeEventType {
     OfflineRegionStatusChanged,
     OfflineRegionResponseError,
     OfflineRegionTileCountLimitExceeded,
-    OfflineOperationCompleted,
     Unknown(u32),
 }
 
@@ -718,7 +619,6 @@ impl RuntimeEventType {
             sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED => {
                 Self::OfflineRegionTileCountLimitExceeded
             }
-            sys::MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED => Self::OfflineOperationCompleted,
             _ => Self::Unknown(raw),
         }
     }
@@ -757,7 +657,6 @@ impl RuntimeEventType {
             Self::OfflineRegionTileCountLimitExceeded => {
                 sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
             }
-            Self::OfflineOperationCompleted => sys::MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED,
             Self::Unknown(raw) => raw,
         }
     }
@@ -800,35 +699,6 @@ impl RenderMode {
         match raw {
             sys::MLN_RENDER_MODE_PARTIAL => Self::Partial,
             sys::MLN_RENDER_MODE_FULL => Self::Full,
-            _ => Self::Unknown(raw),
-        }
-    }
-}
-
-/// Outcome of a successful render-update call.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum RenderResult {
-    /// The call rendered a frame into the render target.
-    Rendered,
-    /// The call produced no frame. Wait for a render-update-available event.
-    NoUpdate,
-    /// The map has not applied the session's current size yet. Wait for the
-    /// next render-update-available event.
-    SizePending,
-    /// The render target had no frame to draw into. Wait for a host event that
-    /// changes the target, or back off and retry.
-    TargetNotReady,
-    Unknown(u32),
-}
-
-impl RenderResult {
-    pub fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_RENDER_RESULT_RENDERED => Self::Rendered,
-            sys::MLN_RENDER_RESULT_NO_UPDATE => Self::NoUpdate,
-            sys::MLN_RENDER_RESULT_SIZE_PENDING => Self::SizePending,
-            sys::MLN_RENDER_RESULT_TARGET_NOT_READY => Self::TargetNotReady,
             _ => Self::Unknown(raw),
         }
     }

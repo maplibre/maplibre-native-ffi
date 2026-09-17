@@ -28,11 +28,12 @@ zig build --build-file ../../build.zig \
 
 [tasks.test]
 extends = "ffi:preset"
-# The preset selects the runner: an iOS or tvOS simulator preset spawns the
-# suite on a simulator, and host presets run in process.
+# The preset selects the runner: Android presets use their matching emulator,
+# an iOS or tvOS simulator preset spawns the suite on a simulator, and host
+# presets run in process.
 run = '''
 case "$usage_preset" in
-  android-x64-*)
+  android-arm64-* | android-x64-*)
     source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
     exec zig build test --build-file ../../build.zig \
       -Doptimize=ReleaseSafe \
@@ -42,7 +43,7 @@ case "$usage_preset" in
       --test-timeout 180s --summary all --verbose
     ;;
   android-*)
-    echo "The Android emulator runs x64 guests only; check $usage_preset with //bindings/zig:build and test an Android x64 preset instead." >&2
+    echo "The Android emulator runs arm64 and x64 guests; check $usage_preset with //bindings/zig:build and test an android-arm64 or android-x64 preset instead." >&2
     exit 2
     ;;
   ios-simulator-*)

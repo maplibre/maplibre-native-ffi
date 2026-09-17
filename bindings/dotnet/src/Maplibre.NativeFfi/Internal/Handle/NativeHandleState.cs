@@ -24,7 +24,6 @@ internal sealed class NativeHandleState<T>
     private T handle;
     private bool closed;
     private bool releaseInProgress;
-    private int activeUses;
 
     internal NativeHandleState(T handle, StatusDestroy<T> destroy, string typeName)
     {
@@ -106,49 +105,6 @@ internal sealed class NativeHandleState<T>
         }
 
         return handle;
-    }
-
-    /// <summary>
-    /// Runs <paramref name="use" /> with the handle and with release held off until it returns.
-    /// </summary>
-    /// <remarks>
-    /// Handles the host may use and release from different threads go through this, so a release
-    /// that begins mid-call waits for the call to finish and a losing race reports this wrapper's
-    /// closed-handle error rather than the C API's rejection of a retired id. Owner-thread-only
-    /// handles get that ordering from the owner-thread rule and can read <see cref="Handle" />
-    /// directly. <paramref name="use" /> runs outside the lock; calling <see cref="Close" /> from
-    /// inside it on the same thread deadlocks.
-    /// </remarks>
-    internal TResult WithLive<TResult>(Func<T, TResult> use)
-    {
-        T live;
-        lock (gate)
-        {
-            live = HandleLocked();
-            activeUses++;
-        }
-
-        try
-        {
-            return use(live);
-        }
-        finally
-        {
-            lock (gate)
-            {
-                activeUses--;
-                Monitor.PulseAll(gate);
-            }
-        }
-    }
-
-    internal void WithLive(Action<T> use)
-    {
-        WithLive<object?>(handle =>
-        {
-            use(handle);
-            return null;
-        });
     }
 
     internal void Close()
@@ -239,12 +195,6 @@ internal sealed class NativeHandleState<T>
         }
 
         releaseInProgress = true;
-
-        // Uses that already read the handle still hold it; wait for them before destroying it.
-        while (activeUses > 0)
-        {
-            Monitor.Wait(gate);
-        }
 
         return true;
     }

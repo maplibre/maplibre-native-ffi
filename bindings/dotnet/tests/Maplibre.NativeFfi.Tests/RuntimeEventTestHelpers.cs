@@ -1,12 +1,31 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Struct;
 using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Runtime;
+using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
+
+internal static class TestStyles
+{
+    /// <summary>A valid style document with no sources and no layers.</summary>
+    internal static byte[] Empty => """{"version":8,"sources":{},"layers":[]}"""u8.ToArray();
+}
+
+internal static class TestHandles
+{
+    /// <summary>Creates a map, failing the test rather than hanging when creation stalls.</summary>
+    internal static MapHandle CreateMap(RuntimeHandle runtime, MapOptions options) =>
+        MapHandle
+            .CreateAsync(runtime, options)
+            .WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken)
+            .GetAwaiter()
+            .GetResult();
+}
 
 internal static unsafe class RuntimeEventTestHelpers
 {
@@ -21,8 +40,7 @@ internal static unsafe class RuntimeEventTestHelpers
     {
         for (var attempt = 0; attempt < 1000; attempt++)
         {
-            runtime.Pump(TimeSpan.Zero);
-            foreach (var runtimeEvent in runtime.DrainEvents().Events)
+            foreach (var runtimeEvent in runtime.DrainEvents())
             {
                 if (
                     runtimeEvent.Type == eventType
@@ -40,23 +58,95 @@ internal static unsafe class RuntimeEventTestHelpers
         throw new TimeoutException($"Timed out waiting for map event {eventType}.");
     }
 
-    /// <summary>Pumps and drains until one batch reports no events.</summary>
+    /// <summary>
+    /// Waits for the command to fail, asserts it carries the expected status and a diagnostic, and
+    /// returns the completion.
+    /// </summary>
+    internal static CommandCompletion AssertFailed(
+        Task<CommandCompletion> command,
+        MaplibreStatus expectedStatus
+    )
+    {
+        var completion = command.GetAwaiter().GetResult();
+        Assert.Equal(CommandDisposition.Failed, completion.Disposition);
+        Assert.Equal((int)expectedStatus, completion.RawStatus);
+        Assert.NotEmpty(completion.Diagnostic);
+        return completion;
+    }
+
+    /// <summary>
+    /// Waits for a map command to commit, asserts it published a generation, and returns the
+    /// completion.
+    /// </summary>
+    internal static CommandCompletion AssertCommitted(Task<CommandCompletion> command)
+    {
+        var completion = command.GetAwaiter().GetResult();
+        Assert.Equal(CommandDisposition.Committed, completion.Disposition);
+        Assert.Equal((int)MaplibreStatus.Ok, completion.RawStatus);
+        Assert.NotEqual(0ul, completion.Generation);
+        return completion;
+    }
+
+    /// <summary>
+    /// Waits for a runtime command to commit and returns the completion. A runtime-scoped command
+    /// publishes no map snapshot, so its completion carries generation zero.
+    /// </summary>
+    internal static CommandCompletion AssertRuntimeCommitted(Task<CommandCompletion> command)
+    {
+        var completion = command.GetAwaiter().GetResult();
+        Assert.Equal(CommandDisposition.Committed, completion.Disposition);
+        Assert.Equal((int)MaplibreStatus.Ok, completion.RawStatus);
+        Assert.Equal(0ul, completion.Generation);
+        return completion;
+    }
+
+    /// <summary>Drains until one batch reports no events.</summary>
     internal static List<RuntimeEvent> DrainUntilIdle(RuntimeHandle runtime)
     {
         var events = new List<RuntimeEvent>();
         for (var attempt = 0; attempt < 100; attempt++)
         {
-            runtime.Pump(TimeSpan.Zero);
+            Thread.Sleep(1);
             var batch = runtime.DrainEvents();
-            if (batch.Events.Count == 0)
+            if (batch.Count == 0)
             {
                 return events;
             }
 
-            events.AddRange(batch.Events);
+            events.AddRange(batch);
         }
 
         throw new TimeoutException("The runtime kept producing events while idle.");
+    }
+
+    /// <param name="LastBatch">The one drained batch that satisfied the predicate.</param>
+    /// <param name="All">Every event drained up to and including that batch.</param>
+    internal sealed record DrainedEvents(
+        IReadOnlyList<RuntimeEvent> LastBatch,
+        IReadOnlyList<RuntimeEvent> All
+    );
+
+    /// <summary>Drains until one batch satisfies <paramref name="isSatisfied" />.</summary>
+    internal static DrainedEvents DrainUntil(
+        RuntimeHandle runtime,
+        Func<IReadOnlyList<RuntimeEvent>, bool> isSatisfied
+    )
+    {
+        var everything = new List<RuntimeEvent>();
+        for (var attempt = 0; attempt < 1000; attempt++)
+        {
+            // Sleeping first lets one batch carry the events a command produces together, which a
+            // caller that asserts on queue order within a batch depends on.
+            Thread.Sleep(1);
+            var batch = runtime.DrainEvents();
+            everything.AddRange(batch);
+            if (isSatisfied(batch))
+            {
+                return new DrainedEvents(batch, everything);
+            }
+        }
+
+        throw new TimeoutException("Timed out waiting for the expected runtime events.");
     }
 
     /// <summary>
@@ -88,9 +178,9 @@ internal static unsafe class RuntimeEventTestHelpers
         fixed (byte* recordBytes = records)
         fixed (byte* messageBytes = messages)
         {
-            var batch = new mln_runtime_event_batch
+            var batch = new mln_runtime_event_batch_view
             {
-                size = (uint)Unsafe.SizeOf<mln_runtime_event_batch>(),
+                size = (uint)Unsafe.SizeOf<mln_runtime_event_batch_view>(),
                 event_size = eventSize,
                 events = (mln_runtime_event*)recordBytes,
                 event_count = eventCount,

@@ -95,10 +95,6 @@ func (feature QueriedFeature) Equal(other QueriedFeature) bool {
 		equalOptionalBytes(feature.State, other.State)
 }
 
-func equalOptionalBytes(left []byte, right []byte) bool {
-	return (left == nil) == (right == nil) && bytes.Equal(left, right)
-}
-
 // FeatureStateSelector selects feature state by source, feature, and key.
 type FeatureStateSelector struct {
 	SourceID      string
@@ -193,14 +189,15 @@ func (geometry cRenderedQueryGeometry) free() {
 }
 
 type cRenderedFeatureQueryOptions struct {
-	raw      *C.mln_rendered_feature_query_options
-	layerIDs cStringViewArray
-	filter   cBufferView
+	raw        *C.mln_rendered_feature_query_options
+	layerIDs   cStringViewArray
+	filter     cBufferView
+	filterSlot cBufferViewSlot
 }
 
-func newCRenderedFeatureQueryOptions(options *RenderedFeatureQueryOptions) (*cRenderedFeatureQueryOptions, error) {
+func newCRenderedFeatureQueryOptions(options *RenderedFeatureQueryOptions) *cRenderedFeatureQueryOptions {
 	if options == nil {
-		return nil, nil
+		return nil
 	}
 	raw := &cRenderedFeatureQueryOptions{
 		raw: (*C.mln_rendered_feature_query_options)(C.malloc(C.size_t(unsafe.Sizeof(C.mln_rendered_feature_query_options{})))),
@@ -214,9 +211,10 @@ func newCRenderedFeatureQueryOptions(options *RenderedFeatureQueryOptions) (*cRe
 	}
 	if options.Filter != nil {
 		raw.filter = newCBufferView(options.Filter)
-		raw.raw.filter = raw.filter.ptr()
+		raw.filterSlot = newCBufferViewSlot(raw.filter)
+		raw.raw.filter = raw.filterSlot.ptr()
 	}
-	return raw, nil
+	return raw
 }
 
 func (options *cRenderedFeatureQueryOptions) ptr() *C.mln_rendered_feature_query_options {
@@ -232,20 +230,22 @@ func (options *cRenderedFeatureQueryOptions) free() {
 	}
 	options.layerIDs.free()
 	options.filter.free()
+	options.filterSlot.free()
 	if options.raw != nil {
 		C.free(unsafe.Pointer(options.raw))
 	}
 }
 
 type cSourceFeatureQueryOptions struct {
-	raw      *C.mln_source_feature_query_options
-	layerIDs cStringViewArray
-	filter   cBufferView
+	raw        *C.mln_source_feature_query_options
+	layerIDs   cStringViewArray
+	filter     cBufferView
+	filterSlot cBufferViewSlot
 }
 
-func newCSourceFeatureQueryOptions(options *SourceFeatureQueryOptions) (*cSourceFeatureQueryOptions, error) {
+func newCSourceFeatureQueryOptions(options *SourceFeatureQueryOptions) *cSourceFeatureQueryOptions {
 	if options == nil {
-		return nil, nil
+		return nil
 	}
 	raw := &cSourceFeatureQueryOptions{
 		raw: (*C.mln_source_feature_query_options)(C.malloc(C.size_t(unsafe.Sizeof(C.mln_source_feature_query_options{})))),
@@ -259,9 +259,10 @@ func newCSourceFeatureQueryOptions(options *SourceFeatureQueryOptions) (*cSource
 	}
 	if options.Filter != nil {
 		raw.filter = newCBufferView(options.Filter)
-		raw.raw.filter = raw.filter.ptr()
+		raw.filterSlot = newCBufferViewSlot(raw.filter)
+		raw.raw.filter = raw.filterSlot.ptr()
 	}
-	return raw, nil
+	return raw
 }
 
 func (options *cSourceFeatureQueryOptions) ptr() *C.mln_source_feature_query_options {
@@ -277,79 +278,54 @@ func (options *cSourceFeatureQueryOptions) free() {
 	}
 	options.layerIDs.free()
 	options.filter.free()
+	options.filterSlot.free()
 	if options.raw != nil {
 		C.free(unsafe.Pointer(options.raw))
 	}
 }
 
-// QueryRenderedFeatures queries rendered features from the latest render session
-// state and returns copied hits.
-func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) ([]QueriedFeature, error) {
-	ptr, release, err := session.ptr()
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	defer session.state.KeepAlive()
+// QueryRenderedFeatures starts a query against the latest driver state.
+// The completed operation yields copied hits.
+func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) (*Future[[]QueriedFeature], error) {
 	rawGeometry := newCRenderedQueryGeometry(geometry)
 	defer rawGeometry.free()
-	rawOptions, err := newCRenderedFeatureQueryOptions(options)
-	if err != nil {
-		return nil, newBindingError(ErrInvalidArgument, err.Error())
-	}
+	rawOptions := newCRenderedFeatureQueryOptions(options)
 	defer rawOptions.free()
-	var result C.mln_queried_feature_list
-	if err := session.withNoAcquiredFrame(func() error {
-		return checkNative(func() int32 {
-			return int32(C.mln_render_session_query_rendered_features(C.mln_render_session(ptr), rawGeometry.ptr(), rawOptions.ptr(), &result))
-		})
-	}); err != nil {
-		return nil, err
-	}
-	return queriedFeatureList(result)
+	return startRenderCompletion(session, func(s C.mln_render_session, completion *C.mln_completion) int32 {
+		return int32(C.mln_render_session_query_rendered_features(
+			s,
+			rawGeometry.ptr(),
+			rawOptions.ptr(),
+			completion,
+		))
+	}, completionQueriedFeatures)
 }
 
-// QuerySourceFeatures queries source features from the latest render session
-// state and returns copied hits.
-func (session *RenderSessionHandle) QuerySourceFeatures(sourceID string, options *SourceFeatureQueryOptions) ([]QueriedFeature, error) {
-	ptr, release, err := session.ptr()
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	defer session.state.KeepAlive()
-	sourceView := newCStringView(sourceID)
-	defer sourceView.free()
-	rawOptions, err := newCSourceFeatureQueryOptions(options)
-	if err != nil {
-		return nil, newBindingError(ErrInvalidArgument, err.Error())
-	}
+// QuerySourceFeatures starts a source query against the latest driver
+// state. The completed operation yields copied hits.
+func (session *RenderSessionHandle) QuerySourceFeatures(sourceID string, options *SourceFeatureQueryOptions) (*Future[[]QueriedFeature], error) {
+	source := newCStringView(sourceID)
+	defer source.free()
+	rawOptions := newCSourceFeatureQueryOptions(options)
 	defer rawOptions.free()
-	var result C.mln_queried_feature_list
-	if err := session.withNoAcquiredFrame(func() error {
-		return checkNative(func() int32 {
-			return int32(C.mln_render_session_query_source_features(C.mln_render_session(ptr), sourceView.raw(), rawOptions.ptr(), &result))
-		})
-	}); err != nil {
-		return nil, err
-	}
-	return queriedFeatureList(result)
+	return startRenderCompletion(session, func(s C.mln_render_session, completion *C.mln_completion) int32 {
+		return int32(C.mln_render_session_query_source_features(
+			s,
+			source.raw(),
+			rawOptions.ptr(),
+			completion,
+		))
+	}, completionQueriedFeatures)
 }
 
-func queriedFeatureList(list C.mln_queried_feature_list) ([]QueriedFeature, error) {
-	defer C.mln_queried_feature_list_destroy(list)
-	var count C.size_t
-	if err := checkNative(func() int32 { return int32(C.mln_queried_feature_list_count(list, &count)) }); err != nil {
+func completionQueriedFeatures(result *C.mln_completion_result) ([]QueriedFeature, error) {
+	raw, err := completionSlice[C.mln_queried_feature](result)
+	if err != nil {
 		return nil, err
 	}
-	features := make([]QueriedFeature, int(count))
+	features := make([]QueriedFeature, len(raw))
 	for i := range features {
-		hit := C.mln_queried_feature_default()
-		if err := checkNative(func() int32 {
-			return int32(C.mln_queried_feature_list_get(list, C.size_t(i), &hit))
-		}); err != nil {
-			return nil, err
-		}
+		hit := raw[i]
 		feature, ok := goByteSlice(hit.feature.data, hit.feature.size)
 		if !ok {
 			return nil, newBindingError(ErrNative, "native queried feature data is invalid")
@@ -375,48 +351,30 @@ func queriedFeatureList(list C.mln_queried_feature_list) ([]QueriedFeature, erro
 	return features, nil
 }
 
-// QueryFeatureExtensions queries a feature extension from the latest render
-// session state.
-//
-// feature contains one UTF-8 GeoJSON Feature. arguments, when present, contains
-// a UTF-8 JSON object. The result contains either JSON or GeoJSON bytes.
-func (session *RenderSessionHandle) QueryFeatureExtensions(sourceID string, feature []byte, extension string, extensionField string, arguments []byte) ([]byte, error) {
-	ptr, release, err := session.ptr()
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	defer session.state.KeepAlive()
-	sourceView := newCStringView(sourceID)
-	defer sourceView.free()
-	extensionView := newCStringView(extension)
-	defer extensionView.free()
-	extensionFieldView := newCStringView(extensionField)
-	defer extensionFieldView.free()
+// QueryFeatureExtensions starts a feature-extension query.
+func (session *RenderSessionHandle) QueryFeatureExtensions(sourceID string, feature []byte, extension, extensionField string, arguments []byte) (*Future[[]byte], error) {
+	source, ext, field := newCStringView(sourceID), newCStringView(extension), newCStringView(extensionField)
+	defer source.free()
+	defer ext.free()
+	defer field.free()
 	featureView := newCBufferView(feature)
 	defer featureView.free()
-	var argumentsView cBufferView
-	var rawArguments *C.mln_buffer_view
+	var argumentView cBufferView
+	var argument *C.mln_buffer_view
 	if arguments != nil {
-		argumentsView = newCBufferView(arguments)
-		defer argumentsView.free()
-		rawArguments = argumentsView.ptr()
+		argumentView = newCBufferView(arguments)
+		defer argumentView.free()
+		argument = argumentView.ptr()
 	}
-	var result C.mln_buffer
-	if err := session.withNoAcquiredFrame(func() error {
-		return checkNative(func() int32 {
-			return int32(C.mln_render_session_query_feature_extensions(
-				C.mln_render_session(ptr),
-				sourceView.raw(),
-				featureView.raw(),
-				extensionView.raw(),
-				extensionFieldView.raw(),
-				rawArguments,
-				&result,
-			))
-		})
-	}); err != nil {
-		return nil, err
-	}
-	return goOwnedBuffer(result)
+	return startRenderCompletion(session, func(s C.mln_render_session, completion *C.mln_completion) int32 {
+		return int32(C.mln_render_session_query_feature_extensions(
+			s,
+			source.raw(),
+			featureView.raw(),
+			ext.raw(),
+			field.raw(),
+			argument,
+			completion,
+		))
+	}, completionBuffer)
 }

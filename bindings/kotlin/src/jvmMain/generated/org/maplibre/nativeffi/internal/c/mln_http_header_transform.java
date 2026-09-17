@@ -18,6 +18,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     uint32_t size;
  *     mln_http_header_transform_callback callback;
  *     void *user_data;
+ *     mln_runtime_callback_release release_user_data;
  * }
  * }
  */
@@ -31,7 +32,8 @@ public class mln_http_header_transform {
         MapLibreNativeC.C_INT.withName("size"),
         MemoryLayout.paddingLayout(4),
         MapLibreNativeC.C_POINTER.withName("callback"),
-        MapLibreNativeC.C_POINTER.withName("user_data")
+        MapLibreNativeC.C_POINTER.withName("user_data"),
+        MapLibreNativeC.C_POINTER.withName("release_user_data")
     ).withName("mln_http_header_transform");
 
     /**
@@ -171,6 +173,50 @@ public class mln_http_header_transform {
      */
     public static void user_data(MemorySegment struct, MemorySegment fieldValue) {
         struct.set(user_data$LAYOUT, user_data$OFFSET, fieldValue);
+    }
+
+    private static final AddressLayout release_user_data$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("release_user_data"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * mln_runtime_callback_release release_user_data
+     * }
+     */
+    public static final AddressLayout release_user_data$layout() {
+        return release_user_data$LAYOUT;
+    }
+
+    private static final long release_user_data$OFFSET = $LAYOUT.byteOffset(groupElement("release_user_data"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * mln_runtime_callback_release release_user_data
+     * }
+     */
+    public static final long release_user_data$offset() {
+        return release_user_data$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * mln_runtime_callback_release release_user_data
+     * }
+     */
+    public static MemorySegment release_user_data(MemorySegment struct) {
+        return struct.get(release_user_data$LAYOUT, release_user_data$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * mln_runtime_callback_release release_user_data
+     * }
+     */
+    public static void release_user_data(MemorySegment struct, MemorySegment fieldValue) {
+        struct.set(release_user_data$LAYOUT, release_user_data$OFFSET, fieldValue);
     }
 
     /**

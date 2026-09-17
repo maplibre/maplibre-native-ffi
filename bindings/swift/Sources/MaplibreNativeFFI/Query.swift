@@ -99,14 +99,18 @@ public extension RenderSessionHandle {
   func queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions = RenderedFeatureQueryOptions()
-  ) throws -> [QueriedFeature] {
-    try mapNativeFailure {
-      try geometry.nativeGeometry.withNativeGeometry { nativeGeometry in
-        try options.nativeOptions.withNativeOptions { nativeOptions in
-          try NativeQuery.renderedFeatures(
-            session: requireLiveHandle(),
-            geometry: nativeGeometry,
-            options: nativeOptions
+  ) async throws -> [QueriedFeature] {
+    try await awaitNative {
+      let session = try requireLiveHandle()
+      return try geometry.nativeGeometry.withNativeGeometry { geometry in
+        try options.nativeOptions.withNativeOptions { options in
+          try NativeCompletion.start(
+            {
+              mln_render_session_query_rendered_features(
+                session.raw, geometry, options, $0
+              )
+            },
+            convert: NativeQuery.copyQueriedFeatures
           )
         }
       }
@@ -116,15 +120,19 @@ public extension RenderSessionHandle {
   func querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions = SourceFeatureQueryOptions()
-  ) throws -> [QueriedFeature] {
-    try mapNativeFailure {
+  ) async throws -> [QueriedFeature] {
+    try await awaitNative {
+      let session = try requireLiveHandle()
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      return try options.nativeOptions.withNativeOptions { nativeOptions in
-        try NativeQuery.sourceFeatures(
-          session: self.requireLiveHandle(),
-          sourceId: arena.view(sourceId),
-          options: nativeOptions
+      return try options.nativeOptions.withNativeOptions { options in
+        try NativeCompletion.start(
+          {
+            mln_render_session_query_source_features(
+              session.raw, arena.view(sourceId), options, $0
+            )
+          },
+          convert: NativeQuery.copyQueriedFeatures
         )
       }
     }
@@ -136,23 +144,32 @@ public extension RenderSessionHandle {
     extensionName: String,
     extensionField: String,
     arguments: Data? = nil
-  ) throws -> Data {
-    try mapNativeFailure {
+  ) async throws -> Data {
+    try await awaitNative {
+      let session = try requireLiveHandle()
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      let call = { (arguments: UnsafePointer<mln_buffer_view>?) throws in
-        try NativeQuery.featureExtensions(
-          session: self.requireLiveHandle(),
-          sourceId: arena.view(sourceId),
-          feature: arena.view(feature),
-          extensionName: arena.view(extensionName),
-          extensionField: arena.view(extensionField),
-          arguments: arguments
+      let start = { (arguments: UnsafePointer<mln_buffer_view>?) throws in
+        try NativeCompletion.start(
+          {
+            mln_render_session_query_feature_extensions(
+              session.raw,
+              arena.view(sourceId),
+              arena.view(feature),
+              arena.view(extensionName),
+              arena.view(extensionField),
+              arguments,
+              $0
+            )
+          },
+          convert: NativeCompletion.data
         )
       }
-      guard let arguments else { return try call(nil) }
-      var argumentsView = arena.view(arguments)
-      return try withUnsafePointer(to: &argumentsView, call)
+      if let arguments {
+        var view = arena.view(arguments)
+        return try withUnsafePointer(to: &view, start)
+      }
+      return try start(nil)
     }
   }
 }

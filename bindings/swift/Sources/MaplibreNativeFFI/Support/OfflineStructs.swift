@@ -1,18 +1,6 @@
 internal import CMaplibreNativeC
 import Foundation
 
-enum NativeAmbientCacheOperation: UInt32, Hashable {
-  case resetDatabase = 1
-  case packDatabase = 2
-  case invalidate = 3
-  case clear = 4
-}
-
-enum NativeOfflineRegionDownloadState: UInt32, Hashable {
-  case inactive = 0
-  case active = 1
-}
-
 enum NativeOfflineRegionDefinition: Equatable {
   case tilePyramid(
     styleURL: String,

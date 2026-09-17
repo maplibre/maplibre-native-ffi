@@ -1,5 +1,4 @@
 import 'dart:ffi';
-import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
@@ -7,8 +6,6 @@ import '../internal/c/maplibre_native_c.dart';
 import '../internal/c/maplibre_native_c.g.dart' as raw;
 import '../internal/status/status.dart';
 import 'native_pointer.dart';
-
-final MaplibreNativeCApi _renderTargetApi = MaplibreNativeCApi.open();
 
 /// Physical render target dimensions in device pixels.
 final class PhysicalRenderTargetSize {
@@ -60,7 +57,7 @@ final class RenderTargetExtent {
         physicalWidth,
         physicalHeight,
       );
-      checkNativeStatus(status, _renderTargetApi.threadLastErrorMessage);
+      checkNativeStatus(status, threadLastErrorMessage);
       return PhysicalRenderTargetSize(
         width: physicalWidth.value,
         height: physicalHeight.value,
@@ -74,92 +71,6 @@ int _positiveExtentDimension(int value, String name) {
     throwInvalidArgument('$name must be in 1...4294967295');
   }
   return value;
-}
-
-/// Closeable native byte buffer for reusable render readback storage.
-final class NativeBuffer implements Finalizable {
-  /// Allocates [byteLength] bytes of native memory.
-  NativeBuffer(int byteLength)
-    : this._(byteLength, _allocateNativeBuffer(byteLength));
-
-  NativeBuffer._(this.byteLength, this._pointer) {
-    _finalizer.attach(
-      this,
-      _pointer.cast<Void>(),
-      detach: _finalizerDetachToken,
-    );
-  }
-
-  static final NativeFinalizer _finalizer = NativeFinalizer(calloc.nativeFree);
-
-  /// Allocated byte length.
-  final int byteLength;
-
-  Pointer<Uint8> _pointer;
-  final Object _finalizerDetachToken = Object();
-
-  /// Whether this buffer has been freed.
-  bool get isClosed => _pointer == nullptr;
-
-  /// Native storage address for FFI integrations.
-  ///
-  /// The pointer is valid only until [close]. Prefer [copyBytes] and
-  /// [writeBytes] when direct FFI access is unnecessary.
-  NativePointer get unsafePointer {
-    if (_pointer == nullptr) {
-      throw StateError('native buffer has been closed');
-    }
-    return NativePointer(_pointer.address);
-  }
-
-  /// Copies bytes from native storage into Dart-owned memory.
-  Uint8List copyBytes({int? length}) {
-    final viewLength = length ?? byteLength;
-    if (viewLength < 0 || viewLength > byteLength) {
-      throw RangeError.range(viewLength, 0, byteLength, 'length');
-    }
-    return Uint8List.fromList(_livePointer.asTypedList(viewLength));
-  }
-
-  /// Copies [bytes] into native storage starting at [offset].
-  void writeBytes(Uint8List bytes, {int offset = 0}) {
-    if (offset < 0 || offset > byteLength) {
-      throw RangeError.range(offset, 0, byteLength, 'offset');
-    }
-    if (bytes.length > byteLength - offset) {
-      throw RangeError.range(
-        bytes.length,
-        0,
-        byteLength - offset,
-        'bytes.length',
-      );
-    }
-    (_livePointer + offset).asTypedList(bytes.length).setAll(0, bytes);
-  }
-
-  /// Frees the native storage. The buffer must not be used afterwards.
-  void close() {
-    if (_pointer == nullptr) {
-      return;
-    }
-    _finalizer.detach(_finalizerDetachToken);
-    calloc.free(_pointer);
-    _pointer = nullptr;
-  }
-
-  Pointer<Uint8> get _livePointer {
-    if (_pointer == nullptr) {
-      throw StateError('native buffer has been closed');
-    }
-    return _pointer;
-  }
-}
-
-Pointer<Uint8> _allocateNativeBuffer(int byteLength) {
-  if (byteLength <= 0) {
-    throw ArgumentError.value(byteLength, 'byteLength', 'must be positive');
-  }
-  return calloc<Uint8>(byteLength);
 }
 
 /// Metal backend context fields shared by Metal render targets.
@@ -232,7 +143,8 @@ final class OpenGLContextProviderMask {
       'OpenGLContextProviderMask[bits=0x${bits.toRadixString(16)}]';
 }
 
-/// How a session's OpenGL context relates to the thread that attached it.
+/// How a session's OpenGL context relates to its driver thread and host
+/// graphics state.
 ///
 /// Known values use the named constants. Values added by a newer compatible
 /// native library retain their raw integer through [fromRawValue].
@@ -319,10 +231,11 @@ sealed class OpenGLContextDescriptor {
     this.ownership = OpenGLContextOwnership.shared,
   });
 
-  /// Whether the session shares its thread with host graphics work.
+  /// Whether the session shares its driver thread and graphics objects with
+  /// the host.
   ///
-  /// WGL and EGL surface sessions support both. A texture session hands its
-  /// texture to the host, so it is shared only.
+  /// A private EGL owned texture is dedicated to its core worker; a target
+  /// that renders into host-visible graphics objects is shared.
   final OpenGLContextOwnership ownership;
 }
 
@@ -584,4 +497,101 @@ final class OpenGLBorrowedTextureDescriptor {
 
   /// Backend-native OpenGL texture target, such as `GL_TEXTURE_2D`.
   final int target;
+}
+
+/// WebGPU device, instance, and queue used by a render target.
+final class WebGPUContextDescriptor {
+  /// Creates a WebGPU context descriptor.
+  const WebGPUContextDescriptor({
+    this.instance = NativePointer.nullPointer,
+    required this.device,
+    this.queue = NativePointer.nullPointer,
+  });
+
+  /// Borrowed `WGPUInstance`, which a texture session may leave null.
+  final NativePointer instance;
+
+  /// Borrowed `WGPUDevice`, which every WebGPU target requires.
+  final NativePointer device;
+
+  /// Borrowed `WGPUQueue` belonging to [device]. Null uses the device's
+  /// default queue.
+  final NativePointer queue;
+}
+
+/// WebGPU native-surface attachment options.
+final class WebGPUSurfaceDescriptor {
+  /// Creates a WebGPU surface descriptor.
+  const WebGPUSurfaceDescriptor({
+    required this.extent,
+    required this.context,
+    required this.surface,
+    required this.format,
+  });
+
+  /// Logical surface extent.
+  final RenderTargetExtent extent;
+
+  /// WebGPU backend context.
+  final WebGPUContextDescriptor context;
+
+  /// Borrowed `WGPUSurface`, which stays alive for the session. The session
+  /// configures it for this device and extent, and unconfigures it at the end.
+  final NativePointer surface;
+
+  /// `WGPUTextureFormat` to configure the surface with. A browser host takes
+  /// it from `navigator.gpu.getPreferredCanvasFormat()`.
+  final int format;
+}
+
+/// WebGPU session-owned texture-ring attachment options.
+final class WebGPUOwnedTextureDescriptor {
+  /// Creates a WebGPU session-owned texture descriptor.
+  const WebGPUOwnedTextureDescriptor({
+    required this.extent,
+    required this.context,
+  });
+
+  /// Logical texture extent.
+  final RenderTargetExtent extent;
+
+  /// WebGPU backend context.
+  final WebGPUContextDescriptor context;
+}
+
+/// WebGPU caller-owned texture attachment options.
+final class WebGPUBorrowedTextureDescriptor {
+  /// Creates a WebGPU caller-owned texture descriptor.
+  const WebGPUBorrowedTextureDescriptor({
+    required this.extent,
+    required this.physicalWidth,
+    required this.physicalHeight,
+    required this.context,
+    required this.texture,
+    required this.textureView,
+    required this.format,
+  });
+
+  /// Logical texture extent.
+  final RenderTargetExtent extent;
+
+  /// Physical texture width in device pixels.
+  final int physicalWidth;
+
+  /// Physical texture height in device pixels.
+  final int physicalHeight;
+
+  /// WebGPU backend context that created [texture] and [textureView].
+  final WebGPUContextDescriptor context;
+
+  /// Borrowed `WGPUTexture`. It must be 2D, single-sample, and
+  /// render-attachment capable, and its physical size and format must match
+  /// this descriptor.
+  final NativePointer texture;
+
+  /// Borrowed 2D color `WGPUTextureView` of [texture].
+  final NativePointer textureView;
+
+  /// Backend-native `WGPUTextureFormat` value.
+  final int format;
 }

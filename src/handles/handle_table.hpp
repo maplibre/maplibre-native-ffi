@@ -23,15 +23,15 @@ enum class HandleKind : std::uint8_t {
   Map = 2,
   MapProjection = 3,
   RenderSession = 4,
-  OfflineRegionSnapshot = 5,
-  OfflineRegionList = 6,
   Buffer = 7,
-  StyleIdList = 8,
-  WakeSource = 11,
   ResourceRequest = 12,
-  StyleStringList = 13,
-  GeoJsonSourceData = 14,
-  QueriedFeatureList = 15,
+  EventBatch = 16,
+  AdapterResourceRequestQueue = 18,
+  AdapterLogQueue = 19,
+  AcquiredFrame = 20,
+  RenderFrameBatch = 21,
+  GeoJsonSourceData = 22,
+  QueriedFeatureList = 23,
 };
 
 inline constexpr auto handle_generation_bits = std::uint32_t{36};
@@ -184,6 +184,14 @@ class HandleTable {
     requires(Traits::leasable)
   {
     const std::scoped_lock lock(mutex_);
+    return lease_locked(handle);
+  }
+
+  // The same lease for a caller that already holds mutex().
+  [[nodiscard]] auto lease_locked(std::uint64_t handle) const
+    -> std::shared_ptr<Object>
+    requires(Traits::leasable)
+  {
     const auto* slot = find_slot(handle);
     if (slot == nullptr) {
       set_handle_fault_error(Traits::kind, handle, fault_for(handle));

@@ -16,9 +16,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  * {@snippet lang=c :
  * struct mln_map_options {
  *     uint32_t size;
- *     uint32_t width;
- *     uint32_t height;
- *     double scale_factor;
+ *     mln_logical_extent initial_extent;
  *     uint32_t map_mode;
  *     bool fast_pfor_enabled;
  *     uint64_t event_mask;
@@ -33,10 +31,8 @@ public class mln_map_options {
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
         MapLibreNativeC.C_INT.withName("size"),
-        MapLibreNativeC.C_INT.withName("width"),
-        MapLibreNativeC.C_INT.withName("height"),
         MemoryLayout.paddingLayout(4),
-        MapLibreNativeC.C_DOUBLE.withName("scale_factor"),
+        mln_logical_extent.layout().withName("initial_extent"),
         MapLibreNativeC.C_INT.withName("map_mode"),
         MapLibreNativeC.C_BOOL.withName("fast_pfor_enabled"),
         MemoryLayout.paddingLayout(3),
@@ -94,136 +90,48 @@ public class mln_map_options {
         struct.set(size$LAYOUT, size$OFFSET, fieldValue);
     }
 
-    private static final OfInt width$LAYOUT = (OfInt)$LAYOUT.select(groupElement("width"));
+    private static final GroupLayout initial_extent$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("initial_extent"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint32_t width
+     * mln_logical_extent initial_extent
      * }
      */
-    public static final OfInt width$layout() {
-        return width$LAYOUT;
+    public static final GroupLayout initial_extent$layout() {
+        return initial_extent$LAYOUT;
     }
 
-    private static final long width$OFFSET = $LAYOUT.byteOffset(groupElement("width"));
+    private static final long initial_extent$OFFSET = $LAYOUT.byteOffset(groupElement("initial_extent"));
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint32_t width
+     * mln_logical_extent initial_extent
      * }
      */
-    public static final long width$offset() {
-        return width$OFFSET;
+    public static final long initial_extent$offset() {
+        return initial_extent$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint32_t width
+     * mln_logical_extent initial_extent
      * }
      */
-    public static int width(MemorySegment struct) {
-        return struct.get(width$LAYOUT, width$OFFSET);
+    public static MemorySegment initial_extent(MemorySegment struct) {
+        return struct.asSlice(initial_extent$OFFSET, initial_extent$LAYOUT.byteSize());
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint32_t width
+     * mln_logical_extent initial_extent
      * }
      */
-    public static void width(MemorySegment struct, int fieldValue) {
-        struct.set(width$LAYOUT, width$OFFSET, fieldValue);
-    }
-
-    private static final OfInt height$LAYOUT = (OfInt)$LAYOUT.select(groupElement("height"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * uint32_t height
-     * }
-     */
-    public static final OfInt height$layout() {
-        return height$LAYOUT;
-    }
-
-    private static final long height$OFFSET = $LAYOUT.byteOffset(groupElement("height"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * uint32_t height
-     * }
-     */
-    public static final long height$offset() {
-        return height$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * uint32_t height
-     * }
-     */
-    public static int height(MemorySegment struct) {
-        return struct.get(height$LAYOUT, height$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * uint32_t height
-     * }
-     */
-    public static void height(MemorySegment struct, int fieldValue) {
-        struct.set(height$LAYOUT, height$OFFSET, fieldValue);
-    }
-
-    private static final OfDouble scale_factor$LAYOUT = (OfDouble)$LAYOUT.select(groupElement("scale_factor"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * double scale_factor
-     * }
-     */
-    public static final OfDouble scale_factor$layout() {
-        return scale_factor$LAYOUT;
-    }
-
-    private static final long scale_factor$OFFSET = $LAYOUT.byteOffset(groupElement("scale_factor"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * double scale_factor
-     * }
-     */
-    public static final long scale_factor$offset() {
-        return scale_factor$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * double scale_factor
-     * }
-     */
-    public static double scale_factor(MemorySegment struct) {
-        return struct.get(scale_factor$LAYOUT, scale_factor$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * double scale_factor
-     * }
-     */
-    public static void scale_factor(MemorySegment struct, double fieldValue) {
-        struct.set(scale_factor$LAYOUT, scale_factor$OFFSET, fieldValue);
+    public static void initial_extent(MemorySegment struct, MemorySegment fieldValue) {
+        MemorySegment.copy(fieldValue, 0L, struct, initial_extent$OFFSET, initial_extent$LAYOUT.byteSize());
     }
 
     private static final OfInt map_mode$LAYOUT = (OfInt)$LAYOUT.select(groupElement("map_mode"));

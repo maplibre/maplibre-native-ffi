@@ -6,20 +6,15 @@ import org.lwjgl.glfw.GLFW.glfwSetWindowContentScaleCallback
 import org.lwjgl.glfw.GLFW.glfwSetWindowSizeCallback
 import org.lwjgl.glfw.GLFW.glfwWaitEventsTimeout
 import org.lwjgl.glfw.GLFW.glfwWindowShouldClose
-import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.render.RenderBackend
 
-/**
- * The two loops the example runs on two native threads.
- *
- * GLFW requires window creation and event polling on the process main thread, so the main thread is
- * the render loop: it owns the window, input decoding, the graphics context, and the render session
- * it attaches. The spawned thread is the runtime loop: it owns the runtime and the map for their
- * whole lifetime.
- */
+/** The GLFW-thread shell that owns the window, graphics context, and render session. */
 internal object Shell {
   private const val INITIAL_WIDTH = 960
   private const val INITIAL_HEIGHT = 640
+
+  // TODO(map-example-spec): Replace the fixed interval with a display-paced host loop. See Frame
+  // loop.
   private const val IDLE_WAIT_SECONDS = 0.004
 
   fun run(mode: RenderTargetMode, backends: Set<RenderBackend>) {
@@ -28,89 +23,37 @@ internal object Shell {
       val initialViewport = Viewport.read(graphics.window())
       val viewport = ViewportHolder(initialViewport)
       initialViewport.log("initial viewport")
-
-      val commands = CommandQueue()
       val renderRequest = RenderRequest()
-      val channel = MapChannel()
-      val runtimeThread =
-        Thread(
-          { runtimeLoop(initialViewport, commands, renderRequest, channel) },
-          "maplibre-runtime",
-        )
-      runtimeThread.start()
 
-      try {
-        renderLoop(graphics, mode, viewport, commands, renderRequest, channel)
-      } finally {
-        // A map with an attached session cannot be destroyed, so the runtime loop tears down only
-        // after the render loop has closed its session.
-        channel.requestShutdown()
-        runtimeThread.join()
+      MapState.create(initialViewport).use { state ->
+        renderLoop(graphics, mode, viewport, state, renderRequest)
       }
-      channel.failure()?.let { throw it }
     }
   }
 
-  /**
-   * Owns the runtime and the map for their whole lifetime, on a thread that is not the one
-   * presenting. The render loop attaches its own session against the map published here.
-   */
-  private fun runtimeLoop(
-    viewport: Viewport,
-    commands: CommandQueue,
-    renderRequest: RenderRequest,
-    channel: MapChannel,
-  ) {
-    try {
-      MapState.create(viewport).use { state ->
-        state.acquireWakeSource().use { wake ->
-          channel.publish(state.map, wake)
-          commands.onEnqueue = { channel.wakeRuntimeLoop() }
-          try {
-            while (!channel.shutdownRequested()) {
-              state.step(commands, renderRequest)
-            }
-          } catch (error: Throwable) {
-            // Publish before the wait below, so the render loop sees the failure and closes its
-            // session rather than stalling until the bound expires.
-            channel.fail(error)
-          }
-          // A map with an attached session cannot be destroyed, so wait for the render loop to
-          // close its session before `use` tears this down.
-          channel.awaitShutdown()
-        }
-      }
-    } catch (error: Throwable) {
-      channel.fail(error)
-    }
-  }
-
-  /** The display-paced render loop. Owns the window, input, and the render session it attaches. */
   private fun renderLoop(
     graphics: GraphicsContext,
     mode: RenderTargetMode,
     viewport: ViewportHolder,
-    commands: CommandQueue,
+    state: MapState,
     renderRequest: RenderRequest,
-    channel: MapChannel,
   ) {
-    val map = awaitMap(channel) ?: return
-    val target = RenderTarget.attach(graphics, map, viewport.value, mode)
+    val target = RenderTarget.attach(graphics, state.map, viewport.value, mode)
     try {
-      InputController(graphics.window(), commands, renderRequest) { viewport.value }
+      InputController(graphics.window(), state, renderRequest) { viewport.value }
         .use {
           println("render target: ${mode.cliName()}")
           println("render target status: ${mode.status()}")
           InputController.printControls()
           installResizeCallbacks(graphics.window(), viewport)
-          // TODO(map-example-spec): Replace poll-and-wait with a display-paced host loop. See Frame
-          // loop.
-          while (!glfwWindowShouldClose(graphics.window()) && channel.failure() == null) {
+          while (!glfwWindowShouldClose(graphics.window())) {
             glfwPollEvents()
+            state.pollEvents(renderRequest)
             if (viewport.consumeChanged()) {
               viewport.value.log("resized viewport")
               if (!viewport.value.empty()) {
                 graphics.resize(viewport.value)
+                // The render target owns the map's extent while a session is attached.
                 target.resize(viewport.value)
                 renderRequest.set()
               }
@@ -119,18 +62,12 @@ internal object Shell {
               glfwWaitEventsTimeout(IDLE_WAIT_SECONDS)
               continue
             }
-            // The map applies a new logical size on the runtime loop's next pump, so a resize is
-            // followed by frames with nothing to render.
-            var rendered = false
+            var settled = false
             if (renderRequest.consume()) {
-              rendered = render(target)
-              if (!rendered) {
-                renderRequest.set()
-              }
+              settled = render(target)
+              if (!settled) renderRequest.set()
             }
-            if (!rendered) {
-              glfwWaitEventsTimeout(IDLE_WAIT_SECONDS)
-            }
+            if (!settled) glfwWaitEventsTimeout(IDLE_WAIT_SECONDS)
           }
         }
     } finally {
@@ -145,24 +82,13 @@ internal object Shell {
       target.renderUpdate()
     }
 
-  /** Waits for the runtime loop to publish its map, or returns null when it failed first. */
-  private fun awaitMap(channel: MapChannel): MapHandle? {
-    while (channel.failure() == null) {
-      channel.mapHandle()?.let {
-        return it
-      }
-      Thread.sleep(1)
-    }
-    return null
-  }
-
   private fun installResizeCallbacks(window: Long, viewport: ViewportHolder) {
     glfwSetWindowSizeCallback(window) { _, _, _ -> viewport.update(window) }
     glfwSetFramebufferSizeCallback(window) { _, _, _ -> viewport.update(window) }
     glfwSetWindowContentScaleCallback(window) { _, _, _ -> viewport.update(window) }
   }
 
-  /** Render loop state: GLFW delivers every resize callback on the thread that polls. */
+  /** GLFW delivers every resize callback on the thread that polls. */
   private class ViewportHolder(var value: Viewport) {
     private var changed = false
 

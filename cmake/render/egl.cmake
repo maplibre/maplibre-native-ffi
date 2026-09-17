@@ -12,7 +12,8 @@ function(mln_ffi_prepare_macos_angle out_var)
   # download, and replacing a build tree with its packaged install keeps it.
   set(angle_root "${PROJECT_SOURCE_DIR}/build/angle/macos-arm64")
   set(angle_marker "${angle_root}/.complete")
-  set(marker_value "${angle_version} ${angle_sha256} install-name-rpath-v1")
+  set(marker_value
+      "${angle_version} ${angle_sha256} install-name-rpath-padding-v2")
   if(EXISTS "${angle_marker}")
     file(READ "${angle_marker}" current_marker)
   endif()
@@ -37,6 +38,21 @@ function(mln_ffi_prepare_macos_angle out_var)
 
     # Rewriting and signing precede the rename, so the shared directory appears
     # only once its contents are complete.
+    # The upstream binaries leave too little header space for consumers that
+    # replace install names with absolute paths, including Dart's asset bundler.
+    find_program(MLN_FFI_UV_EXECUTABLE uv REQUIRED)
+    execute_process(
+      COMMAND
+        "${MLN_FFI_UV_EXECUTABLE}"
+        run
+        --locked
+        --project
+        "${PROJECT_SOURCE_DIR}"
+        python
+        "${PROJECT_SOURCE_DIR}/scripts/pad-macos-angle.py"
+        "${angle_extract_dir}/libEGL.dylib"
+        "${angle_extract_dir}/libGLESv2.dylib"
+      COMMAND_ERROR_IS_FATAL ANY)
     execute_process(
       COMMAND
         install_name_tool -id @rpath/libEGL.dylib
@@ -66,7 +82,10 @@ function(mln_ffi_prepare_macos_angle out_var)
 endfunction()
 
 function(mln_ffi_import_egl)
-  if(APPLE AND NOT MLN_FFI_EGL_ROOT)
+  if(
+    APPLE AND
+    (NOT MLN_FFI_EGL_ROOT OR MLN_FFI_EGL_ROOT STREQUAL
+               "${PROJECT_SOURCE_DIR}/build/angle/macos-arm64"))
     mln_ffi_prepare_macos_angle(MLN_FFI_EGL_ROOT)
   endif()
   if(NOT MLN_FFI_EGL_ROOT)

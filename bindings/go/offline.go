@@ -109,7 +109,7 @@ type cOfflineGeometryRegionDefinition struct {
 	raw      C.mln_offline_region_definition
 }
 
-func newCOfflineGeometryRegionDefinition(definition OfflineGeometryRegionDefinition) (cOfflineGeometryRegionDefinition, error) {
+func newCOfflineGeometryRegionDefinition(definition OfflineGeometryRegionDefinition) cOfflineGeometryRegionDefinition {
 	styleURL := C.CString(definition.StyleURL)
 	geometry := newCBufferView(definition.Geometry)
 	return cOfflineGeometryRegionDefinition{
@@ -123,7 +123,7 @@ func newCOfflineGeometryRegionDefinition(definition OfflineGeometryRegionDefinit
 			C.float(definition.PixelRatio),
 			C.bool(definition.IncludeIdeographs),
 		),
-	}, nil
+	}
 }
 
 func (definition cOfflineGeometryRegionDefinition) free() {
@@ -142,292 +142,171 @@ func metadataPointer(metadata []byte) *C.uint8_t {
 	return (*C.uint8_t)(unsafe.Pointer(&metadata[0]))
 }
 
-// StartCreateOfflineRegion starts creating an offline region.
-func (runtime *RuntimeHandle) StartCreateOfflineRegion(definition OfflineRegionDefinition, metadata []byte) (*OfflineOperationHandle[OfflineRegionInfo], error) {
-	switch region := definition.(type) {
-	case OfflineTilePyramidRegionDefinition:
-		if err := region.validate(); err != nil {
-			return nil, err
-		}
-		return startOfflineOperation[OfflineRegionInfo](runtime, OfflineOperationRegionCreate, OfflineOperationResultRegion, func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
-			rawDefinition := newCOfflineTilePyramidRegionDefinition(region)
-			defer rawDefinition.free()
-			return int32(C.mln_runtime_offline_region_create_start(
-				C.mln_runtime(handle),
-				&rawDefinition.raw,
-				metadataPointer(metadata),
-				C.size_t(len(metadata)),
-				out,
-			))
-		})
-	case OfflineGeometryRegionDefinition:
-		if err := region.validate(); err != nil {
-			return nil, err
-		}
-		rawDefinition, err := newCOfflineGeometryRegionDefinition(region)
-		if err != nil {
-			return nil, err
-		}
-		defer rawDefinition.free()
-		return startOfflineOperation[OfflineRegionInfo](runtime, OfflineOperationRegionCreate, OfflineOperationResultRegion, func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
-			return int32(C.mln_runtime_offline_region_create_start(
-				C.mln_runtime(handle),
-				&rawDefinition.raw,
-				metadataPointer(metadata),
-				C.size_t(len(metadata)),
-				out,
-			))
-		})
-	default:
-		return nil, newBindingError(ErrInvalidArgument, "unsupported offline region definition")
-	}
-}
-
-// StartOfflineRegion starts getting an offline region snapshot by ID.
-func (runtime *RuntimeHandle) StartOfflineRegion(id OfflineRegionID) (*OfflineOperationHandle[*OfflineRegionInfo], error) {
-	return startOfflineOperation[*OfflineRegionInfo](runtime, OfflineOperationRegionGet, OfflineOperationResultOptionalRegion, func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
-		return int32(C.mln_runtime_offline_region_get_start(C.mln_runtime(handle), C.mln_offline_region_id(id), out))
-	})
-}
-
-// StartOfflineRegions starts listing offline regions.
-func (runtime *RuntimeHandle) StartOfflineRegions() (*OfflineOperationHandle[[]OfflineRegionInfo], error) {
-	return startOfflineOperation[[]OfflineRegionInfo](runtime, OfflineOperationRegionsList, OfflineOperationResultRegionList, func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
-		return int32(C.mln_runtime_offline_regions_list_start(C.mln_runtime(handle), out))
-	})
-}
-
-// StartMergeOfflineRegionsDatabase starts merging offline regions from another
-// database path.
-func (runtime *RuntimeHandle) StartMergeOfflineRegionsDatabase(path string) (*OfflineOperationHandle[[]OfflineRegionInfo], error) {
-	if err := validateCStringArgument("offline side database path", path); err != nil {
-		return nil, err
-	}
-	return startOfflineOperation[[]OfflineRegionInfo](runtime, OfflineOperationRegionsMergeDatabase, OfflineOperationResultRegionList, func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
-		rawPath := C.CString(path)
-		defer C.free(unsafe.Pointer(rawPath))
-		return int32(C.mln_runtime_offline_regions_merge_database_start(C.mln_runtime(handle), rawPath, out))
-	})
-}
-
-// StartUpdateOfflineRegionMetadata starts updating offline region metadata.
-func (runtime *RuntimeHandle) StartUpdateOfflineRegionMetadata(id OfflineRegionID, metadata []byte) (*OfflineOperationHandle[OfflineRegionInfo], error) {
-	return startOfflineOperation[OfflineRegionInfo](runtime, OfflineOperationRegionUpdateMetadata, OfflineOperationResultRegion, func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
-		return int32(C.mln_runtime_offline_region_update_metadata_start(
-			C.mln_runtime(handle),
-			C.mln_offline_region_id(id),
-			metadataPointer(metadata),
-			C.size_t(len(metadata)),
-			out,
-		))
-	})
-}
-
-// StartOfflineRegionStatus starts getting offline region status.
-func (runtime *RuntimeHandle) StartOfflineRegionStatus(id OfflineRegionID) (*OfflineOperationHandle[OfflineRegionStatus], error) {
-	return startOfflineOperation[OfflineRegionStatus](runtime, OfflineOperationRegionGetStatus, OfflineOperationResultRegionStatus, func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
-		return int32(C.mln_runtime_offline_region_get_status_start(C.mln_runtime(handle), C.mln_offline_region_id(id), out))
-	})
-}
-
-// StartSetOfflineRegionObserved starts setting offline event observation state.
-func (runtime *RuntimeHandle) StartSetOfflineRegionObserved(id OfflineRegionID, observed bool) (*OfflineOperationHandle[struct{}], error) {
-	operation, err := startOfflineOperation[struct{}](runtime, OfflineOperationRegionSetObserved, OfflineOperationResultNone, func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
-		return int32(C.mln_runtime_offline_region_set_observed_start(C.mln_runtime(handle), C.mln_offline_region_id(id), C.bool(observed), out))
-	})
-	return operation, err
-}
-
-// StartSetOfflineRegionDownloadState starts setting offline region download
-// state.
-func (runtime *RuntimeHandle) StartSetOfflineRegionDownloadState(id OfflineRegionID, state OfflineRegionDownloadState) (*OfflineOperationHandle[struct{}], error) {
-	raw, err := rawOfflineRegionDownloadState(state)
+func completionOfflineRegion(result *C.mln_completion_result) (OfflineRegionInfo, error) {
+	raw, err := completionValue[C.mln_offline_region_info](result)
 	if err != nil {
-		return nil, err
-	}
-	return startOfflineOperation[struct{}](runtime, OfflineOperationRegionSetDownloadState, OfflineOperationResultNone, func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
-		return int32(C.mln_runtime_offline_region_set_download_state_start(C.mln_runtime(handle), C.mln_offline_region_id(id), C.uint32_t(raw), out))
-	})
-}
-
-// StartInvalidateOfflineRegion starts invalidating cached resources for a
-// region.
-func (runtime *RuntimeHandle) StartInvalidateOfflineRegion(id OfflineRegionID) (*OfflineOperationHandle[struct{}], error) {
-	return startOfflineOperation[struct{}](runtime, OfflineOperationRegionInvalidate, OfflineOperationResultNone, func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
-		return int32(C.mln_runtime_offline_region_invalidate_start(C.mln_runtime(handle), C.mln_offline_region_id(id), out))
-	})
-}
-
-// StartDeleteOfflineRegion starts deleting an offline region.
-func (runtime *RuntimeHandle) StartDeleteOfflineRegion(id OfflineRegionID) (*OfflineOperationHandle[struct{}], error) {
-	operation, err := startOfflineOperation[struct{}](runtime, OfflineOperationRegionDelete, OfflineOperationResultNone, func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
-		return int32(C.mln_runtime_offline_region_delete_start(C.mln_runtime(handle), C.mln_offline_region_id(id), out))
-	})
-	return operation, err
-}
-
-// Take consumes a completed offline operation result and copies it into Go
-// values. If native reports that the result is not ready, the handle remains
-// live so callers can retry later or discard it.
-func (operation *OfflineOperationHandle[T]) Take() (T, error) {
-	var zero T
-	if operation == nil || operation.runtime == nil {
-		return zero, newBindingError(ErrInvalidArgument, "OfflineOperationHandle is nil")
-	}
-	operation.mu.Lock()
-	if !operation.live {
-		operation.mu.Unlock()
-		return zero, newBindingError(ErrInvalidArgument, "OfflineOperationHandle is closed")
-	}
-	id := operation.id
-	kind := operation.kind
-	resultKind := operation.resultKind
-
-	ptr, release, err := operation.runtime.ptr()
-	if err != nil {
-		operation.mu.Unlock()
-		return zero, err
-	}
-	defer release()
-	defer operation.runtime.state.KeepAlive()
-
-	result, consumed, err := takeOfflineOperationResult[T](ptr, C.mln_offline_operation_id(id), kind, resultKind)
-	child := operation.child
-	if consumed {
-		operation.live = false
-		operation.discarded = false
-		operation.child = nil
-	}
-	operation.mu.Unlock()
-	if consumed {
-		child.Release()
-	}
-	if err != nil {
-		return zero, err
-	}
-	return result, nil
-}
-
-func takeOfflineOperationResult[T any](runtime nativeRuntime, id C.mln_offline_operation_id, kind OfflineOperationKind, resultKind OfflineOperationResultKind) (T, bool, error) {
-	var zero T
-	rawRuntime := C.mln_runtime(runtime)
-	switch resultKind {
-	case OfflineOperationResultNone:
-		return zero, false, newBindingError(ErrInvalidState, "offline operation does not produce a take result; drain its completion event and discard it")
-	case OfflineOperationResultRegion:
-		var snapshot C.mln_offline_region_snapshot
-		var err error
-		switch kind {
-		case OfflineOperationRegionCreate:
-			err = checkNative(func() int32 {
-				return int32(C.mln_runtime_offline_region_create_take_result(rawRuntime, id, &snapshot))
-			})
-		case OfflineOperationRegionUpdateMetadata:
-			err = checkNative(func() int32 {
-				return int32(C.mln_runtime_offline_region_update_metadata_take_result(rawRuntime, id, &snapshot))
-			})
-		default:
-			return zero, false, newBindingError(ErrInvalidState, "offline operation result kind mismatch")
-		}
-		if err != nil {
-			return zero, false, err
-		}
-		info, err := offlineRegionSnapshotInfo(snapshot)
-		if err != nil {
-			return zero, true, err
-		}
-		if result, ok := any(info).(T); ok {
-			return result, true, nil
-		}
-		return zero, true, newBindingError(ErrInvalidState, "offline operation result type mismatch")
-	case OfflineOperationResultOptionalRegion:
-		var snapshot C.mln_offline_region_snapshot
-		var found C.bool
-		if err := checkNative(func() int32 {
-			return int32(C.mln_runtime_offline_region_get_take_result(rawRuntime, id, &snapshot, &found))
-		}); err != nil {
-			return zero, false, err
-		}
-		var result *OfflineRegionInfo
-		if bool(found) {
-			info, err := offlineRegionSnapshotInfo(snapshot)
-			if err != nil {
-				return zero, true, err
-			}
-			result = &info
-		}
-		if typed, ok := any(result).(T); ok {
-			return typed, true, nil
-		}
-		return zero, true, newBindingError(ErrInvalidState, "offline operation result type mismatch")
-	case OfflineOperationResultRegionList:
-		var list C.mln_offline_region_list
-		var err error
-		switch kind {
-		case OfflineOperationRegionsList:
-			err = checkNative(func() int32 {
-				return int32(C.mln_runtime_offline_regions_list_take_result(rawRuntime, id, &list))
-			})
-		case OfflineOperationRegionsMergeDatabase:
-			err = checkNative(func() int32 {
-				return int32(C.mln_runtime_offline_regions_merge_database_take_result(rawRuntime, id, &list))
-			})
-		default:
-			return zero, false, newBindingError(ErrInvalidState, "offline operation result kind mismatch")
-		}
-		if err != nil {
-			return zero, false, err
-		}
-		regions, err := offlineRegionListInfos(list)
-		if err != nil {
-			return zero, true, err
-		}
-		if result, ok := any(regions).(T); ok {
-			return result, true, nil
-		}
-		return zero, true, newBindingError(ErrInvalidState, "offline operation result type mismatch")
-	case OfflineOperationResultRegionStatus:
-		raw := C.mln_offline_region_status{size: C.uint32_t(unsafe.Sizeof(C.mln_offline_region_status{}))}
-		if err := checkNative(func() int32 { return int32(C.mln_runtime_offline_region_get_status_take_result(rawRuntime, id, &raw)) }); err != nil {
-			return zero, false, err
-		}
-		if result, ok := any(offlineRegionStatusFromC(raw)).(T); ok {
-			return result, true, nil
-		}
-		return zero, true, newBindingError(ErrInvalidState, "offline operation result type mismatch")
-	default:
-		return zero, false, newBindingError(ErrInvalidState, "unknown offline operation result kind")
-	}
-}
-
-func offlineRegionSnapshotInfo(snapshot C.mln_offline_region_snapshot) (OfflineRegionInfo, error) {
-	defer C.mln_offline_region_snapshot_destroy(snapshot)
-	raw := C.mln_offline_region_info{size: C.uint32_t(unsafe.Sizeof(C.mln_offline_region_info{}))}
-	if err := checkNative(func() int32 { return int32(C.mln_offline_region_snapshot_get(snapshot, &raw)) }); err != nil {
 		return OfflineRegionInfo{}, err
 	}
 	return offlineRegionInfoFromC(raw)
 }
 
-func offlineRegionListInfos(list C.mln_offline_region_list) ([]OfflineRegionInfo, error) {
-	defer C.mln_offline_region_list_destroy(list)
-	var count C.size_t
-	if err := checkNative(func() int32 { return int32(C.mln_offline_region_list_count(list, &count)) }); err != nil {
+func completionOptionalOfflineRegion(result *C.mln_completion_result) (*OfflineRegionInfo, error) {
+	if result.value_count == 0 {
+		return nil, nil
+	}
+	value, err := completionOfflineRegion(result)
+	return &value, err
+}
+
+func completionOfflineRegions(result *C.mln_completion_result) ([]OfflineRegionInfo, error) {
+	raw, err := completionSlice[C.mln_offline_region_info](result)
+	if err != nil {
 		return nil, err
 	}
-	regions := make([]OfflineRegionInfo, int(count))
-	for index := range regions {
-		raw := C.mln_offline_region_info{size: C.uint32_t(unsafe.Sizeof(C.mln_offline_region_info{}))}
-		if err := checkNative(func() int32 { return int32(C.mln_offline_region_list_get(list, C.size_t(index), &raw)) }); err != nil {
-			return nil, err
-		}
-		info, err := offlineRegionInfoFromC(raw)
+	regions := make([]OfflineRegionInfo, len(raw))
+	for index := range raw {
+		regions[index], err = offlineRegionInfoFromC(raw[index])
 		if err != nil {
 			return nil, err
 		}
-		regions[index] = info
 	}
 	return regions, nil
+}
+
+func completionOfflineStatus(result *C.mln_completion_result) (OfflineRegionStatus, error) {
+	raw, err := completionValue[C.mln_offline_region_status](result)
+	return offlineRegionStatusFromC(raw), err
+}
+
+// CreateOfflineRegion starts creating an offline region. Style URL, GeoJSON
+// geometry, and metadata bytes are copied before this call returns, and the
+// completed operation yields the stored region record.
+func (runtime *RuntimeHandle) CreateOfflineRegion(definition OfflineRegionDefinition, metadata []byte) (*Future[OfflineRegionInfo], error) {
+	var raw C.mln_offline_region_definition
+	var free func()
+	switch region := definition.(type) {
+	case OfflineTilePyramidRegionDefinition:
+		if err := region.validate(); err != nil {
+			return nil, err
+		}
+		converted := newCOfflineTilePyramidRegionDefinition(region)
+		raw, free = converted.raw, converted.free
+	case OfflineGeometryRegionDefinition:
+		if err := region.validate(); err != nil {
+			return nil, err
+		}
+		converted := newCOfflineGeometryRegionDefinition(region)
+		raw, free = converted.raw, converted.free
+	default:
+		return nil, newBindingError(ErrInvalidArgument, "unsupported offline region definition")
+	}
+	defer free()
+	return startRuntimeCompletion(runtime, func(handle C.mln_runtime, out *C.mln_completion) int32 {
+		return int32(C.mln_runtime_offline_region_create(
+			handle,
+			&raw,
+			metadataPointer(metadata),
+			C.size_t(len(metadata)),
+			out,
+		))
+	}, completionOfflineRegion)
+}
+
+// OfflineRegion starts getting one offline region by ID. Unlike the other
+// region operations, a missing region completes successfully with a nil record
+// rather than with ErrNotFound.
+func (runtime *RuntimeHandle) OfflineRegion(id OfflineRegionID) (*Future[*OfflineRegionInfo], error) {
+	return startRuntimeCompletion(runtime, func(handle C.mln_runtime, out *C.mln_completion) int32 {
+		return int32(C.mln_runtime_offline_region_get(handle, C.mln_offline_region_id(id), out))
+	}, completionOptionalOfflineRegion)
+}
+
+// OfflineRegions starts listing every region in the runtime's offline
+// database.
+func (runtime *RuntimeHandle) OfflineRegions() (*Future[[]OfflineRegionInfo], error) {
+	return startRuntimeCompletion(runtime, func(handle C.mln_runtime, out *C.mln_completion) int32 {
+		return int32(C.mln_runtime_offline_regions_list(handle, out))
+	}, completionOfflineRegions)
+}
+
+// MergeOfflineRegionsDatabase starts merging the regions of another MapLibre
+// offline database into this runtime's, and yields one record per merged
+// region. The path names an existing readable database that this runtime opens
+// read-only and leaves unchanged; keep the file present until the operation
+// completes. A path that names no readable database file is rejected before
+// acceptance, while a format or schema mismatch reports ErrNative through the
+// returned future.
+func (runtime *RuntimeHandle) MergeOfflineRegionsDatabase(path string) (*Future[[]OfflineRegionInfo], error) {
+	if err := validateCStringArgument("offline side database path", path); err != nil {
+		return nil, err
+	}
+	return startRuntimeCompletion(runtime, func(handle C.mln_runtime, out *C.mln_completion) int32 {
+		rawPath := C.CString(path)
+		defer C.free(unsafe.Pointer(rawPath))
+		return int32(C.mln_runtime_offline_regions_merge_database(handle, rawPath, out))
+	}, completionOfflineRegions)
+}
+
+// UpdateOfflineRegionMetadata starts replacing one region's opaque metadata,
+// which is copied before this call returns, and yields the updated record. The
+// operation reports ErrNotFound when no region carries the ID.
+func (runtime *RuntimeHandle) UpdateOfflineRegionMetadata(id OfflineRegionID, metadata []byte) (*Future[OfflineRegionInfo], error) {
+	return startRuntimeCompletion(runtime, func(handle C.mln_runtime, out *C.mln_completion) int32 {
+		return int32(C.mln_runtime_offline_region_update_metadata(
+			handle,
+			C.mln_offline_region_id(id),
+			metadataPointer(metadata),
+			C.size_t(len(metadata)),
+			out,
+		))
+	}, completionOfflineRegion)
+}
+
+// OfflineRegionStatus starts getting one region's download status. The
+// operation reports ErrNotFound when no region carries the ID.
+func (runtime *RuntimeHandle) OfflineRegionStatus(id OfflineRegionID) (*Future[OfflineRegionStatus], error) {
+	return startRuntimeCompletion(runtime, func(handle C.mln_runtime, out *C.mln_completion) int32 {
+		return int32(C.mln_runtime_offline_region_get_status(handle, C.mln_offline_region_id(id), out))
+	}, completionOfflineStatus)
+}
+
+// SetOfflineRegionObserved starts enabling or disabling runtime events for one
+// region. Disabling observation gates later events and keeps queued ones. The
+// operation reports ErrNotFound when no region carries the ID.
+func (runtime *RuntimeHandle) SetOfflineRegionObserved(id OfflineRegionID, observed bool) (*Future[struct{}], error) {
+	return startRuntimeCompletion(runtime, func(handle C.mln_runtime, out *C.mln_completion) int32 {
+		return int32(C.mln_runtime_offline_region_set_observed(handle, C.mln_offline_region_id(id), C.bool(observed), out))
+	}, completionUnit)
+}
+
+// SetOfflineRegionDownloadState starts setting one region's download state.
+// Register observation separately with SetOfflineRegionObserved to receive
+// progress and error events. The operation reports ErrNotFound when no region
+// carries the ID.
+func (runtime *RuntimeHandle) SetOfflineRegionDownloadState(id OfflineRegionID, state OfflineRegionDownloadState) (*Future[struct{}], error) {
+	raw, err := rawOfflineRegionDownloadState(state)
+	if err != nil {
+		return nil, err
+	}
+	return startRuntimeCompletion(runtime, func(handle C.mln_runtime, out *C.mln_completion) int32 {
+		return int32(C.mln_runtime_offline_region_set_download_state(handle, C.mln_offline_region_id(id), C.uint32_t(raw), out))
+	}, completionUnit)
+}
+
+// InvalidateOfflineRegion starts invalidating one region's cached resources.
+// The operation reports ErrNotFound when no region carries the ID.
+func (runtime *RuntimeHandle) InvalidateOfflineRegion(id OfflineRegionID) (*Future[struct{}], error) {
+	return startRuntimeCompletion(runtime, func(handle C.mln_runtime, out *C.mln_completion) int32 {
+		return int32(C.mln_runtime_offline_region_invalidate(handle, C.mln_offline_region_id(id), out))
+	}, completionUnit)
+}
+
+// DeleteOfflineRegion starts deleting one region. The operation reports
+// ErrNotFound when no region carries the ID.
+func (runtime *RuntimeHandle) DeleteOfflineRegion(id OfflineRegionID) (*Future[struct{}], error) {
+	return startRuntimeCompletion(runtime, func(handle C.mln_runtime, out *C.mln_completion) int32 {
+		return int32(C.mln_runtime_offline_region_delete(handle, C.mln_offline_region_id(id), out))
+	}, completionUnit)
 }
 
 func offlineRegionInfoFromC(info C.mln_offline_region_info) (OfflineRegionInfo, error) {
@@ -488,22 +367,4 @@ func rawOfflineRegionDownloadState(state OfflineRegionDownloadState) (uint32, er
 	default:
 		return 0, newBindingError(ErrInvalidArgument, "unknown offline region download state cannot be set")
 	}
-}
-
-func startOfflineOperation[T any](runtime *RuntimeHandle, kind OfflineOperationKind, resultKind OfflineOperationResultKind, start func(nativeRuntime, *C.mln_offline_operation_id) int32) (*OfflineOperationHandle[T], error) {
-	ptr, release, err := runtime.ptr()
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	defer runtime.state.KeepAlive()
-
-	var id C.mln_offline_operation_id
-	if err := checkNative(func() int32 { return start(ptr, &id) }); err != nil {
-		return nil, err
-	}
-	if id == 0 {
-		return nil, newBindingError(ErrInvalidState, "offline operation did not return an ID")
-	}
-	return newOfflineOperationHandle[T](runtime, uint64(id), kind, resultKind), nil
 }

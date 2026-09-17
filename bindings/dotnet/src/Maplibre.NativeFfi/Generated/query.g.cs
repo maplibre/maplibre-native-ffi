@@ -34,7 +34,7 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_query_L51_C3")]
+        [NativeTypeName("__AnonymousRecord_query_L59_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -142,24 +142,12 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_rendered_query_geometry mln_rendered_query_geometry_line_string([NativeTypeName("const mln_screen_point *")] mln_screen_point* points, [NativeTypeName("size_t")] nuint point_count);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_queried_feature mln_queried_feature_default();
+        public static extern mln_status mln_render_session_query_rendered_features([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_rendered_query_geometry *")] mln_rendered_query_geometry* geometry, [NativeTypeName("const mln_rendered_feature_query_options *")] mln_rendered_feature_query_options* options, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_queried_feature_list_count([NativeTypeName("mln_queried_feature_list")] MlnQueriedFeatureList list, [NativeTypeName("size_t *")] nuint* out_count);
+        public static extern mln_status mln_render_session_query_source_features([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, [NativeTypeName("const mln_source_feature_query_options *")] mln_source_feature_query_options* options, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_queried_feature_list_get([NativeTypeName("mln_queried_feature_list")] MlnQueriedFeatureList list, [NativeTypeName("size_t")] nuint index, mln_queried_feature* out_feature);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void mln_queried_feature_list_destroy([NativeTypeName("mln_queried_feature_list")] MlnQueriedFeatureList list);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_query_rendered_features([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_rendered_query_geometry *")] mln_rendered_query_geometry* geometry, [NativeTypeName("const mln_rendered_feature_query_options *")] mln_rendered_feature_query_options* options, [NativeTypeName("mln_queried_feature_list *")] MlnQueriedFeatureList* out_result);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_query_source_features([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, [NativeTypeName("const mln_source_feature_query_options *")] mln_source_feature_query_options* options, [NativeTypeName("mln_queried_feature_list *")] MlnQueriedFeatureList* out_result);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_query_feature_extensions([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension, mln_buffer_view extension_field, [NativeTypeName("const mln_buffer_view *")] mln_buffer_view* arguments, [NativeTypeName("mln_buffer *")] MlnBuffer* out_result);
+        public static extern mln_status mln_render_session_query_feature_extensions([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension, mln_buffer_view extension_field, [NativeTypeName("const mln_buffer_view *")] mln_buffer_view* arguments, [NativeTypeName("const mln_completion *")] mln_completion* completion);
     }
 }

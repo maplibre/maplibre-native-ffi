@@ -1,14 +1,12 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
 import java.util.concurrent.ConcurrentHashMap
-import org.maplibre.nativeffi.render.OwnedTextureFrameHandleCore
-import org.maplibre.nativeffi.runtime.OfflineOperationLeakReport
 
 /**
- * Reports owner-thread-affine native handles that become unreachable before explicit release.
+ * Reports native handles that become unreachable before explicit release.
  *
- * Runtime, map, and render-session handles are bound to their owner thread, so this hook MUST NOT
- * destroy them; explicit release on the owner thread stays the only path that frees native state.
+ * Cleanup remains explicit so failures are observable. Render sessions also require their graphics
+ * thread, which an unreachable-action thread cannot provide.
  *
  * Registered actions must capture leak-report state only. Capturing the wrapper would keep it
  * reachable and suppress every report.
@@ -36,30 +34,7 @@ internal object HandleLeakCleaner {
     }
   }
 
-  /** Reports [frameCore] when [handle] becomes unreachable before explicit release. */
-  fun registerFrame(handle: Any, frameCore: OwnedTextureFrameHandleCore) {
-    leakReportActions.register(handle, FrameLeakAction(frameCore))
-  }
-
-  /** Reports [leakReport] when an offline operation becomes unreachable. */
-  fun registerOfflineOperation(handle: Any, leakReport: OfflineOperationLeakReport) {
-    leakReportActions.register(handle, OfflineOperationLeakAction(leakReport))
-  }
-
   private class LeakReportAction(private val leakReport: HandleStateCore.LeakReport) : Runnable {
-    override fun run() {
-      leakReport.report()
-    }
-  }
-
-  private class FrameLeakAction(private val frameCore: OwnedTextureFrameHandleCore) : Runnable {
-    override fun run() {
-      frameCore.reportLeak()
-    }
-  }
-
-  private class OfflineOperationLeakAction(private val leakReport: OfflineOperationLeakReport) :
-    Runnable {
     override fun run() {
       leakReport.report()
     }

@@ -1,18 +1,28 @@
 #!/usr/bin/env bash
-# Cross-compiles the Rust binding tests for an Android or OpenHarmony x64
-# preset and runs them in the emulator, one executable per crate.
+# Cross-compiles the Rust binding tests for an Android preset or OpenHarmony x64
+# preset and runs them in the matching emulator, one executable per crate.
 set -euo pipefail
 
 preset=${1:?usage: test-rust-device.sh <android|ohos preset>}
 
 case "$preset" in
-  android-x64-* | ohos-x64-egl) ;;
+  android-arm64-*)
+    abi=arm64-v8a
+    ;;
+  android-x64-*)
+    abi=x86_64
+    ;;
+  android-*)
+    echo "The Android emulator runs arm64 and x64 guests; check $preset with //bindings/rust:build and test an android-arm64 or android-x64 preset instead." >&2
+    exit 2
+    ;;
+  ohos-x64-egl) ;;
   ohos-x64-*)
     echo "The OpenHarmony emulator runs EGL only; check $preset with //bindings/rust:build and test ohos-x64-egl instead." >&2
     exit 2
     ;;
-  android-* | ohos-*)
-    echo "The emulators run x64 guests only; check $preset with //bindings/rust:build and run an x64 preset's tests instead." >&2
+  ohos-*)
+    echo "The OpenHarmony emulator runs an x64 guest; check $preset with //bindings/rust:build and test ohos-x64-egl instead." >&2
     exit 2
     ;;
   *)
@@ -44,6 +54,10 @@ cargo clippy \
   --target "$cargo_target" \
   --all-targets -- -D warnings
 
+# Each test binary gets ten minutes on the guest, where the suite renders in
+# software and the whole binding suite runs single-threaded.
+timeout_seconds=600
+
 # A while loop rather than mapfile: macOS tasks can run under Bash 3.2.
 test_binaries=()
 while IFS= read -r test_binary || [[ -n "$test_binary" ]]; do
@@ -57,13 +71,14 @@ if [[ "$preset" == android-* ]]; then
     emulator_args+=(--api 26)
   fi
   exec "$MISE_MONOREPO_ROOT/scripts/run-android-emulator-test.sh" \
-    180 \
+    "$timeout_seconds" \
+    "$abi" \
     "$native_install_dir/lib/libmaplibre-native-c.so" \
     ${emulator_args[@]+"${emulator_args[@]}"} \
     --test-threads=1 -- ${test_binaries[@]+"${test_binaries[@]}"}
 fi
 exec "$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \
-  180 \
+  "$timeout_seconds" \
   "$native_install_dir/lib/libmaplibre-native-c.so" \
   "$OHOS_SDK_NATIVE/llvm/lib/$compiler_target/libc++_shared.so" \
   --test-threads=1 -- ${test_binaries[@]+"${test_binaries[@]}"}

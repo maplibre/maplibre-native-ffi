@@ -82,13 +82,13 @@ public sealed class ResourceTransformTests
 
     [BindingSpecTest("BND-122")]
     [Fact]
-    public unsafe void ResourceTransformInstallFailurePreservesPreviousCallbackAndReleasesReplacement()
+    public unsafe void ResourceTransformInstallFailureReleasesReplacement()
     {
         var failInstall = false;
         ResourceTransformState? failedReplacement = null;
         using var install = RuntimeHandle.UseResourceCallbackInstallMethodsForTest(
-            (_, _) => mln_status.MLN_STATUS_OK,
-            (_, transform) =>
+            (_, _, _) => mln_status.MLN_STATUS_OK,
+            (_, transform, _) =>
             {
                 if (!failInstall)
                 {
@@ -101,28 +101,48 @@ public sealed class ResourceTransformTests
             }
         );
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        runtime.SetResourceTransform(request => request.Url + "?first");
-        var previous = Assert.IsType<ResourceTransformState>(runtime.ResourceTransformStateForTest);
+        runtime.SetResourceTransformAsync(
+            request => request.Url + "?first",
+            TestContext.Current.CancellationToken
+        );
 
         failInstall = true;
         Assert.Throws<InvalidStateException>(() =>
-            runtime.SetResourceTransform(request => request.Url + "?second")
+            runtime
+                .SetResourceTransformAsync(
+                    request => request.Url + "?second",
+                    TestContext.Current.CancellationToken
+                )
+                .GetAwaiter()
+                .GetResult()
         );
 
-        Assert.Same(previous, runtime.ResourceTransformStateForTest);
-        Assert.True(previous.IsHandleAllocatedForTest);
         Assert.NotNull(failedReplacement);
         Assert.False(failedReplacement.IsHandleAllocatedForTest);
     }
 
     [BindingSpecTest("BND-140")]
     [Fact]
-    public void CanInstallReplaceAndClearResourceTransform()
+    public async Task InstallReplaceAndClearOfTheResourceTransformEachCommit()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
 
-        runtime.SetResourceTransform(request => request.Url + "?first");
-        runtime.SetResourceTransform(request => request.Url + "?second");
-        runtime.ClearResourceTransform();
+        RuntimeEventTestHelpers.AssertRuntimeCommitted(
+            runtime.SetResourceTransformAsync(
+                request => request.Url + "?first",
+                TestContext.Current.CancellationToken
+            )
+        );
+        RuntimeEventTestHelpers.AssertRuntimeCommitted(
+            runtime.SetResourceTransformAsync(
+                request => request.Url + "?second",
+                TestContext.Current.CancellationToken
+            )
+        );
+        RuntimeEventTestHelpers.AssertRuntimeCommitted(
+            runtime.ClearResourceTransformAsync(TestContext.Current.CancellationToken)
+        );
+
+        await runtime.BarrierAsync(TestContext.Current.CancellationToken);
     }
 }

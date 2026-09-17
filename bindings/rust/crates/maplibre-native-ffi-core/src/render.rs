@@ -56,11 +56,12 @@ pub struct EglContextDescriptorFields {
     pub ownership: sys::mln_opengl_context_ownership,
 }
 
-/// A browser host owns its WebGL context and hands the session its Emscripten
-/// handle, so there is nothing else for a descriptor to carry.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WebGlContextDescriptorFields {
+    pub kind: sys::mln_webgl_context_kind,
     pub context: i32,
+    pub canvas_selector_data: *const u8,
+    pub canvas_selector_size: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -244,12 +245,14 @@ fn opengl_context_descriptor_to_native(
                 egl: egl_context_descriptor_to_native(egl),
             },
         },
-        // A browser session renders through the host's own context, so it is
-        // shared only.
         OpenGLContextDescriptorFields::WebGl(webgl) => sys::mln_opengl_context_descriptor {
             size: std::mem::size_of::<sys::mln_opengl_context_descriptor>() as u32,
             platform: sys::MLN_OPENGL_CONTEXT_PLATFORM_WEBGL,
-            ownership: sys::MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
+            ownership: if webgl.kind == sys::MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS {
+                sys::MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED
+            } else {
+                sys::MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED
+            },
             data: sys::mln_opengl_context_descriptor__bindgen_ty_1 {
                 webgl: webgl_context_descriptor_to_native(webgl),
             },
@@ -262,7 +265,12 @@ fn webgl_context_descriptor_to_native(
 ) -> sys::mln_webgl_context_descriptor {
     sys::mln_webgl_context_descriptor {
         size: std::mem::size_of::<sys::mln_webgl_context_descriptor>() as u32,
+        kind: fields.kind,
         context: fields.context,
+        canvas_selector: sys::mln_buffer_view {
+            data: fields.canvas_selector_data.cast(),
+            size: fields.canvas_selector_size,
+        },
     }
 }
 
@@ -675,7 +683,10 @@ mod tests {
             opengl_owned_texture_descriptor_to_native(OpenGLOwnedTextureDescriptorFields {
                 extent: extent(),
                 context: OpenGLContextDescriptorFields::WebGl(WebGlContextDescriptorFields {
+                    kind: sys::MLN_WEBGL_CONTEXT_EXISTING,
                     context: 13,
+                    canvas_selector_data: std::ptr::null(),
+                    canvas_selector_size: 0,
                 }),
             });
         assert_eq!(

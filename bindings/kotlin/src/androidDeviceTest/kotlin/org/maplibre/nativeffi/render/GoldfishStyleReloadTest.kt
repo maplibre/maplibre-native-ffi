@@ -2,15 +2,15 @@ package org.maplibre.nativeffi.render
 
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
-import kotlin.test.assertTrue
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
-import org.maplibre.nativeffi.runtime.RuntimeEventType
+import org.maplibre.nativeffi.runtime.CommandDisposition
 import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class GoldfishStyleReloadTest {
   @Test
-  fun repeatedSnapshotStyleReloadRendersComposedLayer() {
+  fun repeatedSnapshotStyleReloadRendersComposedLayer(): Unit = runSuspendTest {
     withOwnedTextureSession(
       width = SNAPSHOT_SIZE,
       height = SNAPSHOT_SIZE,
@@ -18,57 +18,50 @@ class GoldfishStyleReloadTest {
       mapHeight = SNAPSHOT_SIZE,
       mapMode = MapMode.STATIC,
     ) { runtime, map, owned ->
-      loadBaseStyle(runtime, map, BASE_STYLE)
-      addComposition(map)
-      assertContentEquals(GREEN, captureCenterPixel(runtime, map, owned.session))
+      val session = owned.session
+      loadBaseStyle(runtime, map, session, BASE_STYLE)
+      addComposition(runtime, map, session)
+      assertContentEquals(GREEN, captureCenterPixel(map, session))
 
-      loadBaseStyle(runtime, map, ALTERNATE_STYLE)
-      loadBaseStyle(runtime, map, BASE_STYLE.copyOf())
-      addComposition(map)
+      loadBaseStyle(runtime, map, session, ALTERNATE_STYLE)
+      loadBaseStyle(runtime, map, session, BASE_STYLE.copyOf())
+      addComposition(runtime, map, session)
 
-      assertContentEquals(GREEN, captureCenterPixel(runtime, map, owned.session))
+      assertContentEquals(GREEN, captureCenterPixel(map, session))
     }
   }
 
-  private fun loadBaseStyle(runtime: RuntimeHandle, map: MapHandle, style: ByteArray) {
-    map.setStyleJson(style)
-    assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED))
-  }
-
-  private fun addComposition(map: MapHandle) {
-    map.addStyleSourceJson(COMPOSED_SOURCE_ID, COMPOSED_SOURCE)
-    map.addStyleLayerJson(COMPOSED_LAYER, "")
-  }
-
-  private fun captureCenterPixel(
+  private suspend fun loadBaseStyle(
     runtime: RuntimeHandle,
     map: MapHandle,
     session: RenderSessionHandle,
-  ): ByteArray {
-    map.requestStillImage()
-    var captured: ByteArray? = null
-    repeat(10_000) {
-      runtime.pump(0)
-      var finished = false
-      for (event in runtime.drainEvents().events.filter { it.mapSource == map }) {
-        when (event.type) {
-          RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE ->
-            if (session.renderUpdate().result == RenderResult.RENDERED) {
-              val info = session.textureImageInfo()
-              NativeBuffer.allocate(info.byteLength).use { buffer ->
-                session.readPremultipliedRgba8(buffer)
-                val centerOffset = SNAPSHOT_SIZE / 2 * info.stride + SNAPSHOT_SIZE / 2 * 4
-                captured = buffer.toByteArray().copyOfRange(centerOffset, centerOffset + 4)
-              }
-            }
-          RuntimeEventType.MAP_STILL_IMAGE_FINISHED -> finished = true
-          RuntimeEventType.MAP_STILL_IMAGE_FAILED -> error(event.message)
-        }
-      }
-      if (finished) return captured ?: error("still image finished without a rendered frame")
-      runtime.pump(1)
+    style: ByteArray,
+  ) {
+    session.completeOnDriver(map.setStyleJson(style))
+    session.completeOnDriver(runtime.barrier())
+  }
+
+  private suspend fun addComposition(
+    runtime: RuntimeHandle,
+    map: MapHandle,
+    session: RenderSessionHandle,
+  ) {
+    session.completeOnDriver(map.addStyleSourceJson(COMPOSED_SOURCE_ID, COMPOSED_SOURCE))
+    session.completeOnDriver(map.addStyleLayerJson(COMPOSED_LAYER, ""))
+    session.completeOnDriver(runtime.barrier())
+  }
+
+  /** Renders until the still image the map owes this test finishes, then reads its center pixel. */
+  private suspend fun captureCenterPixel(map: MapHandle, session: RenderSessionHandle): ByteArray {
+    val still = map.requestStillImage()
+    val completion = session.completeOnDriver(still) { renderOneFrame() }
+    check(completion.disposition == CommandDisposition.COMMITTED) {
+      "still image failed: ${completion.status} ${completion.diagnostic}"
     }
-    error("still image did not finish")
+
+    val readback = session.completeOnDriver(session.readPremultipliedRgba8())
+    val center = SNAPSHOT_SIZE / 2 * readback.info.stride + SNAPSHOT_SIZE / 2 * 4
+    return readback.bytes.copyOfRange(center, center + 4)
   }
 
   private companion object {

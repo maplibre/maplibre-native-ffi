@@ -13,6 +13,18 @@ import (
 	"unsafe"
 )
 
+//export goMaplibreReleaseCallbackState
+func goMaplibreReleaseCallbackState(userData unsafe.Pointer) {
+	if userData == nil {
+		return
+	}
+	defer func() { _ = recover() }()
+	state, ok := cgo.Handle(uintptr(userData)).Value().(interface{ Release() })
+	if ok {
+		state.Release()
+	}
+}
+
 //export goMaplibreResourceTransform
 func goMaplibreResourceTransform(userData unsafe.Pointer, kind C.uint32_t, url *C.char, outResponse *C.mln_resource_transform_response) (status C.mln_status) {
 	defer func() {

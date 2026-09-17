@@ -3,7 +3,7 @@ use std::ptr;
 use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_sys as sys;
 
-use crate::Result;
+use crate::{NativeFuture, Result};
 
 pub use maplibre_core::query::{
     FeatureStateSelector, QueriedFeature, RenderedFeatureQueryOptions, RenderedQueryGeometry,
@@ -16,73 +16,64 @@ pub(crate) use maplibre_core::query::{
 };
 
 impl super::RenderSessionHandle {
-    /// Copies rendered features from the latest render session state.
+    /// Starts a rendered-feature query whose result is a typed feature list.
     pub fn query_rendered_features(
         &self,
         geometry: &RenderedQueryGeometry,
         options: Option<&RenderedFeatureQueryOptions>,
-    ) -> Result<Vec<QueriedFeature>> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
+    ) -> Result<NativeFuture<Vec<QueriedFeature>>> {
         let geometry = geometry.to_native();
         let options = options
             .map(RenderedFeatureQueryOptions::to_native)
             .transpose()?;
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_queried_feature_list>::new();
-        // SAFETY: All descriptors and out storage remain valid for the call.
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_query_rendered_features(
-                session,
-                geometry.as_ptr(),
-                options
-                    .as_ref()
-                    .map_or(ptr::null(), NativeRenderedFeatureQueryOptions::as_ptr),
-                out.as_mut_ptr(),
-            )
-        })?;
-        // SAFETY: On success, the C API returns an owned queried-feature list
-        // handle; core copies and releases it.
-        unsafe {
-            maplibre_core::query::copy_queried_feature_list(
-                out.into_live("mln_queried_feature_list")?,
-            )
-        }
+        let session = self.inner.native()?;
+        crate::completion::submit(
+            // SAFETY: the handle is live and every borrowed argument stays valid for this
+            // synchronous submission.
+            |completion| unsafe {
+                sys::mln_render_session_query_rendered_features(
+                    session,
+                    geometry.as_ptr(),
+                    options
+                        .as_ref()
+                        .map_or(ptr::null(), NativeRenderedFeatureQueryOptions::as_ptr),
+                    completion,
+                )
+            },
+            copy_queried_features,
+        )
     }
 
-    /// Copies source features from the latest render session state.
+    /// Starts a source-feature query whose result is a typed feature list.
     pub fn query_source_features(
         &self,
         source_id: &str,
         options: Option<&SourceFeatureQueryOptions>,
-    ) -> Result<Vec<QueriedFeature>> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        let source_id = maplibre_core::string::string_view(source_id);
+    ) -> Result<NativeFuture<Vec<QueriedFeature>>> {
+        let source_id = maplibre_core::string::buffer_view(source_id.as_bytes());
         let options = options
             .map(SourceFeatureQueryOptions::to_native)
             .transpose()?;
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_queried_feature_list>::new();
-        // SAFETY: All descriptors and out storage remain valid for the call.
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_query_source_features(
-                session,
-                source_id.raw(),
-                options
-                    .as_ref()
-                    .map_or(ptr::null(), NativeSourceFeatureQueryOptions::as_ptr),
-                out.as_mut_ptr(),
-            )
-        })?;
-        // SAFETY: On success, the C API returns an owned queried-feature list
-        // handle; core copies and releases it.
-        unsafe {
-            maplibre_core::query::copy_queried_feature_list(
-                out.into_live("mln_queried_feature_list")?,
-            )
-        }
+        let session = self.inner.native()?;
+        crate::completion::submit(
+            // SAFETY: the handle is live and every borrowed argument stays valid for this
+            // synchronous submission.
+            |completion| unsafe {
+                sys::mln_render_session_query_source_features(
+                    session,
+                    source_id,
+                    options
+                        .as_ref()
+                        .map_or(ptr::null(), NativeSourceFeatureQueryOptions::as_ptr),
+                    completion,
+                )
+            },
+            copy_queried_features,
+        )
     }
 
-    /// Queries a feature extension as UTF-8 JSON or GeoJSON bytes.
+    /// Starts a feature-extension query whose result is UTF-8 JSON or GeoJSON
+    /// bytes.
     pub fn query_feature_extension(
         &self,
         source_id: &str,
@@ -90,28 +81,34 @@ impl super::RenderSessionHandle {
         extension: &str,
         extension_field: &str,
         arguments: Option<&[u8]>,
-    ) -> Result<Vec<u8>> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        let source_id = maplibre_core::string::string_view(source_id);
+    ) -> Result<NativeFuture<Vec<u8>>> {
+        let source_id = maplibre_core::string::buffer_view(source_id.as_bytes());
         let feature = maplibre_core::string::buffer_view(feature);
-        let extension = maplibre_core::string::string_view(extension);
-        let extension_field = maplibre_core::string::string_view(extension_field);
+        let extension = maplibre_core::string::buffer_view(extension.as_bytes());
+        let extension_field = maplibre_core::string::buffer_view(extension_field.as_bytes());
         let arguments = arguments.map(maplibre_core::string::buffer_view);
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
-        // SAFETY: All views and out storage remain valid for the call.
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_query_feature_extensions(
-                session,
-                source_id.raw(),
-                feature,
-                extension.raw(),
-                extension_field.raw(),
-                arguments.as_ref().map_or(ptr::null(), ptr::from_ref),
-                out.as_mut_ptr(),
-            )
-        })?;
-        // SAFETY: Success transfers the owned buffer to this call.
-        unsafe { maplibre_core::string::copy_owned_buffer(out.get()) }
+        let session = self.inner.native()?;
+        crate::completion::submit(
+            // SAFETY: the handle is live and every borrowed argument stays valid for this
+            // synchronous submission.
+            |completion| unsafe {
+                sys::mln_render_session_query_feature_extensions(
+                    session,
+                    source_id,
+                    feature,
+                    extension,
+                    extension_field,
+                    arguments.as_ref().map_or(ptr::null(), ptr::from_ref),
+                    completion,
+                )
+            },
+            crate::completion::buffer,
+        )
     }
+}
+
+fn copy_queried_features(result: &sys::mln_completion_result) -> Result<Vec<QueriedFeature>> {
+    let hits = crate::completion::copy_slice::<sys::mln_queried_feature>(result)?;
+    // SAFETY: completion keeps every nested feature view alive for this callback.
+    unsafe { maplibre_core::query::copy_queried_features(&hits) }
 }

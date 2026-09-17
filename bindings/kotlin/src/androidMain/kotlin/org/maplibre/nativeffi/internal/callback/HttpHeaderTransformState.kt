@@ -8,6 +8,7 @@ import org.bytedeco.javacpp.Pointer
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.resource.HttpHeaderTransformCallback
 import org.maplibre.nativeffi.resource.HttpHeaderTransformRequest
 import org.maplibre.nativeffi.resource.ResourceKind
@@ -22,6 +23,7 @@ internal class HttpHeaderTransformState(private val callback: HttpHeaderTransfor
     transform.size(transform.sizeof())
     transform.callback(NATIVE_CALLBACK)
     transform.user_data(JavaCppSupport.addressPointer(token))
+    transform.release_user_data(NATIVE_RELEASE)
     STATES[token] = this
   }
 
@@ -59,8 +61,6 @@ internal class HttpHeaderTransformState(private val callback: HttpHeaderTransfor
       lease.close()
     }
   }
-
-  fun checkCanClose() = gate.checkCanClose()
 
   override fun close() = gate.close()
 
@@ -109,6 +109,16 @@ internal class HttpHeaderTransformState(private val callback: HttpHeaderTransfor
         ): Int =
           STATES[userData?.address() ?: 0L]?.invoke(kind, url, response)
             ?: MaplibreStatus.INVALID_ARGUMENT.nativeCode
+      }
+
+    /** One process-wide release thunk; per-state thunks would exhaust the same pool. */
+    private val NATIVE_RELEASE =
+      object : MaplibreNativeC.mln_runtime_callback_release() {
+        override fun call(userData: Pointer?) {
+          val state = STATES[userData?.address() ?: 0L] ?: return
+          HandleLeakCleaner.releaseNativeCallbackRoot(state)
+          state.close()
+        }
       }
   }
 }

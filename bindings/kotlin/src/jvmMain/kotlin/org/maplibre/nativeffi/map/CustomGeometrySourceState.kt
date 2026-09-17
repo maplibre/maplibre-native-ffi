@@ -15,8 +15,8 @@ import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 /**
  * Owns map/style-scoped custom geometry source callback state.
  *
- * [onReleased] runs on the map owner thread when native stops referencing this state, which is what
- * drops it from its map's registry and closes it.
+ * Native invokes [onReleased] after it stops referencing this state, which drops it from its map's
+ * registry and closes it.
  */
 internal class CustomGeometrySourceState(
   private val options: CustomGeometrySourceOptions,

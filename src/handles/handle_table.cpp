@@ -40,20 +40,20 @@ auto handle_kind_name(std::uint8_t kind) noexcept -> const char* {
       return "mln_map_projection";
     case HandleKind::RenderSession:
       return "mln_render_session";
-    case HandleKind::OfflineRegionSnapshot:
-      return "mln_offline_region_snapshot";
-    case HandleKind::OfflineRegionList:
-      return "mln_offline_region_list";
     case HandleKind::Buffer:
       return "mln_buffer";
-    case HandleKind::StyleIdList:
-      return "mln_style_id_list";
-    case HandleKind::WakeSource:
-      return "mln_wake_source";
     case HandleKind::ResourceRequest:
       return "mln_resource_request_handle";
-    case HandleKind::StyleStringList:
-      return "mln_style_string_list";
+    case HandleKind::EventBatch:
+      return "mln_event_batch";
+    case HandleKind::AdapterResourceRequestQueue:
+      return "mln_adapter_resource_request_queue";
+    case HandleKind::AdapterLogQueue:
+      return "mln_adapter_log_queue";
+    case HandleKind::AcquiredFrame:
+      return "mln_acquired_frame";
+    case HandleKind::RenderFrameBatch:
+      return "mln_render_frame_batch";
     case HandleKind::GeoJsonSourceData:
       return "mln_geojson_source_data";
     case HandleKind::QueriedFeatureList:

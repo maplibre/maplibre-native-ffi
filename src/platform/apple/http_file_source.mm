@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <mutex>
 
-#import <Foundation/Foundation.h>
 #include <mln/interface/native_apple_interface.h>
 #include <mln/storage/http_file_source.hpp>
 #include <mln/storage/resource.hpp>
@@ -14,6 +13,8 @@
 #include <mln/util/client_options.hpp>
 #include <mln/util/http_header.hpp>
 #include <mln/util/version.hpp>
+
+#import <Foundation/Foundation.h>
 #import <objc/runtime.h>
 
 #include "maplibre_native_c.h"

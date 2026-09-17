@@ -30,7 +30,6 @@ let testSourceFiles = [
   "MaplibreNativeFFITests/SupportHelperTests.swift",
   "MaplibreNativeFFITests/SyntheticHandles.swift",
   "MaplibreNativeFFITests/ValueTests.swift",
-  "MaplibreNativeFFITests/WakeSourceTests.swift",
 ]
 
 let products: [Product] = [

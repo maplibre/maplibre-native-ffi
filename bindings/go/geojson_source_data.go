@@ -23,7 +23,7 @@ type GeoJSONSourceDataHandle struct {
 // data holds one complete UTF-8 GeoJSON document and options may be nil for
 // defaults; both are copied into the prepared data before the call returns.
 // Preparation touches no runtime or map and is callable from any goroutine, so
-// the expensive parse and tiling can run off the map owner thread.
+// the expensive parse and tiling can run concurrently with map work.
 //
 // AddGeoJSONSourceData and SetGeoJSONSourceData borrow the handle, so one
 // prepared value may be installed on any number of sources and closed at any
@@ -31,10 +31,7 @@ type GeoJSONSourceDataHandle struct {
 func NewGeoJSONSourceData(data []byte, options *StyleGeoJSONSourceOptions) (*GeoJSONSourceDataHandle, error) {
 	rawData := newCBufferView(data)
 	defer rawData.free()
-	rawOptions, err := newCStyleGeoJSONSourceOptions(options)
-	if err != nil {
-		return nil, newBindingError(ErrInvalidArgument, err.Error())
-	}
+	rawOptions := newCStyleGeoJSONSourceOptions(options)
 	defer rawOptions.free()
 
 	var prepared nativeGeoJSONSourceData
@@ -55,15 +52,15 @@ func NewGeoJSONSourceData(data []byte, options *StyleGeoJSONSourceOptions) (*Geo
 	return &GeoJSONSourceDataHandle{state: state}, nil
 }
 
-func (data *GeoJSONSourceDataHandle) ptr() (nativeGeoJSONSourceData, func(), error) {
+func (data *GeoJSONSourceDataHandle) ptr() (nativeGeoJSONSourceData, error) {
 	if data == nil || data.state == nil {
-		return 0, nil, newBindingError(ErrInvalidArgument, "GeoJSONSourceDataHandle is nil")
+		return 0, newBindingError(ErrInvalidArgument, "GeoJSONSourceDataHandle is nil")
 	}
-	borrow, live := data.state.Borrow()
+	value, live := data.state.Handle()
 	if !live {
-		return 0, nil, newBindingError(ErrInvalidArgument, "GeoJSONSourceDataHandle is closed")
+		return 0, newBindingError(ErrInvalidArgument, "GeoJSONSourceDataHandle is closed")
 	}
-	return borrow.Handle(), borrow.Release, nil
+	return value, nil
 }
 
 // Close releases this prepared data. Close is callable from any goroutine, and
@@ -73,10 +70,8 @@ func (data *GeoJSONSourceDataHandle) Close() error {
 	if data == nil || data.state == nil {
 		return newBindingError(ErrInvalidArgument, "GeoJSONSourceDataHandle is nil")
 	}
-	return checkNative(func() int32 {
-		return data.state.Close(func(native nativeGeoJSONSourceData) int32 {
-			C.mln_geojson_source_data_destroy(C.mln_geojson_source_data(native))
-			return int32(C.MLN_STATUS_OK)
-		})
+	return data.state.Close(func(native nativeGeoJSONSourceData) error {
+		C.mln_geojson_source_data_destroy(C.mln_geojson_source_data(native))
+		return nil
 	})
 }

@@ -2,17 +2,12 @@ package handle
 
 import (
 	"bytes"
+	"errors"
 	"log"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
-)
-
-const (
-	testStatusOK          int32 = 0
-	testStatusWrongThread int32 = -3
 )
 
 // A synthetic handle for close-once tests. It reaches only the fake destroy
@@ -20,6 +15,24 @@ const (
 type testNativeHandle uint64
 
 const testHandle testNativeHandle = 0x0200_0000_0000_002a
+
+var errWrongThread = errors.New("wrong thread")
+
+// captureLog redirects the standard logger for one test and returns the buffer
+// it writes into.
+func captureLog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	oldWriter := log.Writer()
+	oldFlags := log.Flags()
+	log.SetOutput(&buf)
+	log.SetFlags(0)
+	t.Cleanup(func() {
+		log.SetOutput(oldWriter)
+		log.SetFlags(oldFlags)
+	})
+	return &buf
+}
 
 func TestStateRejectsTheNullHandle(t *testing.T) {
 	state, err := New[testNativeHandle](0, "test_handle")
@@ -38,19 +51,19 @@ func TestStateCloseIsIdempotentAfterSuccess(t *testing.T) {
 	}
 
 	var calls atomic.Int32
-	destroy := func(handle testNativeHandle) int32 {
+	destroy := func(handle testNativeHandle) error {
 		if handle != testHandle {
 			t.Fatalf("destroy handle = %#x, want %#x", handle, testHandle)
 		}
 		calls.Add(1)
-		return testStatusOK
+		return nil
 	}
 
-	if status := state.Close(destroy); status != testStatusOK {
-		t.Fatalf("first Close status = %d, want OK", status)
+	if err := state.Close(destroy); err != nil {
+		t.Fatalf("first Close: %v", err)
 	}
-	if status := state.Close(destroy); status != testStatusOK {
-		t.Fatalf("second Close status = %d, want OK", status)
+	if err := state.Close(destroy); err != nil {
+		t.Fatalf("second Close: %v", err)
 	}
 	if got := calls.Load(); got != 1 {
 		t.Fatalf("destroy calls = %d, want 1", got)
@@ -67,103 +80,25 @@ func TestStateFailedCloseLeavesHandleLiveForRetry(t *testing.T) {
 	}
 
 	var calls atomic.Int32
-	destroy := func(testNativeHandle) int32 {
+	destroy := func(testNativeHandle) error {
 		if calls.Add(1) == 1 {
-			return testStatusWrongThread
+			return errWrongThread
 		}
-		return testStatusOK
+		return nil
 	}
 
-	if status := state.Close(destroy); status != testStatusWrongThread {
-		t.Fatalf("first Close status = %d, want wrong-thread", status)
+	if err := state.Close(destroy); !errors.Is(err, errWrongThread) {
+		t.Fatalf("first Close error = %v, want wrong thread", err)
 	}
 	if handle, live := state.Handle(); !live || handle != testHandle {
 		t.Fatalf("Handle() = %#x, %v; want the live handle", handle, live)
 	}
-	if status := state.Close(destroy); status != testStatusOK {
-		t.Fatalf("second Close status = %d, want OK", status)
+	if err := state.Close(destroy); err != nil {
+		t.Fatalf("second Close: %v", err)
 	}
 	if got := calls.Load(); got != 2 {
 		t.Fatalf("destroy calls = %d, want 2", got)
 	}
-}
-
-// BND-197.
-func TestStateCloseWaitsForActiveBorrowBeforeDestroy(t *testing.T) {
-	state, err := New(testHandle, "test_handle")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	borrow, live := state.Borrow()
-	if !live {
-		t.Fatal("Borrow() failed for live state")
-	}
-	if handle := borrow.Handle(); handle != testHandle {
-		t.Fatalf("borrow Handle() = %#x, want %#x", handle, testHandle)
-	}
-
-	destroyCalled := make(chan struct{})
-	closeDone := make(chan int32)
-	go func() {
-		closeDone <- state.Close(func(handle testNativeHandle) int32 {
-			if handle != testHandle {
-				t.Errorf("destroy handle = %#x, want %#x", handle, testHandle)
-			}
-			close(destroyCalled)
-			return testStatusOK
-		})
-	}()
-
-	select {
-	case <-destroyCalled:
-		t.Fatal("destroy ran before active borrow was released")
-	default:
-	}
-	deadline := time.After(2 * time.Second)
-	for {
-		if borrow, live := state.Borrow(); live {
-			borrow.Release()
-			select {
-			case <-destroyCalled:
-				t.Fatal("destroy ran before active borrow was released")
-			case <-deadline:
-				t.Fatal("Close did not enter releasing state")
-			case <-time.After(100 * time.Microsecond):
-				continue
-			}
-		}
-		break
-	}
-
-	borrow.Release()
-	if status := <-closeDone; status != testStatusOK {
-		t.Fatalf("Close status = %d, want OK", status)
-	}
-	select {
-	case <-destroyCalled:
-	default:
-		t.Fatal("destroy did not run after borrow release")
-	}
-}
-
-func TestStateFailedCloseAllowsBorrowRetry(t *testing.T) {
-	state, err := New(testHandle, "test_handle")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if status := state.Close(func(testNativeHandle) int32 { return testStatusWrongThread }); status != testStatusWrongThread {
-		t.Fatalf("Close status = %d, want wrong-thread", status)
-	}
-	borrow, live := state.Borrow()
-	if !live {
-		t.Fatal("Borrow() failed after failed close")
-	}
-	if handle := borrow.Handle(); handle != testHandle {
-		t.Fatalf("borrow Handle() = %#x, want %#x", handle, testHandle)
-	}
-	borrow.Release()
 }
 
 func TestStateConcurrentCloseDestroysOnce(t *testing.T) {
@@ -181,11 +116,11 @@ func TestStateConcurrentCloseDestroysOnce(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			if status := state.Close(func(testNativeHandle) int32 {
+			if err := state.Close(func(testNativeHandle) error {
 				calls.Add(1)
-				return testStatusOK
-			}); status != testStatusOK {
-				t.Errorf("Close status = %d, want OK", status)
+				return nil
+			}); err != nil {
+				t.Errorf("Close: %v", err)
 			}
 		}()
 	}
@@ -197,62 +132,13 @@ func TestStateConcurrentCloseDestroysOnce(t *testing.T) {
 	}
 }
 
-func TestStateCloseFailsWithLiveChildrenAndRetries(t *testing.T) {
-	state, err := New(testHandle, "test_handle")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	child := state.AddChild()
-	if status := state.Close(func(testNativeHandle) int32 {
-		t.Fatal("destroy called while child is live")
-		return testStatusOK
-	}, testStatusWrongThread); status != testStatusWrongThread {
-		t.Fatalf("Close status = %d, want live-child status", status)
-	}
-	if borrow, live := state.Borrow(); !live {
-		t.Fatal("Borrow() failed after live-child close failure")
-	} else {
-		borrow.Release()
-	}
-
-	child.Release()
-	if status := state.Close(func(testNativeHandle) int32 { return testStatusOK }, testStatusWrongThread); status != testStatusOK {
-		t.Fatalf("Close after child release status = %d, want OK", status)
-	}
-}
-
-func TestStateKeepsParentsReachable(t *testing.T) {
-	const parentHandle testNativeHandle = 0x0100_0000_0000_0007
-	parent := parentHandle
-	native := testHandle
-	state, err := New(native, "test_handle", parent)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	state.KeepAlive()
-	if got := state.TypeName(); got != "test_handle" {
-		t.Fatalf("TypeName() = %q, want test_handle", got)
-	}
-}
-
 func TestStateLeakReportDoesNotDestroyHandle(t *testing.T) {
 	state, err := New(testHandle, "test_handle")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	var buf bytes.Buffer
-	oldWriter := log.Writer()
-	oldFlags := log.Flags()
-	log.SetOutput(&buf)
-	log.SetFlags(0)
-	defer func() {
-		log.SetOutput(oldWriter)
-		log.SetFlags(oldFlags)
-	}()
-
+	buf := captureLog(t)
 	state.reportLeakIfLive()
 	if got := buf.String(); !strings.Contains(got, "maplibre: leaked test_handle") {
 		t.Fatalf("leak report = %q, want leaked test_handle", got)
@@ -267,20 +153,11 @@ func TestStateLeakReportIgnoresClosedHandle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status := state.Close(func(testNativeHandle) int32 { return testStatusOK }); status != testStatusOK {
-		t.Fatalf("Close status = %d, want OK", status)
+	if err := state.Close(func(testNativeHandle) error { return nil }); err != nil {
+		t.Fatalf("Close: %v", err)
 	}
 
-	var buf bytes.Buffer
-	oldWriter := log.Writer()
-	oldFlags := log.Flags()
-	log.SetOutput(&buf)
-	log.SetFlags(0)
-	defer func() {
-		log.SetOutput(oldWriter)
-		log.SetFlags(oldFlags)
-	}()
-
+	buf := captureLog(t)
 	state.reportLeakIfLive()
 	if got := buf.String(); got != "" {
 		t.Fatalf("leak report after close = %q, want empty", got)

@@ -24,9 +24,9 @@ private class JvmEglOwnedTextureSession(
   private val config: Long,
   private val surface: Long,
   private val context: Long,
-  override val session: RenderSessionHandle,
+  override val attachment: RenderSessionAttachment,
 ) : OwnedTextureTestSession {
-  override fun attachAnotherOwnedTexture(width: Int, height: Int): RenderSessionHandle {
+  override fun attachAnotherOwnedTexture(width: Int, height: Int): RenderSessionAttachment {
     val descriptor =
       EglContextDescriptor(
         NativePointer.ofAddress(display),
@@ -37,32 +37,19 @@ private class JvmEglOwnedTextureSession(
     return session
       .map()
       .attachOpenGLOwnedTexture(
-        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor)
+        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor),
+        OWNED_TEXTURE_ATTACH_OPTIONS,
       )
   }
 
-  override fun acquireFrame(): OwnedTextureTestFrame {
-    val handle = session.acquireOpenGLOwnedTextureFrame()
-    val frame = handle.frame()
-    return object : OwnedTextureTestFrame {
-      override val width: Int
-        get() = frame.width()
-
-      override val height: Int
-        get() = frame.height()
-
-      override val isClosed: Boolean
-        get() = handle.isClosed
-
-      override fun close() {
-        handle.close()
-      }
-    }
+  override fun frameSize(frame: AcquiredFrameHandle): OwnedTextureFrameSize {
+    val texture = frame.openGLTexture()
+    return OwnedTextureFrameSize(texture.width(), texture.height())
   }
 
   override fun close() {
     try {
-      session.close()
+      session.abandonAndClose()
     } finally {
       releaseEgl(display, surface, context)
     }
@@ -132,11 +119,12 @@ private fun createEglSession(
         NativePointer.ofAddress(context),
         NativePointer.NULL_POINTER,
       )
-    val session =
+    val attachment =
       map.attachOpenGLOwnedTexture(
-        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor)
+        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor),
+        OWNED_TEXTURE_ATTACH_OPTIONS,
       )
-    return JvmEglOwnedTextureSession(display, config, surface, context, session)
+    return JvmEglOwnedTextureSession(display, config, surface, context, attachment)
   } catch (error: Throwable) {
     releaseEgl(display, surface, context)
     throw error

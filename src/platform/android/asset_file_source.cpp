@@ -7,7 +7,6 @@
 #include <string_view>
 #include <utility>
 
-#include <android/asset_manager.h>
 #include <mln/actor/actor.hpp>
 #include <mln/platform/settings.hpp>
 #include <mln/storage/asset_file_source.hpp>
@@ -20,6 +19,8 @@
 #include <mln/util/constants.hpp>
 #include <mln/util/thread.hpp>
 #include <mln/util/url.hpp>
+
+#include <android/asset_manager.h>
 #include <sys/types.h>
 
 #include "platform/android/asset_manager.hpp"

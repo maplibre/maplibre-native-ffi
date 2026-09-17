@@ -9,7 +9,6 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.cValue
 import kotlinx.cinterop.get
-import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
@@ -58,27 +57,15 @@ import org.maplibre.nativeffi.internal.c.mln_geojson_source_options_default
 import org.maplibre.nativeffi.internal.c.mln_image_stretch
 import org.maplibre.nativeffi.internal.c.mln_premultiplied_rgba8_image
 import org.maplibre.nativeffi.internal.c.mln_premultiplied_rgba8_image_default
-import org.maplibre.nativeffi.internal.c.mln_style_id_list_count
-import org.maplibre.nativeffi.internal.c.mln_style_id_list_destroy
-import org.maplibre.nativeffi.internal.c.mln_style_id_list_get
 import org.maplibre.nativeffi.internal.c.mln_style_image_info
 import org.maplibre.nativeffi.internal.c.mln_style_image_options
 import org.maplibre.nativeffi.internal.c.mln_style_image_options_default
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
-import org.maplibre.nativeffi.internal.c.mln_style_string_list_count
-import org.maplibre.nativeffi.internal.c.mln_style_string_list_destroy
-import org.maplibre.nativeffi.internal.c.mln_style_string_list_get
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options_default
 import org.maplibre.nativeffi.internal.c.mln_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_style_transition_options_default
-import org.maplibre.nativeffi.internal.lifecycle.NativeStyleIdList
-import org.maplibre.nativeffi.internal.lifecycle.NativeStyleStringList
-import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
-import org.maplibre.nativeffi.internal.memory.CSize
-import org.maplibre.nativeffi.internal.memory.CSizeVar
 import org.maplibre.nativeffi.internal.memory.toCSize
-import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageContent
@@ -110,13 +97,13 @@ internal object StyleStructs {
   fun canonicalTileId(value: mln_canonical_tile_id): CanonicalTileId =
     CanonicalTileId(checkedInt(value.z, "canonical tile z"), value.x.toLong(), value.y.toLong())
 
-  fun withPremultipliedRgba8Image(
+  fun <R> withPremultipliedRgba8Image(
     value: PremultipliedRgba8Image,
     scope: MemScope,
-    block: (CPointer<mln_premultiplied_rgba8_image>) -> Unit,
-  ) {
+    block: (CPointer<mln_premultiplied_rgba8_image>) -> R,
+  ): R {
     val pixels = value.pixelsTransit
-    pixels.usePinned { pinnedPixels ->
+    return pixels.usePinned { pinnedPixels ->
       val native = scope.alloc<mln_premultiplied_rgba8_image>()
       mln_premultiplied_rgba8_image_default().place(native.ptr)
       native.width = value.width.toUInt()
@@ -362,49 +349,6 @@ internal object StyleStructs {
     values.forEachIndexed { index, value -> CoreStructs.setStringView(array[index], value, scope) }
     return array
   }
-
-  fun styleIdList(list: NativeStyleIdList): List<String> =
-    styleIdList(
-      list.rawHandleValue,
-      counter = ::mln_style_id_list_count,
-      getter = ::mln_style_id_list_get,
-      destroyer = ::mln_style_id_list_destroy,
-    )
-
-  fun styleIdList(
-    list: ULong,
-    counter: (ULong, CPointer<CSizeVar>) -> Int,
-    getter: (ULong, CSize, CPointer<mln_buffer_view>) -> Int,
-    destroyer: (ULong) -> Unit,
-  ): List<String> =
-    try {
-      memScoped {
-        val outCount = alloc<CSizeVar>()
-        Status.check(counter(list, outCount.ptr))
-        List(checkedInt(outCount.value.toULong(), "style id count")) { index ->
-          val outId = alloc<mln_buffer_view>()
-          Status.check(getter(list, index.toCSize(), outId.ptr))
-          CoreStructs.stringView(outId)
-        }
-      }
-    } finally {
-      destroyer(list)
-    }
-
-  fun styleStringList(list: NativeStyleStringList): List<String> =
-    styleStringList(
-      list.rawHandleValue,
-      counter = ::mln_style_string_list_count,
-      getter = ::mln_style_string_list_get,
-      destroyer = ::mln_style_string_list_destroy,
-    )
-
-  fun styleStringList(
-    list: ULong,
-    counter: (ULong, CPointer<CSizeVar>) -> Int,
-    getter: (ULong, CSize, CPointer<mln_buffer_view>) -> Int,
-    destroyer: (ULong) -> Unit,
-  ): List<String> = styleIdList(list, counter, getter, destroyer)
 
   fun sourceInfo(
     value: mln_style_source_info,

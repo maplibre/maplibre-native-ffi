@@ -424,9 +424,9 @@ class OptionsValueSemanticsTest {
     )
   }
 
+  // The native field mask distinguishes an absent layer filter from an empty one.
   @Test
   fun absentLayerIdsDifferFromEmptyLayerIds() {
-    // The native field mask distinguishes an absent layer filter from an empty one.
     val absent = RenderedFeatureQueryOptions()
     val empty = RenderedFeatureQueryOptions().apply { layerIds = emptyList() }
 
@@ -458,9 +458,9 @@ class OptionsValueSemanticsTest {
     assertEquals(2.0, derived.zoom)
   }
 
+  // BND-069.
   @Test
   fun queryOptionsSnapshotCallerOwnedLayerIds() {
-    // BND-069.
     val layerIds = mutableListOf("a")
     val options = RenderedFeatureQueryOptions().apply { this.layerIds = layerIds }
     val copy = options.copy()
@@ -508,9 +508,9 @@ class OptionsValueSemanticsTest {
     )
   }
 
+  // BND-069.
   @Test
   fun styleImageOptionsSnapshotCallerOwnedStretches() {
-    // BND-069.
     val stretchX = mutableListOf(ImageStretch(0.0f, 1.0f))
     val options =
       StyleImageOptions().apply {

@@ -5,6 +5,8 @@ from __future__ import annotations
 from enum import IntEnum
 from typing import Self
 
+from .errors import InvalidArgumentError
+
 
 class NativeIntEnum(IntEnum):
     """Integer enum whose value is the native C domain value."""
@@ -35,10 +37,5 @@ class UnknownIntEnum(NativeIntEnum):
     def known_native_code(self, label: str) -> int:
         """Return the native code, rejecting unknown values for setter calls."""
         if self.is_unknown:
-            from .errors import InvalidArgumentError
-
-            raise InvalidArgumentError(
-                None,
-                f"unknown {label} cannot be set: {int(self)}",
-            )
+            raise InvalidArgumentError(f"unknown {label} cannot be set: {int(self)}")
         return int(self)

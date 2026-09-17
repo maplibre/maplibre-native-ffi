@@ -54,16 +54,10 @@ case "$1" in
   android-*)
     native_install_dir="$MISE_MONOREPO_ROOT/build/$1/install"
     descriptor="$native_install_dir/share/maplibre-native-c/artifact.json"
-    ndk_prebuilt_root="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt"
-    ndk_host_prebuilts=()
-    while IFS= read -r ndk_host_prebuilt; do
-      ndk_host_prebuilts+=("$ndk_host_prebuilt")
-    done < <(find "$ndk_prebuilt_root" -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | sort)
-    if (( ${#ndk_host_prebuilts[@]} != 1 )); then
-      echo "The pinned Android NDK must contain one host prebuilt under $ndk_prebuilt_root." >&2
+    if ! ndk_prebuilt="$("$(dirname "${BASH_SOURCE[0]}")/android-ndk-prebuilt.sh")"; then
       exit 2
     fi
-    ndk_sysroot="${ndk_host_prebuilts[0]}/sysroot"
+    ndk_sysroot="$ndk_prebuilt/sysroot"
     if [[ ! -d "$ndk_sysroot" ]]; then
       echo "The pinned Android NDK sysroot does not exist: $ndk_sysroot" >&2
       exit 2

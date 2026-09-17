@@ -64,74 +64,52 @@ public sealed unsafe class NativeHandleStateTests
     [Fact]
     public void PointerFailsWhileCloseIsInProgress()
     {
-        using var destroyStarted = new ManualResetEventSlim(false);
-        using var allowDestroy = new ManualResetEventSlim(false);
-        var destroyCount = 0;
+        using var destroy = new BlockingDestroy();
         var state = new NativeHandleState<MlnRuntime>(
             SyntheticHandles.Runtime(1234),
-            DestroyAfterRelease,
+            destroy.Destroy,
             "RuntimeHandle"
         );
 
         var close = Task.Run(state.Close);
-        Assert.True(destroyStarted.Wait(TimeSpan.FromSeconds(5)));
+        destroy.WaitUntilStarted();
 
         var error = Assert.Throws<InvalidStateException>(() => _ = state.Handle);
 
         Assert.Equal(MaplibreStatus.InvalidState, error.Status);
         Assert.Contains("closing", error.Message, StringComparison.OrdinalIgnoreCase);
 
-        allowDestroy.Set();
+        destroy.Allow();
         close.GetAwaiter().GetResult();
 
         Assert.True(state.IsClosed);
-        Assert.Equal(1, destroyCount);
-
-        mln_status DestroyAfterRelease(MlnRuntime handle)
-        {
-            Assert.False(handle.IsNull);
-            destroyCount++;
-            destroyStarted.Set();
-            Assert.True(allowDestroy.Wait(TimeSpan.FromSeconds(5)));
-            return mln_status.MLN_STATUS_OK;
-        }
+        Assert.Equal(1, destroy.Count);
     }
 
     [BindingSpecTest("BND-046")]
     [Fact]
     public void ConcurrentCloseWaitsForInProgressReleaseWithoutDestroyingTwice()
     {
-        using var destroyStarted = new ManualResetEventSlim(false);
-        using var allowDestroy = new ManualResetEventSlim(false);
-        var destroyCount = 0;
+        using var destroy = new BlockingDestroy();
         var state = new NativeHandleState<MlnRuntime>(
             SyntheticHandles.Runtime(1234),
-            DestroyAfterRelease,
+            destroy.Destroy,
             "RuntimeHandle"
         );
 
         var firstClose = Task.Run(state.Close);
-        Assert.True(destroyStarted.Wait(TimeSpan.FromSeconds(5)));
+        destroy.WaitUntilStarted();
 
         var secondClose = Task.Run(state.Close);
         Assert.False(secondClose.Wait(TimeSpan.FromMilliseconds(50)));
-        Assert.Equal(1, destroyCount);
+        Assert.Equal(1, destroy.Count);
 
-        allowDestroy.Set();
+        destroy.Allow();
         firstClose.GetAwaiter().GetResult();
         secondClose.GetAwaiter().GetResult();
 
         Assert.True(state.IsClosed);
-        Assert.Equal(1, destroyCount);
-
-        mln_status DestroyAfterRelease(MlnRuntime handle)
-        {
-            Assert.False(handle.IsNull);
-            destroyCount++;
-            destroyStarted.Set();
-            Assert.True(allowDestroy.Wait(TimeSpan.FromSeconds(5)));
-            return mln_status.MLN_STATUS_OK;
-        }
+        Assert.Equal(1, destroy.Count);
     }
 
     [BindingSpecTest("BND-048")]
@@ -198,54 +176,6 @@ public sealed unsafe class NativeHandleStateTests
 
     [BindingSpecTest("BND-197")]
     [Fact]
-    public void CloseWaitsForAUseInFlightOnAnotherThread()
-    {
-        using var _ = Gate.EnterScope();
-        destroyStatus = mln_status.MLN_STATUS_OK;
-        destroyCount = 0;
-        var state = new NativeHandleState<MlnRuntime>(
-            SyntheticHandles.Runtime(1234),
-            Destroy,
-            "RuntimeHandle"
-        );
-
-        using var entered = new ManualResetEventSlim(false);
-        using var releaseUse = new ManualResetEventSlim(false);
-        using var closeReturned = new ManualResetEventSlim(false);
-        var destroysSeenByUse = -1;
-
-        var useThread = new Thread(() =>
-            state.WithLive(_ =>
-            {
-                entered.Set();
-                Assert.True(releaseUse.Wait(TimeSpan.FromSeconds(5)));
-                destroysSeenByUse = Volatile.Read(ref destroyCount);
-            })
-        );
-        useThread.Start();
-        Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
-
-        var closeThread = new Thread(() =>
-        {
-            state.Close();
-            closeReturned.Set();
-        });
-        closeThread.Start();
-
-        Assert.False(closeReturned.Wait(TimeSpan.FromMilliseconds(200)));
-        Assert.Equal(0, Volatile.Read(ref destroyCount));
-
-        releaseUse.Set();
-        Assert.True(closeReturned.Wait(TimeSpan.FromSeconds(5)));
-        Assert.True(useThread.Join(TimeSpan.FromSeconds(5)));
-
-        Assert.Equal(1, destroyCount);
-        Assert.Equal(0, destroysSeenByUse);
-        Assert.True(state.IsClosed);
-    }
-
-    [BindingSpecTest("BND-197")]
-    [Fact]
     public void AUseStartingAfterCloseBeginsIsRefused()
     {
         using var _ = Gate.EnterScope();
@@ -259,7 +189,36 @@ public sealed unsafe class NativeHandleStateTests
 
         state.Close();
 
-        Assert.Throws<InvalidStateException>(() => state.WithLive(_ => { }));
+        Assert.Throws<InvalidStateException>(() => state.Handle);
+    }
+
+    /// <summary>A destroy that blocks until the test releases it, so a close stays in progress.</summary>
+    private sealed class BlockingDestroy : IDisposable
+    {
+        private readonly ManualResetEventSlim started = new(false);
+        private readonly ManualResetEventSlim allowed = new(false);
+        private int count;
+
+        internal int Count => Volatile.Read(ref count);
+
+        internal mln_status Destroy(MlnRuntime handle)
+        {
+            Assert.False(handle.IsNull);
+            Interlocked.Increment(ref count);
+            started.Set();
+            Assert.True(allowed.Wait(TimeSpan.FromSeconds(5)));
+            return mln_status.MLN_STATUS_OK;
+        }
+
+        internal void WaitUntilStarted() => Assert.True(started.Wait(TimeSpan.FromSeconds(5)));
+
+        internal void Allow() => allowed.Set();
+
+        public void Dispose()
+        {
+            started.Dispose();
+            allowed.Dispose();
+        }
     }
 
     private static mln_status Destroy(MlnRuntime handle)

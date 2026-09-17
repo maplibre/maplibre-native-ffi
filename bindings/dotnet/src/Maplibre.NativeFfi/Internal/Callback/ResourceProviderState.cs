@@ -22,6 +22,7 @@ internal sealed unsafe class ResourceProviderState : IDisposable
             size = (uint)sizeof(mln_resource_provider),
             callback = &OnRequest,
             user_data = (void*)handle,
+            release_user_data = &Release,
         };
 
     internal bool IsHandleAllocatedForTest => handle != 0;
@@ -52,6 +53,10 @@ internal sealed unsafe class ResourceProviderState : IDisposable
             return uint.MaxValue;
         }
     }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    private static void Release(void* userData) =>
+        CallbackRelease.Dispose<ResourceProviderState>(userData);
 
     private static uint Invoke(
         ResourceProviderState? state,

@@ -11,19 +11,6 @@ APIs. This lets the local file source load percent-encoded `file:///C:/...`
 resources whose paths contain spaces or non-ASCII characters. Upstream:
 [maplibre-native#4572](https://github.com/maplibre/maplibre-native/pull/4572).
 
-`0003-run-loop-process-gate.patch` adds an optional gate callback to
-`RunLoop::process()`, consulted before each queued task is dequeued. The C API
-uses it to bound one pump's drain; the budget logic stays on the C API side, and
-an unset gate keeps upstream behavior. Upstream:
-[maplibre-native#4577](https://github.com/maplibre/maplibre-native/pull/4577).
-The upstream proposal uses a deadline budget in place of the gate callback.
-
-`0004-opengl-valid-api-calls.patch` allocates storage before copying a uniform
-buffer and isolates allocation errors from earlier OpenGL calls. This prevents
-strict implementations and the API 26 Android emulator from turning stale errors
-into false allocation failures. Upstream:
-[maplibre-native#4578](https://github.com/maplibre/maplibre-native/pull/4578).
-
 `0005-unwrapped-unprojection.patch` adds wrap-mode overloads to map and
 standalone projection coordinate conversion. The C API uses them to expose
 continuous longitudes while the existing overloads keep wrapped behavior.

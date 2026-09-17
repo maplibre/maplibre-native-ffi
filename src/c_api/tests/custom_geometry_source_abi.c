@@ -5,6 +5,7 @@
 // the release runs independently of the event mask. A binding observes its own
 // release only through that same mechanism.
 
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -13,26 +14,22 @@
 #include "test_support.h"
 #include "unity.h"
 
-static const char background_style_json[] =
-  "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background\",\"type\":"
-  "\"background\",\"paint\":{\"background-color\":\"#102030\"}}]}";
-static const char empty_style_json[] =
-  "{\"version\":8,\"sources\":{},\"layers\":[]}";
 static const char source_id[] = "custom-geometry";
-static const size_t style_pump_attempts = 200;
 
+// The counters are written from native threads and read from the test thread,
+// so they are atomic; the barrier polls below provide the ordering.
 typedef struct release_probe {
-  size_t release_count;
-  size_t fetch_count;
+  atomic_size_t release_count;
+  atomic_size_t fetch_count;
 } release_probe;
 
 static void probe_fetch_tile(void* user_data, mln_canonical_tile_id tile_id) {
   (void)tile_id;
-  ((release_probe*)user_data)->fetch_count += 1;
+  atomic_fetch_add(&((release_probe*)user_data)->fetch_count, 1);
 }
 
 static void probe_release(void* user_data) {
-  ((release_probe*)user_data)->release_count += 1;
+  atomic_fetch_add(&((release_probe*)user_data)->release_count, 1);
 }
 
 static mln_custom_geometry_source_options probe_options(release_probe* probe) {
@@ -44,21 +41,10 @@ static mln_custom_geometry_source_options probe_options(release_probe* probe) {
   return options;
 }
 
-// Loads an inline style and pumps, so the map reaches a loaded style without
-// reaching the network.
-static void load_style_and_pump(
-  mln_runtime runtime, mln_map map, mln_buffer_view style_json
-) {
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_set_style_json(map, style_json));
-  for (size_t attempt = 0; attempt < style_pump_attempts; attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 2, -1));
-  }
-}
-
 static mln_map create_map_without_style_events(mln_runtime runtime) {
   mln_map_options options = mln_map_options_default();
-  options.width = 256;
-  options.height = 256;
+  options.initial_extent.width = 256;
+  options.initial_extent.height = 256;
   options.event_mask = MLN_RUNTIME_EVENT_MASK_ALL &
                        ~(uint64_t)MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED;
   return mln_test_create_map_with_options(runtime, &options);
@@ -70,25 +56,28 @@ static void a_style_replacement_releases_a_dropped_source_unsubscribed(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_map_without_style_events(runtime);
   release_probe probe = {0};
+  mln_test_completion command = mln_test_completion_default(0);
 
-  load_style_and_pump(runtime, map, MLN_BUFFER_LITERAL(background_style_json));
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
   mln_custom_geometry_source_options options = probe_options(&probe);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_add_custom_geometry_source(
-                     map, MLN_BUFFER_LITERAL(source_id), &options
-                   )
+    MLN_STATUS_OK,
+    mln_map_add_custom_geometry_source(
+      map, MLN_BUFFER_LITERAL(source_id), &options, &command.descriptor
+    )
   );
-  TEST_ASSERT_EQUAL_size_t(0, probe.release_count);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&command));
+  TEST_ASSERT_EQUAL_size_t(0, atomic_load(&probe.release_count));
 
-  load_style_and_pump(runtime, map, MLN_BUFFER_LITERAL(empty_style_json));
-  TEST_ASSERT_EQUAL_size_t(1, probe.release_count);
+  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
   TEST_ASSERT_EQUAL_size_t(
     0, mln_test_drain_counting(runtime, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
   );
 
   // The map no longer references the state, so retiring it releases nothing.
   mln_test_destroy_map(map);
-  TEST_ASSERT_EQUAL_size_t(1, probe.release_count);
+  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -96,64 +85,88 @@ static void an_explicit_removal_releases_once(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   release_probe probe = {0};
+  mln_test_completion add = mln_test_completion_default(0);
 
-  load_style_and_pump(runtime, map, MLN_BUFFER_LITERAL(background_style_json));
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
   mln_custom_geometry_source_options options = probe_options(&probe);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_add_custom_geometry_source(
-                     map, MLN_BUFFER_LITERAL(source_id), &options
+    MLN_STATUS_OK,
+    mln_map_add_custom_geometry_source(
+      map, MLN_BUFFER_LITERAL(source_id), &options, &add.descriptor
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&add));
+
+  mln_test_completion removal = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_remove_style_source(
+                     map, MLN_BUFFER_LITERAL(source_id), &removal.descriptor
                    )
   );
-
-  bool removed = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_remove_style_source(map, MLN_BUFFER_LITERAL(source_id), &removed)
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&removal));
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&removal)
   );
-  TEST_ASSERT_TRUE(removed);
-  TEST_ASSERT_EQUAL_size_t(1, probe.release_count);
+  mln_test_completion_destroy(&removal);
+  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
 
   // A style load after the removal has nothing left to reconcile.
-  load_style_and_pump(runtime, map, MLN_BUFFER_LITERAL(empty_style_json));
+  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
   mln_test_destroy_map(map);
-  TEST_ASSERT_EQUAL_size_t(1, probe.release_count);
+  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
   mln_test_destroy_runtime(runtime);
 }
 
-// A rejected add never referenced user_data, so releasing it would free state
-// the host still owns. Retiring the map then releases the accepted source's
-// state exactly once.
-static void a_rejected_add_releases_nothing(void) {
+// Synchronous rejection never references user_data. An asynchronously rejected
+// accepted command does reference it and therefore releases it. Retiring the
+// map then releases the successful source's state exactly once.
+static void accepted_adds_release_their_callback_state(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   release_probe probe = {0};
+  mln_test_completion rejected = mln_test_completion_default(0);
 
-  load_style_and_pump(runtime, map, MLN_BUFFER_LITERAL(background_style_json));
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
   mln_custom_geometry_source_options options = probe_options(&probe);
   options.fields = MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
   options.min_zoom = -1;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_add_custom_geometry_source(
-                                   map, MLN_BUFFER_LITERAL(source_id), &options
-                                 )
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_custom_geometry_source(
+      map, MLN_BUFFER_LITERAL(source_id), &options, &rejected.descriptor
+    )
   );
+  rejected.descriptor.release_user_data(rejected.descriptor.user_data);
+  mln_test_completion_destroy(&rejected);
 
   options = probe_options(&probe);
+  mln_test_completion first = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_add_custom_geometry_source(
-                     map, MLN_BUFFER_LITERAL(source_id), &options
-                   )
+    MLN_STATUS_OK,
+    mln_map_add_custom_geometry_source(
+      map, MLN_BUFFER_LITERAL(source_id), &options, &first.descriptor
+    )
   );
-  // The duplicate ID is rejected, and the accepted source keeps its own state.
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&first));
+  // The duplicate command is accepted, then fails application because the ID
+  // already exists. Its callback state is released independently.
+  mln_test_completion duplicate = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_add_custom_geometry_source(
-                                   map, MLN_BUFFER_LITERAL(source_id), &options
-                                 )
+    MLN_STATUS_OK,
+    mln_map_add_custom_geometry_source(
+      map, MLN_BUFFER_LITERAL(source_id), &options, &duplicate.descriptor
+    )
   );
-  TEST_ASSERT_EQUAL_size_t(0, probe.release_count);
+  TEST_ASSERT_NOT_EQUAL(MLN_STATUS_OK, mln_test_completion_settle(&duplicate));
+  // The duplicate's release is not ordered before a single barrier.
+  mln_test_barrier_until_count(
+    runtime, &probe.release_count, 1,
+    "the duplicate custom geometry source never released its callback state"
+  );
 
   mln_test_destroy_map(map);
-  TEST_ASSERT_EQUAL_size_t(1, probe.release_count);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  TEST_ASSERT_EQUAL_size_t(2, atomic_load(&probe.release_count));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -161,5 +174,5 @@ void run_custom_geometry_source_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(a_style_replacement_releases_a_dropped_source_unsubscribed);
   RUN_TEST(an_explicit_removal_releases_once);
-  RUN_TEST(a_rejected_add_releases_nothing);
+  RUN_TEST(accepted_adds_release_their_callback_state);
 }

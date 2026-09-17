@@ -101,6 +101,9 @@ func (view cBufferView) raw() C.mln_buffer_view {
 	return C.mln_buffer_view{data: view.data, size: C.size_t(view.size)}
 }
 
+// ptr returns a pointer to Go memory holding this view. The cgo pointer rules
+// allow it as a C call argument only; store a view in C memory with
+// cBufferViewSlot instead.
 func (view cBufferView) ptr() *C.mln_buffer_view {
 	return &C.mln_buffer_view{data: view.data, size: C.size_t(view.size)}
 }
@@ -111,20 +114,26 @@ func (view cBufferView) free() {
 	}
 }
 
-func goOwnedBuffer(buffer C.mln_buffer) ([]byte, error) {
-	if buffer == 0 {
-		return nil, nil
+// cBufferViewSlot is a C-allocated mln_buffer_view. C memory may hold a
+// pointer to it, which the cgo pointer rules forbid for Go memory.
+type cBufferViewSlot struct {
+	raw unsafe.Pointer
+}
+
+func newCBufferViewSlot(view cBufferView) cBufferViewSlot {
+	slot := C.malloc(C.size_t(unsafe.Sizeof(C.mln_buffer_view{})))
+	*(*C.mln_buffer_view)(slot) = view.raw()
+	return cBufferViewSlot{raw: slot}
+}
+
+func (slot cBufferViewSlot) ptr() *C.mln_buffer_view {
+	return (*C.mln_buffer_view)(slot.raw)
+}
+
+func (slot cBufferViewSlot) free() {
+	if slot.raw != nil {
+		C.free(slot.raw)
 	}
-	defer C.mln_buffer_destroy(buffer)
-	var view C.mln_buffer_view
-	if err := checkNative(func() int32 { return int32(C.mln_buffer_get(buffer, &view)) }); err != nil {
-		return nil, err
-	}
-	bytes, ok := goByteSlice(view.data, view.size)
-	if !ok {
-		return nil, newBindingError(ErrNative, "native buffer data is invalid")
-	}
-	return bytes, nil
 }
 
 func goByteSlice(data unsafe.Pointer, size C.size_t) ([]byte, bool) {

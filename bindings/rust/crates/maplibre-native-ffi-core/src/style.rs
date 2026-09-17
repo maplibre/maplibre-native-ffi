@@ -4,7 +4,8 @@ use std::ptr;
 use maplibre_native_ffi_sys as sys;
 
 use crate::enums::{
-    RasterDemEncoding, SourceType, StyleImageTextFit, TileScheme, VectorTileEncoding,
+    RasterDemEncoding, SourceType, StyleImageTextFit, StyleLayerVisibility, TileScheme,
+    VectorTileEncoding,
 };
 use crate::string::{StringView, buffer_view, string_view};
 use crate::values::{
@@ -420,6 +421,47 @@ pub fn style_source_info_from_native(
     }
 }
 
+/// Copied fixed metadata for one style layer.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct StyleLayerInfo {
+    /// Style-spec layer type string, such as `fill` or `background`.
+    pub layer_type: String,
+    /// Lowest zoom at which the layer draws; `f64::NEG_INFINITY` with no lower
+    /// bound.
+    pub min_zoom: f64,
+    /// Highest zoom at which the layer draws; `f64::INFINITY` with no upper
+    /// bound.
+    pub max_zoom: f64,
+    pub visibility: StyleLayerVisibility,
+    /// Source ID; `None` for layer types that take no source.
+    pub source_id: Option<String>,
+    /// Source-layer ID; `None` when the layer carries none.
+    pub source_layer: Option<String>,
+}
+
+/// Converts a filled native layer-info struct plus separately copied strings.
+///
+/// # Safety
+///
+/// `info.type_` must view readable bytes for this call.
+pub unsafe fn style_layer_info_from_native(
+    info: &sys::mln_style_layer_info,
+    source_id: Option<String>,
+    source_layer: Option<String>,
+) -> crate::Result<StyleLayerInfo> {
+    // SAFETY: The caller promises the type view is readable.
+    let layer_type = unsafe { crate::string::copy_string_view(info.type_) }?;
+    Ok(StyleLayerInfo {
+        layer_type,
+        min_zoom: info.min_zoom,
+        max_zoom: info.max_zoom,
+        visibility: StyleLayerVisibility::from_raw(info.visibility),
+        source_id,
+        source_layer,
+    })
+}
+
 /// Copied runtime style image pixels with style-specific metadata.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
@@ -427,6 +469,11 @@ pub struct StyleImage {
     pub image: PremultipliedRgba8Image,
     pub pixel_ratio: f32,
     pub sdf: bool,
+    pub stretch_x: Vec<ImageStretch>,
+    pub stretch_y: Vec<ImageStretch>,
+    pub content: Option<ImageContent>,
+    pub text_fit_width: Option<StyleImageTextFit>,
+    pub text_fit_height: Option<StyleImageTextFit>,
 }
 
 impl StyleImage {
@@ -435,6 +482,11 @@ impl StyleImage {
             image,
             pixel_ratio,
             sdf,
+            stretch_x: Vec::new(),
+            stretch_y: Vec::new(),
+            content: None,
+            text_fit_width: None,
+            text_fit_height: None,
         }
     }
 }
@@ -694,64 +746,6 @@ impl StyleImageOptionsNativeExt for StyleImageOptions {
     fn to_native(&self) -> NativeStyleImageOptions {
         style_image_options_to_native(self)
     }
-}
-
-/// Copies an owned native style ID list into owned Rust strings.
-///
-/// # Safety
-///
-/// `ptr` must point to a live `mln_style_id_list` handle owned by the caller
-/// and returned by the matching C API. This function takes ownership of that
-/// handle and releases it before returning, including on copy errors.
-pub unsafe fn copy_style_id_list(handle: sys::mln_style_id_list) -> crate::Result<Vec<String>> {
-    // SAFETY: handle is an owned style ID list returned by the C API and released by the guard.
-    let list = unsafe { crate::handle::style_id_list(handle) }?;
-    let mut count = 0;
-    // SAFETY: list is live and count points to writable storage.
-    crate::check(unsafe { sys::mln_style_id_list_count(list.handle(), &mut count) })?;
-
-    let mut ids = Vec::with_capacity(count);
-    for index in 0..count {
-        let mut view = sys::mln_buffer_view {
-            data: ptr::null(),
-            size: 0,
-        };
-        // SAFETY: list is live, index is less than count, and view points to writable storage.
-        crate::check(unsafe { sys::mln_style_id_list_get(list.handle(), index, &mut view) })?;
-        // SAFETY: The C API returns a view into list-owned storage that remains valid here.
-        ids.push(unsafe { crate::string::copy_string_view(view) }?);
-    }
-    Ok(ids)
-}
-
-/// Copies an owned native style string list into owned Rust strings.
-///
-/// # Safety
-///
-/// `handle` must be a live `mln_style_string_list` owned by the caller and
-/// returned by the matching C API. This function takes ownership of the handle
-/// and releases it before returning, including on copy errors.
-pub unsafe fn copy_style_string_list(
-    handle: sys::mln_style_string_list,
-) -> crate::Result<Vec<String>> {
-    // SAFETY: handle is an owned string list returned by C and released by the guard.
-    let list = unsafe { crate::handle::style_string_list(handle) }?;
-    let mut count = 0;
-    // SAFETY: list is live and count points to writable storage.
-    crate::check(unsafe { sys::mln_style_string_list_count(list.handle(), &mut count) })?;
-
-    let mut values = Vec::with_capacity(count);
-    for index in 0..count {
-        let mut view = sys::mln_buffer_view {
-            data: ptr::null(),
-            size: 0,
-        };
-        // SAFETY: list is live, index is in range, and view is writable.
-        crate::check(unsafe { sys::mln_style_string_list_get(list.handle(), index, &mut view) })?;
-        // SAFETY: The borrowed view remains valid until the list guard drops.
-        values.push(unsafe { crate::string::copy_string_view(view) }?);
-    }
-    Ok(values)
 }
 
 #[cfg(test)]

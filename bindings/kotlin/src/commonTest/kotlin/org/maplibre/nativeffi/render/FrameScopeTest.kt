@@ -3,12 +3,13 @@ package org.maplibre.nativeffi.render
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class FrameScopeTest {
   // BND-168, BND-173.
 
   @Test
-  fun metalFrameRejectsAccessAfterScopeCloses() {
+  fun metalFrameRejectsAccessAfterScopeCloses(): Unit = runSuspendTest {
     val scope = FrameScope()
     val highBit = Long.MAX_VALUE.toULong() + 1UL
     val frame =
@@ -42,7 +43,7 @@ class FrameScopeTest {
   }
 
   @Test
-  fun vulkanFrameRejectsAccessAfterScopeCloses() {
+  fun vulkanFrameRejectsAccessAfterScopeCloses(): Unit = runSuspendTest {
     val scope = FrameScope()
     val highBit = Long.MAX_VALUE.toULong() + 1UL
     val frame =
@@ -73,7 +74,7 @@ class FrameScopeTest {
   }
 
   @Test
-  fun openglFramePreservesHighBitTextureValues() {
+  fun openglFramePreservesHighBitTextureValues(): Unit = runSuspendTest {
     val scope = FrameScope()
     val highBit = Long.MAX_VALUE.toULong() + 1UL
     val frame =

@@ -6,28 +6,26 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.runtime.OfflineOperationKind
-import org.maplibre.nativeffi.runtime.OfflineOperationLeakReport
-import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class HandleLeakCleanerTest {
-  // BND-044. Destruction is owner-thread-bound, so the cleaner thread only reports.
+  // BND-044. The cleaner reports; explicit close keeps native failures observable.
 
   @Test
-  fun unreachableHandleReportsLeakWithoutExplicitRelease() {
+  fun unreachableHandleReportsLeakWithoutExplicitRelease(): Unit = runSuspendTest {
     val reports = CopyOnWriteArrayList<String>()
 
     registerUnreachableHandle(reports)
 
     assertTrue(awaitReport(reports), "expected the cleaner to report the unreachable handle")
     assertEquals(
-      "Leaked RuntimeHandle native handle 0x1234; close handles explicitly.",
+      "Leaked RuntimeHandle native handle 0x1234; close it explicitly.",
       reports.single(),
     )
   }
 
   @Test
-  fun releasedHandleStaysSilentWhenCollected() {
+  fun releasedHandleStaysSilentWhenCollected(): Unit = runSuspendTest {
     val reports = CopyOnWriteArrayList<String>()
     val liveReports = CopyOnWriteArrayList<String>()
 
@@ -41,26 +39,7 @@ class HandleLeakCleanerTest {
   }
 
   @Test
-  fun unreachableOfflineOperationReportsLeak() {
-    val reports = CopyOnWriteArrayList<String>()
-    val kind = OfflineOperationKind.AMBIENT_CACHE
-    val resultKind = OfflineOperationResultKind.NONE
-
-    HandleLeakCleaner.registerOfflineOperation(
-      Any(),
-      OfflineOperationLeakReport(42L, kind, resultKind, reports::add),
-    )
-
-    assertTrue(awaitReport(reports), "expected the cleaner to report the offline operation")
-    assertEquals(
-      "Leaked OfflineOperationHandle id=42 kind=$kind resultKind=$resultKind; " +
-        "take or discard operations explicitly on the runtime owner thread.",
-      reports.single(),
-    )
-  }
-
-  @Test
-  fun blockedLeakReportDoesNotBlockNativeReclamationWorker() {
+  fun blockedLeakReportDoesNotBlockNativeReclamationWorker(): Unit = runSuspendTest {
     val reportStarted = CountDownLatch(1)
     val unblockReport = CountDownLatch(1)
     val reclaimed = CountDownLatch(1)

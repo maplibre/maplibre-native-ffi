@@ -15,9 +15,6 @@
 #include "test_support.h"
 #include "unity.h"
 
-#define MLN_STRING_LITERAL(text) \
-  ((mln_buffer_view){.data = (text), .size = sizeof(text) - 1})
-
 // The source carries "encoding":"mlt" so the tiles parse as MapLibre Tiles, and
 // a layer references it because a source only loads tiles once one does.
 static const char mlt_style_json[] =
@@ -53,14 +50,50 @@ static uint32_t serve_recorded_tile(
   atomic_fetch_add(&state->served, 1);
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
+// A tile whose encoding the map cannot decode yields no feature however long
+// the test waits, so the render loop below is bounded by its own attempt count.
+// The deadline caps the whole wait on top of that, which keeps the worst case
+// off the product of the two nested loops.
+enum {
+  mlt_render_attempts = 600,
+  mlt_render_deadline_milliseconds = 120000,
+};
 
-// Renders and pumps until the source reports features or the attempts run out.
-// Tiles arrive through a worker thread, so the count stays zero until the map
-// has parsed the tile and folded it into the render tree.
-static size_t query_admin_feature_count(
-  mln_runtime runtime, mln_render_session session
+static bool wait_for_frame_result(
+  const mln_test_render_fixture* fixture, mln_render_frame_batch* out_batch,
+  uint64_t deadline
 ) {
-  const mln_buffer_view source_layers[] = {MLN_STRING_LITERAL("admin")};
+  while (mln_test_monotonic_milliseconds() <= deadline) {
+    if (fixture->driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
+      size_t serviced = 0;
+      if (
+        mln_render_session_service_driver_work(
+          fixture->session, SIZE_MAX, &serviced
+        ) != MLN_STATUS_OK
+      ) {
+        return false;
+      }
+    }
+    const mln_status status =
+      mln_render_session_drain_frame_results(fixture->session, out_batch);
+    if (status == MLN_STATUS_OK) {
+      return true;
+    }
+    if (status != MLN_STATUS_NOT_READY) {
+      return false;
+    }
+    mln_test_sleep_millisecond();
+  }
+  return false;
+}
+
+// Renders until the source reports features or the attempts run out. Tiles
+// arrive through a worker thread, so the count stays zero until the runtime
+// worker parses the tile and folds it into the render tree.
+static size_t query_admin_feature_count(
+  mln_runtime runtime, const mln_test_render_fixture* fixture
+) {
+  const mln_buffer_view source_layers[] = {MLN_BUFFER_LITERAL("admin")};
   mln_source_feature_query_options options =
     mln_source_feature_query_options_default();
   options.fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
@@ -68,25 +101,67 @@ static size_t query_admin_feature_count(
   options.source_layer_id_count = 1;
 
   size_t count = 0;
-  for (unsigned int attempt = 0; attempt < 600 && count == 0; attempt += 1) {
-    mln_render_result render_result = MLN_RENDER_RESULT_NO_UPDATE;
-    bool needs_repaint = false;
+  const uint64_t deadline =
+    mln_test_monotonic_milliseconds() + mlt_render_deadline_milliseconds;
+  for (unsigned int attempt = 0; count == 0 && attempt < mlt_render_attempts &&
+                                 mln_test_monotonic_milliseconds() <= deadline;
+       attempt += 1) {
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+    mln_frame_demand demand = mln_frame_demand_default();
+    demand.flags = 0;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_render_session_request_frame(fixture->session, &demand)
+    );
+
+    // Frame-result readiness is the documented completion signal for a demand.
+    // Waiting for it directly avoids placing query or barrier work behind a
+    // frame whose renderer has not been created yet.
+    mln_render_frame_batch frame_batch = MLN_HANDLE_NULL;
+    TEST_ASSERT_TRUE(wait_for_frame_result(fixture, &frame_batch, deadline));
+    size_t frame_result_count = 0;
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK,
-      mln_render_session_render_update(session, &render_result, &needs_repaint)
+      mln_render_frame_batch_count(frame_batch, &frame_result_count)
     );
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
+    TEST_ASSERT_EQUAL_size_t(1, frame_result_count);
+    mln_render_frame_result frame_result = {
+      .size = sizeof(mln_render_frame_result)
+    };
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_render_frame_batch_get(frame_batch, 0, &frame_result)
+    );
+    mln_render_frame_batch_release(frame_batch);
 
-    mln_queried_feature_list result = MLN_HANDLE_NULL;
-    const mln_status status = mln_render_session_query_source_features(
-      session, MLN_STRING_LITERAL("mlt-source"), &options, &result
-    );
-    if (status == MLN_STATUS_OK) {
+    if (frame_result.disposition == MLN_RENDER_RESULT_RENDERED) {
+      mln_acquired_frame frame = MLN_HANDLE_NULL;
       TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK, mln_queried_feature_list_count(result, &count)
+        MLN_STATUS_OK,
+        mln_render_session_acquire_frame(fixture->session, &frame)
+      );
+      TEST_ASSERT_EQUAL_INT(
+        MLN_STATUS_OK, mln_acquired_frame_release(&frame, NULL)
       );
     }
-    mln_queried_feature_list_destroy(result);
+
+    mln_test_completion query = mln_test_completion_default(0);
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_render_session_query_source_features(
+                       fixture->session, MLN_BUFFER_LITERAL("mlt-source"),
+                       &options, &query.descriptor
+                     )
+    );
+    const mln_status query_status =
+      mln_test_render_fixture_finish_operation(fixture, &query);
+    if (query_status == MLN_STATUS_INVALID_STATE) {
+      // A terminal NO_UPDATE result can precede creation of the renderer.
+      // Retry after the next map update rather than ordering query work behind
+      // an in-flight demand.
+      mln_test_completion_destroy(&query);
+    } else {
+      TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, query_status);
+      count = mln_test_completion_value_count(&query);
+      mln_test_completion_destroy(&query);
+    }
     if (count == 0) {
       mln_test_sleep_millisecond();
     }
@@ -118,32 +193,45 @@ static size_t decode_recorded_tile(
     .callback = serve_recorded_tile,
     .user_data = &provider_state,
   };
+  mln_test_completion provider_completion = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
+    MLN_STATUS_OK, mln_runtime_set_resource_provider(
+                     runtime, &provider, &provider_completion.descriptor
+                   )
   );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_completion_finish(&provider_completion)
+  );
+  mln_test_completion_destroy(&provider_completion);
 
   mln_map_options map_options = mln_map_options_default();
-  map_options.width = 64;
-  map_options.height = 64;
+  map_options.initial_extent.width = 64;
+  map_options.initial_extent.height = 64;
   map_options.fast_pfor_enabled = fast_pfor_enabled;
   mln_map map = mln_test_create_map_with_options(runtime, &map_options);
 
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(mlt_style_json))
+    mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL(mlt_style_json))
   );
 
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
-  const size_t count = query_admin_feature_count(runtime, fixture.session);
+  const size_t count = query_admin_feature_count(runtime, &fixture);
   const int served = atomic_load(&provider_state.served);
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
+  mln_test_completion clear_completion = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_clear_resource_provider(runtime)
+    MLN_STATUS_OK,
+    mln_runtime_clear_resource_provider(runtime, &clear_completion.descriptor)
   );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_completion_finish(&clear_completion)
+  );
+  mln_test_completion_destroy(&clear_completion);
   mln_test_destroy_runtime(runtime);
   free(tile_bytes);
 

@@ -74,14 +74,17 @@ impl ResourceRequestHandle {
     ///
     /// A request accepts one registration; a second one reports
     /// [`ErrorKind::InvalidState`](crate::ErrorKind::InvalidState). MapLibre
-    /// runs the callback at most once, on the thread that discards the request,
-    /// and never for a request the provider completed. Registering on a request
-    /// MapLibre already cancelled runs the callback before this call returns, as
-    /// part of this call: a concurrent `close` on another thread does not wait
-    /// for it. A
-    /// panic inside the callback is contained and discarded, because unwinding
-    /// into native code is undefined behavior and the cancel path reports no
-    /// status.
+    /// runs the callback at most once, and never for a request the provider
+    /// completed. It runs on the thread that discards the request: the runtime
+    /// worker thread when a committed map or runtime command discards it, such
+    /// as a style change or a map close, and a MapLibre worker thread
+    /// otherwise. That thread is never a host thread, so the callback must be
+    /// thread-safe and return quickly. Registering on a request MapLibre
+    /// already cancelled runs the callback before this call returns, as part of
+    /// this call: a concurrent `close` on another thread does not wait for it.
+    /// A panic inside the callback is contained and discarded, because
+    /// unwinding into native code is undefined behavior and the cancel path
+    /// reports no status.
     ///
     /// The callback may complete or close this same request, which is how a
     /// host retires it early: share the handle through `Arc<Mutex<Option<_>>>`
@@ -146,6 +149,7 @@ impl ResourceProviderState {
         maplibre_core::resource::resource_provider_descriptor(
             Some(resource_provider_trampoline),
             ptr::from_ref(self).cast_mut().cast::<c_void>(),
+            Some(release_resource_provider_state),
         )
     }
 
@@ -174,6 +178,13 @@ impl ResourceProviderState {
             Ok(decision) => state.finish_provider_decision(decision),
             Err(_) => state.finish_provider_exception(),
         }
+    }
+}
+
+unsafe extern "C" fn release_resource_provider_state(user_data: *mut c_void) {
+    if !user_data.is_null() {
+        // SAFETY: successful registration transfers this Box to native exactly once.
+        drop(unsafe { Box::from_raw(user_data.cast::<ResourceProviderState>()) });
     }
 }
 
@@ -219,6 +230,7 @@ impl ResourceTransformState {
         maplibre_core::resource::resource_transform_descriptor(
             Some(resource_transform_trampoline),
             ptr::from_ref(self).cast_mut().cast::<c_void>(),
+            Some(release_resource_transform_state),
         )
     }
 
@@ -269,6 +281,13 @@ impl ResourceTransformState {
     }
 }
 
+unsafe extern "C" fn release_resource_transform_state(user_data: *mut c_void) {
+    if !user_data.is_null() {
+        // SAFETY: successful registration transfers this Box to native exactly once.
+        drop(unsafe { Box::from_raw(user_data.cast::<ResourceTransformState>()) });
+    }
+}
+
 unsafe extern "C" fn resource_transform_trampoline(
     user_data: *mut c_void,
     kind: u32,
@@ -312,6 +331,7 @@ impl HttpHeaderTransformState {
         maplibre_core::resource::http_header_transform_descriptor(
             Some(http_header_transform_trampoline),
             ptr::from_ref(self).cast_mut().cast::<c_void>(),
+            Some(release_http_header_transform_state),
         )
     }
 
@@ -364,6 +384,13 @@ impl HttpHeaderTransformState {
             }
         }
         sys::MLN_STATUS_OK
+    }
+}
+
+unsafe extern "C" fn release_http_header_transform_state(user_data: *mut c_void) {
+    if !user_data.is_null() {
+        // SAFETY: successful registration transfers this Box to native exactly once.
+        drop(unsafe { Box::from_raw(user_data.cast::<HttpHeaderTransformState>()) });
     }
 }
 

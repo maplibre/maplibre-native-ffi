@@ -3,27 +3,6 @@ import Foundation
 @testable import MaplibreNativeFFI
 import Testing
 
-private final class LockedBox<Value>: @unchecked Sendable {
-  private let lock = NSLock()
-  private var value: Value
-
-  init(_ value: Value) {
-    self.value = value
-  }
-
-  func update(_ body: (inout Value) -> Void) {
-    lock.withLock {
-      body(&value)
-    }
-  }
-
-  func read<Result>(_ body: (Value) -> Result) -> Result {
-    lock.withLock {
-      body(value)
-    }
-  }
-}
-
 @Test func nativeCStringRejectsEmbeddedNul() throws {
   do {
     _ = try NativeString.withCString("a\0b") { _ in true }

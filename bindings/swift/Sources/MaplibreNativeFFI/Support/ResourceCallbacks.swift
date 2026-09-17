@@ -532,17 +532,15 @@ private func resourceTransformTrampoline(
   return box.invoke(kind: kind, url: url, outResponse: outResponse)
 }
 
-final class NativeResourceTransformState: @unchecked Sendable {
-  private let retainedBox: Unmanaged<NativeResourceTransformBox>
+final class NativeResourceTransformState: NativeDescriptor,
+  @unchecked Sendable
+{
+  private let box: NativeResourceTransformBox
 
   init(_ callback: @escaping @Sendable (NativeResourceTransformRequest)
     -> String?)
   {
-    retainedBox = Unmanaged.passRetained(NativeResourceTransformBox(callback))
-  }
-
-  deinit {
-    retainedBox.release()
+    box = NativeResourceTransformBox(callback)
   }
 
   func invokeForTesting(kind: UInt32,
@@ -550,7 +548,7 @@ final class NativeResourceTransformState: @unchecked Sendable {
   {
     var response = mln_resource_transform_response()
     let status = url.withCString { url in
-      retainedBox.takeUnretainedValue().invoke(
+      box.invoke(
         kind: kind,
         url: url,
         outResponse: &response
@@ -559,15 +557,27 @@ final class NativeResourceTransformState: @unchecked Sendable {
     return (status.rawValue, response.url.map { String(cString: $0) })
   }
 
-  func withDescriptor<Result>(
+  func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_resource_transform>) throws -> Result
   ) throws -> Result {
     var transform = mln_resource_transform()
     transform.size = UInt32(MemoryLayout<mln_resource_transform>.size)
     transform.callback = resourceTransformTrampoline
-    transform.user_data = retainedBox.toOpaque()
-    return try withUnsafePointer(to: &transform, body)
+    let retained = Unmanaged.passRetained(box)
+    transform.user_data = retained.toOpaque()
+    transform.release_user_data = releaseResourceTransform
+    do {
+      return try withUnsafePointer(to: &transform, body)
+    } catch {
+      retained.release()
+      throw error
+    }
   }
+}
+
+private func releaseResourceTransform(_ userData: UnsafeMutableRawPointer?) {
+  guard let userData else { return }
+  Unmanaged<NativeResourceTransformBox>.fromOpaque(userData).release()
 }
 
 private final class NativeHttpHeaderTransformBox: @unchecked Sendable {
@@ -632,26 +642,38 @@ private func httpHeaderTransformTrampoline(
     )
 }
 
-final class NativeHttpHeaderTransformState: @unchecked Sendable {
-  private let retainedBox: Unmanaged<NativeHttpHeaderTransformBox>
+final class NativeHttpHeaderTransformState: NativeDescriptor,
+  @unchecked Sendable
+{
+  private let box: NativeHttpHeaderTransformBox
 
   init(_ callback: @escaping @Sendable (HttpHeaderTransformRequest)
     -> [HttpHeader])
   {
-    retainedBox = Unmanaged.passRetained(NativeHttpHeaderTransformBox(callback))
+    box = NativeHttpHeaderTransformBox(callback)
   }
 
-  deinit { retainedBox.release() }
-
-  func withDescriptor<Result>(
+  func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_http_header_transform>) throws -> Result
   ) throws -> Result {
     var transform = mln_http_header_transform()
     transform.size = UInt32(MemoryLayout<mln_http_header_transform>.size)
     transform.callback = httpHeaderTransformTrampoline
-    transform.user_data = retainedBox.toOpaque()
-    return try withUnsafePointer(to: &transform, body)
+    let retained = Unmanaged.passRetained(box)
+    transform.user_data = retained.toOpaque()
+    transform.release_user_data = releaseHttpHeaderTransform
+    do {
+      return try withUnsafePointer(to: &transform, body)
+    } catch {
+      retained.release()
+      throw error
+    }
   }
+}
+
+private func releaseHttpHeaderTransform(_ userData: UnsafeMutableRawPointer?) {
+  guard let userData else { return }
+  Unmanaged<NativeHttpHeaderTransformBox>.fromOpaque(userData).release()
 }
 
 private final class NativeResourceProviderBox: @unchecked Sendable {
@@ -708,8 +730,8 @@ private func resourceProviderTrampoline(
   return box.invoke(request: request, rawHandle: rawHandle)
 }
 
-final class NativeResourceProviderState: @unchecked Sendable {
-  private let retainedBox: Unmanaged<NativeResourceProviderBox>
+final class NativeResourceProviderState: NativeDescriptor, @unchecked Sendable {
+  private let box: NativeResourceProviderBox
 
   init(
     handleFunctions: NativeResourceRequestHandleFunctions = .native,
@@ -718,36 +740,42 @@ final class NativeResourceProviderState: @unchecked Sendable {
       NativeResourceRequestHandleState
     ) -> UInt32
   ) {
-    retainedBox = Unmanaged.passRetained(
-      NativeResourceProviderBox(
-        handleFunctions: handleFunctions,
-        callback: callback
-      )
+    box = NativeResourceProviderBox(
+      handleFunctions: handleFunctions,
+      callback: callback
     )
-  }
-
-  deinit {
-    retainedBox.release()
   }
 
   func invokeForTesting(request: mln_resource_request,
                         rawHandle: mln_resource_request_handle) -> UInt32
   {
     withUnsafePointer(to: request) { request in
-      retainedBox.takeUnretainedValue().invoke(
+      box.invoke(
         request: request,
         rawHandle: rawHandle
       )
     }
   }
 
-  func withDescriptor<Result>(
+  func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_resource_provider>) throws -> Result
   ) throws -> Result {
     var provider = mln_resource_provider()
     provider.size = UInt32(MemoryLayout<mln_resource_provider>.size)
     provider.callback = resourceProviderTrampoline
-    provider.user_data = retainedBox.toOpaque()
-    return try withUnsafePointer(to: &provider, body)
+    let retained = Unmanaged.passRetained(box)
+    provider.user_data = retained.toOpaque()
+    provider.release_user_data = releaseResourceProvider
+    do {
+      return try withUnsafePointer(to: &provider, body)
+    } catch {
+      retained.release()
+      throw error
+    }
   }
+}
+
+private func releaseResourceProvider(_ userData: UnsafeMutableRawPointer?) {
+  guard let userData else { return }
+  Unmanaged<NativeResourceProviderBox>.fromOpaque(userData).release()
 }

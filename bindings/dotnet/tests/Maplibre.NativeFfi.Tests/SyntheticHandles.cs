@@ -15,19 +15,11 @@ internal static class SyntheticHandles
 {
     private const ulong RuntimeKind = 0x01UL << 56;
     private const ulong MapKind = 0x02UL << 56;
-    private const ulong RenderSessionKind = 0x04UL << 56;
-    private const ulong OfflineRegionListKind = 0x06UL << 56;
     private const ulong ResourceRequestKind = 0x0CUL << 56;
 
     internal static MlnRuntime Runtime(ulong ordinal = 1) => new(RuntimeKind | ordinal);
 
     internal static MlnMap Map(ulong ordinal = 1) => new(MapKind | ordinal);
-
-    internal static MlnRenderSession RenderSession(ulong ordinal = 1) =>
-        new(RenderSessionKind | ordinal);
-
-    internal static MlnOfflineRegionList OfflineRegionList(ulong ordinal = 1) =>
-        new(OfflineRegionListKind | ordinal);
 
     internal static MlnResourceRequest ResourceRequest(ulong ordinal = 1) =>
         new(ResourceRequestKind | ordinal);

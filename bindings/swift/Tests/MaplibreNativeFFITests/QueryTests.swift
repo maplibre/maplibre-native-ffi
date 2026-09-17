@@ -122,3 +122,47 @@ import Testing
     #expect(stateKey == "hover")
   }
 }
+
+private func featureStateObject(
+  _ map: MapHandle,
+  selector: FeatureStateSelector
+) async throws -> [String: Any] {
+  let bytes = try await map.featureState(selector: selector)
+  return try #require(
+    JSONSerialization.jsonObject(with: bytes) as? [String: Any]
+  )
+}
+
+/// Feature state belongs to the map store: a committed set reads back through
+/// an ordered get, a keyed remove drops only that key, and a source-wide
+/// remove clears the rest, all without a render session or a loaded source.
+@Test func mapFeatureStateRoundTripsWithoutARenderSession() async throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(runtime: runtime,
+                                options: MapOptions(width: 64, height: 64))
+  defer { try? map.closeBlockingForTests() }
+
+  let feature = FeatureStateSelector(sourceId: "geo", featureId: "f1")
+  // Missing state reads as an empty JSON object.
+  #expect(try await featureStateObject(map, selector: feature).isEmpty)
+
+  try await map.setFeatureState(
+    selector: feature,
+    state: Data(#"{"hover":true,"rank":2}"#.utf8)
+  )
+  let stored = try await featureStateObject(map, selector: feature)
+  #expect(stored["hover"] as? Bool == true)
+  #expect(stored["rank"] as? Int == 2)
+
+  try await map.removeFeatureState(selector: FeatureStateSelector(
+    sourceId: "geo", featureId: "f1", stateKey: "hover"
+  ))
+  let trimmed = try await featureStateObject(map, selector: feature)
+  #expect(Set(trimmed.keys) == ["rank"])
+
+  try await map
+    .removeFeatureState(selector: FeatureStateSelector(sourceId: "geo"))
+  #expect(try await featureStateObject(map, selector: feature).isEmpty)
+}

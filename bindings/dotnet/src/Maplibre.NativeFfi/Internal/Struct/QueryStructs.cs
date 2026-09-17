@@ -93,14 +93,9 @@ internal sealed unsafe class NativeRenderedFeatureQueryOptions : IDisposable
         var filter = options.Filter is null
             ? null
             : NativeStringView.From(options.Filter, nameof(options.Filter));
-        var native = new NativeRenderedFeatureQueryOptions(
-            new mln_rendered_feature_query_options
-            {
-                size = (uint)sizeof(mln_rendered_feature_query_options),
-                filter = filter?.Pointer,
-            },
-            filter
-        );
+        var seeded = NativeMethods.mln_rendered_feature_query_options_default();
+        seeded.filter = filter?.Pointer;
+        var native = new NativeRenderedFeatureQueryOptions(seeded, filter);
         try
         {
             if (options.LayerIds is { } ids)
@@ -165,14 +160,9 @@ internal sealed unsafe class NativeSourceFeatureQueryOptions : IDisposable
         var filter = options.Filter is null
             ? null
             : NativeStringView.From(options.Filter, nameof(options.Filter));
-        var native = new NativeSourceFeatureQueryOptions(
-            new mln_source_feature_query_options
-            {
-                size = (uint)sizeof(mln_source_feature_query_options),
-                filter = filter?.Pointer,
-            },
-            filter
-        );
+        var seeded = NativeMethods.mln_source_feature_query_options_default();
+        seeded.filter = filter?.Pointer;
+        var native = new NativeSourceFeatureQueryOptions(seeded, filter);
         try
         {
             if (options.SourceLayerIds is { } ids)

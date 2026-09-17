@@ -156,40 +156,6 @@ public sealed unsafe class OfflineStructTests
         Assert.Contains("999", error.Message, StringComparison.Ordinal);
     }
 
-    [BindingSpecTest("BND-066")]
-    [Fact]
-    public void OfflineRegionListIsDestroyedWhenCopyingItemFails()
-    {
-        var destroyCalls = 0;
-        using var methods = OfflineStructs.UseOfflineListMethodsForTest(
-            (_, count) =>
-            {
-                *count = 1;
-                return mln_status.MLN_STATUS_OK;
-            },
-            (_, _, info) =>
-            {
-                *info = new mln_offline_region_info
-                {
-                    size = (uint)sizeof(mln_offline_region_info),
-                    definition = new mln_offline_region_definition
-                    {
-                        size = (uint)sizeof(mln_offline_region_definition),
-                        type = 999,
-                    },
-                };
-                return mln_status.MLN_STATUS_OK;
-            },
-            _ => destroyCalls++
-        );
-
-        Assert.Throws<InvalidOperationException>(() =>
-            OfflineStructs.ReadList(SyntheticHandles.OfflineRegionList(1234))
-        );
-
-        Assert.Equal(1, destroyCalls);
-    }
-
     [BindingSpecTest("BND-060")]
     [Fact]
     public void OfflineRegionStatusCopiesNativeFields()

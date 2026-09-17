@@ -53,7 +53,21 @@ internal readonly struct MlnRenderSession(ulong value) : IMlnHandle
     public bool IsNull => Value == 0;
 }
 
-internal readonly struct MlnWakeSource(ulong value) : IMlnHandle
+internal readonly struct MlnRenderFrameBatch(ulong value) : IMlnHandle
+{
+    public ulong Value { get; } = value;
+
+    public bool IsNull => Value == 0;
+}
+
+internal readonly struct MlnAcquiredFrame(ulong value) : IMlnHandle
+{
+    public ulong Value { get; } = value;
+
+    public bool IsNull => Value == 0;
+}
+
+internal readonly struct MlnEventBatch(ulong value) : IMlnHandle
 {
     public ulong Value { get; } = value;
 
@@ -61,41 +75,6 @@ internal readonly struct MlnWakeSource(ulong value) : IMlnHandle
 }
 
 internal readonly struct MlnResourceRequest(ulong value) : IMlnHandle
-{
-    public ulong Value { get; } = value;
-
-    public bool IsNull => Value == 0;
-}
-
-internal readonly struct MlnOfflineRegionSnapshot(ulong value) : IMlnHandle
-{
-    public ulong Value { get; } = value;
-
-    public bool IsNull => Value == 0;
-}
-
-internal readonly struct MlnOfflineRegionList(ulong value) : IMlnHandle
-{
-    public ulong Value { get; } = value;
-
-    public bool IsNull => Value == 0;
-}
-
-internal readonly struct MlnStyleIdList(ulong value) : IMlnHandle
-{
-    public ulong Value { get; } = value;
-
-    public bool IsNull => Value == 0;
-}
-
-internal readonly struct MlnStyleStringList(ulong value) : IMlnHandle
-{
-    public ulong Value { get; } = value;
-
-    public bool IsNull => Value == 0;
-}
-
-internal readonly struct MlnQueriedFeatureList(ulong value) : IMlnHandle
 {
     public ulong Value { get; } = value;
 

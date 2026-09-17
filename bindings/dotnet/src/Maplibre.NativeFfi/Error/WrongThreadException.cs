@@ -1,6 +1,6 @@
 namespace Maplibre.NativeFfi.Error;
 
-/// <summary>Exception for owner-thread-affine operations called from another thread.</summary>
+/// <summary>Exception for graphics-thread-affine operations called from another thread.</summary>
 public sealed class WrongThreadException : MaplibreException
 {
     public WrongThreadException(

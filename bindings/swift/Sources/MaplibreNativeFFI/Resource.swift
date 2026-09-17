@@ -222,7 +222,7 @@ public final class ResourceRequestHandle: @unchecked Sendable {
 
   public func complete(_ response: ResourceResponse) throws {
     if case let .unknown(raw) = response.errorReason {
-      throw NativeStatusFailure.swiftInvalidArgument(
+      throw MaplibreError.invalidArgument(
         "ResourceErrorReason.unknown(\(raw)) cannot be sent back to native"
       )
     }
@@ -235,12 +235,11 @@ public final class ResourceRequestHandle: @unchecked Sendable {
   ///
   /// A request accepts one registration. A second call throws an
   /// invalid-state error, and a closed request throws as closed. The callback
-  /// runs at most once, on the thread that cancels the request: the runtime
-  /// owner thread inside a map or runtime call, and a MapLibre thread
-  /// otherwise. It never runs for a request the provider completed. When
-  /// MapLibre has already cancelled the request, the callback runs on the
-  /// calling thread before this method returns, as part of this call: a
-  /// concurrent `close()` on another thread does not wait for it.
+  /// runs at most once, on the MapLibre thread that cancels the request, and
+  /// never for a request the provider completed. When MapLibre has already
+  /// cancelled the request, the callback runs on the calling thread before
+  /// this method returns, as part of this call: a concurrent `close()` on
+  /// another thread does not wait for it.
   ///
   /// The callback may complete or close this request. It must return quickly,
   /// and it must not call any map, runtime, or other request handle. The

@@ -28,6 +28,7 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
     descriptor.size = kotlinx.cinterop.sizeOf<mln_resource_provider>().toUInt()
     descriptor.callback = staticCFunction(::resourceProviderCallback)
     descriptor.user_data = selfRef.asCPointer()
+    descriptor.release_user_data = staticCFunction(::releaseResourceProvider)
   }
 
   fun descriptor(): CPointer<mln_resource_provider> = descriptor.ptr
@@ -57,8 +58,6 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
 
   override fun close() = gate.close()
 
-  internal fun checkCanClose() = gate.checkCanClose()
-
   internal fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
 
   private fun closeNative() {
@@ -75,3 +74,8 @@ private fun resourceProviderCallback(
 ): UInt =
   userData?.asStableRef<ResourceProviderState>()?.get()?.invoke(request, rawHandle)
     ?: UInt.MAX_VALUE
+
+@OptIn(ExperimentalForeignApi::class)
+private fun releaseResourceProvider(userData: COpaquePointer?) {
+  userData?.asStableRef<ResourceProviderState>()?.get()?.close()
+}

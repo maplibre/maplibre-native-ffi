@@ -1,4 +1,5 @@
 using Maplibre.NativeFfi.Camera;
+using Maplibre.NativeFfi.Runtime;
 
 namespace Maplibre.NativeFfi.Map;
 
@@ -41,6 +42,37 @@ public sealed record ProjectionModeOptions
     public double? XSkew { get; set; }
     public double? YSkew { get; set; }
 }
+
+public readonly record struct LogicalExtent(uint Width, uint Height, double ScaleFactor);
+
+/// <summary>A synchronous copy of the map's committed state.</summary>
+/// <remarks>
+/// Every committed map command publishes a new snapshot and reports its generation in the
+/// completion, so a snapshot whose <see cref="Generation" /> is at or past that value observes
+/// the commit.
+/// </remarks>
+/// <param name="FullyLoaded">True once every requested style and tile resource finished loading.</param>
+/// <param name="GestureInProgress">
+/// True while the map is between a gesture-begin and a gesture-end or gesture-cancel camera
+/// update.
+/// </param>
+public readonly record struct MapSnapshot(
+    ulong Generation,
+    DebugOptions DebugOptions,
+    CameraOptions Camera,
+    LogicalExtent LogicalExtent,
+    ProjectionModeOptions ProjectionMode,
+    ViewportOptions Viewport,
+    bool FullyLoaded,
+    bool RenderingStatsViewEnabled,
+    bool RepaintDemand,
+    bool GestureInProgress,
+    RuntimeEventMask EventMask,
+    ulong LatestRenderUpdateGeneration,
+    TileOptions Tile,
+    BoundOptions Bounds,
+    FreeCameraOptions FreeCamera
+);
 
 /// <summary>Rendering statistics snapshot.</summary>
 public readonly record struct RenderingStats(
