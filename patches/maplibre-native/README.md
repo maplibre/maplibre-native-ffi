@@ -109,6 +109,24 @@ Upstream:
 The Android SDK also cancels transitions before invoking Native and needs a
 separate change to expose this behavior.
 
+`0016-location-indicator-color-transitions.patch` refreshes the location
+indicator's evaluated paint properties each frame so that accuracy-circle fill
+and border colors reach their transition targets. It includes the upstream
+pixel-readback regression. Upstream:
+[maplibre-native#4639](https://github.com/maplibre/maplibre-native/pull/4639),
+at commit `8691b96715179b5e7eb37b05317fec3dac8c3a57`.
+
+`0017-location-indicator-top-image-hit-testing.patch` includes the location
+indicator's top image in rendered-feature queries. Each top and bearing image
+has independent bounds, and a hit returns the feature once. The patch includes
+the upstream regression for a top-only indicator and checks that shadow and
+accuracy-circle coverage outside the image stays excluded. Upstream:
+[maplibre-native#4640](https://github.com/maplibre/maplibre-native/pull/4640),
+at commit `7560cf49c56ec5bd1c87e12facabaf004b1c5af4`.
+
+Both location-indicator patches preserve the upstream changes and adapt patch
+context to the pinned source and existing regression tests.
+
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
 before applying the list again. A pin bump, an edit to a patch, and a dropped

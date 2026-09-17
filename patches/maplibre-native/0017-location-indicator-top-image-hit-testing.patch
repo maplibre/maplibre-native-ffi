@@ -1,0 +1,160 @@
+diff --git a/src/mln/geometry/feature_index.cpp b/src/mln/geometry/feature_index.cpp
+index fde694a25a8c..7da5ac982a56 100644
+--- a/src/mln/geometry/feature_index.cpp
++++ b/src/mln/geometry/feature_index.cpp
+@@ -14,6 +14,7 @@
+ 
+ #include <mapbox/geometry/envelope.hpp>
+ 
++#include <algorithm>
+ #include <cassert>
+ #include <string>
+ 
+@@ -349,11 +350,11 @@ void DynamicFeatureIndex::query(std::unordered_map<std::string, std::vector<Feat
+     }
+ 
+     for (const auto& f : features) {
+-        // hit testing
+-        mln::GeometryBBox<int64_t> featureBox = DefaultWithinBBox;
+-        for (const auto& p : f.envelope->front()) mln::updateBBox(featureBox, p);
+-
+-        const bool hit = mln::boxWithinBox(featureBox, queryBox) || mln::boxWithinBox(queryBox, featureBox);
++        const bool hit = std::any_of(f.envelope->begin(), f.envelope->end(), [&](const auto& polygon) {
++            mln::GeometryBBox<int64_t> featureBox = DefaultWithinBBox;
++            for (const auto& p : polygon.front()) mln::updateBBox(featureBox, p);
++            return mln::boxWithinBox(featureBox, queryBox) || mln::boxWithinBox(queryBox, featureBox);
++        });
+         if (hit) {
+             assert(f.feature);
+             result[f.feature->sourceLayer].push_back(*f.feature);
+@@ -362,7 +363,7 @@ void DynamicFeatureIndex::query(std::unordered_map<std::string, std::vector<Feat
+ }
+ 
+ void DynamicFeatureIndex::insert(std::shared_ptr<Feature> feature,
+-                                 std::shared_ptr<mapbox::geometry::polygon<int64_t>> envelope) {
++                                 std::shared_ptr<mapbox::geometry::multi_polygon<int64_t>> envelope) {
+     features.push_back({std::move(feature), std::move(envelope)});
+ }
+ 
+diff --git a/src/mln/geometry/feature_index.hpp b/src/mln/geometry/feature_index.hpp
+index 9c2bdf3d9dc3..dfcde40b4f36 100644
+--- a/src/mln/geometry/feature_index.hpp
++++ b/src/mln/geometry/feature_index.hpp
+@@ -93,12 +93,12 @@ class DynamicFeatureIndex {
+                const mln::ScreenLineString& queryGeometry,
+                const TransformState& state) const;
+ 
+-    void insert(std::shared_ptr<Feature> feature, std::shared_ptr<mapbox::geometry::polygon<int64_t>> envelope);
++    void insert(std::shared_ptr<Feature> feature, std::shared_ptr<mapbox::geometry::multi_polygon<int64_t>> envelope);
+ 
+ protected:
+     struct FeatureRecord {
+         std::shared_ptr<Feature> feature;
+-        std::shared_ptr<mapbox::geometry::polygon<int64_t>> envelope;
++        std::shared_ptr<mapbox::geometry::multi_polygon<int64_t>> envelope;
+     };
+ 
+     std::vector<FeatureRecord> features;
+diff --git a/src/mln/renderer/layers/render_location_indicator_layer.cpp b/src/mln/renderer/layers/render_location_indicator_layer.cpp
+index f7d617e02162..bcabcaa78184 100644
+--- a/src/mln/renderer/layers/render_location_indicator_layer.cpp
++++ b/src/mln/renderer/layers/render_location_indicator_layer.cpp
+@@ -476,7 +476,7 @@ void main() {
+     RenderLocationIndicatorImpl(std::string sourceLayer)
+         : ruler(0, mapbox::cheap_ruler::CheapRuler::Meters),
+           feature(std::make_shared<mln::Feature>()),
+-          featureEnvelope(std::make_shared<mapbox::geometry::polygon<int64_t>>()) {
++          featureEnvelope(std::make_shared<mapbox::geometry::multi_polygon<int64_t>>()) {
+         feature->sourceLayer = std::move(sourceLayer);
+     }
+ 
+@@ -547,24 +547,27 @@ void main() {
+         if (!dirtyFeature) return;
+         dirtyFeature = false;
+         featureEnvelope->clear();
++        feature->geometry = mapbox::geometry::point<double>{oldParams.puckPosition.latitude(),
++                                                            oldParams.puckPosition.longitude()};
++        const auto addQuad = [&](const std::array<vec2, 4>& geometry) {
++            mapbox::geometry::linear_ring<int64_t> border;
++            for (const auto& v : geometry) {
++                vec4 p{{v.x, v.y, 0, 1}};
++                matrix::transformMat4(p, p, translation);
++                border.emplace_back(int64_t(p[0]), int64_t(p[1]));
++            }
++            border.push_back(border.front());
++            featureEnvelope->push_back({std::move(border)});
++        };
++
++        // Each image contributes an independent quad, never a hole or a combined bounding box.
+ #ifndef MLN_DRAWABLE_LOCATION_INDICATOR
+-        if (!texPuck || !texPuck->isValid()) return;
++        if (texPuck && texPuck->isValid()) addQuad(puckGeometry);
++        if (texPuckHat && texPuckHat->isValid()) addQuad(hatGeometry);
+ #else
+-        if (!puckDrawableInfo.textureInfo.texture) return;
+-
+-        auto& puckGeometry = puckDrawableInfo.geometry;
++        if (puckDrawableInfo.textureInfo.texture) addQuad(puckDrawableInfo.geometry);
++        if (hatDrawableInfo.textureInfo.texture) addQuad(hatDrawableInfo.geometry);
+ #endif
+-
+-        feature->geometry = mapbox::geometry::point<double>{oldParams.puckPosition.latitude(),
+-                                                            oldParams.puckPosition.longitude()};
+-        mapbox::geometry::linear_ring<int64_t> border;
+-        for (const auto& v : puckGeometry) {
+-            vec4 p{{v.x, v.y, 0, 1}};
+-            matrix::transformMat4(p, p, translation);
+-            border.push_back(Point<int64_t>{int64_t(p[0]), int64_t(p[1])});
+-        }
+-        border.push_back(border.front());
+-        featureEnvelope->push_back(border);
+     }
+ 
+ protected:
+@@ -920,7 +923,7 @@ void main() {
+ public:
+     mln::LocationIndicatorRenderParameters parameters;
+     std::shared_ptr<mln::Feature> feature;
+-    std::shared_ptr<mapbox::geometry::polygon<int64_t>> featureEnvelope;
++    std::shared_ptr<mapbox::geometry::multi_polygon<int64_t>> featureEnvelope;
+     static bool anisotropicFilteringAvailable;
+ };
+ 
+diff --git a/test/api/query.test.cpp b/test/api/query.test.cpp
+index efc938ce2b4b..2d0481509a82 100644
+--- a/test/api/query.test.cpp
++++ b/test/api/query.test.cpp
+@@ -7,6 +7,7 @@
+ #include <mln/util/io.hpp>
+ #include <mln/util/run_loop.hpp>
+ #include <mln/style/layers/symbol_layer.hpp>
++#include <mln/style/layers/location_indicator_layer.hpp>
+ #include <mln/style/style.hpp>
+ #include <mln/style/image.hpp>
+ #include <mln/style/source.hpp>
+@@ -320,3 +321,25 @@ TEST(Query, QueryFeatureExtensionsSuperclusterLeaves) {
+     EXPECT_EQ(offsetLeaves3[1].properties["name"].get<std::string>(), "Cape Sable"s);
+     EXPECT_EQ(offsetLeaves3[2].properties["name"].get<std::string>(), "Cape Cod"s);
+ }
++
++TEST(Query, LocationIndicatorTopImageOnly) {
++    QueryTest test;
++    test.map.jumpTo(CameraOptions().withCenter(LatLng{0, 0}).withZoom(16));
++    auto layer = std::make_unique<LocationIndicatorLayer>("location");
++    layer->setTopImage({"test-icon"});
++    layer->setShadowImage({"test-icon"});
++    layer->setShadowImageSize(10.0f);
++    layer->setAccuracyRadius(100.0f);
++    layer->setAccuracyRadiusColor(Color::red());
++    test.map.getStyle().addLayer(std::move(layer));
++    test.frontend.render(test.map);
++
++    const auto center = test.map.pixelForLatLng({0, 0});
++    const RenderedQueryOptions options({{{"location"}}, {}});
++    const auto features = test.frontend.getRenderer()->queryRenderedFeatures(center, options);
++    ASSERT_EQ(features.size(), 1u);
++    EXPECT_EQ(features.front().sourceLayer, "location");
++    // Shadow and accuracy-circle coverage outside the top image is not queryable.
++    EXPECT_TRUE(
++        test.frontend.getRenderer()->queryRenderedFeatures(ScreenCoordinate{center.x + 60, center.y}, options).empty());
++}

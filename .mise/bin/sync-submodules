@@ -68,6 +68,8 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0013-projection-from-transform-state.patch"
   "$repo_root/patches/maplibre-native/0014-global-state.patch"
   "$repo_root/patches/maplibre-native/0015-independent-camera-animations.patch"
+  "$repo_root/patches/maplibre-native/0016-location-indicator-color-transitions.patch"
+  "$repo_root/patches/maplibre-native/0017-location-indicator-top-image-hit-testing.patch"
 )
 
 # A patch counts as applied when it reverses cleanly, which is also what makes

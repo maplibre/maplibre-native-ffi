@@ -1,0 +1,111 @@
+diff --git a/src/mln/renderer/layers/render_location_indicator_layer.cpp b/src/mln/renderer/layers/render_location_indicator_layer.cpp
+index f7d617e02162..ea5c3b0c452f 100644
+--- a/src/mln/renderer/layers/render_location_indicator_layer.cpp
++++ b/src/mln/renderer/layers/render_location_indicator_layer.cpp
+@@ -983,6 +983,12 @@ void RenderLocationIndicatorLayer::evaluate(const PropertyEvaluationParameters&
+         renderImpl->parameters.puckHatImagePath = layout.get<style::TopImage>().asConstant().id();
+ 
+     evaluatedProperties = std::move(properties);
++
++#ifdef MLN_DRAWABLE_LOCATION_INDICATOR
++    if (layerTweaker) {
++        layerTweaker->updateProperties(evaluatedProperties);
++    }
++#endif
+ }
+ 
+ bool RenderLocationIndicatorLayer::hasTransition() const {
+diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
+--- a/test/map/map.test.cpp
++++ b/test/map/map.test.cpp
+@@ -26,6 +26,7 @@
+ #include <mln/style/layers/background_layer.hpp>
+ #include <mln/style/layers/fill_layer.hpp>
+ #include <mln/style/layers/line_layer.hpp>
++#include <mln/style/layers/location_indicator_layer.hpp>
+ #include <mln/style/layers/raster_layer.hpp>
+ #include <mln/style/layers/symbol_layer.hpp>
+ #include <mln/style/sources/custom_geometry_source.hpp>
+@@ -40,6 +41,7 @@
+ #include <mln/util/image.hpp>
+ #include <mln/util/geo.hpp>
+ #include <mln/util/io.hpp>
++#include <mln/util/timer.hpp>
+ #include <mln/util/logging.hpp>
+ #include <mln/util/run_loop.hpp>
+ 
+@@ -2179,6 +2181,74 @@
+ // when set), and we sample the centre pixel of the rendered frame after each
+ // change. This exercises the full path: setFeatureState -> coalesce during
+ // prepare -> data-driven paint re-evaluation -> pixels.
++TEST(Map, LocationIndicatorAccuracyColorsTransition) {
++    MapTest<> test{1, MapMode::Continuous};
++    test.map.getStyle().loadJSON(R"STYLE({
++      "version": 8,
++      "sources": {},
++      "layers": [{
++        "id": "location",
++        "type": "location-indicator",
++        "paint": {
++          "location": [0, 0, 0],
++          "accuracy-radius": 100,
++          "accuracy-radius-color": "blue",
++          "accuracy-radius-border-color": "white"
++        }
++      }]
++    })STYLE");
++    test.map.jumpTo(CameraOptions().withCenter(LatLng{0, 0}).withZoom(16));
++
++    const auto renderUntilIdle = [&] {
++        bool idle = false;
++        util::Timer timeout;
++        timeout.start(std::chrono::seconds(5), Duration::zero(), [&] { test.runLoop.stop(); });
++        test.observer.didFinishRenderingFrameCallback = [&](MapObserver::RenderFrameStatus status) {
++            if (status.mode == MapObserver::RenderMode::Full && !status.needsRepaint) {
++                idle = true;
++                test.runLoop.stop();
++            }
++        };
++        test.runLoop.run();
++        test.observer.didFinishRenderingFrameCallback = {};
++        return idle;
++    };
++    const auto centerChannel = [](const PremultipliedImage& image, std::size_t channel) {
++        return image.data[(image.size.height / 2 * image.size.width + image.size.width / 2) * 4 + channel];
++    };
++
++    const auto readImage = [&] {
++        gfx::BackendScope scope{*test.frontend.getBackend()};
++        return test.frontend.readStillImage();
++    };
++
++    ASSERT_TRUE(renderUntilIdle());
++    const auto initial = readImage();
++    ASSERT_GT(centerChannel(initial, 2), 240);
++    ASSERT_LT(centerChannel(initial, 0), 10);
++
++    auto* layer = static_cast<LocationIndicatorLayer*>(test.map.getStyle().getLayer("location"));
++    ASSERT_NE(layer, nullptr);
++    TransitionOptions transition;
++    transition.duration = std::chrono::milliseconds(100);
++    layer->setAccuracyRadiusColorTransition(transition);
++    layer->setAccuracyRadiusBorderColorTransition(transition);
++    layer->setAccuracyRadiusColor(Color::red());
++    layer->setAccuracyRadiusBorderColor(Color{0, 1, 0, 1});
++
++    ASSERT_TRUE(renderUntilIdle());
++    const auto result = readImage();
++    EXPECT_GT(centerChannel(result, 0), 240);
++    EXPECT_LT(centerChannel(result, 2), 10);
++    std::size_t greenPixels = 0;
++    for (std::size_t i = 0; i < result.bytes(); i += 4) {
++        if (result.data[i] < 40 && result.data[i + 1] > 200 && result.data[i + 2] < 40) {
++            ++greenPixels;
++        }
++    }
++    EXPECT_GT(greenPixels, 0u) << "The accuracy border should finish transitioning to green";
++}
++
+ TEST(Map, FeatureStateChangesRenderedStyle) {
+     MapTest<> test;
+ 
