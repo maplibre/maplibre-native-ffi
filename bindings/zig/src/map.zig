@@ -712,6 +712,21 @@ pub const MapHandle = enum(c.mln_map) {
         return submitCommand(self, c.mln_map_set_style_light_json, .{ try native(self), try temp.stringView(value) });
     }
 
+    pub fn setGlobalStateProperty(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        property_name: []const u8,
+        value: []const u8,
+    ) status.Error!completion.Future(completion.CommandCompletion) {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        return submitCommand(self, c.mln_map_set_global_state_property, .{
+            try native(self),
+            try temp.stringView(property_name),
+            try temp.stringView(value),
+        });
+    }
+
     pub fn setStyleLightProperty(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -725,6 +740,10 @@ pub const MapHandle = enum(c.mln_map) {
             try temp.stringView(property_name),
             try temp.stringView(value),
         });
+    }
+
+    pub fn getGlobalState(self: *MapHandle, allocator: std.mem.Allocator) status.Error!completion.Future(values.OwnedString) {
+        return submitAllocatedQuery(values.OwnedString, self, allocator, copyOwnedStringResult, c.mln_map_get_global_state, .{try native(self)});
     }
 
     pub fn getStyleLightProperty(self: *MapHandle, allocator: std.mem.Allocator, property_name: []const u8) status.Error!completion.Future(?values.OwnedString) {

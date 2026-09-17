@@ -620,6 +620,18 @@ final class RenderSessionHandle {
     );
   });
 
+  /// Copies the last completed rendered transform into an independent projection.
+  MapProjectionHandle createProjection() {
+    return withNativeArena((arena) {
+      final outProjection = arena<Uint64>();
+      outProjection.value = 0;
+      _check(
+        raw.mln_render_session_projection_create(_handle.raw, outProjection),
+      );
+      return MapProjectionHandle._(NativeMapProjection(outProjection.value));
+    });
+  }
+
   /// Copies the latest session state and generations.
   RenderSessionSnapshot snapshot() => withNativeArena((arena) {
     final out = arena<raw.mln_render_session_snapshot>()

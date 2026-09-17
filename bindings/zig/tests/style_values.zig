@@ -364,3 +364,35 @@ test "style transition options round trip through the C API" {
 
     try support.expectCommandError(try map.setStyleTransitionOptions(.{ .delay_ms = -1.0 }), error.InvalidArgument);
 }
+
+// BND-110: global-state lifetime and copied JSON values.
+test "global state defaults updates and style replacement" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.resolve(maplibre.MapHandle, try maplibre.MapHandle.create(&runtime, .{}));
+    defer support.closeMap(&map) catch @panic("map close failed");
+    try support.expectCommandError(try map.setGlobalStateProperty(testing.allocator, "theme", "true"), error.InvalidState);
+    try support.expectCommitted(try map.setStyleJson(
+        \\{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}
+    ));
+    var defaults = try support.resolve(maplibre.OwnedString, try map.getGlobalState(testing.allocator));
+    defer defaults.deinit();
+    try testing.expectEqualStrings("{\"theme\":\"light\"}", defaults.value);
+    try support.expectCommitted(try map.setGlobalStateProperty(testing.allocator, "theme", "[\"dark\",{\"enabled\":true}]"));
+    var snapshot = try support.resolve(maplibre.OwnedString, try map.getGlobalState(testing.allocator));
+    defer snapshot.deinit();
+    try support.expectCommitted(try map.setGlobalStateProperty(testing.allocator, "theme", "null"));
+    var reset = try support.resolve(maplibre.OwnedString, try map.getGlobalState(testing.allocator));
+    defer reset.deinit();
+    try testing.expectEqualStrings(defaults.value, reset.value);
+    try testing.expectEqualStrings("{\"theme\":[\"dark\",{\"enabled\":true}]}", snapshot.value);
+    try support.expectCommitted(try map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}"));
+    var replaced = try support.resolve(maplibre.OwnedString, try map.getGlobalState(testing.allocator));
+    defer replaced.deinit();
+    try testing.expectEqualStrings("{}", replaced.value);
+    try support.expectCommitted(try map.setGlobalStateProperty(testing.allocator, "theme", "true"));
+    try support.expectCommitted(try map.setGlobalStateProperty(testing.allocator, "theme", "null"));
+    var cleared = try support.resolve(maplibre.OwnedString, try map.getGlobalState(testing.allocator));
+    defer cleared.deinit();
+    try testing.expectEqualStrings("{\"theme\":null}", cleared.value);
+}

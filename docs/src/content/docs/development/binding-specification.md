@@ -974,6 +974,12 @@ A session barrier completion runs after all preceding accepted render work is
 terminal. A binding MUST NOT represent a barrier as a frame request or a runtime
 pump.
 
+Rendered projection creation MUST be callable from any thread and MUST remain
+available while an owned texture frame is acquired. Bindings MUST preserve the C
+API's snapshot lifetime and invalidation rules. Hosts pair the projection with
+the rendered image and its presentation extent, using the render target's GPU
+synchronization contract.
+
 ### Texture frames
 
 Session-owned targets negotiate a ring depth from one to three. Acquisition is
@@ -1138,6 +1144,7 @@ that a real native failure would expose.
 | BND-106 | Query workflows return copied queried-feature values. Each value contains a GeoJSON Feature buffer, optional source and source-layer identifiers, and optional feature-state JSON.                            |
 | BND-108 | The loaded style document reads back byte-for-byte through public map APIs, the style URL reads back the last requested URL, and both report empty when absent.                                               |
 | BND-109 | Source inspection copies a URL-backed source URL and inline tile-source metadata, including multiple tile URLs and absent fields, and the result remains valid after the map no longer owns the source.       |
+| BND-110 | Global state supports style defaults, JSON value updates, null resets, independent snapshots, and reset on style replacement; writes before style loading report invalid state.                               |
 
 ### Logging and callbacks
 

@@ -1072,6 +1072,23 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
       }
     }
 
+  public actual fun setGlobalStateProperty(
+    propertyName: String,
+    value: ByteArray,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    StringViewScope(propertyName).use { nativePropertyName ->
+      ByteArrayViewScope(value).use { nativeValue ->
+        MaplibreNativeC.mln_map_set_global_state_property(
+          requireLiveHandle(),
+          nativePropertyName.view,
+          nativeValue.view,
+          completion,
+        )
+      }
+    }
+  }
+
   public actual fun setStyleLightProperty(
     propertyName: String,
     value: ByteArray,
@@ -1088,6 +1105,12 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
       }
     }
   }
+
+  public actual fun getGlobalState(): Deferred<ByteArray> =
+    CompletionBridge.submit(
+      ::requiredBuffer,
+      { completion -> MaplibreNativeC.mln_map_get_global_state(requireLiveHandle(), completion) },
+    )
 
   public actual fun styleLightProperty(propertyName: String): Deferred<ByteArray?> =
     StringViewScope(propertyName).use { nativePropertyName ->

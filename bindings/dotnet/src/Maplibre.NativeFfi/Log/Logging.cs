@@ -22,7 +22,7 @@ public enum LogEvent : uint
     HttpRequest = 8,
     Sprite = 9,
     Image = 10,
-    OpenGl = 11,
+    GraphicsBackend = 11,
     Jni = 12,
     Android = 13,
     Crash = 14,

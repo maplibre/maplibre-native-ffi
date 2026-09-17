@@ -66,8 +66,8 @@ final class LogEvent {
   /// Image category.
   static const image = LogEvent._(10, 'image');
 
-  /// OpenGL category.
-  static const openGl = LogEvent._(11, 'openGl');
+  /// Graphics backend category.
+  static const graphicsBackend = LogEvent._(11, 'graphicsBackend');
 
   /// JNI category.
   static const jni = LogEvent._(12, 'jni');
@@ -97,7 +97,7 @@ final class LogEvent {
     8 => httpRequest,
     9 => sprite,
     10 => image,
-    11 => openGl,
+    11 => graphicsBackend,
     12 => jni,
     13 => android,
     14 => crash,

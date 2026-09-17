@@ -175,6 +175,16 @@ MLN_API mln_status mln_map_camera_snapshot_get(
  * update->gesture_phase is applied around the camera write; see
  * mln_gesture_phase.
  *
+ * Each selected camera field replaces that field's animation. Omitted fields
+ * retain their animations and timing. A flight couples center and zoom;
+ * replacing either stops both. An anchor couples center with all fields in its
+ * update; replacing any of them stops that anchored update. Explicit center
+ * takes precedence over anchor. Constraints apply to the combined camera.
+ *
+ * Ease duration defaults to zero. Fly duration is derived from flight distance
+ * and velocity when omitted. The command completion reports application of the
+ * update; transition-finished events report the end of its animations.
+ *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, update is null

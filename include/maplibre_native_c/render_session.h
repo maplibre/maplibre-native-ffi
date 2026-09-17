@@ -18,6 +18,23 @@
 extern "C" {
 #endif
 
+/**
+ * Copies the last completed rendered transform into an independent projection.
+ * Callable from any thread. Returns invalid state before a completed render,
+ * after an extent or target change, or after detachment. The caller owns the
+ * returned projection, which remains usable after the session is released.
+ * out_projection must point to a null handle.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT for an invalid session or output pointer.
+ * - MLN_STATUS_INVALID_STATE when the target has no rendered projection.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_render_session_projection_create(
+  mln_render_session session, mln_map_projection* out_projection
+) MLN_NOEXCEPT;
+
 /** Terminal disposition of one accepted frame demand. */
 typedef enum mln_render_result : uint32_t {
   /** A frame was rendered for acquisition, presentation, or ordered readback.

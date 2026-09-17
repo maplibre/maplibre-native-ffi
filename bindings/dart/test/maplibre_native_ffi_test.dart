@@ -62,6 +62,33 @@ int _dispatchLogRecord({
 }
 
 void main() {
+  test('global state uses style defaults and resets on replacement', () async {
+    final runtime = RuntimeHandle.create();
+    addTearDown(runtime.close);
+    final map = await runtime.createMap();
+    addTearDown(map.close);
+    Uint8List bytes(String value) => Uint8List.fromList(utf8.encode(value));
+    final rejected = await map.setGlobalStateProperty('theme', bytes('true'));
+    expect(rejected.disposition, CommandDisposition.failed);
+    expect(rejected.status, MaplibreStatus.invalidState);
+    await map.setStyleJson(
+      bytes(
+        '{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}',
+      ),
+    );
+    expect(utf8.decode(await map.getGlobalState()), '{"theme":"light"}');
+    await map.setGlobalStateProperty(
+      'theme',
+      bytes('["dark",{"enabled":true}]'),
+    );
+    final snapshot = await map.getGlobalState();
+    await map.setGlobalStateProperty('theme', bytes('null'));
+    expect(utf8.decode(await map.getGlobalState()), '{"theme":"light"}');
+    expect(utf8.decode(snapshot), '{"theme":["dark",{"enabled":true}]}');
+    await map.setStyleJson(bytes('{"version":8,"sources":{},"layers":[]}'));
+    expect(utf8.decode(await map.getGlobalState()), '{}');
+  });
+
   test('map options carry FastPFOR decoding to native', () async {
     expect(const MapOptions().fastPforEnabled, isFalse);
     expect(const MapOptions(fastPforEnabled: true), isNot(const MapOptions()));

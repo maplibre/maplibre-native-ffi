@@ -271,16 +271,17 @@ typedef struct mln_animation_options {
    * passes the value through without interpreting it, so callers pick their own
    * scheme, such as a monotonically increasing counter.
    *
-   * Each transition emits that event exactly once when it completes, is
-   * superseded, is cancelled, or applies instantly. The event carries no
+   * Each command emits that event once all its properties complete or are
+   * superseded. Replacing one property leaves other properties animating.
+   * Cancelling all transitions ends every active command. The event carries no
    * completion reason, so a host that needs to distinguish outcomes compares
    * the resulting camera against the requested one.
    *
    * The event is queued on the runtime that owns the map and is drained by
-   * mln_runtime_drain_events(). For a transition that runs to completion, it is
-   * queued immediately before that transition's
-   * MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE event. A map reports the terminal
-   * outcome only while its event mask selects
+   * mln_runtime_drain_events(). It is queued immediately before that command's
+   * MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE event. Other commands can still be
+   * animating when these events arrive. A map reports the terminal outcome
+   * only while its event mask selects
    * MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED.
    *
    * When this field is omitted, the transition emits no such event.
@@ -1163,9 +1164,8 @@ mln_map_style_url(mln_map map, const mln_completion* completion) MLN_NOEXCEPT;
  *   MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED report observer completion
  *   in addition to the still-image completion.
  * - MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED carries the
- *   transition identity a caller set on an animation, and
- *   MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE distinguishes a completed
- *   transition from a cancelled one. See mln_animation_options.transition_id.
+ *   transition identity a caller set on an animation. Camera events report no
+ *   completion reason. See mln_animation_options.transition_id.
  * - MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED and
  *   MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR carry native failure text.
  *

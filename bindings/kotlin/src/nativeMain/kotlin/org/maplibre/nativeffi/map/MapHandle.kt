@@ -73,6 +73,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_create
 import org.maplibre.nativeffi.internal.c.mln_map_dump_debug_logs
 import org.maplibre.nativeffi.internal.c.mln_map_get_feature_state
+import org.maplibre.nativeffi.internal.c.mln_map_get_global_state
 import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_property
@@ -120,6 +121,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_data
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_synchronous_tiling
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_url
+import org.maplibre.nativeffi.internal.c.mln_map_set_global_state_property
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_image
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_url
@@ -1113,6 +1115,20 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) {
       }
     }
 
+  public actual fun setGlobalStateProperty(
+    propertyName: String,
+    value: ByteArray,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      mln_map_set_global_state_property(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(propertyName, this),
+        ByteStructs.bufferView(value, this),
+        completion,
+      )
+    }
+  }
+
   public actual fun setStyleLightProperty(
     propertyName: String,
     value: ByteArray,
@@ -1126,6 +1142,12 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) {
       )
     }
   }
+
+  public actual fun getGlobalState(): Deferred<ByteArray> =
+    CompletionBridge.submit(
+      { result -> checkNotNull(bufferCompletion(result)) },
+      { completion -> mln_map_get_global_state(state.requireLive().rawHandleValue, completion) },
+    )
 
   public actual fun styleLightProperty(propertyName: String): Deferred<ByteArray?> = memScoped {
     CompletionBridge.submit(

@@ -7501,14 +7501,14 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     public static int MLN_LOG_EVENT_IMAGE() {
         return MLN_LOG_EVENT_IMAGE;
     }
-    private static final int MLN_LOG_EVENT_OPENGL = (int)11L;
+    private static final int MLN_LOG_EVENT_GRAPHICS_BACKEND = (int)11L;
     /**
      * {@snippet lang=c :
-     * enum mln_log_event.MLN_LOG_EVENT_OPENGL = 11
+     * enum mln_log_event.MLN_LOG_EVENT_GRAPHICS_BACKEND = 11
      * }
      */
-    public static int MLN_LOG_EVENT_OPENGL() {
-        return MLN_LOG_EVENT_OPENGL;
+    public static int MLN_LOG_EVENT_GRAPHICS_BACKEND() {
+        return MLN_LOG_EVENT_GRAPHICS_BACKEND;
     }
     private static final int MLN_LOG_EVENT_JNI = (int)12L;
     /**
@@ -9433,6 +9433,67 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
            throw new AssertionError("should not reach here", ex$);
         }
     }
+
+    private static class mln_render_session_projection_create {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_render_session_projection_create");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_render_session_projection_create(mln_render_session session, mln_map_projection *out_projection)
+     * }
+     */
+    public static FunctionDescriptor mln_render_session_projection_create$descriptor() {
+        return mln_render_session_projection_create.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_render_session_projection_create(mln_render_session session, mln_map_projection *out_projection)
+     * }
+     */
+    public static MethodHandle mln_render_session_projection_create$handle() {
+        return mln_render_session_projection_create.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_render_session_projection_create(mln_render_session session, mln_map_projection *out_projection)
+     * }
+     */
+    public static MemorySegment mln_render_session_projection_create$address() {
+        return mln_render_session_projection_create.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_render_session_projection_create(mln_render_session session, mln_map_projection *out_projection)
+     * }
+     */
+    public static int mln_render_session_projection_create(long session, MemorySegment out_projection) {
+        var mh$ = mln_render_session_projection_create.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_render_session_projection_create", session, out_projection);
+            }
+            return (int)mh$.invokeExact(session, out_projection);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
     private static final int MLN_RENDER_RESULT_RENDERED = (int)0L;
     /**
      * {@snippet lang=c :
@@ -10849,6 +10910,130 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
                 traceDowncall("mln_render_session_destroy", session);
             }
             return (int)mh$.invokeExact(session);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_set_global_state_property {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_buffer_view.layout(),
+            mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_set_global_state_property");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_global_state_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion)
+     * }
+     */
+    public static FunctionDescriptor mln_map_set_global_state_property$descriptor() {
+        return mln_map_set_global_state_property.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_global_state_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion)
+     * }
+     */
+    public static MethodHandle mln_map_set_global_state_property$handle() {
+        return mln_map_set_global_state_property.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_global_state_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion)
+     * }
+     */
+    public static MemorySegment mln_map_set_global_state_property$address() {
+        return mln_map_set_global_state_property.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_set_global_state_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion)
+     * }
+     */
+    public static int mln_map_set_global_state_property(long map, MemorySegment property_name, MemorySegment value, MemorySegment completion) {
+        var mh$ = mln_map_set_global_state_property.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_set_global_state_property", map, property_name, value, completion);
+            }
+            return (int)mh$.invokeExact(map, property_name, value, completion);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_get_global_state {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_get_global_state");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_get_global_state(mln_map map, const mln_completion *completion)
+     * }
+     */
+    public static FunctionDescriptor mln_map_get_global_state$descriptor() {
+        return mln_map_get_global_state.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_get_global_state(mln_map map, const mln_completion *completion)
+     * }
+     */
+    public static MethodHandle mln_map_get_global_state$handle() {
+        return mln_map_get_global_state.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_get_global_state(mln_map map, const mln_completion *completion)
+     * }
+     */
+    public static MemorySegment mln_map_get_global_state$address() {
+        return mln_map_get_global_state.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_get_global_state(mln_map map, const mln_completion *completion)
+     * }
+     */
+    public static int mln_map_get_global_state(long map, MemorySegment completion) {
+        var mh$ = mln_map_get_global_state.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_get_global_state", map, completion);
+            }
+            return (int)mh$.invokeExact(map, completion);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

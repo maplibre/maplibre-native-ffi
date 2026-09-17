@@ -1472,6 +1472,18 @@ impl RenderSessionHandle {
         })
     }
 
+    /// Copies the last completed rendered transform into an independent projection.
+    /// Callable from any thread, including while a frame is acquired.
+    pub fn create_projection(&self) -> Result<crate::MapProjectionHandle> {
+        let session = self.inner.native()?;
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map_projection>::new();
+        // SAFETY: session is live and out is a valid output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_projection_create(session, out.as_mut_ptr())
+        })?;
+        crate::MapProjectionHandle::from_native(out.into_live("mln_map_projection")?)
+    }
+
     /// Queues one frame demand. The demand's outcome arrives through
     /// [`RenderSessionHandle::drain_frame_results`], not through this call.
     ///

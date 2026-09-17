@@ -9,6 +9,31 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class StyleLayerTests
 {
+    [BindingSpecTest("BND-110")]
+    [Fact]
+    public async Task GlobalStateDefaultsUpdatesAndStyleReplacement()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(runtime, new MapOptions());
+        var rejected = await map.SetGlobalStatePropertyAsync("theme", "true"u8.ToArray());
+        Assert.Equal(CommandDisposition.Failed, rejected.Disposition);
+        Assert.Contains("style JSON has not loaded", rejected.Diagnostic);
+        await map.SetStyleJsonAsync(
+            """{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}"""u8.ToArray()
+        );
+        Assert.Equal("""{"theme":"light"}"""u8.ToArray(), await map.GetGlobalStateAsync());
+        await map.SetGlobalStatePropertyAsync("theme", """["dark",{"enabled":true}]"""u8.ToArray());
+        var snapshot = await map.GetGlobalStateAsync();
+        await map.SetGlobalStatePropertyAsync("theme", "null"u8.ToArray());
+        Assert.Equal("""{"theme":"light"}"""u8.ToArray(), await map.GetGlobalStateAsync());
+        Assert.Equal("""{"theme":["dark",{"enabled":true}]}"""u8.ToArray(), snapshot);
+        await map.SetStyleJsonAsync("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
+        Assert.Equal("{}"u8.ToArray(), await map.GetGlobalStateAsync());
+        await map.SetGlobalStatePropertyAsync("theme", "true"u8.ToArray());
+        await map.SetGlobalStatePropertyAsync("theme", "null"u8.ToArray());
+        Assert.Equal("""{"theme":null}"""u8.ToArray(), await map.GetGlobalStateAsync());
+    }
+
     [BindingSpecTest("BND-105")]
     [Fact]
     public async Task DemAndLocationLayerHelpersAdaptThroughNativeMap()

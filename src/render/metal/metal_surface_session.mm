@@ -244,12 +244,12 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
   }
 
   void setSize(mln::Size size_) {
-    size = size_;
+    setRenderableSize(size_);
     getResource<MetalSurfaceRenderableResource>().setSize(size_);
   }
 
   void set_layer(CA::MetalLayer* layer_, mln::Size size_) {
-    size = size_;
+    setRenderableSize(size_);
     getResource<MetalSurfaceRenderableResource>().set_layer(layer_, size_);
   }
 
@@ -265,7 +265,6 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
 
   void activate() override {}
   void deactivate() override {}
-  void updateAssumedState() override {}
 };
 
 class MetalSurfaceSessionBackend final

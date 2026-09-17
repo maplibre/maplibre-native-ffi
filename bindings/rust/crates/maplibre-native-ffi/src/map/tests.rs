@@ -1649,9 +1649,26 @@ fn a_camera_transition_reports_one_terminal_outcome() {
     submit_camera_update(&map, crate::CameraUpdateMode::Ease, 6.0, Some(12));
     assert_eq!(drain_finished_transitions(&runtime), vec![11]);
 
-    // A jump cancels the running transition, which reports the cancelled ID.
+    // A bearing animation leaves the running zoom animation active.
+    let mut bearing = CameraUpdate::default();
+    bearing.mode = crate::CameraUpdateMode::Ease;
+    bearing.camera.bearing = Some(90.0);
+    bearing.animation.duration_ms = Some(60_000.0);
+    bearing.animation.transition_id = Some(13);
+    assert_command_disposition(
+        map.update_camera(&bearing).unwrap(),
+        CommandDisposition::Committed,
+    );
+    assert!(drain_finished_transitions(&runtime).is_empty());
+
+    // A partial zoom jump ends only the zoom animation.
     submit_camera_update(&map, crate::CameraUpdateMode::Jump, 8.0, None);
     assert_eq!(drain_finished_transitions(&runtime), vec![12]);
+    assert_command_disposition(
+        map.cancel_transitions().unwrap(),
+        CommandDisposition::Committed,
+    );
+    assert_eq!(drain_finished_transitions(&runtime), vec![13]);
 
     // A transition started without an ID is silent, and so is its end.
     submit_camera_update(&map, crate::CameraUpdateMode::Ease, 10.0, None);
@@ -2000,6 +2017,45 @@ fn narrow_style_image_copies_read_the_same_image_as_the_aggregate() {
     assert!(crate::completion::blocking(map.style_image_premultiplied_rgba8("missing")).is_none());
     assert!(crate::completion::blocking(map.style_image_stretches("missing")).is_none());
 
+    map.close_and_wait();
+    runtime.close_and_wait();
+}
+
+#[test]
+// BND-110: global-state lifetime and copied JSON values.
+fn global_state_defaults_updates_and_style_replacement() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
+    let rejected = map.set_global_state_property("theme", b"true").unwrap();
+    assert!(rejected.wait(std::time::Duration::from_secs(10)).unwrap());
+    assert_eq!(
+        rejected.take().unwrap().raw_status,
+        sys::MLN_STATUS_INVALID_STATE
+    );
+    let style = br#"{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}"#;
+    map.set_style_json(style).unwrap();
+    assert_eq!(
+        crate::completion::blocking(map.get_global_state()),
+        br#"{"theme":"light"}"#
+    );
+    map.set_global_state_property("theme", br#"["dark",{"enabled":true}]"#)
+        .unwrap();
+    let snapshot = crate::completion::blocking(map.get_global_state());
+    map.set_global_state_property("theme", b"null").unwrap();
+    assert_eq!(
+        crate::completion::blocking(map.get_global_state()),
+        br#"{"theme":"light"}"#
+    );
+    assert_eq!(snapshot, br#"{"theme":["dark",{"enabled":true}]}"#);
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    assert_eq!(crate::completion::blocking(map.get_global_state()), b"{}");
+    map.set_global_state_property("theme", b"true").unwrap();
+    map.set_global_state_property("theme", b"null").unwrap();
+    assert_eq!(
+        crate::completion::blocking(map.get_global_state()),
+        br#"{"theme":null}"#
+    );
     map.close_and_wait();
     runtime.close_and_wait();
 }

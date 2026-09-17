@@ -705,6 +705,16 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         };
     }
 
+    /// Copies the last completed rendered transform into an independent projection.
+    /// Callable from any thread, including while a frame is acquired.
+    pub fn createProjection(self: RenderSessionHandle) status.Error!@import("projection.zig").MapProjectionHandle {
+        const lease = try renderSessionLease(self);
+        defer lease.release();
+        var projection: c.mln_map_projection = 0;
+        try status.checkStatus(c.mln_render_session_projection_create(lease.native, &projection), lease.diagnostic_store);
+        return @import("projection.zig").fromNative(projection, lease.diagnostic_store);
+    }
+
     /// Queues one frame demand. Detaching the session gives a demand still
     /// outstanding the `.target_not_ready` disposition.
     pub fn requestFrame(self: RenderSessionHandle, demand: FrameDemand) status.Error!void {

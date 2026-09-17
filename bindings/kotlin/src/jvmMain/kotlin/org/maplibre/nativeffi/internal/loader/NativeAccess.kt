@@ -1374,6 +1374,24 @@ internal object NativeAccess {
     }
   }
 
+  internal fun setGlobalStateProperty(
+    map: NativeMap,
+    propertyName: String,
+    value: ByteArray,
+  ): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
+    Arena.ofConfined().use { arena ->
+      mapStringViewAddressStatusFunction("mln_map_set_global_state_property")
+        .invokeNative(map, stringView(arena, propertyName), byteArrayView(arena, value), completion)
+        as Int
+    }
+  }
+
+  internal fun getGlobalState(map: NativeMap): Deferred<ByteArray> =
+    CompletionBridge.submit(
+      ::requiredBufferCompletion,
+      { completion -> MapLibreNativeC.mln_map_get_global_state(map.raw, completion) },
+    )
+
   internal fun setStyleLightProperty(
     map: NativeMap,
     propertyName: String,
@@ -2455,6 +2473,18 @@ internal object NativeAccess {
       mln_opengl_owned_texture_frame.format(segment),
       mln_opengl_owned_texture_frame.type(segment),
     )
+
+  internal fun createRenderSessionProjection(session: NativeRenderSession): NativeMapProjection =
+    Arena.ofConfined().use { arena ->
+      val outProjection = arena.allocate(ValueLayout.JAVA_LONG)
+      outProjection.set(ValueLayout.JAVA_LONG, 0, 0L)
+      Status.check(MapLibreNativeC.mln_render_session_projection_create(session.raw, outProjection))
+      NativeMapProjection(outProjection.get(ValueLayout.JAVA_LONG, 0)).also { projection ->
+        require(!projection.isNull) {
+          "mln_render_session_projection_create returned the null handle"
+        }
+      }
+    }
 
   internal fun createMapProjection(map: NativeMap): Deferred<NativeMapProjection> =
     CompletionBridge.submit(

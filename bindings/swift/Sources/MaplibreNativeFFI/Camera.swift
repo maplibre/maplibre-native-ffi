@@ -91,7 +91,9 @@ public struct AnimationOptions: Equatable, Sendable {
   ///
   /// The event fires exactly once however the transition ends, including when a
   /// later camera command supersedes it, and reports no outcome. A rejected
-  /// command starts no transition and emits no event.
+  /// command starts no transition and emits no event. A partially superseded
+  /// command remains active until its remaining properties finish. Other
+  /// commands can still be animating.
   public var transitionId: UInt64?
 
   public init(

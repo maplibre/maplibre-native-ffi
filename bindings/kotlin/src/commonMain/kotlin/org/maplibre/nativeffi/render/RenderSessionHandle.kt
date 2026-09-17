@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.render
 
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.map.MapProjectionHandle
 import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
@@ -10,6 +11,9 @@ import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 /** Owned render session control handle. Driver methods remain graphics-thread-affine. */
 public expect class RenderSessionHandle : AutoCloseable {
   public val isClosed: Boolean
+
+  /** Copies the last completed rendered transform into an independent projection. */
+  public fun createProjection(): MapProjectionHandle
 
   public fun map(): MapHandle
 

@@ -8,6 +8,7 @@ import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.map.MapProjectionHandle
 import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
@@ -27,6 +28,11 @@ internal constructor(private val ownerMap: MapHandle, private val handle: Native
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
+
+  public actual fun createProjection(): MapProjectionHandle {
+    NativeAccess.ensureLoaded()
+    return MapProjectionHandle(NativeAccess.createRenderSessionProjection(requireLiveHandle()))
+  }
 
   public actual fun map(): MapHandle = ownerMap
 

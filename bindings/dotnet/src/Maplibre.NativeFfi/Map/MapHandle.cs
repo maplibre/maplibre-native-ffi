@@ -1953,6 +1953,27 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             .WaitAsync(cancellationToken);
     }
 
+    /// <summary>Sets a global-state JSON value; JSON null restores the style default.</summary>
+    public Task<CommandCompletion> SetGlobalStatePropertyAsync(
+        string propertyName,
+        byte[] value,
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
+        using var nativeValue = NativeStringView.From(value, nameof(value));
+        return NativeCompletion
+            .SubmitCommand(completion =>
+                NativeMethods.mln_map_set_global_state_property(
+                    Handle,
+                    nativePropertyName.Value,
+                    nativeValue.Value,
+                    completion
+                )
+            )
+            .WaitAsync(cancellationToken);
+    }
+
     /// <summary>Sets one style light property.</summary>
     public Task<CommandCompletion> SetStyleLightPropertyAsync(
         string propertyName,
@@ -1972,6 +1993,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
                 )
             )
             .WaitAsync(cancellationToken);
+    }
+
+    /// <summary>Queries the global-state JSON object, including style defaults.</summary>
+    public Task<byte[]> GetGlobalStateAsync(CancellationToken cancellationToken = default)
+    {
+        return RunMapOperationAsync(
+            completion => NativeMethods.mln_map_get_global_state(Handle, completion),
+            ReadBuffer,
+            cancellationToken
+        );
     }
 
     /// <summary>Gets one style light property snapshot, or null when undefined.</summary>

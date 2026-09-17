@@ -1329,3 +1329,37 @@ private func jsonData(_ value: String) -> Data {
     #expect(error.diagnostic.contains("exactly 4"))
   }
 }
+
+@Test func globalStateDefaultsUpdatesAndStyleReplacement() async throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 32, height: 32)
+  )
+  defer { try? map.closeBlockingForTests() }
+  let rejected = try await map.setGlobalStateProperty(
+    "theme",
+    value: Data("true".utf8)
+  )
+  #expect(rejected.disposition == .failed)
+  #expect(rejected.diagnostic.contains("style JSON has not loaded"))
+  try await map
+    .setStyleJSON(
+      Data(#"{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}"#
+        .utf8)
+    )
+  #expect(try await map.globalState() == Data(#"{"theme":"light"}"#.utf8))
+  try await map.setGlobalStateProperty(
+    "theme",
+    value: Data(#"["dark",{"enabled":true}]"#.utf8)
+  )
+  let snapshot = try await map.globalState()
+  try await map.setGlobalStateProperty("theme", value: Data("null".utf8))
+  #expect(try await map.globalState() == Data(#"{"theme":"light"}"#.utf8))
+  #expect(snapshot == Data(#"{"theme":["dark",{"enabled":true}]}"#.utf8))
+  try await map
+    .setStyleJSON(Data(#"{"version":8,"sources":{},"layers":[]}"#.utf8))
+  #expect(try await map.globalState() == Data("{}".utf8))
+}

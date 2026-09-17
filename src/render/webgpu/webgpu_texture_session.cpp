@@ -268,7 +268,7 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     return true;
   }
 
-  void set_ring_size(mln::Size new_size) { size = new_size; }
+  void set_ring_size(mln::Size new_size) { setRenderableSize(new_size); }
 
   // Whether a replacement target names the context this session attached with.
   // A null queue names the device's default queue, as it does at attach. The
@@ -789,7 +789,7 @@ class WebGPUSurfaceBackend final : public mln::webgpu::RendererBackend,
     if (size_ == getSize()) {
       return;
     }
-    size = size_;
+    setRenderableSize(size_);
     releaseFrame();
     configureSurface();
   }
@@ -818,14 +818,16 @@ class WebGPUSurfaceBackend final : public mln::webgpu::RendererBackend,
       wgpuSurfaceRelease(surface_);
     }
     surface_ = replacement;
-    size = mln::Size{
-      mln::core::physical_dimension(
-        descriptor.extent.width, descriptor.extent.scale_factor
-      ),
-      mln::core::physical_dimension(
-        descriptor.extent.height, descriptor.extent.scale_factor
-      )
-    };
+    setRenderableSize(
+      mln::Size{
+        mln::core::physical_dimension(
+          descriptor.extent.width, descriptor.extent.scale_factor
+        ),
+        mln::core::physical_dimension(
+          descriptor.extent.height, descriptor.extent.scale_factor
+        )
+      }
+    );
     configureSurface();
   }
 

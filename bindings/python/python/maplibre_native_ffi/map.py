@@ -755,6 +755,16 @@ class MapHandle(NativeHandleMixin):
         """
         return self._native.set_style_json(json)
 
+    def set_global_state_property(
+        self, property_name: str, value: bytes
+    ) -> Future[CommandCompletion]:
+        """Set a JSON value in the loaded style; JSON null restores its default."""
+        return self._native.set_global_state_property(property_name, value)
+
+    def get_global_state(self) -> Future[bytes]:
+        """Copy the current global-state JSON object, including defaults."""
+        return self._native.get_global_state()
+
     def set_feature_state(
         self,
         selector: FeatureStateSelector,

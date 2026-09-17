@@ -3910,3 +3910,64 @@ fn a_failed_attachment_still_owns_the_session_it_published() {
     drop(context);
     runtime.close_and_wait();
 }
+
+#[test]
+fn projection_captures_last_rendered_update_and_survives_session() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(64, 64, 1.0),
+    ));
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0)).unwrap();
+    assert_eq!(
+        session.create_projection().unwrap_err().kind(),
+        ErrorKind::InvalidState
+    );
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
+    await_runtime_barrier(&runtime);
+    assert_eq!(
+        render_frame(&session, false).disposition,
+        FrameDisposition::Rendered
+    );
+    let camera_a = session.create_projection().unwrap().camera().unwrap();
+    let mut camera_b = crate::CameraOptions::default();
+    camera_b.center = Some(crate::LatLng::new(10.0, 20.0));
+    camera_b.zoom = Some(3.0);
+    let mut update = crate::CameraUpdate::default();
+    update.camera = camera_b;
+    crate::completion::blocking(map.update_camera(&update));
+    await_runtime_barrier(&runtime);
+    let projection = session.create_projection().unwrap();
+    assert_eq!(projection.camera().unwrap(), camera_a);
+    assert_eq!(
+        render_frame(&session, false).disposition,
+        FrameDisposition::Rendered
+    );
+    assert_eq!(
+        session.create_projection().unwrap().camera().unwrap().zoom,
+        Some(3.0)
+    );
+    finish(
+        &session,
+        session
+            .resize(&RenderTargetExtent::new(80, 40, 1.0))
+            .unwrap(),
+    );
+    assert_eq!(
+        session.create_projection().unwrap_err().kind(),
+        ErrorKind::InvalidState
+    );
+    close_session(session);
+    map.close_and_wait();
+    runtime.close_and_wait();
+    std::thread::spawn(move || {
+        assert_eq!(projection.camera().unwrap(), camera_a);
+        projection.close().unwrap();
+    })
+    .join()
+    .unwrap();
+}

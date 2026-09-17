@@ -282,12 +282,12 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
   }
 
   auto select_slot(std::size_t slot) -> bool {
-    if (!ring_.select(slot, size, resource)) return false;
+    if (!ring_.select(slot, getSize(), resource)) return false;
     resource_size_ = ring_.selected_size();
     return true;
   }
 
-  void set_ring_size(mln::Size new_size) { size = new_size; }
+  void set_ring_size(mln::Size new_size) { setRenderableSize(new_size); }
 
   void finish_rendering() { getContext<mln::gl::Context>().finish(); }
 

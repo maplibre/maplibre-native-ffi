@@ -876,6 +876,12 @@ external int mln_map_get_feature_state(
   ffi.Pointer<mln_completion> completion,
 );
 
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_get_global_state(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+);
+
 @ffi.Native<
   ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
@@ -1452,6 +1458,21 @@ external int mln_map_set_geojson_source_url(
   int map,
   mln_buffer_view source_id,
   mln_buffer_view url,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+  )
+>()
+external int mln_map_set_global_state_property(
+  int map,
+  mln_buffer_view property_name,
+  mln_buffer_view value,
   ffi.Pointer<mln_completion> completion,
 );
 
@@ -2144,6 +2165,14 @@ external int mln_render_session_get_capabilities(
 external int mln_render_session_get_snapshot(
   int session,
   ffi.Pointer<mln_render_session_snapshot> out_snapshot,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_map_projection>)
+>()
+external int mln_render_session_projection_create(
+  int session,
+  ffi.Pointer<mln_map_projection> out_projection,
 );
 
 @ffi.Native<
@@ -4369,7 +4398,7 @@ enum mln_log_event {
   MLN_LOG_EVENT_HTTP_REQUEST(8),
   MLN_LOG_EVENT_SPRITE(9),
   MLN_LOG_EVENT_IMAGE(10),
-  MLN_LOG_EVENT_OPENGL(11),
+  MLN_LOG_EVENT_GRAPHICS_BACKEND(11),
   MLN_LOG_EVENT_JNI(12),
   MLN_LOG_EVENT_ANDROID(13),
   MLN_LOG_EVENT_CRASH(14),
@@ -4391,7 +4420,7 @@ enum mln_log_event {
     8 => MLN_LOG_EVENT_HTTP_REQUEST,
     9 => MLN_LOG_EVENT_SPRITE,
     10 => MLN_LOG_EVENT_IMAGE,
-    11 => MLN_LOG_EVENT_OPENGL,
+    11 => MLN_LOG_EVENT_GRAPHICS_BACKEND,
     12 => MLN_LOG_EVENT_JNI,
     13 => MLN_LOG_EVENT_ANDROID,
     14 => MLN_LOG_EVENT_CRASH,

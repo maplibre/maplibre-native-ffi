@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi.render
 
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -20,9 +22,124 @@ import org.maplibre.nativeffi.runtime.runSuspendTest
 import org.maplibre.nativeffi.sleepMillis
 
 class RenderSessionHandleTest {
-  // BND-160, BND-161, BND-163, BND-164, BND-165, BND-166, BND-167, BND-168,
-  // BND-169, BND-170: owned-texture attachment, frame demands, frame leases,
-  // readback, and detachment on a caller-driven graphics thread.
+  @Test
+  fun globalStateChangesRenderedPaint(): Unit = runSuspendTest {
+    withOwnedTextureSession { runtime, map, owned ->
+      val session = owned.session
+      session.completeOnDriver(
+        map.setStyleJson(
+          """{"version":8,"transition":{"duration":0},"state":{"color":{"default":"#ff0000"}},"sources":{},"layers":[{"id":"bg","type":"background","paint":{"background-color":["global-state","color"]}}]}"""
+            .encodeToByteArray()
+        )
+      )
+      suspend fun renderColor(): List<Int> {
+        session.completeOnDriver(runtime.barrier())
+        session.renderUntilSettled()
+        return session.completeOnDriver(session.readPremultipliedRgba8()).bytes.take(4).map {
+          it.toInt() and 255
+        }
+      }
+      assertEquals(listOf(255, 0, 0, 255), renderColor())
+      session.completeOnDriver(
+        map.setGlobalStateProperty("color", "\"#0000ff\"".encodeToByteArray())
+      )
+      assertEquals(listOf(0, 0, 255, 255), renderColor())
+      session.completeOnDriver(map.setGlobalStateProperty("color", "null".encodeToByteArray()))
+      assertEquals(listOf(255, 0, 0, 255), renderColor())
+      session.completeOnDriver(session.detach())
+    }
+  }
+
+  @OptIn(ExperimentalAtomicApi::class)
+  @Test
+  fun staticRenderWaitingForStyleKeepsThePreviousProjection(): Unit = runSuspendTest {
+    withOwnedTextureSession(mapMode = MapMode.STATIC) { runtime, map, owned ->
+      val session = owned.session
+      val pending = AtomicReference<org.maplibre.nativeffi.resource.ResourceRequestHandle?>(null)
+      session.completeOnDriver(
+        runtime.setResourceProvider(
+          org.maplibre.nativeffi.resource.ResourceProviderCallback { _, handle ->
+            pending.store(handle)
+            org.maplibre.nativeffi.resource.ResourceProviderDecision.HANDLE
+          }
+        )
+      )
+      try {
+        session.completeOnDriver(map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray()))
+        session.completeOnDriver(
+          map.updateCamera(CameraUpdate(camera = CameraOptions().apply { zoom = 3.0 }))
+        )
+        val first = map.requestStillImage()
+        session.renderUntilSettled()
+        session.completeOnDriver(first)
+        session.completeOnDriver(map.setStyleUrl("test://pending-style.json"))
+        session.completeOnDriver(
+          map.updateCamera(CameraUpdate(camera = CameraOptions().apply { zoom = 6.0 }))
+        )
+        val second = map.requestStillImage()
+        for (attempt in 0 until 500) {
+          if (pending.load() != null) break
+          sleepMillis(1)
+        }
+        assertNotNull(pending.load())
+        val skipped = session.renderOneFrame()
+        assertEquals(RenderResult.NO_UPDATE, skipped.disposition)
+        assertFalse(skipped.needsRepaint)
+        session.createProjection().use { assertEquals(3.0, it.camera().zoom) }
+        pending
+          .load()!!
+          .complete(
+            org.maplibre.nativeffi.resource
+              .ResourceResponse(org.maplibre.nativeffi.resource.ResourceResponseStatus.OK)
+              .apply { bytes = BACKGROUND_STYLE_JSON.encodeToByteArray() }
+          )
+        session.renderUntilSettled()
+        session.completeOnDriver(second)
+        session.createProjection().use { assertEquals(6.0, it.camera().zoom) }
+        session.completeOnDriver(session.detach())
+      } finally {
+        pending.load()?.close()
+      }
+    }
+  }
+
+  @Test
+  fun renderedProjectionFollowsRenderedUpdatesAndOutlivesTheSession(): Unit = runSuspendTest {
+    var retained: org.maplibre.nativeffi.map.MapProjectionHandle? = null
+    try {
+      withOwnedTextureSession { runtime, map, owned ->
+        val session = owned.session
+        assertFailsWith<org.maplibre.nativeffi.error.InvalidStateException> {
+          session.createProjection()
+        }
+        session.completeOnDriver(map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray()))
+        session.completeOnDriver(
+          map.updateCamera(CameraUpdate(camera = CameraOptions().apply { zoom = 3.0 }))
+        )
+        session.completeOnDriver(runtime.barrier())
+        session.renderUntilSettled()
+        session.completeOnDriver(
+          map.updateCamera(CameraUpdate(camera = CameraOptions().apply { zoom = 6.0 }))
+        )
+        val projection = session.createProjection()
+        retained = projection
+        assertEquals(3.0, projection.camera().zoom)
+        val frame = assertNotNull(session.acquireFrame())
+        session.createProjection().use { assertEquals(3.0, it.camera().zoom) }
+        frame.release()
+        assertEquals(RenderResult.RENDERED, session.renderOneFrame().disposition)
+        session.createProjection().use { assertEquals(6.0, it.camera().zoom) }
+        session.completeOnDriver(session.resize(RenderTargetExtent(16, 8, 1.0)))
+        assertFailsWith<org.maplibre.nativeffi.error.InvalidStateException> {
+          session.createProjection()
+        }
+        session.completeOnDriver(session.detach())
+      }
+      retained?.let { assertEquals(3.0, it.camera().zoom) }
+    } finally {
+      retained?.close()
+    }
+  }
 
   @Test
   fun ownedTextureSessionRendersReadsBackAcquiresAFrameAndDetaches(): Unit = runSuspendTest {

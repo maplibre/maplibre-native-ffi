@@ -1345,6 +1345,18 @@ public extension MapHandle {
   }
 
   @discardableResult
+  func setGlobalStateProperty(
+    _ propertyName: String,
+    value: Data
+  ) async throws -> CommandCompletion {
+    try await styleCommand {
+      mln_map_set_global_state_property(
+        $0, $1.view(propertyName), $1.view(value), $2
+      )
+    }
+  }
+
+  @discardableResult
   func setStyleLightProperty(
     _ propertyName: String,
     value: Data
@@ -1354,6 +1366,13 @@ public extension MapHandle {
         $0, $1.view(propertyName), $1.view(value), $2
       )
     }
+  }
+
+  func globalState() async throws -> Data {
+    try await styleQuery(
+      { map, _, completion in mln_map_get_global_state(map, completion) },
+      convert: NativeCompletion.data
+    )
   }
 
   func styleLightProperty(_ propertyName: String) async throws -> Data? {

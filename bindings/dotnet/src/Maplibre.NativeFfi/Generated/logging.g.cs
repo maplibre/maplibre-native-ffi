@@ -35,7 +35,7 @@ namespace Maplibre.NativeFfi.Internal.C
         MLN_LOG_EVENT_HTTP_REQUEST = 8,
         MLN_LOG_EVENT_SPRITE = 9,
         MLN_LOG_EVENT_IMAGE = 10,
-        MLN_LOG_EVENT_OPENGL = 11,
+        MLN_LOG_EVENT_GRAPHICS_BACKEND = 11,
         MLN_LOG_EVENT_JNI = 12,
         MLN_LOG_EVENT_ANDROID = 13,
         MLN_LOG_EVENT_CRASH = 14,

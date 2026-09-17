@@ -31,7 +31,6 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   auto getRendererBackend() -> mln::gfx::RendererBackend* override;
   void activate() override;
   void deactivate() override;
-  void updateAssumedState() override;
 
   // The texture of the slot this backend is rendering into.
   auto metal_texture() -> MTL::Texture*;

@@ -22,6 +22,7 @@
 #include <mln/gfx/headless_backend.hpp>
 #include <mln/gfx/renderable.hpp>
 #include <mln/gfx/renderer_backend.hpp>
+#include <mln/map/transform_state.hpp>
 #include <mln/renderer/renderer.hpp>
 #include <mln/renderer/renderer_observer.hpp>
 #include <mln/util/feature.hpp>
@@ -397,6 +398,15 @@ class SessionFrameObserver final : public mln::RendererObserver {
 
   [[nodiscard]] auto needs_repaint() const -> bool { return needs_repaint_; }
 
+  auto begin_render() -> void {
+    frame_completed_ = false;
+    needs_repaint_ = false;
+  }
+
+  [[nodiscard]] auto frame_completed() const -> bool {
+    return frame_completed_;
+  }
+
   auto suppress_frame_callbacks(bool suppress) -> void {
     suppress_frame_callbacks_ = suppress;
   }
@@ -435,6 +445,7 @@ class SessionFrameObserver final : public mln::RendererObserver {
       return;
     }
     needs_repaint_ = repaint;
+    frame_completed_ = true;
     if (delegate_ != nullptr) {
       delegate_->onDidFinishRenderingFrame(
         mode, repaint, placement_changed, stats
@@ -533,6 +544,7 @@ class SessionFrameObserver final : public mln::RendererObserver {
  private:
   mln::RendererObserver* delegate_ = nullptr;
   bool needs_repaint_ = false;
+  bool frame_completed_ = false;
   bool suppress_frame_callbacks_ = false;
 };
 
@@ -581,6 +593,7 @@ struct mln_render_session_object
   uint64_t map_update_generation = 0;
   uint64_t rendered_generation = 0;
   uint64_t rendered_target_generation = 0;
+  std::optional<mln::TransformState> rendered_transform;
   uint64_t extent_generation = 1;
   uint64_t frame_generation = 0;
   uint64_t latest_demand_token = 0;
@@ -891,6 +904,10 @@ auto surface_session_set_target(
   mln_render_session session, const mln_render_target_extent& extent,
   const RenderTargetReplacer& replace
 ) -> mln_status;
+auto render_session_projection_create(
+  mln_render_session session, mln_map_projection* out_projection
+) -> mln_status;
+
 auto render_session_destroy(mln_render_session session) -> mln_status;
 auto queried_feature_list_count(
   mln_queried_feature_list list, size_t* out_count

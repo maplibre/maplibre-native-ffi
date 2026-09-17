@@ -84,11 +84,15 @@ impl MapProjectionHandle {
             move |completion| unsafe { sys::mln_map_projection_create(map_ptr, completion) },
             |result| {
                 let native = crate::completion::copy_value::<sys::mln_map_projection>(result)?;
-                Ok(Self {
-                    inner: Arc::new(MapProjectionState::new(native)?),
-                })
+                Self::from_native(native)
             },
         )
+    }
+
+    pub(crate) fn from_native(native: sys::mln_map_projection) -> Result<Self> {
+        Ok(Self {
+            inner: Arc::new(MapProjectionState::new(native)?),
+        })
     }
 
     /// Closes the projection synchronously.

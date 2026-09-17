@@ -36,6 +36,10 @@
 #include <mln/util/size.hpp>
 #include <mln/util/string.hpp>
 
+#if defined(MLN_RENDER_BACKEND_VULKAN)
+#include <mln/vulkan/renderable_resource.hpp>
+#endif
+
 #include "bytes/buffer.hpp"
 #include "c_api/autorelease_pool.hpp"
 #include "diagnostics/diagnostics.hpp"
@@ -1638,6 +1642,7 @@ auto render_session_set_target(
     const auto lock = std::scoped_lock{live->control_mutex};
     live->rendered_generation = 0;
     live->rendered_target_generation = 0;
+    live->rendered_transform.reset();
     live->width = extent.width;
     live->height = extent.height;
     live->physical_width = physical_width;
@@ -1765,14 +1770,23 @@ auto render_session_render_update_on_driver(
     }
   }
 
-  const auto render_once = [&]() -> mln_status {
+  // Returns an early status, or nothing once the render attempt returns.
+  const auto render_once = [&]() -> std::optional<mln_status> {
     try {
+      live->frame_observer.begin_render();
       live->renderer->render(update);
+#if defined(MLN_RENDER_BACKEND_VULKAN)
+    } catch (const mln::vulkan::SurfaceNotReady&) {
+      // The swapchain had no free image within the acquire bound. The frame
+      // recorded nothing, so the host retries with this session.
+      *out_result = MLN_RENDER_RESULT_TARGET_NOT_READY;
+      return MLN_STATUS_OK;
+#endif
     } catch (const std::exception& exception) {
       set_native_stage_error("rendering update", exception);
       return MLN_STATUS_NATIVE_ERROR;
     }
-    return MLN_STATUS_OK;
+    return std::nullopt;
   };
 
   auto desired = map_feature_state_snapshot(live->map);
@@ -1781,10 +1795,8 @@ auto render_session_render_update_on_driver(
   if (warmup) {
     {
       const UnpresentedRender unpresented{live->frame_observer};
-      if (
-        const auto warmup_status = render_once(); warmup_status != MLN_STATUS_OK
-      ) {
-        return warmup_status;
+      if (const auto early = render_once()) {
+        return *early;
       }
     }
     if (const auto early = wait_surface()) {
@@ -1800,13 +1812,16 @@ auto render_session_render_update_on_driver(
   }
   remember_rendered_sources(live->rendered_source_ids, *update);
 
-  if (
-    const auto render_status = render_once(); render_status != MLN_STATUS_OK
-  ) {
-    return render_status;
+  if (const auto early = render_once()) {
+    return *early;
   }
   // Absorb results that landed from worker threads during the render.
   live->scheduler.drain();
+  // Static maps can return without drawing while style or tile data is pending.
+  // Only a completed frame replaces the target's projection and backend state.
+  if (!live->frame_observer.frame_completed()) {
+    return MLN_STATUS_OK;
+  }
   if (live->kind == RenderSessionKind::Texture) {
     auto frame_rendered = true;
     const auto after_status =
@@ -1822,7 +1837,11 @@ auto render_session_render_update_on_driver(
       return MLN_STATUS_OK;
     }
   }
-  live->rendered_target_generation = live->generation;
+  {
+    const auto lock = std::scoped_lock{live->control_mutex};
+    live->rendered_transform = update->transformState;
+    live->rendered_target_generation = live->generation;
+  }
   *out_result = MLN_RENDER_RESULT_RENDERED;
   *out_needs_repaint = live->frame_observer.needs_repaint();
   return MLN_STATUS_OK;
@@ -1861,6 +1880,7 @@ auto render_session_detach(mln_render_session_object& session) -> mln_status {
     const auto lock = std::scoped_lock{live->control_mutex};
     live->rendered_generation = 0;
     live->rendered_target_generation = 0;
+    live->rendered_transform.reset();
     ++live->generation;
   }
   return MLN_STATUS_OK;
@@ -1889,6 +1909,25 @@ auto run_renderer_maintenance(
 }
 
 }  // namespace
+
+auto render_session_projection_create(
+  mln_render_session session, mln_map_projection* out_projection
+) -> mln_status {
+  auto live = lease_render_session(session);
+  if (!live) return MLN_STATUS_INVALID_ARGUMENT;
+  const auto lock = std::scoped_lock{live->control_mutex};
+  if (
+    live->state != MLN_RENDER_SESSION_STATE_ATTACHED ||
+    !live->rendered_transform ||
+    live->rendered_target_generation != live->generation
+  ) {
+    set_thread_error("render session target has no rendered projection");
+    return MLN_STATUS_INVALID_STATE;
+  }
+  return map_projection_create_from_transform(
+    *live->rendered_transform, out_projection
+  );
+}
 
 auto render_session_destroy(mln_render_session session) -> mln_status {
   const auto live = lease_render_session(session);

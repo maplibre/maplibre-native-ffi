@@ -3399,6 +3399,35 @@ auto map_get_style_layer_json(
   return create_buffer(serialize_json_value(layer->serialize()), out_layer);
 }
 
+auto map_set_global_state_property(
+  MapObject& live, mln_buffer_view property_name, mln_buffer_view value
+) -> mln_status {
+  if (!validate_string_view(property_name, "property_name")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto native_value = to_native_json_value(value);
+  if (!native_value) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto& style = map_native(live).getStyle();
+  if (!style.isLoaded()) {
+    set_thread_error("style JSON has not loaded");
+    return MLN_STATUS_INVALID_STATE;
+  }
+  style.setGlobalStateProperty(string_from_view(property_name), *native_value);
+  return MLN_STATUS_OK;
+}
+
+auto map_get_global_state(MapObject& live, mln_buffer* out_state)
+  -> mln_status {
+  return create_buffer(
+    serialize_json_value(
+      mln::Value{map_native(live).getStyle().getGlobalState()}
+    ),
+    out_state
+  );
+}
+
 auto map_set_style_light_json(MapObject& live, mln_buffer_view light_json)
   -> mln_status {
   if (!validate_bytes(light_json, "style light")) {

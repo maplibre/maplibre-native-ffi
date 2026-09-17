@@ -4,9 +4,14 @@ import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.cinterop.*
+import kotlinx.cinterop.ULongVar
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.ptr
+import kotlinx.cinterop.value
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.c.*
+import org.maplibre.nativeffi.internal.c.mln_render_session_projection_create
 import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.CSizeVar
 import org.maplibre.nativeffi.internal.memory.toCSize
@@ -15,6 +20,7 @@ import org.maplibre.nativeffi.internal.struct.ByteStructs
 import org.maplibre.nativeffi.internal.struct.QueryStructs
 import org.maplibre.nativeffi.internal.struct.RenderStructs
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.map.MapProjectionHandle
 import org.maplibre.nativeffi.query.*
 import org.maplibre.nativeffi.runtime.*
 
@@ -26,6 +32,17 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
 
   public actual val isClosed: Boolean
     get() = state.isReleased()
+
+  public actual fun createProjection(): MapProjectionHandle = memScoped {
+    val outProjection = alloc<ULongVar>()
+    outProjection.value = 0uL
+    Status.check(
+      mln_render_session_projection_create(state.requireLive().rawHandleValue, outProjection.ptr)
+    )
+    MapProjectionHandle(
+      outProjection.value.asHandle("mln_render_session_projection_create", ::mapProjectionHandle)
+    )
+  }
 
   public actual fun map(): MapHandle = map
 

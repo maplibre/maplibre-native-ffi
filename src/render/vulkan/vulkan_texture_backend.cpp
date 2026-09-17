@@ -420,7 +420,7 @@ auto VulkanTextureBackend::getDefaultRenderable() -> mln::gfx::Renderable& {
     resource = std::make_unique<VulkanTextureRenderableResource>(*this);
     // Recorded with the resource it describes, so a slot that keeps an older
     // resource keeps the size that resource was built for.
-    ring_.record_size(size);
+    ring_.record_size(getSize());
   }
   return *this;
 }
@@ -451,18 +451,19 @@ void VulkanTextureBackend::set_borrowed_target(
     descriptor, new_size.width, new_size.height
   );
   borrowed_descriptor_ = descriptor;
-  size = new_size;
+  setRenderableSize(new_size);
 }
 
 void VulkanTextureBackend::set_ring_size(mln::Size new_size) {
   // Slots keep their old resources until the ring selects a released slot for
   // rendering at the new extent.
-  size = new_size;
+  setRenderableSize(new_size);
 }
 
 auto VulkanTextureBackend::readStillImage() -> mln::PremultipliedImage {
   prepareRenderResources();
 
+  const auto size = getSize();
   auto image = mln::PremultipliedImage(size);
   const auto image_size = image.bytes();
   const auto& allocator = getAllocator();
@@ -590,7 +591,7 @@ auto VulkanTextureBackend::frame_resources() -> VulkanTextureFrameResources {
 }
 
 auto VulkanTextureBackend::select_slot(std::size_t slot) -> bool {
-  return ring_.select(slot, size, resource);
+  return ring_.select(slot, getSize(), resource);
 }
 
 void VulkanTextureBackend::initInstance() {

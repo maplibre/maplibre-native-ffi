@@ -413,10 +413,17 @@ public expect class MapHandle {
 
   public fun setStyleLightJson(lightJson: ByteArray): Deferred<CommandCompletion>
 
+  public fun setGlobalStateProperty(
+    propertyName: String,
+    value: ByteArray,
+  ): Deferred<CommandCompletion>
+
   public fun setStyleLightProperty(
     propertyName: String,
     value: ByteArray,
   ): Deferred<CommandCompletion>
+
+  public fun getGlobalState(): Deferred<ByteArray>
 
   public fun styleLightProperty(propertyName: String): Deferred<ByteArray?>
 
@@ -566,19 +573,33 @@ public expect class MapHandle {
   /** Queries an ordered camera observation behind commands accepted before this call. */
   public fun queryCamera(): Deferred<CameraSnapshot>
 
-  /** Queries the camera that fits [bounds] inside the map's viewport. */
+  /**
+   * Queries the camera that fits [bounds] inside the map's viewport. A null [fitOptions] uses zero
+   * padding without a bearing or pitch override. Invalid bounds fail the deferred with
+   * [org.maplibre.nativeffi.error.InvalidArgumentException].
+   */
   public fun cameraForLatLngBounds(
     bounds: LatLngBounds,
     fitOptions: CameraFitOptions?,
   ): Deferred<CameraOptions>
 
-  /** Queries the camera that fits [coordinates] inside the map's viewport. */
+  /**
+   * Queries the camera that fits [coordinates] inside the map's viewport. The coordinates are
+   * copied before return. A null [fitOptions] uses zero padding without a bearing or pitch
+   * override. Empty or invalid coordinates fail the deferred with
+   * [org.maplibre.nativeffi.error.InvalidArgumentException].
+   */
   public fun cameraForLatLngs(
     coordinates: List<LatLng>,
     fitOptions: CameraFitOptions?,
   ): Deferred<CameraOptions>
 
-  /** Queries the camera that fits GeoJSON Geometry [geometry] inside the map's viewport. */
+  /**
+   * Queries the camera that fits UTF-8 GeoJSON Geometry [geometry] inside the map's viewport. The
+   * bytes are copied before return. A null [fitOptions] uses zero padding without a bearing or
+   * pitch override. Empty or malformed geometry, or geometry without coordinates, fails the
+   * deferred with [org.maplibre.nativeffi.error.InvalidArgumentException].
+   */
   public fun cameraForGeometry(
     geometry: ByteArray,
     fitOptions: CameraFitOptions?,

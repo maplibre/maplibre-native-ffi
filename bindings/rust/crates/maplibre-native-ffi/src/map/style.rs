@@ -1118,6 +1118,20 @@ impl super::MapHandle {
         })
     }
 
+    /// Sets a global-state JSON value; JSON null restores the style default.
+    pub fn set_global_state_property(
+        &self,
+        property_name: &str,
+        value: &[u8],
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let property_name = maplibre_core::string::string_view(property_name);
+        let value = maplibre_core::string::buffer_view(value);
+        // SAFETY: map is live, and property_name and value remain valid for this call.
+        self.submit_command(move |map, completion| unsafe {
+            sys::mln_map_set_global_state_property(map, property_name.raw(), value, completion)
+        })
+    }
+
     /// Sets one style light property.
     pub fn set_style_light_property(
         &self,
@@ -1130,6 +1144,15 @@ impl super::MapHandle {
         self.submit_command(move |map, completion| unsafe {
             sys::mln_map_set_style_light_property(map, property_name.raw(), value, completion)
         })
+    }
+
+    /// Queries the global-state JSON object, including style defaults.
+    pub fn get_global_state(&self) -> Result<NativeFuture<Vec<u8>>> {
+        // SAFETY: map is live for this synchronous submission.
+        self.submit_query(
+            move |map, completion| unsafe { sys::mln_map_get_global_state(map, completion) },
+            crate::completion::buffer,
+        )
     }
 
     /// Copies one style light property as a style-spec JSON value.

@@ -2850,6 +2850,19 @@ impl MapHandle {
         })
     }
 
+    fn set_global_state_property(
+        &self,
+        py: Python<'_>,
+        property_name: String,
+        value: &Bound<'_, PyBytes>,
+    ) -> PyResult<Py<PyAny>> {
+        let property_name = maplibre_core::string::string_view(&property_name);
+        let value = maplibre_core::string::buffer_view(value.as_bytes());
+        self.submit_map_command(py, |map, out| unsafe {
+            sys::mln_map_set_global_state_property(map, property_name.raw(), value, out)
+        })
+    }
+
     fn set_style_light_property(
         &self,
         py: Python<'_>,
@@ -2861,6 +2874,14 @@ impl MapHandle {
         self.submit_map_command(py, |map, out| unsafe {
             sys::mln_map_set_style_light_property(map, property_name.raw(), value, out)
         })
+    }
+
+    fn get_global_state(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        self.submit_map_operation(
+            py,
+            |map, completion| unsafe { sys::mln_map_get_global_state(map, completion) },
+            py_buffer,
+        )
     }
 
     fn get_style_light_property(
@@ -3847,6 +3868,28 @@ impl RenderSessionHandle {
         });
         maplibre_core::check(status).map_err(map_error)?;
         Ok(serviced)
+    }
+
+    fn create_projection(&self) -> PyResult<MapProjectionHandle> {
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map_projection>::new();
+        // SAFETY: The C API validates the session handle and
+        // output pointer. out starts null and is consumed immediately on success.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_projection_create(state.native(), out.as_mut_ptr())
+        })
+        .map_err(map_error)?;
+        let native = out.into_live("mln_map_projection").map_err(map_error)?;
+        // SAFETY: ptr came from mln_render_session_projection_create and is paired with
+        // mln_map_projection_close in close.
+        let handle = unsafe { NativeHandleState::from_handle(native, "mln_map_projection") }
+            .map_err(map_error)?;
+        Ok(MapProjectionHandle {
+            state: Mutex::new(handle),
+        })
     }
 
     fn request_frame(
@@ -5144,7 +5187,7 @@ fn log_event_raw(event: LogEvent) -> u32 {
         LogEvent::HttpRequest => sys::MLN_LOG_EVENT_HTTP_REQUEST,
         LogEvent::Sprite => sys::MLN_LOG_EVENT_SPRITE,
         LogEvent::Image => sys::MLN_LOG_EVENT_IMAGE,
-        LogEvent::OpenGl => sys::MLN_LOG_EVENT_OPENGL,
+        LogEvent::GraphicsBackend => sys::MLN_LOG_EVENT_GRAPHICS_BACKEND,
         LogEvent::Jni => sys::MLN_LOG_EVENT_JNI,
         LogEvent::Android => sys::MLN_LOG_EVENT_ANDROID,
         LogEvent::Crash => sys::MLN_LOG_EVENT_CRASH,

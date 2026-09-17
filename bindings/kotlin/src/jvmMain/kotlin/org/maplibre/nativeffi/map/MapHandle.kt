@@ -552,12 +552,25 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     return NativeAccess.setStyleLightJson(requireLiveHandle(), lightJson)
   }
 
+  public actual fun setGlobalStateProperty(
+    propertyName: String,
+    value: ByteArray,
+  ): Deferred<CommandCompletion> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.setGlobalStateProperty(requireLiveHandle(), propertyName, value)
+  }
+
   public actual fun setStyleLightProperty(
     propertyName: String,
     value: ByteArray,
   ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
     return NativeAccess.setStyleLightProperty(requireLiveHandle(), propertyName, value)
+  }
+
+  public actual fun getGlobalState(): Deferred<ByteArray> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.getGlobalState(requireLiveHandle())
   }
 
   public actual fun styleLightProperty(propertyName: String): Deferred<ByteArray?> {

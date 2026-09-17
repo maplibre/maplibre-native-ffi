@@ -42,12 +42,7 @@ pub const MapProjectionHandle = enum(c.mln_map_projection) {
         return completion.submitWithCopyContext(MapProjectionHandle, ?*diagnostics.DiagnosticStore, diagnostic_store, struct {
             fn copyResult(result: *const c.mln_completion_result, store: *?*diagnostics.DiagnosticStore) status.Error!MapProjectionHandle {
                 const projection = try completion.value(c.mln_map_projection)(result);
-                // A projection this binding cannot track has no other closer.
-                errdefer _ = c.mln_map_projection_close(projection);
-                const projection_state = try std.heap.smp_allocator.create(ProjectionState);
-                projection_state.* = .{ .diagnostic_store = store.* };
-                errdefer std.heap.smp_allocator.destroy(projection_state);
-                return registerProjectionState(projection, projection_state);
+                return fromNative(projection, store.*);
             }
         }.copyResult, diagnostic_store, try map_module.native(map), struct {
             fn start(native_map: c.mln_map, descriptor: *const c.mln_completion) c.mln_status {
@@ -252,4 +247,14 @@ pub fn latLngForProjectedMeters(
     var coordinate: c.mln_lat_lng = undefined;
     try status.checkStatus(c.mln_lat_lng_for_projected_meters(values.projectedMetersToNative(meters), &coordinate), diagnostic_store);
     return values.latLngFromNative(coordinate);
+}
+
+pub fn fromNative(projection: c.mln_map_projection, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!MapProjectionHandle {
+    errdefer _ = c.mln_map_projection_close(projection);
+
+    const projection_state = try std.heap.smp_allocator.create(ProjectionState);
+    projection_state.* = .{ .diagnostic_store = diagnostic_store };
+    errdefer std.heap.smp_allocator.destroy(projection_state);
+
+    return try registerProjectionState(projection, projection_state);
 }

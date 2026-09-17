@@ -824,6 +824,10 @@ class RenderSessionHandle(NativeHandleMixin):
         """Return the latest state and generation snapshot."""
         return RenderSessionSnapshot._from_native(self._native.snapshot())
 
+    def create_projection(self) -> MapProjectionHandle:
+        """Copy the last completed rendered transform into an independent projection."""
+        return MapProjectionHandle._from_native(self._native.create_projection())
+
     def request_frame(self, demand: FrameDemand = _DEFAULT_FRAME_DEMAND) -> None:
         """Submit one nonblocking frame demand."""
         self._native.request_frame(
@@ -1368,4 +1372,4 @@ __all__ = [
     "WglContextDescriptor",
 ]
 
-from .map import MapHandle
+from .map import MapHandle, MapProjectionHandle

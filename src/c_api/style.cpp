@@ -1491,6 +1491,51 @@ auto mln_map_set_style_light_json(
   });
 }
 
+auto mln_map_set_global_state_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value,
+  const mln_completion* completion
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    if (
+      !valid_view(property_name, "property_name is invalid") ||
+      !valid_view(value, "value is invalid")
+    ) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto name = OwnedView{property_name};
+    auto json = OwnedView{value};
+    return command(
+      map,
+      [name = std::move(name),
+       json = std::move(json)](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_set_global_state_property(
+          live, name.view(), json.view()
+        );
+      },
+      completion
+    );
+  });
+}
+
+auto mln_map_get_global_state(
+  mln_map map, const mln_completion* completion
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return operation(
+      map, mln::core::StyleOperationKind::GlobalState,
+      [](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
+        auto buffer = mln_buffer{MLN_HANDLE_NULL};
+        const auto status = mln::core::map_get_global_state(live, &buffer);
+        if (status != MLN_STATUS_OK) return status;
+        return take_buffer(buffer, result.bytes);
+      },
+      completion
+    );
+  });
+}
+
 auto mln_map_set_style_light_property(
   mln_map map, mln_buffer_view property_name, mln_buffer_view value,
   const mln_completion* completion

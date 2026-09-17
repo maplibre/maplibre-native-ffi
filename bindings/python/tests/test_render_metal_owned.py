@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import maplibre_native_ffi as mln
 import pytest
 from maplibre_native_ffi import render
+from maplibre_native_ffi.camera import CameraOptions
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
     assert_abandon_retires_the_session,
@@ -499,3 +500,24 @@ def test_metal_abandon_retires_the_session_and_its_map(
     assert_abandon_retires_the_session(
         metal_owned_session.session, metal_owned_session.map
     )
+
+
+def test_rendered_projection_retains_the_rendered_camera(
+    metal_owned_session: MetalOwnedSession,
+) -> None:
+    fixture = metal_owned_session
+    with pytest.raises(mln.InvalidStateError):
+        fixture.session.create_projection()
+    fixture.map.jump_to(CameraOptions(zoom=3)).result(timeout=5)
+    fixture.render_once()
+    fixture.map.jump_to(CameraOptions(zoom=6)).result(timeout=5)
+    with fixture.session.create_projection() as projection:
+        assert projection.get_camera().zoom == 3
+        finish_render_operation(
+            fixture.session,
+            fixture.session.resize(render.RenderTargetExtent(16, 16, 1)),
+        )
+        with pytest.raises(mln.InvalidStateError):
+            fixture.session.create_projection()
+        fixture.close()
+        assert projection.get_camera().zoom == 3

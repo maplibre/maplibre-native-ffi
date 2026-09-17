@@ -19,7 +19,7 @@ public sealed unsafe class MapProjectionHandle : IDisposable
 {
     private readonly NativeHandleState<MlnMapProjection> state;
 
-    private MapProjectionHandle(MlnMapProjection handle)
+    internal MapProjectionHandle(MlnMapProjection handle)
     {
         state = new NativeHandleState<MlnMapProjection>(
             handle,

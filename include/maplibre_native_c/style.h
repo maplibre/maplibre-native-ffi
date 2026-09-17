@@ -36,6 +36,35 @@
 extern "C" {
 #endif
 
+/**
+ * Submits a global-state JSON value. JSON null restores the style default.
+ * Input is copied before return. Completion reports invalid state if the style
+ * is not loaded, or invalid argument if the JSON cannot be parsed.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT for an invalid map, view, or completion.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_set_global_state_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value,
+  const mln_completion* completion
+) MLN_NOEXCEPT;
+/**
+ * Queries the global-state JSON object, including style defaults.
+ * Completion borrows one mln_buffer_view for the duration of the callback.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT for an invalid map or completion.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_get_global_state(
+  mln_map map, const mln_completion* completion
+) MLN_NOEXCEPT;
+
 typedef uint64_t mln_geojson_source_data;
 
 /** Style source type values returned by source metadata queries. */

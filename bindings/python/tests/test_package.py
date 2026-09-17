@@ -4619,3 +4619,28 @@ def test_live_map_snapshot_is_any_thread() -> None:
         snapshot = map_handle.snapshot()
         assert results == [(snapshot.width, snapshot.height, snapshot.scale_factor)]
         map_handle.close()
+
+
+# BND-110: global-state lifetime and copied JSON values.
+def test_global_state_defaults_updates_and_style_replacement() -> None:
+    with mln.RuntimeHandle() as runtime, _await(runtime.create_map()) as map_handle:
+        _assert_command_failed(
+            map_handle.set_global_state_property("theme", b"true"),
+            mln.MaplibreStatus.INVALID_STATE,
+        )
+        map_handle.set_style_json(
+            b'{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}'
+        )
+        assert json.loads(_await(map_handle.get_global_state())) == {"theme": "light"}
+        _await(
+            map_handle.set_global_state_property("theme", b'["dark",{"enabled":true}]')
+        )
+        snapshot = _await(map_handle.get_global_state())
+        _await(map_handle.set_global_state_property("theme", b"null"))
+        assert json.loads(_await(map_handle.get_global_state())) == {"theme": "light"}
+        assert json.loads(snapshot) == {"theme": ["dark", {"enabled": True}]}
+        _await(map_handle.set_style_json(_EMPTY_STYLE_BYTES))
+        assert json.loads(_await(map_handle.get_global_state())) == {}
+        _await(map_handle.set_global_state_property("theme", b"true"))
+        _await(map_handle.set_global_state_property("theme", b"null"))
+        assert json.loads(_await(map_handle.get_global_state())) == {"theme": None}

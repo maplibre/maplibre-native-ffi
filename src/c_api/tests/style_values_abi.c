@@ -1135,8 +1135,34 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static void global_state_checks_views_and_completion(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_completion discard = mln_test_discard_completion();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_get_global_state(map, NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_global_state_property(
+      map, (mln_buffer_view){.data = NULL, .size = 1},
+      MLN_BUFFER_LITERAL("true"), &discard
+    )
+  );
+  EXPECT_STYLE_COMMAND_FAILED(
+    MLN_STATUS_INVALID_STATE, "style JSON has not loaded",
+    mln_map_set_global_state_property(
+      map, MLN_BUFFER_LITERAL("theme"), MLN_BUFFER_LITERAL("true"),
+      &completion.descriptor
+    )
+  );
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_style_values_abi_tests(void) {
   UnitySetTestFile(__FILE__);
+  RUN_TEST(global_state_checks_views_and_completion);
   RUN_TEST(style_transition_options_reject_unsafe_raw_input);
   RUN_TEST(style_command_deep_copies_and_ordered_read_observes_it);
   RUN_TEST(duplicate_id_is_an_async_failed_terminal_event);

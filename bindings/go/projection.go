@@ -36,6 +36,33 @@ func (m *MapHandle) NewProjection() (*Future[*MapProjectionHandle], error) {
 	})
 }
 
+// NewProjection copies the last completed rendered transform into an independent projection.
+// It is callable from any goroutine, including while a frame is acquired.
+func (session *RenderSessionHandle) NewProjection() (*MapProjectionHandle, error) {
+	ptr, err := session.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer session.state.KeepAlive()
+
+	var projection nativeProjection
+	if err := checkNative(func() int32 {
+		var raw C.mln_map_projection
+		status := int32(C.mln_render_session_projection_create(C.mln_render_session(ptr), &raw))
+		if status == int32(C.MLN_STATUS_OK) {
+			projection = nativeProjection(raw)
+		}
+		return status
+	}); err != nil {
+		return nil, err
+	}
+	state, err := handle.New(projection, "MapProjectionHandle")
+	if err != nil {
+		return nil, newBindingError(ErrInvalidArgument, err.Error())
+	}
+	return &MapProjectionHandle{state: state}, nil
+}
+
 func (projection *MapProjectionHandle) ptr() (nativeProjection, error) {
 	if projection == nil || projection.state == nil {
 		return 0, newBindingError(ErrInvalidArgument, "MapProjectionHandle is nil")

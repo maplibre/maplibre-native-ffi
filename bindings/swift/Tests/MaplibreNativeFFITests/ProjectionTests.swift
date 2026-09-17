@@ -139,3 +139,69 @@ import Testing
     Issue.record("unexpected error: \(error)")
   }
 }
+
+#if canImport(Metal)
+  import Metal
+
+  @Test func sessionProjectionKeepsTheRenderedCameraAfterMapChanges(
+  ) async throws {
+    guard Maplibre.supportedRenderBackends().contains(.metal) else { return }
+    let device = try #require(MTLCreateSystemDefaultDevice())
+    let runtime =
+      try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    defer { try? runtime.closeBlockingForTests() }
+    let map = try await MapHandle(
+      runtime: runtime,
+      options: MapOptions(width: 32, height: 32)
+    )
+    defer { try? map.closeBlockingForTests() }
+    let attachment = try map.attachMetalOwnedTexture(
+      MetalOwnedTextureDescriptor(
+        extent: RenderTargetExtent(width: 32, height: 32, scaleFactor: 1),
+        context: MetalContextDescriptor(
+          device: NativePointer(bitPattern: UInt(bitPattern: Unmanaged
+              .passUnretained(device as AnyObject).toOpaque()))
+        )
+      ), options: RenderSessionAttachOptions(driver: .coreWorker)
+    )
+    let session = attachment.session
+    defer {
+      if !session.isClosed { _ = try? session.abandon(); try? session.close() }
+    }
+    try await attachment.completion.value
+    #expect(throws: MaplibreError.self) {
+      try MapProjectionHandle(session: session)
+    }
+    _ = try await map
+      .setStyleJSON(Data(#"{"version":8,"sources":{},"layers":[]}"#.utf8))
+    _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions(zoom: 3)))
+    try session.requestFrame(FrameDemand(options: [], token: 1))
+    try await session.barrier()
+    #expect(try session.drainFrameResults().first?.result == .rendered)
+    _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions(zoom: 6)))
+    let projection = try MapProjectionHandle(session: session)
+    defer { try? projection.close() }
+    #expect(try projection.camera().zoom == 3)
+    let frame = try #require(try session.acquireFrame())
+    let captured = try MapProjectionHandle(session: session)
+    #expect(try captured.camera().zoom == 3)
+    try captured.close()
+    try frame.release()
+    try await session.resize(RenderTargetExtent(
+      width: 16,
+      height: 16,
+      scaleFactor: 1
+    ))
+    #expect(throws: MaplibreError.self) {
+      try MapProjectionHandle(session: session)
+    }
+    try await session.detach()
+    try session.close()
+    try await map.close()
+    try await runtime.close()
+    let retainedZoom = try await Task.detached { try projection.camera().zoom }
+      .value
+    #expect(retainedZoom == 3)
+    withExtendedLifetime(device) {}
+  }
+#endif

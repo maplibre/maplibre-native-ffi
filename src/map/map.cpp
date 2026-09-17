@@ -2559,7 +2559,8 @@ auto start_style_operation(
               count = 1;
             }
             break;
-          // These always produce one view, empty when the layer sets none.
+          // These always produce one view, even when the result is empty.
+          case StyleOperationKind::GlobalState:
           case StyleOperationKind::LayerSourceLayer:
           case StyleOperationKind::LayerSourceId:
             view = bytes_view();
@@ -4263,6 +4264,25 @@ auto map_lat_lngs_for_pixels_unwrapped_start(
   return start_coordinates_for_pixels(
     map, points, point_count, true, completion
   );
+}
+
+auto map_projection_create_from_transform(
+  const mln::TransformState& transform, mln_map_projection* out_projection
+) -> mln_status {
+  if (out_projection == nullptr) {
+    set_thread_error("out_projection must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (*out_projection != MLN_HANDLE_NULL) {
+    set_thread_error("out_projection must point to the null handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto owned_projection = std::make_shared<MapProjectionObject>();
+  owned_projection->projection =
+    std::make_unique<mln::MapProjection>(transform);
+  *out_projection =
+    handle_table<MapProjectionObject>().insert(std::move(owned_projection));
+  return MLN_STATUS_OK;
 }
 
 auto map_projection_create_start(mln_map map, const mln_completion* completion)

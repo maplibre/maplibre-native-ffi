@@ -1859,6 +1859,20 @@ final class MapHandle {
     });
   }
 
+  /// Queries the global-state JSON object, including style defaults.
+  Future<Uint8List> getGlobalState() {
+    return _startMapValue(
+      copyKind: raw
+          .mln_adapter_completion_copy_kind
+          .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEWS,
+      elementSize: sizeOf<raw.mln_buffer_view>(),
+      start: (completion) =>
+          raw.mln_map_get_global_state(_handle.raw, completion),
+      decode: (result) =>
+          _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
+    );
+  }
+
   /// Returns the style document this map's style was last parsed from.
   ///
   /// This is the loaded document, not a serialization of the live style:
@@ -3553,6 +3567,25 @@ final class MapHandle {
         raw.mln_map_set_style_light_json(
           _handle.raw,
           nativeLightJson,
+          completion,
+        ),
+      );
+    });
+  }
+
+  /// Sets a global-state JSON value; JSON null restores the style default.
+  Future<CommandCompletion> setGlobalStateProperty(
+    String propertyName,
+    Uint8List value,
+  ) {
+    return _startCommandInArena((arena, completion) {
+      final nativePropertyName = nativeStringView(propertyName, arena);
+      final nativeValue = nativeBufferView(value, arena);
+      _check(
+        raw.mln_map_set_global_state_property(
+          _handle.raw,
+          nativePropertyName.value,
+          nativeValue,
           completion,
         ),
       );

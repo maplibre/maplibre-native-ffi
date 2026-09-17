@@ -12,6 +12,7 @@
 namespace mln {
 class Map;
 class RendererObserver;
+class TransformState;
 class UpdateParameters;
 }  // namespace mln
 
@@ -60,6 +61,7 @@ enum class StyleOperationKind : uint32_t {
   LayerIds,
   LayerJson,
   LightProperty,
+  GlobalState,
   TransitionOptions,
   LayerProperty,
   LayerFilter,
@@ -361,6 +363,11 @@ auto map_get_style_layer_json(
   MapObject& live, mln_buffer_view layer_id, mln_buffer* out_layer,
   bool* out_found
 ) -> mln_status;
+auto map_set_global_state_property(
+  MapObject& live, mln_buffer_view property_name, mln_buffer_view value
+) -> mln_status;
+auto map_get_global_state(MapObject& live, mln_buffer* out_state) -> mln_status;
+
 auto map_set_style_light_json(MapObject& live, mln_buffer_view light_json)
   -> mln_status;
 auto map_set_style_light_property(
@@ -473,6 +480,10 @@ auto map_lat_lng_bounds_for_camera_unwrapped_start(
   mln_map map, const mln_camera_options* camera,
   const mln_completion* completion
 ) -> mln_status;
+auto map_projection_create_from_transform(
+  const mln::TransformState& transform, mln_map_projection* out_projection
+) -> mln_status;
+
 auto map_projection_create_start(mln_map map, const mln_completion* completion)
   -> mln_status;
 auto map_projection_close(mln_map_projection projection) -> mln_status;

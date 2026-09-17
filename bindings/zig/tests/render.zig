@@ -1852,3 +1852,37 @@ test "Vulkan surface attach rejects a descriptor with no surface" {
         .surface = maplibre.VulkanHandle.fromBits(1),
     }, .{ .driver = .core_worker }));
 }
+
+test "projection captures last rendered update and survives session" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{ .width = 64, .height = 64 });
+    defer support.closeMap(&map) catch @panic("map close failed");
+    var owned = try attachTestOwnedTexture(&map, .{
+        .width = 64,
+        .height = 64,
+        .scale_factor = 1.0,
+    });
+    defer owned.close() catch {};
+    const session = &owned.session;
+    try testing.expectError(error.InvalidState, session.createProjection());
+    try support.expectCommitted(try map.updateCamera(.{ .camera = .{ .center = .{ .latitude = 0, .longitude = 0 }, .zoom = 5 } }));
+    try support.expectCommitted(try map.setStyleJson(support.style_json));
+    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
+    try testing.expectEqual(.rendered, std.meta.activeTag((try support.renderFrame(session.*, false, true)).disposition));
+    try support.expectCommitted(try map.updateCamera(.{ .camera = .{ .center = .{ .latitude = 10, .longitude = 20 }, .zoom = 3 } }));
+    try support.waitForBarrier(&runtime);
+    var projection = try session.createProjection();
+    defer projection.close() catch @panic("projection close failed");
+    try testing.expectApproxEqAbs(@as(f64, 5), (try projection.getCamera()).zoom.?, 0.000001);
+    try testing.expectEqual(.rendered, std.meta.activeTag((try support.renderFrame(session.*, false, true)).disposition));
+    var newer = try session.createProjection();
+    defer newer.close() catch @panic("projection close failed");
+    try testing.expectApproxEqAbs(@as(f64, 3), (try newer.getCamera()).zoom.?, 0.000001);
+    try finishOperation(session.*, try session.resize(.{ .width = 80, .height = 40, .scale_factor = 1.0 }));
+    try testing.expectError(error.InvalidState, session.createProjection());
+    try owned.close();
+    try support.closeMap(&map);
+    try testing.expectApproxEqAbs(@as(f64, 5), (try projection.getCamera()).zoom.?, 0.000001);
+}

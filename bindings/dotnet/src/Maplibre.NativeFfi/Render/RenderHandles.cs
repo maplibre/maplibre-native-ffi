@@ -537,6 +537,14 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             )
             .WaitAsync(cancellationToken);
 
+    /// <summary>Copies the last completed rendered transform into an independent projection.</summary>
+    public MapProjectionHandle CreateProjection()
+    {
+        MlnMapProjection projection = default;
+        NativeStatus.Check(NativeMethods.mln_render_session_projection_create(Handle, &projection));
+        return new MapProjectionHandle(projection);
+    }
+
     /// <summary>Reads the last rendered frame back as premultiplied RGBA8 pixels.</summary>
     /// <remarks>
     /// The session must carry <see cref="RenderSessionCapabilities.Readback" />; a session over a

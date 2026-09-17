@@ -53,6 +53,45 @@ import org.maplibre.nativeffi.style.VectorTileEncoding
 
 class MapHandleTest {
 
+  // BND-110: global-state lifetime and copied JSON values.
+  @Test
+  fun globalStateUsesStyleDefaultsAndResetsOnStyleReplacement(): Unit = runSuspendTest {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      MapHandle.create(runtime, MapOptions()).await().use { map ->
+        assertEquals("{}", map.getGlobalState().await().decodeToString())
+        assertCommandFailed(
+          map.setGlobalStateProperty("theme", "true".encodeToByteArray()).await(),
+          MaplibreStatus.INVALID_STATE,
+        )
+        val style =
+          """{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}"""
+            .encodeToByteArray()
+        map.setStyleJson(style).awaitCommitted()
+        assertEquals("""{"theme":"light"}""", map.getGlobalState().await().decodeToString())
+        val input = """["dark",{"enabled":true}]""".encodeToByteArray()
+        val submitted = map.setGlobalStateProperty("theme", input)
+        input.fill(0)
+        submitted.awaitCommitted()
+        val snapshot = map.getGlobalState().await()
+        assertEquals("""{"theme":["dark",{"enabled":true}]}""", snapshot.decodeToString())
+        assertCommandFailed(
+          map.setGlobalStateProperty("theme", "[".encodeToByteArray()).await(),
+          MaplibreStatus.INVALID_ARGUMENT,
+        )
+        map.setGlobalStateProperty("theme", "null".encodeToByteArray()).awaitCommitted()
+        assertEquals("""{"theme":"light"}""", map.getGlobalState().await().decodeToString())
+        assertEquals("""{"theme":["dark",{"enabled":true}]}""", snapshot.decodeToString())
+        map
+          .setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
+          .awaitCommitted()
+        assertEquals("{}", map.getGlobalState().await().decodeToString())
+        map.setGlobalStateProperty("theme", "false".encodeToByteArray()).awaitCommitted()
+        map.setGlobalStateProperty("theme", "null".encodeToByteArray()).awaitCommitted()
+        assertEquals("""{"theme":null}""", map.getGlobalState().await().decodeToString())
+      }
+    }
+  }
+
   @Test
   fun layerBaseAccessorsReachNativeThroughDowncalls(): Unit = runSuspendTest {
     RuntimeHandle.create(RuntimeOptions()).use { runtime ->

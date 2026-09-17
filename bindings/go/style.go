@@ -1431,6 +1431,16 @@ func (m *MapHandle) SetStyleLightJSON(lightJSON []byte) (*Future[CommandCompleti
 }
 
 // SetStyleLightProperty sets one style light property.
+func (m *MapHandle) SetGlobalStateProperty(propertyName string, value []byte) (*Future[CommandCompletion], error) {
+	propertyView := newCStringView(propertyName)
+	defer propertyView.free()
+	rawValue := newCBufferView(value)
+	defer rawValue.free()
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_global_state_property(raw, propertyView.raw(), rawValue.raw(), completion))
+	}, completionCommand)
+}
+
 func (m *MapHandle) SetStyleLightProperty(propertyName string, value []byte) (*Future[CommandCompletion], error) {
 	propertyView := newCStringView(propertyName)
 	defer propertyView.free()
@@ -1691,6 +1701,12 @@ func (m *MapHandle) StyleLayerJSON(layerID string) (*Future[StyleOptional[[]byte
 
 // StyleLightProperty returns one copied style light property as a style-spec
 // JSON value.
+func (m *MapHandle) GetGlobalState() (*Future[[]byte], error) {
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_get_global_state(raw, completion))
+	}, completionBuffer)
+}
+
 func (m *MapHandle) StyleLightProperty(name string) (*Future[[]byte], error) {
 	view := newCStringView(name)
 	defer view.free()
