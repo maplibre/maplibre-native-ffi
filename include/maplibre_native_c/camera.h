@@ -225,7 +225,9 @@ mln_map_get_camera(mln_map map, mln_camera_options* out_camera) MLN_NOEXCEPT;
 /**
  * Applies a camera jump command.
  *
- * Only fields indicated by camera->fields affect the map.
+ * Replaces animations of the fields indicated by camera->fields and applies
+ * those fields immediately. Other fields keep their current animations. The
+ * coupling rules on mln_map_ease_to() also apply to jumps.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -242,7 +244,16 @@ mln_map_jump_to(mln_map map, const mln_camera_options* camera) MLN_NOEXCEPT;
 /**
  * Applies a camera ease transition command.
  *
- * Only fields indicated by camera->fields affect the map.
+ * Each field indicated by camera->fields replaces that field's animation.
+ * Omitted fields keep their animations, including their original duration and
+ * easing. Submit a partial camera command to change independent properties;
+ * a camera snapshot selects every field that it contains.
+ *
+ * A flight couples center and zoom. Replacing either stops both parts of the
+ * flight. An anchor couples center with every field in its command. Replacing
+ * any of those fields stops that anchored command. An explicit center takes
+ * precedence over an anchor. Bounds and pitch constraints apply to the
+ * combined camera each frame, so they can also change an omitted field.
  *
  * MapLibre Native's default ease duration is zero, so a null animation, or one
  * that omits MLN_ANIMATION_OPTION_DURATION, moves the camera to the target
@@ -272,7 +283,9 @@ MLN_API mln_status mln_map_ease_to(
 /**
  * Applies a camera fly transition command.
  *
- * Only fields indicated by camera->fields affect the map.
+ * Center and zoom form one flight trajectory, including when either field is
+ * omitted. Other fields follow the independent animation and anchor rules on
+ * mln_map_ease_to().
  *
  * This is the one camera command that animates by default. When the animation
  * is null or omits MLN_ANIMATION_OPTION_DURATION, MapLibre Native derives a

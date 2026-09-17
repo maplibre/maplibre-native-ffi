@@ -95,6 +95,20 @@ at commit `cf1e6ec24755d433958d667379a16f33b583dfb5`, as an unmodified diff from
 base `9ee6f1c3b5b97fc2cba1c1042cadef87fa158476`. The C API exposes the runtime
 state setter and snapshot getter.
 
+`0015-independent-camera-animations.patch` lets partial camera commands animate
+independently. Replacing a property preserves the timing of other properties,
+including properties from the same command. Flights couple center and zoom;
+anchors couple center with the properties in their command. Native composes the
+active values before applying camera constraints, and reports each command
+finished once all its properties have ended. The patch includes Transform
+regressions for timing, partial replacement, coupled motion, constraints, and
+callback reentrancy. See
+[maplibre-native#2790](https://github.com/maplibre/maplibre-native/issues/2790).
+Upstream:
+[maplibre-native#4637](https://github.com/maplibre/maplibre-native/pull/4637).
+The Android SDK also cancels transitions before invoking Native and needs a
+separate change to expose this behavior.
+
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
 before applying the list again. A pin bump, an edit to a patch, and a dropped
