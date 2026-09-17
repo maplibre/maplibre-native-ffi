@@ -1,0 +1,1913 @@
+diff --git a/include/mln/shaders/gl/location_indicator.hpp b/include/mln/shaders/gl/location_indicator.hpp
+index 9a95c730e7c984e5ebdd3e0c0dbd27c1629abe93..c1bc5c1a97595c0f4ec19731f62cc2ada07b345d 100644
+--- a/include/mln/shaders/gl/location_indicator.hpp
++++ b/include/mln/shaders/gl/location_indicator.hpp
+@@ -11,21 +11,37 @@ struct ShaderSource<BuiltIn::LocationIndicatorShader, gfx::Backend::Type::OpenGL
+     static constexpr const char* vertex = R"(layout (std140) uniform LocationIndicatorDrawableUBO {
+     mat4 u_matrix;
+     vec4 u_color;
++    vec4 u_sector;
+ };
+ 
+ layout(location = 0) in vec2 a_pos;
+ 
++out vec2 v_local;
++
+ void main() {
++    v_local = a_pos;
+     gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
+ }
+ )";
+     static constexpr const char* fragment = R"(layout (std140) uniform LocationIndicatorDrawableUBO {
+     mat4 u_matrix;
+     vec4 u_color;
++    vec4 u_sector;
+ };
+ 
++in vec2 v_local;
++
+ void main() {
+-    fragColor = u_color;
++    float opacity = 1.0;
++    if (u_sector.y > 0.0) {
++        float radius = length(v_local);
++        float angle = atan(max(abs(v_local.x), 0.000001), -v_local.y);
++        float feather = length(fwidth(v_local)) / max(radius, 0.0001);
++        float angular = u_sector.x >= 3.14159265 ? 1.0 :
++            1.0 - smoothstep(u_sector.x - feather, u_sector.x + feather, angle);
++        opacity = angular * (1.0 - smoothstep(0.0, 1.0, radius));
++    }
++    fragColor = u_color * opacity;
+ }
+ )";
+ };
+diff --git a/include/mln/shaders/gl/location_indicator_textured.hpp b/include/mln/shaders/gl/location_indicator_textured.hpp
+index 2764321da53df49e60fb51801be492a7e5bafdf2..84dac5266f6aa2109408bc92cee320a73c532af9 100644
+--- a/include/mln/shaders/gl/location_indicator_textured.hpp
++++ b/include/mln/shaders/gl/location_indicator_textured.hpp
+@@ -11,6 +11,7 @@ struct ShaderSource<BuiltIn::LocationIndicatorTexturedShader, gfx::Backend::Type
+     static constexpr const char* vertex = R"(layout (std140) uniform LocationIndicatorDrawableUBO {
+     mat4 u_matrix;
+     vec4 u_color;
++    vec4 u_sector;
+ };
+ 
+ layout(location = 0) in vec2 a_pos;
+@@ -26,6 +27,7 @@ void main() {
+     static constexpr const char* fragment = R"(layout (std140) uniform LocationIndicatorDrawableUBO {
+     mat4 u_matrix;
+     vec4 u_color;
++    vec4 u_sector;
+ };
+ 
+ in vec2 frag_uv;
+diff --git a/include/mln/shaders/location_indicator_ubo.hpp b/include/mln/shaders/location_indicator_ubo.hpp
+index 8c730f32b5c6b53d715e06124cbd137c9f48d82f..e3e35e33fa50b9e8b7509abfa2e1dcaa6833f45f 100644
+--- a/include/mln/shaders/location_indicator_ubo.hpp
++++ b/include/mln/shaders/location_indicator_ubo.hpp
+@@ -8,9 +8,11 @@ namespace shaders {
+ struct alignas(16) LocationIndicatorDrawableUBO {
+     /*  0 */ std::array<float, 4 * 4> matrix;
+     /* 64 */ Color color;
+-    /* 80 */
++    // Half-angle in radians, sector enabled, padding. Zero disables the sector mask.
++    /* 80 */ std::array<float, 4> sector{};
++    /* 96 */
+ };
+-static_assert(sizeof(LocationIndicatorDrawableUBO) == 5 * 16);
++static_assert(sizeof(LocationIndicatorDrawableUBO) == 6 * 16);
+ 
+ } // namespace shaders
+ } // namespace mln
+diff --git a/include/mln/shaders/mtl/location_indicator.hpp b/include/mln/shaders/mtl/location_indicator.hpp
+index 43d527dc1ee0fed3e7aafac07f3503f5da249d67..611f93afced3e015c2fdac959e1406caa0877c75 100644
+--- a/include/mln/shaders/mtl/location_indicator.hpp
++++ b/include/mln/shaders/mtl/location_indicator.hpp
+@@ -17,9 +17,10 @@ enum {
+ struct alignas(16) LocationIndicatorDrawableUBO {
+     /*  0 */ float4x4 matrix;
+     /* 64 */ float4 color;
+-    /* 80 */
++    /* 80 */ float4 sector;
++    /* 96 */
+ };
+-static_assert(sizeof(LocationIndicatorDrawableUBO) == 5 * 16, "wrong size");
++static_assert(sizeof(LocationIndicatorDrawableUBO) == 6 * 16, "wrong size");
+ 
+ )";
+ 
+@@ -42,19 +43,30 @@ struct VertexStage {
+ 
+ struct FragmentStage {
+     float4 position [[position, invariant]];
++    float2 local;
+ };
+ 
+ FragmentStage vertex vertexMain(thread const VertexStage vertx [[stage_in]],
+                                 device const LocationIndicatorDrawableUBO& drawable [[buffer(idLocationIndicatorUBO)]]) {
+ 
+     return {
+-        .position = drawable.matrix * float4(vertx.position, 1.0)
++        .position = drawable.matrix * float4(vertx.position, 1.0),
++        .local = vertx.position
+     };
+ }
+ 
+ half4 fragment fragmentMain(FragmentStage in [[stage_in]],
+                             device const LocationIndicatorDrawableUBO& drawable [[buffer(idLocationIndicatorUBO)]]) {
+-    return half4(drawable.color);
++    float opacity = 1.0;
++    if (drawable.sector.y > 0.0) {
++        float radius = length(in.local);
++        float angle = atan2(max(abs(in.local.x), 0.000001), -in.local.y);
++        float feather = length(fwidth(in.local)) / max(radius, 0.0001);
++        float angular = drawable.sector.x >= 3.14159265 ? 1.0 :
++            1.0 - smoothstep(drawable.sector.x - feather, drawable.sector.x + feather, angle);
++        opacity = angular * (1.0 - smoothstep(0.0, 1.0, radius));
++    }
++    return half4(drawable.color * opacity);
+ }
+ )";
+ };
+diff --git a/include/mln/shaders/vulkan/location_indicator.hpp b/include/mln/shaders/vulkan/location_indicator.hpp
+index c387640ca62fb721c66fe03ee616a72a6f896261..65aa33a43220eab2d7b87b488bd090b1749ab95a 100644
+--- a/include/mln/shaders/vulkan/location_indicator.hpp
++++ b/include/mln/shaders/vulkan/location_indicator.hpp
+@@ -19,13 +19,16 @@ struct ShaderSource<BuiltIn::LocationIndicatorShader, gfx::Backend::Type::Vulkan
+     static constexpr auto prelude = locationIndicatorShaderPrelude;
+     static constexpr auto vertex = R"(
+ layout(location = 0) in vec2 in_position;
++layout(location = 0) out vec2 frag_local;
+ 
+ layout(set = DRAWABLE_UBO_SET_INDEX, binding = idLocationIndicatorDrawableUBO) uniform LocationIndicatorDrawableUBO {
+     mat4 matrix;
+     vec4 color;
++    vec4 sector;
+ } drawable;
+ 
+ void main() {
++    frag_local = in_position;
+     gl_Position = drawable.matrix * vec4(in_position, 0, 1);
+     applySurfaceTransform();
+ }
+@@ -33,14 +36,25 @@ void main() {
+ 
+     static constexpr auto fragment = R"(
+ layout(location = 0) out vec4 out_color;
++layout(location = 0) in vec2 frag_local;
+ 
+ layout(set = DRAWABLE_UBO_SET_INDEX, binding = idLocationIndicatorDrawableUBO) uniform LocationIndicatorDrawableUBO {
+     mat4 matrix;
+     vec4 color;
++    vec4 sector;
+ } drawable;
+ 
+ void main() {
+-    out_color = drawable.color;
++    float opacity = 1.0;
++    if (drawable.sector.y > 0.0) {
++        float radius = length(frag_local);
++        float angle = atan(max(abs(frag_local.x), 0.000001), -frag_local.y);
++        float feather = length(fwidth(frag_local)) / max(radius, 0.0001);
++        float angular = drawable.sector.x >= 3.14159265 ? 1.0 :
++            1.0 - smoothstep(drawable.sector.x - feather, drawable.sector.x + feather, angle);
++        opacity = angular * (1.0 - smoothstep(0.0, 1.0, radius));
++    }
++    out_color = drawable.color * opacity;
+ }
+ )";
+ };
+@@ -61,6 +75,7 @@ layout(location = 1) in vec2 in_texcoord;
+ layout(set = DRAWABLE_UBO_SET_INDEX, binding = idLocationIndicatorDrawableUBO) uniform LocationIndicatorDrawableUBO {
+     mat4 matrix;
+     vec4 color;
++    vec4 sector;
+ } drawable;
+ 
+ layout(location = 0) out vec2 frag_uv;
+diff --git a/include/mln/shaders/webgpu/location_indicator.hpp b/include/mln/shaders/webgpu/location_indicator.hpp
+index 2cc9d4617a74c71f650f8ab6b4388b67084e3db2..3718f7fba92c3a3a32e36137048828491501a314 100644
+--- a/include/mln/shaders/webgpu/location_indicator.hpp
++++ b/include/mln/shaders/webgpu/location_indicator.hpp
+@@ -21,11 +21,13 @@ struct VertexInput {
+ 
+ struct VertexOutput {
+     @builtin(position) position: vec4<f32>,
++    @location(0) local: vec2<f32>,
+ };
+ 
+ struct LocationIndicatorUBO {
+     matrix: mat4x4<f32>,
+     color: vec4<f32>,
++    sector: vec4<f32>,
+ };
+ 
+ @group(0) @binding(4) var<uniform> ubo: LocationIndicatorUBO;
+@@ -34,6 +36,7 @@ struct LocationIndicatorUBO {
+ fn main(in: VertexInput) -> VertexOutput {
+     var out: VertexOutput;
+     out.position = ubo.matrix * vec4<f32>(in.position, 0.0, 1.0);
++    out.local = in.position;
+     return out;
+ }
+ )";
+@@ -42,13 +45,24 @@ fn main(in: VertexInput) -> VertexOutput {
+ struct LocationIndicatorUBO {
+     matrix: mat4x4<f32>,
+     color: vec4<f32>,
++    sector: vec4<f32>,
+ };
+ 
+ @group(0) @binding(4) var<uniform> ubo: LocationIndicatorUBO;
+ 
+ @fragment
+-fn main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
+-    return ubo.color;
++fn main(@location(0) local: vec2<f32>) -> @location(0) vec4<f32> {
++    var opacity = 1.0;
++    if (ubo.sector.y > 0.0) {
++        let radius = length(local);
++        let angle = atan2(max(abs(local.x), 0.000001), -local.y);
++        let feather = length(fwidth(local)) / max(radius, 0.0001);
++        let angular = select(
++            1.0 - smoothstep(ubo.sector.x - feather, ubo.sector.x + feather, angle),
++            1.0, ubo.sector.x >= 3.14159265);
++        opacity = angular * (1.0 - smoothstep(0.0, 1.0, radius));
++    }
++    return ubo.color * opacity;
+ }
+ )";
+ };
+@@ -74,6 +88,7 @@ struct VertexOutput {
+ struct LocationIndicatorUBO {
+     matrix: mat4x4<f32>,
+     color: vec4<f32>,
++    sector: vec4<f32>,
+ };
+ 
+ @group(0) @binding(4) var<uniform> ubo: LocationIndicatorUBO;
+@@ -91,6 +106,7 @@ fn main(in: VertexInput) -> VertexOutput {
+ struct LocationIndicatorUBO {
+     matrix: mat4x4<f32>,
+     color: vec4<f32>,
++    sector: vec4<f32>,
+ };
+ 
+ @group(0) @binding(4) var<uniform> ubo: LocationIndicatorUBO;
+diff --git a/include/mln/style/layers/location_indicator_layer.hpp b/include/mln/style/layers/location_indicator_layer.hpp
+index 37aa6757fc3e80f3e39d33f3aca907aa30291f2d..f0c29755b840ad0dfa264657ba481ff06dbd026d 100644
+--- a/include/mln/style/layers/location_indicator_layer.hpp
++++ b/include/mln/style/layers/location_indicator_layer.hpp
+@@ -60,6 +60,24 @@ public:
+     void setBearingTransition(const TransitionOptions&);
+     TransitionOptions getBearingTransition() const;
+ 
++    static PropertyValue<float> getDefaultBearingAccuracy();
++    const PropertyValue<float>& getBearingAccuracy() const;
++    void setBearingAccuracy(const PropertyValue<float>&);
++    void setBearingAccuracyTransition(const TransitionOptions&);
++    TransitionOptions getBearingAccuracyTransition() const;
++
++    static PropertyValue<Color> getDefaultBearingAccuracyColor();
++    const PropertyValue<Color>& getBearingAccuracyColor() const;
++    void setBearingAccuracyColor(const PropertyValue<Color>&);
++    void setBearingAccuracyColorTransition(const TransitionOptions&);
++    TransitionOptions getBearingAccuracyColorTransition() const;
++
++    static PropertyValue<float> getDefaultBearingAccuracyRadius();
++    const PropertyValue<float>& getBearingAccuracyRadius() const;
++    void setBearingAccuracyRadius(const PropertyValue<float>&);
++    void setBearingAccuracyRadiusTransition(const TransitionOptions&);
++    TransitionOptions getBearingAccuracyRadiusTransition() const;
++
+     static PropertyValue<float> getDefaultBearingImageSize();
+     const PropertyValue<float>& getBearingImageSize() const;
+     void setBearingImageSize(const PropertyValue<float>&);
+diff --git a/metrics/tests/location_indicator/bearing_accuracy/expected.png b/metrics/tests/location_indicator/bearing_accuracy/expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..a1dcba468dcee0410d617dff43ecae3eaa2a7512
+GIT binary patch
+literal 5349
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/metrics/tests/location_indicator/bearing_accuracy/style.json b/metrics/tests/location_indicator/bearing_accuracy/style.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..7bd2bb99845259d60b84a4460b443f5d63ebc564
+--- /dev/null
++++ b/metrics/tests/location_indicator/bearing_accuracy/style.json
+@@ -0,0 +1,44 @@
++{
++  "version": 8,
++  "metadata": {
++    "test": {
++      "width": 512,
++      "height": 256,
++      "ignoreProbing": true
++    }
++  },
++  "center": [
++    0,
++    0
++  ],
++  "zoom": 16,
++  "sources": {},
++  "layers": [
++    {
++      "id": "background",
++      "type": "background",
++      "paint": {
++        "background-color": "white"
++      }
++    },
++    {
++      "id": "indicator",
++      "type": "location-indicator",
++      "paint": {
++        "location": [
++          0,
++          0,
++          0
++        ],
++        "bearing": 350,
++        "bearing-accuracy": 25,
++        "bearing-accuracy-radius": 85,
++        "bearing-accuracy-color": "rgba(0, 100, 255, 0.65)",
++        "perspective-compensation": 1,
++        "accuracy-radius": 65,
++        "accuracy-radius-color": "rgba(0, 100, 255, 0.12)",
++        "accuracy-radius-border-color": "rgba(0, 100, 255, 0.3)"
++      }
++    }
++  ]
++}
+diff --git a/metrics/tests/location_indicator/bearing_accuracy_limits/expected.png b/metrics/tests/location_indicator/bearing_accuracy_limits/expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..66241d7d8265f8a5d3e2b0034eca2150ebe2c3b8
+GIT binary patch
+literal 20045
+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
+P0#{`C7hx?SX`+7t<a{!u
+
+literal 0
+HcmV?d00001
+
+diff --git a/metrics/tests/location_indicator/bearing_accuracy_limits/style.json b/metrics/tests/location_indicator/bearing_accuracy_limits/style.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..36a894f6719bb059d0c7a802d0cf68e609a4be89
+--- /dev/null
++++ b/metrics/tests/location_indicator/bearing_accuracy_limits/style.json
+@@ -0,0 +1,105 @@
++{
++  "version": 8,
++  "metadata": {
++    "test": {
++      "width": 512,
++      "height": 256,
++      "ignoreProbing": true
++    }
++  },
++  "center": [
++    0,
++    0
++  ],
++  "zoom": 16,
++  "sources": {},
++  "layers": [
++    {
++      "id": "background",
++      "type": "background",
++      "paint": {
++        "background-color": "white"
++      }
++    },
++    {
++      "id": "full",
++      "type": "location-indicator",
++      "paint": {
++        "location": [
++          0,
++          -0.0014,
++          0
++        ],
++        "bearing": 350,
++        "bearing-accuracy": 180,
++        "bearing-accuracy-radius": 85,
++        "bearing-accuracy-color": "rgba(0, 100, 255, 0.65)",
++        "perspective-compensation": 1
++      }
++    },
++    {
++      "id": "wide",
++      "type": "location-indicator",
++      "paint": {
++        "location": [
++          0,
++          0.0014,
++          0
++        ],
++        "bearing": 90,
++        "bearing-accuracy": 120,
++        "bearing-accuracy-radius": 85,
++        "bearing-accuracy-color": "rgba(0, 100, 255, 0.65)",
++        "perspective-compensation": 1
++      }
++    },
++    {
++      "id": "zero-angle",
++      "type": "location-indicator",
++      "paint": {
++        "location": [
++          0,
++          0,
++          0
++        ],
++        "bearing": 350,
++        "bearing-accuracy": 0,
++        "bearing-accuracy-radius": 85,
++        "bearing-accuracy-color": "red",
++        "perspective-compensation": 1
++      }
++    },
++    {
++      "id": "zero-radius",
++      "type": "location-indicator",
++      "paint": {
++        "location": [
++          0,
++          0,
++          0
++        ],
++        "bearing": 350,
++        "bearing-accuracy": 25,
++        "bearing-accuracy-radius": 0,
++        "bearing-accuracy-color": "red",
++        "perspective-compensation": 1
++      }
++    },
++    {
++      "id": "transparent",
++      "type": "location-indicator",
++      "paint": {
++        "location": [
++          0,
++          0,
++          0
++        ],
++        "bearing": 350,
++        "bearing-accuracy": 25,
++        "bearing-accuracy-radius": 85,
++        "bearing-accuracy-color": "rgba(255,0,0,0)",
++        "perspective-compensation": 1
++      }
++    }
++  ]
++}
+diff --git a/metrics/tests/location_indicator/bearing_accuracy_pitched/expected.png b/metrics/tests/location_indicator/bearing_accuracy_pitched/expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..81f2c39369e705b2e4ca2a29ce9b91d567da2c53
+GIT binary patch
+literal 9984
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/metrics/tests/location_indicator/bearing_accuracy_pitched/style.json b/metrics/tests/location_indicator/bearing_accuracy_pitched/style.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..ccd2919b8a43a167afa12126a44ae58b5c56195a
+--- /dev/null
++++ b/metrics/tests/location_indicator/bearing_accuracy_pitched/style.json
+@@ -0,0 +1,86 @@
++{
++  "version": 8,
++  "metadata": {
++    "test": {
++      "width": 512,
++      "height": 256,
++      "ignoreProbing": true,
++      "operations": [
++        [
++          "addImage",
++          "puck",
++          "puck.png"
++        ],
++        [
++          "addImage",
++          "puck_hat",
++          "puck_hat.png"
++        ],
++        [
++          "wait"
++        ],
++        [
++          "setPaintProperty",
++          "indicator",
++          "bearing",
++          80
++        ],
++        [
++          "setPaintProperty",
++          "indicator",
++          "bearing-accuracy",
++          45
++        ],
++        [
++          "setPaintProperty",
++          "indicator",
++          "bearing-accuracy-radius",
++          100
++        ],
++        [
++          "wait"
++        ]
++      ],
++      "pixelRatio": 2
++    }
++  },
++  "center": [
++    0,
++    0
++  ],
++  "zoom": 16,
++  "sources": {},
++  "layers": [
++    {
++      "id": "background",
++      "type": "background",
++      "paint": {
++        "background-color": "white"
++      }
++    },
++    {
++      "id": "indicator",
++      "type": "location-indicator",
++      "paint": {
++        "location": [
++          0,
++          0,
++          0
++        ],
++        "bearing": 0,
++        "bearing-accuracy": 25,
++        "bearing-accuracy-radius": 35,
++        "bearing-accuracy-color": "rgba(0, 100, 255, 0.65)",
++        "perspective-compensation": 1,
++        "bearing-image-size": 0.26,
++        "top-image-size": 0.18
++      },
++      "layout": {
++        "bearing-image": "puck",
++        "top-image": "puck_hat"
++      }
++    }
++  ],
++  "pitch": 60,
++  "bearing": 40
++}
+diff --git a/scripts/style-spec.mjs b/scripts/style-spec.mjs
+index 7329ee97516089ec0e48b5d6215c0d6d00d78005..cb26a378be63d0444fa2eb7d81a01807dcf763f5 100644
+--- a/scripts/style-spec.mjs
++++ b/scripts/style-spec.mjs
+@@ -119,6 +119,44 @@ modifiedReferenceSpec["paint_location-indicator"] = {
+       "transition": true,
+       "doc": "The accuracy, in meters, of the position source used to retrieve the position of the location indicator."
+   },
++  "bearing-accuracy": {
++      "type": "number",
++      "units": "degrees",
++      "default": 0,
++      "minimum": 0,
++      "maximum": 180,
++      "property-type": "data-constant",
++      "expression": {
++          "interpolated": true,
++          "parameters": ["zoom"]
++      },
++      "transition": true,
++      "doc": "The angular half-width of the bearing accuracy sector, centered on bearing. A value of 15 produces a 30 degree sector; 180 produces a full circle. A value of 0 hides the sector."
++  },
++  "bearing-accuracy-radius": {
++      "type": "number",
++      "units": "pixels",
++      "default": 0,
++      "minimum": 0,
++      "property-type": "data-constant",
++      "expression": {
++          "interpolated": true,
++          "parameters": ["zoom"]
++      },
++      "transition": true,
++      "doc": "The visual radius of the bearing accuracy sector, in logical pixels before perspective compensation. The sector follows the location indicator's bearing and perspective-compensation. It is independent of accuracy-radius. A value of 0 hides the sector."
++  },
++  "bearing-accuracy-color": {
++      "type": "color",
++      "default": "#ffffff",
++      "property-type": "data-constant",
++      "expression": {
++          "interpolated": true,
++          "parameters": ["zoom"]
++      },
++      "transition": true,
++      "doc": "The color of the bearing accuracy sector. The alpha component controls opacity at the center, fading smoothly to transparent at the outer edge."
++  },
+   "top-image-size": {
+       "type": "number",
+       "units": "factor of the original icon size",
+diff --git a/shaders/location_indicator.fragment.glsl b/shaders/location_indicator.fragment.glsl
+index 0956f100e3d1bfe7f2b671819cc7c2c3b681664e..ea53f25bfb852ab31c0431bc43a135fea99cd903 100644
+--- a/shaders/location_indicator.fragment.glsl
++++ b/shaders/location_indicator.fragment.glsl
+@@ -1,8 +1,20 @@
+ layout (std140) uniform LocationIndicatorDrawableUBO {
+     mat4 u_matrix;
+     vec4 u_color;
++    vec4 u_sector;
+ };
+ 
++in vec2 v_local;
++
+ void main() {
+-    fragColor = u_color;
++    float opacity = 1.0;
++    if (u_sector.y > 0.0) {
++        float radius = length(v_local);
++        float angle = atan(max(abs(v_local.x), 0.000001), -v_local.y);
++        float feather = length(fwidth(v_local)) / max(radius, 0.0001);
++        float angular = u_sector.x >= 3.14159265 ? 1.0 :
++            1.0 - smoothstep(u_sector.x - feather, u_sector.x + feather, angle);
++        opacity = angular * (1.0 - smoothstep(0.0, 1.0, radius));
++    }
++    fragColor = u_color * opacity;
+ }
+diff --git a/shaders/location_indicator.vertex.glsl b/shaders/location_indicator.vertex.glsl
+index 045634b387deecf33af6fe9e5ecd92c1bb15ff3e..87ffcee8c62bfc78e750c9e95f5a142938c98287 100644
+--- a/shaders/location_indicator.vertex.glsl
++++ b/shaders/location_indicator.vertex.glsl
+@@ -1,10 +1,14 @@
+ layout (std140) uniform LocationIndicatorDrawableUBO {
+     mat4 u_matrix;
+     vec4 u_color;
++    vec4 u_sector;
+ };
+ 
+ layout(location = 0) in vec2 a_pos;
+ 
++out vec2 v_local;
++
+ void main() {
++    v_local = a_pos;
+     gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
+ }
+diff --git a/shaders/location_indicator_textured.fragment.glsl b/shaders/location_indicator_textured.fragment.glsl
+index 4ca7698a3609b9a44b97409fab0fe73ddea54214..f16dc7b3ca3d4d2b45ec79754286dc102502ec99 100644
+--- a/shaders/location_indicator_textured.fragment.glsl
++++ b/shaders/location_indicator_textured.fragment.glsl
+@@ -1,6 +1,7 @@
+ layout (std140) uniform LocationIndicatorDrawableUBO {
+     mat4 u_matrix;
+     vec4 u_color;
++    vec4 u_sector;
+ };
+ 
+ in vec2 frag_uv;
+diff --git a/shaders/location_indicator_textured.vertex.glsl b/shaders/location_indicator_textured.vertex.glsl
+index e577f419d63e09f7b877ffbf63f8210c0e032316..03dab0af41a6cdc1e9790d20b17d3e5d23aa483a 100644
+--- a/shaders/location_indicator_textured.vertex.glsl
++++ b/shaders/location_indicator_textured.vertex.glsl
+@@ -1,6 +1,7 @@
+ layout (std140) uniform LocationIndicatorDrawableUBO {
+     mat4 u_matrix;
+     vec4 u_color;
++    vec4 u_sector;
+ };
+ 
+ layout(location = 0) in vec2 a_pos;
+diff --git a/src/mln/renderer/layers/location_indicator_layer_tweaker.cpp b/src/mln/renderer/layers/location_indicator_layer_tweaker.cpp
+index a3d8f7c4e41100261f9dee70598bd6aa728c8b43..c3d40ca5b263d9a57e79a6e3a4db540d396ca042 100644
+--- a/src/mln/renderer/layers/location_indicator_layer_tweaker.cpp
++++ b/src/mln/renderer/layers/location_indicator_layer_tweaker.cpp
+@@ -5,6 +5,7 @@
+ #include <mln/renderer/layers/render_location_indicator_layer.hpp>
+ #include <mln/style/layers/location_indicator_layer_properties.hpp>
+ #include <mln/shaders/location_indicator_ubo.hpp>
++#include <mln/util/math.hpp>
+ 
+ namespace mln {
+ 
+@@ -40,6 +41,19 @@ void LocationIndicatorLayerTweaker::execute(LayerGroupBase& layerGroup, const Pa
+                 break;
+             }
+ 
++            case RenderLocationIndicatorLayer::LocationIndicatorComponentType::BearingAccuracy: {
++                const LocationIndicatorDrawableUBO drawableUBO = {
++                    .matrix = util::cast<float>(projectionSector),
++                    .color = props.evaluated.get<BearingAccuracyColor>(),
++                    .sector = {static_cast<float>(
++                                   util::deg2rad(util::clamp(props.evaluated.get<BearingAccuracy>(), 0.0f, 180.0f))),
++                               1.0f,
++                               0.0f,
++                               0.0f}};
++                drawableUniforms.createOrUpdate(idLocationIndicatorDrawableUBO, &drawableUBO, params.context);
++                break;
++            }
++
+             case RenderLocationIndicatorLayer::LocationIndicatorComponentType::PuckShadow:
+                 [[fallthrough]];
+             case RenderLocationIndicatorLayer::LocationIndicatorComponentType::Puck:
+diff --git a/src/mln/renderer/layers/location_indicator_layer_tweaker.hpp b/src/mln/renderer/layers/location_indicator_layer_tweaker.hpp
+index cbe442107d4b6c71a4f2c3eb97fd7841fbbec543..ae76ea0ec76b8d66941928afb7b8ccddada62c3d 100644
+--- a/src/mln/renderer/layers/location_indicator_layer_tweaker.hpp
++++ b/src/mln/renderer/layers/location_indicator_layer_tweaker.hpp
+@@ -15,10 +15,12 @@ public:
+     LocationIndicatorLayerTweaker(std::string id_,
+                                   Immutable<style::LayerProperties> properties,
+                                   const mln::mat4& projectionCircle_,
+-                                  const mln::mat4& projectionPuck_)
++                                  const mln::mat4& projectionPuck_,
++                                  const mln::mat4& projectionSector_)
+         : LayerTweaker(std::move(id_), properties),
+           projectionCircle(projectionCircle_),
+-          projectionPuck(projectionPuck_) {}
++          projectionPuck(projectionPuck_),
++          projectionSector(projectionSector_) {}
+ 
+ public:
+     ~LocationIndicatorLayerTweaker() override = default;
+@@ -28,6 +30,7 @@ public:
+ private:
+     const mln::mat4& projectionCircle;
+     const mln::mat4& projectionPuck;
++    const mln::mat4& projectionSector;
+ };
+ 
+ } // namespace mln
+diff --git a/src/mln/renderer/layers/render_location_indicator_layer.cpp b/src/mln/renderer/layers/render_location_indicator_layer.cpp
+index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b421aa7543 100644
+--- a/src/mln/renderer/layers/render_location_indicator_layer.cpp
++++ b/src/mln/renderer/layers/render_location_indicator_layer.cpp
+@@ -83,7 +83,10 @@ struct LocationIndicatorRenderParameters {
+     // some testing defaults, for before it gets updated via props
+     double puckBearing = 0.0;
+     LatLng puckPosition = {0, 0};
+-    double errorRadiusMeters;
++    double errorRadiusMeters = 0;
++    float bearingAccuracy = 0;
++    float bearingAccuracyRadius = 0;
++    mln::Color bearingAccuracyColor{0, 0, 0, 0};
+     mln::Color errorRadiusColor{0, 0, 0, 0};
+     mln::Color errorRadiusBorderColor{0, 0, 0, 0};
+     float puckScale = 0;
+@@ -189,19 +192,33 @@ precision highp float;
+ 
+ attribute vec2 a_pos;
+ uniform mat4 u_matrix;
++varying vec2 v_local;
+ void main() {
++    v_local = a_pos;
+     gl_Position = u_matrix * vec4(a_pos, 0, 1);
+ }
+ )MBGL_SHADER";
+ 
+         const GLchar* fragmentShaderSource = R"MBGL_SHADER(
+ #ifdef GL_ES
++#extension GL_OES_standard_derivatives : enable
+ precision highp float;
+ #endif
+ 
+ uniform vec4 u_color;
++uniform vec4 u_sector;
++varying vec2 v_local;
+ void main() {
+-    gl_FragColor = u_color;
++    float opacity = 1.0;
++    if (u_sector.y > 0.0) {
++        float radius = length(v_local);
++        float angle = atan(max(abs(v_local.x), 0.000001), -v_local.y);
++        float feather = length(fwidth(v_local)) / max(radius, 0.0001);
++        float angular = u_sector.x >= 3.14159265 ? 1.0 :
++            1.0 - smoothstep(u_sector.x - feather, u_sector.x + feather, angle);
++        opacity = angular * (1.0 - smoothstep(0.0, 1.0, radius));
++    }
++    gl_FragColor = u_color * opacity;
+ }
+ )MBGL_SHADER";
+ 
+@@ -209,6 +226,7 @@ void main() {
+ 
+         void pullLocations() override {
+             a_pos = MBGL_CHECK_ERROR(glGetAttribLocation(program, "a_pos"));
++            u_sector = MBGL_CHECK_ERROR(glGetUniformLocation(program, "u_sector"));
+             u_color = MBGL_CHECK_ERROR(glGetUniformLocation(program, "u_color"));
+             u_matrix = MBGL_CHECK_ERROR(glGetUniformLocation(program, "u_matrix"));
+         }
+@@ -218,6 +236,7 @@ void main() {
+         }
+ 
+         GLuint a_pos = 0;
++        GLuint u_sector = 0;
+         GLuint u_color = 0;
+         GLuint u_matrix = 0;
+     };
+@@ -412,6 +431,7 @@ public:
+     void render(const mln::LocationIndicatorRenderParameters& params) {
+         initialize();
+         drawRadius(params);
++        drawBearingAccuracy(params);
+         drawShadow();
+         drawPuck();
+         drawHat();
+@@ -489,6 +509,7 @@ public:
+         for (const auto& t : textures) t.second->release();
+         buffer.release();
+         circleBuffer.release();
++        sectorBuffer.release();
+         puckBuffer.release();
+         hatBuffer.release();
+         texCoordsBuffer.release();
+@@ -510,6 +531,7 @@ public:
+         } else if (params.puckBearing != oldParams.puckBearing ||
+                    params.puckLayersDisplacement != oldParams.puckLayersDisplacement ||
+                    params.perspectiveCompensation != oldParams.perspectiveCompensation ||
++                   params.bearingAccuracyRadius != oldParams.bearingAccuracyRadius ||
+                    params.puckScale != oldParams.puckScale || params.puckHatScale != oldParams.puckHatScale ||
+                    params.puckShadowScale != oldParams.puckShadowScale)
+             bearingChanged = true; // changes puck geometry but not necessarily the location
+@@ -711,7 +733,11 @@ protected:
+             (1.0f - params.perspectiveCompensation) +
+             util::clamp(pixelSizeToWorldSizeH(params.puckPosition, s), 0.8f, 10.1f) *
+                 params.perspectiveCompensation; // Compensation factor for the perspective deformation
+-        //     ^ clamping this to 0.8 to avoid growing the puck too much close to the camera.
++        // Clamp above avoids growing the puck too much close to the camera.
++        projectionSector = projectionCircle;
++        matrix::rotate_z(projectionSector, projectionSector, util::deg2rad(params.puckBearing));
++        const double sectorRadius = std::max(0.0f, params.bearingAccuracyRadius) * horizontalScaleFactor;
++        matrix::scale(projectionSector, projectionSector, sectorRadius, sectorRadius, 1.0);
+ 
+ #ifndef MLN_DRAWABLE_LOCATION_INDICATOR
+         const double shadowRadius = ((texShadow) ? texShadow->width / texShadow->pixelRatio : 0.0) *
+@@ -759,12 +785,33 @@ protected:
+     }
+ 
+ #ifndef MLN_DRAWABLE_LOCATION_INDICATOR
++    void drawBearingAccuracy(const mln::LocationIndicatorRenderParameters& params) {
++        if (!sectorVisible()) return;
++        simpleShader.bind();
++        mln::gl::bindUniform(simpleShader.u_color, params.bearingAccuracyColor);
++        mln::gl::bindUniform(simpleShader.u_matrix, projectionSector);
++        mln::gl::bindUniform(
++            simpleShader.u_sector,
++            std::array<float, 4>{static_cast<float>(util::deg2rad(util::clamp(params.bearingAccuracy, 0.0f, 180.0f))),
++                                 1.0f,
++                                 0.0f,
++                                 0.0f});
++        sectorBuffer.upload(sectorGeometry);
++        MBGL_CHECK_ERROR(glEnableVertexAttribArray(simpleShader.a_pos));
++        MBGL_CHECK_ERROR(glVertexAttribPointer(simpleShader.a_pos, 2, GL_FLOAT, GL_FALSE, 0, nullptr));
++        MBGL_CHECK_ERROR(glDrawArrays(GL_TRIANGLE_FAN, 0, GLsizei(sectorGeometry.size())));
++        MBGL_CHECK_ERROR(glDisableVertexAttribArray(simpleShader.a_pos));
++        sectorBuffer.detach();
++        simpleShader.detach();
++    }
++
+     void drawRadius(const mln::LocationIndicatorRenderParameters& params) {
+         if (!(params.errorRadiusMeters > 0.0) ||
+             (params.errorRadiusColor.a == 0.0 && params.errorRadiusBorderColor.a == 0.0))
+             return;
+ 
+         simpleShader.bind();
++        mln::gl::bindUniform(simpleShader.u_sector, std::array<float, 4>{});
+         mln::gl::bindUniform(simpleShader.u_color, params.errorRadiusColor);
+         mln::gl::bindUniform(simpleShader.u_matrix, projectionCircle);
+ 
+@@ -853,6 +900,7 @@ protected:
+     TexturedShader texturedShader;
+     Buffer buffer;
+     Buffer circleBuffer;
++    Buffer sectorBuffer;
+     Buffer shadowBuffer;
+     Buffer puckBuffer;
+     Buffer hatBuffer;
+@@ -873,7 +921,18 @@ protected:
+     mln::mat4 translation{};
+     mln::mat4 projectionCircle{};
+     mln::mat4 projectionPuck{};
++    mln::mat4 projectionSector{};
+ 
++public:
++    // Unit quad: the sector matrix supplies its radius and geographic bearing.
++    const std::array<vec2, 4> sectorGeometry{{{-1, 1}, {-1, -1}, {1, -1}, {1, 1}}};
++
++    bool sectorVisible() const {
++        return parameters.bearingAccuracy > 0 && parameters.bearingAccuracyRadius > 0 &&
++               parameters.bearingAccuracyColor.a > 0;
++    }
++
++private:
+     bool positionChanged = false;
+     bool radiusChanged = false;
+     bool bearingChanged = false;
+@@ -905,11 +964,13 @@ public:
+         void reset() { textureInfo.reset(); }
+     };
+ 
++    std::optional<std::reference_wrapper<gfx::Drawable>> sectorDrawable;
+     CircleDrawableInfo circleDrawableInfo;
+     QuadDrawableInfo shadowDrawableInfo;
+     QuadDrawableInfo puckDrawableInfo;
+     QuadDrawableInfo hatDrawableInfo;
+ 
++    const auto& getProjectionSector() const { return projectionSector; }
+     const auto& getProjectionCircle() const { return projectionCircle; }
+     const auto& getProjectionPuck() const { return projectionPuck; }
+ 
+@@ -962,6 +1023,9 @@ void RenderLocationIndicatorLayer::evaluate(const PropertyEvaluationParameters&
+     renderImpl->parameters.errorRadiusColor = evaluated.get<style::AccuracyRadiusColor>();
+     renderImpl->parameters.errorRadiusBorderColor = evaluated.get<style::AccuracyRadiusBorderColor>();
+     renderImpl->parameters.errorRadiusMeters = evaluated.get<style::AccuracyRadius>();
++    renderImpl->parameters.bearingAccuracy = evaluated.get<style::BearingAccuracy>();
++    renderImpl->parameters.bearingAccuracyRadius = evaluated.get<style::BearingAccuracyRadius>();
++    renderImpl->parameters.bearingAccuracyColor = evaluated.get<style::BearingAccuracyColor>();
+     renderImpl->parameters.puckScale = evaluated.get<style::BearingImageSize>();
+     renderImpl->parameters.puckHatScale = evaluated.get<style::TopImageSize>();
+     renderImpl->parameters.puckShadowScale = evaluated.get<style::ShadowImageSize>();
+@@ -1088,8 +1152,11 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
+     }
+ 
+     if (!layerTweaker) {
+-        layerTweaker = std::make_shared<LocationIndicatorLayerTweaker>(
+-            getID(), evaluatedProperties, renderImpl->getProjectionCircle(), renderImpl->getProjectionPuck());
++        layerTweaker = std::make_shared<LocationIndicatorLayerTweaker>(getID(),
++                                                                       evaluatedProperties,
++                                                                       renderImpl->getProjectionCircle(),
++                                                                       renderImpl->getProjectionPuck(),
++                                                                       renderImpl->getProjectionSector());
+         layerGroup->addLayerTweaker(layerTweaker);
+     }
+ 
+@@ -1099,14 +1166,15 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
+         // create empty drawable using a builder
+         const gfx::UniqueDrawableBuilder& builder = context.createDrawableBuilder(getID());
+ 
+-        const auto createQuadGeometry = [&](gfx::Drawable& drawable, const auto& geometry) {
++        const auto createQuadGeometry = [&](gfx::Drawable& drawable, const auto& geometry, bool textured = true) {
+             auto vertexAttrs = context.createVertexAttributeArray();
+ 
+             drawable.setVertices({}, 4, gfx::AttributeDataType::Float2);
+             vertexAttrs->set(shaders::idLocationIndicatorPosVertexAttribute, 0, gfx::AttributeDataType::Float2, 4);
+ 
+-            if (const auto& attr = vertexAttrs->set(
+-                    shaders::idLocationIndicatorTexVertexAttribute, 0, gfx::AttributeDataType::Float2, 4)) {
++            if (textured) {
++                const auto& attr = vertexAttrs->set(
++                    shaders::idLocationIndicatorTexVertexAttribute, 0, gfx::AttributeDataType::Float2, 4);
+                 const std::array<RenderLocationIndicatorImpl::vec2, 4> texCoords = {
+                     {{0.0f, 1.0f}, {0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}}};
+ 
+@@ -1224,6 +1292,19 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
+         };
+ 
+         createCircleDrawable();
++        {
++            auto vertexAttrs = context.createVertexAttributeArray();
++            auto& drawable = getCircleDrawable("locationBearingAccuracy", vertexAttrs);
++            drawable->setType(static_cast<uint8_t>(LocationIndicatorComponentType::BearingAccuracy));
++            // Reuse quad indices, but the sector shader only needs position.
++            createQuadGeometry(*drawable, renderImpl->sectorGeometry, false);
++            const auto& attr = drawable->getVertexAttributes()->get(shaders::idLocationIndicatorPosVertexAttribute);
++            const auto* begin = reinterpret_cast<const uint8_t*>(renderImpl->sectorGeometry.data());
++            attr->setRawData(std::vector<uint8_t>(begin, begin + sizeof(renderImpl->sectorGeometry)));
++            renderImpl->sectorDrawable.emplace(*drawable);
++            localLayerGroup->addDrawable(std::move(drawable));
++            ++stats.drawablesAdded;
++        }
+         createQuadDrawable(
+             renderImpl->shadowDrawableInfo, "locationShadow", LocationIndicatorComponentType::PuckShadow);
+         createQuadDrawable(renderImpl->puckDrawableInfo, "locationPuck", LocationIndicatorComponentType::Puck);
+@@ -1304,6 +1385,7 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
+         drawable.setEnabled(static_cast<bool>(info.textureInfo.texture));
+     };
+ 
++    renderImpl->sectorDrawable->get().setEnabled(renderImpl->sectorVisible());
+     updateCircleDrawable();
+     updateQuadDrawable(renderImpl->shadowDrawableInfo);
+     updateQuadDrawable(renderImpl->puckDrawableInfo);
+diff --git a/src/mln/renderer/layers/render_location_indicator_layer.hpp b/src/mln/renderer/layers/render_location_indicator_layer.hpp
+index 597328116ebe94846e73059bbec03a12a05523ab..6be640769a6c82ba2a24a7c89b5a9c9090c9788d 100644
+--- a/src/mln/renderer/layers/render_location_indicator_layer.hpp
++++ b/src/mln/renderer/layers/render_location_indicator_layer.hpp
+@@ -16,6 +16,7 @@ public:
+     enum class LocationIndicatorComponentType : uint8_t {
+         Circle,
+         CircleOutline,
++        BearingAccuracy,
+         PuckShadow,
+         Puck,
+         PuckHat,
+diff --git a/src/mln/style/layers/location_indicator_layer.cpp b/src/mln/style/layers/location_indicator_layer.cpp
+index dbba80557c7274c57fa239c048dac988203cda8c..06d020050a1839f8a48944d5d70b112f27a447e5 100644
+--- a/src/mln/style/layers/location_indicator_layer.cpp
++++ b/src/mln/style/layers/location_indicator_layer.cpp
+@@ -220,6 +220,87 @@ TransitionOptions LocationIndicatorLayer::getBearingTransition() const {
+     return impl().paint.template get<Bearing>().options;
+ }
+ 
++PropertyValue<float> LocationIndicatorLayer::getDefaultBearingAccuracy() {
++    return {0.f};
++}
++
++const PropertyValue<float>& LocationIndicatorLayer::getBearingAccuracy() const {
++    return impl().paint.template get<BearingAccuracy>().value;
++}
++
++void LocationIndicatorLayer::setBearingAccuracy(const PropertyValue<float>& value) {
++    if (value == getBearingAccuracy())
++        return;
++    auto impl_ = mutableImpl();
++    impl_->paint.template get<BearingAccuracy>().value = value;
++    baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
++}
++
++void LocationIndicatorLayer::setBearingAccuracyTransition(const TransitionOptions& options) {
++    auto impl_ = mutableImpl();
++    impl_->paint.template get<BearingAccuracy>().options = options;
++    baseImpl = std::move(impl_);
++}
++
++TransitionOptions LocationIndicatorLayer::getBearingAccuracyTransition() const {
++    return impl().paint.template get<BearingAccuracy>().options;
++}
++
++PropertyValue<Color> LocationIndicatorLayer::getDefaultBearingAccuracyColor() {
++    return {Color::white()};
++}
++
++const PropertyValue<Color>& LocationIndicatorLayer::getBearingAccuracyColor() const {
++    return impl().paint.template get<BearingAccuracyColor>().value;
++}
++
++void LocationIndicatorLayer::setBearingAccuracyColor(const PropertyValue<Color>& value) {
++    if (value == getBearingAccuracyColor())
++        return;
++    auto impl_ = mutableImpl();
++    impl_->paint.template get<BearingAccuracyColor>().value = value;
++    baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
++}
++
++void LocationIndicatorLayer::setBearingAccuracyColorTransition(const TransitionOptions& options) {
++    auto impl_ = mutableImpl();
++    impl_->paint.template get<BearingAccuracyColor>().options = options;
++    baseImpl = std::move(impl_);
++}
++
++TransitionOptions LocationIndicatorLayer::getBearingAccuracyColorTransition() const {
++    return impl().paint.template get<BearingAccuracyColor>().options;
++}
++
++PropertyValue<float> LocationIndicatorLayer::getDefaultBearingAccuracyRadius() {
++    return {0.f};
++}
++
++const PropertyValue<float>& LocationIndicatorLayer::getBearingAccuracyRadius() const {
++    return impl().paint.template get<BearingAccuracyRadius>().value;
++}
++
++void LocationIndicatorLayer::setBearingAccuracyRadius(const PropertyValue<float>& value) {
++    if (value == getBearingAccuracyRadius())
++        return;
++    auto impl_ = mutableImpl();
++    impl_->paint.template get<BearingAccuracyRadius>().value = value;
++    baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
++}
++
++void LocationIndicatorLayer::setBearingAccuracyRadiusTransition(const TransitionOptions& options) {
++    auto impl_ = mutableImpl();
++    impl_->paint.template get<BearingAccuracyRadius>().options = options;
++    baseImpl = std::move(impl_);
++}
++
++TransitionOptions LocationIndicatorLayer::getBearingAccuracyRadiusTransition() const {
++    return impl().paint.template get<BearingAccuracyRadius>().options;
++}
++
+ PropertyValue<float> LocationIndicatorLayer::getDefaultBearingImageSize() {
+     return {1.f};
+ }
+@@ -386,13 +467,16 @@ using namespace conversion;
+ 
+ namespace {
+ 
+-constexpr uint8_t kPaintPropertyCount = 20u;
++constexpr uint8_t kPaintPropertyCount = 26u;
+ 
+ enum class Property : uint8_t {
+     AccuracyRadius,
+     AccuracyRadiusBorderColor,
+     AccuracyRadiusColor,
+     Bearing,
++    BearingAccuracy,
++    BearingAccuracyColor,
++    BearingAccuracyRadius,
+     BearingImageSize,
+     ImageTiltDisplacement,
+     Location,
+@@ -403,6 +487,9 @@ enum class Property : uint8_t {
+     AccuracyRadiusBorderColorTransition,
+     AccuracyRadiusColorTransition,
+     BearingTransition,
++    BearingAccuracyTransition,
++    BearingAccuracyColorTransition,
++    BearingAccuracyRadiusTransition,
+     BearingImageSizeTransition,
+     ImageTiltDisplacementTransition,
+     LocationTransition,
+@@ -424,6 +511,9 @@ constexpr const auto layerProperties = mapbox::eternal::hash_map<mapbox::eternal
+      {"accuracy-radius-border-color", toUint8(Property::AccuracyRadiusBorderColor)},
+      {"accuracy-radius-color", toUint8(Property::AccuracyRadiusColor)},
+      {"bearing", toUint8(Property::Bearing)},
++     {"bearing-accuracy", toUint8(Property::BearingAccuracy)},
++     {"bearing-accuracy-color", toUint8(Property::BearingAccuracyColor)},
++     {"bearing-accuracy-radius", toUint8(Property::BearingAccuracyRadius)},
+      {"bearing-image-size", toUint8(Property::BearingImageSize)},
+      {"image-tilt-displacement", toUint8(Property::ImageTiltDisplacement)},
+      {"location", toUint8(Property::Location)},
+@@ -434,6 +524,9 @@ constexpr const auto layerProperties = mapbox::eternal::hash_map<mapbox::eternal
+      {"accuracy-radius-border-color-transition", toUint8(Property::AccuracyRadiusBorderColorTransition)},
+      {"accuracy-radius-color-transition", toUint8(Property::AccuracyRadiusColorTransition)},
+      {"bearing-transition", toUint8(Property::BearingTransition)},
++     {"bearing-accuracy-transition", toUint8(Property::BearingAccuracyTransition)},
++     {"bearing-accuracy-color-transition", toUint8(Property::BearingAccuracyColorTransition)},
++     {"bearing-accuracy-radius-transition", toUint8(Property::BearingAccuracyRadiusTransition)},
+      {"bearing-image-size-transition", toUint8(Property::BearingImageSizeTransition)},
+      {"image-tilt-displacement-transition", toUint8(Property::ImageTiltDisplacementTransition)},
+      {"location-transition", toUint8(Property::LocationTransition)},
+@@ -454,6 +547,12 @@ StyleProperty getLayerProperty(const LocationIndicatorLayer& layer, Property pro
+             return makeStyleProperty(layer.getAccuracyRadiusColor());
+         case Property::Bearing:
+             return makeStyleProperty(layer.getBearing());
++        case Property::BearingAccuracy:
++            return makeStyleProperty(layer.getBearingAccuracy());
++        case Property::BearingAccuracyColor:
++            return makeStyleProperty(layer.getBearingAccuracyColor());
++        case Property::BearingAccuracyRadius:
++            return makeStyleProperty(layer.getBearingAccuracyRadius());
+         case Property::BearingImageSize:
+             return makeStyleProperty(layer.getBearingImageSize());
+         case Property::ImageTiltDisplacement:
+@@ -474,6 +573,12 @@ StyleProperty getLayerProperty(const LocationIndicatorLayer& layer, Property pro
+             return makeStyleProperty(layer.getAccuracyRadiusColorTransition());
+         case Property::BearingTransition:
+             return makeStyleProperty(layer.getBearingTransition());
++        case Property::BearingAccuracyTransition:
++            return makeStyleProperty(layer.getBearingAccuracyTransition());
++        case Property::BearingAccuracyColorTransition:
++            return makeStyleProperty(layer.getBearingAccuracyColorTransition());
++        case Property::BearingAccuracyRadiusTransition:
++            return makeStyleProperty(layer.getBearingAccuracyRadiusTransition());
+         case Property::BearingImageSizeTransition:
+             return makeStyleProperty(layer.getBearingImageSizeTransition());
+         case Property::ImageTiltDisplacementTransition:
+@@ -523,7 +628,8 @@ std::optional<Error> LocationIndicatorLayer::setPropertyInternal(const std::stri
+ 
+     auto property = static_cast<Property>(it->second);
+ 
+-    if (property == Property::AccuracyRadius || property == Property::BearingImageSize ||
++    if (property == Property::AccuracyRadius || property == Property::BearingAccuracy ||
++        property == Property::BearingAccuracyRadius || property == Property::BearingImageSize ||
+         property == Property::ImageTiltDisplacement || property == Property::PerspectiveCompensation ||
+         property == Property::ShadowImageSize || property == Property::TopImageSize) {
+         Error error;
+@@ -537,6 +643,16 @@ std::optional<Error> LocationIndicatorLayer::setPropertyInternal(const std::stri
+             return std::nullopt;
+         }
+ 
++        if (property == Property::BearingAccuracy) {
++            setBearingAccuracy(*typedValue);
++            return std::nullopt;
++        }
++
++        if (property == Property::BearingAccuracyRadius) {
++            setBearingAccuracyRadius(*typedValue);
++            return std::nullopt;
++        }
++
+         if (property == Property::BearingImageSize) {
+             setBearingImageSize(*typedValue);
+             return std::nullopt;
+@@ -562,7 +678,8 @@ std::optional<Error> LocationIndicatorLayer::setPropertyInternal(const std::stri
+             return std::nullopt;
+         }
+     }
+-    if (property == Property::AccuracyRadiusBorderColor || property == Property::AccuracyRadiusColor) {
++    if (property == Property::AccuracyRadiusBorderColor || property == Property::AccuracyRadiusColor ||
++        property == Property::BearingAccuracyColor) {
+         Error error;
+         const auto& typedValue = convert<PropertyValue<Color>>(value, error, false, false);
+         if (!typedValue) {
+@@ -578,6 +695,11 @@ std::optional<Error> LocationIndicatorLayer::setPropertyInternal(const std::stri
+             setAccuracyRadiusColor(*typedValue);
+             return std::nullopt;
+         }
++
++        if (property == Property::BearingAccuracyColor) {
++            setBearingAccuracyColor(*typedValue);
++            return std::nullopt;
++        }
+     }
+     if (property == Property::Bearing) {
+         Error error;
+@@ -648,6 +770,21 @@ std::optional<Error> LocationIndicatorLayer::setPropertyInternal(const std::stri
+         return std::nullopt;
+     }
+ 
++    if (property == Property::BearingAccuracyTransition) {
++        setBearingAccuracyTransition(*transition);
++        return std::nullopt;
++    }
++
++    if (property == Property::BearingAccuracyColorTransition) {
++        setBearingAccuracyColorTransition(*transition);
++        return std::nullopt;
++    }
++
++    if (property == Property::BearingAccuracyRadiusTransition) {
++        setBearingAccuracyRadiusTransition(*transition);
++        return std::nullopt;
++    }
++
+     if (property == Property::BearingImageSizeTransition) {
+         setBearingImageSizeTransition(*transition);
+         return std::nullopt;
+diff --git a/src/mln/style/layers/location_indicator_layer_properties.hpp b/src/mln/style/layers/location_indicator_layer_properties.hpp
+index 6796683e96372567b44206e13582fed673385836..fd0eb1a8ba972efdcf786877793f115d529f74cf 100644
+--- a/src/mln/style/layers/location_indicator_layer_properties.hpp
++++ b/src/mln/style/layers/location_indicator_layer_properties.hpp
+@@ -47,6 +47,18 @@ struct Bearing : PaintProperty<Rotation> {
+     static Rotation defaultValue() { return 0.f; }
+ };
+ 
++struct BearingAccuracy : PaintProperty<float> {
++    static float defaultValue() { return 0.f; }
++};
++
++struct BearingAccuracyColor : PaintProperty<Color> {
++    static Color defaultValue() { return Color::white(); }
++};
++
++struct BearingAccuracyRadius : PaintProperty<float> {
++    static float defaultValue() { return 0.f; }
++};
++
+ struct BearingImageSize : PaintProperty<float> {
+     static float defaultValue() { return 1.f; }
+ };
+@@ -82,6 +94,9 @@ class LocationIndicatorPaintProperties : public Properties<
+     AccuracyRadiusBorderColor,
+     AccuracyRadiusColor,
+     Bearing,
++    BearingAccuracy,
++    BearingAccuracyColor,
++    BearingAccuracyRadius,
+     BearingImageSize,
+     ImageTiltDisplacement,
+     Location,
+diff --git a/test/style/conversion/layer.test.cpp b/test/style/conversion/layer.test.cpp
+index 63428fc5b9b0e3cd04ee50122d23fae88b599d78..50f3b7eb663968b5ba4b7fe7d5054560796e4bcc 100644
+--- a/test/style/conversion/layer.test.cpp
++++ b/test/style/conversion/layer.test.cpp
+@@ -4,6 +4,7 @@
+ #include <mln/style/conversion/json.hpp>
+ #include <mln/style/conversion/layer.hpp>
+ #include <mln/style/layers/background_layer_impl.hpp>
++#include <mln/style/layers/location_indicator_layer.hpp>
+ 
+ #include <rapidjson/prettywriter.h>
+ 
+@@ -163,3 +164,37 @@ TEST(StyleConversion, SetGenericProperties) {
+     layer->setProperty("maxzoom", Convertible(&newMaxZoom));
+     EXPECT_EQ(22.0f, layer->getMaxZoom());
+ }
++
++TEST(StyleConversion, LocationIndicatorBearingAccuracy) {
++    EXPECT_EQ(0.0f, LocationIndicatorLayer::getDefaultBearingAccuracy().asConstant());
++    EXPECT_EQ(0.0f, LocationIndicatorLayer::getDefaultBearingAccuracyRadius().asConstant());
++    EXPECT_EQ(LocationIndicatorLayer::getDefaultAccuracyRadiusColor(),
++              LocationIndicatorLayer::getDefaultBearingAccuracyColor());
++
++    auto layer = parseLayer(R"JSON({
++        "type": "location-indicator",
++        "id": "location",
++        "paint": {
++            "bearing": 350,
++            "bearing-accuracy": 15,
++            "bearing-accuracy-radius": ["interpolate", ["linear"], ["zoom"], 0, 32, 20, 64],
++            "bearing-accuracy-color": "rgba(0, 128, 255, 0.5)",
++            "bearing-accuracy-transition": {"duration": 200},
++            "bearing-accuracy-radius-transition": {"duration": 300},
++            "bearing-accuracy-color-transition": {"duration": 400}
++        }
++    })JSON");
++    ASSERT_TRUE(layer);
++    const auto& indicator = *static_cast<LocationIndicatorLayer*>(layer.get());
++    EXPECT_EQ(15.0f, indicator.getBearingAccuracy().asConstant());
++    EXPECT_TRUE(indicator.getBearingAccuracyRadius().isExpression());
++    EXPECT_EQ(0.5f, indicator.getBearingAccuracyColor().asConstant().a);
++    EXPECT_EQ(200ms, indicator.getBearingAccuracyTransition().duration);
++    EXPECT_EQ(300ms, indicator.getBearingAccuracyRadiusTransition().duration);
++    EXPECT_EQ(400ms, indicator.getBearingAccuracyColorTransition().duration);
++
++    const auto serialized = stringifyLayer(layer->serialize());
++    auto roundTrip = parseLayer(serialized);
++    ASSERT_TRUE(roundTrip);
++    EXPECT_EQ(serialized, stringifyLayer(roundTrip->serialize()));
++}
