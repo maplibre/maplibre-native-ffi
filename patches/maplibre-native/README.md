@@ -118,11 +118,12 @@ at commit `8691b96715179b5e7eb37b05317fec3dac8c3a57`.
 
 `0017-location-indicator-top-image-hit-testing.patch` includes the location
 indicator's top image in rendered-feature queries. Each top and bearing image
-has independent bounds, and a hit returns the feature once. The patch includes
-the upstream regression for a top-only indicator and checks that shadow and
-accuracy-circle coverage outside the image stays excluded. Upstream:
+has independent bounds, and a hit returns the feature once with
+longitude-latitude geometry. The patch includes the upstream regression for a
+top-only indicator and checks that shadow and accuracy-circle coverage outside
+the image stays excluded. Upstream:
 [maplibre-native#4640](https://github.com/maplibre/maplibre-native/pull/4640),
-at commit `40febf9c986ccc90a1c4615a12a76868135e03fa`.
+at commit `eceb218a7fd7913991f2ae37a8fa6cd6290c7d65`.
 
 `0018-location-indicator-missing-images.patch` disables each location-indicator
 image drawable while it has no texture. The upstream regression checks that an

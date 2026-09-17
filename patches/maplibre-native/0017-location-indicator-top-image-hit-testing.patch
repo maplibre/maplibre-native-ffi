@@ -1,5 +1,20 @@
+diff --git a/metrics/tests/location_indicator/query_test/expected.json b/metrics/tests/location_indicator/query_test/expected.json
+index 4f7dee5c009a..13dcc7a562d4 100644
+--- a/metrics/tests/location_indicator/query_test/expected.json
++++ b/metrics/tests/location_indicator/query_test/expected.json
+@@ -4,8 +4,8 @@
+     "geometry": {
+       "type": "Point",
+       "coordinates": [
+-        35.693055,
+-        139.766707
++        139.766707,
++        35.693055
+       ]
+     },
+     "properties": {},
 diff --git a/metrics/tests/location_indicator/query_test_no_image/expected.json b/metrics/tests/location_indicator/query_test_no_image/expected.json
-index fe51488c7066..4f7dee5c009a 100644
+index fe51488c7066..13dcc7a562d4 100644
 --- a/metrics/tests/location_indicator/query_test_no_image/expected.json
 +++ b/metrics/tests/location_indicator/query_test_no_image/expected.json
 @@ -1 +1,16 @@
@@ -10,8 +25,8 @@ index fe51488c7066..4f7dee5c009a 100644
 +    "geometry": {
 +      "type": "Point",
 +      "coordinates": [
-+        35.693055,
-+        139.766707
++        139.766707,
++        35.693055
 +      ]
 +    },
 +    "properties": {},
@@ -62,7 +77,7 @@ diff --git a/src/mln/geometry/feature_index.hpp b/src/mln/geometry/feature_index
 index 9c2bdf3d9dc3..dfcde40b4f36 100644
 --- a/src/mln/geometry/feature_index.hpp
 +++ b/src/mln/geometry/feature_index.hpp
-@@ -93,12 +93,12 @@ class DynamicFeatureIndex {
+@@ -93,12 +93,12 @@ public:
                 const mln::ScreenLineString& queryGeometry,
                 const TransformState& state) const;
  
@@ -78,10 +93,10 @@ index 9c2bdf3d9dc3..dfcde40b4f36 100644
  
      std::vector<FeatureRecord> features;
 diff --git a/src/mln/renderer/layers/render_location_indicator_layer.cpp b/src/mln/renderer/layers/render_location_indicator_layer.cpp
-index f7d617e02162..bcabcaa78184 100644
+index f7d617e02162..236525f4e7bc 100644
 --- a/src/mln/renderer/layers/render_location_indicator_layer.cpp
 +++ b/src/mln/renderer/layers/render_location_indicator_layer.cpp
-@@ -476,7 +476,7 @@ void main() {
+@@ -476,7 +476,7 @@ public:
      RenderLocationIndicatorImpl(std::string sourceLayer)
          : ruler(0, mapbox::cheap_ruler::CheapRuler::Meters),
            feature(std::make_shared<mln::Feature>()),
@@ -90,12 +105,12 @@ index f7d617e02162..bcabcaa78184 100644
          feature->sourceLayer = std::move(sourceLayer);
      }
  
-@@ -547,24 +547,27 @@ void main() {
+@@ -547,24 +547,27 @@ public:
          if (!dirtyFeature) return;
          dirtyFeature = false;
          featureEnvelope->clear();
-+        feature->geometry = mapbox::geometry::point<double>{oldParams.puckPosition.latitude(),
-+                                                            oldParams.puckPosition.longitude()};
++        feature->geometry = mapbox::geometry::point<double>{oldParams.puckPosition.longitude(),
++                                                            oldParams.puckPosition.latitude()};
 +        const auto addQuad = [&](const std::array<vec2, 4>& geometry) {
 +            mapbox::geometry::linear_ring<int64_t> border;
 +            for (const auto& v : geometry) {
@@ -133,7 +148,7 @@ index f7d617e02162..bcabcaa78184 100644
      }
  
  protected:
-@@ -920,7 +923,7 @@ void main() {
+@@ -920,7 +923,7 @@ public:
  public:
      mln::LocationIndicatorRenderParameters parameters;
      std::shared_ptr<mln::Feature> feature;
@@ -143,7 +158,7 @@ index f7d617e02162..bcabcaa78184 100644
  };
  
 diff --git a/test/api/query.test.cpp b/test/api/query.test.cpp
-index efc938ce2b4b..2d0481509a82 100644
+index efc938ce2b4b..eac0a85cd4a0 100644
 --- a/test/api/query.test.cpp
 +++ b/test/api/query.test.cpp
 @@ -7,6 +7,7 @@
@@ -154,15 +169,16 @@ index efc938ce2b4b..2d0481509a82 100644
  #include <mln/style/style.hpp>
  #include <mln/style/image.hpp>
  #include <mln/style/source.hpp>
-@@ -320,3 +321,25 @@ TEST(Query, QueryFeatureExtensionsSuperclusterLeaves) {
+@@ -320,3 +321,30 @@ TEST(Query, QueryFeatureExtensionsSuperclusterLeaves) {
      EXPECT_EQ(offsetLeaves3[1].properties["name"].get<std::string>(), "Cape Sable"s);
      EXPECT_EQ(offsetLeaves3[2].properties["name"].get<std::string>(), "Cape Cod"s);
  }
 +
 +TEST(Query, LocationIndicatorTopImageOnly) {
 +    QueryTest test;
-+    test.map.jumpTo(CameraOptions().withCenter(LatLng{0, 0}).withZoom(16));
++    test.map.jumpTo(CameraOptions().withCenter(LatLng{35.693055, 139.766707}).withZoom(16));
 +    auto layer = std::make_unique<LocationIndicatorLayer>("location");
++    layer->setLocation({{35.693055, 139.766707, 0}});
 +    layer->setTopImage({"test-icon"});
 +    layer->setShadowImage({"test-icon"});
 +    layer->setShadowImageSize(10.0f);
@@ -171,11 +187,15 @@ index efc938ce2b4b..2d0481509a82 100644
 +    test.map.getStyle().addLayer(std::move(layer));
 +    test.frontend.render(test.map);
 +
-+    const auto center = test.map.pixelForLatLng({0, 0});
++    const auto center = test.map.pixelForLatLng({35.693055, 139.766707});
 +    const RenderedQueryOptions options({{{"location"}}, {}});
 +    const auto features = test.frontend.getRenderer()->queryRenderedFeatures(center, options);
 +    ASSERT_EQ(features.size(), 1u);
 +    EXPECT_EQ(features.front().sourceLayer, "location");
++    ASSERT_TRUE(features.front().geometry.is<mapbox::geometry::point<double>>());
++    const auto& point = features.front().geometry.get<mapbox::geometry::point<double>>();
++    EXPECT_DOUBLE_EQ(point.x, 139.766707);
++    EXPECT_DOUBLE_EQ(point.y, 35.693055);
 +    // Shadow and accuracy-circle coverage outside the top image is not queryable.
 +    EXPECT_TRUE(
 +        test.frontend.getRenderer()->queryRenderedFeatures(ScreenCoordinate{center.x + 60, center.y}, options).empty());
