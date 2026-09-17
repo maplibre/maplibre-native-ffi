@@ -104,7 +104,9 @@ pub struct AnimationOptions {
     /// value in its
     /// [`CameraTransitionFinishedEvent`](crate::CameraTransitionFinishedEvent)
     /// payload. The event arrives for every terminal outcome and does not name
-    /// which one occurred. Leaving this absent emits no such event.
+    /// which one occurred. A partially superseded command remains active until
+    /// its remaining properties finish. Other commands may still be animating.
+    /// Leaving this absent emits no such event.
     pub transition_id: Option<u64>,
 }
 

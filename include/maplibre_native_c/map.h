@@ -282,20 +282,21 @@ typedef struct mln_animation_options {
    * passes the value through without interpreting it, so callers pick their own
    * scheme, such as a monotonically increasing counter.
    *
-   * Each transition emits that event exactly once, whichever way it ends:
-   * running to completion, being superseded by a later camera command, being
-   * cancelled by mln_map_cancel_transitions(), or completing instantly as a
-   * zero-duration jump. A command this API rejects -- one carrying a non-finite
-   * enabled camera field, for example -- starts no transition and emits no such
+   * Each command emits that event once all its properties have completed or
+   * been superseded. Replacing one property leaves the command active while
+   * another property continues. Cancelling all transitions also ends every
+   * active command. A zero-duration ease emits its event during the call.
+   * A command this API rejects -- one carrying a non-finite enabled camera
+   * field, for example -- starts no transition and emits no such
    * event. The event carries no completion reason, so a host that needs to tell
    * completion from cancellation compares the resulting camera against the
-   * requested one, or tracks which transition ID is current.
+   * requested one, or tracks which commands own the requested properties.
    *
    * The event is queued on the runtime that owns the map and is drained by
-   * mln_runtime_drain_events(). For a transition that runs to completion, it is
-   * queued immediately before that transition's
-   * MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE event. A map reports the terminal
-   * outcome only while its event mask selects
+   * mln_runtime_drain_events(). It is queued immediately before that command's
+   * MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE event. Other commands can still be
+   * animating when these events arrive. A map reports the terminal outcome
+   * only while its event mask selects
    * MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED.
    *
    * When this field is omitted, the transition emits no such event.
@@ -1242,9 +1243,8 @@ MLN_API mln_status mln_map_copy_style_url(
  *   MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED are the only reports that a
  *   still-image request finished. See mln_map_request_still_image().
  * - MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED carries the
- *   transition identity a caller set on an animation, and
- *   MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE distinguishes a completed
- *   transition from a cancelled one. See mln_animation_options.transition_id.
+ *   transition identity a caller set on an animation. Camera events report no
+ *   completion reason. See mln_animation_options.transition_id.
  * - MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED and
  *   MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR carry native failure text.
  *

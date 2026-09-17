@@ -22,8 +22,9 @@ public class AnimationOptions {
    * When set, the transition emits one
    * [org.maplibre.nativeffi.runtime.RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED] event carrying
    * this value, however the transition ends: completed, superseded, cancelled, or applied instantly
-   * as a zero-duration jump. The event reports only that the transition released the camera, not
-   * the outcome. A rejected command starts no transition and emits no event.
+   * as a zero-duration jump. A partially superseded command ends once its remaining properties
+   * finish. Other commands can still be animating. The event carries no completion reason. A
+   * rejected command starts no transition and emits no event.
    *
    * The value is opaque to MapLibre Native. Native `uint64_t` carried as a [Long] bit pattern.
    */

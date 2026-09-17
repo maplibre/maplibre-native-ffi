@@ -1,0 +1,789 @@
+diff --git a/include/mln/map/camera.hpp b/include/mln/map/camera.hpp
+index 63e7d2b..a67ab2d 100644
+--- a/include/mln/map/camera.hpp
++++ b/include/mln/map/camera.hpp
+@@ -13,6 +13,10 @@ namespace mln {
+ 
+ /** Various options for describing the viewpoint of a map. All fields are
+     optional.
++    A partial command replaces animations of its specified fields. Omitted
++    fields keep their original animation timing. Flights couple center and zoom;
++    anchored commands couple center with their specified fields. Replacing any
++    member of a coupled group stops that group.
+     Anchor and center points are mutually exclusive, with preference for the
+     center point when both are set.
+     */
+@@ -122,8 +126,9 @@ struct AnimationOptions {
+         the elapsed time as a percentage of the duration. */
+     std::function<void(double)> transitionFrameFn;
+ 
+-    /** A function that is called once on the last frame of the transition, just
+-        before the corresponding screen update. */
++    /** Called once when all properties of the command have completed or been
++        superseded, including explicit cancellation. Other commands may still
++        be animating when this callback runs. */
+     std::function<void()> transitionFinishFn;
+ 
+     /** Creates an animation with no options specified. */
+diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
+index c05acb1..c2da17d 100644
+--- a/src/mln/map/transform.cpp
++++ b/src/mln/map/transform.cpp
+@@ -95,8 +95,7 @@ CameraOptions Transform::getCameraOptions(const std::optional<EdgeInsets>& paddi
+ 
+ /**
+  * Change any combination of center, zoom, bearing, and pitch, without
+- * a transition. The map will retain the current values for any options
+- * not included in `options`.
++ * a transition. Omitted options keep their current animations.
+  */
+ void Transform::jumpTo(const CameraOptions& camera) {
+     easeTo(camera);
+@@ -104,8 +103,8 @@ void Transform::jumpTo(const CameraOptions& camera) {
+ 
+ /**
+  * Change any combination of center, zoom, bearing, pitch and edgeInsets, with a
+- * smooth animation between old and new values. The map will retain the current
+- * values for any options not included in `options`.
++ * smooth animation between old and new values. Omitted options keep their
++ * current animations and timing.
+  */
+ void Transform::easeTo(const CameraOptions& inputCamera, const AnimationOptions& animation) {
+     CameraOptions camera = inputCamera;
+@@ -163,49 +162,33 @@ void Transform::easeTo(const CameraOptions& inputCamera, const AnimationOptions&
+ 
+     // Minimize rotation by taking the shorter path around the circle.
+     bearing = _normalizeAngle(bearing, state.getBearing());
+-    state.setBearing(_normalizeAngle(state.getBearing(), bearing));
+ 
+     const double startZoom = state.getZoom();
+-    const double startBearing = state.getBearing();
++    const double startBearing = _normalizeAngle(state.getBearing(), bearing);
+     const double startPitch = state.getPitch();
+     const double startRoll = state.getRoll();
+     const double startFov = state.getFieldOfView();
+-    state.setProperties(TransformStateProperties()
+-                            .withPanningInProgress(unwrappedLatLng != startLatLng)
+-                            .withScalingInProgress(zoom != startZoom)
+-                            .withRotatingInProgress(bearing != startBearing));
+     const EdgeInsets startEdgeInsets = state.getEdgeInsets();
+ 
+     startTransition(
+-        camera,
++        inputCamera,
+         animation,
+         [=, this](double t) {
+             Point<double> framePoint = util::interpolate(startPoint, endPoint, t);
+             LatLng frameLatLng = Projection::unproject(framePoint, state.zoomScale(startZoom));
+             double frameZoom = util::interpolate(startZoom, zoom, t);
+-            state.setLatLngZoom(frameLatLng, frameZoom);
+-            state.setCenterAltitude(util::interpolate(startCenterAlt, centerAlt, t));
+-            if (bearing != startBearing) {
+-                state.setBearing(util::wrap(util::interpolate(startBearing, bearing, t), -pi, pi));
+-            }
+-            if (padding != startEdgeInsets) {
+-                // Interpolate edge insets
+-                EdgeInsets edgeInsets;
+-                state.setEdgeInsets({util::interpolate(startEdgeInsets.top(), padding.top(), t),
+-                                     util::interpolate(startEdgeInsets.left(), padding.left(), t),
+-                                     util::interpolate(startEdgeInsets.bottom(), padding.bottom(), t),
+-                                     util::interpolate(startEdgeInsets.right(), padding.right(), t)});
+-            }
+-            double maxPitch = getMaxPitchForEdgeInsets(state.getEdgeInsets());
+-            if (pitch != startPitch || maxPitch < startPitch) {
+-                state.setPitch(std::min(maxPitch, util::interpolate(startPitch, pitch, t)));
+-            }
+-            if (roll != startRoll) {
+-                state.setRoll(util::interpolate(startRoll, roll, t));
+-            }
+-            if (fov != startFov) {
+-                state.setFieldOfView(util::interpolate(startFov, fov, t));
+-            }
++            return CameraOptions()
++                .withCenter(frameLatLng)
++                .withZoom(frameZoom)
++                .withCenterAltitude(util::interpolate(startCenterAlt, centerAlt, t))
++                .withBearing(-util::rad2deg(util::wrap(util::interpolate(startBearing, bearing, t), -pi, pi)))
++                .withPadding(EdgeInsets{util::interpolate(startEdgeInsets.top(), padding.top(), t),
++                                        util::interpolate(startEdgeInsets.left(), padding.left(), t),
++                                        util::interpolate(startEdgeInsets.bottom(), padding.bottom(), t),
++                                        util::interpolate(startEdgeInsets.right(), padding.right(), t)})
++                .withPitch(util::rad2deg(util::interpolate(startPitch, pitch, t)))
++                .withRoll(util::rad2deg(util::interpolate(startRoll, roll, t)))
++                .withFov(util::rad2deg(util::interpolate(startFov, fov, t)));
+         },
+         duration);
+ }
+@@ -257,9 +240,8 @@ void Transform::flyTo(const CameraOptions& inputCamera,
+ 
+     // Minimize rotation by taking the shorter path around the circle.
+     bearing = _normalizeAngle(bearing, state.getBearing());
+-    state.setBearing(_normalizeAngle(state.getBearing(), bearing));
+     const double startZoom = state.scaleZoom(state.getScale());
+-    const double startBearing = state.getBearing();
++    const double startBearing = _normalizeAngle(state.getBearing(), bearing);
+     const double startPitch = state.getPitch();
+     const double startRoll = state.getRoll();
+     const double startFov = state.getFieldOfView();
+@@ -339,23 +321,11 @@ void Transform::flyTo(const CameraOptions& inputCamera,
+         }
+         duration = std::chrono::duration_cast<Duration>(std::chrono::duration<double>(S / velocity));
+     }
+-    if (duration == Duration::zero()) {
+-        // Perform an instantaneous transition.
+-        jumpTo(camera);
+-        if (animation.transitionFinishFn) {
+-            animation.transitionFinishFn();
+-        }
+-        return;
+-    }
+-
+     const double startScale = state.getScale();
+-    state.setProperties(
+-        TransformStateProperties().withPanningInProgress(true).withScalingInProgress(true).withRotatingInProgress(
+-            bearing != startBearing));
+     const EdgeInsets startEdgeInsets = state.getEdgeInsets();
+ 
+     startTransition(
+-        camera,
++        inputCamera,
+         animation,
+         [=, this](double k) {
+             /// s: The distance traveled along the flight path, measured in
+@@ -375,31 +345,21 @@ void Transform::flyTo(const CameraOptions& inputCamera,
+ 
+             // Convert to geographic coordinates and set the new viewpoint.
+             LatLng frameLatLng = Projection::unproject(framePoint, startScale);
+-            state.setLatLngZoom(frameLatLng, frameZoom);
+-            state.setCenterAltitude(util::interpolate(startCenterAlt, centerAlt, us));
+-            if (bearing != startBearing) {
+-                state.setBearing(util::wrap(util::interpolate(startBearing, bearing, k), -pi, pi));
+-            }
+-
+-            if (padding != startEdgeInsets) {
+-                // Interpolate edge insets
+-                state.setEdgeInsets({util::interpolate(startEdgeInsets.top(), padding.top(), k),
+-                                     util::interpolate(startEdgeInsets.left(), padding.left(), k),
+-                                     util::interpolate(startEdgeInsets.bottom(), padding.bottom(), k),
+-                                     util::interpolate(startEdgeInsets.right(), padding.right(), k)});
+-            }
+-
+-            if (pitch != startPitch) {
+-                state.setPitch(util::interpolate(startPitch, pitch, k));
+-            }
+-            if (roll != startRoll) {
+-                state.setPitch(util::interpolate(startRoll, roll, k));
+-            }
+-            if (fov != startFov) {
+-                state.setFieldOfView(util::interpolate(startFov, fov, k));
+-            }
++            return CameraOptions()
++                .withCenter(frameLatLng)
++                .withZoom(frameZoom)
++                .withCenterAltitude(util::interpolate(startCenterAlt, centerAlt, us))
++                .withBearing(-util::rad2deg(util::wrap(util::interpolate(startBearing, bearing, k), -pi, pi)))
++                .withPadding(EdgeInsets{util::interpolate(startEdgeInsets.top(), padding.top(), k),
++                                        util::interpolate(startEdgeInsets.left(), padding.left(), k),
++                                        util::interpolate(startEdgeInsets.bottom(), padding.bottom(), k),
++                                        util::interpolate(startEdgeInsets.right(), padding.right(), k)})
++                .withPitch(util::rad2deg(util::interpolate(startPitch, pitch, k)))
++                .withRoll(util::rad2deg(util::interpolate(startRoll, roll, k)))
++                .withFov(util::rad2deg(util::interpolate(startFov, fov, k)));
+         },
+-        duration);
++        duration,
++        !linearZoomInterpolation);
+ }
+ 
+ // MARK: - Position
+@@ -585,130 +545,167 @@ ProjectionMode Transform::getProjectionMode() const {
+ 
+ // MARK: - Transition
+ 
++uint16_t Transform::cameraFields(const CameraOptions& camera) {
++    return (camera.center ? Center : 0) | (camera.zoom ? Zoom : 0) | (camera.bearing ? Bearing : 0) |
++           (camera.pitch ? Pitch : 0) | (camera.padding ? Padding : 0) | (camera.centerAltitude ? Altitude : 0) |
++           (camera.roll ? Roll : 0) | (camera.fov ? Fov : 0);
++}
++
+ void Transform::startTransition(const CameraOptions& camera,
+                                 const AnimationOptions& animation,
+-                                const std::function<void(double)>& frame,
+-                                const Duration& duration) {
+-    if (transitionFinishFn) {
+-        transitionFinishFn();
++                                const std::function<CameraOptions(double)>& frame,
++                                const Duration& duration,
++                                bool flight) {
++    auto transition = std::make_shared<Transition>(animation);
++    transition->fields = cameraFields(camera);
++    transition->coupledFields = flight ? Center | Zoom : 0;
++    transition->fields |= transition->coupledFields;
++    // An anchor controls center together with the properties it transforms.
++    // An explicit center takes precedence over an anchor.
++    transition->anchor = camera.center ? std::nullopt : camera.anchor;
++    if (transition->anchor) {
++        transition->fields |= Center;
++        transition->coupledFields = transition->fields;
++        transition->anchor->y = state.getSize().height - transition->anchor->y;
++        transition->anchorLatLng = state.screenCoordinateToLatLng(*transition->anchor);
++    }
++    const auto target = frame(1.0);
++    transition->movingFields =
++        ((flight || transition->anchor || camera.center != std::optional(getLatLng(LatLng::Unwrapped))) ? Center : 0) |
++        ((flight || target.zoom != std::optional(getZoom())) ? Zoom : 0) |
++        ((target.bearing != std::optional(-util::rad2deg(getBearing()))) ? Bearing : 0);
++    transition->start = transitionStart = Clock::now();
++    transition->duration = transitionDuration = transition->fields ? duration : Duration::zero();
++    transition->frame = frame;
++
++    std::vector<std::shared_ptr<Transition>> finished;
++    for (auto& active : transitions) {
++        auto replaced = transition->fields;
++        if (active->coupledFields & replaced) replaced |= active->coupledFields;
++        active->fields &= ~replaced;
++        if (!active->fields) finished.push_back(active);
++    }
++    std::erase_if(transitions, [](const auto& active) { return !active->fields; });
++    transitions.push_back(transition);
++    updateMovementFlags();
++    finishTransitions(finished);
++
++    // Finish callbacks may replace or cancel the newly installed command.
++    if (std::find(transitions.begin(), transitions.end(), transition) == transitions.end()) return;
++    const bool animated = transition->duration != Duration::zero();
++    observer.onCameraWillChange(animated ? MapObserver::CameraChangeMode::Animated
++                                         : MapObserver::CameraChangeMode::Immediate);
++    if (std::find(transitions.begin(), transitions.end(), transition) == transitions.end()) return;
++    if (!animated) {
++        applyTransitions({transition}, transition->start);
++        std::erase(transitions, transition);
++        updateMovementFlags();
++        finishTransitions({transition});
++    }
++}
++
++void Transform::applyTransitions(const std::vector<std::shared_ptr<Transition>>& active, const TimePoint& now) {
++    auto camera = state.getCameraOptions(std::nullopt);
++    camera.center = getLatLng(LatLng::Unwrapped);
++    std::shared_ptr<Transition> anchored;
++    for (const auto& transition : active) {
++        const double t = transition->duration == Duration::zero()
++                             ? 1.0
++                             : std::clamp(std::chrono::duration<double>(now - transition->start) /
++                                              std::chrono::duration<double>(transition->duration),
++                                          0.0,
++                                          1.0);
++        auto ease = transition->animation.easing.value_or(util::DEFAULT_TRANSITION_EASE);
++        const auto value = transition->frame(t == 1.0 ? 1.0 : ease.solve(t, 0.001));
++        const auto fields = transition->fields;
++        if (fields & Center) camera.center = value.center;
++        if (fields & Zoom) camera.zoom = value.zoom;
++        if (fields & Bearing) camera.bearing = value.bearing;
++        if (fields & Pitch) camera.pitch = value.pitch;
++        if (fields & Padding) camera.padding = value.padding;
++        if (fields & Altitude) camera.centerAltitude = value.centerAltitude;
++        if (fields & Roll) camera.roll = value.roll;
++        if (fields & Fov) camera.fov = value.fov;
++    }
++    // An active anchor also applies to immediate changes of other properties.
++    for (const auto& transition : transitions) {
++        if (transition->anchor && (transition->fields & Center)) anchored = transition;
+     }
+ 
+-    bool isAnimated = duration != Duration::zero();
+-    observer.onCameraWillChange(isAnimated ? MapObserver::CameraChangeMode::Animated
+-                                           : MapObserver::CameraChangeMode::Immediate);
++    // Compose the camera before applying constraints. In particular, padding
++    // and field of view determine the pitch limit, and center and zoom jointly
++    // determine the geographic bounds and altitude scale.
++    state.setEdgeInsets(*camera.padding);
++    state.setFieldOfView(util::deg2rad(*camera.fov));
++    state.setBearing(util::deg2rad(-*camera.bearing));
++    state.setRoll(util::deg2rad(*camera.roll));
++    state.setPitch(std::min(getMaxPitchForEdgeInsets(*camera.padding), util::deg2rad(*camera.pitch)));
++    state.constrainCameraAndZoomToBounds(camera, *camera.zoom);
++    state.setLatLngZoom(*camera.center, *camera.zoom);
++    if (anchored) state.moveLatLng(anchored->anchorLatLng, *anchored->anchor);
++    state.setCenterAltitude(*camera.centerAltitude);
++}
+ 
+-    // Associate the anchor, if given, with a coordinate.
+-    // Anchor and center points are mutually exclusive, with preference for the
+-    // center point when both are set.
+-    std::optional<ScreenCoordinate> anchor = camera.center ? std::nullopt : camera.anchor;
+-    LatLng anchorLatLng;
+-    if (anchor) {
+-        anchor->y = state.getSize().height - anchor->y;
+-        anchorLatLng = state.screenCoordinateToLatLng(*anchor);
+-    }
++void Transform::updateMovementFlags() {
++    uint16_t moving = 0;
++    for (const auto& transition : transitions) moving |= transition->fields & transition->movingFields;
++    state.setProperties(TransformStateProperties()
++                            .withPanningInProgress(moving & Center)
++                            .withScalingInProgress(moving & Zoom)
++                            .withRotatingInProgress(moving & Bearing));
++}
+ 
+-    transitionStart = Clock::now();
+-    transitionDuration = duration;
+-
+-    transitionFrameFn = [isAnimated, animation, frame, anchor, anchorLatLng, this](const TimePoint now) {
+-        float t = isAnimated ? (std::chrono::duration<float>(now - transitionStart) / transitionDuration) : 1.0f;
+-        if (t >= 1.0) {
+-            frame(1.0);
+-        } else {
+-            util::UnitBezier ease = animation.easing ? *animation.easing : util::DEFAULT_TRANSITION_EASE;
+-            frame(ease.solve(t, 0.001));
+-        }
+-
+-        if (anchor) state.moveLatLng(anchorLatLng, *anchor);
+-
+-        // At t = 1.0, a DidChangeAnimated notification should be sent from finish().
+-        if (t < 1.0) {
+-            if (animation.transitionFrameFn) {
+-                animation.transitionFrameFn(t);
+-            }
+-            observer.onCameraIsChanging();
+-            return false;
+-        } else {
+-            // Indicate that we need to terminate this transition
+-            return true;
+-        }
+-    };
+-
+-    transitionFinishFn = [isAnimated, animation, this] {
+-        state.setProperties(
+-            TransformStateProperties().withPanningInProgress(false).withScalingInProgress(false).withRotatingInProgress(
+-                false));
+-        if (animation.transitionFinishFn) {
+-            animation.transitionFinishFn();
+-        }
+-        observer.onCameraDidChange(isAnimated ? MapObserver::CameraChangeMode::Animated
+-                                              : MapObserver::CameraChangeMode::Immediate);
+-    };
+-
+-    if (!isAnimated) {
+-        auto update = std::move(transitionFrameFn);
+-        auto finish = std::move(transitionFinishFn);
+-
+-        transitionFrameFn = nullptr;
+-        transitionFinishFn = nullptr;
+-
+-        update(Clock::now());
+-        finish();
++void Transform::finishTransitions(const std::vector<std::shared_ptr<Transition>>& finished) {
++    for (const auto& transition : finished) {
++        if (transition->animation.transitionFinishFn) transition->animation.transitionFinishFn();
++        // This notification ends a command, not necessarily all camera motion.
++        observer.onCameraDidChange(transition->duration != Duration::zero() ? MapObserver::CameraChangeMode::Animated
++                                                                            : MapObserver::CameraChangeMode::Immediate);
+     }
+ }
+ 
+ bool Transform::inTransition() const {
+-    return transitionFrameFn != nullptr;
++    return !transitions.empty();
+ }
+ 
+ void Transform::updateTransitions(const TimePoint& now) {
+-    // Use a temporary function to ensure that the transitionFrameFn lambda is
+-    // called only once per update.
+-
+-    // This addresses the symptoms of
+-    // https://github.com/mapbox/mapbox-gl-native/issues/11180 where setting a
+-    // shape source to nil (or similar) in the `onCameraIsChanging` observer
+-    // function causes `Map::Impl::onUpdate()` to be called which in turn calls
+-    // this function (before the current iteration has completed), leading to an
+-    // infinite loop. See https://github.com/mapbox/mapbox-gl-native/issues/5833
+-    // for a similar, related, issue.
+-    //
+-    // By temporarily nulling the `transitionFrameFn` (and then restoring it
+-    // after the temporary has been called) we stop this recursion.
+-    //
+-    // It's important to note that the scope of this change is stop the above
+-    // crashes. It doesn't address any potential deeper issue (for example
+-    // user error, how often and when transition callbacks are called).
+-
+-    auto transition = std::move(transitionFrameFn);
+-    transitionFrameFn = nullptr;
+-
+-    if (transition && transition(now)) {
+-        // If the transition indicates that it is complete, then we should call
+-        // the finish lambda (going via a temporary as above)
+-        auto finish = std::move(transitionFinishFn);
+-
+-        transitionFinishFn = nullptr;
+-        transitionFrameFn = nullptr;
+-
+-        if (finish) {
+-            finish();
++    // Observers can synchronously update the map or start another command.
++    // Snapshot the commands for this frame, and detach completed commands
++    // before calling user code so each command finishes exactly once.
++    if (updatingTransitions || transitions.empty()) return;
++    updatingTransitions = true;
++    struct Reset {
++        bool& flag;
++        ~Reset() { flag = false; }
++    } reset{updatingTransitions};
++    const auto active = transitions;
++    applyTransitions(active, now);
++    std::vector<std::shared_ptr<Transition>> finished;
++    for (const auto& transition : active) {
++        if (now - transition->start >= transition->duration) {
++            std::erase(transitions, transition);
++            finished.push_back(transition);
+         }
+-    } else if (!transitionFrameFn) {
+-        // We have to check `transitionFrameFn` is nil here, since a new
+-        // transition may have been triggered in a user callback (from the
+-        // transition call above)
+-        transitionFrameFn = std::move(transition);
+     }
++    updateMovementFlags();
++    for (const auto& transition : active) {
++        if (std::find(transitions.begin(), transitions.end(), transition) == transitions.end()) continue;
++        if (transition->animation.transitionFrameFn) {
++            const double t = std::clamp(std::chrono::duration<double>(now - transition->start) /
++                                            std::chrono::duration<double>(transition->duration),
++                                        0.0,
++                                        1.0);
++            transition->animation.transitionFrameFn(t);
++        }
++    }
++    if (!transitions.empty()) observer.onCameraIsChanging();
++    finishTransitions(finished);
+ }
+ 
+ void Transform::cancelTransitions() {
+-    if (transitionFinishFn) {
+-        transitionFinishFn();
+-    }
+-
+-    transitionFrameFn = nullptr;
+-    transitionFinishFn = nullptr;
++    auto finished = std::exchange(transitions, {});
++    updateMovementFlags();
++    finishTransitions(finished);
+ }
+ 
+ void Transform::setGestureInProgress(bool inProgress) {
+diff --git a/src/mln/map/transform.hpp b/src/mln/map/transform.hpp
+index d9ec6ac..c93af33 100644
+--- a/src/mln/map/transform.hpp
++++ b/src/mln/map/transform.hpp
+@@ -13,6 +13,8 @@
+ #include <cmath>
+ #include <functional>
+ #include <optional>
++#include <memory>
++#include <vector>
+ 
+ namespace mln {
+ 
+@@ -144,16 +146,45 @@ private:
+ 
+     void startTransition(const CameraOptions&,
+                          const AnimationOptions&,
+-                         const std::function<void(double)>&,
+-                         const Duration&);
++                         const std::function<CameraOptions(double)>&,
++                         const Duration&,
++                         bool flight = false);
++
++    enum CameraField : uint16_t {
++        Center = 1 << 0,
++        Zoom = 1 << 1,
++        Bearing = 1 << 2,
++        Pitch = 1 << 3,
++        Padding = 1 << 4,
++        Altitude = 1 << 5,
++        Roll = 1 << 6,
++        Fov = 1 << 7
++    };
++    struct Transition {
++        explicit Transition(const AnimationOptions& options)
++            : animation(options) {}
++        uint16_t fields;
++        uint16_t coupledFields;
++        uint16_t movingFields;
++        TimePoint start;
++        Duration duration;
++        AnimationOptions animation;
++        std::function<CameraOptions(double)> frame;
++        std::optional<ScreenCoordinate> anchor;
++        LatLng anchorLatLng;
++    };
++    static uint16_t cameraFields(const CameraOptions&);
++    void applyTransitions(const std::vector<std::shared_ptr<Transition>>&, const TimePoint&);
++    void updateMovementFlags();
++    void finishTransitions(const std::vector<std::shared_ptr<Transition>>&);
+ 
+     // We don't want to show horizon: limit max pitch based on edge insets.
+     double getMaxPitchForEdgeInsets(const EdgeInsets& insets) const;
+ 
+     TimePoint transitionStart;
+     Duration transitionDuration;
+-    std::function<bool(const TimePoint)> transitionFrameFn;
+-    std::function<void()> transitionFinishFn;
++    std::vector<std::shared_ptr<Transition>> transitions;
++    bool updatingTransitions = false;
+ };
+ 
+ } // namespace mln
+diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
+index 3a886f6..4d152bc 100644
+--- a/test/map/transform.test.cpp
++++ b/test/map/transform.test.cpp
+@@ -1268,3 +1268,249 @@ TEST(Camera, SetOrientationWithRollNoPitch) {
+     EXPECT_NEAR(pitch, pitch_, 1.0e-9);
+     EXPECT_NEAR(0.0, roll_, 1.0e-9);
+ }
++
++TEST(Transform, IndependentCameraTracks) {
++    Transform transform;
++    transform.resize({1000, 1000});
++    transform.jumpTo(CameraOptions().withZoom(8).withCenterAltitude(120));
++    unsigned zoomFinished = 0;
++    unsigned centerFinished = 0;
++    AnimationOptions zoom(Seconds(2));
++    zoom.easing.emplace(1.0 / 3, 1.0 / 3, 2.0 / 3, 2.0 / 3);
++    zoom.transitionFinishFn = [&] {
++        ++zoomFinished;
++    };
++    transform.easeTo(CameraOptions().withZoom(12), zoom);
++    const auto zoomStart = transform.getTransitionStart();
++    transform.updateTransitions(zoomStart + Milliseconds(500));
++    EXPECT_NEAR(transform.getZoom(), 9, 1e-5);
++
++    AnimationOptions center(Seconds(8));
++    center.easing.emplace(1.0 / 3, 1.0 / 3, 2.0 / 3, 2.0 / 3);
++    center.transitionFinishFn = [&] {
++        ++centerFinished;
++    };
++    transform.easeTo(CameraOptions().withCenter(LatLng{20, 30}), center);
++    const auto centerStart = transform.getTransitionStart();
++    EXPECT_EQ(zoomFinished, 0u);
++    transform.updateTransitions(zoomStart + Seconds(2));
++    EXPECT_NEAR(transform.getZoom(), 12, 1e-5);
++    EXPECT_GT(transform.getLatLng().longitude(), 0);
++    EXPECT_LT(transform.getLatLng().longitude(), 30);
++    EXPECT_NEAR(transform.getState().getCenterAltitude(), 120, 1e-5);
++    EXPECT_EQ(zoomFinished, 1u);
++    EXPECT_EQ(centerFinished, 0u);
++    EXPECT_TRUE(transform.isPanning());
++    EXPECT_FALSE(transform.isScaling());
++    EXPECT_TRUE(transform.inTransition());
++    transform.updateTransitions(centerStart + Seconds(8));
++    EXPECT_NEAR(transform.getLatLng().latitude(), 20, 1e-5);
++    EXPECT_NEAR(transform.getLatLng().longitude(), 30, 1e-5);
++    EXPECT_NEAR(transform.getZoom(), 12, 1e-5);
++    EXPECT_EQ(centerFinished, 1u);
++    EXPECT_FALSE(transform.inTransition());
++}
++
++TEST(Transform, PartialReplacementKeepsCommandAndTiming) {
++    Transform transform;
++    transform.resize({1000, 1000});
++    transform.jumpTo(CameraOptions().withZoom(8));
++    unsigned finished = 0;
++    AnimationOptions animation(Seconds(4));
++    animation.easing.emplace(1.0 / 3, 1.0 / 3, 2.0 / 3, 2.0 / 3);
++    animation.transitionFinishFn = [&] {
++        ++finished;
++    };
++    transform.easeTo(CameraOptions().withZoom(12).withBearing(80), animation);
++    const auto start = transform.getTransitionStart();
++    transform.updateTransitions(start + Seconds(1));
++    EXPECT_NEAR(transform.getZoom(), 9, 1e-5);
++    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 20, 1e-5);
++    transform.jumpTo(CameraOptions().withZoom(10));
++    EXPECT_EQ(finished, 0u);
++    EXPECT_TRUE(transform.isRotating());
++    EXPECT_FALSE(transform.isScaling());
++    transform.updateTransitions(start + Seconds(2));
++    EXPECT_NEAR(transform.getZoom(), 10, 1e-5);
++    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 40, 1e-5);
++    transform.updateTransitions(start + Seconds(4));
++    EXPECT_EQ(finished, 1u);
++    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 80, 1e-5);
++    transform.cancelTransitions();
++    EXPECT_EQ(finished, 1u);
++}
++
++TEST(Transform, FlightAndAnchorCoupleCenterWithTheirProperties) {
++    Transform transform;
++    transform.resize({1000, 1000});
++    transform.jumpTo(CameraOptions().withZoom(8));
++    unsigned flightFinished = 0;
++    AnimationOptions flight(Seconds(4));
++    flight.easing.emplace(1.0 / 3, 1.0 / 3, 2.0 / 3, 2.0 / 3);
++    flight.transitionFinishFn = [&] {
++        ++flightFinished;
++    };
++    transform.flyTo(CameraOptions().withCenter(LatLng{20, 30}).withZoom(12).withRoll(20), flight);
++    const auto start = transform.getTransitionStart();
++    transform.updateTransitions(start + Seconds(1));
++    EXPECT_NEAR(util::rad2deg(transform.getRoll()), 5, 1e-5);
++    const auto center = transform.getLatLng();
++    transform.jumpTo(CameraOptions().withZoom(10));
++    EXPECT_EQ(flightFinished, 0u); // Roll remains after the coupled flight ends.
++    transform.updateTransitions(start + Seconds(4));
++    EXPECT_NEAR(transform.getLatLng().latitude(), center.latitude(), 1e-5);
++    EXPECT_NEAR(transform.getLatLng().longitude(), center.longitude(), 1e-5);
++    EXPECT_NEAR(transform.getZoom(), 10, 1e-5);
++    EXPECT_NEAR(util::rad2deg(transform.getRoll()), 20, 1e-5);
++    EXPECT_EQ(flightFinished, 1u);
++
++    unsigned anchorFinished = 0;
++    AnimationOptions anchorAnimation(Seconds(4));
++    anchorAnimation.transitionFinishFn = [&] {
++        ++anchorFinished;
++    };
++    const ScreenCoordinate anchor{200, 300};
++    const auto fixed = transform.screenCoordinateToLatLng(anchor);
++    transform.easeTo(CameraOptions().withZoom(12).withAnchor(anchor), anchorAnimation);
++    transform.updateTransitions(transform.getTransitionStart() + Seconds(1));
++    const auto pixel = transform.latLngToScreenCoordinate(fixed);
++    EXPECT_NEAR(pixel.x, anchor.x, 1e-5);
++    EXPECT_NEAR(pixel.y, anchor.y, 1e-5);
++    transform.jumpTo(CameraOptions().withBearing(70));
++    const auto rotatedPixel = transform.latLngToScreenCoordinate(fixed);
++    EXPECT_NEAR(rotatedPixel.x, anchor.x, 1e-5);
++    EXPECT_NEAR(rotatedPixel.y, anchor.y, 1e-5);
++    EXPECT_EQ(anchorFinished, 0u);
++    transform.jumpTo(CameraOptions().withCenter(LatLng{10, 15}));
++    EXPECT_EQ(anchorFinished, 1u);
++    EXPECT_FALSE(transform.inTransition());
++    EXPECT_NEAR(transform.getLatLng().latitude(), 10, 1e-5);
++
++    transform.easeTo(CameraOptions().withCenter(LatLng{20, 30}).withAnchor(anchor), anchorAnimation);
++    transform.easeTo(CameraOptions().withZoom(14), AnimationOptions(Seconds(2)));
++    EXPECT_EQ(anchorFinished, 1u); // Explicit center ignores the anchor.
++    transform.cancelTransitions();
++    EXPECT_EQ(anchorFinished, 2u);
++}
++
++TEST(Transform, ComposePaddingPitchAndFieldOfView) {
++    Transform transform;
++    transform.resize({1000, 1000});
++    transform.jumpTo(CameraOptions().withZoom(8));
++    AnimationOptions animation(Seconds(4));
++    animation.easing.emplace(1.0 / 3, 1.0 / 3, 2.0 / 3, 2.0 / 3);
++    transform.easeTo(CameraOptions().withPadding(EdgeInsets{300, 20, 0, 0}), animation);
++    transform.easeTo(CameraOptions().withPitch(50).withFov(45), animation);
++    const auto end = transform.getTransitionStart() + Seconds(4);
++    transform.updateTransitions(end);
++    EXPECT_EQ(transform.getState().getEdgeInsets(), (EdgeInsets{300, 20, 0, 0}));
++    EXPECT_NEAR(util::rad2deg(transform.getFieldOfView()), 45, 1e-5);
++    const auto maxPitch = transform.getState().getMaxPitch() + util::deg2rad(45.0) / 2 -
++                          std::atan(1.3 * std::tan(util::deg2rad(45.0) / 2));
++    EXPECT_NEAR(transform.getPitch(), std::min(util::deg2rad(50.0), maxPitch), 1e-5);
++    EXPECT_FALSE(transform.inTransition());
++}
++
++TEST(Transform, CameraCallbacksCanReplaceAndCancelTransitions) {
++    struct Observer : TransformObserver {
++        Transform* transform = nullptr;
++        unsigned changes = 0;
++        std::function<void()> willChange;
++        void onCameraWillChange(MapObserver::CameraChangeMode) override {
++            if (auto callback = std::exchange(willChange, {})) callback();
++        }
++        void onCameraIsChanging() override {
++            ++changes;
++            transform->updateTransitions(Clock::now());
++        }
++    } observer;
++    Transform transform(observer);
++    observer.transform = &transform;
++    transform.resize({1000, 1000});
++    unsigned firstFinished = 0;
++    unsigned secondFinished = 0;
++    AnimationOptions second(Seconds(4));
++    second.transitionFinishFn = [&] {
++        ++secondFinished;
++    };
++    AnimationOptions first(Seconds(2));
++    first.transitionFrameFn = [&](double) {
++        transform.cancelTransitions();
++        transform.easeTo(CameraOptions().withZoom(12), second);
++    };
++    first.transitionFinishFn = [&] {
++        ++firstFinished;
++    };
++    transform.easeTo(CameraOptions().withZoom(10), first);
++    transform.updateTransitions(transform.getTransitionStart() + Seconds(1));
++    EXPECT_EQ(firstFinished, 1u);
++    EXPECT_EQ(secondFinished, 0u);
++    EXPECT_EQ(observer.changes, 1u);
++    EXPECT_TRUE(transform.inTransition());
++    transform.updateTransitions(transform.getTransitionStart() + Seconds(4));
++    EXPECT_EQ(firstFinished, 1u);
++    EXPECT_EQ(secondFinished, 1u);
++    EXPECT_NEAR(transform.getZoom(), 12, 1e-5);
++
++    first.transitionFrameFn = {};
++    first.transitionFinishFn = [&] {
++        ++firstFinished;
++        transform.easeTo(CameraOptions().withBearing(45), second);
++    };
++    transform.easeTo(CameraOptions().withZoom(10), first);
++    transform.cancelTransitions();
++    EXPECT_TRUE(transform.inTransition());
++    transform.updateTransitions(transform.getTransitionStart() + Seconds(4));
++    EXPECT_EQ(firstFinished, 2u);
++    EXPECT_EQ(secondFinished, 2u);
++    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 45, 1e-5);
++
++    // A will-change observer can cancel even an immediate command and start
++    // its replacement. The canceled command must not apply or finish twice.
++    observer.willChange = [&] {
++        transform.cancelTransitions();
++        transform.easeTo(CameraOptions().withBearing(90), second);
++    };
++    const auto zoom = transform.getZoom();
++    transform.easeTo(CameraOptions().withZoom(3));
++    EXPECT_NEAR(transform.getZoom(), zoom, 1e-5);
++    transform.updateTransitions(transform.getTransitionStart() + Seconds(4));
++    EXPECT_EQ(secondFinished, 3u);
++    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 90, 1e-5);
++}
++
++TEST(Transform, PartialCameraCommandsFinishTogetherForStillImage) {
++    struct Observer : TransformObserver {
++        std::vector<int> events;
++        void onCameraDidChange(MapObserver::CameraChangeMode) override { events.push_back(0); }
++    } observer;
++    Transform transform(observer);
++    transform.resize({512, 512});
++    AnimationOptions position(Seconds(5));
++    position.transitionFinishFn = [&] {
++        observer.events.push_back(1);
++    };
++    AnimationOptions bearing(Seconds(10));
++    bearing.transitionFinishFn = [&] {
++        observer.events.push_back(2);
++    };
++    transform.easeTo(CameraOptions().withCenter(LatLng{20, 30}).withZoom(12), position);
++    transform.easeTo(CameraOptions().withBearing(60), bearing);
++    observer.events.clear();
++    transform.jumpTo(CameraOptions().withZoom(10));
++    EXPECT_EQ(observer.events, (std::vector<int>{0}));
++
++    // Static maps advance to the maximum time point for a still image. Each
++    // command finishes before its own did-change notification, even when
++    // another command has replaced one of its properties.
++    observer.events.clear();
++    transform.updateTransitions(TimePoint::max());
++    EXPECT_EQ(observer.events, (std::vector<int>{1, 0, 2, 0}));
++    EXPECT_NEAR(transform.getLatLng().latitude(), 20, 1e-5);
++    EXPECT_NEAR(transform.getLatLng().longitude(), 30, 1e-5);
++    EXPECT_NEAR(transform.getZoom(), 10, 1e-5);
++    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 60, 1e-5);
++    EXPECT_FALSE(transform.inTransition());
++    transform.cancelTransitions();
++    EXPECT_EQ(observer.events, (std::vector<int>{1, 0, 2, 0}));
++}
