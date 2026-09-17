@@ -1,3 +1,25 @@
+diff --git a/metrics/tests/location_indicator/query_test_no_image/expected.json b/metrics/tests/location_indicator/query_test_no_image/expected.json
+index fe51488c7066..4f7dee5c009a 100644
+--- a/metrics/tests/location_indicator/query_test_no_image/expected.json
++++ b/metrics/tests/location_indicator/query_test_no_image/expected.json
+@@ -1 +1,16 @@
+-[]
++[
++  {
++    "type": "Feature",
++    "geometry": {
++      "type": "Point",
++      "coordinates": [
++        35.693055,
++        139.766707
++      ]
++    },
++    "properties": {},
++    "source": "",
++    "sourceLayer": "puck123",
++    "state": {}
++  }
++]
 diff --git a/src/mln/geometry/feature_index.cpp b/src/mln/geometry/feature_index.cpp
 index fde694a25a8c..7da5ac982a56 100644
 --- a/src/mln/geometry/feature_index.cpp

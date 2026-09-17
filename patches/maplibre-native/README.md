@@ -122,10 +122,40 @@ has independent bounds, and a hit returns the feature once. The patch includes
 the upstream regression for a top-only indicator and checks that shadow and
 accuracy-circle coverage outside the image stays excluded. Upstream:
 [maplibre-native#4640](https://github.com/maplibre/maplibre-native/pull/4640),
-at commit `7560cf49c56ec5bd1c87e12facabaf004b1c5af4`.
+at commit `40febf9c986ccc90a1c4615a12a76868135e03fa`.
 
-Both location-indicator patches preserve the upstream changes and adapt patch
-context to the pinned source and existing regression tests.
+`0018-location-indicator-missing-images.patch` disables each location-indicator
+image drawable while it has no texture. The upstream regression checks that an
+indicator with no images and zero accuracy radius submits no draw calls.
+Upstream:
+[maplibre-native#4641](https://github.com/maplibre/maplibre-native/pull/4641),
+at commit `4cbaf989cc9c769b0f7710b430a92c8744539e93`.
+
+`0019-webgpu-location-indicator-uniform-binding.patch` makes the WebGPU
+location-indicator shaders read their uniform buffer from binding 4, where the
+renderer supplies it. Upstream:
+[maplibre-native#4642](https://github.com/maplibre/maplibre-native/pull/4642),
+at commit `64c8fc02c92f4cb97ae99a1caa5662b2678c817b`.
+
+`0020-webgpu-required-bindings.patch` skips a WebGPU drawable when a required
+bind-group layout or resource is missing, or bind-group creation fails. This
+prevents a draw from using a previous drawable's incompatible bindings.
+Upstream:
+[maplibre-native#4643](https://github.com/maplibre/maplibre-native/pull/4643),
+at commit `a4123bae78a50b8b3b9bcb482bfb6973efa0262e`.
+
+`0021-location-indicator-bearing-accuracy.patch` adds a bearing-accuracy sector
+with an angular half-width, a radius in logical pixels, and a color that fades
+toward the outer edge. The paint properties support zoom expressions and
+transitions. The patch includes the upstream conversion test and three render
+fixtures with their binary reference images. Upstream:
+[maplibre-native#4644](https://github.com/maplibre/maplibre-native/pull/4644),
+at commit `593fc79db52c24b3ed75e7afd1f294ec71acdcf7`.
+
+The location-indicator patches preserve the upstream changes and adapt patch
+context and test placement to the pinned source and existing patches. The
+bearing-accuracy patch retains binding 4 from #4642 and places its projection
+accessor beside the pinned source's existing accessors.
 
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
