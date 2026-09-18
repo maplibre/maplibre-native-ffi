@@ -19,6 +19,7 @@ void run_handles_abi_tests(void);
 void run_map_options_abi_tests(void);
 void run_render_backend_abi_tests(void);
 void run_owned_texture_abi_tests(void);
+void run_plugin_layer_abi_tests(void);
 void run_render_target_lifecycle_abi_tests(void);
 void run_render_thread_abi_tests(void);
 void run_query_abi_tests(void);

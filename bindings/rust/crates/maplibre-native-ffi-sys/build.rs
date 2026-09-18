@@ -24,6 +24,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
     let out_path = PathBuf::from(env::var("OUT_DIR")?);
     let header = include_dir.join("maplibre_native_c.h");
+    // Layer plugin registration stays outside the umbrella header; see
+    // include/maplibre_native_c/plugin.h.
+    let plugin_header = include_dir.join("maplibre_native_c/plugin.h");
 
     require_dir(&include_dir, "native include directory")?;
     require_dir(&link_dir, "native link directory")?;
@@ -65,6 +68,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut builder = bindgen::Builder::default()
         .header(header.display().to_string())
+        .header(plugin_header.display().to_string())
         .clang_arg("-xc")
         .clang_arg("-std=c23")
         .clang_arg(format!("-I{}", include_dir.display()));

@@ -16,10 +16,20 @@ directly when useful.
 include/                 # public C API headers
   maplibre_native_c.h    # public umbrella header
   maplibre_native_c/     # public domain headers
+    plugin.h             # layer plugin registration, outside the umbrella
 src/
   c_api/                 # exported C definitions and C boundary validation
   <subsystem>/           # implementation semantics
 ```
+
+`plugin.h` is the one domain header that the umbrella leaves out. It includes
+MapLibre Native's `mln/plugin/plugin_api.h`, which the install copies next to
+this library's headers, and the shared library exports upstream's
+`mln_plugin_register_v1`. Upstream owns that contract and versions its structs
+independently of `mln_c_version()`, and a plugin is native code whose callbacks
+run on tile workers and the render thread for the process lifetime. Bindings
+expose the plugin declarations through their raw C layer only, so the generated
+map API of every binding stays the umbrella.
 
 ## ABI Rules
 
@@ -96,8 +106,8 @@ drives the graphics API the way a host does. An artifact carries the C API and
 nothing else that loads, so repackaging it copies no implementation along, and a
 host that loads its own still runs one: handles that one copy mints are opaque
 pointers another copy does not own. An artifact carries the C API's own headers
-alone, because the headers that a host builds surface descriptors against arrive
-with the implementation that it loads.
+and the plugin header, because the headers that a host builds surface
+descriptors against arrive with the implementation that it loads.
 
 A local stand-in for the implementation, its headers included, reaches the
 install tree through the CMake `loader` component, which a full installation and

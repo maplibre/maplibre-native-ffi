@@ -1,8 +1,11 @@
 //! Generated raw declarations for the MapLibre Native public C ABI.
 //!
 //! This crate mirrors the C boundary: constants, layouts, opaque handle types,
-//! and unsafe extern functions generated from `include/maplibre_native_c.h`.
+//! and unsafe extern functions generated from `include/maplibre_native_c.h`
+//! and, for layer plugin registration, `include/maplibre_native_c/plugin.h`.
 //! Safety policy and ergonomic adaptation live in crates above this layer.
+//! The plugin declarations stay raw: plugins are native code whose callbacks
+//! run on MapLibre's worker and render threads for the process lifetime.
 
 // Keep the Cargo-built platform rlib on the Emscripten link line.
 #[cfg(target_os = "emscripten")]
@@ -31,5 +34,16 @@ mod tests {
         // SAFETY: mln_supported_render_backend_mask takes no arguments and
         // returns a process-global constant.
         assert_ne!(unsafe { super::mln_supported_render_backend_mask() }, 0);
+    }
+
+    /// The plugin header translates and the registration entry point links,
+    /// which nothing above this crate references.
+    #[test]
+    fn links_plugin_registration() {
+        // SAFETY: a null descriptor is rejected before it is read, and a null
+        // message buffer with zero capacity asks for no diagnostic.
+        let status =
+            unsafe { super::mln_plugin_register_v1(std::ptr::null(), std::ptr::null_mut(), 0) };
+        assert_eq!(status, super::MLN_PLUGIN_STATUS_INVALID_ARGUMENT);
     }
 }
