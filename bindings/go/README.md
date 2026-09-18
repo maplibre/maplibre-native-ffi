@@ -16,12 +16,3 @@ that status.
 
 TODO: add a binding-owned owner-thread helper that serializes create, pump,
 event draining, operations, and close on one native owner thread.
-
-## Layer plugins
-
-The binding exposes no plugin API. MapLibre Native's layer plugins are native
-code whose callbacks run on tile workers and the render thread for the process
-lifetime, so a plugin is written in C or another native language and registers
-through the exported `mln_plugin_register_v1`. Its contract is
-`maplibre_native_c/plugin.h` from the installed headers, which a cgo file can
-include alongside `maplibre_native_c.h`.

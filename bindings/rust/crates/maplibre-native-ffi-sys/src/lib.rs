@@ -2,10 +2,8 @@
 //!
 //! This crate mirrors the C boundary: constants, layouts, opaque handle types,
 //! and unsafe extern functions generated from `include/maplibre_native_c.h`
-//! and, for layer plugin registration, `include/maplibre_native_c/plugin.h`.
-//! Safety policy and ergonomic adaptation live in crates above this layer.
-//! The plugin declarations stay raw: plugins are native code whose callbacks
-//! run on MapLibre's worker and render threads for the process lifetime.
+//! and `include/maplibre_native_c/plugin.h`. Safety policy and ergonomic
+//! adaptation live in crates above this layer.
 
 // Keep the Cargo-built platform rlib on the Emscripten link line.
 #[cfg(target_os = "emscripten")]
