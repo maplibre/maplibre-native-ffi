@@ -207,12 +207,6 @@ struct RuntimeObject {
   std::vector<mln::core::QueuedRuntimeEvent> event_drain_staging;
   std::vector<mln_runtime_event> event_batch_events;
   std::string event_batch_messages;
-  // Owner-thread only: the live pump's drain budget. The run loop's process
-  // gate reads these between tasks, and the pump writes them around each
-  // drain, all on the owner thread. Unset outside a bounded pump.
-  std::optional<std::chrono::steady_clock::time_point> pump_deadline;
-  bool pump_ran_task = false;
-  bool pump_budget_exhausted = false;
 };
 
 template <>

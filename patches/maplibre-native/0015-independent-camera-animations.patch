@@ -1,5 +1,5 @@
 diff --git a/include/mln/map/camera.hpp b/include/mln/map/camera.hpp
-index 63e7d2b..a67ab2d 100644
+index 63e7d2b92c20..a67ab2dddec5 100644
 --- a/include/mln/map/camera.hpp
 +++ b/include/mln/map/camera.hpp
 @@ -13,6 +13,10 @@ namespace mln {
@@ -26,7 +26,7 @@ index 63e7d2b..a67ab2d 100644
  
      /** Creates an animation with no options specified. */
 diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
-index c05acb1..c2da17d 100644
+index c05acb105252..03d07b0086fb 100644
 --- a/src/mln/map/transform.cpp
 +++ b/src/mln/map/transform.cpp
 @@ -95,8 +95,7 @@ CameraOptions Transform::getCameraOptions(const std::optional<EdgeInsets>& paddi
@@ -196,7 +196,7 @@ index c05acb1..c2da17d 100644
  }
  
  // MARK: - Position
-@@ -585,130 +545,167 @@ ProjectionMode Transform::getProjectionMode() const {
+@@ -585,130 +545,177 @@ ProjectionMode Transform::getProjectionMode() const {
  
  // MARK: - Transition
  
@@ -219,6 +219,7 @@ index c05acb1..c2da17d 100644
 +    transition->fields = cameraFields(camera);
 +    transition->coupledFields = flight ? Center | Zoom : 0;
 +    transition->fields |= transition->coupledFields;
++
 +    // An anchor controls center together with the properties it transforms.
 +    // An explicit center takes precedence over an anchor.
 +    transition->anchor = camera.center ? std::nullopt : camera.anchor;
@@ -227,12 +228,25 @@ index c05acb1..c2da17d 100644
 +        transition->coupledFields = transition->fields;
 +        transition->anchor->y = state.getSize().height - transition->anchor->y;
 +        transition->anchorLatLng = state.screenCoordinateToLatLng(*transition->anchor);
-+    }
+     }
+ 
+-    bool isAnimated = duration != Duration::zero();
+-    observer.onCameraWillChange(isAnimated ? MapObserver::CameraChangeMode::Animated
+-                                           : MapObserver::CameraChangeMode::Immediate);
 +    const auto target = frame(1.0);
-+    transition->movingFields =
-+        ((flight || transition->anchor || camera.center != std::optional(getLatLng(LatLng::Unwrapped))) ? Center : 0) |
-+        ((flight || target.zoom != std::optional(getZoom())) ? Zoom : 0) |
-+        ((target.bearing != std::optional(-util::rad2deg(getBearing()))) ? Bearing : 0);
++    const bool panning = flight || transition->anchor || camera.center != std::optional(getLatLng(LatLng::Unwrapped));
++    const bool scaling = flight || target.zoom != std::optional(getZoom());
++    const bool rotating = target.bearing != std::optional(-util::rad2deg(getBearing()));
++    transition->movingFields = (panning ? Center : 0) | (scaling ? Zoom : 0) | (rotating ? Bearing : 0);
+ 
+-    // Associate the anchor, if given, with a coordinate.
+-    // Anchor and center points are mutually exclusive, with preference for the
+-    // center point when both are set.
+-    std::optional<ScreenCoordinate> anchor = camera.center ? std::nullopt : camera.anchor;
+-    LatLng anchorLatLng;
+-    if (anchor) {
+-        anchor->y = state.getSize().height - anchor->y;
+-        anchorLatLng = state.screenCoordinateToLatLng(*anchor);
 +    transition->start = transitionStart = Clock::now();
 +    transition->duration = transitionDuration = transition->fields ? duration : Duration::zero();
 +    transition->frame = frame;
@@ -255,6 +269,7 @@ index c05acb1..c2da17d 100644
 +    observer.onCameraWillChange(animated ? MapObserver::CameraChangeMode::Animated
 +                                         : MapObserver::CameraChangeMode::Immediate);
 +    if (std::find(transitions.begin(), transitions.end(), transition) == transitions.end()) return;
++
 +    if (!animated) {
 +        applyTransitions({transition}, transition->start);
 +        std::erase(transitions, transition);
@@ -266,7 +281,7 @@ index c05acb1..c2da17d 100644
 +void Transform::applyTransitions(const std::vector<std::shared_ptr<Transition>>& active, const TimePoint& now) {
 +    auto camera = state.getCameraOptions(std::nullopt);
 +    camera.center = getLatLng(LatLng::Unwrapped);
-+    std::shared_ptr<Transition> anchored;
++
 +    for (const auto& transition : active) {
 +        const double t = transition->duration == Duration::zero()
 +                             ? 1.0
@@ -285,15 +300,24 @@ index c05acb1..c2da17d 100644
 +        if (fields & Altitude) camera.centerAltitude = value.centerAltitude;
 +        if (fields & Roll) camera.roll = value.roll;
 +        if (fields & Fov) camera.fov = value.fov;
-+    }
-+    // An active anchor also applies to immediate changes of other properties.
-+    for (const auto& transition : transitions) {
-+        if (transition->anchor && (transition->fields & Center)) anchored = transition;
      }
  
--    bool isAnimated = duration != Duration::zero();
--    observer.onCameraWillChange(isAnimated ? MapObserver::CameraChangeMode::Animated
--                                           : MapObserver::CameraChangeMode::Immediate);
+-    transitionStart = Clock::now();
+-    transitionDuration = duration;
++    // An active anchor also applies to immediate changes of other properties.
++    std::shared_ptr<Transition> anchored;
++    for (const auto& transition : transitions) {
++        if (transition->anchor && (transition->fields & Center)) anchored = transition;
++    }
+ 
+-    transitionFrameFn = [isAnimated, animation, frame, anchor, anchorLatLng, this](const TimePoint now) {
+-        float t = isAnimated ? (std::chrono::duration<float>(now - transitionStart) / transitionDuration) : 1.0f;
+-        if (t >= 1.0) {
+-            frame(1.0);
+-        } else {
+-            util::UnitBezier ease = animation.easing ? *animation.easing : util::DEFAULT_TRANSITION_EASE;
+-            frame(ease.solve(t, 0.001));
+-        }
 +    // Compose the camera before applying constraints. In particular, padding
 +    // and field of view determine the pitch limit, and center and zoom jointly
 +    // determine the geographic bounds and altitude scale.
@@ -308,15 +332,7 @@ index c05acb1..c2da17d 100644
 +    state.setCenterAltitude(*camera.centerAltitude);
 +}
  
--    // Associate the anchor, if given, with a coordinate.
--    // Anchor and center points are mutually exclusive, with preference for the
--    // center point when both are set.
--    std::optional<ScreenCoordinate> anchor = camera.center ? std::nullopt : camera.anchor;
--    LatLng anchorLatLng;
--    if (anchor) {
--        anchor->y = state.getSize().height - anchor->y;
--        anchorLatLng = state.screenCoordinateToLatLng(*anchor);
--    }
+-        if (anchor) state.moveLatLng(anchorLatLng, *anchor);
 +void Transform::updateMovementFlags() {
 +    uint16_t moving = 0;
 +    for (const auto& transition : transitions) moving |= transition->fields & transition->movingFields;
@@ -326,20 +342,6 @@ index c05acb1..c2da17d 100644
 +                            .withRotatingInProgress(moving & Bearing));
 +}
  
--    transitionStart = Clock::now();
--    transitionDuration = duration;
--
--    transitionFrameFn = [isAnimated, animation, frame, anchor, anchorLatLng, this](const TimePoint now) {
--        float t = isAnimated ? (std::chrono::duration<float>(now - transitionStart) / transitionDuration) : 1.0f;
--        if (t >= 1.0) {
--            frame(1.0);
--        } else {
--            util::UnitBezier ease = animation.easing ? *animation.easing : util::DEFAULT_TRANSITION_EASE;
--            frame(ease.solve(t, 0.001));
--        }
--
--        if (anchor) state.moveLatLng(anchorLatLng, *anchor);
--
 -        // At t = 1.0, a DidChangeAnimated notification should be sent from finish().
 -        if (t < 1.0) {
 -            if (animation.transitionFrameFn) {
@@ -390,7 +392,16 @@ index c05acb1..c2da17d 100644
  void Transform::updateTransitions(const TimePoint& now) {
 -    // Use a temporary function to ensure that the transitionFrameFn lambda is
 -    // called only once per update.
--
++    // Observers can synchronously update the map or start another command.
++    // Snapshot the commands for this frame, and detach completed commands
++    // before calling user code so each command finishes exactly once.
++    if (updatingTransitions || transitions.empty()) return;
++    updatingTransitions = true;
++    struct TransitionUpdateGuard {
++        bool& updating;
++        ~TransitionUpdateGuard() { updating = false; }
++    } guard{updatingTransitions};
+ 
 -    // This addresses the symptoms of
 -    // https://github.com/mapbox/mapbox-gl-native/issues/11180 where setting a
 -    // shape source to nil (or similar) in the `onCameraIsChanging` observer
@@ -405,7 +416,9 @@ index c05acb1..c2da17d 100644
 -    // It's important to note that the scope of this change is stop the above
 -    // crashes. It doesn't address any potential deeper issue (for example
 -    // user error, how often and when transition callbacks are called).
--
++    const auto active = transitions;
++    applyTransitions(active, now);
+ 
 -    auto transition = std::move(transitionFrameFn);
 -    transitionFrameFn = nullptr;
 -
@@ -419,17 +432,6 @@ index c05acb1..c2da17d 100644
 -
 -        if (finish) {
 -            finish();
-+    // Observers can synchronously update the map or start another command.
-+    // Snapshot the commands for this frame, and detach completed commands
-+    // before calling user code so each command finishes exactly once.
-+    if (updatingTransitions || transitions.empty()) return;
-+    updatingTransitions = true;
-+    struct Reset {
-+        bool& flag;
-+        ~Reset() { flag = false; }
-+    } reset{updatingTransitions};
-+    const auto active = transitions;
-+    applyTransitions(active, now);
 +    std::vector<std::shared_ptr<Transition>> finished;
 +    for (const auto& transition : active) {
 +        if (now - transition->start >= transition->duration) {
@@ -443,6 +445,7 @@ index c05acb1..c2da17d 100644
 -        transitionFrameFn = std::move(transition);
      }
 +    updateMovementFlags();
++
 +    for (const auto& transition : active) {
 +        if (std::find(transitions.begin(), transitions.end(), transition) == transitions.end()) continue;
 +        if (transition->animation.transitionFrameFn) {
@@ -454,6 +457,7 @@ index c05acb1..c2da17d 100644
 +        }
 +    }
 +    if (!transitions.empty()) observer.onCameraIsChanging();
++
 +    finishTransitions(finished);
  }
  
@@ -471,7 +475,7 @@ index c05acb1..c2da17d 100644
  
  void Transform::setGestureInProgress(bool inProgress) {
 diff --git a/src/mln/map/transform.hpp b/src/mln/map/transform.hpp
-index d9ec6ac..c93af33 100644
+index d9ec6acf284a..ef0bba55ad44 100644
 --- a/src/mln/map/transform.hpp
 +++ b/src/mln/map/transform.hpp
 @@ -13,6 +13,8 @@
@@ -483,7 +487,16 @@ index d9ec6ac..c93af33 100644
  
  namespace mln {
  
-@@ -144,16 +146,45 @@ private:
+@@ -113,6 +115,8 @@ public:
+     // Transitions
+     bool inTransition() const;
+     void updateTransitions(const TimePoint& now);
++    // Timing of the most recently started command, even after it finishes.
++    // Other commands may still be active.
+     TimePoint getTransitionStart() const { return transitionStart; }
+     Duration getTransitionDuration() const { return transitionDuration; }
+     void cancelTransitions();
+@@ -144,16 +148,49 @@ private:
  
      void startTransition(const CameraOptions&,
                           const AnimationOptions&,
@@ -506,8 +519,12 @@ index d9ec6ac..c93af33 100644
 +    struct Transition {
 +        explicit Transition(const AnimationOptions& options)
 +            : animation(options) {}
++        // Remaining property ownership; replacement removes fields from this mask.
 +        uint16_t fields;
++        // Replacing any coupled field relinquishes all coupled fields together.
 +        uint16_t coupledFields;
++        // Properties classified as moving at command start; intersect with fields
++        // when reporting movement so replaced properties no longer contribute.
 +        uint16_t movingFields;
 +        TimePoint start;
 +        Duration duration;
@@ -534,10 +551,10 @@ index d9ec6ac..c93af33 100644
  
  } // namespace mln
 diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
-index 3a886f6..4d152bc 100644
+index 3a886f6622c9..6c03189f275f 100644
 --- a/test/map/transform.test.cpp
 +++ b/test/map/transform.test.cpp
-@@ -1268,3 +1268,249 @@ TEST(Camera, SetOrientationWithRollNoPitch) {
+@@ -1268,3 +1268,250 @@ TEST(Camera, SetOrientationWithRollNoPitch) {
      EXPECT_NEAR(pitch, pitch_, 1.0e-9);
      EXPECT_NEAR(0.0, roll_, 1.0e-9);
  }
@@ -673,14 +690,15 @@ index 3a886f6..4d152bc 100644
 +    AnimationOptions animation(Seconds(4));
 +    animation.easing.emplace(1.0 / 3, 1.0 / 3, 2.0 / 3, 2.0 / 3);
 +    transform.easeTo(CameraOptions().withPadding(EdgeInsets{300, 20, 0, 0}), animation);
-+    transform.easeTo(CameraOptions().withPitch(50).withFov(45), animation);
++    transform.easeTo(CameraOptions().withPitch(60).withFov(45), animation);
 +    const auto end = transform.getTransitionStart() + Seconds(4);
 +    transform.updateTransitions(end);
 +    EXPECT_EQ(transform.getState().getEdgeInsets(), (EdgeInsets{300, 20, 0, 0}));
 +    EXPECT_NEAR(util::rad2deg(transform.getFieldOfView()), 45, 1e-5);
 +    const auto maxPitch = transform.getState().getMaxPitch() + util::deg2rad(45.0) / 2 -
 +                          std::atan(1.3 * std::tan(util::deg2rad(45.0) / 2));
-+    EXPECT_NEAR(transform.getPitch(), std::min(util::deg2rad(50.0), maxPitch), 1e-5);
++    ASSERT_LT(maxPitch, util::deg2rad(60.0));
++    EXPECT_NEAR(transform.getPitch(), maxPitch, 1e-5);
 +    EXPECT_FALSE(transform.inTransition());
 +}
 +

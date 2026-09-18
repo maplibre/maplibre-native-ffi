@@ -1,5 +1,5 @@
 diff --git a/include/mln/vulkan/renderable_resource.hpp b/include/mln/vulkan/renderable_resource.hpp
-index 01efce01852..e6a19e2d6c6 100644
+index 01efce018527..e6a19e2d6c66 100644
 --- a/include/mln/vulkan/renderable_resource.hpp
 +++ b/include/mln/vulkan/renderable_resource.hpp
 @@ -1,5 +1,8 @@
@@ -36,7 +36,7 @@ index 01efce01852..e6a19e2d6c6 100644
      virtual std::vector<const char*> getDeviceExtensions() { return {}; }
  
 diff --git a/src/mln/vulkan/context.cpp b/src/mln/vulkan/context.cpp
-index 174a1686f80..b7019d9aac8 100644
+index 174a1686f80e..b7019d9aac85 100644
 --- a/src/mln/vulkan/context.cpp
 +++ b/src/mln/vulkan/context.cpp
 @@ -302,10 +302,7 @@ void Context::beginFrame() {
@@ -81,10 +81,10 @@ index 174a1686f80..b7019d9aac8 100644
      frame.commandBuffer->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit), dispatcher);
  
 diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
-index 24fbe22c2fd..688d84e89d7 100644
+index 48379fa7c43b..b3b772c02f3d 100644
 --- a/test/CMakeLists.txt
 +++ b/test/CMakeLists.txt
-@@ -160,6 +160,7 @@ if(MLN_WITH_VULKAN)
+@@ -162,6 +162,7 @@ if(MLN_WITH_VULKAN)
          PRIVATE
              ${PROJECT_SOURCE_DIR}/test/api/custom_layer.test.cpp
              ${PROJECT_SOURCE_DIR}/test/renderer/backend_scope.test.cpp
@@ -94,7 +94,7 @@ index 24fbe22c2fd..688d84e89d7 100644
  endif()
 diff --git a/test/renderer/vulkan_acquire.test.cpp b/test/renderer/vulkan_acquire.test.cpp
 new file mode 100644
-index 00000000000..b0f0e569607
+index 000000000000..b0f0e5696076
 --- /dev/null
 +++ b/test/renderer/vulkan_acquire.test.cpp
 @@ -0,0 +1,122 @@

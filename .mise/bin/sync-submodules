@@ -56,13 +56,12 @@ mlt_vendor_paths=(
 # pointing at maplibre/maplibre-native. See patches/maplibre-native/README.md.
 mln_patches=(
   "$repo_root/patches/maplibre-native/0002-windows-local-file-urls.patch"
-  "$repo_root/patches/maplibre-native/0003-run-loop-process-gate.patch"
+  "$repo_root/patches/maplibre-native/0003-run-loop-budget.patch"
   "$repo_root/patches/maplibre-native/0004-opengl-valid-api-calls.patch"
   "$repo_root/patches/maplibre-native/0005-unwrapped-unprojection.patch"
   "$repo_root/patches/maplibre-native/0006-process-lifetime-logging.patch"
   "$repo_root/patches/maplibre-native/0007-retain-active-on-demand-images.patch"
   "$repo_root/patches/maplibre-native/0009-synchronous-symbol-dependencies.patch"
-  "$repo_root/patches/maplibre-native/0010-background-drawable-replacement.patch"
   "$repo_root/patches/maplibre-native/0011-opengl-uniform-block-order.patch"
   "$repo_root/patches/maplibre-native/0012-vulkan-surface-acquire-timeout.patch"
   "$repo_root/patches/maplibre-native/0013-projection-from-transform-state.patch"
@@ -71,8 +70,6 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0016-location-indicator-color-transitions.patch"
   "$repo_root/patches/maplibre-native/0017-location-indicator-top-image-hit-testing.patch"
   "$repo_root/patches/maplibre-native/0018-location-indicator-missing-images.patch"
-  "$repo_root/patches/maplibre-native/0019-webgpu-location-indicator-uniform-binding.patch"
-  "$repo_root/patches/maplibre-native/0020-webgpu-required-bindings.patch"
   "$repo_root/patches/maplibre-native/0021-location-indicator-bearing-accuracy.patch"
 )
 

@@ -362,9 +362,12 @@ class SessionFrameObserver final : public mln::RendererObserver {
     delegate_->onWillStartRenderingFrame();
   }
 
+  // The renderer reports frames through the shared-pointer overload, and
+  // mln::Map::Impl implements only that one, so the delegate receives the
+  // same pointer rather than a copy of the stats.
   void onDidFinishRenderingFrame(
     RenderMode mode, bool repaint, bool placement_changed,
-    const mln::gfx::RenderingStats& stats
+    std::shared_ptr<mln::gfx::RenderingStats> stats
   ) override {
     if (suppress_frame_callbacks_) {
       return;
@@ -373,7 +376,7 @@ class SessionFrameObserver final : public mln::RendererObserver {
     frame_completed_ = true;
     if (delegate_ != nullptr) {
       delegate_->onDidFinishRenderingFrame(
-        mode, repaint, placement_changed, stats
+        mode, repaint, placement_changed, std::move(stats)
       );
     }
   }

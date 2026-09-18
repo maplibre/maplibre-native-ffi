@@ -1527,7 +1527,11 @@ auto render_frame_payload(const mln::MapObserver::RenderFrameStatus& status)
     .mode = to_c_render_mode(status.mode),
     .needs_repaint = status.needsRepaint,
     .placement_changed = status.placementChanged,
-    .stats = to_c_rendering_stats(status.renderingStats)
+    // Native always attaches the frame's stats; a missing pointer reports
+    // zeroed counters rather than reading through null.
+    .stats = status.renderingStats != nullptr
+               ? to_c_rendering_stats(*status.renderingStats)
+               : mln_rendering_stats{}
   };
   return payload;
 }
@@ -1822,14 +1826,16 @@ class ForwardingRendererObserver final : public mln::RendererObserver {
 
   void onDidFinishRenderingFrame(
     RenderMode mode, bool repaint_needed, bool placement_changed,
-    const mln::gfx::RenderingStats& stats
+    std::shared_ptr<mln::gfx::RenderingStats> stats
   ) override {
-    // The name carries three overloads; mln::Map::Impl implements only this
-    // one.
+    // The name carries four overloads; mln::Map::Impl implements only this
+    // one, and it schedules the next update from it.
     void (mln::RendererObserver::*method)(
-      RenderMode, bool, bool, const mln::gfx::RenderingStats&
+      RenderMode, bool, bool, std::shared_ptr<mln::gfx::RenderingStats>
     ) = &mln::RendererObserver::onDidFinishRenderingFrame;
-    delegate_.invoke(method, mode, repaint_needed, placement_changed, stats);
+    delegate_.invoke(
+      method, mode, repaint_needed, placement_changed, std::move(stats)
+    );
   }
 
   void onDidFinishRenderingMap() override {

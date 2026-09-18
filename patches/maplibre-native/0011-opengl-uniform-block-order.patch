@@ -1,5 +1,5 @@
 diff --git a/include/mln/shaders/gl/background_pattern.hpp b/include/mln/shaders/gl/background_pattern.hpp
-index f0f3eae..9d0c0eb 100644
+index f0f3eaedddd3..9d0c0eb25075 100644
 --- a/include/mln/shaders/gl/background_pattern.hpp
 +++ b/include/mln/shaders/gl/background_pattern.hpp
 @@ -42,19 +42,7 @@ void main() {
@@ -43,7 +43,7 @@ index f0f3eae..9d0c0eb 100644
  
  in mediump vec2 v_pos_a;
 diff --git a/include/mln/shaders/gl/line_sdf.hpp b/include/mln/shaders/gl/line_sdf.hpp
-index 2b1c870..0833dc4 100644
+index 2b1c870d6edf..0833dc467c65 100644
 --- a/include/mln/shaders/gl/line_sdf.hpp
 +++ b/include/mln/shaders/gl/line_sdf.hpp
 @@ -188,14 +188,7 @@ lowp float floorwidth = u_floorwidth;
@@ -77,7 +77,7 @@ index 2b1c870..0833dc4 100644
  
  in vec2 v_normal;
 diff --git a/include/mln/shaders/gl/symbol_icon.hpp b/include/mln/shaders/gl/symbol_icon.hpp
-index 194c200..e6b803a 100644
+index 194c2003aae0..e6b803a2ebb7 100644
 --- a/include/mln/shaders/gl/symbol_icon.hpp
 +++ b/include/mln/shaders/gl/symbol_icon.hpp
 @@ -148,13 +148,6 @@ lowp float opacity = u_opacity;
@@ -109,7 +109,7 @@ index 194c200..e6b803a 100644
  in float v_fade_opacity;
  
 diff --git a/include/mln/shaders/gl/symbol_sdf.hpp b/include/mln/shaders/gl/symbol_sdf.hpp
-index 0e43733..6cbc7fd 100644
+index 0e43733ea49f..6cbc7fdb906a 100644
 --- a/include/mln/shaders/gl/symbol_sdf.hpp
 +++ b/include/mln/shaders/gl/symbol_sdf.hpp
 @@ -205,13 +205,6 @@ lowp float halo_blur = u_halo_blur;
@@ -141,7 +141,7 @@ index 0e43733..6cbc7fd 100644
  
  in vec2 v_data0;
 diff --git a/include/mln/shaders/gl/symbol_text_and_icon.hpp b/include/mln/shaders/gl/symbol_text_and_icon.hpp
-index 27ceb07..89ad613 100644
+index 27ceb07fc437..89ad613a4288 100644
 --- a/include/mln/shaders/gl/symbol_text_and_icon.hpp
 +++ b/include/mln/shaders/gl/symbol_text_and_icon.hpp
 @@ -208,13 +208,6 @@ lowp float halo_blur = u_halo_blur;
@@ -173,7 +173,7 @@ index 27ceb07..89ad613 100644
  uniform sampler2D u_texture_icon;
  
 diff --git a/shaders/background_pattern.fragment.glsl b/shaders/background_pattern.fragment.glsl
-index 8729d5d..d61a9d2 100644
+index 8729d5d62542..d61a9d230f5d 100644
 --- a/shaders/background_pattern.fragment.glsl
 +++ b/shaders/background_pattern.fragment.glsl
 @@ -1,15 +1,3 @@
@@ -212,7 +212,7 @@ index 8729d5d..d61a9d2 100644
  
  in mediump vec2 v_pos_a;
 diff --git a/shaders/line_sdf.fragment.glsl b/shaders/line_sdf.fragment.glsl
-index 852f5f6..2e800e1 100644
+index 852f5f6d59a6..2e800e177fd1 100644
 --- a/shaders/line_sdf.fragment.glsl
 +++ b/shaders/line_sdf.fragment.glsl
 @@ -1,10 +1,3 @@
@@ -241,7 +241,7 @@ index 852f5f6..2e800e1 100644
  
  in vec2 v_normal;
 diff --git a/shaders/symbol_icon.fragment.glsl b/shaders/symbol_icon.fragment.glsl
-index ce3a301..c39859f 100644
+index ce3a301d52d7..c39859ffcffd 100644
 --- a/shaders/symbol_icon.fragment.glsl
 +++ b/shaders/symbol_icon.fragment.glsl
 @@ -1,12 +1,5 @@
@@ -272,7 +272,7 @@ index ce3a301..c39859f 100644
  in float v_fade_opacity;
  
 diff --git a/shaders/symbol_sdf.fragment.glsl b/shaders/symbol_sdf.fragment.glsl
-index 76bfd36..c50ba67 100644
+index 76bfd36e4645..c50ba671ade3 100644
 --- a/shaders/symbol_sdf.fragment.glsl
 +++ b/shaders/symbol_sdf.fragment.glsl
 @@ -1,12 +1,5 @@
@@ -303,7 +303,7 @@ index 76bfd36..c50ba67 100644
  
  in vec2 v_data0;
 diff --git a/shaders/symbol_text_and_icon.fragment.glsl b/shaders/symbol_text_and_icon.fragment.glsl
-index ce5d120..1ada6fa 100644
+index ce5d120c8bad..1ada6fab0001 100644
 --- a/shaders/symbol_text_and_icon.fragment.glsl
 +++ b/shaders/symbol_text_and_icon.fragment.glsl
 @@ -3,13 +3,6 @@
@@ -335,11 +335,12 @@ index ce5d120..1ada6fa 100644
  uniform sampler2D u_texture_icon;
  
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
+index 09a752f9467d..df747a8c2458 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
-@@ -2096,6 +2096,83 @@
-     test::checkImage("test/fixtures/map/setFrustumOffset/after", test.frontend.render(test.map).image, 0.0006, 0.1);
- }
+@@ -2211,6 +2211,87 @@ INSTANTIATE_TEST_SUITE_P(GeoJSON,
+                                     (withText ? "WithText" : "IconOnly");
+                          });
  
 +class UniformBlockOrderTest : public testing::TestWithParam<std::string> {};
 +
@@ -409,14 +410,18 @@ diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
 +        redPixels += pixel[0] > 200 && pixel[1] < 100 && pixel[2] < 100;
 +        bluePixels += pixel[2] > 200 && pixel[0] < 100 && pixel[1] < 100;
 +    }
-+    if (withText || kind == "line") EXPECT_GT(redPixels, 100u);
-+    if (withImage) EXPECT_GT(bluePixels, 100u);
++    if (withText || kind == "line") {
++        EXPECT_GT(redPixels, 100u);
++    }
++    if (withImage) {
++        EXPECT_GT(bluePixels, 100u);
++    }
 +}
 +
 +INSTANTIATE_TEST_SUITE_P(Rendering,
 +                         UniformBlockOrderTest,
 +                         testing::Values("text", "icon", "mixed", "line", "background"),
-+                         [](const testing::TestParamInfo<std::string>& info) { return info.param; });
++                         [](const testing::TestParamInfo<std::string>& paramInfo) { return paramInfo.param; });
 +
  // End-to-end: a feature-state change must alter the *rendered* output, not just
  // the value read back through the API. A fill covering the viewport is colored

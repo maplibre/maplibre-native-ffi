@@ -1,16 +1,23 @@
 diff --git a/src/mln/renderer/layers/render_location_indicator_layer.cpp b/src/mln/renderer/layers/render_location_indicator_layer.cpp
-index fccbcb7bf8151b791bbc95ec1b5209bdcdff48e6..56d6407c336a98e71b8bcb85bd58a27e36bf0615 100644
+index 51af6dd1e219..655c852b39b7 100644
 --- a/src/mln/renderer/layers/render_location_indicator_layer.cpp
 +++ b/src/mln/renderer/layers/render_location_indicator_layer.cpp
-@@ -1303,2 +1303,3 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
+@@ -1333,6 +1333,7 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
+             drawable.setTexture(info.textureInfo.texture, shaders::idLocationIndicatorTexture);
+             info.textureInfo.dirty = false;
          }
 +        drawable.setEnabled(static_cast<bool>(info.textureInfo.texture));
      };
+ 
+     updateCircleDrawable();
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
+index e581c0365400..27958def3f59 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
-@@ -102,2 +102,19 @@
- };
+@@ -2434,3 +2434,20 @@ TEST(Map, LocationIndicatorAccuracyColorsTransition) {
+     }
+     EXPECT_GT(greenPixels, 0u) << "The accuracy border should finish transitioning to green";
+ }
 +
 +TEST(Map, LocationIndicatorWithoutImages) {
 +    MapTest<> test;
@@ -28,4 +35,3 @@ diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
 +    // Neither the accuracy circle nor any image should produce a draw call.
 +    EXPECT_EQ(test.frontend.render(test.map).stats.numDrawCalls, 0);
 +}
- 
