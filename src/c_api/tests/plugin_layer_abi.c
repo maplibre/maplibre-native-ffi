@@ -2,6 +2,7 @@
 // library's exports, and a layer type registered through it renders through
 // the C API on every backend the plugin API declares shaders for.
 
+#include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>

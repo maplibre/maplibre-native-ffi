@@ -519,7 +519,8 @@ fn addMaplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Modu
 }
 
 fn defaultDocIncludeDirs(b: *std.Build) []const std.Build.LazyPath {
-    return &.{b.path("include")};
+    // The plugin header includes MapLibre Native's mln/plugin/plugin_api.h.
+    return &.{ b.path("include"), b.path("third_party/maplibre-native/include") };
 }
 
 fn addMaplibreNativeDocs(
