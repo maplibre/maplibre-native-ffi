@@ -212,12 +212,9 @@ void copyRows(
   uint8_t* dst, const uint8_t* src, uint32_t width, uint32_t height,
   std::size_t rowStride, int32_t format
 ) {
-  const auto tightStride =
-    checkedByteCount(static_cast<std::size_t>(width), 4, "row stride");
-
   for (uint32_t y = 0; y < height; ++y) {
     const auto* srcRow = src + y * rowStride;
-    auto* dstRow = dst + y * tightStride;
+    auto* dstRow = dst + y * rowStride;
 
     if (format == PIXEL_FORMAT_BGRA_8888) {
       for (uint32_t x = 0; x < width; ++x) {
@@ -227,7 +224,7 @@ void copyRows(
         dstRow[4 * x + 3] = srcRow[4 * x + 3];
       }
     } else {
-      std::memcpy(dstRow, srcRow, tightStride);
+      std::memcpy(dstRow, srcRow, rowStride);
     }
   }
 }
@@ -315,6 +312,12 @@ PremultipliedImage decodeImage(const std::string& string) {
     );
   }
 
+  // OH_PixelmapNative_ReadPixels copies each row without its padding bytes
+  // and treats bufferSize as input capacity only, so the buffer it fills is
+  // always tightly packed even when the pixelmap reports a padded row stride.
+  // OH_PixelmapNative_GetByteCount reports that unpadded size; verify it
+  // before reading so a decoder that disagrees fails loudly instead of
+  // producing a corrupted image.
   const auto tightRowStride =
     checkedByteCount(static_cast<std::size_t>(width), 4, "row stride");
   if (rowStride < tightRowStride) {
@@ -323,21 +326,28 @@ PremultipliedImage decodeImage(const std::string& string) {
       description
     );
   }
-  const auto bytesRequired =
-    checkedByteCount(rowStride, height, "pixel buffer size");
-  std::vector<uint8_t> pixels(bytesRequired);
-  size_t bytesRead = pixels.size();
+  const auto tightBytes =
+    checkedByteCount(tightRowStride, height, "pixel buffer size");
+
+  uint32_t byteCount = 0;
   checkImageResult(
-    OH_PixelmapNative_ReadPixels(pixelmap.get(), pixels.data(), &bytesRead),
-    "OH_PixelmapNative_ReadPixels"
+    OH_PixelmapNative_GetByteCount(pixelmap.get(), &byteCount),
+    "OH_PixelmapNative_GetByteCount"
   );
-  if (bytesRead < bytesRequired) {
+  if (byteCount != tightBytes) {
     throw std::runtime_error(
-      "OHOS image decoder returned fewer pixel bytes than expected: read " +
-      std::to_string(bytesRead) + " of " + std::to_string(bytesRequired) +
-      " bytes, " + description
+      "OHOS image decoder reported unexpected pixel byte count " +
+      std::to_string(byteCount) + " (expected " + std::to_string(tightBytes) +
+      "), " + description
     );
   }
+
+  std::vector<uint8_t> pixels(tightBytes);
+  size_t bufferSize = pixels.size();
+  checkImageResult(
+    OH_PixelmapNative_ReadPixels(pixelmap.get(), pixels.data(), &bufferSize),
+    "OH_PixelmapNative_ReadPixels"
+  );
 
   const Size imageSize{width, height};
   if (
@@ -346,14 +356,15 @@ PremultipliedImage decodeImage(const std::string& string) {
   ) {
     UnassociatedImage image(imageSize);
     copyRows(
-      image.data.get(), pixels.data(), width, height, rowStride, pixelFormat
+      image.data.get(), pixels.data(), width, height, tightRowStride,
+      pixelFormat
     );
     return util::premultiply(std::move(image));
   }
 
   PremultipliedImage image(imageSize);
   copyRows(
-    image.data.get(), pixels.data(), width, height, rowStride, pixelFormat
+    image.data.get(), pixels.data(), width, height, tightRowStride, pixelFormat
   );
   return image;
 }

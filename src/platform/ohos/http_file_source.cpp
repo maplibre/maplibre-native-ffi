@@ -176,7 +176,7 @@ const char* errorCodeName(uint32_t errCode) {
   }
 }
 
-std::string errorMessage(const Resource& resource, uint32_t errCode) {
+std::string errorMessage(uint32_t errCode) {
   std::string message{"OpenHarmony HTTP request failed with "};
   if (const char* name = errorCodeName(errCode)) {
     message += name;
@@ -187,17 +187,13 @@ std::string errorMessage(const Resource& resource, uint32_t errCode) {
     message += "error ";
     message += util::toString(errCode);
   }
-  if (!resource.url.empty()) {
-    message += " for ";
-    message += resource.url;
-  }
   return message;
 }
 
-Response makeNetworkError(const Resource& resource, uint32_t errCode) {
+Response makeNetworkError(uint32_t errCode) {
   Response response;
   response.error = std::make_unique<Response::Error>(
-    errorReason(errCode), errorMessage(resource, errCode)
+    errorReason(errCode), errorMessage(errCode)
   );
   return response;
 }
@@ -224,7 +220,7 @@ Response makeResponse(
   const Resource& resource, Http_Response* httpResponse, uint32_t errCode
 ) {
   if (errCode != OH_HTTP_RESULT_OK) {
-    return makeNetworkError(resource, errCode);
+    return makeNetworkError(errCode);
   }
 
   Response response;
