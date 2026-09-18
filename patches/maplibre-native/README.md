@@ -72,11 +72,6 @@ session. The patch includes a Native regression that injects acquisition stalls
 and checks that frame fences remain usable for later GPU submissions. See
 [maplibre-compose#1370](https://github.com/maplibre/maplibre-compose/issues/1370).
 
-`0013-projection-from-transform-state.patch` adds a standalone projection
-constructor that copies a transform state. The C API uses it to expose the
-projection of the update that a render session rendered. Upstream:
-[maplibre-native#4647](https://github.com/maplibre/maplibre-native/pull/4647).
-
 `0014-global-state.patch` adds the `global-state` expression, root `state`
 defaults, and Native's runtime state APIs. State changes update dependent paint
 properties, filters, layout, and color ramps. The patch includes the upstream
