@@ -1,5 +1,5 @@
 diff --git a/src/mln/renderer/layers/render_location_indicator_layer.cpp b/src/mln/renderer/layers/render_location_indicator_layer.cpp
-index f7d617e02162..ea5c3b0c452f 100644
+index 6815a331df57..7ffa7f1669a8 100644
 --- a/src/mln/renderer/layers/render_location_indicator_layer.cpp
 +++ b/src/mln/renderer/layers/render_location_indicator_layer.cpp
 @@ -983,6 +983,12 @@ void RenderLocationIndicatorLayer::evaluate(const PropertyEvaluationParameters&
@@ -16,7 +16,7 @@ index f7d617e02162..ea5c3b0c452f 100644
  
  bool RenderLocationIndicatorLayer::hasTransition() const {
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index df747a8c2458..e581c0365400 100644
+index be333acf82d9..27958def3f59 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
 @@ -28,6 +28,7 @@
@@ -35,11 +35,10 @@ index df747a8c2458..e581c0365400 100644
  
  #include <atomic>
  #include <tuple>
-@@ -2364,3 +2366,71 @@ TEST(Map, FeatureStateChangesRenderedStyle) {
-         EXPECT_GT(centerChannel(result.image, 2), 200) << "blue channel (removed)";
+@@ -2365,6 +2367,74 @@ TEST(Map, FeatureStateChangesRenderedStyle) {
      }
  }
-+
+ 
 +TEST(Map, LocationIndicatorAccuracyColorsTransition) {
 +    MapTest<> test{1, MapMode::Continuous};
 +    test.map.getStyle().loadJSON(R"STYLE({
@@ -107,3 +106,7 @@ index df747a8c2458..e581c0365400 100644
 +    }
 +    EXPECT_GT(greenPixels, 0u) << "The accuracy border should finish transitioning to green";
 +}
++
+ TEST(Map, LocationIndicatorWithoutImages) {
+     MapTest<> test;
+     test.map.getStyle().loadJSON(R"STYLE({

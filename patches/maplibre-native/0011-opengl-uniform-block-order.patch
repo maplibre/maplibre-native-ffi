@@ -335,7 +335,7 @@ index ce5d120c8bad..1ada6fab0001 100644
  uniform sampler2D u_texture_icon;
  
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index 09a752f9467d..df747a8c2458 100644
+index 6a2e3b6f26e3..be333acf82d9 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
 @@ -2211,6 +2211,87 @@ INSTANTIATE_TEST_SUITE_P(GeoJSON,

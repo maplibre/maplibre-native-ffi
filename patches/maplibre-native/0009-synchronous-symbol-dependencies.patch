@@ -59,7 +59,7 @@ index 703dfa23262c..7420f1c72521 100644
      void symbolDependenciesChanged();
      bool hasPendingDependencies() const;
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index 012eea670d11..09a752f9467d 100644
+index 383efcc77846..6a2e3b6f26e3 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
 @@ -21,6 +21,7 @@

@@ -1,5 +1,5 @@
 diff --git a/include/mln/util/run_loop.hpp b/include/mln/util/run_loop.hpp
-index 1a87cd82b4b7..74738a4c1103 100644
+index 1a87cd82b4b7..1920df7f4ab4 100644
 --- a/include/mln/util/run_loop.hpp
 +++ b/include/mln/util/run_loop.hpp
 @@ -2,13 +2,16 @@
@@ -19,7 +19,7 @@ index 1a87cd82b4b7..74738a4c1103 100644
  #include <queue>
  #include <utility>
  
-@@ -45,6 +48,16 @@ public:
+@@ -45,6 +48,23 @@ public:
  
      void run();
      void runOnce();
@@ -27,17 +27,32 @@ index 1a87cd82b4b7..74738a4c1103 100644
 +    /// Like runOnce(), but stops dequeuing tasks once `budget` has elapsed.
 +    /// At least one queued task runs. Tasks left behind stay queued and the
 +    /// loop is woken again, so the next runOnce() or run() picks them up.
++    ///
++    /// Reentrancy: a task may pump the loop again from inside a budgeted
++    /// pass. A nested runOnce(budget) uses only its own budget, and a nested
++    /// runOnce() or run() is unbounded; neither inherits the outer deadline.
++    /// Once the nested call returns, the outer pass continues to honor its
++    /// original deadline.
 +    void runOnce(Duration budget) {
 +        const auto now = Clock::now();
-+        processDeadline = budget > TimePoint::max() - now ? TimePoint::max() : now + budget;
-+        const Scoped clearDeadline([this] { processDeadline.reset(); });
++        const auto previousDeadline = std::exchange(processDeadline,
++                                                    budget > TimePoint::max() - now ? TimePoint::max() : now + budget);
++        const Scoped restoreDeadline([this, previousDeadline] { processDeadline = previousDeadline; });
 +        runOnce();
 +    }
      void stop();
  
      void updateTime();
-@@ -118,24 +131,36 @@ private:
+@@ -116,26 +136,44 @@ private:
+     }
+ 
      void process() {
++        // Take the deadline for this pass only, so a task that pumps the loop
++        // reentrantly does not inherit it. It is put back once the pass ends,
++        // whether or not a nested pass installed a deadline of its own.
++        const auto deadline = std::exchange(processDeadline, std::nullopt);
++        const Scoped restoreDeadline([this, deadline] { processDeadline = deadline; });
++
          std::shared_ptr<WorkTask> task;
          std::unique_lock<std::mutex> lock(mutex);
 +        bool ranTask = false;
@@ -45,7 +60,7 @@ index 1a87cd82b4b7..74738a4c1103 100644
 +            if (highPriorityQueue.empty() && defaultQueue.empty()) {
 +                break;
 +            }
-+            if (ranTask && processDeadline && Clock::now() >= *processDeadline) {
++            if (ranTask && deadline && Clock::now() >= *deadline) {
 +                // Re-arm the wake so the remaining tasks run on the next iteration.
 +                wake();
 +                if (platformCallback) {
@@ -77,7 +92,7 @@ index 1a87cd82b4b7..74738a4c1103 100644
      Queue defaultQueue;
      Queue highPriorityQueue;
 diff --git a/test/util/run_loop.test.cpp b/test/util/run_loop.test.cpp
-index 2a286991273b..c27bf36e91c6 100644
+index 2a286991273b..af20f04f40cc 100644
 --- a/test/util/run_loop.test.cpp
 +++ b/test/util/run_loop.test.cpp
 @@ -6,6 +6,7 @@
@@ -88,7 +103,7 @@ index 2a286991273b..c27bf36e91c6 100644
  
  using namespace mln::util;
  
-@@ -65,6 +66,52 @@ TEST(RunLoop, Priorities) {
+@@ -65,6 +66,95 @@ TEST(RunLoop, Priorities) {
      EXPECT_EQ((std::vector<int>{2, 4, 1, 3}), order);
  }
  
@@ -108,6 +123,49 @@ index 2a286991273b..c27bf36e91c6 100644
 +
 +    loop.runOnce();
 +    EXPECT_EQ((std::vector<int>{2, 1, 3}), order);
++}
++
++TEST(RunLoop, RunOnceBudgetNestedBudgetRestoresOuterDeadline) {
++    std::vector<int> order;
++
++    RunLoop loop(RunLoop::Type::New);
++    loop.invoke([&] {
++        order.push_back(1);
++        // Queue more work (which wakes the loop again) and pump it with a
++        // nested budget: that pass runs one task and stops.
++        loop.invoke([&] { order.push_back(4); });
++        loop.runOnce(mln::Duration::zero());
++        EXPECT_EQ((std::vector<int>{1, 2}), order);
++    });
++    loop.invoke([&] { order.push_back(2); });
++    loop.invoke([&] { order.push_back(3); });
++
++    // The outer pass must still honor its own (expired) deadline after the
++    // nested pass returns, leaving the remaining tasks queued.
++    loop.runOnce(mln::Duration::zero());
++    EXPECT_EQ((std::vector<int>{1, 2}), order);
++
++    loop.runOnce();
++    EXPECT_EQ((std::vector<int>{1, 2, 3, 4}), order);
++}
++
++TEST(RunLoop, RunOnceBudgetNestedRunOnceIsUnbounded) {
++    std::vector<int> order;
++
++    RunLoop loop(RunLoop::Type::New);
++    loop.invoke([&] {
++        order.push_back(1);
++        // Queue more work (which wakes the loop again) and pump it with a
++        // plain nested runOnce(): it does not inherit the outer deadline.
++        loop.invoke([&] { order.push_back(4); });
++        loop.runOnce();
++        EXPECT_EQ((std::vector<int>{1, 2, 3, 4}), order);
++    });
++    loop.invoke([&] { order.push_back(2); });
++    loop.invoke([&] { order.push_back(3); });
++
++    loop.runOnce(mln::Duration::zero());
++    EXPECT_EQ((std::vector<int>{1, 2, 3, 4}), order);
 +}
 +
 +TEST(RunLoop, RunOnceMaximumBudget) {

@@ -75,7 +75,7 @@ index e7ce2835981b..e14c6aa63890 100644
  
  void MapProjection::setCamera(const CameraOptions& camera) {
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index e1db62fc6265..012eea670d11 100644
+index 2d6352668cff..383efcc77846 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
 @@ -11,6 +11,7 @@

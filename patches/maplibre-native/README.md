@@ -116,13 +116,6 @@ the image stays excluded. Upstream:
 [maplibre-native#4640](https://github.com/maplibre/maplibre-native/pull/4640),
 at commit `363acddb8471dc344cb17dac1e2637e17cff5535`.
 
-`0018-location-indicator-missing-images.patch` disables each location-indicator
-image drawable while it has no texture. The upstream regression checks that an
-indicator with no images and zero accuracy radius submits no draw calls.
-Upstream:
-[maplibre-native#4641](https://github.com/maplibre/maplibre-native/pull/4641),
-at commit `4cbaf989cc9c769b0f7710b430a92c8744539e93`.
-
 `0021-location-indicator-bearing-accuracy.patch` adds a bearing-accuracy sector
 with an angular half-width, a radius in logical pixels, and a color that fades
 toward the outer edge. The paint properties support zoom expressions and

@@ -93,7 +93,7 @@ index 7cf4f7ff35d0..84eacdf3bebe 100644
  
      std::vector<FeatureRecord> features;
 diff --git a/src/mln/renderer/layers/render_location_indicator_layer.cpp b/src/mln/renderer/layers/render_location_indicator_layer.cpp
-index ea5c3b0c452f..51af6dd1e219 100644
+index 7ffa7f1669a8..655c852b39b7 100644
 --- a/src/mln/renderer/layers/render_location_indicator_layer.cpp
 +++ b/src/mln/renderer/layers/render_location_indicator_layer.cpp
 @@ -476,7 +476,7 @@ public:
