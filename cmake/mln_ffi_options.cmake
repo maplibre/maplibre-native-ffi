@@ -4,6 +4,8 @@ function(mln_ffi_configure_options)
       CACHE BOOL "Disable MapLibre Native GLFW platform" FORCE)
   set(MLN_WITH_PMTILES ON
       CACHE BOOL "Build MapLibre Native PMTiles support" FORCE)
+  set(MLN_WITH_PLUGINS ON
+      CACHE BOOL "Build MapLibre Native plugin layer support" FORCE)
 
   set(MLN_FFI_RENDER_BACKEND ""
       CACHE STRING "Render backend for this wrapper build")
