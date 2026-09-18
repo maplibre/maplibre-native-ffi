@@ -1,5 +1,6 @@
 #include <array>
 #include <cmath>
+#include <functional>
 #include <string>
 
 #include <mln/platform/thread.hpp>
@@ -52,5 +53,7 @@ void setCurrentThreadPriority(double priority) {
 void attachThread() {}
 
 void detachThread() {}
+
+void runTask(const std::function<void()>& task) { task(); }
 
 }  // namespace mln::platform
