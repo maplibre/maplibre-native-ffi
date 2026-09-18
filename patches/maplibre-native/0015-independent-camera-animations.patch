@@ -1,5 +1,5 @@
 diff --git a/include/mln/map/camera.hpp b/include/mln/map/camera.hpp
-index 63e7d2b..a67ab2d 100644
+index 63e7d2b92c20..a67ab2dddec5 100644
 --- a/include/mln/map/camera.hpp
 +++ b/include/mln/map/camera.hpp
 @@ -13,6 +13,10 @@ namespace mln {
@@ -26,7 +26,7 @@ index 63e7d2b..a67ab2d 100644
  
      /** Creates an animation with no options specified. */
 diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
-index c05acb1..c2da17d 100644
+index c05acb105252..f091f2d5cf35 100644
 --- a/src/mln/map/transform.cpp
 +++ b/src/mln/map/transform.cpp
 @@ -95,8 +95,7 @@ CameraOptions Transform::getCameraOptions(const std::optional<EdgeInsets>& paddi
@@ -196,7 +196,7 @@ index c05acb1..c2da17d 100644
  }
  
  // MARK: - Position
-@@ -585,130 +545,167 @@ ProjectionMode Transform::getProjectionMode() const {
+@@ -585,130 +545,177 @@ ProjectionMode Transform::getProjectionMode() const {
  
  // MARK: - Transition
  
@@ -219,6 +219,7 @@ index c05acb1..c2da17d 100644
 +    transition->fields = cameraFields(camera);
 +    transition->coupledFields = flight ? Center | Zoom : 0;
 +    transition->fields |= transition->coupledFields;
++
 +    // An anchor controls center together with the properties it transforms.
 +    // An explicit center takes precedence over an anchor.
 +    transition->anchor = camera.center ? std::nullopt : camera.anchor;
@@ -227,14 +228,27 @@ index c05acb1..c2da17d 100644
 +        transition->coupledFields = transition->fields;
 +        transition->anchor->y = state.getSize().height - transition->anchor->y;
 +        transition->anchorLatLng = state.screenCoordinateToLatLng(*transition->anchor);
-+    }
+     }
+ 
+-    bool isAnimated = duration != Duration::zero();
+-    observer.onCameraWillChange(isAnimated ? MapObserver::CameraChangeMode::Animated
+-                                           : MapObserver::CameraChangeMode::Immediate);
 +    const auto target = frame(1.0);
-+    transition->movingFields =
-+        ((flight || transition->anchor || camera.center != std::optional(getLatLng(LatLng::Unwrapped))) ? Center : 0) |
-+        ((flight || target.zoom != std::optional(getZoom())) ? Zoom : 0) |
-+        ((target.bearing != std::optional(-util::rad2deg(getBearing()))) ? Bearing : 0);
-+    transition->start = transitionStart = Clock::now();
-+    transition->duration = transitionDuration = transition->fields ? duration : Duration::zero();
++    const bool panning = flight || transition->anchor || camera.center != std::optional(getLatLng(LatLng::Unwrapped));
++    const bool scaling = flight || target.zoom != std::optional(getZoom());
++    const bool rotating = target.bearing != std::optional(-util::rad2deg(getBearing()));
++    transition->movingFields = (panning ? Center : 0) | (scaling ? Zoom : 0) | (rotating ? Bearing : 0);
+ 
+-    // Associate the anchor, if given, with a coordinate.
+-    // Anchor and center points are mutually exclusive, with preference for the
+-    // center point when both are set.
+-    std::optional<ScreenCoordinate> anchor = camera.center ? std::nullopt : camera.anchor;
+-    LatLng anchorLatLng;
+-    if (anchor) {
+-        anchor->y = state.getSize().height - anchor->y;
+-        anchorLatLng = state.screenCoordinateToLatLng(*anchor);
++    transition->start = latestTransitionStart = Clock::now();
++    transition->duration = latestTransitionDuration = transition->fields ? duration : Duration::zero();
 +    transition->frame = frame;
 +
 +    std::vector<std::shared_ptr<Transition>> finished;
@@ -255,6 +269,7 @@ index c05acb1..c2da17d 100644
 +    observer.onCameraWillChange(animated ? MapObserver::CameraChangeMode::Animated
 +                                         : MapObserver::CameraChangeMode::Immediate);
 +    if (std::find(transitions.begin(), transitions.end(), transition) == transitions.end()) return;
++
 +    if (!animated) {
 +        applyTransitions({transition}, transition->start);
 +        std::erase(transitions, transition);
@@ -266,7 +281,7 @@ index c05acb1..c2da17d 100644
 +void Transform::applyTransitions(const std::vector<std::shared_ptr<Transition>>& active, const TimePoint& now) {
 +    auto camera = state.getCameraOptions(std::nullopt);
 +    camera.center = getLatLng(LatLng::Unwrapped);
-+    std::shared_ptr<Transition> anchored;
++
 +    for (const auto& transition : active) {
 +        const double t = transition->duration == Duration::zero()
 +                             ? 1.0
@@ -285,15 +300,24 @@ index c05acb1..c2da17d 100644
 +        if (fields & Altitude) camera.centerAltitude = value.centerAltitude;
 +        if (fields & Roll) camera.roll = value.roll;
 +        if (fields & Fov) camera.fov = value.fov;
-+    }
-+    // An active anchor also applies to immediate changes of other properties.
-+    for (const auto& transition : transitions) {
-+        if (transition->anchor && (transition->fields & Center)) anchored = transition;
      }
  
--    bool isAnimated = duration != Duration::zero();
--    observer.onCameraWillChange(isAnimated ? MapObserver::CameraChangeMode::Animated
--                                           : MapObserver::CameraChangeMode::Immediate);
+-    transitionStart = Clock::now();
+-    transitionDuration = duration;
++    // An active anchor also applies to immediate changes of other properties.
++    std::shared_ptr<Transition> anchored;
++    for (const auto& transition : transitions) {
++        if (transition->anchor && (transition->fields & Center)) anchored = transition;
++    }
+ 
+-    transitionFrameFn = [isAnimated, animation, frame, anchor, anchorLatLng, this](const TimePoint now) {
+-        float t = isAnimated ? (std::chrono::duration<float>(now - transitionStart) / transitionDuration) : 1.0f;
+-        if (t >= 1.0) {
+-            frame(1.0);
+-        } else {
+-            util::UnitBezier ease = animation.easing ? *animation.easing : util::DEFAULT_TRANSITION_EASE;
+-            frame(ease.solve(t, 0.001));
+-        }
 +    // Compose the camera before applying constraints. In particular, padding
 +    // and field of view determine the pitch limit, and center and zoom jointly
 +    // determine the geographic bounds and altitude scale.
@@ -308,15 +332,7 @@ index c05acb1..c2da17d 100644
 +    state.setCenterAltitude(*camera.centerAltitude);
 +}
  
--    // Associate the anchor, if given, with a coordinate.
--    // Anchor and center points are mutually exclusive, with preference for the
--    // center point when both are set.
--    std::optional<ScreenCoordinate> anchor = camera.center ? std::nullopt : camera.anchor;
--    LatLng anchorLatLng;
--    if (anchor) {
--        anchor->y = state.getSize().height - anchor->y;
--        anchorLatLng = state.screenCoordinateToLatLng(*anchor);
--    }
+-        if (anchor) state.moveLatLng(anchorLatLng, *anchor);
 +void Transform::updateMovementFlags() {
 +    uint16_t moving = 0;
 +    for (const auto& transition : transitions) moving |= transition->fields & transition->movingFields;
@@ -326,20 +342,6 @@ index c05acb1..c2da17d 100644
 +                            .withRotatingInProgress(moving & Bearing));
 +}
  
--    transitionStart = Clock::now();
--    transitionDuration = duration;
--
--    transitionFrameFn = [isAnimated, animation, frame, anchor, anchorLatLng, this](const TimePoint now) {
--        float t = isAnimated ? (std::chrono::duration<float>(now - transitionStart) / transitionDuration) : 1.0f;
--        if (t >= 1.0) {
--            frame(1.0);
--        } else {
--            util::UnitBezier ease = animation.easing ? *animation.easing : util::DEFAULT_TRANSITION_EASE;
--            frame(ease.solve(t, 0.001));
--        }
--
--        if (anchor) state.moveLatLng(anchorLatLng, *anchor);
--
 -        // At t = 1.0, a DidChangeAnimated notification should be sent from finish().
 -        if (t < 1.0) {
 -            if (animation.transitionFrameFn) {
@@ -390,7 +392,16 @@ index c05acb1..c2da17d 100644
  void Transform::updateTransitions(const TimePoint& now) {
 -    // Use a temporary function to ensure that the transitionFrameFn lambda is
 -    // called only once per update.
--
++    // Observers can synchronously update the map or start another command.
++    // Snapshot the commands for this frame, and detach completed commands
++    // before calling user code so each command finishes exactly once.
++    if (updatingTransitions || transitions.empty()) return;
++    updatingTransitions = true;
++    struct TransitionUpdateGuard {
++        bool& updating;
++        ~TransitionUpdateGuard() { updating = false; }
++    } guard{updatingTransitions};
+ 
 -    // This addresses the symptoms of
 -    // https://github.com/mapbox/mapbox-gl-native/issues/11180 where setting a
 -    // shape source to nil (or similar) in the `onCameraIsChanging` observer
@@ -405,7 +416,9 @@ index c05acb1..c2da17d 100644
 -    // It's important to note that the scope of this change is stop the above
 -    // crashes. It doesn't address any potential deeper issue (for example
 -    // user error, how often and when transition callbacks are called).
--
++    const auto active = transitions;
++    applyTransitions(active, now);
+ 
 -    auto transition = std::move(transitionFrameFn);
 -    transitionFrameFn = nullptr;
 -
@@ -419,17 +432,6 @@ index c05acb1..c2da17d 100644
 -
 -        if (finish) {
 -            finish();
-+    // Observers can synchronously update the map or start another command.
-+    // Snapshot the commands for this frame, and detach completed commands
-+    // before calling user code so each command finishes exactly once.
-+    if (updatingTransitions || transitions.empty()) return;
-+    updatingTransitions = true;
-+    struct Reset {
-+        bool& flag;
-+        ~Reset() { flag = false; }
-+    } reset{updatingTransitions};
-+    const auto active = transitions;
-+    applyTransitions(active, now);
 +    std::vector<std::shared_ptr<Transition>> finished;
 +    for (const auto& transition : active) {
 +        if (now - transition->start >= transition->duration) {
@@ -443,6 +445,7 @@ index c05acb1..c2da17d 100644
 -        transitionFrameFn = std::move(transition);
      }
 +    updateMovementFlags();
++
 +    for (const auto& transition : active) {
 +        if (std::find(transitions.begin(), transitions.end(), transition) == transitions.end()) continue;
 +        if (transition->animation.transitionFrameFn) {
@@ -454,6 +457,7 @@ index c05acb1..c2da17d 100644
 +        }
 +    }
 +    if (!transitions.empty()) observer.onCameraIsChanging();
++
 +    finishTransitions(finished);
  }
  
@@ -471,7 +475,7 @@ index c05acb1..c2da17d 100644
  
  void Transform::setGestureInProgress(bool inProgress) {
 diff --git a/src/mln/map/transform.hpp b/src/mln/map/transform.hpp
-index d9ec6ac..c93af33 100644
+index d9ec6acf284a..3107c308b74b 100644
 --- a/src/mln/map/transform.hpp
 +++ b/src/mln/map/transform.hpp
 @@ -13,6 +13,8 @@
@@ -483,7 +487,20 @@ index d9ec6ac..c93af33 100644
  
  namespace mln {
  
-@@ -144,16 +146,45 @@ private:
+@@ -113,8 +115,10 @@ public:
+     // Transitions
+     bool inTransition() const;
+     void updateTransitions(const TimePoint& now);
+-    TimePoint getTransitionStart() const { return transitionStart; }
+-    Duration getTransitionDuration() const { return transitionDuration; }
++    // Timing of the most recently started command, even after it finishes.
++    // Other commands may still be active.
++    TimePoint getLatestTransitionStart() const { return latestTransitionStart; }
++    Duration getLatestTransitionDuration() const { return latestTransitionDuration; }
+     void cancelTransitions();
+ 
+     // Gesture
+@@ -144,16 +148,49 @@ private:
  
      void startTransition(const CameraOptions&,
                           const AnimationOptions&,
@@ -506,8 +523,12 @@ index d9ec6ac..c93af33 100644
 +    struct Transition {
 +        explicit Transition(const AnimationOptions& options)
 +            : animation(options) {}
++        // Remaining property ownership; replacement removes fields from this mask.
 +        uint16_t fields;
++        // Replacing any coupled field relinquishes all coupled fields together.
 +        uint16_t coupledFields;
++        // Properties classified as moving at command start; intersect with fields
++        // when reporting movement so replaced properties no longer contribute.
 +        uint16_t movingFields;
 +        TimePoint start;
 +        Duration duration;
@@ -524,20 +545,143 @@ index d9ec6ac..c93af33 100644
      // We don't want to show horizon: limit max pitch based on edge insets.
      double getMaxPitchForEdgeInsets(const EdgeInsets& insets) const;
  
-     TimePoint transitionStart;
-     Duration transitionDuration;
+-    TimePoint transitionStart;
+-    Duration transitionDuration;
 -    std::function<bool(const TimePoint)> transitionFrameFn;
 -    std::function<void()> transitionFinishFn;
++    TimePoint latestTransitionStart;
++    Duration latestTransitionDuration;
 +    std::vector<std::shared_ptr<Transition>> transitions;
 +    bool updatingTransitions = false;
  };
  
  } // namespace mln
 diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
-index 3a886f6..4d152bc 100644
+index 3a886f6622c9..8547b69fcdf2 100644
 --- a/test/map/transform.test.cpp
 +++ b/test/map/transform.test.cpp
-@@ -1268,3 +1268,249 @@ TEST(Camera, SetOrientationWithRollNoPitch) {
+@@ -45,7 +45,7 @@ TEST(Transform, InvalidZoom) {
+     transform.flyTo(CameraOptions()
+                         .withCenter(LatLng{util::LATITUDE_MAX, util::LONGITUDE_MAX})
+                         .withZoom(transform.getState().getMaxZoom()));
+-    transform.updateTransitions(transform.getTransitionStart() + transform.getTransitionDuration());
++    transform.updateTransitions(transform.getLatestTransitionStart() + transform.getLatestTransitionDuration());
+     ASSERT_DOUBLE_EQ(transform.getZoom(), transform.getState().getMaxZoom());
+ 
+     // Executing flyTo with maximum zoom level to the same zoom level causes
+@@ -54,7 +54,7 @@ TEST(Transform, InvalidZoom) {
+     transform.flyTo(CameraOptions()
+                         .withCenter(LatLng{util::LATITUDE_MAX, util::LONGITUDE_MAX})
+                         .withZoom(transform.getState().getMaxZoom()));
+-    transform.updateTransitions(transform.getTransitionStart() + transform.getTransitionDuration());
++    transform.updateTransitions(transform.getLatestTransitionStart() + transform.getLatestTransitionDuration());
+ 
+     ASSERT_TRUE(transform.getState().valid());
+     ASSERT_DOUBLE_EQ(transform.getState().getMaxZoom(), transform.getZoom());
+@@ -497,10 +497,10 @@ TEST(Transform, Camera) {
+ 
+     transform.easeTo(cameraOptions1, easeOptions);
+     ASSERT_TRUE(transform.inTransition());
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(250));
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(500));
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(750));
+-    transform.updateTransitions(transform.getTransitionStart() + transform.getTransitionDuration());
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(250));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(500));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(750));
++    transform.updateTransitions(transform.getLatestTransitionStart() + transform.getLatestTransitionDuration());
+     ASSERT_FALSE(transform.inTransition());
+ 
+     AnimationOptions flyOptions(Seconds(1));
+@@ -519,10 +519,10 @@ TEST(Transform, Camera) {
+ 
+     transform.flyTo(cameraOptions2, flyOptions);
+     ASSERT_TRUE(transform.inTransition());
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(250));
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(500));
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(750));
+-    transform.updateTransitions(transform.getTransitionStart() + transform.getTransitionDuration());
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(250));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(500));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(750));
++    transform.updateTransitions(transform.getLatestTransitionStart() + transform.getLatestTransitionDuration());
+     ASSERT_FALSE(transform.inTransition());
+ 
+     // Anchor and center points are mutually exclusive.
+@@ -531,10 +531,10 @@ TEST(Transform, Camera) {
+     camera.anchor = ScreenCoordinate{0, 0}; // top-left
+     camera.zoom = transform.getState().getMaxZoom();
+     transform.easeTo(camera, AnimationOptions(Seconds(1)));
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(250));
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(500));
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(750));
+-    transform.updateTransitions(transform.getTransitionStart() + transform.getTransitionDuration());
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(250));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(500));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(750));
++    transform.updateTransitions(transform.getLatestTransitionStart() + transform.getLatestTransitionDuration());
+     ASSERT_DOUBLE_EQ(transform.getLatLng().latitude(), 0);
+     ASSERT_DOUBLE_EQ(transform.getLatLng().longitude(), 0);
+ }
+@@ -560,10 +560,10 @@ TEST(Transform, IsPanning) {
+ 
+     transform.resize({1000, 1000});
+     transform.easeTo(CameraOptions().withCenter(LatLng(0, 360.0)), easeOptions);
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(250));
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(500));
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(750));
+-    transform.updateTransitions(transform.getTransitionStart() + transform.getTransitionDuration());
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(250));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(500));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(750));
++    transform.updateTransitions(transform.getLatestTransitionStart() + transform.getLatestTransitionDuration());
+ }
+ 
+ TEST(Transform, DefaultTransform) {
+@@ -647,7 +647,7 @@ TEST(Transform, DefaultTransform) {
+     AnimationOptions easeOptions(Seconds(1));
+     transform.easeTo(CameraOptions().withCenter(LatLng{56, 11}).withZoom(1), easeOptions);
+     ASSERT_TRUE(transform.inTransition());
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(250));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(250));
+ 
+     // Rotate the screen during a transition (resize it)
+     transform.resize({500, 1000});
+@@ -776,11 +776,11 @@ TEST(Transform, LatLngBounds) {
+     };
+     transform.moveBy(ScreenCoordinate{-500, -500}, easeOptions);
+ 
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(0));
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(250));
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(500));
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(750));
+-    transform.updateTransitions(transform.getTransitionStart() + transform.getTransitionDuration());
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(0));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(250));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(500));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(750));
++    transform.updateTransitions(transform.getLatestTransitionStart() + transform.getLatestTransitionDuration());
+ 
+     // Constrain to the right edge.
+     transform.jumpTo(CameraOptions().withCenter(LatLng{inside.latitude(), 241.0}));
+@@ -795,11 +795,11 @@ TEST(Transform, LatLngBounds) {
+     };
+     transform.moveBy(ScreenCoordinate{500, 500}, easeOptions);
+ 
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(0));
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(250));
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(500));
+-    transform.updateTransitions(transform.getTransitionStart() + Milliseconds(750));
+-    transform.updateTransitions(transform.getTransitionStart() + transform.getTransitionDuration());
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(0));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(250));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(500));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(750));
++    transform.updateTransitions(transform.getLatestTransitionStart() + transform.getLatestTransitionDuration());
+ 
+     //    -1   |   0   |  +1
+     // ┌───┬───┰───┬───┰───┬───┐
+@@ -1268,3 +1268,250 @@ TEST(Camera, SetOrientationWithRollNoPitch) {
      EXPECT_NEAR(pitch, pitch_, 1.0e-9);
      EXPECT_NEAR(0.0, roll_, 1.0e-9);
  }
@@ -554,7 +698,7 @@ index 3a886f6..4d152bc 100644
 +        ++zoomFinished;
 +    };
 +    transform.easeTo(CameraOptions().withZoom(12), zoom);
-+    const auto zoomStart = transform.getTransitionStart();
++    const auto zoomStart = transform.getLatestTransitionStart();
 +    transform.updateTransitions(zoomStart + Milliseconds(500));
 +    EXPECT_NEAR(transform.getZoom(), 9, 1e-5);
 +
@@ -564,7 +708,7 @@ index 3a886f6..4d152bc 100644
 +        ++centerFinished;
 +    };
 +    transform.easeTo(CameraOptions().withCenter(LatLng{20, 30}), center);
-+    const auto centerStart = transform.getTransitionStart();
++    const auto centerStart = transform.getLatestTransitionStart();
 +    EXPECT_EQ(zoomFinished, 0u);
 +    transform.updateTransitions(zoomStart + Seconds(2));
 +    EXPECT_NEAR(transform.getZoom(), 12, 1e-5);
@@ -595,7 +739,7 @@ index 3a886f6..4d152bc 100644
 +        ++finished;
 +    };
 +    transform.easeTo(CameraOptions().withZoom(12).withBearing(80), animation);
-+    const auto start = transform.getTransitionStart();
++    const auto start = transform.getLatestTransitionStart();
 +    transform.updateTransitions(start + Seconds(1));
 +    EXPECT_NEAR(transform.getZoom(), 9, 1e-5);
 +    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 20, 1e-5);
@@ -624,7 +768,7 @@ index 3a886f6..4d152bc 100644
 +        ++flightFinished;
 +    };
 +    transform.flyTo(CameraOptions().withCenter(LatLng{20, 30}).withZoom(12).withRoll(20), flight);
-+    const auto start = transform.getTransitionStart();
++    const auto start = transform.getLatestTransitionStart();
 +    transform.updateTransitions(start + Seconds(1));
 +    EXPECT_NEAR(util::rad2deg(transform.getRoll()), 5, 1e-5);
 +    const auto center = transform.getLatLng();
@@ -645,7 +789,7 @@ index 3a886f6..4d152bc 100644
 +    const ScreenCoordinate anchor{200, 300};
 +    const auto fixed = transform.screenCoordinateToLatLng(anchor);
 +    transform.easeTo(CameraOptions().withZoom(12).withAnchor(anchor), anchorAnimation);
-+    transform.updateTransitions(transform.getTransitionStart() + Seconds(1));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Seconds(1));
 +    const auto pixel = transform.latLngToScreenCoordinate(fixed);
 +    EXPECT_NEAR(pixel.x, anchor.x, 1e-5);
 +    EXPECT_NEAR(pixel.y, anchor.y, 1e-5);
@@ -673,14 +817,15 @@ index 3a886f6..4d152bc 100644
 +    AnimationOptions animation(Seconds(4));
 +    animation.easing.emplace(1.0 / 3, 1.0 / 3, 2.0 / 3, 2.0 / 3);
 +    transform.easeTo(CameraOptions().withPadding(EdgeInsets{300, 20, 0, 0}), animation);
-+    transform.easeTo(CameraOptions().withPitch(50).withFov(45), animation);
-+    const auto end = transform.getTransitionStart() + Seconds(4);
++    transform.easeTo(CameraOptions().withPitch(60).withFov(45), animation);
++    const auto end = transform.getLatestTransitionStart() + Seconds(4);
 +    transform.updateTransitions(end);
 +    EXPECT_EQ(transform.getState().getEdgeInsets(), (EdgeInsets{300, 20, 0, 0}));
 +    EXPECT_NEAR(util::rad2deg(transform.getFieldOfView()), 45, 1e-5);
 +    const auto maxPitch = transform.getState().getMaxPitch() + util::deg2rad(45.0) / 2 -
 +                          std::atan(1.3 * std::tan(util::deg2rad(45.0) / 2));
-+    EXPECT_NEAR(transform.getPitch(), std::min(util::deg2rad(50.0), maxPitch), 1e-5);
++    ASSERT_LT(maxPitch, util::deg2rad(60.0));
++    EXPECT_NEAR(transform.getPitch(), maxPitch, 1e-5);
 +    EXPECT_FALSE(transform.inTransition());
 +}
 +
@@ -715,12 +860,12 @@ index 3a886f6..4d152bc 100644
 +        ++firstFinished;
 +    };
 +    transform.easeTo(CameraOptions().withZoom(10), first);
-+    transform.updateTransitions(transform.getTransitionStart() + Seconds(1));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Seconds(1));
 +    EXPECT_EQ(firstFinished, 1u);
 +    EXPECT_EQ(secondFinished, 0u);
 +    EXPECT_EQ(observer.changes, 1u);
 +    EXPECT_TRUE(transform.inTransition());
-+    transform.updateTransitions(transform.getTransitionStart() + Seconds(4));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Seconds(4));
 +    EXPECT_EQ(firstFinished, 1u);
 +    EXPECT_EQ(secondFinished, 1u);
 +    EXPECT_NEAR(transform.getZoom(), 12, 1e-5);
@@ -733,7 +878,7 @@ index 3a886f6..4d152bc 100644
 +    transform.easeTo(CameraOptions().withZoom(10), first);
 +    transform.cancelTransitions();
 +    EXPECT_TRUE(transform.inTransition());
-+    transform.updateTransitions(transform.getTransitionStart() + Seconds(4));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Seconds(4));
 +    EXPECT_EQ(firstFinished, 2u);
 +    EXPECT_EQ(secondFinished, 2u);
 +    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 45, 1e-5);
@@ -747,7 +892,7 @@ index 3a886f6..4d152bc 100644
 +    const auto zoom = transform.getZoom();
 +    transform.easeTo(CameraOptions().withZoom(3));
 +    EXPECT_NEAR(transform.getZoom(), zoom, 1e-5);
-+    transform.updateTransitions(transform.getTransitionStart() + Seconds(4));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Seconds(4));
 +    EXPECT_EQ(secondFinished, 3u);
 +    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 90, 1e-5);
 +}

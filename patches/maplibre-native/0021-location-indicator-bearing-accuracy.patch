@@ -1,5 +1,5 @@
 diff --git a/include/mln/shaders/gl/location_indicator.hpp b/include/mln/shaders/gl/location_indicator.hpp
-index 9a95c730e7c984e5ebdd3e0c0dbd27c1629abe93..c1bc5c1a97595c0f4ec19731f62cc2ada07b345d 100644
+index 9a95c730e7c9..c1bc5c1a9759 100644
 --- a/include/mln/shaders/gl/location_indicator.hpp
 +++ b/include/mln/shaders/gl/location_indicator.hpp
 @@ -11,21 +11,37 @@ struct ShaderSource<BuiltIn::LocationIndicatorShader, gfx::Backend::Type::OpenGL
@@ -42,7 +42,7 @@ index 9a95c730e7c984e5ebdd3e0c0dbd27c1629abe93..c1bc5c1a97595c0f4ec19731f62cc2ad
  )";
  };
 diff --git a/include/mln/shaders/gl/location_indicator_textured.hpp b/include/mln/shaders/gl/location_indicator_textured.hpp
-index 2764321da53df49e60fb51801be492a7e5bafdf2..84dac5266f6aa2109408bc92cee320a73c532af9 100644
+index 2764321da53d..84dac5266f6a 100644
 --- a/include/mln/shaders/gl/location_indicator_textured.hpp
 +++ b/include/mln/shaders/gl/location_indicator_textured.hpp
 @@ -11,6 +11,7 @@ struct ShaderSource<BuiltIn::LocationIndicatorTexturedShader, gfx::Backend::Type
@@ -62,7 +62,7 @@ index 2764321da53df49e60fb51801be492a7e5bafdf2..84dac5266f6aa2109408bc92cee320a7
  
  in vec2 frag_uv;
 diff --git a/include/mln/shaders/location_indicator_ubo.hpp b/include/mln/shaders/location_indicator_ubo.hpp
-index 8c730f32b5c6b53d715e06124cbd137c9f48d82f..e3e35e33fa50b9e8b7509abfa2e1dcaa6833f45f 100644
+index 8c730f32b5c6..e3e35e33fa50 100644
 --- a/include/mln/shaders/location_indicator_ubo.hpp
 +++ b/include/mln/shaders/location_indicator_ubo.hpp
 @@ -8,9 +8,11 @@ namespace shaders {
@@ -80,7 +80,7 @@ index 8c730f32b5c6b53d715e06124cbd137c9f48d82f..e3e35e33fa50b9e8b7509abfa2e1dcaa
  } // namespace shaders
  } // namespace mln
 diff --git a/include/mln/shaders/mtl/location_indicator.hpp b/include/mln/shaders/mtl/location_indicator.hpp
-index 43d527dc1ee0fed3e7aafac07f3503f5da249d67..611f93afced3e015c2fdac959e1406caa0877c75 100644
+index 43d527dc1ee0..611f93afced3 100644
 --- a/include/mln/shaders/mtl/location_indicator.hpp
 +++ b/include/mln/shaders/mtl/location_indicator.hpp
 @@ -17,9 +17,10 @@ enum {
@@ -130,7 +130,7 @@ index 43d527dc1ee0fed3e7aafac07f3503f5da249d67..611f93afced3e015c2fdac959e1406ca
  )";
  };
 diff --git a/include/mln/shaders/vulkan/location_indicator.hpp b/include/mln/shaders/vulkan/location_indicator.hpp
-index c387640ca62fb721c66fe03ee616a72a6f896261..65aa33a43220eab2d7b87b488bd090b1749ab95a 100644
+index c387640ca62f..65aa33a43220 100644
 --- a/include/mln/shaders/vulkan/location_indicator.hpp
 +++ b/include/mln/shaders/vulkan/location_indicator.hpp
 @@ -19,13 +19,16 @@ struct ShaderSource<BuiltIn::LocationIndicatorShader, gfx::Backend::Type::Vulkan
@@ -186,7 +186,7 @@ index c387640ca62fb721c66fe03ee616a72a6f896261..65aa33a43220eab2d7b87b488bd090b1
  
  layout(location = 0) out vec2 frag_uv;
 diff --git a/include/mln/shaders/webgpu/location_indicator.hpp b/include/mln/shaders/webgpu/location_indicator.hpp
-index 2cc9d4617a74c71f650f8ab6b4388b67084e3db2..3718f7fba92c3a3a32e36137048828491501a314 100644
+index 2cc9d4617a74..3718f7fba92c 100644
 --- a/include/mln/shaders/webgpu/location_indicator.hpp
 +++ b/include/mln/shaders/webgpu/location_indicator.hpp
 @@ -21,11 +21,13 @@ struct VertexInput {
@@ -255,7 +255,7 @@ index 2cc9d4617a74c71f650f8ab6b4388b67084e3db2..3718f7fba92c3a3a32e3613704882849
  
  @group(0) @binding(4) var<uniform> ubo: LocationIndicatorUBO;
 diff --git a/include/mln/style/layers/location_indicator_layer.hpp b/include/mln/style/layers/location_indicator_layer.hpp
-index 37aa6757fc3e80f3e39d33f3aca907aa30291f2d..f0c29755b840ad0dfa264657ba481ff06dbd026d 100644
+index 37aa6757fc3e..f0c29755b840 100644
 --- a/include/mln/style/layers/location_indicator_layer.hpp
 +++ b/include/mln/style/layers/location_indicator_layer.hpp
 @@ -60,6 +60,24 @@ public:
@@ -383,7 +383,7 @@ HcmV?d00001
 
 diff --git a/metrics/tests/location_indicator/bearing_accuracy/style.json b/metrics/tests/location_indicator/bearing_accuracy/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..7bd2bb99845259d60b84a4460b443f5d63ebc564
+index 000000000000..7bd2bb998452
 --- /dev/null
 +++ b/metrics/tests/location_indicator/bearing_accuracy/style.json
 @@ -0,0 +1,44 @@
@@ -807,7 +807,7 @@ HcmV?d00001
 
 diff --git a/metrics/tests/location_indicator/bearing_accuracy_limits/style.json b/metrics/tests/location_indicator/bearing_accuracy_limits/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..36a894f6719bb059d0c7a802d0cf68e609a4be89
+index 000000000000..36a894f6719b
 --- /dev/null
 +++ b/metrics/tests/location_indicator/bearing_accuracy_limits/style.json
 @@ -0,0 +1,105 @@
@@ -1062,7 +1062,7 @@ HcmV?d00001
 
 diff --git a/metrics/tests/location_indicator/bearing_accuracy_pitched/style.json b/metrics/tests/location_indicator/bearing_accuracy_pitched/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..ccd2919b8a43a167afa12126a44ae58b5c56195a
+index 000000000000..ccd2919b8a43
 --- /dev/null
 +++ b/metrics/tests/location_indicator/bearing_accuracy_pitched/style.json
 @@ -0,0 +1,86 @@
@@ -1153,7 +1153,7 @@ index 0000000000000000000000000000000000000000..ccd2919b8a43a167afa12126a44ae58b
 +  "bearing": 40
 +}
 diff --git a/scripts/style-spec.mjs b/scripts/style-spec.mjs
-index 7329ee97516089ec0e48b5d6215c0d6d00d78005..cb26a378be63d0444fa2eb7d81a01807dcf763f5 100644
+index 7329ee975160..cb26a378be63 100644
 --- a/scripts/style-spec.mjs
 +++ b/scripts/style-spec.mjs
 @@ -119,6 +119,44 @@ modifiedReferenceSpec["paint_location-indicator"] = {
@@ -1202,7 +1202,7 @@ index 7329ee97516089ec0e48b5d6215c0d6d00d78005..cb26a378be63d0444fa2eb7d81a01807
        "type": "number",
        "units": "factor of the original icon size",
 diff --git a/shaders/location_indicator.fragment.glsl b/shaders/location_indicator.fragment.glsl
-index 0956f100e3d1bfe7f2b671819cc7c2c3b681664e..ea53f25bfb852ab31c0431bc43a135fea99cd903 100644
+index 0956f100e3d1..ea53f25bfb85 100644
 --- a/shaders/location_indicator.fragment.glsl
 +++ b/shaders/location_indicator.fragment.glsl
 @@ -1,8 +1,20 @@
@@ -1228,7 +1228,7 @@ index 0956f100e3d1bfe7f2b671819cc7c2c3b681664e..ea53f25bfb852ab31c0431bc43a135fe
 +    fragColor = u_color * opacity;
  }
 diff --git a/shaders/location_indicator.vertex.glsl b/shaders/location_indicator.vertex.glsl
-index 045634b387deecf33af6fe9e5ecd92c1bb15ff3e..87ffcee8c62bfc78e750c9e95f5a142938c98287 100644
+index 045634b387de..87ffcee8c62b 100644
 --- a/shaders/location_indicator.vertex.glsl
 +++ b/shaders/location_indicator.vertex.glsl
 @@ -1,10 +1,14 @@
@@ -1247,7 +1247,7 @@ index 045634b387deecf33af6fe9e5ecd92c1bb15ff3e..87ffcee8c62bfc78e750c9e95f5a1429
      gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
  }
 diff --git a/shaders/location_indicator_textured.fragment.glsl b/shaders/location_indicator_textured.fragment.glsl
-index 4ca7698a3609b9a44b97409fab0fe73ddea54214..f16dc7b3ca3d4d2b45ec79754286dc102502ec99 100644
+index 4ca7698a3609..f16dc7b3ca3d 100644
 --- a/shaders/location_indicator_textured.fragment.glsl
 +++ b/shaders/location_indicator_textured.fragment.glsl
 @@ -1,6 +1,7 @@
@@ -1259,7 +1259,7 @@ index 4ca7698a3609b9a44b97409fab0fe73ddea54214..f16dc7b3ca3d4d2b45ec79754286dc10
  
  in vec2 frag_uv;
 diff --git a/shaders/location_indicator_textured.vertex.glsl b/shaders/location_indicator_textured.vertex.glsl
-index e577f419d63e09f7b877ffbf63f8210c0e032316..03dab0af41a6cdc1e9790d20b17d3e5d23aa483a 100644
+index e577f419d63e..03dab0af41a6 100644
 --- a/shaders/location_indicator_textured.vertex.glsl
 +++ b/shaders/location_indicator_textured.vertex.glsl
 @@ -1,6 +1,7 @@
@@ -1271,7 +1271,7 @@ index e577f419d63e09f7b877ffbf63f8210c0e032316..03dab0af41a6cdc1e9790d20b17d3e5d
  
  layout(location = 0) in vec2 a_pos;
 diff --git a/src/mln/renderer/layers/location_indicator_layer_tweaker.cpp b/src/mln/renderer/layers/location_indicator_layer_tweaker.cpp
-index a3d8f7c4e41100261f9dee70598bd6aa728c8b43..c3d40ca5b263d9a57e79a6e3a4db540d396ca042 100644
+index a3d8f7c4e411..c3d40ca5b263 100644
 --- a/src/mln/renderer/layers/location_indicator_layer_tweaker.cpp
 +++ b/src/mln/renderer/layers/location_indicator_layer_tweaker.cpp
 @@ -5,6 +5,7 @@
@@ -1303,7 +1303,7 @@ index a3d8f7c4e41100261f9dee70598bd6aa728c8b43..c3d40ca5b263d9a57e79a6e3a4db540d
                  [[fallthrough]];
              case RenderLocationIndicatorLayer::LocationIndicatorComponentType::Puck:
 diff --git a/src/mln/renderer/layers/location_indicator_layer_tweaker.hpp b/src/mln/renderer/layers/location_indicator_layer_tweaker.hpp
-index cbe442107d4b6c71a4f2c3eb97fd7841fbbec543..ae76ea0ec76b8d66941928afb7b8ccddada62c3d 100644
+index cbe442107d4b..ae76ea0ec76b 100644
 --- a/src/mln/renderer/layers/location_indicator_layer_tweaker.hpp
 +++ b/src/mln/renderer/layers/location_indicator_layer_tweaker.hpp
 @@ -15,10 +15,12 @@ public:
@@ -1330,10 +1330,10 @@ index cbe442107d4b6c71a4f2c3eb97fd7841fbbec543..ae76ea0ec76b8d66941928afb7b8ccdd
  
  } // namespace mln
 diff --git a/src/mln/renderer/layers/render_location_indicator_layer.cpp b/src/mln/renderer/layers/render_location_indicator_layer.cpp
-index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b421aa7543 100644
+index 655c852b39b7..1dbfafd09daa 100644
 --- a/src/mln/renderer/layers/render_location_indicator_layer.cpp
 +++ b/src/mln/renderer/layers/render_location_indicator_layer.cpp
-@@ -83,7 +83,10 @@ struct LocationIndicatorRenderParameters {
+@@ -80,7 +80,10 @@ struct LocationIndicatorRenderParameters {
      // some testing defaults, for before it gets updated via props
      double puckBearing = 0.0;
      LatLng puckPosition = {0, 0};
@@ -1345,7 +1345,7 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
      mln::Color errorRadiusColor{0, 0, 0, 0};
      mln::Color errorRadiusBorderColor{0, 0, 0, 0};
      float puckScale = 0;
-@@ -189,19 +192,33 @@ precision highp float;
+@@ -186,19 +189,33 @@ precision highp float;
  
  attribute vec2 a_pos;
  uniform mat4 u_matrix;
@@ -1380,7 +1380,7 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
  }
  )MBGL_SHADER";
  
-@@ -209,6 +226,7 @@ void main() {
+@@ -206,6 +223,7 @@ void main() {
  
          void pullLocations() override {
              a_pos = MBGL_CHECK_ERROR(glGetAttribLocation(program, "a_pos"));
@@ -1388,7 +1388,7 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
              u_color = MBGL_CHECK_ERROR(glGetUniformLocation(program, "u_color"));
              u_matrix = MBGL_CHECK_ERROR(glGetUniformLocation(program, "u_matrix"));
          }
-@@ -218,6 +236,7 @@ void main() {
+@@ -215,6 +233,7 @@ void main() {
          }
  
          GLuint a_pos = 0;
@@ -1396,7 +1396,7 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
          GLuint u_color = 0;
          GLuint u_matrix = 0;
      };
-@@ -412,6 +431,7 @@ public:
+@@ -409,6 +428,7 @@ public:
      void render(const mln::LocationIndicatorRenderParameters& params) {
          initialize();
          drawRadius(params);
@@ -1404,7 +1404,7 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
          drawShadow();
          drawPuck();
          drawHat();
-@@ -489,6 +509,7 @@ public:
+@@ -486,6 +506,7 @@ public:
          for (const auto& t : textures) t.second->release();
          buffer.release();
          circleBuffer.release();
@@ -1412,7 +1412,7 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
          puckBuffer.release();
          hatBuffer.release();
          texCoordsBuffer.release();
-@@ -510,6 +531,7 @@ public:
+@@ -507,6 +528,7 @@ public:
          } else if (params.puckBearing != oldParams.puckBearing ||
                     params.puckLayersDisplacement != oldParams.puckLayersDisplacement ||
                     params.perspectiveCompensation != oldParams.perspectiveCompensation ||
@@ -1420,7 +1420,15 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
                     params.puckScale != oldParams.puckScale || params.puckHatScale != oldParams.puckHatScale ||
                     params.puckShadowScale != oldParams.puckShadowScale)
              bearingChanged = true; // changes puck geometry but not necessarily the location
-@@ -711,7 +733,11 @@ protected:
+@@ -570,6 +592,7 @@ public:
+ #endif
+     }
+ 
++    const auto& getProjectionSector() const { return projectionSector; }
+     const auto& getProjectionCircle() const { return projectionCircle; }
+     const auto& getProjectionPuck() const { return projectionPuck; }
+ 
+@@ -719,7 +742,11 @@ protected:
              (1.0f - params.perspectiveCompensation) +
              util::clamp(pixelSizeToWorldSizeH(params.puckPosition, s), 0.8f, 10.1f) *
                  params.perspectiveCompensation; // Compensation factor for the perspective deformation
@@ -1433,7 +1441,7 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
  
  #ifndef MLN_DRAWABLE_LOCATION_INDICATOR
          const double shadowRadius = ((texShadow) ? texShadow->width / texShadow->pixelRatio : 0.0) *
-@@ -759,12 +785,33 @@ protected:
+@@ -767,12 +794,33 @@ protected:
      }
  
  #ifndef MLN_DRAWABLE_LOCATION_INDICATOR
@@ -1467,7 +1475,7 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
          mln::gl::bindUniform(simpleShader.u_color, params.errorRadiusColor);
          mln::gl::bindUniform(simpleShader.u_matrix, projectionCircle);
  
-@@ -853,6 +900,7 @@ protected:
+@@ -861,6 +909,7 @@ protected:
      TexturedShader texturedShader;
      Buffer buffer;
      Buffer circleBuffer;
@@ -1475,7 +1483,7 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
      Buffer shadowBuffer;
      Buffer puckBuffer;
      Buffer hatBuffer;
-@@ -873,7 +921,18 @@ protected:
+@@ -881,12 +930,25 @@ protected:
      mln::mat4 translation{};
      mln::mat4 projectionCircle{};
      mln::mat4 projectionPuck{};
@@ -1490,11 +1498,18 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
 +               parameters.bearingAccuracyColor.a > 0;
 +    }
 +
-+private:
++protected:
      bool positionChanged = false;
      bool radiusChanged = false;
      bool bearingChanged = false;
-@@ -905,11 +964,13 @@ public:
+     mln::LocationIndicatorRenderParameters oldParams;
++#ifndef MLN_DRAWABLE_LOCATION_INDICATOR
+     bool initialized = false;
++#endif
+     bool dirtyFeature = true;
+ 
+ #ifdef MLN_DRAWABLE_LOCATION_INDICATOR
+@@ -913,6 +975,7 @@ public:
          void reset() { textureInfo.reset(); }
      };
  
@@ -1502,13 +1517,7 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
      CircleDrawableInfo circleDrawableInfo;
      QuadDrawableInfo shadowDrawableInfo;
      QuadDrawableInfo puckDrawableInfo;
-     QuadDrawableInfo hatDrawableInfo;
- 
-+    const auto& getProjectionSector() const { return projectionSector; }
-     const auto& getProjectionCircle() const { return projectionCircle; }
-     const auto& getProjectionPuck() const { return projectionPuck; }
- 
-@@ -962,6 +1023,9 @@ void RenderLocationIndicatorLayer::evaluate(const PropertyEvaluationParameters&
+@@ -967,6 +1030,9 @@ void RenderLocationIndicatorLayer::evaluate(const PropertyEvaluationParameters&
      renderImpl->parameters.errorRadiusColor = evaluated.get<style::AccuracyRadiusColor>();
      renderImpl->parameters.errorRadiusBorderColor = evaluated.get<style::AccuracyRadiusBorderColor>();
      renderImpl->parameters.errorRadiusMeters = evaluated.get<style::AccuracyRadius>();
@@ -1518,7 +1527,7 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
      renderImpl->parameters.puckScale = evaluated.get<style::BearingImageSize>();
      renderImpl->parameters.puckHatScale = evaluated.get<style::TopImageSize>();
      renderImpl->parameters.puckShadowScale = evaluated.get<style::ShadowImageSize>();
-@@ -1088,8 +1152,11 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
+@@ -1116,8 +1182,11 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
      }
  
      if (!layerTweaker) {
@@ -1532,7 +1541,7 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
          layerGroup->addLayerTweaker(layerTweaker);
      }
  
-@@ -1099,14 +1166,15 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
+@@ -1131,14 +1200,15 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
          // create empty drawable using a builder
          const gfx::UniqueDrawableBuilder& builder = context.createDrawableBuilder(getID());
  
@@ -1551,7 +1560,7 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
                  const std::array<RenderLocationIndicatorImpl::vec2, 4> texCoords = {
                      {{0.0f, 1.0f}, {0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}}};
  
-@@ -1224,6 +1292,19 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
+@@ -1256,6 +1326,19 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
          };
  
          createCircleDrawable();
@@ -1571,7 +1580,7 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
          createQuadDrawable(
              renderImpl->shadowDrawableInfo, "locationShadow", LocationIndicatorComponentType::PuckShadow);
          createQuadDrawable(renderImpl->puckDrawableInfo, "locationPuck", LocationIndicatorComponentType::Puck);
-@@ -1304,6 +1385,7 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
+@@ -1336,6 +1419,7 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
          drawable.setEnabled(static_cast<bool>(info.textureInfo.texture));
      };
  
@@ -1580,7 +1589,7 @@ index 56d6407c336a98e71b8bcb85bd58a27e36bf0615..440b7734601ddf99a1ce7e7b122a42b4
      updateQuadDrawable(renderImpl->shadowDrawableInfo);
      updateQuadDrawable(renderImpl->puckDrawableInfo);
 diff --git a/src/mln/renderer/layers/render_location_indicator_layer.hpp b/src/mln/renderer/layers/render_location_indicator_layer.hpp
-index 597328116ebe94846e73059bbec03a12a05523ab..6be640769a6c82ba2a24a7c89b5a9c9090c9788d 100644
+index f0035ea3cd6e..57971112a0c7 100644
 --- a/src/mln/renderer/layers/render_location_indicator_layer.hpp
 +++ b/src/mln/renderer/layers/render_location_indicator_layer.hpp
 @@ -16,6 +16,7 @@ public:
@@ -1592,7 +1601,7 @@ index 597328116ebe94846e73059bbec03a12a05523ab..6be640769a6c82ba2a24a7c89b5a9c90
          Puck,
          PuckHat,
 diff --git a/src/mln/style/layers/location_indicator_layer.cpp b/src/mln/style/layers/location_indicator_layer.cpp
-index dbba80557c7274c57fa239c048dac988203cda8c..06d020050a1839f8a48944d5d70b112f27a447e5 100644
+index dbba80557c72..06d020050a18 100644
 --- a/src/mln/style/layers/location_indicator_layer.cpp
 +++ b/src/mln/style/layers/location_indicator_layer.cpp
 @@ -220,6 +220,87 @@ TransitionOptions LocationIndicatorLayer::getBearingTransition() const {
@@ -1829,7 +1838,7 @@ index dbba80557c7274c57fa239c048dac988203cda8c..06d020050a1839f8a48944d5d70b112f
          setBearingImageSizeTransition(*transition);
          return std::nullopt;
 diff --git a/src/mln/style/layers/location_indicator_layer_properties.hpp b/src/mln/style/layers/location_indicator_layer_properties.hpp
-index 6796683e96372567b44206e13582fed673385836..fd0eb1a8ba972efdcf786877793f115d529f74cf 100644
+index 6796683e9637..fd0eb1a8ba97 100644
 --- a/src/mln/style/layers/location_indicator_layer_properties.hpp
 +++ b/src/mln/style/layers/location_indicator_layer_properties.hpp
 @@ -47,6 +47,18 @@ struct Bearing : PaintProperty<Rotation> {
@@ -1862,7 +1871,7 @@ index 6796683e96372567b44206e13582fed673385836..fd0eb1a8ba972efdcf786877793f115d
      ImageTiltDisplacement,
      Location,
 diff --git a/test/style/conversion/layer.test.cpp b/test/style/conversion/layer.test.cpp
-index 63428fc5b9b0e3cd04ee50122d23fae88b599d78..50f3b7eb663968b5ba4b7fe7d5054560796e4bcc 100644
+index 63428fc5b9b0..50f3b7eb6639 100644
 --- a/test/style/conversion/layer.test.cpp
 +++ b/test/style/conversion/layer.test.cpp
 @@ -4,6 +4,7 @@

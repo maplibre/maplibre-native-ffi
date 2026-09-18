@@ -1,55 +1,72 @@
 diff --git a/src/mln/util/logging.cpp b/src/mln/util/logging.cpp
+index a210ac4ad416..86ac0bad7671 100644
 --- a/src/mln/util/logging.cpp
 +++ b/src/mln/util/logging.cpp
-@@ -5,6 +5,7 @@
- #include <mln/util/platform.hpp>
- #include <mln/util/traits.hpp>
- 
-+#include <atomic>
- #include <cstdio>
- #include <cstdarg>
+@@ -10,26 +10,24 @@
  #include <exception>
-@@ -15,15 +16,16 @@
+ #include <sstream>
+ #include <mutex>
++#include <utility>
+ 
+ namespace mln {
  
  namespace {
  
 -std::unique_ptr<Log::Observer> currentObserver;
  constexpr auto SeverityCount = underlying_type(EventSeverity::SeverityCount);
--std::atomic<bool> useThread[SeverityCount] = {true, true, true, false};
+ std::atomic<bool> useThread[SeverityCount] = {true, true, true, false};
 -std::mutex mutex;
  
  } // namespace
  
  class Log::Impl {
  public:
+-    Impl()
+-        : scheduler(Scheduler::GetSequenced()) {}
+-
+     void record(EventSeverity severity, Event event, int64_t code, const std::string& msg) try {
+         if (useThread[underlying_type(severity)]) {
+             auto threadName = platform::getCurrentThreadName();
++            // Construct the worker only when an asynchronous record needs it.
++            std::call_once(schedulerOnce, [this] { scheduler = Scheduler::GetSequenced(); });
+             scheduler->schedule([=]() { Log::record(severity, event, code, msg, threadName); });
+         } else {
+             Log::record(severity, event, code, msg, {});
+@@ -43,8 +41,12 @@ public:
+ #endif
+     }
+ 
 +    std::unique_ptr<Observer> observer;
-+    std::atomic<bool> useThread[SeverityCount] = {true, true, true, false};
 +    std::mutex mutex;
 +
-     Impl()
-         : scheduler(Scheduler::GetSequenced()) {}
+ private:
+-    const std::shared_ptr<Scheduler> scheduler;
++    std::once_flag schedulerOnce;
++    std::shared_ptr<Scheduler> scheduler;
+ };
  
-@@ -53,13 +55,16 @@
+ Log::Log()
+@@ -53,8 +55,17 @@ Log::Log()
  Log::~Log() = default;
  
  Log* Log::get() noexcept {
 -    static Log instance;
 -    return &instance;
-+    // Keep the worker and the state it accesses alive until process termination.
-+    // Joining it during static destruction can deadlock after a host VM shuts down
-+    // because native thread-local cleanup may need to detach from that VM.
++    // Never destroyed: the worker thread may be attached to a host VM (JNI in
++    // MapLibre Android, Java FFM upcalls elsewhere) that is gone by static
++    // destruction, and joining it then deadlocks. The worker never drained its
++    // queue on termination, so nothing is lost.
 +    static auto* const instance = new Log();
++    // Releasing the observer at exit keeps host cleanup that ran from its
++    // destructor; the logger and its thread stay alive.
++    static const struct ObserverRelease {
++        ~ObserverRelease() { removeObserver(); }
++    } observerRelease;
 +    return instance;
  }
  
  void Log::useLogThread(bool enable, std::optional<EventSeverity> severity) {
-     if (severity) {
--        useThread[underlying_type(*severity)] = enable;
-+        get()->impl->useThread[underlying_type(*severity)] = enable;
-     } else {
-         useLogThread(enable, EventSeverity::Debug);
-         useLogThread(enable, EventSeverity::Info);
-@@ -69,14 +74,16 @@
+@@ -69,15 +80,15 @@ void Log::useLogThread(bool enable, std::optional<EventSeverity> severity) {
  }
  
  void Log::setObserver(std::unique_ptr<Observer> observer) {
@@ -62,15 +79,16 @@ diff --git a/src/mln/util/logging.cpp b/src/mln/util/logging.cpp
  
  std::unique_ptr<Log::Observer> Log::removeObserver() {
 -    std::scoped_lock lock(mutex);
+-    std::unique_ptr<Observer> observer;
+-    std::swap(observer, currentObserver);
+-    return observer;
 +    auto& state = *get()->impl;
 +    std::scoped_lock lock(state.mutex);
-     std::unique_ptr<Observer> observer;
--    std::swap(observer, currentObserver);
-+    std::swap(observer, state.observer);
-     return observer;
++    return std::exchange(state.observer, nullptr);
  }
  
-@@ -93,8 +100,9 @@
+ void Log::record(EventSeverity severity, Event event, const std::string& msg) noexcept {
+@@ -93,8 +104,9 @@ void Log::record(EventSeverity severity,
                   int64_t code,
                   const std::string& msg,
                   const std::optional<std::string>& threadName) {

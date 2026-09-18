@@ -56,13 +56,12 @@ mlt_vendor_paths=(
 # pointing at maplibre/maplibre-native. See patches/maplibre-native/README.md.
 mln_patches=(
   "$repo_root/patches/maplibre-native/0002-windows-local-file-urls.patch"
-  "$repo_root/patches/maplibre-native/0003-run-loop-process-gate.patch"
+  "$repo_root/patches/maplibre-native/0003-run-loop-budget.patch"
   "$repo_root/patches/maplibre-native/0004-opengl-valid-api-calls.patch"
   "$repo_root/patches/maplibre-native/0005-unwrapped-unprojection.patch"
   "$repo_root/patches/maplibre-native/0006-process-lifetime-logging.patch"
   "$repo_root/patches/maplibre-native/0007-retain-active-on-demand-images.patch"
   "$repo_root/patches/maplibre-native/0009-synchronous-symbol-dependencies.patch"
-  "$repo_root/patches/maplibre-native/0010-background-drawable-replacement.patch"
   "$repo_root/patches/maplibre-native/0011-opengl-uniform-block-order.patch"
   "$repo_root/patches/maplibre-native/0012-vulkan-surface-acquire-timeout.patch"
   "$repo_root/patches/maplibre-native/0013-projection-from-transform-state.patch"
@@ -70,38 +69,42 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0015-independent-camera-animations.patch"
   "$repo_root/patches/maplibre-native/0016-location-indicator-color-transitions.patch"
   "$repo_root/patches/maplibre-native/0017-location-indicator-top-image-hit-testing.patch"
-  "$repo_root/patches/maplibre-native/0018-location-indicator-missing-images.patch"
-  "$repo_root/patches/maplibre-native/0019-webgpu-location-indicator-uniform-binding.patch"
-  "$repo_root/patches/maplibre-native/0020-webgpu-required-bindings.patch"
   "$repo_root/patches/maplibre-native/0021-location-indicator-bearing-accuracy.patch"
 )
 
-# A patch counts as applied when it reverses cleanly, which is also what makes
-# applying idempotent: a sync that changes nothing leaves the worktree alone.
-mln_patch_applied() {
-  git -C "$mln_path" apply --reverse --check "$1" >/dev/null 2>&1
+# The patches overlap, so no single patch reverses cleanly on its own once the
+# later ones are on. A sync instead records what it produced: the pinned
+# commit plus a hash of the worktree's diff against it. A worktree that still
+# matches that record is synced, and any edit since, patched path or not,
+# changes the hash.
+mln_stamp_path() {
+  printf '%s/mln-ffi-sync.stamp' "$(git -C "$mln_path" rev-parse --git-dir)"
 }
 
-mln_patches_applied() {
-  local patch
-  for patch in "${mln_patches[@]}"; do
-    mln_patch_applied "$patch" || return 1
-  done
+mln_state() {
+  printf '%s %s\n' "$(git -C "$mln_path" rev-parse HEAD)" \
+    "$(git -C "$mln_path" diff --binary HEAD | git hash-object --stdin)"
 }
 
-# The forced checkout below resets tracked files but leaves a file that a patch
-# adds in place, so remove those before the patch goes back on.
+mln_synced() {
+  local stamp
+  stamp="$(mln_stamp_path)"
+  [[ -f "$stamp" ]] && [[ "$(cat "$stamp")" == "$(mln_state)" ]]
+}
+
+# Runs on a worktree the forced checkout below just reset, so every patch goes
+# on in order. The checkout leaves a file that a patch adds in place, so remove
+# those before the patch goes back on.
 apply_mln_patches() {
   local patch path
   for patch in "${mln_patches[@]}"; do
-    if ! mln_patch_applied "$patch"; then
-      git -C "$mln_path" apply --numstat "$patch" | cut -f3 |
-        while read -r path; do
-          git -C "$mln_path" clean -fq -- "$path"
-        done
-      git -C "$mln_path" apply "$patch"
-    fi
+    git -C "$mln_path" apply --numstat "$patch" | cut -f3 |
+      while read -r path; do
+        git -C "$mln_path" clean -fq -- "$path"
+      done
+    git -C "$mln_path" apply "$patch"
   done
+  mln_state > "$(mln_stamp_path)"
 }
 
 # A synced worktree is modified in exactly the paths that the listed patches
@@ -159,8 +162,7 @@ if [[ "$top_status" == " "* ]]; then
     mlt_count="$(printf '%s\n' "$mlt_status" | sed '/^$/d' | wc -l | tr -d ' ')"
     if [[ "$mlt_count" == "${#mlt_vendor_paths[@]}" ]] &&
       ! grep -qE '^[+-U]' <<<"$mlt_status" &&
-      mln_patches_applied &&
-      [[ -z "$(mln_unexplained_paths)" ]]; then
+      mln_synced; then
       exit 0
     fi
   fi

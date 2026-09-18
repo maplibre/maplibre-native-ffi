@@ -36,7 +36,7 @@ index fe51488c7066..13dcc7a562d4 100644
 +  }
 +]
 diff --git a/src/mln/geometry/feature_index.cpp b/src/mln/geometry/feature_index.cpp
-index fde694a25a8c..7da5ac982a56 100644
+index e76d248438d5..9fb86a54df99 100644
 --- a/src/mln/geometry/feature_index.cpp
 +++ b/src/mln/geometry/feature_index.cpp
 @@ -14,6 +14,7 @@
@@ -47,7 +47,7 @@ index fde694a25a8c..7da5ac982a56 100644
  #include <cassert>
  #include <string>
  
-@@ -349,11 +350,11 @@ void DynamicFeatureIndex::query(std::unordered_map<std::string, std::vector<Feat
+@@ -355,11 +356,11 @@ void DynamicFeatureIndex::query(std::unordered_map<std::string, std::vector<Feat
      }
  
      for (const auto& f : features) {
@@ -64,7 +64,7 @@ index fde694a25a8c..7da5ac982a56 100644
          if (hit) {
              assert(f.feature);
              result[f.feature->sourceLayer].push_back(*f.feature);
-@@ -362,7 +363,7 @@ void DynamicFeatureIndex::query(std::unordered_map<std::string, std::vector<Feat
+@@ -368,7 +369,7 @@ void DynamicFeatureIndex::query(std::unordered_map<std::string, std::vector<Feat
  }
  
  void DynamicFeatureIndex::insert(std::shared_ptr<Feature> feature,
@@ -74,7 +74,7 @@ index fde694a25a8c..7da5ac982a56 100644
  }
  
 diff --git a/src/mln/geometry/feature_index.hpp b/src/mln/geometry/feature_index.hpp
-index 9c2bdf3d9dc3..dfcde40b4f36 100644
+index 7cf4f7ff35d0..84eacdf3bebe 100644
 --- a/src/mln/geometry/feature_index.hpp
 +++ b/src/mln/geometry/feature_index.hpp
 @@ -93,12 +93,12 @@ public:
@@ -93,7 +93,7 @@ index 9c2bdf3d9dc3..dfcde40b4f36 100644
  
      std::vector<FeatureRecord> features;
 diff --git a/src/mln/renderer/layers/render_location_indicator_layer.cpp b/src/mln/renderer/layers/render_location_indicator_layer.cpp
-index f7d617e02162..236525f4e7bc 100644
+index 7ffa7f1669a8..655c852b39b7 100644
 --- a/src/mln/renderer/layers/render_location_indicator_layer.cpp
 +++ b/src/mln/renderer/layers/render_location_indicator_layer.cpp
 @@ -476,7 +476,7 @@ public:
@@ -147,7 +147,7 @@ index f7d617e02162..236525f4e7bc 100644
 -        featureEnvelope->push_back(border);
      }
  
- protected:
+     const auto& getProjectionCircle() const { return projectionCircle; }
 @@ -920,7 +923,7 @@ public:
  public:
      mln::LocationIndicatorRenderParameters parameters;
@@ -158,7 +158,7 @@ index f7d617e02162..236525f4e7bc 100644
  };
  
 diff --git a/test/api/query.test.cpp b/test/api/query.test.cpp
-index efc938ce2b4b..eac0a85cd4a0 100644
+index 49c1abc89d94..4a8cd43d448e 100644
 --- a/test/api/query.test.cpp
 +++ b/test/api/query.test.cpp
 @@ -7,6 +7,7 @@
@@ -169,7 +169,7 @@ index efc938ce2b4b..eac0a85cd4a0 100644
  #include <mln/style/style.hpp>
  #include <mln/style/image.hpp>
  #include <mln/style/source.hpp>
-@@ -320,3 +321,30 @@ TEST(Query, QueryFeatureExtensionsSuperclusterLeaves) {
+@@ -367,3 +368,30 @@ TEST(Query, QueryFeatureExtensionsSuperclusterLeaves) {
      EXPECT_EQ(offsetLeaves3[1].properties["name"].get<std::string>(), "Cape Sable"s);
      EXPECT_EQ(offsetLeaves3[2].properties["name"].get<std::string>(), "Cape Cod"s);
  }

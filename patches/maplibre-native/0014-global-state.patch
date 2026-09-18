@@ -1,5 +1,5 @@
 diff --git a/CHANGELOG.md b/CHANGELOG.md
-index 09779a2a4a5f3fc84c552cdae63eae61159d8e73..29219bb497f7d06c73296b416c4ba1b6b00c0f72 100644
+index d3c3c189615f..e335240491ef 100644
 --- a/CHANGELOG.md
 +++ b/CHANGELOG.md
 @@ -5,6 +5,11 @@
@@ -15,7 +15,7 @@ index 09779a2a4a5f3fc84c552cdae63eae61159d8e73..29219bb497f7d06c73296b416c4ba1b6
  - [core] Added new map observer events: onPreCompileShader, onPostCompileShader, onShaderCompileFailed, onGlyphsLoaded, onGlyphsError, onGlyphsRequested, onTileAction, onSpriteLoaded, onSpriteError, onSpriteRequested ([#2694](https://github.com/maplibre/maplibre-native/pull/2694)).
  - [core] Add WebP image decoding support to default platform (Linux, Windows)
 diff --git a/include/mln/style/color_ramp_property_value.hpp b/include/mln/style/color_ramp_property_value.hpp
-index be0b8e9de094fa51db2c6857291b832514461900..09a25f952edfb677c429c018050bb44b35f12fef 100644
+index be0b8e9de094..09a25f952edf 100644
 --- a/include/mln/style/color_ramp_property_value.hpp
 +++ b/include/mln/style/color_ramp_property_value.hpp
 @@ -9,11 +9,18 @@ namespace style {
@@ -83,7 +83,7 @@ index be0b8e9de094fa51db2c6857291b832514461900..09a25f952edfb677c429c018050bb44b
  
  } // namespace style
 diff --git a/include/mln/style/expression/expression.hpp b/include/mln/style/expression/expression.hpp
-index 82ff2f616c3231aeda841380ff251dd554f54568..21f6a71e825fd32977f20de28e3efac3cb450936 100644
+index 82ff2f616c32..21f6a71e825f 100644
 --- a/include/mln/style/expression/expression.hpp
 +++ b/include/mln/style/expression/expression.hpp
 @@ -9,10 +9,13 @@
@@ -168,7 +168,7 @@ index 82ff2f616c3231aeda841380ff251dd554f54568..21f6a71e825fd32977f20de28e3efac3
  } // namespace style
  
 diff --git a/include/mln/style/expression/format_section_override.hpp b/include/mln/style/expression/format_section_override.hpp
-index 6d3a30b5a56c6c397f9e3e2cf20bc6755e233652..fc9c5e04e5e233cc29e76db5ecd281ff6662b3ba 100644
+index 6d3a30b5a56c..fc9c5e04e5e2 100644
 --- a/include/mln/style/expression/format_section_override.hpp
 +++ b/include/mln/style/expression/format_section_override.hpp
 @@ -27,7 +27,16 @@ public:
@@ -190,7 +190,7 @@ index 6d3a30b5a56c6c397f9e3e2cf20bc6755e233652..fc9c5e04e5e233cc29e76db5ecd281ff
      }
  
 diff --git a/include/mln/style/layer.hpp b/include/mln/style/layer.hpp
-index 2e71f747dff3d3ee51f73632c53e7c8ef13b8f0b..d60e51b56ac25395e2f46d6710fc94177e60362e 100644
+index 2e71f747dff3..d60e51b56ac2 100644
 --- a/include/mln/style/layer.hpp
 +++ b/include/mln/style/layer.hpp
 @@ -3,6 +3,7 @@
@@ -217,7 +217,7 @@ index 2e71f747dff3d3ee51f73632c53e7c8ef13b8f0b..d60e51b56ac25395e2f46d6710fc9417
      float getMinZoom() const;
      float getMaxZoom() const;
 diff --git a/include/mln/style/layer_properties.hpp b/include/mln/style/layer_properties.hpp
-index 1ce2959cafe3564a0cb788faf976cd07632a1d77..3ccea9369a2154b24cee1fdc84497d8634bcef13 100644
+index 1ce2959cafe3..3ccea9369a21 100644
 --- a/include/mln/style/layer_properties.hpp
 +++ b/include/mln/style/layer_properties.hpp
 @@ -1,6 +1,9 @@
@@ -247,7 +247,7 @@ index 1ce2959cafe3564a0cb788faf976cd07632a1d77..3ccea9369a2154b24cee1fdc84497d86
      LayerProperties(Immutable<Layer::Impl> impl) noexcept
          : baseImpl(std::move(impl)) {}
 diff --git a/include/mln/style/property_expression.hpp b/include/mln/style/property_expression.hpp
-index 96159ff4130bfc70d466bbe20b131fc7be56c7b2..83f7d9c638fad6d9ba55462a343eaddbd302b095 100644
+index 96159ff4130b..83f7d9c638fa 100644
 --- a/include/mln/style/property_expression.hpp
 +++ b/include/mln/style/property_expression.hpp
 @@ -45,6 +45,20 @@ public:
@@ -326,7 +326,7 @@ index 96159ff4130bfc70d466bbe20b131fc7be56c7b2..83f7d9c638fad6d9ba55462a343eaddb
  };
  
 diff --git a/include/mln/style/property_value.hpp b/include/mln/style/property_value.hpp
-index 36f9153d01011bfc5ee87185ff8a252ec7fecbfe..1ffb98dc31499a8f4c75237800a4c8d4d2285ef2 100644
+index 36f9153d0101..1ffb98dc3149 100644
 --- a/include/mln/style/property_value.hpp
 +++ b/include/mln/style/property_value.hpp
 @@ -72,6 +72,12 @@ public:
@@ -343,7 +343,7 @@ index 36f9153d01011bfc5ee87185ff8a252ec7fecbfe..1ffb98dc31499a8f4c75237800a4c8d4
  
  } // namespace style
 diff --git a/include/mln/style/style.hpp b/include/mln/style/style.hpp
-index f656d626f2908f9d1e1241ee8647d8ff6bbde0c4..9a24fdab6e2d00b5fba1feab976b4890da0b83af 100644
+index f656d626f290..9a24fdab6e2d 100644
 --- a/include/mln/style/style.hpp
 +++ b/include/mln/style/style.hpp
 @@ -4,6 +4,7 @@
@@ -379,7 +379,7 @@ index f656d626f2908f9d1e1241ee8647d8ff6bbde0c4..9a24fdab6e2d00b5fba1feab976b4890
      std::optional<Image> getImage(const std::string&) const;
      void addImage(std::unique_ptr<Image>);
 diff --git a/include/mln/util/feature.hpp b/include/mln/util/feature.hpp
-index b0d85c191563fc3acc8816b9a90280791b6c50cd..971b96db62df11453a9aadbc8b8cabf3d51b517a 100644
+index b0d85c191563..971b96db62df 100644
 --- a/include/mln/util/feature.hpp
 +++ b/include/mln/util/feature.hpp
 @@ -16,6 +16,7 @@ using GeoJSONFeature = mapbox::feature::feature<double>;
@@ -391,7 +391,7 @@ index b0d85c191563fc3acc8816b9a90280791b6c50cd..971b96db62df11453a9aadbc8b8cabf3
  class Feature : public GeoJSONFeature {
  public:
 diff --git a/metrics/ignores/platform-macos-webgpu.json b/metrics/ignores/platform-macos-webgpu.json
-index a14c4a9cc82fd79161b9cd44db700c978077f427..584836c73823d507afb86be5dd692ac9fc0b810b 100644
+index a14c4a9cc82f..584836c73823 100644
 --- a/metrics/ignores/platform-macos-webgpu.json
 +++ b/metrics/ignores/platform-macos-webgpu.json
 @@ -9,6 +9,7 @@
@@ -425,7 +425,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/circle-color/global-state-with-get/style.json b/metrics/integration/render-tests/circle-color/global-state-with-get/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..37426e7fae388e33458d35d8d88a1d0f063419f1
+index 000000000000..37426e7fae38
 --- /dev/null
 +++ b/metrics/integration/render-tests/circle-color/global-state-with-get/style.json
 @@ -0,0 +1,72 @@
@@ -524,7 +524,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/circle-color/global-state/style.json b/metrics/integration/render-tests/circle-color/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..352ac4d2e7669927b7d48e19d2686c6572e51a21
+index 000000000000..352ac4d2e766
 --- /dev/null
 +++ b/metrics/integration/render-tests/circle-color/global-state/style.json
 @@ -0,0 +1,62 @@
@@ -612,7 +612,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/circle-radius/global-state-with-get/style.json b/metrics/integration/render-tests/circle-radius/global-state-with-get/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..c1f9e965e447176737fb61342e022d7d66435aee
+index 000000000000..c1f9e965e447
 --- /dev/null
 +++ b/metrics/integration/render-tests/circle-radius/global-state-with-get/style.json
 @@ -0,0 +1,71 @@
@@ -707,7 +707,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/circle-radius/global-state/style.json b/metrics/integration/render-tests/circle-radius/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..b078ce493a3f1eb39554035e53d9f9b64cec6bef
+index 000000000000..b078ce493a3f
 --- /dev/null
 +++ b/metrics/integration/render-tests/circle-radius/global-state/style.json
 @@ -0,0 +1,59 @@
@@ -793,7 +793,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/feature-state/with-global-state/style.json b/metrics/integration/render-tests/feature-state/with-global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..295ffca71d33e4a6468fbf62b87c707939ee5e96
+index 000000000000..295ffca71d33
 --- /dev/null
 +++ b/metrics/integration/render-tests/feature-state/with-global-state/style.json
 @@ -0,0 +1,73 @@
@@ -884,7 +884,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/fill-color/global-state-with-get/style.json b/metrics/integration/render-tests/fill-color/global-state-with-get/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..cb938472d39ec94ec00ce8c5d563cacb2f1bd66c
+index 000000000000..cb938472d39e
 --- /dev/null
 +++ b/metrics/integration/render-tests/fill-color/global-state-with-get/style.json
 @@ -0,0 +1,143 @@
@@ -1045,7 +1045,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/fill-color/global-state/style.json b/metrics/integration/render-tests/fill-color/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..a419b3528b4f80053d86c60580ae04163698a58d
+index 000000000000..a419b3528b4f
 --- /dev/null
 +++ b/metrics/integration/render-tests/fill-color/global-state/style.json
 @@ -0,0 +1,134 @@
@@ -1213,7 +1213,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/fill-extrusion-color/global-state-with-get/style.json b/metrics/integration/render-tests/fill-extrusion-color/global-state-with-get/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..788307bde09901c6b25c2e0c36024f7ec39eb83a
+index 000000000000..788307bde099
 --- /dev/null
 +++ b/metrics/integration/render-tests/fill-extrusion-color/global-state-with-get/style.json
 @@ -0,0 +1,111 @@
@@ -1357,7 +1357,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/fill-extrusion-color/global-state/style.json b/metrics/integration/render-tests/fill-extrusion-color/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..e8b2ee01f116616717e6a7861708f3dbf96b2004
+index 000000000000..e8b2ee01f116
 --- /dev/null
 +++ b/metrics/integration/render-tests/fill-extrusion-color/global-state/style.json
 @@ -0,0 +1,101 @@
@@ -3063,7 +3063,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/fill-extrusion-pattern/global-state/style.json b/metrics/integration/render-tests/fill-extrusion-pattern/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..d83f07d61f479514064de4b489fa92d5fde2b852
+index 000000000000..d83f07d61f47
 --- /dev/null
 +++ b/metrics/integration/render-tests/fill-extrusion-pattern/global-state/style.json
 @@ -0,0 +1,176 @@
@@ -3345,7 +3345,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/fill-pattern/global-state/style.json b/metrics/integration/render-tests/fill-pattern/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..572fe4efb11863096a24521be110018c54cd902d
+index 000000000000..572fe4efb118
 --- /dev/null
 +++ b/metrics/integration/render-tests/fill-pattern/global-state/style.json
 @@ -0,0 +1,167 @@
@@ -3533,7 +3533,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/filter/global-state/style.json b/metrics/integration/render-tests/filter/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..01841499e3441e5a914ceb9fefcc2b551cf01d62
+index 000000000000..01841499e344
 --- /dev/null
 +++ b/metrics/integration/render-tests/filter/global-state/style.json
 @@ -0,0 +1,59 @@
@@ -3619,7 +3619,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/global-state/basic/style.json b/metrics/integration/render-tests/global-state/basic/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..e77d93974f9979444577d09c2dea1e6167db9969
+index 000000000000..e77d93974f99
 --- /dev/null
 +++ b/metrics/integration/render-tests/global-state/basic/style.json
 @@ -0,0 +1,48 @@
@@ -3693,7 +3693,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/global-state/default/style.json b/metrics/integration/render-tests/global-state/default/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..7ed495455087cb702c89db9ac6e35f77c57cd1bb
+index 000000000000..7ed495455087
 --- /dev/null
 +++ b/metrics/integration/render-tests/global-state/default/style.json
 @@ -0,0 +1,45 @@
@@ -3765,7 +3765,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/global-state/set-property/style.json b/metrics/integration/render-tests/global-state/set-property/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..a926cb4462742703e6e8041d27e19165f06dff69
+index 000000000000..a926cb446274
 --- /dev/null
 +++ b/metrics/integration/render-tests/global-state/set-property/style.json
 @@ -0,0 +1,61 @@
@@ -3853,7 +3853,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/global-state/with-feature-state/basic/style.json b/metrics/integration/render-tests/global-state/with-feature-state/basic/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..abbe840ac8aada860f2cf51cda3892114b0a5f55
+index 000000000000..abbe840ac8aa
 --- /dev/null
 +++ b/metrics/integration/render-tests/global-state/with-feature-state/basic/style.json
 @@ -0,0 +1,73 @@
@@ -3953,7 +3953,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/global-state/with-feature-state/set-and-remove/style.json b/metrics/integration/render-tests/global-state/with-feature-state/set-and-remove/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..14e07c0672b7846febe165e5cf0029144f2b7fbf
+index 000000000000..14e07c0672b7
 --- /dev/null
 +++ b/metrics/integration/render-tests/global-state/with-feature-state/set-and-remove/style.json
 @@ -0,0 +1,80 @@
@@ -4060,7 +4060,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/global-state/with-get/style.json b/metrics/integration/render-tests/global-state/with-get/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..4ce1261eeb87fd66a3652349a77790043f646a17
+index 000000000000..4ce1261eeb87
 --- /dev/null
 +++ b/metrics/integration/render-tests/global-state/with-get/style.json
 @@ -0,0 +1,63 @@
@@ -4202,7 +4202,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/icon-size/global-state/style.json b/metrics/integration/render-tests/icon-size/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..efb2b6c1d22de3aed81c26d12dce4550468a5874
+index 000000000000..efb2b6c1d22d
 --- /dev/null
 +++ b/metrics/integration/render-tests/icon-size/global-state/style.json
 @@ -0,0 +1,39 @@
@@ -4260,7 +4260,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/light/anchor/global-state/style.json b/metrics/integration/render-tests/light/anchor/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..b82ad8e8f11c05df673b5d1daf0539c7c2c6baf1
+index 000000000000..b82ad8e8f11c
 --- /dev/null
 +++ b/metrics/integration/render-tests/light/anchor/global-state/style.json
 @@ -0,0 +1,75 @@
@@ -4355,7 +4355,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/light/color/global-state/style.json b/metrics/integration/render-tests/light/color/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..1fd2e0ab9a7ee69aa8274d0b0333a41b06414dda
+index 000000000000..1fd2e0ab9a7e
 --- /dev/null
 +++ b/metrics/integration/render-tests/light/color/global-state/style.json
 @@ -0,0 +1,75 @@
@@ -4448,7 +4448,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/light/intensity/global-state/style.json b/metrics/integration/render-tests/light/intensity/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..4b5f643f9fad629fb2f0ac1f2fbfcf809bade540
+index 000000000000..4b5f643f9fad
 --- /dev/null
 +++ b/metrics/integration/render-tests/light/intensity/global-state/style.json
 @@ -0,0 +1,75 @@
@@ -4542,7 +4542,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/light/position/global-state/style.json b/metrics/integration/render-tests/light/position/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..a61c87674507be6eb7f5e2a4efb43eb603695ffd
+index 000000000000..a61c87674507
 --- /dev/null
 +++ b/metrics/integration/render-tests/light/position/global-state/style.json
 @@ -0,0 +1,79 @@
@@ -5662,7 +5662,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/line-cap/global-state/style.json b/metrics/integration/render-tests/line-cap/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..2016033e09f88fc2fa4dc926683b0f147d70d6b1
+index 000000000000..2016033e09f8
 --- /dev/null
 +++ b/metrics/integration/render-tests/line-cap/global-state/style.json
 @@ -0,0 +1,50 @@
@@ -5744,7 +5744,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/line-color/global-state-with-get/style.json b/metrics/integration/render-tests/line-color/global-state-with-get/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..09d63727cf0b7fc2b6a2fb0849af3677e0dfd0ea
+index 000000000000..09d63727cf0b
 --- /dev/null
 +++ b/metrics/integration/render-tests/line-color/global-state-with-get/style.json
 @@ -0,0 +1,98 @@
@@ -5870,7 +5870,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/line-color/global-state/style.json b/metrics/integration/render-tests/line-color/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..04666d1d441f81ec093f1b549c742cf1e36a3667
+index 000000000000..04666d1d441f
 --- /dev/null
 +++ b/metrics/integration/render-tests/line-color/global-state/style.json
 @@ -0,0 +1,88 @@
@@ -6035,7 +6035,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/line-miter-limit/global-state/style.json b/metrics/integration/render-tests/line-miter-limit/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..ff7b59ee57216c6657e8697788ebe138886f86fc
+index 000000000000..ff7b59ee5721
 --- /dev/null
 +++ b/metrics/integration/render-tests/line-miter-limit/global-state/style.json
 @@ -0,0 +1,54 @@
@@ -6138,7 +6138,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/line-pattern/global-state/style.json b/metrics/integration/render-tests/line-pattern/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..e367e07f520bc33236335eaa8a8d74615e574d5e
+index 000000000000..e367e07f520b
 --- /dev/null
 +++ b/metrics/integration/render-tests/line-pattern/global-state/style.json
 @@ -0,0 +1,133 @@
@@ -6362,7 +6362,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/line-round-limit/global-state/style.json b/metrics/integration/render-tests/line-round-limit/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..4324b27df90e075289fe511f67ccbef45c502e6f
+index 000000000000..4324b27df90e
 --- /dev/null
 +++ b/metrics/integration/render-tests/line-round-limit/global-state/style.json
 @@ -0,0 +1,54 @@
@@ -6455,7 +6455,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/text-color/global-state-with-get/style.json b/metrics/integration/render-tests/text-color/global-state-with-get/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..413db4646872b8ec755e6722314ac37dab463ec2
+index 000000000000..413db4646872
 --- /dev/null
 +++ b/metrics/integration/render-tests/text-color/global-state-with-get/style.json
 @@ -0,0 +1,81 @@
@@ -6575,7 +6575,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/text-color/global-state/style.json b/metrics/integration/render-tests/text-color/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..84198e2c68955c6ecf4f9c79ebfc0fb84180fec6
+index 000000000000..84198e2c6895
 --- /dev/null
 +++ b/metrics/integration/render-tests/text-color/global-state/style.json
 @@ -0,0 +1,67 @@
@@ -6724,7 +6724,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/text-field/global-state/style.json b/metrics/integration/render-tests/text-field/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..87305c42f242ba89afa797d3d28bdc242b8d56ec
+index 000000000000..87305c42f242
 --- /dev/null
 +++ b/metrics/integration/render-tests/text-field/global-state/style.json
 @@ -0,0 +1,56 @@
@@ -6815,7 +6815,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/text-size/global-state/style.json b/metrics/integration/render-tests/text-size/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..996523092756399378f60107a1fc26252f745a21
+index 000000000000..996523092756
 --- /dev/null
 +++ b/metrics/integration/render-tests/text-size/global-state/style.json
 @@ -0,0 +1,43 @@
@@ -8160,7 +8160,7 @@ HcmV?d00001
 
 diff --git a/metrics/integration/render-tests/visibility/global-state/style.json b/metrics/integration/render-tests/visibility/global-state/style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..f8c6ad2d5eff416445fa05538366d5ec01357de4
+index 000000000000..f8c6ad2d5eff
 --- /dev/null
 +++ b/metrics/integration/render-tests/visibility/global-state/style.json
 @@ -0,0 +1,47 @@
@@ -8212,10 +8212,10 @@ index 0000000000000000000000000000000000000000..f8c6ad2d5eff416445fa05538366d5ec
 +  ]
 +}
 diff --git a/platform/android/MapLibreAndroid/src/cpp/native_map_view.cpp b/platform/android/MapLibreAndroid/src/cpp/native_map_view.cpp
-index 9c7c30a1971e2c909a785d46a55d39cd5a04b086..930c7e81af8bee455eea94cd5247f3f803f96957 100644
+index b9f2b1f26edf..0cd3542d0b2e 100644
 --- a/platform/android/MapLibreAndroid/src/cpp/native_map_view.cpp
 +++ b/platform/android/MapLibreAndroid/src/cpp/native_map_view.cpp
-@@ -1068,6 +1068,21 @@ void NativeMapView::removeFeatureState(JNIEnv& env,
+@@ -1016,6 +1016,21 @@ void NativeMapView::removeFeatureState(JNIEnv& env,
      map->triggerRepaint();
  }
  
@@ -8237,7 +8237,7 @@ index 9c7c30a1971e2c909a785d46a55d39cd5a04b086..930c7e81af8bee455eea94cd5247f3f8
  jni::Local<jni::Object<Light>> NativeMapView::getLight(JNIEnv& env) {
      mln::style::Light* light = map->getStyle().getLight();
      if (light) {
-@@ -1484,6 +1499,8 @@ void NativeMapView::registerNative(jni::JNIEnv& env) {
+@@ -1441,6 +1456,8 @@ void NativeMapView::registerNative(jni::JNIEnv& env) {
          METHOD(&NativeMapView::setFeatureState, "nativeSetFeatureState"),
          METHOD(&NativeMapView::getFeatureState, "nativeGetFeatureState"),
          METHOD(&NativeMapView::removeFeatureState, "nativeRemoveFeatureState"),
@@ -8247,7 +8247,7 @@ index 9c7c30a1971e2c909a785d46a55d39cd5a04b086..930c7e81af8bee455eea94cd5247f3f8
          METHOD(&NativeMapView::getLayers, "nativeGetLayers"),
          METHOD(&NativeMapView::getLayer, "nativeGetLayer"),
 diff --git a/platform/android/MapLibreAndroid/src/cpp/native_map_view.hpp b/platform/android/MapLibreAndroid/src/cpp/native_map_view.hpp
-index 26a4abafeb2e7e9f4c9a99c048adcabd56ad2da5..73822e0a046b8aaeb7933f756c63c9381428b27b 100644
+index b219dd7d3af0..0907e3bc64cb 100644
 --- a/platform/android/MapLibreAndroid/src/cpp/native_map_view.hpp
 +++ b/platform/android/MapLibreAndroid/src/cpp/native_map_view.hpp
 @@ -276,6 +276,10 @@ public:
@@ -8262,7 +8262,7 @@ index 26a4abafeb2e7e9f4c9a99c048adcabd56ad2da5..73822e0a046b8aaeb7933f756c63c938
  
      jni::Local<jni::Array<jni::Object<Layer>>> getLayers(JNIEnv&);
 diff --git a/platform/android/MapLibreAndroid/src/cpp/snapshotter/map_snapshotter.cpp b/platform/android/MapLibreAndroid/src/cpp/snapshotter/map_snapshotter.cpp
-index 435e2a5d6904e788cfe319d9d37d9c64937e2c6b..7e1bdbba1292b4d7f63d4491954c685ba09f74b5 100644
+index 435e2a5d6904..7e1bdbba1292 100644
 --- a/platform/android/MapLibreAndroid/src/cpp/snapshotter/map_snapshotter.cpp
 +++ b/platform/android/MapLibreAndroid/src/cpp/snapshotter/map_snapshotter.cpp
 @@ -319,6 +319,25 @@ jni::Local<jni::Object<Source>> MapSnapshotter::getSource(JNIEnv& env, const jni
@@ -8377,7 +8377,7 @@ index 435e2a5d6904e788cfe319d9d37d9c64937e2c6b..7e1bdbba1292b4d7f63d4491954c685b
  
  } // namespace android
 diff --git a/platform/android/MapLibreAndroid/src/cpp/snapshotter/map_snapshotter.hpp b/platform/android/MapLibreAndroid/src/cpp/snapshotter/map_snapshotter.hpp
-index ccbfef0886c967a706fc86acc18e4fc167117cc6..28302b355bf07e7d120f59ca0e736099f0d423bf 100644
+index ccbfef0886c9..28302b355bf0 100644
 --- a/platform/android/MapLibreAndroid/src/cpp/snapshotter/map_snapshotter.hpp
 +++ b/platform/android/MapLibreAndroid/src/cpp/snapshotter/map_snapshotter.hpp
 @@ -9,6 +9,7 @@
@@ -8401,7 +8401,7 @@ index ccbfef0886c967a706fc86acc18e4fc167117cc6..28302b355bf07e7d120f59ca0e736099
      void onDidFailLoadingStyle(const std::string&) override;
      void onDidFinishLoadingStyle() override;
 diff --git a/platform/android/MapLibreAndroid/src/cpp/style/layers/layer.cpp b/platform/android/MapLibreAndroid/src/cpp/style/layers/layer.cpp
-index 16f84d5fb740cf3403833805c2495e03966c9229..99f46a9a8ab725936f9fa479dba2c63e85dd3d4b 100644
+index 16f84d5fb740..99f46a9a8ab7 100644
 --- a/platform/android/MapLibreAndroid/src/cpp/style/layers/layer.cpp
 +++ b/platform/android/MapLibreAndroid/src/cpp/style/layers/layer.cpp
 @@ -198,6 +198,19 @@ jni::Local<jni::Object<>> Layer::getVisibility(jni::JNIEnv& env) {
@@ -8435,7 +8435,7 @@ index 16f84d5fb740cf3403833805c2495e03966c9229..99f46a9a8ab725936f9fa479dba2c63e
  
  } // namespace android
 diff --git a/platform/android/MapLibreAndroid/src/cpp/style/layers/layer.hpp b/platform/android/MapLibreAndroid/src/cpp/style/layers/layer.hpp
-index 980b10e0b643ea4ca79b819f1213aaf3d2a3631a..ca0f734439e99de201fd4553fd5f2bf7d08e2666 100644
+index 980b10e0b643..ca0f734439e9 100644
 --- a/platform/android/MapLibreAndroid/src/cpp/style/layers/layer.hpp
 +++ b/platform/android/MapLibreAndroid/src/cpp/style/layers/layer.hpp
 @@ -62,6 +62,7 @@ public:
@@ -8447,7 +8447,7 @@ index 980b10e0b643ea4ca79b819f1213aaf3d2a3631a..ca0f734439e99de201fd4553fd5f2bf7
  protected:
      /*
 diff --git a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/location/LocationPropertyFactory.java b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/location/LocationPropertyFactory.java
-index 653f2d224f1faf217a71cd53d8703c53b6dfe670..7a33e0532f7ccc603d379afa3eb3f9b9970573d8 100644
+index 653f2d224f1f..7a33e0532f7c 100644
 --- a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/location/LocationPropertyFactory.java
 +++ b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/location/LocationPropertyFactory.java
 @@ -4,6 +4,8 @@ package org.maplibre.android.location;
@@ -8480,7 +8480,7 @@ index 653f2d224f1faf217a71cd53d8703c53b6dfe670..7a33e0532f7ccc603d379afa3eb3f9b9
     * The amount of the perspective compensation, between 0 and 1. A value of 1 produces a location indicator of constant width across the screen. A value of 0 makes it scale naturally according to the viewing projection.
     *
 diff --git a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/NativeMap.java b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/NativeMap.java
-index 24ae9491e8e67c5fdc569f271b382e53b7b4a5d0..ae8f56695aaabc6e5df7765965e02164fce2ee11 100644
+index d6e5229a44db..0d137f7efb74 100644
 --- a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/NativeMap.java
 +++ b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/NativeMap.java
 @@ -8,6 +8,7 @@ import androidx.annotation.IntRange;
@@ -8491,7 +8491,7 @@ index 24ae9491e8e67c5fdc569f271b382e53b7b4a5d0..ae8f56695aaabc6e5df7765965e02164
  import com.google.gson.JsonObject;
  import org.maplibre.geojson.Feature;
  import org.maplibre.geojson.Geometry;
-@@ -206,6 +207,11 @@ interface NativeMap {
+@@ -211,6 +212,11 @@ interface NativeMap {
                            @Nullable String featureId,
                            @Nullable String stateKey);
  
@@ -8504,7 +8504,7 @@ index 24ae9491e8e67c5fdc569f271b382e53b7b4a5d0..ae8f56695aaabc6e5df7765965e02164
    // Projection API
    //
 diff --git a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/NativeMapView.java b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/NativeMapView.java
-index 55d3228e8863ff039850c4d43c1770a05856fb15..e414d2ddffbcac98dfdeaab910abbb23a604c46d 100755
+index 1ef8caa6f5ab..b4243e0ceed2 100755
 --- a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/NativeMapView.java
 +++ b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/NativeMapView.java
 @@ -13,6 +13,7 @@ import androidx.annotation.Keep;
@@ -8515,7 +8515,7 @@ index 55d3228e8863ff039850c4d43c1770a05856fb15..e414d2ddffbcac98dfdeaab910abbb23
  import com.google.gson.JsonObject;
  import org.maplibre.geojson.Feature;
  import org.maplibre.geojson.Geometry;
-@@ -1157,6 +1158,23 @@ final class NativeMapView implements NativeMap {
+@@ -1169,6 +1170,23 @@ final class NativeMapView implements NativeMap {
      nativeRemoveFeatureState(sourceId, sourceLayerId, featureId, stateKey);
    }
  
@@ -8539,7 +8539,7 @@ index 55d3228e8863ff039850c4d43c1770a05856fb15..e414d2ddffbcac98dfdeaab910abbb23
    @Override
    public void setApiBaseUrl(String baseUrl) {
      if (checkState("setApiBaseUrl")) {
-@@ -1770,6 +1788,13 @@ final class NativeMapView implements NativeMap {
+@@ -1785,6 +1803,13 @@ final class NativeMapView implements NativeMap {
                                                 String featureId,
                                                 String stateKey);
  
@@ -8554,7 +8554,7 @@ index 55d3228e8863ff039850c4d43c1770a05856fb15..e414d2ddffbcac98dfdeaab910abbb23
    @Keep
    private native Light nativeGetLight();
 diff --git a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/Style.java b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/Style.java
-index 936a562fa5aa9804c28907bb07e699e34d584f9d..8ed842f8b5ca3a605d50e7deae205727a436dbec 100644
+index 936a562fa5aa..8ed842f8b5ca 100644
 --- a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/Style.java
 +++ b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/Style.java
 @@ -10,6 +10,9 @@ import androidx.annotation.IntRange;
@@ -8606,7 +8606,7 @@ index 936a562fa5aa9804c28907bb07e699e34d584f9d..8ed842f8b5ca3a605d50e7deae205727
    // Light
    //
 diff --git a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/snapshotter/MapSnapshotter.kt b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/snapshotter/MapSnapshotter.kt
-index 41b3805db0d36b42fd2c487adc1411aaaa04d15e..83c9c4fa3753447e1133ce93da09bfc22eebdf26 100644
+index 41b3805db0d3..83c9c4fa3753 100644
 --- a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/snapshotter/MapSnapshotter.kt
 +++ b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/snapshotter/MapSnapshotter.kt
 @@ -14,6 +14,8 @@ import androidx.annotation.Keep
@@ -8717,7 +8717,7 @@ index 41b3805db0d36b42fd2c487adc1411aaaa04d15e..83c9c4fa3753447e1133ce93da09bfc2
      @Throws(Throwable::class)
      protected open external fun finalize()
 diff --git a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/expressions/Expression.java b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/expressions/Expression.java
-index 0b6fd5b051ea1d9fee3b18b4aa2ad9e2f18709bf..b452783bf01b58f333c3379879fdea8f49764363 100644
+index 0b6fd5b051ea..b452783bf01b 100644
 --- a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/expressions/Expression.java
 +++ b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/expressions/Expression.java
 @@ -1437,6 +1437,32 @@ public class Expression {
@@ -8754,7 +8754,7 @@ index 0b6fd5b051ea1d9fee3b18b4aa2ad9e2f18709bf..b452783bf01b58f333c3379879fdea8f
     * Gets the feature's id, if it has one.
     * <p>
 diff --git a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/layers/Layer.java b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/layers/Layer.java
-index 6d6bccc4ed4be5f91a8ca5f8eaaf7a21bd28be96..1fd79b18fb1afa8379c1711dc2bfe02e2d4805bb 100644
+index 6d6bccc4ed4b..1fd79b18fb1a 100644
 --- a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/layers/Layer.java
 +++ b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/layers/Layer.java
 @@ -71,12 +71,31 @@ public abstract class Layer {
@@ -8801,7 +8801,7 @@ index 6d6bccc4ed4be5f91a8ca5f8eaaf7a21bd28be96..1fd79b18fb1afa8379c1711dc2bfe02e
    protected native void nativeSetLayoutProperty(String name, Object value);
  
 diff --git a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/layers/PropertyFactory.java b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/layers/PropertyFactory.java
-index 1c1525f75686a035cd0004929d20ac9cf36c203c..f356e5a60a3e0b39a7789713e2527b127eee5c24 100644
+index 1c1525f75686..f356e5a60a3e 100644
 --- a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/layers/PropertyFactory.java
 +++ b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/layers/PropertyFactory.java
 @@ -4,6 +4,8 @@ package org.maplibre.android.style.layers;
@@ -8834,7 +8834,7 @@ index 1c1525f75686a035cd0004929d20ac9cf36c203c..f356e5a60a3e0b39a7789713e2527b12
     * Whether or not the fill should be antialiased.
     *
 diff --git a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/layers/property_factory.java.ejs b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/layers/property_factory.java.ejs
-index 6730ff5834e5e570781777f5be416c37224b095b..b1ba7ab98980c3933a226ee1b3c8e3f54158e96d 100644
+index 6730ff5834e5..b1ba7ab98980 100644
 --- a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/layers/property_factory.java.ejs
 +++ b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/layers/property_factory.java.ejs
 @@ -13,6 +13,8 @@ package org.maplibre.android.style.layers;
@@ -8867,7 +8867,7 @@ index 6730ff5834e5e570781777f5be416c37224b095b..b1ba7ab98980c3933a226ee1b3c8e3f5
  <% if (property.type == 'color') { -%>
    /**
 diff --git a/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/style/expressions/ExpressionTest.kt b/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/style/expressions/ExpressionTest.kt
-index 2a71898d94e91cec7835fd95652f90d715187993..108970e476c4a927ee8a53bd53fe2af0d5ce7662 100644
+index 2a71898d94e9..108970e476c4 100644
 --- a/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/style/expressions/ExpressionTest.kt
 +++ b/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/style/expressions/ExpressionTest.kt
 @@ -401,6 +401,14 @@ class ExpressionTest : BaseTest() {
@@ -8886,7 +8886,7 @@ index 2a71898d94e91cec7835fd95652f90d715187993..108970e476c4a927ee8a53bd53fe2af0
      @Throws(Exception::class)
      fun testId() {
 diff --git a/platform/android/MapLibreAndroidTestApp/src/androidTest/java/org/maplibre/android/snapshotter/MapSnapshotterTest.kt b/platform/android/MapLibreAndroidTestApp/src/androidTest/java/org/maplibre/android/snapshotter/MapSnapshotterTest.kt
-index 31d1287d8bb4b68aaa8d198ea770b3829f72685d..169c4b3cd8a583aba3d22f5231553593efc9f2c3 100644
+index 31d1287d8bb4..169c4b3cd8a5 100644
 --- a/platform/android/MapLibreAndroidTestApp/src/androidTest/java/org/maplibre/android/snapshotter/MapSnapshotterTest.kt
 +++ b/platform/android/MapLibreAndroidTestApp/src/androidTest/java/org/maplibre/android/snapshotter/MapSnapshotterTest.kt
 @@ -2,6 +2,7 @@ package org.maplibre.android.snapshotter
@@ -8999,7 +8999,7 @@ index 31d1287d8bb4b68aaa8d198ea770b3829f72685d..169c4b3cd8a583aba3d22f5231553593
 +    }
  }
 diff --git a/platform/android/MapLibreAndroidTestApp/src/androidTest/java/org/maplibre/android/testapp/style/RuntimeStyleTests.java b/platform/android/MapLibreAndroidTestApp/src/androidTest/java/org/maplibre/android/testapp/style/RuntimeStyleTests.java
-index 216c5cac863abe00b94844b0072cecca62fb70c7..f9bfb363ff31b4d4cf0750e36c9ef9086c79aeb2 100644
+index 216c5cac863a..f9bfb363ff31 100644
 --- a/platform/android/MapLibreAndroidTestApp/src/androidTest/java/org/maplibre/android/testapp/style/RuntimeStyleTests.java
 +++ b/platform/android/MapLibreAndroidTestApp/src/androidTest/java/org/maplibre/android/testapp/style/RuntimeStyleTests.java
 @@ -8,6 +8,10 @@ import androidx.test.espresso.UiController;
@@ -9085,7 +9085,7 @@ index 216c5cac863abe00b94844b0072cecca62fb70c7..f9bfb363ff31b4d4cf0750e36c9ef908
      validateTestSetup();
 diff --git a/platform/android/MapLibreAndroidTestApp/src/main/assets/snapshotter_global_state_style.json b/platform/android/MapLibreAndroidTestApp/src/main/assets/snapshotter_global_state_style.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..9e811b4e45302f6e16736116807adcd8e78e49a0
+index 000000000000..9e811b4e4530
 --- /dev/null
 +++ b/platform/android/MapLibreAndroidTestApp/src/main/assets/snapshotter_global_state_style.json
 @@ -0,0 +1,18 @@
@@ -9108,7 +9108,7 @@ index 0000000000000000000000000000000000000000..9e811b4e45302f6e16736116807adcd8
 +  "layers": []
 +}
 diff --git a/platform/darwin/src/MLNConversion.h b/platform/darwin/src/MLNConversion.h
-index 3d0bb71c87c5563cba64a4e09a2a4dfe998141ea..0e8faed6cec83607e7a06d0c8701c77ff72cb14a 100644
+index 3d0bb71c87c5..0e8faed6cec8 100644
 --- a/platform/darwin/src/MLNConversion.h
 +++ b/platform/darwin/src/MLNConversion.h
 @@ -1,3 +1,5 @@
@@ -9118,7 +9118,7 @@ index 3d0bb71c87c5563cba64a4e09a2a4dfe998141ea..0e8faed6cec83607e7a06d0c8701c77f
  
  NS_ASSUME_NONNULL_BEGIN
 diff --git a/platform/darwin/src/MLNStyle.h b/platform/darwin/src/MLNStyle.h
-index 54757147aa201bf5860f38be4709d7163bb3e1c9..7d56e477dd052acc757690aa6c1633707fd6261e 100644
+index 54757147aa20..7d56e477dd05 100644
 --- a/platform/darwin/src/MLNStyle.h
 +++ b/platform/darwin/src/MLNStyle.h
 @@ -104,6 +104,31 @@ MLN_EXPORT
@@ -9154,7 +9154,7 @@ index 54757147aa201bf5860f38be4709d7163bb3e1c9..7d56e477dd052acc757690aa6c163370
   Returns a source with the given identifier in the current style.
  
 diff --git a/platform/darwin/src/MLNStyle.mm b/platform/darwin/src/MLNStyle.mm
-index 224e413fa64bc4875a0718ab110fd0fc393d89ea..c32af96fd9dc9153cebc691d5dd0f87101dc042c 100644
+index 224e413fa64b..c32af96fd9dc 100644
 --- a/platform/darwin/src/MLNStyle.mm
 +++ b/platform/darwin/src/MLNStyle.mm
 @@ -27,6 +27,7 @@
@@ -9193,7 +9193,7 @@ index 224e413fa64bc4875a0718ab110fd0fc393d89ea..c32af96fd9dc9153cebc691d5dd0f871
  
  - (void)setTransition:(MLNTransition)transition {
 diff --git a/platform/darwin/src/MLNStyleLayer.h b/platform/darwin/src/MLNStyleLayer.h
-index 48e23cb2618e1f5cc740cf9ce284d1f83c37bb70..822f625d0501020f1cdfa86a5fa7a7d5396e2bf9 100644
+index 48e23cb2618e..822f625d0501 100644
 --- a/platform/darwin/src/MLNStyleLayer.h
 +++ b/platform/darwin/src/MLNStyleLayer.h
 @@ -51,6 +51,19 @@ MLN_EXPORT
@@ -9217,7 +9217,7 @@ index 48e23cb2618e1f5cc740cf9ce284d1f83c37bb70..822f625d0501020f1cdfa86a5fa7a7d5
   The maximum zoom level at which the layer gets parsed and appears. This value is a floating-point
   number.
 diff --git a/platform/darwin/src/MLNStyleLayer.mm b/platform/darwin/src/MLNStyleLayer.mm
-index 3bbce2b5e7adde16cc31619f788507d81b249ec5..9fd2a1f76b424a6e34a6b54d778ad58ec44929c1 100644
+index 3bbce2b5e7ad..9fd2a1f76b42 100644
 --- a/platform/darwin/src/MLNStyleLayer.mm
 +++ b/platform/darwin/src/MLNStyleLayer.mm
 @@ -1,5 +1,8 @@
@@ -9263,7 +9263,7 @@ index 3bbce2b5e7adde16cc31619f788507d81b249ec5..9fd2a1f76b424a6e34a6b54d778ad58e
    MLNAssertStyleLayerIsValid();
  
 diff --git a/platform/darwin/src/MLNStyleValue.mm b/platform/darwin/src/MLNStyleValue.mm
-index 7c5297d196c59c850c3faaf105f065561c644217..17fc416bef27cf6ac6da072d8af0acddfbd4ecb9 100644
+index 7c5297d196c5..17fc416bef27 100644
 --- a/platform/darwin/src/MLNStyleValue.mm
 +++ b/platform/darwin/src/MLNStyleValue.mm
 @@ -42,6 +42,49 @@ id MLNJSONObjectFromMBGLExpression(const mln::style::expression::Expression &mbg
@@ -9317,7 +9317,7 @@ index 7c5297d196c59c850c3faaf105f065561c644217..17fc416bef27cf6ac6da072d8af0acdd
      NSExpression *expression) {
    if (!expression) {
 diff --git a/platform/darwin/src/MLNStyleValue_Private.h b/platform/darwin/src/MLNStyleValue_Private.h
-index d2a14998ebcf630337d6711a5e8e5a2abbf93dc3..1979a09d3fb93ae931e07cf092127ebf3615ff3b 100644
+index d2a14998ebcf..1979a09d3fb9 100644
 --- a/platform/darwin/src/MLNStyleValue_Private.h
 +++ b/platform/darwin/src/MLNStyleValue_Private.h
 @@ -38,6 +38,8 @@ class Expression;
@@ -9330,7 +9330,7 @@ index d2a14998ebcf630337d6711a5e8e5a2abbf93dc3..1979a09d3fb93ae931e07cf092127ebf
    MLNTransition transition;
    transition.duration =
 diff --git a/platform/darwin/src/NSExpression+MLNAdditions.mm b/platform/darwin/src/NSExpression+MLNAdditions.mm
-index ec34cac76e1410176d088369046e9046912eaeda..706960f6bb945c6b7e6902f5868b564536f1da0d 100644
+index ec34cac76e14..706960f6bb94 100644
 --- a/platform/darwin/src/NSExpression+MLNAdditions.mm
 +++ b/platform/darwin/src/NSExpression+MLNAdditions.mm
 @@ -81,6 +81,7 @@ + (void)installFunctions {
@@ -9374,7 +9374,7 @@ index ec34cac76e1410176d088369046e9046912eaeda..706960f6bb945c6b7e6902f5868b5645
        // argument.
        @"MLN_LET" : @"let",
 diff --git a/platform/darwin/test/MLNExpressionTests.mm b/platform/darwin/test/MLNExpressionTests.mm
-index 2f79fce33f0280ceb9a33333efa0763ce70dab7e..bf97f7e92874ec66d9fb47c0d00d16a70782a586 100644
+index 2f79fce33f02..bf97f7e92874 100644
 --- a/platform/darwin/test/MLNExpressionTests.mm
 +++ b/platform/darwin/test/MLNExpressionTests.mm
 @@ -953,6 +953,16 @@ - (void)testShapeDistanceExpressionObject {
@@ -9395,7 +9395,7 @@ index 2f79fce33f0280ceb9a33333efa0763ce70dab7e..bf97f7e92874ec66d9fb47c0d00d16a7
    NSArray *arguments = @[ MLNConstantExpression(@"MacDonald") ];
    {
 diff --git a/platform/darwin/test/MLNMapSnapshotterTests.m b/platform/darwin/test/MLNMapSnapshotterTests.m
-index 5352220bc228d907b90e175d24871c7cf33f3de4..c96da27f8a082572377b61f5bd66dc4dc67af78d 100644
+index 5352220bc228..c96da27f8a08 100644
 --- a/platform/darwin/test/MLNMapSnapshotterTests.m
 +++ b/platform/darwin/test/MLNMapSnapshotterTests.m
 @@ -74,6 +74,26 @@ - (void)tearDown {
@@ -9426,7 +9426,7 @@ index 5352220bc228d907b90e175d24871c7cf33f3de4..c96da27f8a082572377b61f5bd66dc4d
      XCTSkip(@"Snapshotter not implemented yet for Metal. See https://github.com/maplibre/maplibre-native/issues/1862");
      self.styleLoadingExpectation = [self expectationWithDescription:@"Style should finish loading."];
 diff --git a/platform/darwin/test/MLNStyleTests.mm b/platform/darwin/test/MLNStyleTests.mm
-index 6733222f8b95ea8a251969e82aa2e09f8fb77395..da9ff7306f6472188887a99512be762ade8dbdc4 100644
+index 6733222f8b95..da9ff7306f64 100644
 --- a/platform/darwin/test/MLNStyleTests.mm
 +++ b/platform/darwin/test/MLNStyleTests.mm
 @@ -540,6 +540,65 @@ - (void)testLanguageMatching {
@@ -9496,7 +9496,7 @@ index 6733222f8b95ea8a251969e82aa2e09f8fb77395..da9ff7306f6472188887a99512be762a
    MLNTransition transitionTest = MLNTransitionMake(5, 4);
  
 diff --git a/platform/ios/MapLibre.docc/Predicates_and_Expressions.md b/platform/ios/MapLibre.docc/Predicates_and_Expressions.md
-index bb89fd0b6c0e6084c4ed23ebd403814a0d0b3e06..9f33bb56cb5975d6327bf7b288a9801dd471d29d 100644
+index bb89fd0b6c0e..9f33bb56cb59 100644
 --- a/platform/ios/MapLibre.docc/Predicates_and_Expressions.md
 +++ b/platform/ios/MapLibre.docc/Predicates_and_Expressions.md
 @@ -434,6 +434,21 @@ This function corresponds to the
@@ -9522,7 +9522,7 @@ index bb89fd0b6c0e6084c4ed23ebd403814a0d0b3e06..9f33bb56cb5975d6327bf7b288a9801d
  
  **Selector:** `mgl_coalesce:`
 diff --git a/platform/node/index.d.ts b/platform/node/index.d.ts
-index 33573695811ce05ec8d39eb446b579e76ecef11b..304b8dcabd0aa0a3120ac146fb9e678b6bf6af28 100644
+index 33573695811c..304b8dcabd0a 100644
 --- a/platform/node/index.d.ts
 +++ b/platform/node/index.d.ts
 @@ -169,15 +169,30 @@ declare module '@maplibre/maplibre-gl-native' {
@@ -9559,7 +9559,7 @@ index 33573695811ce05ec8d39eb446b579e76ecef11b..304b8dcabd0aa0a3120ac146fb9e678b
       * Set size of the tile
       */
 diff --git a/platform/node/src/node_map.cpp b/platform/node/src/node_map.cpp
-index 95d619b843b79378473de309203226fd60f8f491..3da4968445a97b1c11905813618faf68f89658ad 100644
+index 95d619b843b7..3da4968445a9 100644
 --- a/platform/node/src/node_map.cpp
 +++ b/platform/node/src/node_map.cpp
 @@ -117,6 +117,8 @@ ParseError)JS")
@@ -9640,7 +9640,7 @@ index 95d619b843b79378473de309203226fd60f8f491..3da4968445a97b1c11905813618faf68
      auto nodeMap = Nan::ObjectWrap::Unwrap<NodeMap>(info.Holder());
      if (!nodeMap->map) return Nan::ThrowError(releasedMessage());
 diff --git a/platform/node/src/node_map.hpp b/platform/node/src/node_map.hpp
-index 1429bc33f484f4569bcca16b52b44180501d8496..423f6a8a098b418c45312344f04035a6637bacae 100644
+index 1429bc33f484..423f6a8a098b 100644
 --- a/platform/node/src/node_map.hpp
 +++ b/platform/node/src/node_map.hpp
 @@ -70,6 +70,8 @@ public:
@@ -9654,7 +9654,7 @@ index 1429bc33f484f4569bcca16b52b44180501d8496..423f6a8a098b418c45312344f04035a6
  
 diff --git a/platform/node/test/js/global_state.test.js b/platform/node/test/js/global_state.test.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..b8f77100ad333ce01df2d6cbfac66ef0daa7ad10
+index 000000000000..b8f77100ad33
 --- /dev/null
 +++ b/platform/node/test/js/global_state.test.js
 @@ -0,0 +1,81 @@
@@ -9740,7 +9740,7 @@ index 0000000000000000000000000000000000000000..b8f77100ad333ce01df2d6cbfac66ef0
 +    t.end();
 +});
 diff --git a/platform/node/test/js/map.test.js b/platform/node/test/js/map.test.js
-index 3d1f291246ae9c33d343fe9f681cb0df4334cd40..4cf455f1813edad2b2e07500220febff4f43a4e2 100644
+index 3d1f291246ae..4cf455f1813e 100644
 --- a/platform/node/test/js/map.test.js
 +++ b/platform/node/test/js/map.test.js
 @@ -128,6 +128,8 @@ test('Map', function(t) {
@@ -9753,7 +9753,7 @@ index 3d1f291246ae9c33d343fe9f681cb0df4334cd40..4cf455f1813edad2b2e07500220febff
              'queryRenderedFeatures'
          ]);
 diff --git a/render-test/parser.cpp b/render-test/parser.cpp
-index 9623abe7e8dd62b71a02c886c4c64e6965e982eb..a51c5b4bc25c0da08dff1c466cc66348bd20c3dd 100644
+index 9623abe7e8dd..a51c5b4bc25c 100644
 --- a/render-test/parser.cpp
 +++ b/render-test/parser.cpp
 @@ -639,6 +639,7 @@ const std::string addSourceOp("addSource");
@@ -9828,7 +9828,7 @@ index 9623abe7e8dd62b71a02c886c4c64e6965e982eb..a51c5b4bc25c0da08dff1c466cc66348
              // probeFileSize
              assert(operationArray.Size() >= 4u);
 diff --git a/scripts/style-spec-reference/v8.json b/scripts/style-spec-reference/v8.json
-index 55337fcdf90943244933b69deb7b9da2daa9f3c9..84d41422aef4555dea394d1d6dff5e0e7199b238 100644
+index 55337fcdf909..84d41422aef4 100644
 --- a/scripts/style-spec-reference/v8.json
 +++ b/scripts/style-spec-reference/v8.json
 @@ -28,6 +28,7 @@
@@ -11116,7 +11116,7 @@ index 55337fcdf90943244933b69deb7b9da2daa9f3c9..84d41422aef4555dea394d1d6dff5e0e
    }
  }
 diff --git a/src/mln/annotation/render_annotation_source.cpp b/src/mln/annotation/render_annotation_source.cpp
-index 08666e190ad8a0ca67971d37af08d05b310b938f..71afc70f2b959a235e9ad496d96d9be4aaafa077 100644
+index 08666e190ad8..71afc70f2b95 100644
 --- a/src/mln/annotation/render_annotation_source.cpp
 +++ b/src/mln/annotation/render_annotation_source.cpp
 @@ -52,11 +52,13 @@ std::unordered_map<std::string, std::vector<Feature>> RenderAnnotationSource::qu
@@ -11136,7 +11136,7 @@ index 08666e190ad8a0ca67971d37af08d05b310b938f..71afc70f2b959a235e9ad496d96d9be4
  }
  
 diff --git a/src/mln/annotation/render_annotation_source.hpp b/src/mln/annotation/render_annotation_source.hpp
-index 598e5d06a6589380b10757eaeb2efb1e713498d2..6155eda6d76a13f1df0014e20f2f2fbfa805a327 100644
+index 598e5d06a658..6155eda6d76a 100644
 --- a/src/mln/annotation/render_annotation_source.hpp
 +++ b/src/mln/annotation/render_annotation_source.hpp
 @@ -20,9 +20,10 @@ public:
@@ -11152,7 +11152,7 @@ index 598e5d06a6589380b10757eaeb2efb1e713498d2..6155eda6d76a13f1df0014e20f2f2fbf
  private:
      const AnnotationSource::Impl& impl() const;
 diff --git a/src/mln/geometry/feature_index.cpp b/src/mln/geometry/feature_index.cpp
-index fde694a25a8c2311ec26a965d120ff589ce86bbb..e76d248438d5970af6860ccd20ea6eb24ec9c157 100644
+index fde694a25a8c..e76d248438d5 100644
 --- a/src/mln/geometry/feature_index.cpp
 +++ b/src/mln/geometry/feature_index.cpp
 @@ -153,6 +153,7 @@ void FeatureIndex::query(std::unordered_map<std::string, std::vector<Feature>>&
@@ -11206,7 +11206,7 @@ index fde694a25a8c2311ec26a965d120ff589ce86bbb..e76d248438d5970af6860ccd20ea6eb2
          }
  
 diff --git a/src/mln/geometry/feature_index.hpp b/src/mln/geometry/feature_index.hpp
-index 9c2bdf3d9dc39aebd2fdf60a77d3aaa9a6c7a2c3..7cf4f7ff35d07446ec37a9933b4c9e1c1f674de9 100644
+index 9c2bdf3d9dc3..7cf4f7ff35d0 100644
 --- a/src/mln/geometry/feature_index.hpp
 +++ b/src/mln/geometry/feature_index.hpp
 @@ -125,6 +125,7 @@ public:
@@ -11234,10 +11234,10 @@ index 9c2bdf3d9dc39aebd2fdf60a77d3aaa9a6c7a2c3..7cf4f7ff35d07446ec37a9933b4c9e1c
                      const std::unordered_map<std::string, const RenderLayer*>&,
                      const GeometryCoordinates& queryGeometry,
 diff --git a/src/mln/layout/circle_layout.hpp b/src/mln/layout/circle_layout.hpp
-index e84f3672fda1dc90cf22456d393c6509ca1af310..5463d6e0d75fc6a3a0bd4aa3e45f6ffb54f7c3d9 100644
+index acc1ad7631ba..e075d0e0728c 100644
 --- a/src/mln/layout/circle_layout.hpp
 +++ b/src/mln/layout/circle_layout.hpp
-@@ -21,7 +21,9 @@ public:
+@@ -22,7 +22,9 @@ public:
          auto leaderLayerProperties = staticImmutableCast<style::CircleLayerProperties>(group.front());
          const auto& unevaluatedLayout = leaderLayerProperties->layerImpl().layout;
          const bool sortFeaturesByKey = !unevaluatedLayout.get<style::CircleSortKey>().isUndefined();
@@ -11248,7 +11248,7 @@ index e84f3672fda1dc90cf22456d393c6509ca1af310..5463d6e0d75fc6a3a0bd4aa3e45f6ffb
          sourceLayerID = leaderLayerProperties->layerImpl().sourceLayer;
          bucketLeaderID = leaderLayerProperties->layerImpl().id;
  
-@@ -34,7 +36,8 @@ public:
+@@ -35,7 +37,8 @@ public:
          for (size_t i = 0; i < featureCount; ++i) {
              auto feature = sourceLayer->getFeature(i);
              if (!leaderLayerProperties->layerImpl().filter(style::expression::EvaluationContext(zoom, feature.get())
@@ -11259,11 +11259,11 @@ index e84f3672fda1dc90cf22456d393c6509ca1af310..5463d6e0d75fc6a3a0bd4aa3e45f6ffb
              }
  
 diff --git a/src/mln/layout/pattern_layout.hpp b/src/mln/layout/pattern_layout.hpp
-index f348d6c4059c80675fa67848cd7bcf98c7cf215c..839e1a86bccff7d984546b7dcb93ecdb7cbf7db2 100644
+index ea29d25a069c..4597743ff63b 100644
 --- a/src/mln/layout/pattern_layout.hpp
 +++ b/src/mln/layout/pattern_layout.hpp
-@@ -101,7 +101,9 @@ public:
-           hasPattern(false) {
+@@ -100,7 +100,9 @@ public:
+           retainFeaturesById(parameters.retainFeaturesById) {
          assert(!group.empty());
          auto leaderLayerProperties = staticImmutableCast<LayerPropertiesType>(group.front());
 -        layout = leaderLayerProperties->layerImpl().layout.evaluate(PropertyEvaluationParameters(zoom));
@@ -11273,21 +11273,21 @@ index f348d6c4059c80675fa67848cd7bcf98c7cf215c..839e1a86bccff7d984546b7dcb93ecdb
          sourceLayerID = leaderLayerProperties->layerImpl().sourceLayer;
          bucketLeaderID = leaderLayerProperties->layerImpl().id;
  
-@@ -128,7 +130,8 @@ public:
+@@ -127,7 +129,8 @@ public:
              auto feature = sourceLayer->getFeature(i);
              if (!leaderLayerProperties->layerImpl().filter(
                      style::expression::EvaluationContext(this->zoom, feature.get())
--                        .withCanonicalTileID(&parameters.tileID.canonical)))
+-                        .withCanonicalTileID(&parameters.tileID.canonical))) {
 +                        .withCanonicalTileID(&parameters.tileID.canonical)
-+                        .withGlobalState(parameters.globalState.get())))
++                        .withGlobalState(parameters.globalState.get()))) {
                  continue;
+             }
  
-             PatternLayerMap patternDependencyMap;
 diff --git a/src/mln/layout/symbol_layout.cpp b/src/mln/layout/symbol_layout.cpp
-index a71c27ff9ad9d6cb10577416d9595151fbb9bda6..04662454f66967a1e8825eeebfbefa180ccfc34f 100644
+index f85e1accd953..0793bb2a8291 100644
 --- a/src/mln/layout/symbol_layout.cpp
 +++ b/src/mln/layout/symbol_layout.cpp
-@@ -55,9 +55,13 @@ inline const SymbolLayerProperties& toSymbolLayerProperties(const Immutable<Laye
+@@ -58,9 +58,13 @@ inline const SymbolLayerProperties& toSymbolLayerProperties(const Immutable<Laye
  }
  
  inline Immutable<style::SymbolLayoutProperties::PossiblyEvaluated> createLayout(
@@ -11303,16 +11303,16 @@ index a71c27ff9ad9d6cb10577416d9595151fbb9bda6..04662454f66967a1e8825eeebfbefa18
  
      if (layout->get<IconRotationAlignment>() == AlignmentType::Auto) {
          if (layout->get<SymbolPlacement>() != SymbolPlacementType::Point) {
-@@ -128,7 +132,7 @@ SymbolLayout::SymbolLayout(const BucketParameters& parameters,
+@@ -131,7 +135,7 @@ SymbolLayout::SymbolLayout(const BucketParameters& parameters,
        pixelRatio(parameters.pixelRatio),
        tileSize(static_cast<uint32_t>(util::tileSize_D * overscaling)),
        tilePixelRatio(static_cast<float>(util::EXTENT) / tileSize),
--      layout(createLayout(toSymbolLayerProperties(layers.at(0)).layerImpl().layout, zoom)) {
-+      layout(createLayout(toSymbolLayerProperties(layers.at(0)).layerImpl().layout, zoom, parameters.globalState)) {
+-      layout(createLayout(toSymbolLayerProperties(layers.at(0)).layerImpl().layout, zoom)),
++      layout(createLayout(toSymbolLayerProperties(layers.at(0)).layerImpl().layout, zoom, parameters.globalState)),
+       retainFeaturesById(parameters.retainFeaturesById) {
      const SymbolLayer::Impl& leader = toSymbolLayerProperties(layers.at(0)).layerImpl();
  
-     textSize = leader.layout.get<TextSize>();
-@@ -136,6 +140,18 @@ SymbolLayout::SymbolLayout(const BucketParameters& parameters,
+@@ -140,6 +144,18 @@ SymbolLayout::SymbolLayout(const BucketParameters& parameters,
      textRadialOffset = leader.layout.get<TextRadialOffset>();
      textVariableAnchorOffset = leader.layout.get<TextVariableAnchorOffset>();
  
@@ -11331,21 +11331,21 @@ index a71c27ff9ad9d6cb10577416d9595151fbb9bda6..04662454f66967a1e8825eeebfbefa18
      const bool hasText = has<TextField>(*layout) && has<TextFont>(*layout);
      const bool hasIcon = has<IconImage>(*layout);
  
-@@ -172,7 +188,8 @@ SymbolLayout::SymbolLayout(const BucketParameters& parameters,
+@@ -176,7 +192,8 @@ SymbolLayout::SymbolLayout(const BucketParameters& parameters,
      for (size_t i = 0; i < featureCount; ++i) {
          auto feature = sourceLayer->getFeature(i);
          if (!leader.filter(expression::EvaluationContext(this->zoom, feature.get())
--                               .withCanonicalTileID(&parameters.tileID.canonical)))
+-                               .withCanonicalTileID(&parameters.tileID.canonical))) {
 +                               .withCanonicalTileID(&parameters.tileID.canonical)
-+                               .withGlobalState(parameters.globalState.get())))
++                               .withGlobalState(parameters.globalState.get()))) {
              continue;
+         }
  
-         SymbolFeature ft(std::move(feature));
 diff --git a/src/mln/map/map_impl.cpp b/src/mln/map/map_impl.cpp
-index 64ee606e45edc5a27702583698be9d4031d66b51..0f7431bd7472f3a29551c96688eba3d34b4247f8 100644
+index 2fb7a9e16566..52c156a314b2 100644
 --- a/src/mln/map/map_impl.cpp
 +++ b/src/mln/map/map_impl.cpp
-@@ -128,6 +128,7 @@ void Map::Impl::onUpdate() {
+@@ -129,6 +129,7 @@ void Map::Impl::onUpdate() {
                                 .images = style->impl->getImageImpls(),
                                 .sources = style->impl->getSourceImpls(),
                                 .layers = style->impl->getLayerImpls(),
@@ -11354,12 +11354,12 @@ index 64ee606e45edc5a27702583698be9d4031d66b51..0f7431bd7472f3a29551c96688eba3d3
                                 .fileSource = fileSource,
                                 .prefetchZoomDelta = prefetchZoomDelta,
 diff --git a/src/mln/renderer/bucket_parameters.hpp b/src/mln/renderer/bucket_parameters.hpp
-index 3adca03ffd72eb72fae06e8e449636dc304af43e..05c9a4c64545562d2ba561848e63e27bfc3c8d25 100644
+index 494e3a2cd5fb..d932ab2717c2 100644
 --- a/src/mln/renderer/bucket_parameters.hpp
 +++ b/src/mln/renderer/bucket_parameters.hpp
-@@ -2,6 +2,9 @@
- 
+@@ -3,6 +3,9 @@
  #include <mln/map/mode.hpp>
+ #include <mln/renderer/bucket.hpp>
  #include <mln/tile/tile_id.hpp>
 +#include <mln/util/feature.hpp>
 +
@@ -11367,17 +11367,17 @@ index 3adca03ffd72eb72fae06e8e449636dc304af43e..05c9a4c64545562d2ba561848e63e27b
  
  namespace mln {
  namespace style {
-@@ -14,6 +17,8 @@ public:
+@@ -15,6 +18,8 @@ public:
      const MapMode mode;
      const float pixelRatio;
      const style::LayerTypeInfo* layerType;
 +    // The style's global state, used by "global-state" expressions.
 +    std::shared_ptr<const GlobalStateMap> globalState = nullptr;
+     const bool retainFeaturesById = false;
  };
  
- } // namespace mln
 diff --git a/src/mln/renderer/buckets/symbol_bucket.hpp b/src/mln/renderer/buckets/symbol_bucket.hpp
-index c669e5f54a14bcddd5059d4ae8ac275fd5cfea59..c05f55fc55a08ad00507f7f0f1e939479f383770 100644
+index 524755059ca0..b1b391a13a7e 100644
 --- a/src/mln/renderer/buckets/symbol_bucket.hpp
 +++ b/src/mln/renderer/buckets/symbol_bucket.hpp
 @@ -107,9 +107,13 @@ public:
@@ -11398,7 +11398,7 @@ index c669e5f54a14bcddd5059d4ae8ac275fd5cfea59..c05f55fc55a08ad00507f7f0f1e93947
  
      Range<float> getVertexSizeData(const GeometryTileFeature&) noexcept override { return {0.0f, 0.0f}; };
 diff --git a/src/mln/renderer/cross_faded_property_evaluator.cpp b/src/mln/renderer/cross_faded_property_evaluator.cpp
-index 7ab15b7fc1d8ef0d22e77c2311d17b3f60f1ead9..1782591a1629b830458ac653c6746d4199946c4a 100644
+index 7ab15b7fc1d8..1782591a1629 100644
 --- a/src/mln/renderer/cross_faded_property_evaluator.cpp
 +++ b/src/mln/renderer/cross_faded_property_evaluator.cpp
 @@ -18,9 +18,11 @@ Faded<T> CrossFadedPropertyEvaluator<T>::operator()(const T& constant) const {
@@ -11417,7 +11417,7 @@ index 7ab15b7fc1d8ef0d22e77c2311d17b3f60f1ead9..1782591a1629b830458ac653c6746d41
  
  template <typename T>
 diff --git a/src/mln/renderer/data_driven_property_evaluator.hpp b/src/mln/renderer/data_driven_property_evaluator.hpp
-index 296c7ae41fa3d1a9049f2f74802c61429191438a..5f9db6dc0fda2e8bfc0c4faec3f7e4ff8d4fc841 100644
+index 296c7ae41fa3..5f9db6dc0fda 100644
 --- a/src/mln/renderer/data_driven_property_evaluator.hpp
 +++ b/src/mln/renderer/data_driven_property_evaluator.hpp
 @@ -24,18 +24,31 @@ public:
@@ -11469,7 +11469,7 @@ index 296c7ae41fa3d1a9049f2f74802c61429191438a..5f9db6dc0fda2e8bfc0c4faec3f7e4ff
              const T evaluated = expression.evaluate(std::floor(parameters.z));
              return ResultType(calculate(evaluated, evaluated, evaluated));
 diff --git a/src/mln/renderer/layers/render_color_relief_layer.cpp b/src/mln/renderer/layers/render_color_relief_layer.cpp
-index 29bad168450566528628dbf1502154b8aed7830c..78d8564c0178ce2d7518abf400f4d7a508b0f6b0 100644
+index 29bad1684505..78d8564c0178 100644
 --- a/src/mln/renderer/layers/render_color_relief_layer.cpp
 +++ b/src/mln/renderer/layers/render_color_relief_layer.cpp
 @@ -61,6 +61,17 @@ void RenderColorReliefLayer::transition(const TransitionParameters& parameters)
@@ -11508,7 +11508,7 @@ index 29bad168450566528628dbf1502154b8aed7830c..78d8564c0178ce2d7518abf400f4d7a5
          }
      }
 diff --git a/src/mln/renderer/layers/render_color_relief_layer.hpp b/src/mln/renderer/layers/render_color_relief_layer.hpp
-index 3f4371b44e3a56fdccc9f5d808de3c6a57f09c3d..2593527035afd31af149e4e5f6a8da280ae44bf3 100644
+index 3f4371b44e3a..2593527035af 100644
 --- a/src/mln/renderer/layers/render_color_relief_layer.hpp
 +++ b/src/mln/renderer/layers/render_color_relief_layer.hpp
 @@ -52,6 +52,8 @@ private:
@@ -11521,7 +11521,7 @@ index 3f4371b44e3a56fdccc9f5d808de3c6a57f09c3d..2593527035afd31af149e4e5f6a8da28
      // FIX 1: Changed type and name to correctly hold float elevation data
      std::shared_ptr<std::vector<float>> elevationStopsData; // Elevation values for each stop
 diff --git a/src/mln/renderer/layers/render_heatmap_layer.cpp b/src/mln/renderer/layers/render_heatmap_layer.cpp
-index 552b403d48a08a7e9d79a13a3eed201a004f9500..b71e0202aed323c4a6a35e6325e12055dfa7450a 100644
+index 552b403d48a0..b71e0202aed3 100644
 --- a/src/mln/renderer/layers/render_heatmap_layer.cpp
 +++ b/src/mln/renderer/layers/render_heatmap_layer.cpp
 @@ -59,6 +59,17 @@ void RenderHeatmapLayer::layerChanged(const TransitionParameters& parameters,
@@ -11552,7 +11552,7 @@ index 552b403d48a08a7e9d79a13a3eed201a004f9500..b71e0202aed323c4a6a35e6325e12055
  }
  
 diff --git a/src/mln/renderer/layers/render_heatmap_layer.hpp b/src/mln/renderer/layers/render_heatmap_layer.hpp
-index 30b3d212d86a785e9f6ff726f21db01753624af3..3de02c9b8cf8e11ff356f94c4c5bff95401d7f22 100644
+index 30b3d212d86a..3de02c9b8cf8 100644
 --- a/src/mln/renderer/layers/render_heatmap_layer.hpp
 +++ b/src/mln/renderer/layers/render_heatmap_layer.hpp
 @@ -60,6 +60,8 @@ private:
@@ -11565,7 +11565,7 @@ index 30b3d212d86a785e9f6ff726f21db01753624af3..3de02c9b8cf8e11ff356f94c4c5bff95
      SegmentVector segments;
  
 diff --git a/src/mln/renderer/layers/render_line_layer.cpp b/src/mln/renderer/layers/render_line_layer.cpp
-index b7d577fc57620be20bb9294f508374ca4afc3481..4891628e24b2a5c1822e507f7220df221b42b015 100644
+index 80a35e00f51b..de2cb8615c17 100644
 --- a/src/mln/renderer/layers/render_line_layer.cpp
 +++ b/src/mln/renderer/layers/render_line_layer.cpp
 @@ -67,6 +67,17 @@ void RenderLineLayer::transition(const TransitionParameters& parameters) {
@@ -11586,7 +11586,7 @@ index b7d577fc57620be20bb9294f508374ca4afc3481..4891628e24b2a5c1822e507f7220df22
      const auto previousProperties = staticImmutableCast<LineLayerProperties>(evaluatedProperties);
      auto properties = makeMutable<LineLayerProperties>(staticImmutableCast<LineLayer::Impl>(baseImpl),
                                                         parameters.getCrossfadeParameters(),
-@@ -184,7 +195,7 @@ bool RenderLineLayer::queryIntersectsFeature(const GeometryCoordinates& queryGeo
+@@ -269,7 +280,7 @@ bool RenderLineLayer::queryIntersectsFeature(const GeometryCoordinates& queryGeo
  
  void RenderLineLayer::updateColorRamp() {
      const style::ColorRampPropertyValue colorValue = unevaluated.get<LineGradient>().getValue();
@@ -11596,10 +11596,10 @@ index b7d577fc57620be20bb9294f508374ca4afc3481..4891628e24b2a5c1822e507f7220df22
      }
  
 diff --git a/src/mln/renderer/layers/render_line_layer.hpp b/src/mln/renderer/layers/render_line_layer.hpp
-index a813b10a87d4096428a69cb172ac72ff5913df1e..9d7433a666de97de0f5a4746d9a3808ff427860b 100644
+index 7bac378e95c1..1739796b3c1d 100644
 --- a/src/mln/renderer/layers/render_line_layer.hpp
 +++ b/src/mln/renderer/layers/render_line_layer.hpp
-@@ -58,6 +58,8 @@ private:
+@@ -67,6 +67,8 @@ private:
      void updateColorRamp();
  
      std::shared_ptr<PremultipliedImage> colorRamp;
@@ -11609,10 +11609,10 @@ index a813b10a87d4096428a69cb172ac72ff5913df1e..9d7433a666de97de0f5a4746d9a3808f
  
      gfx::ShaderGroupPtr lineShaderGroup;
 diff --git a/src/mln/renderer/layers/render_symbol_layer.cpp b/src/mln/renderer/layers/render_symbol_layer.cpp
-index cbfea31bedb8e5b8b62100d88513165797fa74f2..1b8ebf6dc926151ccafca3a85da8c1e1ce6f7115 100644
+index da035e9daea3..3e3d63b2a0d9 100644
 --- a/src/mln/renderer/layers/render_symbol_layer.cpp
 +++ b/src/mln/renderer/layers/render_symbol_layer.cpp
-@@ -163,7 +163,7 @@ void RenderSymbolLayer::evaluate(const PropertyEvaluationParameters& parameters)
+@@ -167,7 +167,7 @@ void RenderSymbolLayer::evaluate(const PropertyEvaluationParameters& parameters)
      const auto& layout = impl_cast(baseImpl).layout;
  
      if (hasFormatSectionOverrides) {
@@ -11620,9 +11620,9 @@ index cbfea31bedb8e5b8b62100d88513165797fa74f2..1b8ebf6dc926151ccafca3a85da8c1e1
 +        SymbolLayerPaintPropertyOverrides::setOverrides(layout, evaluated, unevaluated, parameters.globalState);
      }
  
-     auto hasIconOpacity = evaluated.get<style::IconColor>().constantOr(Color::black()).a > 0 ||
+     const auto hasIconOpacity = evaluated.get<style::IconColor>().constantOr(IconColor::defaultValue()).a > 0 ||
 diff --git a/src/mln/renderer/possibly_evaluated_property_value.hpp b/src/mln/renderer/possibly_evaluated_property_value.hpp
-index 1cf8fb8ea35e5d97429c55edd2119447b3b68a44..bbffdc798fca230fdbc771a8f205310804829739 100644
+index 1cf8fb8ea35e..bbffdc798fca 100644
 --- a/src/mln/renderer/possibly_evaluated_property_value.hpp
 +++ b/src/mln/renderer/possibly_evaluated_property_value.hpp
 @@ -70,6 +70,12 @@ public:
@@ -11652,7 +11652,7 @@ index 1cf8fb8ea35e5d97429c55edd2119447b3b68a44..bbffdc798fca230fdbc771a8f2053108
  
  namespace util {
 diff --git a/src/mln/renderer/property_evaluation_parameters.hpp b/src/mln/renderer/property_evaluation_parameters.hpp
-index 8e86716fa868b8c00a800be8639ab7a86dfa7766..47d9bc6f72f5bcf0b8ac259905f2cb99821d5d1d 100644
+index 8e86716fa868..47d9bc6f72f5 100644
 --- a/src/mln/renderer/property_evaluation_parameters.hpp
 +++ b/src/mln/renderer/property_evaluation_parameters.hpp
 @@ -2,6 +2,11 @@
@@ -11686,7 +11686,7 @@ index 8e86716fa868b8c00a800be8639ab7a86dfa7766..47d9bc6f72f5bcf0b8ac259905f2cb99
  
  } // namespace mln
 diff --git a/src/mln/renderer/property_evaluator.hpp b/src/mln/renderer/property_evaluator.hpp
-index bc2c8ba65328fbdbbeae0f5ae1c7862fbc88d291..38249ccd3a95682cbbe67cd135ca8be0ce73c222 100644
+index bc2c8ba65328..38249ccd3a95 100644
 --- a/src/mln/renderer/property_evaluator.hpp
 +++ b/src/mln/renderer/property_evaluator.hpp
 @@ -17,7 +17,11 @@ public:
@@ -11703,10 +11703,10 @@ index bc2c8ba65328fbdbbeae0f5ae1c7862fbc88d291..38249ccd3a95682cbbe67cd135ca8be0
  private:
      const PropertyEvaluationParameters& parameters;
 diff --git a/src/mln/renderer/render_layer.cpp b/src/mln/renderer/render_layer.cpp
-index 48a3fa1d05173d50f97e272872dac618621f7b7b..e1b824cffcebf713b3699c9037d35d22e26f2066 100644
+index 5f5a19817a8c..da11335640a3 100644
 --- a/src/mln/renderer/render_layer.cpp
 +++ b/src/mln/renderer/render_layer.cpp
-@@ -232,7 +232,9 @@ void RenderLayer::activateLayerGroup(const LayerGroupBasePtr& layerGroup_,
+@@ -238,7 +238,9 @@ void RenderLayer::activateLayerGroup(const LayerGroupBasePtr& layerGroup_,
      }
  }
  
@@ -11717,7 +11717,7 @@ index 48a3fa1d05173d50f97e272872dac618621f7b7b..e1b824cffcebf713b3699c9037d35d22
      if (colorValue.isUndefined()) {
          return false;
      }
-@@ -240,7 +242,7 @@ bool RenderLayer::applyColorRamp(const style::ColorRampPropertyValue& colorValue
+@@ -246,7 +248,7 @@ bool RenderLayer::applyColorRamp(const style::ColorRampPropertyValue& colorValue
      const auto length = image.bytes();
  
      for (uint32_t i = 0; i < length; i += 4) {
@@ -11727,10 +11727,10 @@ index 48a3fa1d05173d50f97e272872dac618621f7b7b..e1b824cffcebf713b3699c9037d35d22
          image.data[i + 1] = static_cast<uint8_t>(std::floor(color.g * 255.f));
          image.data[i + 2] = static_cast<uint8_t>(std::floor(color.b * 255.f));
 diff --git a/src/mln/renderer/render_layer.hpp b/src/mln/renderer/render_layer.hpp
-index 7dc4524a48afb40dd7d3287994eeca7af8bdb90c..5670c900b8fca353cfba0b2980f4c49be76e7437 100644
+index 08e82730ea53..19975d3c7e77 100644
 --- a/src/mln/renderer/render_layer.hpp
 +++ b/src/mln/renderer/render_layer.hpp
-@@ -281,7 +281,9 @@ protected:
+@@ -290,7 +290,9 @@ protected:
      /// unchanged
      bool setRenderTileBucketID(const OverscaledTileID&, util::SimpleIdentity bucketID);
  
@@ -11739,13 +11739,13 @@ index 7dc4524a48afb40dd7d3287994eeca7af8bdb90c..5670c900b8fca353cfba0b2980f4c49b
 +                               PremultipliedImage&,
 +                               const GlobalStateMap* globalState = nullptr);
  
- protected:
-     // Stores current set of tiles to be rendered for this layer.
+     using FloatPair = std::array<float, 2>;
+     using FloatQuad = std::array<float, 4>;
 diff --git a/src/mln/renderer/render_orchestrator.cpp b/src/mln/renderer/render_orchestrator.cpp
-index f6a5cb12a6686e2f4d81e32345f6f375b4adc239..fd3c2e284b2d2b5181cc43fb0ed16a63a22db173 100644
+index d74eb5cf3f8e..bccc35207fb3 100644
 --- a/src/mln/renderer/render_orchestrator.cpp
 +++ b/src/mln/renderer/render_orchestrator.cpp
-@@ -62,6 +62,25 @@ RendererObserver& nullObserver() {
+@@ -63,6 +63,25 @@ RendererObserver& nullObserver() {
      return observer;
  }
  
@@ -11771,7 +11771,7 @@ index f6a5cb12a6686e2f4d81e32345f6f375b4adc239..fd3c2e284b2d2b5181cc43fb0ed16a63
  class RenderTreeImpl final : public RenderTree {
  public:
      RenderTreeImpl(std::unique_ptr<RenderTreeParameters> parameters_,
-@@ -183,8 +202,19 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
+@@ -184,8 +203,19 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
      const auto transitionDuration = transitionOptions.duration.value_or(
          isMapModeContinuous ? util::DEFAULT_TRANSITION_DURATION : Duration::zero());
  
@@ -11791,17 +11791,15 @@ index f6a5cb12a6686e2f4d81e32345f6f375b4adc239..fd3c2e284b2d2b5181cc43fb0ed16a63
  
      TileParameters tileParameters{.pixelRatio = updateParameters->pixelRatio,
                                    .debugOptions = updateParameters->debugOptions,
-@@ -201,7 +231,8 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
-                                   .tileLodPitchThreshold = updateParameters->tileLodPitchThreshold,
+@@ -203,6 +233,7 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
                                    .tileLodZoomShift = updateParameters->tileLodZoomShift,
                                    .tileLodMode = updateParameters->tileLodMode,
--                                  .dynamicTextureAtlas = dynamicTextureAtlas};
-+                                  .dynamicTextureAtlas = dynamicTextureAtlas,
-+                                  .globalState = globalState};
+                                   .dynamicTextureAtlas = dynamicTextureAtlas,
++                                  .globalState = globalState,
+                                   .captureRenderedFeatures = updateParameters->captureRenderedFeatures};
  
      glyphManager->setURL(updateParameters->glyphURL);
-     glyphManager->setFontFaces(updateParameters->fontFaces);
-@@ -214,7 +245,7 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
+@@ -216,7 +247,7 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
          renderLight.transition(transitionParameters);
      }
  
@@ -11810,7 +11808,7 @@ index f6a5cb12a6686e2f4d81e32345f6f375b4adc239..fd3c2e284b2d2b5181cc43fb0ed16a63
          renderLight.evaluate(evaluationParameters);
      }
  
-@@ -315,8 +346,13 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
+@@ -317,8 +348,13 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
          const bool zoomChangedAndMatters = zoomChanged && !layerAddedOrChanged &&
                                             (layer.getStyleDependencies() & Dependency::Zoom);
  
@@ -11826,7 +11824,7 @@ index f6a5cb12a6686e2f4d81e32345f6f375b4adc239..fd3c2e284b2d2b5181cc43fb0ed16a63
              const auto previousMask = layer.evaluatedProperties->constantsMask();
              layer.evaluate(evaluationParameters);
              if (previousMask != layer.evaluatedProperties->constantsMask()) {
-@@ -383,9 +419,29 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
+@@ -385,9 +421,29 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
              if (layerInfo->source != LayerTypeInfo::Source::NotRequired) {
                  if (layer.baseImpl->source == sourceImpl->id) {
                      const std::string& layerId = layer.getID();
@@ -11857,7 +11855,7 @@ index f6a5cb12a6686e2f4d81e32345f6f375b4adc239..fd3c2e284b2d2b5181cc43fb0ed16a63
                      if (layerIsVisible) {
                          filteredLayersForSource.push_back(layer.evaluatedProperties);
                          if (zoomFitsLayer) {
-@@ -614,6 +670,7 @@ void RenderOrchestrator::queryRenderedSymbols(std::unordered_map<std::string, st
+@@ -616,6 +672,7 @@ void RenderOrchestrator::queryRenderedSymbols(std::unordered_map<std::string, st
          auto& queryData = wrappedQueryData.get();
          auto bucketSymbols = queryData.featureIndex->lookupSymbolFeatures(renderedSymbols[queryData.bucketInstanceId],
                                                                            options,
@@ -11865,7 +11863,7 @@ index f6a5cb12a6686e2f4d81e32345f6f375b4adc239..fd3c2e284b2d2b5181cc43fb0ed16a63
                                                                            crossTileSymbolIndexLayers,
                                                                            queryData.tileID,
                                                                            queryData.featureSortOrder);
-@@ -648,7 +705,7 @@ std::vector<Feature> RenderOrchestrator::queryRenderedFeatures(
+@@ -650,7 +707,7 @@ std::vector<Feature> RenderOrchestrator::queryRenderedFeatures(
      for (const auto& sourceID : sourceIDs) {
          if (RenderSource* renderSource = getRenderSource(sourceID)) {
              auto sourceResults = renderSource->queryRenderedFeatures(
@@ -11874,7 +11872,7 @@ index f6a5cb12a6686e2f4d81e32345f6f375b4adc239..fd3c2e284b2d2b5181cc43fb0ed16a63
              std::ranges::move(sourceResults, std::inserter(resultsByLayer, resultsByLayer.begin()));
          }
      }
-@@ -706,7 +763,7 @@ std::vector<Feature> RenderOrchestrator::querySourceFeatures(const std::string&
+@@ -708,7 +765,7 @@ std::vector<Feature> RenderOrchestrator::querySourceFeatures(const std::string&
      const RenderSource* source = getRenderSource(sourceID);
      if (!source) return {};
  
@@ -11884,10 +11882,10 @@ index f6a5cb12a6686e2f4d81e32345f6f375b4adc239..fd3c2e284b2d2b5181cc43fb0ed16a63
  
  FeatureExtensionValue RenderOrchestrator::queryFeatureExtensions(
 diff --git a/src/mln/renderer/render_orchestrator.hpp b/src/mln/renderer/render_orchestrator.hpp
-index 15f1f6665aeb2c02de2327c6ceb7ed3e33c1f984..cfd41691c7641c83802c3f122dde2f4c3d60d395 100644
+index b87a3a380379..c7cebfb5a28b 100644
 --- a/src/mln/renderer/render_orchestrator.hpp
 +++ b/src/mln/renderer/render_orchestrator.hpp
-@@ -215,6 +215,9 @@ private:
+@@ -219,6 +219,9 @@ private:
      Immutable<std::vector<Immutable<style::Source::Impl>>> sourceImpls;
      Immutable<std::vector<Immutable<style::Layer::Impl>>> layerImpls;
  
@@ -11898,10 +11896,10 @@ index 15f1f6665aeb2c02de2327c6ceb7ed3e33c1f984..cfd41691c7641c83802c3f122dde2f4c
      std::unordered_map<std::string, std::unique_ptr<RenderLayer>> renderLayers;
      RenderLight renderLight;
 diff --git a/src/mln/renderer/render_source.hpp b/src/mln/renderer/render_source.hpp
-index aae4aefaadc4a7d6006581c350fbe2cd7f8a1b93..c1905d8896c6fba28d2720c588228305d9fb1675 100644
+index 720e9c53f2cc..bf389edf1f9f 100644
 --- a/src/mln/renderer/render_source.hpp
 +++ b/src/mln/renderer/render_source.hpp
-@@ -85,9 +85,10 @@ public:
+@@ -87,9 +87,10 @@ public:
          const TransformState& transformState,
          const std::unordered_map<std::string, const RenderLayer*>& layers,
          const RenderedQueryOptions& options,
@@ -11914,7 +11912,7 @@ index aae4aefaadc4a7d6006581c350fbe2cd7f8a1b93..c1905d8896c6fba28d2720c588228305
      virtual FeatureExtensionValue queryFeatureExtensions(const Feature&,
                                                           const std::string&,
 diff --git a/src/mln/renderer/sources/render_image_source.cpp b/src/mln/renderer/sources/render_image_source.cpp
-index f25a0422b04e5895dd7a284cec83d8d624ac8776..61382e084f8ffd7d8cb0672f5d7dc892798743da 100644
+index f25a0422b04e..61382e084f8f 100644
 --- a/src/mln/renderer/sources/render_image_source.cpp
 +++ b/src/mln/renderer/sources/render_image_source.cpp
 @@ -68,11 +68,12 @@ std::unordered_map<std::string, std::vector<Feature>> RenderImageSource::queryRe
@@ -11932,7 +11930,7 @@ index f25a0422b04e5895dd7a284cec83d8d624ac8776..61382e084f8ffd7d8cb0672f5d7dc892
  }
  
 diff --git a/src/mln/renderer/sources/render_image_source.hpp b/src/mln/renderer/sources/render_image_source.hpp
-index d961717ce00765626fdc019e4085fdb5b0495681..3367fd7292c7da6e08b8e6d9c10e86323ebec977 100644
+index d961717ce007..3367fd7292c7 100644
 --- a/src/mln/renderer/sources/render_image_source.hpp
 +++ b/src/mln/renderer/sources/render_image_source.hpp
 @@ -53,9 +53,10 @@ public:
@@ -11948,7 +11946,7 @@ index d961717ce00765626fdc019e4085fdb5b0495681..3367fd7292c7da6e08b8e6d9c10e8632
      void reduceMemoryUse() final {}
      void dumpDebugLogs() const final;
 diff --git a/src/mln/renderer/sources/render_raster_dem_source.cpp b/src/mln/renderer/sources/render_raster_dem_source.cpp
-index ff40de4415d864fd3e6d6a397094470eeed95a98..c42f7da79e84e328a19c5f5024459c42e6403b86 100644
+index ff40de4415d8..c42f7da79e84 100644
 --- a/src/mln/renderer/sources/render_raster_dem_source.cpp
 +++ b/src/mln/renderer/sources/render_raster_dem_source.cpp
 @@ -113,11 +113,13 @@ std::unordered_map<std::string, std::vector<Feature>> RenderRasterDEMSource::que
@@ -11967,7 +11965,7 @@ index ff40de4415d864fd3e6d6a397094470eeed95a98..c42f7da79e84e328a19c5f5024459c42
  }
  
 diff --git a/src/mln/renderer/sources/render_raster_dem_source.hpp b/src/mln/renderer/sources/render_raster_dem_source.hpp
-index 929d7ab1f1565b7ab816e588dc09de857522a655..f93723996c6159db687dfd611220f739c34e9859 100644
+index 929d7ab1f156..f93723996c61 100644
 --- a/src/mln/renderer/sources/render_raster_dem_source.hpp
 +++ b/src/mln/renderer/sources/render_raster_dem_source.hpp
 @@ -14,9 +14,10 @@ public:
@@ -11983,7 +11981,7 @@ index 929d7ab1f1565b7ab816e588dc09de857522a655..f93723996c6159db687dfd611220f739
  private:
      // RenderTileSetSource overrides
 diff --git a/src/mln/renderer/sources/render_raster_source.cpp b/src/mln/renderer/sources/render_raster_source.cpp
-index 7cdef6f059960b0a960be2d4e1cbefd86c6cd1dd..7db99d46548235b95f0e63c4c358a7cf76c47db4 100644
+index 7cdef6f05996..7db99d465482 100644
 --- a/src/mln/renderer/sources/render_raster_source.cpp
 +++ b/src/mln/renderer/sources/render_raster_source.cpp
 @@ -47,11 +47,12 @@ std::unordered_map<std::string, std::vector<Feature>> RenderRasterSource::queryR
@@ -12001,7 +11999,7 @@ index 7cdef6f059960b0a960be2d4e1cbefd86c6cd1dd..7db99d46548235b95f0e63c4c358a7cf
  }
  
 diff --git a/src/mln/renderer/sources/render_raster_source.hpp b/src/mln/renderer/sources/render_raster_source.hpp
-index a74407d658cb2f56405abed942dbcf052ff1444d..e03d497a153c896396c7f0b4a5509716e7bcfc5a 100644
+index a74407d658cb..e03d497a153c 100644
 --- a/src/mln/renderer/sources/render_raster_source.hpp
 +++ b/src/mln/renderer/sources/render_raster_source.hpp
 @@ -17,9 +17,10 @@ private:
@@ -12017,7 +12015,7 @@ index a74407d658cb2f56405abed942dbcf052ff1444d..e03d497a153c896396c7f0b4a5509716
      // RenderTileSetSource overrides
      void updateInternal(const Tileset&,
 diff --git a/src/mln/renderer/sources/render_tile_source.cpp b/src/mln/renderer/sources/render_tile_source.cpp
-index a10d76b3c7b894f353d85e80cc294f5d58d07736..a3856f4085c0ea4e0802aea33b2fa147941c03b4 100644
+index a10d76b3c7b8..a3856f4085c0 100644
 --- a/src/mln/renderer/sources/render_tile_source.cpp
 +++ b/src/mln/renderer/sources/render_tile_source.cpp
 @@ -532,12 +532,15 @@ std::unordered_map<std::string, std::vector<Feature>> RenderTileSource::queryRen
@@ -12040,7 +12038,7 @@ index a10d76b3c7b894f353d85e80cc294f5d58d07736..a3856f4085c0ea4e0802aea33b2fa147
  
  void RenderTileSource::setFeatureState(const std::optional<std::string>& sourceLayerID,
 diff --git a/src/mln/renderer/sources/render_tile_source.hpp b/src/mln/renderer/sources/render_tile_source.hpp
-index 8af09564234f221002b69b63526e055efaec9299..04f1b047dd11ff91011453a1feeba5cac0350cec 100644
+index 8af09564234f..04f1b047dd11 100644
 --- a/src/mln/renderer/sources/render_tile_source.hpp
 +++ b/src/mln/renderer/sources/render_tile_source.hpp
 @@ -34,9 +34,10 @@ public:
@@ -12056,7 +12054,7 @@ index 8af09564234f221002b69b63526e055efaec9299..04f1b047dd11ff91011453a1feeba5ca
      void setFeatureState(const std::optional<std::string>&, const std::string&, const FeatureState&) override;
  
 diff --git a/src/mln/renderer/tile_parameters.hpp b/src/mln/renderer/tile_parameters.hpp
-index 291858c93da2e5e8b09edab26879e5c74eb448b8..2598d93e255afdc0566cbbe2cab26edb724133d2 100644
+index 37f02684a07d..ff99d2b4e460 100644
 --- a/src/mln/renderer/tile_parameters.hpp
 +++ b/src/mln/renderer/tile_parameters.hpp
 @@ -2,6 +2,7 @@
@@ -12073,10 +12071,10 @@ index 291858c93da2e5e8b09edab26879e5c74eb448b8..2598d93e255afdc0566cbbe2cab26edb
      gfx::DynamicTextureAtlasPtr dynamicTextureAtlas;
 +    std::shared_ptr<const GlobalStateMap> globalState = nullptr;
      bool isUpdateSynchronous = false;
+     bool captureRenderedFeatures = false;
  };
- 
 diff --git a/src/mln/renderer/tile_pyramid.cpp b/src/mln/renderer/tile_pyramid.cpp
-index 41e899dfd2a9d537702fbab30057aa1f2dbb81cb..a45781207b0e290075d0b1016298e3fcaf11d340 100644
+index 41e899dfd2a9..a45781207b0e 100644
 --- a/src/mln/renderer/tile_pyramid.cpp
 +++ b/src/mln/renderer/tile_pyramid.cpp
 @@ -164,7 +164,7 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
@@ -12128,7 +12126,7 @@ index 41e899dfd2a9d537702fbab30057aa1f2dbb81cb..a45781207b0e290075d0b1016298e3fc
  
      return result;
 diff --git a/src/mln/renderer/tile_pyramid.hpp b/src/mln/renderer/tile_pyramid.hpp
-index 0f0a92362c9a763dc7dee4e5ae50090428cc783a..56eda6aeb0aea358eab9eec78907da829026d783 100644
+index 0f0a92362c9a..56eda6aeb0ae 100644
 --- a/src/mln/renderer/tile_pyramid.hpp
 +++ b/src/mln/renderer/tile_pyramid.hpp
 @@ -55,10 +55,11 @@ public:
@@ -12145,7 +12143,7 @@ index 0f0a92362c9a763dc7dee4e5ae50090428cc783a..56eda6aeb0aea358eab9eec78907da82
      void setCacheEnabled(bool);
      void reduceMemoryUse();
 diff --git a/src/mln/renderer/update_parameters.hpp b/src/mln/renderer/update_parameters.hpp
-index 64ee8d52fccc38dad9a2626145e8809e548b1065..863a1891d5a80e146c8f2b9921944ed63465830d 100644
+index 968b63516933..e3ead8f5c569 100644
 --- a/src/mln/renderer/update_parameters.hpp
 +++ b/src/mln/renderer/update_parameters.hpp
 @@ -8,6 +8,7 @@
@@ -12167,7 +12165,7 @@ index 64ee8d52fccc38dad9a2626145e8809e548b1065..863a1891d5a80e146c8f2b9921944ed6
      std::shared_ptr<FileSource> fileSource;
  
 diff --git a/src/mln/style/expression/compound_expression.cpp b/src/mln/style/expression/compound_expression.cpp
-index da025387dcc3ddd4a9b59ecbb4fda70f9b4ac1cb..d198137895ee95166a5740dc78ecc90071f22ff4 100644
+index da025387dcc3..d198137895ee 100644
 --- a/src/mln/style/expression/compound_expression.cpp
 +++ b/src/mln/style/expression/compound_expression.cpp
 @@ -786,6 +786,23 @@ const auto& featureStateCompoundExpression() {
@@ -12217,7 +12215,7 @@ index da025387dcc3ddd4a9b59ecbb4fda70f9b4ac1cb..d198137895ee95166a5740dc78ecc900
          const auto& signature = it->second();
  
 diff --git a/src/mln/style/expression/expression.cpp b/src/mln/style/expression/expression.cpp
-index 91c177210aa410eba73235585c980a6519a70f67..4083c7f51233088e296504499787b5220ff817f5 100644
+index 91c177210aa4..4083c7f51233 100644
 --- a/src/mln/style/expression/expression.cpp
 +++ b/src/mln/style/expression/expression.cpp
 @@ -1,5 +1,6 @@
@@ -12273,7 +12271,7 @@ index 91c177210aa410eba73235585c980a6519a70f67..4083c7f51233088e296504499787b522
      return os;
  }
 diff --git a/src/mln/style/expression/is_constant.cpp b/src/mln/style/expression/is_constant.cpp
-index e322faae64f182d2b238f3c48cc6b8d19e917f62..564b35057150e57a984767d4bb2eb6e1ace3637a 100644
+index e322faae64f1..564b35057150 100644
 --- a/src/mln/style/expression/is_constant.cpp
 +++ b/src/mln/style/expression/is_constant.cpp
 @@ -64,6 +64,15 @@ bool isRuntimeConstant(const Expression& expression) {
@@ -12293,7 +12291,7 @@ index e322faae64f182d2b238f3c48cc6b8d19e917f62..564b35057150e57a984767d4bb2eb6e1
      expression.eachChild([&](const Expression& e) {
          if (runtimeConstant && !isRuntimeConstant(e)) {
 diff --git a/src/mln/style/expression/parsing_context.cpp b/src/mln/style/expression/parsing_context.cpp
-index c0edbd41cbafaedde7614291212a792000b1c171..4503c42994cc46f6219725958d7adf5f94b50d51 100644
+index c0edbd41cbaf..4503c42994cc 100644
 --- a/src/mln/style/expression/parsing_context.cpp
 +++ b/src/mln/style/expression/parsing_context.cpp
 @@ -45,8 +45,8 @@ namespace style {
@@ -12308,7 +12306,7 @@ index c0edbd41cbafaedde7614291212a792000b1c171..4503c42994cc46f6219725958d7adf5f
  bool isConstant(const Expression& expression) {
      const auto kind = expression.getKind();
 diff --git a/src/mln/style/layer.cpp b/src/mln/style/layer.cpp
-index cec0388c4c941acb8ff79f5ce0168c335e7df8db..9724b8692b72d610177fe610b780c3a61bc47176 100644
+index cec0388c4c94..9724b8692b72 100644
 --- a/src/mln/style/layer.cpp
 +++ b/src/mln/style/layer.cpp
 @@ -1,12 +1,15 @@
@@ -12415,7 +12413,7 @@ index cec0388c4c941acb8ff79f5ce0168c335e7df8db..9724b8692b72d610177fe610b780c3a6
      std::optional<VisibilityType> visibility = convert<VisibilityType>(value, error);
      if (!visibility) {
 diff --git a/src/mln/style/layer_impl.hpp b/src/mln/style/layer_impl.hpp
-index 0c2f43a21a24fa62206d579be45e975d864a101d..9005635ccdab01d47c680f43f42984ac072c40a5 100644
+index 0c2f43a21a24..9005635ccdab 100644
 --- a/src/mln/style/layer_impl.hpp
 +++ b/src/mln/style/layer_impl.hpp
 @@ -9,6 +9,7 @@
@@ -12458,7 +12456,7 @@ index 0c2f43a21a24fa62206d579be45e975d864a101d..9005635ccdab01d47c680f43f42984ac
      std::string source;
      std::string sourceLayer;
 diff --git a/src/mln/style/layers/background_layer_properties.cpp b/src/mln/style/layers/background_layer_properties.cpp
-index a996950f42302b6cb00295056be8ed7c4bdc816d..15c86fec8221482fdb71a16c552d21ed55d3ee12 100644
+index a996950f4230..15c86fec8221 100644
 --- a/src/mln/style/layers/background_layer_properties.cpp
 +++ b/src/mln/style/layers/background_layer_properties.cpp
 @@ -35,6 +35,14 @@ expression::Dependency BackgroundLayerProperties::getDependencies() const noexce
@@ -12477,7 +12475,7 @@ index a996950f42302b6cb00295056be8ed7c4bdc816d..15c86fec8221482fdb71a16c552d21ed
  } // namespace mln
  
 diff --git a/src/mln/style/layers/background_layer_properties.hpp b/src/mln/style/layers/background_layer_properties.hpp
-index f6a18b0f94203eb6284b07ec51d6382b3f7a77f1..5af45f7717b8251e9edb39e0deaaa6d62a47a766 100644
+index f6a18b0f9420..5af45f7717b8 100644
 --- a/src/mln/style/layers/background_layer_properties.hpp
 +++ b/src/mln/style/layers/background_layer_properties.hpp
 @@ -47,6 +47,10 @@ public:
@@ -12492,7 +12490,7 @@ index f6a18b0f94203eb6284b07ec51d6382b3f7a77f1..5af45f7717b8251e9edb39e0deaaa6d6
      // Data members.
      CrossfadeParameters crossfade;
 diff --git a/src/mln/style/layers/circle_layer_impl.hpp b/src/mln/style/layers/circle_layer_impl.hpp
-index f14a9a8ba5218de99c0160768ad604f686ed23a4..37634463b77e19810a6046230ca9c7a8d7d4c20f 100644
+index f14a9a8ba521..37634463b77e 100644
 --- a/src/mln/style/layers/circle_layer_impl.hpp
 +++ b/src/mln/style/layers/circle_layer_impl.hpp
 @@ -14,6 +14,15 @@ public:
@@ -12512,7 +12510,7 @@ index f14a9a8ba5218de99c0160768ad604f686ed23a4..37634463b77e19810a6046230ca9c7a8
      CirclePaintProperties::Transitionable paint;
  
 diff --git a/src/mln/style/layers/circle_layer_properties.cpp b/src/mln/style/layers/circle_layer_properties.cpp
-index 8ba147ba5da2026016c89e3d86579dc960742ed4..8e9526937b4d8f987b34916209242c1b7e168ba3 100644
+index 8ba147ba5da2..8e9526937b4d 100644
 --- a/src/mln/style/layers/circle_layer_properties.cpp
 +++ b/src/mln/style/layers/circle_layer_properties.cpp
 @@ -33,6 +33,14 @@ expression::Dependency CircleLayerProperties::getDependencies() const noexcept {
@@ -12531,7 +12529,7 @@ index 8ba147ba5da2026016c89e3d86579dc960742ed4..8e9526937b4d8f987b34916209242c1b
  } // namespace mln
  
 diff --git a/src/mln/style/layers/circle_layer_properties.hpp b/src/mln/style/layers/circle_layer_properties.hpp
-index 16462d34686f1a9021cdb09f38dd8321de942177..45a1f36462d5bebc3e83778d7bfe5d870ff25a09 100644
+index 16462d34686f..45a1f36462d5 100644
 --- a/src/mln/style/layers/circle_layer_properties.hpp
 +++ b/src/mln/style/layers/circle_layer_properties.hpp
 @@ -95,6 +95,10 @@ public:
@@ -12546,7 +12544,7 @@ index 16462d34686f1a9021cdb09f38dd8321de942177..45a1f36462d5bebc3e83778d7bfe5d87
      // Data members.
      CirclePaintProperties::PossiblyEvaluated evaluated;
 diff --git a/src/mln/style/layers/color_relief_layer_properties.cpp b/src/mln/style/layers/color_relief_layer_properties.cpp
-index 1119d5e716ae809c8e25a5f6f43efab2ba4c124b..c26a8ab5eaa21f15d54cf62b0c54eec19f369c6e 100644
+index 1119d5e716ae..c26a8ab5eaa2 100644
 --- a/src/mln/style/layers/color_relief_layer_properties.cpp
 +++ b/src/mln/style/layers/color_relief_layer_properties.cpp
 @@ -33,6 +33,14 @@ expression::Dependency ColorReliefLayerProperties::getDependencies() const noexc
@@ -12565,7 +12563,7 @@ index 1119d5e716ae809c8e25a5f6f43efab2ba4c124b..c26a8ab5eaa21f15d54cf62b0c54eec1
  } // namespace mln
  
 diff --git a/src/mln/style/layers/color_relief_layer_properties.hpp b/src/mln/style/layers/color_relief_layer_properties.hpp
-index d1875fa3e585879a578baa21d1ae83debed150be..f28a1df8b0be64ffac173ff120096e45fd952520 100644
+index d1875fa3e585..f28a1df8b0be 100644
 --- a/src/mln/style/layers/color_relief_layer_properties.hpp
 +++ b/src/mln/style/layers/color_relief_layer_properties.hpp
 @@ -40,6 +40,10 @@ public:
@@ -12580,7 +12578,7 @@ index d1875fa3e585879a578baa21d1ae83debed150be..f28a1df8b0be64ffac173ff120096e45
      // Data members.
      ColorReliefPaintProperties::PossiblyEvaluated evaluated;
 diff --git a/src/mln/style/layers/fill_extrusion_layer_impl.hpp b/src/mln/style/layers/fill_extrusion_layer_impl.hpp
-index b377c176974b8aa52833578a4292be6b9f8a138c..5bbd57b9521bf5c2a8ee213a37304e9387047197 100644
+index b377c176974b..5bbd57b9521b 100644
 --- a/src/mln/style/layers/fill_extrusion_layer_impl.hpp
 +++ b/src/mln/style/layers/fill_extrusion_layer_impl.hpp
 @@ -14,6 +14,15 @@ public:
@@ -12600,7 +12598,7 @@ index b377c176974b8aa52833578a4292be6b9f8a138c..5bbd57b9521bf5c2a8ee213a37304e93
      FillExtrusionPaintProperties::Transitionable paint;
  
 diff --git a/src/mln/style/layers/fill_extrusion_layer_properties.cpp b/src/mln/style/layers/fill_extrusion_layer_properties.cpp
-index f9f06d91a308323c1849105129319686cc19e0fc..61e5d8558b494ba6b7c0b64177abf580bd8f6c82 100644
+index f9f06d91a308..61e5d8558b49 100644
 --- a/src/mln/style/layers/fill_extrusion_layer_properties.cpp
 +++ b/src/mln/style/layers/fill_extrusion_layer_properties.cpp
 @@ -35,6 +35,14 @@ expression::Dependency FillExtrusionLayerProperties::getDependencies() const noe
@@ -12619,7 +12617,7 @@ index f9f06d91a308323c1849105129319686cc19e0fc..61e5d8558b494ba6b7c0b64177abf580
  } // namespace mln
  
 diff --git a/src/mln/style/layers/fill_extrusion_layer_properties.hpp b/src/mln/style/layers/fill_extrusion_layer_properties.hpp
-index 3ca9b9f4b4211d35815f348b6f139d812c430ed4..a864ee3119622d1112e3aaf0c0c9d2fccd080121 100644
+index 3ca9b9f4b421..a864ee311962 100644
 --- a/src/mln/style/layers/fill_extrusion_layer_properties.hpp
 +++ b/src/mln/style/layers/fill_extrusion_layer_properties.hpp
 @@ -81,6 +81,10 @@ public:
@@ -12634,7 +12632,7 @@ index 3ca9b9f4b4211d35815f348b6f139d812c430ed4..a864ee3119622d1112e3aaf0c0c9d2fc
      // Data members.
      CrossfadeParameters crossfade;
 diff --git a/src/mln/style/layers/fill_layer_impl.hpp b/src/mln/style/layers/fill_layer_impl.hpp
-index 8af951b4ca9e89b7e520a6d601345553214136ba..3ccfde1c52a2aaaff1726cfadcb0f23e8f3e4eea 100644
+index 8af951b4ca9e..3ccfde1c52a2 100644
 --- a/src/mln/style/layers/fill_layer_impl.hpp
 +++ b/src/mln/style/layers/fill_layer_impl.hpp
 @@ -14,6 +14,15 @@ public:
@@ -12654,7 +12652,7 @@ index 8af951b4ca9e89b7e520a6d601345553214136ba..3ccfde1c52a2aaaff1726cfadcb0f23e
      FillPaintProperties::Transitionable paint;
  
 diff --git a/src/mln/style/layers/fill_layer_properties.cpp b/src/mln/style/layers/fill_layer_properties.cpp
-index 3a76b70dd84fea8fc88e24ebc089d2ccb5c84954..64a91f2b4e1b647939b7cb19480064159b020700 100644
+index 3a76b70dd84f..64a91f2b4e1b 100644
 --- a/src/mln/style/layers/fill_layer_properties.cpp
 +++ b/src/mln/style/layers/fill_layer_properties.cpp
 @@ -35,6 +35,14 @@ expression::Dependency FillLayerProperties::getDependencies() const noexcept {
@@ -12673,7 +12671,7 @@ index 3a76b70dd84fea8fc88e24ebc089d2ccb5c84954..64a91f2b4e1b647939b7cb1948006415
  } // namespace mln
  
 diff --git a/src/mln/style/layers/fill_layer_properties.hpp b/src/mln/style/layers/fill_layer_properties.hpp
-index b249d08b6cac5f7d5a22eb3b9eab86b86a0c05bf..3836727e75784f66d6c7c0bf14465066b5a97c8e 100644
+index b249d08b6cac..3836727e7578 100644
 --- a/src/mln/style/layers/fill_layer_properties.hpp
 +++ b/src/mln/style/layers/fill_layer_properties.hpp
 @@ -76,6 +76,10 @@ public:
@@ -12688,7 +12686,7 @@ index b249d08b6cac5f7d5a22eb3b9eab86b86a0c05bf..3836727e75784f66d6c7c0bf14465066
      // Data members.
      CrossfadeParameters crossfade;
 diff --git a/src/mln/style/layers/heatmap_layer_properties.cpp b/src/mln/style/layers/heatmap_layer_properties.cpp
-index 8e23c46582efdd8058b453376910257dacfaeb7d..b5fe92d6f019f466aa5031bc88f0d77486a15f5d 100644
+index 8e23c46582ef..b5fe92d6f019 100644
 --- a/src/mln/style/layers/heatmap_layer_properties.cpp
 +++ b/src/mln/style/layers/heatmap_layer_properties.cpp
 @@ -33,6 +33,14 @@ expression::Dependency HeatmapLayerProperties::getDependencies() const noexcept
@@ -12707,7 +12705,7 @@ index 8e23c46582efdd8058b453376910257dacfaeb7d..b5fe92d6f019f466aa5031bc88f0d774
  } // namespace mln
  
 diff --git a/src/mln/style/layers/heatmap_layer_properties.hpp b/src/mln/style/layers/heatmap_layer_properties.hpp
-index 96d313ca882cc66c743878990431665388b5705f..f5ef8e482c99cce825a0cee0b63611a4e3d91cf4 100644
+index 96d313ca882c..f5ef8e482c99 100644
 --- a/src/mln/style/layers/heatmap_layer_properties.hpp
 +++ b/src/mln/style/layers/heatmap_layer_properties.hpp
 @@ -55,6 +55,10 @@ public:
@@ -12722,7 +12720,7 @@ index 96d313ca882cc66c743878990431665388b5705f..f5ef8e482c99cce825a0cee0b63611a4
      // Data members.
      HeatmapPaintProperties::PossiblyEvaluated evaluated;
 diff --git a/src/mln/style/layers/hillshade_layer_properties.cpp b/src/mln/style/layers/hillshade_layer_properties.cpp
-index 9cbcf5b0d0ff0f3673bedd9ea7f99035058416e0..824dab81e715b5bbb9d65646fa494d9b93a5c6f6 100644
+index 9cbcf5b0d0ff..824dab81e715 100644
 --- a/src/mln/style/layers/hillshade_layer_properties.cpp
 +++ b/src/mln/style/layers/hillshade_layer_properties.cpp
 @@ -33,6 +33,14 @@ expression::Dependency HillshadeLayerProperties::getDependencies() const noexcep
@@ -12741,7 +12739,7 @@ index 9cbcf5b0d0ff0f3673bedd9ea7f99035058416e0..824dab81e715b5bbb9d65646fa494d9b
  } // namespace mln
  
 diff --git a/src/mln/style/layers/hillshade_layer_properties.hpp b/src/mln/style/layers/hillshade_layer_properties.hpp
-index ca0c0ad4d8a7efebe13ecd0295b4f441d8b296f2..0fdb700f091933b7f56013dc49bff8f469fddc2e 100644
+index ca0c0ad4d8a7..0fdb700f0919 100644
 --- a/src/mln/style/layers/hillshade_layer_properties.hpp
 +++ b/src/mln/style/layers/hillshade_layer_properties.hpp
 @@ -71,6 +71,10 @@ public:
@@ -12756,7 +12754,7 @@ index ca0c0ad4d8a7efebe13ecd0295b4f441d8b296f2..0fdb700f091933b7f56013dc49bff8f4
      // Data members.
      HillshadePaintProperties::PossiblyEvaluated evaluated;
 diff --git a/src/mln/style/layers/layer_properties.cpp.ejs b/src/mln/style/layers/layer_properties.cpp.ejs
-index 1c1d3cbff7292090a2932ef6af2f7b2f3300333e..4b41b0482fab2a31832d8c65d9e2762fe3a62d23 100644
+index 1c1d3cbff729..4b41b0482fab 100644
 --- a/src/mln/style/layers/layer_properties.cpp.ejs
 +++ b/src/mln/style/layers/layer_properties.cpp.ejs
 @@ -44,6 +44,14 @@ expression::Dependency <%- camelize(type) %>LayerProperties::getDependencies() c
@@ -12775,7 +12773,7 @@ index 1c1d3cbff7292090a2932ef6af2f7b2f3300333e..4b41b0482fab2a31832d8c65d9e2762f
  } // namespace mln
  
 diff --git a/src/mln/style/layers/layer_properties.hpp.ejs b/src/mln/style/layers/layer_properties.hpp.ejs
-index 775a11ed50af89dfa049d680763a15e0a099dd1d..a84253166497c5661c148bbd2bfb80be4990a999 100644
+index 775a11ed50af..a84253166497 100644
 --- a/src/mln/style/layers/layer_properties.hpp.ejs
 +++ b/src/mln/style/layers/layer_properties.hpp.ejs
 @@ -78,6 +78,10 @@ public:
@@ -12790,7 +12788,7 @@ index 775a11ed50af89dfa049d680763a15e0a099dd1d..a84253166497c5661c148bbd2bfb80be
      // Data members.
  <% if (type === 'background' || type === 'fill' || type === 'line' || type === 'fill-extrusion') { -%>
 diff --git a/src/mln/style/layers/line_layer_impl.hpp b/src/mln/style/layers/line_layer_impl.hpp
-index a742fc81ea0a6d86f4d31b290b00fa9c37f5949d..6cb044bce9fc4e02fe35abf00c51603ece75bd38 100644
+index a742fc81ea0a..6cb044bce9fc 100644
 --- a/src/mln/style/layers/line_layer_impl.hpp
 +++ b/src/mln/style/layers/line_layer_impl.hpp
 @@ -18,6 +18,15 @@ public:
@@ -12810,7 +12808,7 @@ index a742fc81ea0a6d86f4d31b290b00fa9c37f5949d..6cb044bce9fc4e02fe35abf00c51603e
      LinePaintProperties::Transitionable paint;
  
 diff --git a/src/mln/style/layers/line_layer_properties.cpp b/src/mln/style/layers/line_layer_properties.cpp
-index 20a53108911b73f9e13cd11d7833c01a4bdc5f57..72737b357f45fdaa3d8cb52e7de9f89b35fb4b6e 100644
+index 20a53108911b..72737b357f45 100644
 --- a/src/mln/style/layers/line_layer_properties.cpp
 +++ b/src/mln/style/layers/line_layer_properties.cpp
 @@ -35,6 +35,14 @@ expression::Dependency LineLayerProperties::getDependencies() const noexcept {
@@ -12829,7 +12827,7 @@ index 20a53108911b73f9e13cd11d7833c01a4bdc5f57..72737b357f45fdaa3d8cb52e7de9f89b
  } // namespace mln
  
 diff --git a/src/mln/style/layers/line_layer_properties.hpp b/src/mln/style/layers/line_layer_properties.hpp
-index 406f4ef54ee026eb8cbc78ff7b220353925fc8ad..37821126c82f5299fd5ddcd38374dbd3b194b900 100644
+index 406f4ef54ee0..37821126c82f 100644
 --- a/src/mln/style/layers/line_layer_properties.hpp
 +++ b/src/mln/style/layers/line_layer_properties.hpp
 @@ -125,6 +125,10 @@ public:
@@ -12844,7 +12842,7 @@ index 406f4ef54ee026eb8cbc78ff7b220353925fc8ad..37821126c82f5299fd5ddcd38374dbd3
      // Data members.
      CrossfadeParameters crossfade;
 diff --git a/src/mln/style/layers/location_indicator_layer_impl.hpp b/src/mln/style/layers/location_indicator_layer_impl.hpp
-index 924d6e53b50abccc9540f1a3a3b46e2712feb6fd..786309a759f7111c37294858b528861ea18b4c52 100644
+index 924d6e53b50a..786309a759f7 100644
 --- a/src/mln/style/layers/location_indicator_layer_impl.hpp
 +++ b/src/mln/style/layers/location_indicator_layer_impl.hpp
 @@ -25,6 +25,15 @@ public:
@@ -12864,7 +12862,7 @@ index 924d6e53b50abccc9540f1a3a3b46e2712feb6fd..786309a759f7111c37294858b528861e
      LocationIndicatorPaintProperties::Transitionable paint;
      DECLARE_LAYER_TYPE_INFO;
 diff --git a/src/mln/style/layers/location_indicator_layer_properties.cpp b/src/mln/style/layers/location_indicator_layer_properties.cpp
-index 561c17d96657f3885d5d6a73869f1df045380894..ee1546fd70ed0b6f09b329551e85e97516b4c1fd 100644
+index 561c17d96657..ee1546fd70ed 100644
 --- a/src/mln/style/layers/location_indicator_layer_properties.cpp
 +++ b/src/mln/style/layers/location_indicator_layer_properties.cpp
 @@ -33,6 +33,14 @@ expression::Dependency LocationIndicatorLayerProperties::getDependencies() const
@@ -12883,7 +12881,7 @@ index 561c17d96657f3885d5d6a73869f1df045380894..ee1546fd70ed0b6f09b329551e85e975
  } // namespace mln
  
 diff --git a/src/mln/style/layers/location_indicator_layer_properties.hpp b/src/mln/style/layers/location_indicator_layer_properties.hpp
-index b0bd1cfd892d1ec28141e921b7b1026497964419..6796683e96372567b44206e13582fed673385836 100644
+index b0bd1cfd892d..6796683e9637 100644
 --- a/src/mln/style/layers/location_indicator_layer_properties.hpp
 +++ b/src/mln/style/layers/location_indicator_layer_properties.hpp
 @@ -102,6 +102,10 @@ public:
@@ -12898,7 +12896,7 @@ index b0bd1cfd892d1ec28141e921b7b1026497964419..6796683e96372567b44206e13582fed6
      // Data members.
      LocationIndicatorPaintProperties::PossiblyEvaluated evaluated;
 diff --git a/src/mln/style/layers/raster_layer_properties.cpp b/src/mln/style/layers/raster_layer_properties.cpp
-index a5ede5d380d9ab2e504012ef3dd4375927da6e3c..9caf8e41df411e9ceac1d3940c640ac80a1c9e5f 100644
+index a5ede5d380d9..9caf8e41df41 100644
 --- a/src/mln/style/layers/raster_layer_properties.cpp
 +++ b/src/mln/style/layers/raster_layer_properties.cpp
 @@ -33,6 +33,14 @@ expression::Dependency RasterLayerProperties::getDependencies() const noexcept {
@@ -12917,7 +12915,7 @@ index a5ede5d380d9ab2e504012ef3dd4375927da6e3c..9caf8e41df411e9ceac1d3940c640ac8
  } // namespace mln
  
 diff --git a/src/mln/style/layers/raster_layer_properties.hpp b/src/mln/style/layers/raster_layer_properties.hpp
-index 63f482c94c603945495a4bb8812b964503d69969..096a11a230b519c829c765148f3041f61d092781 100644
+index 63f482c94c60..096a11a230b5 100644
 --- a/src/mln/style/layers/raster_layer_properties.hpp
 +++ b/src/mln/style/layers/raster_layer_properties.hpp
 @@ -71,6 +71,10 @@ public:
@@ -12932,7 +12930,7 @@ index 63f482c94c603945495a4bb8812b964503d69969..096a11a230b519c829c765148f3041f6
      // Data members.
      RasterPaintProperties::PossiblyEvaluated evaluated;
 diff --git a/src/mln/style/layers/symbol_layer_impl.hpp b/src/mln/style/layers/symbol_layer_impl.hpp
-index fef8cc1c755a8c49e7032d69ccf9c9a67e59c1fe..e291a5c3daa89ea77c791dad5a07beac78433300 100644
+index fef8cc1c755a..e291a5c3daa8 100644
 --- a/src/mln/style/layers/symbol_layer_impl.hpp
 +++ b/src/mln/style/layers/symbol_layer_impl.hpp
 @@ -17,20 +17,38 @@ struct FormatSectionOverrides;
@@ -12997,7 +12995,7 @@ index fef8cc1c755a8c49e7032d69ccf9c9a67e59c1fe..e291a5c3daa89ea77c791dad5a07beac
      SymbolPaintProperties::Transitionable paint;
  
 diff --git a/src/mln/style/layers/symbol_layer_properties.cpp b/src/mln/style/layers/symbol_layer_properties.cpp
-index 7b6d3df12bdaa96ae0bdb696dde20eeca8e52024..9437cb9a4363ba11c84ed39864ebc568909ce259 100644
+index 7b6d3df12bda..9437cb9a4363 100644
 --- a/src/mln/style/layers/symbol_layer_properties.cpp
 +++ b/src/mln/style/layers/symbol_layer_properties.cpp
 @@ -33,6 +33,14 @@ expression::Dependency SymbolLayerProperties::getDependencies() const noexcept {
@@ -13016,7 +13014,7 @@ index 7b6d3df12bdaa96ae0bdb696dde20eeca8e52024..9437cb9a4363ba11c84ed39864ebc568
  } // namespace mln
  
 diff --git a/src/mln/style/layers/symbol_layer_properties.hpp b/src/mln/style/layers/symbol_layer_properties.hpp
-index 83d2dea56ba1bfcc70422e8e44f0372452909340..eb4e95bc00662c2359863e6cf35fbf9e4a3fdcc7 100644
+index 83d2dea56ba1..eb4e95bc0066 100644
 --- a/src/mln/style/layers/symbol_layer_properties.hpp
 +++ b/src/mln/style/layers/symbol_layer_properties.hpp
 @@ -365,6 +365,10 @@ public:
@@ -13031,7 +13029,7 @@ index 83d2dea56ba1bfcc70422e8e44f0372452909340..eb4e95bc00662c2359863e6cf35fbf9e
      // Data members.
      SymbolPaintProperties::PossiblyEvaluated evaluated;
 diff --git a/src/mln/style/parser.cpp b/src/mln/style/parser.cpp
-index b4c9891e6bc31ad88f6977b3c3dba937322612a3..5a13bb7ee30b268499844f3f28b77faadee92155 100644
+index 2e4aa34c24db..b14919e38877 100644
 --- a/src/mln/style/parser.cpp
 +++ b/src/mln/style/parser.cpp
 @@ -112,6 +112,10 @@ StyleParseResult Parser::parse(const std::string& json) {
@@ -13112,7 +13110,7 @@ index b4c9891e6bc31ad88f6977b3c3dba937322612a3..5a13bb7ee30b268499844f3f28b77faa
      if (!value.IsObject()) {
          Log::Warning(Event::ParseStyle, "sources must be an object");
 diff --git a/src/mln/style/parser.hpp b/src/mln/style/parser.hpp
-index bae2a43f4a93f25f19f9ff3b0806c03f78caebf5..d78c0e8bda1efc80f3b2e04f3cc7885a86eab925 100644
+index bae2a43f4a93..d78c0e8bda1e 100644
 --- a/src/mln/style/parser.hpp
 +++ b/src/mln/style/parser.hpp
 @@ -8,6 +8,7 @@
@@ -13143,10 +13141,10 @@ index bae2a43f4a93f25f19f9ff3b0806c03f78caebf5..d78c0e8bda1efc80f3b2e04f3cc7885a
      void parseSprites(const JSValue&);
      void parseLayers(const JSValue&);
 diff --git a/src/mln/style/properties.hpp b/src/mln/style/properties.hpp
-index 39da5fe41c27a5e9516763a78e03ff45dcebd3e3..ea16aca267595748022c3058dd10631a6765c078 100644
+index bb27a0ba4a1c..4f970889bd31 100644
 --- a/src/mln/style/properties.hpp
 +++ b/src/mln/style/properties.hpp
-@@ -279,6 +279,28 @@ public:
+@@ -278,6 +278,28 @@ public:
              return result;
          }
  
@@ -13175,7 +13173,7 @@ index 39da5fe41c27a5e9516763a78e03ff45dcebd3e3..ea16aca267595748022c3058dd10631a
          unsigned long constantsMask() const noexcept { return ConstantsMask<DataDrivenProperties>::getMask(*this); }
      };
  
-@@ -311,7 +333,11 @@ public:
+@@ -310,7 +332,11 @@ public:
              using Evaluator = typename P::EvaluatorType;
              const auto& property = this->template get<P>();
              const bool needEvaluate = parameters.layerChanged || parameters.hasCrossfade || property.hasTransition() ||
@@ -13188,7 +13186,7 @@ index 39da5fe41c27a5e9516763a78e03ff45dcebd3e3..ea16aca267595748022c3058dd10631a
              return needEvaluate ? property.evaluate(Evaluator(parameters, P::defaultValue()), parameters.now)
                                  : oldResult;
          }
-@@ -360,6 +386,31 @@ public:
+@@ -359,6 +385,31 @@ public:
              return v.getValue().getDependencies();
          }
  
@@ -13221,7 +13219,7 @@ index 39da5fe41c27a5e9516763a78e03ff45dcebd3e3..ea16aca267595748022c3058dd10631a
          bool updateGPUExpression(Unevaluated::GPUExpressions& exprs, TimePoint now) const {
              constexpr auto index = TypeIndex<P, Ps...>::value;
 diff --git a/src/mln/style/property_expression.cpp b/src/mln/style/property_expression.cpp
-index a158e93bbe54653270fb916f7db079cb75f496ec..19bf7738ef8aed565b2ae9ecc41a08f0eb6551c6 100644
+index a158e93bbe54..19bf7738ef8a 100644
 --- a/src/mln/style/property_expression.cpp
 +++ b/src/mln/style/property_expression.cpp
 @@ -15,15 +15,25 @@ bool checkGPUCapable(const Expression& expression, const ZoomCurvePtr& zoomCurve
@@ -13288,7 +13286,7 @@ index a158e93bbe54653270fb916f7db079cb75f496ec..19bf7738ef8aed565b2ae9ecc41a08f0
      useIntegerZoom_ = other.useIntegerZoom_;
      isZoomConstant_ = other.isZoomConstant_;
 diff --git a/src/mln/style/style.cpp b/src/mln/style/style.cpp
-index d6c2060a61b3b6f362ebf285541b4c491128486e..d14204c1669d1c2788c731cd525c009d481d577e 100644
+index d6c2060a61b3..d14204c1669d 100644
 --- a/src/mln/style/style.cpp
 +++ b/src/mln/style/style.cpp
 @@ -5,6 +5,7 @@
@@ -13331,7 +13329,7 @@ index d6c2060a61b3b6f362ebf285541b4c491128486e..d14204c1669d1c2788c731cd525c009d
      return impl->getLight();
  }
 diff --git a/src/mln/style/style_impl.cpp b/src/mln/style/style_impl.cpp
-index e5deefdaacfe73dde70c2c77cc11e53b60e8582d..5c9634227e40b666406e4f8020e88b804bbe7825 100644
+index e5deefdaacfe..5c9634227e40 100644
 --- a/src/mln/style/style_impl.cpp
 +++ b/src/mln/style/style_impl.cpp
 @@ -23,6 +23,8 @@
@@ -13454,7 +13452,7 @@ index e5deefdaacfe73dde70c2c77cc11e53b60e8582d..5c9634227e40b666406e4f8020e88b80
      observer->onUpdate();
  }
 diff --git a/src/mln/style/style_impl.hpp b/src/mln/style/style_impl.hpp
-index a69926379cef8525fb17cc4e360e6a9ab893903e..bf4039dd55f87a1298d7b6df740767ca85ff9787 100644
+index a69926379cef..bf4039dd55f8 100644
 --- a/src/mln/style/style_impl.hpp
 +++ b/src/mln/style/style_impl.hpp
 @@ -18,6 +18,7 @@
@@ -13496,7 +13494,7 @@ index a69926379cef8525fb17cc4e360e6a9ab893903e..bf4039dd55f87a1298d7b6df740767ca
      std::string name;
      CameraOptions defaultCamera;
 diff --git a/src/mln/tile/custom_geometry_tile.cpp b/src/mln/tile/custom_geometry_tile.cpp
-index 377f43c9af0dfe4ef6f8380754fd2d05ad4c7200..772c3360a3689d7ba5c7d6616c359a8a506da0fb 100644
+index 377f43c9af0d..772c3360a368 100644
 --- a/src/mln/tile/custom_geometry_tile.cpp
 +++ b/src/mln/tile/custom_geometry_tile.cpp
 @@ -69,7 +69,9 @@ void CustomGeometryTile::setNecessity(TileNecessity newNecessity) {
@@ -13521,7 +13519,7 @@ index 377f43c9af0dfe4ef6f8380754fd2d05ad4c7200..772c3360a3689d7ba5c7d6616c359a8a
              }
  
 diff --git a/src/mln/tile/custom_geometry_tile.hpp b/src/mln/tile/custom_geometry_tile.hpp
-index 522c86e478fb87d1d8ed1b788eb4c4d4b63948a4..649edcfbd3f1b1afd48d4ff8d0bee705b8ee2ebf 100644
+index 522c86e478fb..649edcfbd3f1 100644
 --- a/src/mln/tile/custom_geometry_tile.hpp
 +++ b/src/mln/tile/custom_geometry_tile.hpp
 @@ -29,7 +29,9 @@ public:
@@ -13536,7 +13534,7 @@ index 522c86e478fb87d1d8ed1b788eb4c4d4b63948a4..649edcfbd3f1b1afd48d4ff8d0bee705
  private:
      bool stale = true;
 diff --git a/src/mln/tile/geojson_tile.cpp b/src/mln/tile/geojson_tile.cpp
-index bb1461489ffef297e809780816b9f1336259fbc0..df7459a12662fdd23a8bebe5574144dca5986c77 100644
+index bb1461489ffe..df7459a12662 100644
 --- a/src/mln/tile/geojson_tile.cpp
 +++ b/src/mln/tile/geojson_tile.cpp
 @@ -36,7 +36,9 @@ void GeoJSONTile::updateData(std::shared_ptr<style::GeoJSONData> data_, bool nee
@@ -13561,7 +13559,7 @@ index bb1461489ffef297e809780816b9f1336259fbc0..df7459a12662fdd23a8bebe5574144dc
                  }
  
 diff --git a/src/mln/tile/geojson_tile.hpp b/src/mln/tile/geojson_tile.hpp
-index 46fa510030895ea932a3b8108f6986a2e63ac8b5..70fa842e421f8fd0efdd164c96979f0423a67de3 100644
+index 46fa51003089..70fa842e421f 100644
 --- a/src/mln/tile/geojson_tile.hpp
 +++ b/src/mln/tile/geojson_tile.hpp
 @@ -21,7 +21,9 @@ public:
@@ -13576,10 +13574,10 @@ index 46fa510030895ea932a3b8108f6986a2e63ac8b5..70fa842e421f8fd0efdd164c96979f04
  private:
      std::shared_ptr<style::GeoJSONData> data;
 diff --git a/src/mln/tile/geometry_tile.cpp b/src/mln/tile/geometry_tile.cpp
-index 6de108030369f7e7a08880e1c902ab259f96e3f8..7f5b3953ee5db6451bf02b2fb57484e2be416953 100644
+index 78e9d9dc8d68..a817b5d0f226 100644
 --- a/src/mln/tile/geometry_tile.cpp
 +++ b/src/mln/tile/geometry_tile.cpp
-@@ -293,7 +293,8 @@ std::unique_ptr<TileRenderData> GeometryTile::createRenderData() {
+@@ -294,7 +294,8 @@ std::unique_ptr<TileRenderData> GeometryTile::createRenderData() {
      return std::make_unique<GeometryTileRenderData>(layoutResult, atlasTextures);
  }
  
@@ -13589,7 +13587,7 @@ index 6de108030369f7e7a08880e1c902ab259f96e3f8..7f5b3953ee5db6451bf02b2fb57484e2
      MLN_TRACE_FUNC();
  
      // Mark the tile as pending again if it was complete before to prevent
-@@ -322,8 +323,11 @@ void GeometryTile::setLayers(const std::vector<Immutable<LayerProperties>>& laye
+@@ -323,8 +324,11 @@ void GeometryTile::setLayers(const std::vector<Immutable<LayerProperties>>& laye
      }
  
      ++correlationID;
@@ -13603,7 +13601,7 @@ index 6de108030369f7e7a08880e1c902ab259f96e3f8..7f5b3953ee5db6451bf02b2fb57484e2
  }
  
  void GeometryTile::setShowCollisionBoxes(const bool showCollisionBoxes_) {
-@@ -509,6 +513,7 @@ void GeometryTile::queryRenderedFeatures(std::unordered_map<std::string, std::ve
+@@ -510,6 +514,7 @@ void GeometryTile::queryRenderedFeatures(std::unordered_map<std::string, std::ve
                                           const TransformState& transformState,
                                           const std::unordered_map<std::string, const RenderLayer*>& layers,
                                           const RenderedQueryOptions& options,
@@ -13611,7 +13609,7 @@ index 6de108030369f7e7a08880e1c902ab259f96e3f8..7f5b3953ee5db6451bf02b2fb57484e2
                                           const mat4& projMatrix,
                                           const SourceFeatureState& featureState) {
      MLN_TRACE_FUNC();
-@@ -528,13 +533,16 @@ void GeometryTile::queryRenderedFeatures(std::unordered_map<std::string, std::ve
+@@ -529,13 +534,16 @@ void GeometryTile::queryRenderedFeatures(std::unordered_map<std::string, std::ve
                                        util::tileSize_D * id.overscaleFactor(),
                                        std::pow(2, transformState.getZoom() - id.overscaledZ),
                                        options,
@@ -13629,7 +13627,7 @@ index 6de108030369f7e7a08880e1c902ab259f96e3f8..7f5b3953ee5db6451bf02b2fb57484e2
      MLN_TRACE_FUNC();
  
      // Data not yet available, or tile is empty
-@@ -560,7 +568,8 @@ void GeometryTile::querySourceFeatures(std::vector<Feature>& result, const Sourc
+@@ -561,7 +569,8 @@ void GeometryTile::querySourceFeatures(std::vector<Feature>& result, const Sourc
  
                  // Apply filter, if any
                  if (options.filter && !(*options.filter)(style::expression::EvaluationContext{
@@ -13640,7 +13638,7 @@ index 6de108030369f7e7a08880e1c902ab259f96e3f8..7f5b3953ee5db6451bf02b2fb57484e2
                  }
  
 diff --git a/src/mln/tile/geometry_tile.hpp b/src/mln/tile/geometry_tile.hpp
-index 92ada761ae86f81f733bba75a72c3ca518a14b52..5c6562f061d9fc0b3aa15034b54d25460bbb6da3 100644
+index e6db64d96edd..b3f3fcd7f485 100644
 --- a/src/mln/tile/geometry_tile.hpp
 +++ b/src/mln/tile/geometry_tile.hpp
 @@ -41,7 +41,8 @@ public:
@@ -13669,7 +13667,7 @@ index 92ada761ae86f81f733bba75a72c3ca518a14b52..5c6562f061d9fc0b3aa15034b54d2546
      float getQueryPadding(const std::unordered_map<std::string, const RenderLayer*>&) override;
  
 diff --git a/src/mln/tile/geometry_tile_worker.cpp b/src/mln/tile/geometry_tile_worker.cpp
-index 459142dd28648490fd20b6013f90f80918835626..63ebbfa9a47601696ed08b2c7bcbabbf7f21fa01 100644
+index a69df5a24d12..19b23bb8f226 100644
 --- a/src/mln/tile/geometry_tile_worker.cpp
 +++ b/src/mln/tile/geometry_tile_worker.cpp
 @@ -161,12 +161,14 @@ void GeometryTileWorker::setData(std::unique_ptr<const GeometryTileData> data_,
@@ -13687,35 +13685,31 @@ index 459142dd28648490fd20b6013f90f80918835626..63ebbfa9a47601696ed08b2c7bcbabbf
          correlationID = correlationID_;
          availableImages = std::move(availableImages_);
  
-@@ -456,8 +458,11 @@ void GeometryTileWorker::parse() {
-         }
- 
-         const style::Layer::Impl& leaderImpl = *(group.at(0)->baseImpl);
--        BucketParameters parameters{
--            .tileID = id, .mode = mode, .pixelRatio = pixelRatio, .layerType = leaderImpl.getTypeInfo()};
-+        BucketParameters parameters{.tileID = id,
-+                                    .mode = mode,
-+                                    .pixelRatio = pixelRatio,
-+                                    .layerType = leaderImpl.getTypeInfo(),
-+                                    .globalState = globalState};
+@@ -459,6 +461,7 @@ void GeometryTileWorker::parse() {
+                                     .mode = mode,
+                                     .pixelRatio = pixelRatio,
+                                     .layerType = leaderImpl.getTypeInfo(),
++                                    .globalState = globalState,
+                                     .retainFeaturesById = captureRenderedFeatures};
  
          auto geometryLayer = (*data)->getLayer(leaderImpl.sourceLayer);
-         if (!geometryLayer) {
-@@ -500,7 +505,8 @@ void GeometryTileWorker::parse() {
-                 std::unique_ptr<GeometryTileFeature> feature = geometryLayer->getFeature(i);
+@@ -505,8 +508,9 @@ void GeometryTileWorker::parse() {
+                 auto feature = geometryLayer->getFeature(i);
  
-                 if (!filter(expression::EvaluationContext(static_cast<float>(this->id.overscaledZ), feature.get())
--                                .withCanonicalTileID(&id.canonical)))
+                 const auto effectiveZ = static_cast<float>(id.overscaledZ);
+-                if (!filter(
+-                        expression::EvaluationContext(effectiveZ, feature.get()).withCanonicalTileID(&id.canonical))) {
++                if (!filter(expression::EvaluationContext(effectiveZ, feature.get())
 +                                .withCanonicalTileID(&id.canonical)
-+                                .withGlobalState(globalState.get())))
++                                .withGlobalState(globalState.get()))) {
                      continue;
+                 }
  
-                 const GeometryCollection& geometries = feature->getGeometries();
 diff --git a/src/mln/tile/geometry_tile_worker.hpp b/src/mln/tile/geometry_tile_worker.hpp
-index 67172512e875d9fbc804a858f8765af751364aa3..95d4110b5783fd09c6390e78ca3660cf8225a59e 100644
+index 7420f1c72521..4e388f7297c9 100644
 --- a/src/mln/tile/geometry_tile_worker.hpp
 +++ b/src/mln/tile/geometry_tile_worker.hpp
-@@ -51,6 +51,7 @@ public:
+@@ -52,6 +52,7 @@ public:
      void setObserver(TileObserver* observer);
  
      void setLayers(std::vector<Immutable<style::LayerProperties>>,
@@ -13723,7 +13717,7 @@ index 67172512e875d9fbc804a858f8765af751364aa3..95d4110b5783fd09c6390e78ca3660cf
                     std::set<std::string> availableImages,
                     uint64_t correlationID);
      void setData(std::unique_ptr<const GeometryTileData>,
-@@ -110,6 +111,9 @@ private:
+@@ -111,6 +112,9 @@ private:
      std::optional<std::vector<Immutable<style::LayerProperties>>> layers;
      std::optional<std::unique_ptr<const GeometryTileData>> data;
  
@@ -13734,7 +13728,7 @@ index 67172512e875d9fbc804a858f8765af751364aa3..95d4110b5783fd09c6390e78ca3660cf
  
      GlyphDependencies pendingGlyphDependencies;
 diff --git a/src/mln/tile/tile.cpp b/src/mln/tile/tile.cpp
-index 663483cc528d6c8ab772c792cb8c7332b349c999..8a6fc7e9ad9e88d25ff31b6eb5d67e3a81527a62 100644
+index 663483cc528d..8a6fc7e9ad9e 100644
 --- a/src/mln/tile/tile.cpp
 +++ b/src/mln/tile/tile.cpp
 @@ -56,6 +56,7 @@ void Tile::queryRenderedFeatures(std::unordered_map<std::string, std::vector<Fea
@@ -13755,7 +13749,7 @@ index 663483cc528d6c8ab772c792cb8c7332b349c999..8a6fc7e9ad9e88d25ff31b6eb5d67e3a
  void Tile::onTileAction(TileOperation op) {
      observer->onTileAction(id, sourceID, op);
 diff --git a/src/mln/tile/tile.hpp b/src/mln/tile/tile.hpp
-index 13615273b1759c4d9cc6ff8cde78846a1d582544..f21ee089d369a0aff984358878d472ea27d9cc84 100644
+index 13615273b175..f21ee089d369 100644
 --- a/src/mln/tile/tile.hpp
 +++ b/src/mln/tile/tile.hpp
 @@ -80,7 +80,8 @@ public:
@@ -13784,10 +13778,10 @@ index 13615273b1759c4d9cc6ff8cde78846a1d582544..f21ee089d369a0aff984358878d472ea
      virtual float getQueryPadding(const std::unordered_map<std::string, const RenderLayer*>&);
  
 diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
-index 24fbe22c2fdbcebb72d5b122089fd06d8e907338..3692cff7fabff786ae93c68e0017bc4a9a93462b 100644
+index b3b772c02f3d..7016af355937 100644
 --- a/test/CMakeLists.txt
 +++ b/test/CMakeLists.txt
-@@ -59,6 +59,7 @@ add_library(
+@@ -60,6 +60,7 @@ add_library(
      ${PROJECT_SOURCE_DIR}/test/style/expression/dependency.test.cpp
      ${PROJECT_SOURCE_DIR}/test/style/expression/expression.test.cpp
      ${PROJECT_SOURCE_DIR}/test/style/expression/semiliteral.test.cpp
@@ -13796,7 +13790,7 @@ index 24fbe22c2fdbcebb72d5b122089fd06d8e907338..3692cff7fabff786ae93c68e0017bc4a
      ${PROJECT_SOURCE_DIR}/test/style/expression/utf8_op_helpers.test.cpp
      ${PROJECT_SOURCE_DIR}/test/style/filter.test.cpp
 diff --git a/test/api/query.test.cpp b/test/api/query.test.cpp
-index efc938ce2b4b1ede4a91da61531220919d39ed89..49c1abc89d94d269fddb924c6f35c7c316a8c08d 100644
+index efc938ce2b4b..49c1abc89d94 100644
 --- a/test/api/query.test.cpp
 +++ b/test/api/query.test.cpp
 @@ -11,6 +11,8 @@
@@ -13868,7 +13862,7 @@ index efc938ce2b4b1ede4a91da61531220919d39ed89..49c1abc89d94d269fddb924c6f35c7c3
      QueryTest test;
  
 diff --git a/test/fixtures/style_parser/expressions.info.json b/test/fixtures/style_parser/expressions.info.json
-index af8a6053e070799f23e4c4d7a703a2f6fb30eaa7..a37cc2a9e4970a2f97232a99c9f64e1c10ab55aa 100644
+index af8a6053e070..a37cc2a9e497 100644
 --- a/test/fixtures/style_parser/expressions.info.json
 +++ b/test/fixtures/style_parser/expressions.info.json
 @@ -4,7 +4,9 @@
@@ -13884,7 +13878,7 @@ index af8a6053e070799f23e4c4d7a703a2f6fb30eaa7..a37cc2a9e4970a2f97232a99c9f64e1c
          ]
 diff --git a/test/style/expression/global_state.test.cpp b/test/style/expression/global_state.test.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..f851bac0b5d37b493a47d25afda3ff90bd98f522
+index 000000000000..f851bac0b5d3
 --- /dev/null
 +++ b/test/style/expression/global_state.test.cpp
 @@ -0,0 +1,287 @@
@@ -14176,7 +14170,7 @@ index 0000000000000000000000000000000000000000..f851bac0b5d37b493a47d25afda3ff90
 +    EXPECT_EQ(mln::Value("showLabels"), array[1]);
 +}
 diff --git a/test/style/style.test.cpp b/test/style/style.test.cpp
-index 2682473efe22394641b810d839c3abf13c9e34d4..374109a281f091f115a5597852a290c27ad0ce60 100644
+index 2682473efe22..374109a281f0 100644
 --- a/test/style/style.test.cpp
 +++ b/test/style/style.test.cpp
 @@ -8,7 +8,10 @@
@@ -14463,7 +14457,7 @@ index 2682473efe22394641b810d839c3abf13c9e34d4..374109a281f091f115a5597852a290c2
      util::RunLoop loop;
      auto fileSource = std::make_shared<StubFileSource>();
 diff --git a/test/style/style_layer.test.cpp b/test/style/style_layer.test.cpp
-index a7e59b9348b5206a5987ac1e230c314174933872..09606dd5a358982763700b4ed7067708936e8434 100644
+index a7e59b9348b5..09606dd5a358 100644
 --- a/test/style/style_layer.test.cpp
 +++ b/test/style/style_layer.test.cpp
 @@ -2,10 +2,12 @@
@@ -14534,7 +14528,7 @@ index a7e59b9348b5206a5987ac1e230c314174933872..09606dd5a358982763700b4ed7067708
 +    }
  }
 diff --git a/test/tile/custom_geometry_tile.test.cpp b/test/tile/custom_geometry_tile.test.cpp
-index 87c264e49406fb7e268622cfa0d067281acbb297..61060375bdb28e3435fdaa12b6738f418fca64f8 100644
+index 87c264e49406..61060375bdb2 100644
 --- a/test/tile/custom_geometry_tile.test.cpp
 +++ b/test/tile/custom_geometry_tile.test.cpp
 @@ -134,7 +134,7 @@ TEST(CustomGeometryTile, InvokeTileChanged) {
@@ -14547,7 +14541,7 @@ index 87c264e49406fb7e268622cfa0d067281acbb297..61060375bdb28e3435fdaa12b6738f41
      tile.setTileData(features);
  
 diff --git a/test/tile/geojson_tile.test.cpp b/test/tile/geojson_tile.test.cpp
-index 68d985ffa78760e1212da2ee854577856b63f74a..a733bb4c246dface1545ebbbb30e01defd686824 100644
+index 68d985ffa787..a733bb4c246d 100644
 --- a/test/tile/geojson_tile.test.cpp
 +++ b/test/tile/geojson_tile.test.cpp
 @@ -89,7 +89,7 @@ TEST(GeoJSONTile, SynchronousUpdate) {
@@ -14578,7 +14572,7 @@ index 68d985ffa78760e1212da2ee854577856b63f74a..a733bb4c246dface1545ebbbb30e01de
      while (!tile.isComplete()) {
          test.loop.runOnce();
 diff --git a/test/tile/vector_tile.test.cpp b/test/tile/vector_tile.test.cpp
-index 0b00ee8c263975c7d48f69b909fc885bd79fc9fa..ecf39a03e4ef40718e678446fc7a2fa034bacc70 100644
+index 0b00ee8c2639..ecf39a03e4ef 100644
 --- a/test/tile/vector_tile.test.cpp
 +++ b/test/tile/vector_tile.test.cpp
 @@ -49,7 +49,7 @@ TEST(VectorTile, Issue8542) {

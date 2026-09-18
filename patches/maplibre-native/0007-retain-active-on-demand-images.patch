@@ -1,17 +1,19 @@
 diff --git a/src/mln/renderer/image_manager.cpp b/src/mln/renderer/image_manager.cpp
-index f1625f9..6da4bbc 100644
+index f1625f93fe6d..f9d5e0dd4d76 100644
 --- a/src/mln/renderer/image_manager.cpp
 +++ b/src/mln/renderer/image_manager.cpp
-@@ -226,6 +226,8 @@ void ImageManager::checkMissingAndNotify(ImageRequestor& requestor, const ImageR
+@@ -226,6 +226,10 @@ void ImageManager::checkMissingAndNotify(ImageRequestor& requestor, const ImageR
      for (const auto& dependency : pair.first) {
          if (!images.contains(dependency.first)) {
              missingDependencies.emplace(dependency);
-+        } else if (auto it = requestedImages.find(dependency.first); it != requestedImages.end()) {
-+            it->second.emplace(&requestor);
++        } else if (requestedImages.contains(dependency.first)) {
++            // The missing-image path below never registers images that are
++            // already present.
++            requestedImages.at(dependency.first).emplace(&requestor);
          }
      }
  
-@@ -277,12 +279,6 @@ void ImageManager::checkMissingAndNotify(ImageRequestor& requestor, const ImageR
+@@ -277,12 +281,6 @@ void ImageManager::checkMissingAndNotify(ImageRequestor& requestor, const ImageR
                                            Scheduler::GetCurrent()->bindOnce(std::move(removePendingRequests)));
          }
      } else {
@@ -25,15 +27,28 @@ index f1625f9..6da4bbc 100644
      }
  }
 diff --git a/test/renderer/image_manager.test.cpp b/test/renderer/image_manager.test.cpp
-index fbfded4..ccc2f12 100644
+index fbfded4b0fff..f9c7a3c8c2be 100644
 --- a/test/renderer/image_manager.test.cpp
 +++ b/test/renderer/image_manager.test.cpp
-@@ -359,3 +359,77 @@ TEST(ImageManager, RemoveUnusedStyleImages) {
+@@ -6,6 +6,7 @@
+ #include <mln/renderer/image_manager_observer.hpp>
+ #include <mln/sprite/sprite_parser.hpp>
+ #include <mln/style/image_impl.hpp>
++#include <mln/util/constants.hpp>
+ #include <mln/util/io.hpp>
+ #include <mln/util/image.hpp>
+ #include <mln/util/run_loop.hpp>
+@@ -359,3 +360,81 @@ TEST(ImageManager, RemoveUnusedStyleImages) {
      ASSERT_TRUE(imageManager->getImage("1024px") == nullptr);
      ASSERT_FALSE(imageManager->getImage("sprite") == nullptr);
  }
 +
-+TEST(ImageManager, MixedDependenciesKeepPresentOnDemandImagesInUse) {
++TEST(ImageManager, MixedDependenciesRetainProvidedImages) {
++    constexpr std::size_t onDemandImageCount = 6;
++    constexpr uint32_t onDemandImageSide = 256;
++    static_assert(onDemandImageCount * onDemandImageSide * onDemandImageSide * 4 >
++                  util::DEFAULT_ON_DEMAND_IMAGES_CACHE_SIZE);
++
 +    util::RunLoop runLoop;
 +    auto imageManager = ImageManager::create();
 +    StubImageManagerObserver observer;
@@ -41,7 +56,8 @@ index fbfded4..ccc2f12 100644
 +    imageManager->setLoaded(true);
 +
 +    observer.imageMissing = [&](const std::string& id) {
-+        imageManager->addImage(makeMutable<style::Image::Impl>(id, PremultipliedImage({213, 213}), 3.0f));
++        imageManager->addImage(
++            makeMutable<style::Image::Impl>(id, PremultipliedImage({onDemandImageSide, onDemandImageSide}), 3.0f));
 +    };
 +    std::vector<std::string> evicted;
 +    observer.removeUnusedStyleImages = [&](const std::vector<std::string>& ids) {
@@ -54,7 +70,7 @@ index fbfded4..ccc2f12 100644
 +    auto requestor = std::make_unique<StubImageRequestor>(imageManager);
 +    imageManager->addImage(makeMutable<style::Image::Impl>("sprite", PremultipliedImage({16, 16}), 1.0f));
 +    ImageDependencies dependencies{{"sprite", ImageType::Icon}};
-+    for (int i = 0; i < 6; ++i) {
++    for (std::size_t i = 0; i < onDemandImageCount; ++i) {
 +        dependencies.emplace("a" + std::to_string(i), ImageType::Icon);
 +    }
 +    bool notified = false;
@@ -82,11 +98,10 @@ index fbfded4..ccc2f12 100644
 +    request();
 +    EXPECT_EQ(observer.count, 6);
 +
-+    // Existing on-demand images must stay in use when this tile also needs new images.
-+    for (int i = 0; i < 6; ++i) {
++    for (std::size_t i = 0; i < onDemandImageCount; ++i) {
 +        dependencies.emplace("b" + std::to_string(i), ImageType::Icon);
 +    }
-+    for (int round = 0; round < 4; ++round) {
++    for (int round = 0; round < 2; ++round) {
 +        request();
 +        imageManager->reduceMemoryUseIfCacheSizeExceedsLimit();
 +        EXPECT_TRUE(evicted.empty());
@@ -96,7 +111,6 @@ index fbfded4..ccc2f12 100644
 +        }
 +    }
 +
-+    // Still reclaim images after their last requestor releases them.
 +    requestor.reset();
 +    imageManager->reduceMemoryUseIfCacheSizeExceedsLimit();
 +    EXPECT_EQ(evicted.size(), 12u);

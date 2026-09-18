@@ -1,7 +1,8 @@
 diff --git a/include/mln/map/map_projection.hpp b/include/mln/map/map_projection.hpp
+index 5cdef135fa84..06a6813cd32b 100644
 --- a/include/mln/map/map_projection.hpp
 +++ b/include/mln/map/map_projection.hpp
-@@ -11,6 +11,7 @@ class Transform;
+@@ -12,6 +12,7 @@ class Transform;
  class MapProjection : private util::noncopyable {
  public:
      explicit MapProjection(const Map&);
@@ -10,14 +11,15 @@ diff --git a/include/mln/map/map_projection.hpp b/include/mln/map/map_projection
  
      ScreenCoordinate pixelForLatLng(const LatLng&) const;
 diff --git a/src/mln/map/map_projection.cpp b/src/mln/map/map_projection.cpp
+index e14c6aa63890..f50a1db5e27c 100644
 --- a/src/mln/map/map_projection.cpp
 +++ b/src/mln/map/map_projection.cpp
 @@ -6,7 +6,10 @@
  namespace mln {
  
  MapProjection::MapProjection(const Map& map)
--    : transform(std::make_unique<Transform>(map.getTransfromState())) {}
-+    : MapProjection(map.getTransfromState()) {}
+-    : transform(std::make_unique<Transform>(map.getTransformState())) {}
++    : MapProjection(map.getTransformState()) {}
 +
 +MapProjection::MapProjection(const TransformState& state)
 +    : transform(std::make_unique<Transform>(state)) {}
