@@ -1,0 +1,9 @@
+.{
+    .name = .location_indicator,
+    .version = "0.1.0",
+    .dependencies = .{
+        .maplibre_native_ffi = .{ .path = "../.." },
+    },
+    .paths = .{""},
+    .fingerprint = 0x9fe14bc5e28a4abc,
+}

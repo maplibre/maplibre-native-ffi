@@ -496,6 +496,50 @@ static mln_plugin_status register_square_plugin(void) {
   return status;
 }
 
+// The accessor exists for consumers that cannot take the entry point's
+// address; it must hand out exactly that entry point.
+static void register_function_accessor_returns_the_entry_point(void) {
+  const mln_plugin_register_function_v1 register_fn =
+    mln_plugin_get_register_function_v1();
+  TEST_ASSERT_TRUE(register_fn != NULL);
+  TEST_ASSERT_EQUAL_PTR(&mln_plugin_register_v1, register_fn);
+}
+
+// The loader reports bad arguments and OS load failures through the status
+// and thread diagnostic channel without touching the registry.
+static void plugin_load_library_rejects_bad_arguments(void) {
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_plugin_load_library(
+      MLN_BUFFER_LITERAL(""), MLN_BUFFER_LITERAL("mln_test_plugin_register")
+    )
+  );
+  TEST_ASSERT_GREATER_THAN_size_t(0, strlen(mln_thread_last_error_message()));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_plugin_load_library(
+      MLN_BUFFER_LITERAL("/nonexistent/libmaplibre-test-plugin.so"),
+      MLN_BUFFER_LITERAL("")
+    )
+  );
+  TEST_ASSERT_GREATER_THAN_size_t(0, strlen(mln_thread_last_error_message()));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_plugin_load_library(
+      (mln_buffer_view){.data = NULL, .size = 3},
+      MLN_BUFFER_LITERAL("mln_test_plugin_register")
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_NATIVE_ERROR,
+    mln_plugin_load_library(
+      MLN_BUFFER_LITERAL("/nonexistent/libmaplibre-test-plugin.so"),
+      MLN_BUFFER_LITERAL("mln_test_plugin_register")
+    )
+  );
+  TEST_ASSERT_GREATER_THAN_size_t(0, strlen(mln_thread_last_error_message()));
+}
+
 #if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 
 // The plugin API declares shaders for OpenGL, Vulkan, and Metal, so a WebGPU
@@ -569,6 +613,8 @@ static void a_registered_layer_type_renders_through_the_c_api(void) {
 
 void run_plugin_layer_abi_tests(void) {
   UnitySetTestFile(__FILE__);
+  RUN_TEST(register_function_accessor_returns_the_entry_point);
+  RUN_TEST(plugin_load_library_rejects_bad_arguments);
 #if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
   RUN_TEST(registration_reaches_the_library_exports);
 #else

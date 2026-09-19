@@ -103,6 +103,35 @@ public static unsafe class Maplibre
         );
     }
 
+    /// <summary>Loads a layer plugin shared library and registers its style layer types.</summary>
+    /// <remarks>
+    /// <paramref name="path" /> is the UTF-8 path of the plugin library, and
+    /// <paramref name="entryPoint" /> names the exported entry point that the call
+    /// invokes with the process-wide register function. The library stays loaded
+    /// for the process lifetime, because registration retains the plugin's
+    /// callbacks.
+    /// <para>
+    /// Registration is process-wide and callable from any thread. Call this before
+    /// any style that uses the plugin's layer types loads. Loading an identical
+    /// plugin again succeeds.
+    /// </para>
+    /// <para>
+    /// An empty <paramref name="path" /> or <paramref name="entryPoint" /> throws
+    /// <see cref="InvalidArgumentException" />. A library that fails to load, an
+    /// entry point that fails to resolve, or a rejected registration throws
+    /// <see cref="NativeErrorException" /> with the OS or plugin diagnostic.
+    /// </para>
+    /// </remarks>
+    public static void LoadPlugin(string path, string entryPoint)
+    {
+        NativeLibraryLoader.EnsureLoaded();
+        using var nativePath = NativeStringView.From(path, nameof(path));
+        using var nativeEntryPoint = NativeStringView.From(entryPoint, nameof(entryPoint));
+        NativeStatus.Check(
+            NativeMethods.mln_plugin_load_library(nativePath.Value, nativeEntryPoint.Value)
+        );
+    }
+
     /// <summary>Converts a geographic coordinate to Spherical Mercator projected meters.</summary>
     public static ProjectedMeters ProjectedMetersForLatLng(LatLng coordinate)
     {

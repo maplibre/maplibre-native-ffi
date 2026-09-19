@@ -18,6 +18,7 @@ import org.maplibre.nativeffi.internal.c.mln_log_set_async_severity_mask
 import org.maplibre.nativeffi.internal.c.mln_network_status_get
 import org.maplibre.nativeffi.internal.c.mln_network_status_set
 import org.maplibre.nativeffi.internal.c.mln_opengl_supported_context_provider_mask
+import org.maplibre.nativeffi.internal.c.mln_plugin_load_library
 import org.maplibre.nativeffi.internal.c.mln_projected_meters
 import org.maplibre.nativeffi.internal.c.mln_projected_meters_for_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_supported_render_backend_mask
@@ -116,5 +117,17 @@ public actual object Maplibre {
       mln_lat_lng_for_projected_meters(CoreStructs.projectedMeters(meters), outCoordinate.ptr)
     )
     CoreStructs.latLng(outCoordinate)
+  }
+
+  /** Loads a layer plugin shared library and registers its layer types. */
+  public actual fun loadPlugin(path: String, entryPoint: String) {
+    memScoped {
+      Status.check(
+        mln_plugin_load_library(
+          CoreStructs.stringView(path, this),
+          CoreStructs.stringView(entryPoint, this),
+        )
+      )
+    }
   }
 }

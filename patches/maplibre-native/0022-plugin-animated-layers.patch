@@ -1,0 +1,111 @@
+diff --git a/include/mln/plugin/plugin_api.h b/include/mln/plugin/plugin_api.h
+index ed11e95e4e3..7fe5fee371c 100644
+--- a/include/mln/plugin/plugin_api.h
++++ b/include/mln/plugin/plugin_api.h
+@@ -423,6 +423,16 @@ typedef float (*mln_plugin_query_radius_fn)(const mln_plugin_property_statistics
+                                             const mln_plugin_property_value_v1* camera_properties,
+                                             size_t camera_property_count);
+ 
++/* Optional animation signal, consulted on the render thread during layer
++ * evaluation with the camera-evaluated paint property values (the same array
++ * shape as query_feature; feature-dependent properties evaluate without a
++ * feature). The property array and its strings are borrowed for the call only.
++ * A nonzero return marks the layer as animating, and the map keeps repainting;
++ * return zero while the layer's animation is disabled. A null callback means
++ * the layer never animates. It must support concurrent calls for different
++ * maps. */
++typedef uint8_t (*mln_plugin_should_animate_fn)(const mln_plugin_property_value_v1* properties, size_t property_count);
++
+ typedef struct mln_plugin_layer_type_v1 {
+     uint32_t struct_size;
+     mln_plugin_string layer_type;
+@@ -439,6 +449,7 @@ typedef struct mln_plugin_layer_type_v1 {
+     mln_plugin_query_feature_fn query_feature;
+     mln_plugin_update_uniform_block_fn update_uniform_block;
+     mln_plugin_query_radius_fn get_query_radius;
++    mln_plugin_should_animate_fn should_animate;
+ } mln_plugin_layer_type_v1;
+ 
+ typedef struct mln_plugin_descriptor_v1 {
+diff --git a/src/mln/plugin/plugin_registry.cpp b/src/mln/plugin/plugin_registry.cpp
+index 6bfb7313b62..9c53679bc92 100644
+--- a/src/mln/plugin/plugin_registry.cpp
++++ b/src/mln/plugin/plugin_registry.cpp
+@@ -459,6 +459,7 @@ mln_plugin_status PluginRegistry::registerPlugin(const mln_plugin_descriptor_v1&
+         copiedLayerType.queryFeature = layerType.query_feature;
+         copiedLayerType.queryRadius = layerType.get_query_radius;
+         copiedLayerType.updateUniformBlock = layerType.update_uniform_block;
++        copiedLayerType.shouldAnimate = layerType.should_animate;
+         if (!appendShaders(pluginID,
+                            layerType.shaders,
+                            layerType.shader_count,
+diff --git a/src/mln/plugin/plugin_registry.hpp b/src/mln/plugin/plugin_registry.hpp
+index c795c96a6ea..12b80907cfc 100644
+--- a/src/mln/plugin/plugin_registry.hpp
++++ b/src/mln/plugin/plugin_registry.hpp
+@@ -89,6 +89,7 @@ struct LayerType {
+     mln_plugin_query_feature_fn queryFeature = nullptr;
+     mln_plugin_query_radius_fn queryRadius = nullptr;
+     mln_plugin_update_uniform_block_fn updateUniformBlock = nullptr;
++    mln_plugin_should_animate_fn shouldAnimate = nullptr;
+     bool operator==(const LayerType&) const = default;
+ 
+     const PropertyDefinition* findProperty(const std::string& name) const;
+diff --git a/src/mln/renderer/layers/render_plugin_style_layer.cpp b/src/mln/renderer/layers/render_plugin_style_layer.cpp
+index 69d74b429c7..b6e4161ab39 100644
+--- a/src/mln/renderer/layers/render_plugin_style_layer.cpp
++++ b/src/mln/renderer/layers/render_plugin_style_layer.cpp
+@@ -99,6 +99,27 @@ void RenderPluginStyleLayer::evaluate(const PropertyEvaluationParameters& parame
+     if (*evaluatedPaintSnapshot != evaluatedPluginProperties) {
+         evaluatedPaintSnapshot = std::make_shared<const style::PluginPropertyMap>(evaluatedPluginProperties);
+     }
++    if (registration->shouldAnimate) {
++        std::vector<style::PluginPropertyValue::EvaluationStorage> storage(definitions.size());
++        std::vector<mln_plugin_property_value_v1> animationProperties;
++        animationProperties.reserve(definitions.size());
++        auto storageIt = storage.begin();
++        for (const auto& definition : definitions) {
++            const auto propertyIt = evaluatedPluginProperties.find(definition.name);
++            const auto value = propertyIt == evaluatedPluginProperties.end()
++                                   ? style::defaultPluginPropertyValue(definition)
++                                   : propertyIt->second;
++            mln_plugin_property_value_v1 property{};
++            property.struct_size = sizeof(property);
++            property.name = {definition.name.data(), definition.name.size()};
++            property.value = value.evaluate(parameters.z, definition, *storageIt++);
++            property.explicitly_set = impl.pluginProperties.contains(definition.name);
++            animationProperties.push_back(property);
++        }
++        animated = registration->shouldAnimate(animationProperties.data(), animationProperties.size()) != 0;
++    } else {
++        animated = false;
++    }
+     auto properties = makeMutable<style::PluginStyleLayerProperties>(
+         staticImmutableCast<style::PluginStyleLayer::Impl>(baseImpl), evaluatedPluginProperties);
+     properties->renderPasses = underlying_type(passes);
+@@ -107,9 +128,9 @@ void RenderPluginStyleLayer::evaluate(const PropertyEvaluationParameters& parame
+ }
+ 
+ bool RenderPluginStyleLayer::hasTransition() const {
+-    return std::any_of(transitioningPaintProperties.begin(),
+-                       transitioningPaintProperties.end(),
+-                       [](const auto& property) { return property.second.hasTransition(); });
++    return animated || std::any_of(transitioningPaintProperties.begin(),
++                                   transitioningPaintProperties.end(),
++                                   [](const auto& property) { return property.second.hasTransition(); });
+ }
+ 
+ void RenderPluginStyleLayer::layerChanged(const TransitionParameters&,
+diff --git a/src/mln/renderer/layers/render_plugin_style_layer.hpp b/src/mln/renderer/layers/render_plugin_style_layer.hpp
+index e6ba914245a..52d79447b6e 100644
+--- a/src/mln/renderer/layers/render_plugin_style_layer.hpp
++++ b/src/mln/renderer/layers/render_plugin_style_layer.hpp
+@@ -41,6 +41,8 @@ private:
+     style::PluginPropertyMap evaluatedPluginProperties;
+     std::shared_ptr<const style::PluginPropertyMap> evaluatedPaintSnapshot;
+     std::map<std::string, gfx::ShaderGroupPtr> shaderGroups;
++    /// True while the layer reports an active animation.
++    bool animated = false;
+ };
+ 
+ } // namespace mln

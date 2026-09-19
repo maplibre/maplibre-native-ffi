@@ -16,6 +16,7 @@ mod handle;
 mod logging;
 mod map;
 mod options;
+mod plugin;
 mod projection;
 mod render;
 mod resource;
@@ -58,6 +59,7 @@ pub use maplibre_core::{
     RuntimeEventType, TileLodMode, TileOperation, ViewportMode,
 };
 pub use maplibre_native_ffi_core::handle::{NativeHandleLeak, set_leak_reporter};
+pub use plugin::load_plugin;
 pub use projection::MapProjectionHandle;
 pub use render::{
     DetachedRenderSessionHandle, EglContextDescriptor, FeatureStateSelector, FrameNativePointer,

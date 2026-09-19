@@ -10,9 +10,14 @@ import org.bytedeco.javacpp.annotation.Raw;
 /** Android-only JavaCPP helpers for JNI context and borrowed arrays. */
 @Properties(
     inherit = MaplibreNativeCConfig.class,
-    value = @Platform(include = "android_image_bridge.h"))
+    value = @Platform(include = {"android_image_bridge.h", "plugin_bridge.h"}))
 public final class AndroidNativeBridge {
   private AndroidNativeBridge() {}
+
+  @Name("mln_android_plugin_load_library")
+  public static native @Cast("mln_status") int pluginLoadLibrary(
+      @Cast("const mln_buffer_view*") Pointer path,
+      @Cast("const mln_buffer_view*") Pointer entryPoint);
 
   @Name("mln_android_init")
   public static native @Cast("mln_status") int initialize(@Raw(withEnv = true) Object context);

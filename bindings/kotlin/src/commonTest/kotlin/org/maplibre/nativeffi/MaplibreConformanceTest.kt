@@ -3,7 +3,9 @@ package org.maplibre.nativeffi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 import org.maplibre.nativeffi.error.InvalidArgumentException
+import org.maplibre.nativeffi.error.NativeErrorException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.runtime.NetworkStatus
 
@@ -32,5 +34,15 @@ class MaplibreConformanceTest {
   @Test
   fun networkStatusRejectsAnUnknownInputBeforeNativeCall() {
     assertFailsWith<InvalidArgumentException> { Maplibre.setNetworkStatus(NetworkStatus(999)) }
+  }
+
+  @Test
+  fun pluginLoadFailureSurfacesANativeError() {
+    Maplibre.loadNativeLibrary()
+    val error =
+      assertFailsWith<NativeErrorException> {
+        Maplibre.loadPlugin("/nonexistent/libmaplibre-plugin-missing.so", "missing_entry_point")
+      }
+    assertTrue(error.diagnostic.isNotBlank())
   }
 }
