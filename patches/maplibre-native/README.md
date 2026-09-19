@@ -119,6 +119,21 @@ fixtures with their binary reference images. Upstream:
 [maplibre-native#4644](https://github.com/maplibre/maplibre-native/pull/4644),
 at commit `02d9a4b2ccb4f3d15cdca438fd08ea6fa2cd530b`.
 
+`0022-plugin-animated-layers.patch` adds an optional `should_animate` callback
+to the plugin layer ABI. A layer whose callback returns nonzero counts as
+animating during evaluation, so continuous-mode maps report needs-repaint on
+every rendered frame while the animation is on. Upstream:
+[maplibre-native#4654](https://github.com/maplibre/maplibre-native/pull/4654),
+at commit `c9346eed9c732115bfcae1f4cb64edb2ad4f6550`.
+
+`0023-source-free-plugin-layers.patch` adds an optional `requires_source` flag
+and a `build_frame` callback to the plugin layer ABI. A source-free layer takes
+no source in the style, skips tile layout, and instead receives its geometry
+from the callback on every rendered frame, drawing through the same shaders and
+uniform tweaker as tile-driven layers. Source-free layers cannot declare
+data-driven properties and receive no feature hit-testing. This patch is
+local-only: it is not upstreamed, and no upstream PR exists.
+
 Each patch is the squashed diff of its upstream branch, applied on top of the
 patches before it, so a patch that adds a test next to an earlier patch's test
 carries that placement rather than the branch's own context.

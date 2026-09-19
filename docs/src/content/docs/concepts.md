@@ -126,20 +126,28 @@ results.
 ## Layer plugins
 
 MapLibre Native's plugin API lets native code add style layer types. A plugin
-declares paint properties and shaders for each render backend, lays out tile
-features into vertex data on tile workers, and fills uniform blocks on the
-render thread. The renderer owns the GPU resources and draws the result like any
-other layer, so a style names the layer type and sets its paint properties the
-same way it does for built-in layers.
+declares paint properties and shaders for each render backend and fills uniform
+blocks on the render thread. Geometry arrives one of two ways. A tile-driven
+layer takes a style source and lays out its tile features into vertex data on
+tile workers. A source-free layer takes no source and instead receives a
+per-frame callback with the camera-evaluated paint values and a screen
+projection; its constant properties — position and bearing for a location
+indicator, for example — transition like any built-in paint property, while
+tile-driven data-driven properties never transition. Source-free layers cannot
+declare data-driven properties and receive no feature hit-testing.
 
 This library builds plugin support into its core and exports the registration
 entry point. A plugin registers once per process, before a style that uses its
 layer types loads. Registration retains the plugin's callbacks for the rest of
-the process, and those callbacks run on MapLibre's threads, so a plugin is
-native code that links this library directly. Language bindings carry the plugin
-declarations in their raw C layer and add no safe wrapper. The plugin API
-declares shaders for OpenGL, Vulkan, and Metal; a WebGPU build registers a
-plugin but has no shader path for its layers.
+the process, and those callbacks run on MapLibre's threads, so authoring a
+plugin is native work, and language bindings carry the plugin declarations in
+their raw C layer without a safe wrapper. Loading a prebuilt plugin is open to
+every binding: a plugin shared library exports an entry point that takes the
+register function, and the consumer obtains that function from
+`mln_plugin_get_register_function_v1` and hands it over, so the plugin binary
+never links the host library. The plugin API declares shaders for OpenGL,
+Vulkan, and Metal; a WebGPU build registers a plugin but has no shader path for
+its layers.
 
 ## Language bindings
 

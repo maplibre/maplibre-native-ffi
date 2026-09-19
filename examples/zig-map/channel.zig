@@ -19,6 +19,11 @@ pub const CameraCommand = union(enum) {
     adjust_bearing_animated: struct { delta: f64, duration_ms: f64 },
     adjust_pitch_animated: struct { delta: f64, duration_ms: f64 },
     reset_orientation: struct { duration_ms: f64 },
+    puck_move: struct { dx: f64, dy: f64 },
+    puck_rotate: struct { delta: f64 },
+    puck_accuracy: struct { scale: f64 },
+    puck_toggle_bearing,
+    puck_toggle_pulse,
 };
 
 /// Pending camera commands, filled by the render loop and drained by the

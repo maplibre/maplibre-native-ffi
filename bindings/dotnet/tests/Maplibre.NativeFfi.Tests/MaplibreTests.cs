@@ -75,4 +75,19 @@ public sealed class MaplibreTests
         Assert.Null(error.RawStatus);
         Assert.Contains("999999", error.Diagnostic, StringComparison.Ordinal);
     }
+
+    [BindingSpecTest("BND-068")]
+    [Fact]
+    public void LoadingNonexistentPluginLibraryReportsNativeError()
+    {
+        var error = Assert.Throws<NativeErrorException>(() =>
+            Maplibre.LoadPlugin(
+                "/nonexistent/libmln-plugin-no-such-library.dylib",
+                "mln_plugin_entry"
+            )
+        );
+
+        Assert.Equal(MaplibreStatus.NativeError, error.Status);
+        Assert.NotEmpty(error.Diagnostic);
+    }
 }

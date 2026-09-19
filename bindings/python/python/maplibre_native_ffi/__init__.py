@@ -4,6 +4,7 @@ from . import _loader as _loader
 from ._global import (
     EXPECTED_C_ABI_VERSION,
     c_version,
+    load_plugin,
     network_status,
     set_network_status,
     supported_opengl_context_providers,
@@ -95,6 +96,7 @@ __all__ = [
     "WakeSource",
     "WrongThreadError",
     "c_version",
+    "load_plugin",
     "network_status",
     "set_network_status",
     "supported_opengl_context_providers",

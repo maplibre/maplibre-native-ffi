@@ -20580,4 +20580,65 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
            throw new AssertionError("should not reach here", ex$);
         }
     }
+
+    private static class mln_plugin_load_library {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            mln_buffer_view.layout(),
+            mln_buffer_view.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_plugin_load_library");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_plugin_load_library(mln_buffer_view path, mln_buffer_view entry_point)
+     * }
+     */
+    public static FunctionDescriptor mln_plugin_load_library$descriptor() {
+        return mln_plugin_load_library.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_plugin_load_library(mln_buffer_view path, mln_buffer_view entry_point)
+     * }
+     */
+    public static MethodHandle mln_plugin_load_library$handle() {
+        return mln_plugin_load_library.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_plugin_load_library(mln_buffer_view path, mln_buffer_view entry_point)
+     * }
+     */
+    public static MemorySegment mln_plugin_load_library$address() {
+        return mln_plugin_load_library.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_plugin_load_library(mln_buffer_view path, mln_buffer_view entry_point)
+     * }
+     */
+    public static int mln_plugin_load_library(MemorySegment path, MemorySegment entry_point) {
+        var mh$ = mln_plugin_load_library.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_plugin_load_library", path, entry_point);
+            }
+            return (int)mh$.invokeExact(path, entry_point);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
 }

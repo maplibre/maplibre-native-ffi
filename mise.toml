@@ -36,7 +36,13 @@ activate_aggressive = true
 dotnet.isolated = true
 
 [monorepo]
-config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
+config_roots = [
+  ".devcontainer",
+  "bindings/*",
+  "examples/*",
+  "docs",
+  "plugins/*",
+]
 lockfile = true
 
 # Inline task scripts across the workspace are Bash. Cascading the shell gives

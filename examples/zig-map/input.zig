@@ -139,6 +139,11 @@ pub fn logControls() void {
         \\  Q / E: rotate
         \\  ] / [: pitch
         \\  0: reset pitch and bearing
+        \\  I / J / K / L: move puck up / left / down / right
+        \\  R / F: rotate puck bearing
+        \\  Z / X: shrink / grow accuracy radius
+        \\  V: toggle puck bearing indicator
+        \\  P: toggle puck pulse
         \\
     , .{});
 }
@@ -166,6 +171,9 @@ fn handleKeyDown(
     const zoom_step = 1.25;
     const bearing_step = 10.0;
     const pitch_step = 5.0;
+    const puck_step = 40.0;
+    const puck_bearing_step = 15.0;
+    const puck_accuracy_step = 1.25;
     const center = point(
         @as(f64, @floatFromInt(current_viewport.logical_width)) / 2.0,
         @as(f64, @floatFromInt(current_viewport.logical_height)) / 2.0,
@@ -204,6 +212,36 @@ fn handleKeyDown(
         },
         scancode(c.SDL_SCANCODE_0) => {
             commands.push(.{ .reset_orientation = .{ .duration_ms = reset_animation_ms } });
+        },
+        scancode(c.SDL_SCANCODE_I) => {
+            commands.push(.{ .puck_move = .{ .dx = 0, .dy = -puck_step } });
+        },
+        scancode(c.SDL_SCANCODE_K) => {
+            commands.push(.{ .puck_move = .{ .dx = 0, .dy = puck_step } });
+        },
+        scancode(c.SDL_SCANCODE_J) => {
+            commands.push(.{ .puck_move = .{ .dx = -puck_step, .dy = 0 } });
+        },
+        scancode(c.SDL_SCANCODE_L) => {
+            commands.push(.{ .puck_move = .{ .dx = puck_step, .dy = 0 } });
+        },
+        scancode(c.SDL_SCANCODE_R) => {
+            commands.push(.{ .puck_rotate = .{ .delta = puck_bearing_step } });
+        },
+        scancode(c.SDL_SCANCODE_F) => {
+            commands.push(.{ .puck_rotate = .{ .delta = -puck_bearing_step } });
+        },
+        scancode(c.SDL_SCANCODE_Z) => {
+            commands.push(.{ .puck_accuracy = .{ .scale = 1.0 / puck_accuracy_step } });
+        },
+        scancode(c.SDL_SCANCODE_X) => {
+            commands.push(.{ .puck_accuracy = .{ .scale = puck_accuracy_step } });
+        },
+        scancode(c.SDL_SCANCODE_V) => {
+            commands.push(.puck_toggle_bearing);
+        },
+        scancode(c.SDL_SCANCODE_P) => {
+            commands.push(.puck_toggle_pulse);
         },
         else => return .{},
     }

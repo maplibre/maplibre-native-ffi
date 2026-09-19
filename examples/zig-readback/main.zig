@@ -18,6 +18,20 @@ const height = 512;
 const style_url = "https://tiles.openfreemap.org/styles/bright";
 const park_timeout_milliseconds = 100;
 
+// The location-puck plugin (plugins/location-indicator) adds its source-free
+// indicator over the bright style at the camera center.
+const puck_layer_json =
+    "{\"id\":\"puck\",\"type\":\"location-puck\",\"paint\":{" ++
+    "\"position\":[37.7749,-122.4194]," ++
+    "\"bearing\":35," ++
+    "\"accuracy-radius\":80," ++
+    "\"bearing-accuracy\":25," ++
+    "\"bearing-accuracy-radius\":90," ++
+    "\"bearing-visible\":1," ++
+    "\"accuracy-border-width\":1.5," ++
+    "\"pulse-radius\":0" ++
+    "}}";
+
 const RuntimeLoopArgs = struct {
     allocator: std.mem.Allocator,
     context: *OwnedTextureContext,
@@ -55,11 +69,11 @@ fn runtimeLoopFallible(args: RuntimeLoopArgs) !void {
         .map_still_image_failed = true,
         .map_loading_failed = true,
         .map_render_error = true,
+        .map_style_loaded = true,
     });
 
     try setInitialCamera(&map);
     try map.setStyleUrl(args.allocator, style_url);
-    try map.requestStillImage();
 
     // The render loop signals this to release the parked pump.
     const wake = try runtime.wakeSource();
@@ -98,6 +112,12 @@ fn pumpUntilSessionCloses(
                 !std.meta.eql(event.source_id.?, map_id)) continue;
             switch (event.event_type) {
                 .map_render_update_available => shared.requestRender(),
+                // The source-free plugin layer attaches once the base style is
+                // live; the still image request then covers it.
+                .map_style_loaded => {
+                    try map.addStyleLayerJson(args.allocator, puck_layer_json, "");
+                    try map.requestStillImage();
+                },
                 .map_still_image_finished => shared.finishStillImage(),
                 .map_loading_failed => return error.MapLoadingFailed,
                 .map_render_error => return error.MapRenderFailed,
@@ -113,11 +133,18 @@ pub fn main(init_args: std.process.Init) !void {
     var args = try std.process.Args.Iterator.initAllocator(init_args.minimal.args, allocator);
     defer args.deinit();
     _ = args.skip();
+    const plugin_path = args.next() orelse {
+        std.debug.print("usage: zig-readback <plugin-library> [output.ppm]\n", .{});
+        return error.MissingPluginLibraryPath;
+    };
     const output_path = args.next() orelse "map.ppm";
 
     try maplibre.setAsyncLogSeverityMask(.none, null);
     defer maplibre.setAsyncLogSeverityMask(.default, null) catch {};
     try logAndValidateRenderBackend();
+
+    // Registration is process-wide and must happen before the style loads.
+    try maplibre.loadPlugin(allocator, plugin_path, "mln_location_puck_register");
 
     // The graphics context belongs to this thread, which attaches the session,
     // presents, and reads back. It stays current here for the whole run.
@@ -180,6 +207,20 @@ fn renderOnThisThread(
     const image_data = try allocator.alloc(u8, @as(usize, width) * @as(usize, height) * 4);
     defer allocator.free(image_data);
     const image_info = try session.readPremultipliedRgba8Into(image_data);
+
+    // Smoke check: the location-puck layer covers the camera center with the
+    // opaque blue puck. Loose on purpose — this is an example, not a test.
+    const center_index = ((@as(usize, @intCast(image_info.height)) / 2) * @as(usize, @intCast(image_info.width)) +
+        @as(usize, @intCast(image_info.width)) / 2) * 4;
+    const center_red = image_data[center_index];
+    const center_blue = image_data[center_index + 2];
+    if (center_blue < center_red +| 20) {
+        std.debug.print(
+            "center pixel reads {d},{d},{d},{d}; expected the blue puck\n",
+            .{ center_red, image_data[center_index + 1], center_blue, image_data[center_index + 3] },
+        );
+        return error.LocationPuckNotRendered;
+    }
 
     try writePpm(io, allocator, output_path, image_data, image_info);
     std.debug.print("wrote {s} ({d}x{d})\n", .{ output_path, image_info.width, image_info.height });

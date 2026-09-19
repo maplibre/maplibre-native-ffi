@@ -9,6 +9,8 @@ sources = [
   "build.zig.zon",
   "../../build.zig",
   "../../build.zig.zon",
+  "../../plugins/location-indicator/build.zig",
+  "../../plugins/location-indicator/build.zig.zon",
 ]
 outputs = ["zig-pkg"]
 timeout = "10m"

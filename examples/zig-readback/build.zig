@@ -110,7 +110,21 @@ pub fn build(b: *std.Build) void {
     };
 
     const readback = addReadbackExample(b, options);
+
+    // The location-puck plugin builds as a shared library through the package
+    // dependency; the demo loads it at startup like any SDK consumer.
+    const puck = b.dependency("maplibre_location_puck", .{
+        .target = target,
+        .optimize = options.optimize,
+        .@"native-install-dir" = native_install_dir,
+        .@"dependency-include-dir" = dependency_include_dirs,
+        .@"system-root" = system_root,
+    });
+    const puck_library = puck.artifact("maplibre-location-puck");
+    b.installArtifact(puck_library);
+
     const run_readback = b.addRunArtifact(readback);
+    run_readback.addArtifactArg(puck_library);
     if (b.args) |args| run_readback.addArgs(args);
 
     const run_step = b.step("run", "Render a map image to map.ppm");

@@ -3,7 +3,9 @@ package org.maplibre.nativeffi
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.internal.callback.LogCallbackState
+import org.maplibre.nativeffi.internal.javacpp.AndroidNativeBridge
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.javacpp.StringViewScope
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.log.LogSeverity
@@ -99,6 +101,16 @@ public actual object Maplibre {
     val outCoordinate = MaplibreNativeC.mln_lat_lng()
     Status.check(MaplibreNativeC.mln_lat_lng_for_projected_meters(nativeMeters, outCoordinate))
     return LatLng(outCoordinate.latitude(), outCoordinate.longitude())
+  }
+
+  /** Loads a layer plugin shared library and registers its layer types. */
+  public actual fun loadPlugin(path: String, entryPoint: String) {
+    NativeAccess.ensureLoaded()
+    StringViewScope(path).use { nativePath ->
+      StringViewScope(entryPoint).use { nativeEntryPoint ->
+        Status.check(AndroidNativeBridge.pluginLoadLibrary(nativePath.view, nativeEntryPoint.view))
+      }
+    }
   }
 }
 

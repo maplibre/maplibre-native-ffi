@@ -95,4 +95,10 @@ public actual object Maplibre {
     NativeAccess.ensureLoaded()
     return NativeAccess.latLngForProjectedMeters(meters)
   }
+
+  /** Loads a layer plugin shared library and registers its layer types. */
+  public actual fun loadPlugin(path: String, entryPoint: String) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.loadPlugin(path, entryPoint)
+  }
 }

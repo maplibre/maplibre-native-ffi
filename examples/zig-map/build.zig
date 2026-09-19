@@ -147,9 +147,22 @@ pub fn build(b: *std.Build) void {
         .system_root = system_root,
     };
 
+    // The location-puck plugin builds as a shared library through the package
+    // dependency; the demo loads it at startup like any SDK consumer.
+    const puck = b.dependency("maplibre_location_puck", .{
+        .target = target,
+        .optimize = options.optimize,
+        .@"native-install-dir" = native_install_dir,
+        .@"dependency-include-dir" = dependency_include_dirs,
+        .@"system-root" = system_root,
+    });
+    const puck_library = puck.artifact("maplibre-location-puck");
+    b.installArtifact(puck_library);
+
     const run_step = b.step("run", "Run Zig map example");
     const zig_map = addZigMapExample(b, options);
     const run_zig_map = b.addRunArtifact(zig_map);
+    run_zig_map.addArtifactArg(puck_library);
     if (b.args) |args| run_zig_map.addArgs(args);
     run_step.dependOn(&run_zig_map.step);
 }

@@ -80,6 +80,7 @@ shared = [
 
   # Not inputs to any published artifact.
   "!examples/**",
+  "!plugins/**",
   "!dprint.jsonc",
   "!hk.pkl",
   "!vite.config.ts",

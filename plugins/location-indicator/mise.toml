@@ -1,0 +1,23 @@
+[tools]
+"core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }
+
+[deps.zig]
+auto = true
+description = "Fetch Zig package dependencies."
+sources = [
+  "build.zig",
+  "build.zig.zon",
+  "../../build.zig",
+  "../../build.zig.zon",
+]
+outputs = ["zig-pkg"]
+timeout = "10m"
+run = "zig build --fetch=needed"
+
+[tasks.build]
+extends = "ffi:preset"
+run = '''
+zig build \
+  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
+'''

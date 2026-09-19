@@ -488,6 +488,160 @@ static const char square_style_json[] =
   "{\"id\":\"square\",\"type\":\"ffi-test-square\",\"source\":\"points\","
   "\"paint\":{\"square-color\":\"#00ff00\",\"square-radius\":8}}]}";
 
+static mln_plugin_status square_free_update_uniform_block(
+  const mln_plugin_uniform_context_v1* context, uint32_t uniform_id,
+  uint8_t* output, size_t output_size
+);
+static mln_plugin_status square_free_build_frame(
+  const mln_plugin_frame_context_v1* context, mln_plugin_bucket_v1* bucket
+);
+
+// The source-free variant reuses the square properties with camera-only
+// expression capabilities, which source-free layers require.
+static const mln_plugin_property_descriptor_v1 square_free_properties[] = {
+  {
+    .struct_size = sizeof(mln_plugin_property_descriptor_v1),
+    .name = SQUARE_STRING("square-radius"),
+    .type = MLN_PLUGIN_VALUE_FLOAT,
+    .default_value =
+      {sizeof(mln_plugin_value), MLN_PLUGIN_VALUE_FLOAT, {.float_value = 4.0f}},
+    .expression_capabilities = MLN_PLUGIN_EXPRESSION_CAMERA,
+    .supports_transitions = 1,
+    .has_minimum = 1,
+    .minimum = 0.0f,
+  },
+  {
+    .struct_size = sizeof(mln_plugin_property_descriptor_v1),
+    .name = SQUARE_STRING("square-color"),
+    .type = MLN_PLUGIN_VALUE_COLOR,
+    .default_value =
+      {sizeof(mln_plugin_value),
+       MLN_PLUGIN_VALUE_COLOR,
+       {.color_value = {0.0f, 0.0f, 0.0f, 1.0f}}},
+    .expression_capabilities = MLN_PLUGIN_EXPRESSION_CAMERA,
+    .supports_transitions = 1,
+  },
+};
+
+// A source-free variant of the square plugin: no style source, geometry from
+// build_frame, and a viewport frame matrix instead of a tile matrix.
+static const mln_plugin_layer_type_v1 square_free_layer_type = {
+  .struct_size = sizeof(mln_plugin_layer_type_v1),
+  .layer_type = SQUARE_STRING("ffi-test-square-free"),
+  .backend_mask = MLN_PLUGIN_BACKEND_OPENGL | MLN_PLUGIN_BACKEND_VULKAN |
+                  MLN_PLUGIN_BACKEND_METAL,
+  .properties = square_free_properties,
+  .property_count =
+    sizeof(square_free_properties) / sizeof(*square_free_properties),
+  .geometry_type_mask = MLN_PLUGIN_GEOMETRY_POINT,
+  .shaders = &square_shader,
+  .shader_count = 1,
+  .update_uniform_block = square_free_update_uniform_block,
+  .source_free = 1,
+  .build_frame = square_free_build_frame,
+};
+
+static const mln_plugin_descriptor_v1 square_free_descriptor = {
+  .struct_size = sizeof(mln_plugin_descriptor_v1),
+  .abi_version = MLN_PLUGIN_ABI_VERSION_1,
+  .plugin_id =
+    SQUARE_STRING("org.maplibre.maplibre-native-ffi.test-square-free"),
+  .plugin_version = SQUARE_STRING("0.0.0"),
+  .minimum_host_abi = MLN_PLUGIN_ABI_VERSION_1,
+  .maximum_host_abi = MLN_PLUGIN_ABI_VERSION_1,
+  .layer_types = &square_free_layer_type,
+  .layer_type_count = 1,
+};
+
+// Frame-unit grid over the viewport; square_free_update_uniform_block maps it
+// to NDC.
+#define SQUARE_FREE_EXTENT 8192.0f
+
+static mln_plugin_status square_free_update_uniform_block(
+  const mln_plugin_uniform_context_v1* context, uint32_t uniform_id,
+  uint8_t* output, size_t output_size
+) {
+  if (
+    context == NULL || context->struct_size < sizeof(*context) ||
+    uniform_id != SQUARE_UNIFORM_BLOCK || output == NULL ||
+    output_size != sizeof(square_uniforms)
+  ) {
+    return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
+  }
+  square_uniforms value = {0};
+  const float scale = 2.0f / SQUARE_FREE_EXTENT;
+  const float frame_matrix[16] = {scale, 0, 0, 0, 0,  -scale, 0, 0,
+                                  0,     0, 1, 0, -1, 1,      0, 1};
+  memcpy(value.matrix, frame_matrix, sizeof(value.matrix));
+  value.pixels_to_gl_units[0] = context->pixels_to_gl_units[0];
+  value.pixels_to_gl_units[1] = context->pixels_to_gl_units[1];
+  memcpy(output, &value, sizeof(value));
+  return MLN_PLUGIN_STATUS_OK;
+}
+
+static mln_plugin_status square_free_build_frame(
+  const mln_plugin_frame_context_v1* context, mln_plugin_bucket_v1* bucket
+) {
+  if (
+    context == NULL || bucket == NULL ||
+    context->struct_size < sizeof(*context) ||
+    bucket->struct_size < sizeof(*bucket)
+  ) {
+    return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
+  }
+  // One quad at the viewport center, packed like the tile path's square.
+  static square_vertex vertices[4];
+  static mln_plugin_segment_v1 segment;
+  static mln_plugin_vertex_stream_v1 stream;
+  static uint16_t indices[6] = {0, 1, 2, 0, 2, 3};
+  static mln_plugin_attribute_binding_v1 attribute;
+  static mln_plugin_drawable_descriptor_v1 drawable;
+  static const int16_t center = (int16_t)(SQUARE_FREE_EXTENT / 2);
+  static const int16_t corners[4][2] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+  for (size_t corner = 0; corner < 4; corner += 1) {
+    vertices[corner].position[0] = (int16_t)(center * 2 + corners[corner][0]);
+    vertices[corner].position[1] = (int16_t)(center * 2 + corners[corner][1]);
+  }
+  segment = (mln_plugin_segment_v1){
+    .struct_size = sizeof(mln_plugin_segment_v1),
+    .vertex_length = 4,
+    .index_length = 6,
+  };
+  stream = (mln_plugin_vertex_stream_v1){
+    .struct_size = sizeof(mln_plugin_vertex_stream_v1),
+    .stream_id = SQUARE_VERTEX_STREAM,
+    .data = (const uint8_t*)vertices,
+    .data_size = sizeof(vertices),
+    .vertex_count = 4,
+    .stride = sizeof(square_vertex),
+  };
+  attribute = (mln_plugin_attribute_binding_v1){
+    .struct_size = sizeof(mln_plugin_attribute_binding_v1),
+    .attribute_id = SQUARE_ATTRIBUTE_POSITION,
+    .stream_id = SQUARE_VERTEX_STREAM,
+    .byte_offset = offsetof(square_vertex, position),
+  };
+  drawable = (mln_plugin_drawable_descriptor_v1){
+    .struct_size = sizeof(mln_plugin_drawable_descriptor_v1),
+    .drawable_key = square_drawable_key,
+    .shader_id = SQUARE_STRING("square"),
+    .attributes = &attribute,
+    .attribute_count = 1,
+    .segments = &segment,
+    .segment_count = 1,
+  };
+  bucket->vertex_streams = &stream;
+  bucket->vertex_stream_count = 1;
+  bucket->indices = indices;
+  bucket->index_count = 6;
+  bucket->drawables = &drawable;
+  bucket->drawable_count = 1;
+  bucket->query_radius = 0.0f;
+  bucket->feature_vertex_ranges = NULL;
+  bucket->feature_vertex_range_count = 0;
+  return MLN_PLUGIN_STATUS_OK;
+}
+
 static mln_plugin_status register_square_plugin(void) {
   char error[256] = "";
   const mln_plugin_status status =
@@ -495,6 +649,118 @@ static mln_plugin_status register_square_plugin(void) {
   TEST_ASSERT_EQUAL_STRING("", error);
   return status;
 }
+
+// The accessor exists for consumers that cannot take the entry point's
+// address; it must hand out exactly that entry point.
+static void register_function_accessor_returns_the_entry_point(void) {
+  const mln_plugin_register_function_v1 register_fn =
+    mln_plugin_get_register_function_v1();
+  TEST_ASSERT_TRUE(register_fn != NULL);
+  TEST_ASSERT_EQUAL_PTR(&mln_plugin_register_v1, register_fn);
+}
+
+// The loader reports bad arguments and OS load failures through the status
+// and thread diagnostic channel without touching the registry.
+static void plugin_load_library_rejects_bad_arguments(void) {
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_plugin_load_library(
+      MLN_BUFFER_LITERAL(""), MLN_BUFFER_LITERAL("mln_test_plugin_register")
+    )
+  );
+  TEST_ASSERT_GREATER_THAN_size_t(0, strlen(mln_thread_last_error_message()));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_plugin_load_library(
+      MLN_BUFFER_LITERAL("/nonexistent/libmaplibre-test-plugin.so"),
+      MLN_BUFFER_LITERAL("")
+    )
+  );
+  TEST_ASSERT_GREATER_THAN_size_t(0, strlen(mln_thread_last_error_message()));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_plugin_load_library(
+      (mln_buffer_view){.data = NULL, .size = 3},
+      MLN_BUFFER_LITERAL("mln_test_plugin_register")
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_NATIVE_ERROR,
+    mln_plugin_load_library(
+      MLN_BUFFER_LITERAL("/nonexistent/libmaplibre-test-plugin.so"),
+      MLN_BUFFER_LITERAL("mln_test_plugin_register")
+    )
+  );
+  TEST_ASSERT_GREATER_THAN_size_t(0, strlen(mln_thread_last_error_message()));
+}
+
+// The source-free square takes no source key; the style keeps a source
+// because source-free layers render only when the style has at least one.
+static const char square_free_style_json[] =
+  "{\"version\":8,\"sources\":{\"points\":{\"type\":\"geojson\",\"data\":"
+  "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+  "\"coordinates\":[0,0]},\"properties\":{}}}},"
+  "\"layers\":[{\"id\":\"bg\",\"type\":\"background\","
+  "\"paint\":{\"background-color\":\"#ff0000\"}},"
+  "{\"id\":\"square\",\"type\":\"ffi-test-square-free\","
+  "\"paint\":{\"square-color\":\"#00ff00\",\"square-radius\":8}}]}";
+
+#if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
+
+static void a_source_free_layer_renders_through_the_c_api(void) {
+  TEST_ASSERT_EQUAL_INT(
+    MLN_PLUGIN_STATUS_OK,
+    mln_plugin_register_v1(&square_free_descriptor, NULL, 0)
+  );
+
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(square_free_style_json))
+  );
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+
+  // The frame callback is synchronous, so the first rendered frame covers the
+  // center pixel and spares the corner, like the tile-driven square.
+  static uint8_t pixels[64 * 64 * 4];
+  bool square_rendered = false;
+  for (unsigned int attempt = 0; attempt < 2000 && !square_rendered;
+       attempt += 1) {
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
+    mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
+    bool needs_repaint = false;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_render_session_render_update(fixture.session, &result, &needs_repaint)
+    );
+    if (result == MLN_RENDER_RESULT_RENDERED) {
+      mln_texture_image_info info = {.size = sizeof(mln_texture_image_info)};
+      TEST_ASSERT_EQUAL_INT(
+        MLN_STATUS_OK, mln_texture_read_premultiplied_rgba8(
+                         fixture.session, pixels, sizeof(pixels), &info
+                       )
+      );
+      const uint8_t* center = pixels + ((32 * 64) + 32) * 4;
+      square_rendered = center[1] == 255;
+    }
+    if (!square_rendered) {
+      mln_test_sleep_millisecond();
+    }
+  }
+  TEST_ASSERT_TRUE_MESSAGE(
+    square_rendered,
+    "the source-free plugin layer never covered the center pixel"
+  );
+  TEST_ASSERT_EQUAL_UINT8(255, pixels[0]);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+#endif
 
 #if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 
@@ -569,6 +835,11 @@ static void a_registered_layer_type_renders_through_the_c_api(void) {
 
 void run_plugin_layer_abi_tests(void) {
   UnitySetTestFile(__FILE__);
+  RUN_TEST(register_function_accessor_returns_the_entry_point);
+  RUN_TEST(plugin_load_library_rejects_bad_arguments);
+#if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
+  RUN_TEST(a_source_free_layer_renders_through_the_c_api);
+#endif
 #if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
   RUN_TEST(registration_reaches_the_library_exports);
 #else

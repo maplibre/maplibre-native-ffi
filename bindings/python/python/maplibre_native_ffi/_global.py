@@ -27,6 +27,26 @@ def network_status() -> NetworkStatus:
     return NetworkStatus(_native.network_status_raw())
 
 
+def load_plugin(path: str, entry_point: str) -> None:
+    """Load a layer plugin shared library and register its style layer types.
+
+    ``path`` is the UTF-8 path of the plugin library, and ``entry_point``
+    names the exported entry point that the library calls with the
+    process-wide register function. The library stays loaded for the process
+    lifetime, because registration retains the plugin's callbacks.
+
+    This function is callable from any thread. Call it before any style that
+    uses the plugin's layer types loads. Loading an identical plugin again
+    succeeds.
+
+    Raises :class:`InvalidArgumentError` when ``path`` or ``entry_point`` is
+    empty, and :class:`NativeError` with the OS or plugin diagnostic when the
+    library fails to load, the entry point fails to resolve, or registration
+    fails.
+    """
+    _native.load_plugin(path, entry_point)
+
+
 def set_network_status(status: NetworkStatus) -> None:
     """Set MapLibre Native's process-global network status."""
     network_status_value = (
