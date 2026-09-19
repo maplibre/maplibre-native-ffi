@@ -1699,7 +1699,7 @@ fn buildFrame(
         break :blk @max(@sqrt(dx * dx + dy * dy), 1e-6);
     };
 
-    const start_time: f32 = @floatCast(ctx.time_seconds);
+    const start_time = timeSeconds();
     const border_meters = accuracy_border_width * meters_per_unit / px_per_unit;
     const inner_radius = @max(accuracy_radius - border_meters, 0.0);
 
@@ -1716,7 +1716,10 @@ fn buildFrame(
                 packOffset((outer_mercator[0] - center_mercator[0]) * 2 + 1),
                 packOffset((outer_mercator[1] - center_mercator[1]) * 2 + 1),
             },
-            .prev_pos = .{ 0, 0 },
+            .prev_pos = .{
+                packOffset(outer_mercator[0] - center_mercator[0]),
+                packOffset(outer_mercator[1] - center_mercator[1]),
+            },
             .scale = scale,
             .start_time = start_time,
         };
@@ -1727,7 +1730,10 @@ fn buildFrame(
                 packOffset((inner_mercator[0] - center_mercator[0]) * 2),
                 packOffset((inner_mercator[1] - center_mercator[1]) * 2),
             },
-            .prev_pos = .{ 0, 0 },
+            .prev_pos = .{
+                packOffset(inner_mercator[0] - center_mercator[0]),
+                packOffset(inner_mercator[1] - center_mercator[1]),
+            },
             .scale = scale,
             .start_time = start_time,
         };
