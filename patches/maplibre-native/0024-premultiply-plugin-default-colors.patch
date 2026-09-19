@@ -1,0 +1,27 @@
+diff --git a/include/mln/plugin/plugin_api.h b/include/mln/plugin/plugin_api.h
+index 7fe5fee371c..26929f8aa71 100644
+--- a/include/mln/plugin/plugin_api.h
++++ b/include/mln/plugin/plugin_api.h
+@@ -94,6 +94,8 @@ typedef struct mln_plugin_float2 {
+     float y;
+ } mln_plugin_float2;
+ 
++/* Straight-alpha color. The host premultiplies registered defaults when it
++ * adopts them into the style system. */
+ typedef struct mln_plugin_color {
+     float r;
+     float g;
+diff --git a/src/mln/style/plugin_property.cpp b/src/mln/style/plugin_property.cpp
+index 3e9185c9ba3..2577496c245 100644
+--- a/src/mln/style/plugin_property.cpp
++++ b/src/mln/style/plugin_property.cpp
+@@ -75,7 +75,8 @@ Color defaultValue<Color>(const plugin::PropertyDefinition& definition) {
+     if (const auto* array = definition.defaultValue.getArray(); array && array->size() == result.size()) {
+         for (size_t i = 0; i < result.size(); ++i) result[i] = numericValue<float>((*array)[i]).value_or(0.0f);
+     }
+-    return {result[0], result[1], result[2], result[3]};
++    // Registered defaults arrive straight; Color is premultiplied.
++    return {result[0] * result[3], result[1] * result[3], result[2] * result[3], result[3]};
+ }
+ 
+ template <>

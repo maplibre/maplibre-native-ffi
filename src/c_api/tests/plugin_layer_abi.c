@@ -517,7 +517,7 @@ static const mln_plugin_property_descriptor_v1 square_free_properties[] = {
     .default_value =
       {sizeof(mln_plugin_value),
        MLN_PLUGIN_VALUE_COLOR,
-       {.color_value = {0.0f, 0.0f, 0.0f, 1.0f}}},
+       {.color_value = {0.0f, 1.0f, 0.0f, 0.5f}}},
     .expression_capabilities = MLN_PLUGIN_EXPRESSION_CAMERA,
     .supports_transitions = 1,
   },
@@ -703,7 +703,7 @@ static const char square_free_style_json[] =
   "\"layers\":[{\"id\":\"bg\",\"type\":\"background\","
   "\"paint\":{\"background-color\":\"#ff0000\"}},"
   "{\"id\":\"square\",\"type\":\"ffi-test-square-free\","
-  "\"paint\":{\"square-color\":\"#00ff00\",\"square-radius\":8}}]}";
+  "\"paint\":{\"square-radius\":8}}]}";
 
 #if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 
@@ -722,8 +722,9 @@ static void a_source_free_layer_renders_through_the_c_api(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
-  // The frame callback is synchronous, so the first rendered frame covers the
-  // center pixel and spares the corner, like the tile-driven square.
+  // The default square-color is translucent green, and the style leaves it
+  // unset. A premultiplied default composites to half green over the red
+  // background; a straight default would read nearly full green.
   static uint8_t pixels[64 * 64 * 4];
   bool square_rendered = false;
   for (unsigned int attempt = 0; attempt < 2000 && !square_rendered;
@@ -743,7 +744,7 @@ static void a_source_free_layer_renders_through_the_c_api(void) {
                        )
       );
       const uint8_t* center = pixels + ((32 * 64) + 32) * 4;
-      square_rendered = center[1] == 255;
+      square_rendered = center[1] > 100 && center[1] < 160;
     }
     if (!square_rendered) {
       mln_test_sleep_millisecond();
@@ -753,6 +754,10 @@ static void a_source_free_layer_renders_through_the_c_api(void) {
     square_rendered,
     "the source-free plugin layer never covered the center pixel"
   );
+  const uint8_t* center = pixels + ((32 * 64) + 32) * 4;
+  TEST_ASSERT_UINT8_WITHIN(8, 127, center[0]);
+  TEST_ASSERT_UINT8_WITHIN(8, 127, center[1]);
+  TEST_ASSERT_UINT8_WITHIN(8, 0, center[2]);
   TEST_ASSERT_EQUAL_UINT8(255, pixels[0]);
 
   mln_test_render_fixture_destroy(&fixture);
