@@ -222,7 +222,13 @@ pub fn translateCModule(b: *std.Build, options: TranslateCModuleOptions) *std.Bu
 
 fn maplibreNativeCHeader(b: *std.Build) std.Build.LazyPath {
     const header = b.addWriteFiles();
-    return header.add("maplibre_native_c_import.h", "#include <maplibre_native_c.h>\n");
+    // Layer plugin registration stays outside the umbrella header; see
+    // include/maplibre_native_c/plugin.h.
+    return header.add("maplibre_native_c_import.h",
+        \\#include <maplibre_native_c.h>
+        \\#include <maplibre_native_c/plugin.h>
+        \\
+    );
 }
 
 fn vulkanBindingsHeader(b: *std.Build) std.Build.LazyPath {
@@ -513,7 +519,11 @@ fn addMaplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Modu
 }
 
 fn defaultDocIncludeDirs(b: *std.Build) []const std.Build.LazyPath {
-    return &.{b.path("include")};
+    // The plugin header includes MapLibre Native's mln/plugin/plugin_api.h.
+    const include_dirs = b.allocator.alloc(std.Build.LazyPath, 2) catch @panic("out of memory");
+    include_dirs[0] = b.path("include");
+    include_dirs[1] = b.path("third_party/maplibre-native/include");
+    return include_dirs;
 }
 
 fn addMaplibreNativeDocs(
@@ -688,6 +698,7 @@ pub fn build(b: *std.Build) void {
     const maplibre_native_ffi = addMaplibreNativeModule(b, options);
 
     const test_sources = [_]std.Build.LazyPath{
+        b.path("bindings/zig/src/c.zig"),
         b.path("bindings/zig/src/status.zig"),
         b.path("bindings/zig/src/runtime.zig"),
         b.path("bindings/zig/src/logging.zig"),

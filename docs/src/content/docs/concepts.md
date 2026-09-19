@@ -123,6 +123,24 @@ Events report asynchronous failures, such as a style load, resource request, or
 still-image request that failed. Drain events in addition to checking call
 results.
 
+## Layer plugins
+
+MapLibre Native's plugin API lets native code add style layer types. A plugin
+declares paint properties and shaders for each render backend, lays out tile
+features into vertex data on tile workers, and fills uniform blocks on the
+render thread. The renderer owns the GPU resources and draws the result like any
+other layer, so a style names the layer type and sets its paint properties the
+same way it does for built-in layers.
+
+This library builds plugin support into its core and exports the registration
+entry point. A plugin registers once per process, before a style that uses its
+layer types loads. Registration retains the plugin's callbacks for the rest of
+the process, and those callbacks run on MapLibre's threads, so a plugin is
+native code that links this library directly. Language bindings carry the plugin
+declarations in their raw C layer and add no safe wrapper. The plugin API
+declares shaders for OpenGL, Vulkan, and Metal; a WebGPU build registers a
+plugin but has no shader path for its layers.
+
 ## Language bindings
 
 Language bindings preserve the runtime, map, render session, and event model in

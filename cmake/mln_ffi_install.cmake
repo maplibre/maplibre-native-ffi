@@ -258,6 +258,14 @@ function(mln_ffi_install_c_api_library target)
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}"
     FILES_MATCHING
     PATTERN "*.h")
+  # The contract behind include/maplibre_native_c/plugin.h and the exported
+  # mln_plugin_register_v1, kept at upstream's path so the header stays
+  # verbatim.
+  install(
+    FILES
+    "${PROJECT_SOURCE_DIR}/third_party/maplibre-native/include/mln/plugin/plugin_api.h"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/mln/plugin"
+    COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
   install(
     FILES "${PROJECT_SOURCE_DIR}/LICENSE"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/maplibre-native-c"
