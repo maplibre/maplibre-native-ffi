@@ -1481,11 +1481,11 @@ const property_descriptors = [_]c.mln_plugin_property_descriptor_v1{
     .{
         .struct_size = @sizeOf(c.mln_plugin_property_descriptor_v1),
         .name = str("position"),
-        .type = c.MLN_PLUGIN_VALUE_FLOAT2,
+        .type = c.MLN_PLUGIN_VALUE_DOUBLE2,
         .default_value = .{
             .struct_size = @sizeOf(c.mln_plugin_value),
-            .type = c.MLN_PLUGIN_VALUE_FLOAT2,
-            .data = .{ .float2_value = .{ .x = 0, .y = 0 } },
+            .type = c.MLN_PLUGIN_VALUE_DOUBLE2,
+            .data = .{ .double2_value = .{ .x = 0, .y = 0 } },
         },
         .expression_capabilities = camera_only_capabilities,
         .supports_transitions = 1,
@@ -1550,8 +1550,8 @@ const Frame = struct {
     accuracy_bindings: [4]c.mln_plugin_attribute_binding_v1,
     stream_bindings: [3]c.mln_plugin_attribute_binding_v1,
     stream: c.mln_plugin_vertex_stream_v1,
-    proj_matrix: [16]f32,
-    center: [2]f32,
+    proj_matrix: [16]f64,
+    center: [2]f64,
     bearing_dir: [2]f32,
 };
 
@@ -1602,8 +1602,8 @@ fn findFloat2(properties: []const c.mln_plugin_property_value_v1, comptime name:
         if (property.struct_size < @sizeOf(c.mln_plugin_property_value_v1)) continue;
         if (property.name.data == null or property.name.size != name.len) continue;
         if (!std.mem.eql(u8, property.name.data[0..name.len], name)) continue;
-        if (property.value.type != c.MLN_PLUGIN_VALUE_FLOAT2) continue;
-        return .{ property.value.data.float2_value.x, property.value.data.float2_value.y };
+        if (property.value.type != c.MLN_PLUGIN_VALUE_DOUBLE2) continue;
+        return .{ property.value.data.double2_value.x, property.value.data.double2_value.y };
     }
     return default;
 }
@@ -1664,8 +1664,8 @@ fn buildFrame(
     const accuracy_border_width = findFloat(props, "accuracy-border-width", 0);
 
     const center_mercator = projectMercator(ctx, position[0], position[1]);
-    for (&frame.proj_matrix, ctx.proj_matrix) |*dst, value| dst.* = @floatCast(value);
-    frame.center = .{ @floatCast(center_mercator[0]), @floatCast(center_mercator[1]) };
+    frame.proj_matrix = ctx.proj_matrix;
+    frame.center = center_mercator;
 
     // The on-screen bearing direction comes from projecting a second point
     // along the bearing, which keeps arrows and the sector honest under pitch.
@@ -1686,8 +1686,8 @@ fn buildFrame(
     // mirroring the vertex shader's epsilon projection.
     const px_per_unit = blk: {
         const m = frame.proj_matrix;
-        const cx: f32 = @floatCast(center_mercator[0]);
-        const cy: f32 = @floatCast(center_mercator[1]);
+        const cx = center_mercator[0];
+        const cy = center_mercator[1];
         const pw = m[3] * cx + m[7] * cy + m[15];
         const qw = pw + m[3];
         const p_ndc_x = (m[0] * cx + m[4] * cy + m[12]) / pw;
@@ -1858,7 +1858,9 @@ fn timeSeconds() f32 {
 }
 
 /// The frame projection translated to the puck center, matching the mercator
-/// offsets build_frame packs into the vertices.
+/// offsets build_frame packs into the vertices. The translate folds in f64:
+/// world-pixel magnitudes only become f32 after the fold, so nothing carries
+/// absolute coordinates at f32 precision.
 fn frameMatrix(frame: ?*const Frame) [16]f32 {
     const fallback_scale = 2.0 / 8192.0;
     const frame_state = frame orelse
@@ -1867,10 +1869,22 @@ fn frameMatrix(frame: ?*const Frame) [16]f32 {
     const cx = frame_state.center[0];
     const cy = frame_state.center[1];
     return .{
-        m[0],                          m[1],                          m[2],                          m[3],
-        m[4],                          m[5],                          m[6],                          m[7],
-        m[8],                          m[9],                          m[10],                         m[11],
-        m[0] * cx + m[4] * cy + m[12], m[1] * cx + m[5] * cy + m[13], m[2] * cx + m[6] * cy + m[14], m[3] * cx + m[7] * cy + m[15],
+        @floatCast(m[0]),
+        @floatCast(m[1]),
+        @floatCast(m[2]),
+        @floatCast(m[3]),
+        @floatCast(m[4]),
+        @floatCast(m[5]),
+        @floatCast(m[6]),
+        @floatCast(m[7]),
+        @floatCast(m[8]),
+        @floatCast(m[9]),
+        @floatCast(m[10]),
+        @floatCast(m[11]),
+        @floatCast(m[0] * cx + m[4] * cy + m[12]),
+        @floatCast(m[1] * cx + m[5] * cy + m[13]),
+        @floatCast(m[2] * cx + m[6] * cy + m[14]),
+        @floatCast(m[3] * cx + m[7] * cy + m[15]),
     };
 }
 

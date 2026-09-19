@@ -1,8 +1,37 @@
 diff --git a/include/mln/plugin/plugin_api.h b/include/mln/plugin/plugin_api.h
-index 7fe5fee371c..26929f8aa71 100644
+index 7fe5fee371c..80db38ef804 100644
 --- a/include/mln/plugin/plugin_api.h
 +++ b/include/mln/plugin/plugin_api.h
-@@ -433,6 +435,75 @@ typedef float (*mln_plugin_query_radius_fn)(const mln_plugin_property_statistics
+@@ -65,6 +65,8 @@ typedef enum mln_plugin_value_type {
+     MLN_PLUGIN_VALUE_FLOAT2 = 2,
+     MLN_PLUGIN_VALUE_COLOR = 3,
+     MLN_PLUGIN_VALUE_STRING = 4,
++    /* Two doubles, for properties that carry geographic coordinates. */
++    MLN_PLUGIN_VALUE_DOUBLE2 = 5,
+ } mln_plugin_value_type;
+ 
+ /* Expression dependencies accepted by a plugin property. */
+@@ -94,6 +96,11 @@ typedef struct mln_plugin_float2 {
+     float y;
+ } mln_plugin_float2;
+ 
++typedef struct mln_plugin_double2 {
++    double x;
++    double y;
++} mln_plugin_double2;
++
+ typedef struct mln_plugin_color {
+     float r;
+     float g;
+@@ -104,6 +111,7 @@ typedef struct mln_plugin_color {
+ typedef union mln_plugin_value_data {
+     float float_value;
+     mln_plugin_float2 float2_value;
++    mln_plugin_double2 double2_value;
+     mln_plugin_color color_value;
+     mln_plugin_string string_value;
+ } mln_plugin_value_data;
+@@ -433,6 +441,75 @@ typedef float (*mln_plugin_query_radius_fn)(const mln_plugin_property_statistics
   * maps. */
  typedef uint8_t (*mln_plugin_should_animate_fn)(const mln_plugin_property_value_v1* properties, size_t property_count);
  
@@ -78,7 +107,7 @@ index 7fe5fee371c..26929f8aa71 100644
  typedef struct mln_plugin_layer_type_v1 {
      uint32_t struct_size;
      mln_plugin_string layer_type;
-@@ -450,6 +521,16 @@ typedef struct mln_plugin_layer_type_v1 {
+@@ -450,6 +527,16 @@ typedef struct mln_plugin_layer_type_v1 {
      mln_plugin_update_uniform_block_fn update_uniform_block;
      mln_plugin_query_radius_fn get_query_radius;
      mln_plugin_should_animate_fn should_animate;
@@ -96,10 +125,29 @@ index 7fe5fee371c..26929f8aa71 100644
  
  typedef struct mln_plugin_descriptor_v1 {
 diff --git a/src/mln/plugin/plugin_registry.cpp b/src/mln/plugin/plugin_registry.cpp
-index 9c53679bc92..3f210c110b4 100644
+index 9c53679bc92..3f4225ad4d3 100644
 --- a/src/mln/plugin/plugin_registry.cpp
 +++ b/src/mln/plugin/plugin_registry.cpp
-@@ -436,12 +436,25 @@ mln_plugin_status PluginRegistry::registerPlugin(const mln_plugin_descriptor_v1&
+@@ -25,6 +25,8 @@ Value copyValue(const mln_plugin_value& value) {
+         case MLN_PLUGIN_VALUE_FLOAT2:
+             return Value{mapbox::base::ValueArray{static_cast<double>(value.data.float2_value.x),
+                                                   static_cast<double>(value.data.float2_value.y)}};
++        case MLN_PLUGIN_VALUE_DOUBLE2:
++            return Value{mapbox::base::ValueArray{value.data.double2_value.x, value.data.double2_value.y}};
+         case MLN_PLUGIN_VALUE_COLOR:
+             return Value{mapbox::base::ValueArray{static_cast<double>(value.data.color_value.r),
+                                                   static_cast<double>(value.data.color_value.g),
+@@ -334,7 +336,8 @@ bool appendProperties(const mln_plugin_property_descriptor_v1* properties,
+         }
+         const bool transitionableType = property.type == MLN_PLUGIN_VALUE_FLOAT ||
+                                         property.type == MLN_PLUGIN_VALUE_FLOAT2 ||
+-                                        property.type == MLN_PLUGIN_VALUE_COLOR;
++                                        property.type == MLN_PLUGIN_VALUE_COLOR ||
++                                        property.type == MLN_PLUGIN_VALUE_DOUBLE2;
+         if (property.supports_transitions && !transitionableType) {
+             error = "plugin transitions require an interpolatable paint property";
+             return false;
+@@ -436,12 +439,25 @@ mln_plugin_status PluginRegistry::registerPlugin(const mln_plugin_descriptor_v1&
              error = "plugin layer type is malformed or has no supported backend";
              return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
          }
@@ -128,7 +176,7 @@ index 9c53679bc92..3f210c110b4 100644
          const auto type = copyString(layerType.layer_type);
          if (!layerTypeKeys.emplace(type).second) {
              error = "plugin descriptor contains duplicate layer types";
-@@ -460,6 +473,8 @@ mln_plugin_status PluginRegistry::registerPlugin(const mln_plugin_descriptor_v1&
+@@ -460,6 +476,8 @@ mln_plugin_status PluginRegistry::registerPlugin(const mln_plugin_descriptor_v1&
          copiedLayerType.queryRadius = layerType.get_query_radius;
          copiedLayerType.updateUniformBlock = layerType.update_uniform_block;
          copiedLayerType.shouldAnimate = layerType.should_animate;
@@ -137,7 +185,7 @@ index 9c53679bc92..3f210c110b4 100644
          if (!appendShaders(pluginID,
                             layerType.shaders,
                             layerType.shader_count,
-@@ -501,6 +516,10 @@ mln_plugin_status PluginRegistry::registerPlugin(const mln_plugin_descriptor_v1&
+@@ -501,6 +519,10 @@ mln_plugin_status PluginRegistry::registerPlugin(const mln_plugin_descriptor_v1&
          for (const auto& property : copiedLayerType.properties) {
              const auto dataDependencies = MLN_PLUGIN_EXPRESSION_FEATURE | MLN_PLUGIN_EXPRESSION_COMPOSITE |
                                            MLN_PLUGIN_EXPRESSION_FEATURE_STATE;
@@ -148,6 +196,18 @@ index 9c53679bc92..3f210c110b4 100644
              if ((property.expressionCapabilities & dataDependencies) == 0) continue;
              const bool bound = std::any_of(
                  copiedLayerType.shaders.begin(), copiedLayerType.shaders.end(), [&](const auto& shader) {
+@@ -577,9 +599,10 @@ bool PluginRegistry::valueMatches(mln_plugin_value_type type, const Value& value
+         case MLN_PLUGIN_VALUE_STRING:
+             return value.getString() != nullptr;
+         case MLN_PLUGIN_VALUE_FLOAT2:
++        case MLN_PLUGIN_VALUE_DOUBLE2:
+         case MLN_PLUGIN_VALUE_COLOR: {
+             const auto* array = value.getArray();
+-            const auto size = type == MLN_PLUGIN_VALUE_FLOAT2 ? 2u : 4u;
++            const auto size = type == MLN_PLUGIN_VALUE_COLOR ? 4u : 2u;
+             return array && array->size() == size && std::all_of(array->begin(), array->end(), [](const auto& item) {
+                        return item.getDouble() || item.getInt() || item.getUint();
+                    });
 diff --git a/src/mln/plugin/plugin_registry.hpp b/src/mln/plugin/plugin_registry.hpp
 index 12b80907cfc..8f7b5574434 100644
 --- a/src/mln/plugin/plugin_registry.hpp
@@ -615,3 +675,116 @@ index 52d79447b6e..04c21aa8e8d 100644
  };
  
  } // namespace mln
+diff --git a/src/mln/style/conversion/constant.cpp b/src/mln/style/conversion/constant.cpp
+index 880b0d15c37..752712b3403 100644
+--- a/src/mln/style/conversion/constant.cpp
++++ b/src/mln/style/conversion/constant.cpp
+@@ -229,6 +229,8 @@ std::optional<std::array<float, N>> Converter<std::array<float, N>>::operator()(
+     return result;
+ }
+ 
++template std::optional<std::array<double, 2>> Converter<std::array<double, 2>>::operator()(const Convertible&,
++                                                                                            Error&) const;
+ template std::optional<std::array<float, 2>> Converter<std::array<float, 2>>::operator()(const Convertible&,
+                                                                                          Error&) const;
+ template std::optional<std::array<float, 3>> Converter<std::array<float, 3>>::operator()(const Convertible&,
+diff --git a/src/mln/style/conversion/function.cpp b/src/mln/style/conversion/function.cpp
+index faaf2f928ca..8bf31713857 100644
+--- a/src/mln/style/conversion/function.cpp
++++ b/src/mln/style/conversion/function.cpp
+@@ -142,6 +142,8 @@ template std::optional<PropertyExpression<Position>> convertFunctionToExpression
+                                                                                            bool);
+ template std::optional<PropertyExpression<RasterResamplingType>> convertFunctionToExpression<RasterResamplingType>(
+     const Convertible&, Error&, bool);
++template std::optional<PropertyExpression<std::array<double, 2>>> convertFunctionToExpression<std::array<double, 2>>(
++    const Convertible&, Error&, bool);
+ template std::optional<PropertyExpression<std::array<float, 2>>> convertFunctionToExpression<std::array<float, 2>>(
+     const Convertible&, Error&, bool);
+ template std::optional<PropertyExpression<std::array<float, 4>>> convertFunctionToExpression<std::array<float, 4>>(
+diff --git a/src/mln/style/conversion/property_value.cpp b/src/mln/style/conversion/property_value.cpp
+index b145e360813..2d457cd3403 100644
+--- a/src/mln/style/conversion/property_value.cpp
++++ b/src/mln/style/conversion/property_value.cpp
+@@ -71,6 +71,8 @@ template std::optional<PropertyValue<float>> Converter<PropertyValue<float>>::op
+                                                                                          bool) const;
+ template std::optional<PropertyValue<std::array<float, 2>>> Converter<PropertyValue<std::array<float, 2>>>::operator()(
+     conversion::Convertible const&, conversion::Error&, bool, bool) const;
++template std::optional<PropertyValue<std::array<double, 2>>> Converter<PropertyValue<std::array<double, 2>>>::operator()(
++    conversion::Convertible const&, conversion::Error&, bool, bool) const;
+ template std::optional<PropertyValue<std::array<float, 4>>> Converter<PropertyValue<std::array<float, 4>>>::operator()(
+     conversion::Convertible const&, conversion::Error&, bool, bool) const;
+ template std::optional<PropertyValue<std::vector<float>>> Converter<PropertyValue<std::vector<float>>>::operator()(
+diff --git a/src/mln/style/expression/value.cpp b/src/mln/style/expression/value.cpp
+index 644235ae178..fd1d348456c 100644
+--- a/src/mln/style/expression/value.cpp
++++ b/src/mln/style/expression/value.cpp
+@@ -367,6 +367,10 @@ template type::Type valueTypeToExpressionType<Rotation>();
+ template type::Type valueTypeToExpressionType<std::array<float, 2>>();
+ template struct ValueConverter<std::array<float, 2>>;
+ 
++// plugin properties carrying geographic coordinates
++template type::Type valueTypeToExpressionType<std::array<double, 2>>();
++template struct ValueConverter<std::array<double, 2>>;
++
+ template type::Type valueTypeToExpressionType<std::array<float, 4>>();
+ template struct ValueConverter<std::array<float, 4>>;
+ 
+diff --git a/src/mln/style/plugin_property.cpp b/src/mln/style/plugin_property.cpp
+index 3e9185c9ba3..413324f98d0 100644
+--- a/src/mln/style/plugin_property.cpp
++++ b/src/mln/style/plugin_property.cpp
+@@ -69,6 +69,15 @@ std::array<float, 2> defaultValue<std::array<float, 2>>(const plugin::PropertyDe
+     return result;
+ }
+ 
++template <>
++std::array<double, 2> defaultValue<std::array<double, 2>>(const plugin::PropertyDefinition& definition) {
++    std::array<double, 2> result{};
++    if (const auto* array = definition.defaultValue.getArray(); array && array->size() == result.size()) {
++        for (size_t i = 0; i < result.size(); ++i) result[i] = numericValue<double>((*array)[i]).value_or(0.0);
++    }
++    return result;
++}
++
+ template <>
+ Color defaultValue<Color>(const plugin::PropertyDefinition& definition) {
+     std::array<float, 4> result{};
+@@ -92,6 +101,8 @@ auto withPropertyType(mln_plugin_value_type type, Fn&& fn) {
+             return fn.template operator()<float>();
+         case MLN_PLUGIN_VALUE_FLOAT2:
+             return fn.template operator()<std::array<float, 2>>();
++        case MLN_PLUGIN_VALUE_DOUBLE2:
++            return fn.template operator()<std::array<double, 2>>();
+         case MLN_PLUGIN_VALUE_COLOR:
+             return fn.template operator()<Color>();
+         case MLN_PLUGIN_VALUE_STRING:
+@@ -120,6 +131,9 @@ mln_plugin_value toPluginValue(const T& value, PluginPropertyValue::EvaluationSt
+     } else if constexpr (std::is_same_v<T, std::array<float, 2>>) {
+         result.type = MLN_PLUGIN_VALUE_FLOAT2;
+         result.data.float2_value = {value[0], value[1]};
++    } else if constexpr (std::is_same_v<T, std::array<double, 2>>) {
++        result.type = MLN_PLUGIN_VALUE_DOUBLE2;
++        result.data.double2_value = {value[0], value[1]};
+     } else if constexpr (std::is_same_v<T, Color>) {
+         result.type = MLN_PLUGIN_VALUE_COLOR;
+         result.data.color_value = {value.r, value.g, value.b, value.a};
+diff --git a/src/mln/style/plugin_property.hpp b/src/mln/style/plugin_property.hpp
+index 7c11ee74405..ebeca5e849c 100644
+--- a/src/mln/style/plugin_property.hpp
++++ b/src/mln/style/plugin_property.hpp
+@@ -29,6 +29,7 @@ class PluginPropertyValue {
+ public:
+     using TypedValue = std::variant<PropertyValue<float>,
+                                     PropertyValue<std::array<float, 2>>,
++                                    PropertyValue<std::array<double, 2>>,
+                                     PropertyValue<Color>,
+                                     PropertyValue<std::string>>;
+ 
+@@ -83,6 +84,7 @@ public:
+ private:
+     using TypedValue = std::variant<Transitioning<PropertyValue<float>>,
+                                     Transitioning<PropertyValue<std::array<float, 2>>>,
++                                    Transitioning<PropertyValue<std::array<double, 2>>>,
+                                     Transitioning<PropertyValue<Color>>,
+                                     Transitioning<PropertyValue<std::string>>>;
+     TypedValue value;

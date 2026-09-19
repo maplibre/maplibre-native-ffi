@@ -1,10 +1,10 @@
 diff --git a/include/mln/plugin/plugin_api.h b/include/mln/plugin/plugin_api.h
-index 7fe5fee371c..26929f8aa71 100644
+index 80db38ef804..9fec4636270 100644
 --- a/include/mln/plugin/plugin_api.h
 +++ b/include/mln/plugin/plugin_api.h
-@@ -94,6 +94,8 @@ typedef struct mln_plugin_float2 {
-     float y;
- } mln_plugin_float2;
+@@ -101,6 +101,8 @@ typedef struct mln_plugin_double2 {
+     double y;
+ } mln_plugin_double2;
  
 +/* Straight-alpha color. The host premultiplies registered defaults when it
 + * adopts them into the style system. */
@@ -12,10 +12,10 @@ index 7fe5fee371c..26929f8aa71 100644
      float r;
      float g;
 diff --git a/src/mln/style/plugin_property.cpp b/src/mln/style/plugin_property.cpp
-index 3e9185c9ba3..2577496c245 100644
+index 413324f98d0..1fa0128d16a 100644
 --- a/src/mln/style/plugin_property.cpp
 +++ b/src/mln/style/plugin_property.cpp
-@@ -75,7 +75,8 @@ Color defaultValue<Color>(const plugin::PropertyDefinition& definition) {
+@@ -84,7 +84,8 @@ Color defaultValue<Color>(const plugin::PropertyDefinition& definition) {
      if (const auto* array = definition.defaultValue.getArray(); array && array->size() == result.size()) {
          for (size_t i = 0; i < result.size(); ++i) result[i] = numericValue<float>((*array)[i]).value_or(0.0f);
      }
