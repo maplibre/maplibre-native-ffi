@@ -126,13 +126,21 @@ every rendered frame while the animation is on. Upstream:
 [maplibre-native#4654](https://github.com/maplibre/maplibre-native/pull/4654),
 at commit `c9346eed9c732115bfcae1f4cb64edb2ad4f6550`.
 
-`0023-source-free-plugin-layers.patch` adds an optional `requires_source` flag
-and a `build_frame` callback to the plugin layer ABI. A source-free layer takes
-no source in the style, skips tile layout, and instead receives its geometry
-from the callback on every rendered frame, drawing through the same shaders and
-uniform tweaker as tile-driven layers. Source-free layers cannot declare
-data-driven properties and receive no feature hit-testing. This patch is
-local-only: it is not upstreamed, and no upstream PR exists.
+`0023-source-free-plugin-layers.patch` adds an optional `source_free` flag and a
+`build_frame` callback to the plugin layer ABI. A source-free layer takes no
+source in the style, skips tile layout, and instead receives its geometry from
+the callback on every rendered frame, drawing through the same shaders and
+uniform tweaker as tile-driven layers. The frame context carries the
+camera-evaluated paint values, a y-down screen projection, a mercator world
+projection, a ground-offset destination helper, and the frame's full projection
+matrix. Source-free layers cannot declare data-driven properties and receive no
+feature hit-testing. This patch is local-only: it is not upstreamed, and no
+upstream PR exists.
+
+`0024-premultiply-plugin-default-colors.patch` premultiplies registered plugin
+default colors when they are adopted into the style system, matching the
+premultiplied-alpha `Color` invariant that style-parsed colors already honor.
+This patch is local-only: it is not upstreamed, and no upstream PR exists.
 
 Each patch is the squashed diff of its upstream branch, applied on top of the
 patches before it, so a patch that adds a test next to an earlier patch's test

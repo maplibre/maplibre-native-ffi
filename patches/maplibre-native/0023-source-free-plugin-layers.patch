@@ -1,8 +1,8 @@
 diff --git a/include/mln/plugin/plugin_api.h b/include/mln/plugin/plugin_api.h
-index 7fe5fee371c..8b73d3d991d 100644
+index 7fe5fee371c..26929f8aa71 100644
 --- a/include/mln/plugin/plugin_api.h
 +++ b/include/mln/plugin/plugin_api.h
-@@ -433,6 +433,52 @@ typedef float (*mln_plugin_query_radius_fn)(const mln_plugin_property_statistics
+@@ -433,6 +435,75 @@ typedef float (*mln_plugin_query_radius_fn)(const mln_plugin_property_statistics
   * maps. */
  typedef uint8_t (*mln_plugin_should_animate_fn)(const mln_plugin_property_value_v1* properties, size_t property_count);
  
@@ -13,10 +13,28 @@ index 7fe5fee371c..8b73d3d991d 100644
 +struct mln_plugin_frame_context_v1;
 +
 +/* Maps a latitude/longitude to logical screen pixels, with y growing
-+ * downward. The function and the context's project_state storage are borrowed
++ * downward, unwrapping the longitude for the shortest path from the camera
++ * center. The function and the context's project_state storage are borrowed
 + * for the duration of build_frame. */
 +typedef void (*mln_plugin_project_screen_fn)(
 +    const struct mln_plugin_frame_context_v1* context, double latitude, double longitude, double* out_x, double* out_y);
++
++/* Maps a latitude/longitude to mercator world pixels, unwrapping the
++ * longitude for the shortest path from the camera center. Borrowed for the
++ * duration of build_frame. */
++typedef void (*mln_plugin_project_mercator_fn)(
++    const struct mln_plugin_frame_context_v1* context, double latitude, double longitude, double* out_x, double* out_y);
++
++/* Resolves a ground offset to a geographic position: the position reached by
++ * moving distance_meters from (latitude, longitude) along bearing_deg degrees
++ * clockwise from north. Borrowed for the duration of build_frame. */
++typedef void (*mln_plugin_destination_fn)(const struct mln_plugin_frame_context_v1* context,
++                                          double latitude,
++                                          double longitude,
++                                          double distance_meters,
++                                          double bearing_deg,
++                                          double* out_latitude,
++                                          double* out_longitude);
 +
 +/* Borrowed per-frame inputs for a source-free layer's frame callback. All
 + * pointers and nested storage are valid only for the duration of the
@@ -39,9 +57,14 @@ index 7fe5fee371c..8b73d3d991d 100644
 +    float pixel_ratio;
 +    /* NDC units per logical pixel, matching the uniform context. */
 +    float pixels_to_gl_units[2];
-+    /* Opaque host storage for project_screen. */
++    /* Opaque host storage for the projection helpers. */
 +    const void* project_state;
 +    mln_plugin_project_screen_fn project_screen;
++    /* This frame's projection matrix: mercator world pixels to clip space,
++     * with pitch, bearing, roll, viewport mode, and insets applied. */
++    double proj_matrix[16];
++    mln_plugin_project_mercator_fn project_mercator;
++    mln_plugin_destination_fn destination;
 +} mln_plugin_frame_context_v1;
 +
 +/* Per-frame geometry for a source-free layer, called on a render thread once
@@ -55,7 +78,7 @@ index 7fe5fee371c..8b73d3d991d 100644
  typedef struct mln_plugin_layer_type_v1 {
      uint32_t struct_size;
      mln_plugin_string layer_type;
-@@ -450,6 +496,16 @@ typedef struct mln_plugin_layer_type_v1 {
+@@ -450,6 +521,16 @@ typedef struct mln_plugin_layer_type_v1 {
      mln_plugin_update_uniform_block_fn update_uniform_block;
      mln_plugin_query_radius_fn get_query_radius;
      mln_plugin_should_animate_fn should_animate;
@@ -176,10 +199,10 @@ index b04ffd4adbf..07691347a12 100644
  
  std::unique_ptr<RenderLayer> PluginStyleLayerFactory::createRenderLayer(Immutable<style::Layer::Impl> impl) noexcept {
 diff --git a/src/mln/renderer/layers/render_plugin_style_layer.cpp b/src/mln/renderer/layers/render_plugin_style_layer.cpp
-index b6e4161ab39..a76bf625065 100644
+index b6e4161ab39..697863d291d 100644
 --- a/src/mln/renderer/layers/render_plugin_style_layer.cpp
 +++ b/src/mln/renderer/layers/render_plugin_style_layer.cpp
-@@ -16,13 +16,17 @@
+@@ -16,13 +16,20 @@
  #include <mln/renderer/layer_group.hpp>
  #include <mln/renderer/layers/plugin_layer_tweaker.hpp>
  #include <mln/renderer/render_static_data.hpp>
@@ -191,13 +214,16 @@ index b6e4161ab39..a76bf625065 100644
  #include <mln/shaders/shader_program_base.hpp>
  #include <mln/style/plugin_property.hpp>
 +#include <mln/util/logging.hpp>
++#include <mln/util/projection.hpp>
  
++#include <mapbox/cheap_ruler.hpp>
++
 +#include <chrono>
 +#include <cstring>
  #include <set>
  
  namespace mln {
-@@ -32,8 +36,20 @@ const style::PluginStyleLayer::Impl& pluginImpl(const Immutable<style::Layer::Im
+@@ -32,8 +39,51 @@ const style::PluginStyleLayer::Impl& pluginImpl(const Immutable<style::Layer::Im
      return static_cast<const style::PluginStyleLayer::Impl&>(*impl);
  }
  
@@ -206,9 +232,40 @@ index b6e4161ab39..a76bf625065 100644
 +    if (!context || !outX || !outY) return;
 +    const auto* state = static_cast<const TransformState*>(context->project_state);
 +    if (!state) return;
-+    const auto coordinate = state->latLngToScreenCoordinate(LatLng(latitude, longitude));
++    // The ABI promises y-down logical pixels with antimeridian unwrapping;
++    // latLngToScreenCoordinate returns wrapped y-up.
++    auto unwrapped = LatLng(latitude, longitude).wrapped();
++    unwrapped.unwrapForShortestPath(state->getLatLng(LatLng::Wrapped));
++    const auto coordinate = state->latLngToScreenCoordinate(unwrapped);
 +    *outX = coordinate.x;
-+    *outY = coordinate.y;
++    *outY = state->getSize().height - coordinate.y;
++}
++
++void projectToMercatorPixels(
++    const mln_plugin_frame_context_v1* context, double latitude, double longitude, double* outX, double* outY) {
++    if (!context || !outX || !outY) return;
++    const auto* state = static_cast<const TransformState*>(context->project_state);
++    if (!state) return;
++    auto unwrapped = LatLng(latitude, longitude).wrapped();
++    unwrapped.unwrapForShortestPath(state->getLatLng(LatLng::Wrapped));
++    const auto point = Projection::project(unwrapped, state->getScale());
++    *outX = point.x;
++    *outY = point.y;
++}
++
++void destinationToLatLng(const mln_plugin_frame_context_v1* context,
++                         double latitude,
++                         double longitude,
++                         double distance_meters,
++                         double bearing_deg,
++                         double* out_latitude,
++                         double* out_longitude) {
++    if (!out_latitude || !out_longitude) return;
++    (void)context;
++    const mapbox::cheap_ruler::CheapRuler ruler(latitude, mapbox::cheap_ruler::CheapRuler::Meters);
++    const auto point = ruler.destination(mapbox::cheap_ruler::point(longitude, latitude), distance_meters, bearing_deg);
++    *out_latitude = point.y;
++    *out_longitude = point.x;
 +}
 +
  } // namespace
@@ -218,7 +275,7 @@ index b6e4161ab39..a76bf625065 100644
  RenderPluginStyleLayer::RenderPluginStyleLayer(Immutable<style::PluginStyleLayer::Impl> impl)
      : RenderLayer(makeMutable<style::PluginStyleLayerProperties>(std::move(impl))) {
      // Unlike generated layers, a plugin layer has no generated evaluated
-@@ -142,14 +158,26 @@ void RenderPluginStyleLayer::layerChanged(const TransitionParameters&,
+@@ -142,14 +192,26 @@ void RenderPluginStyleLayer::layerChanged(const TransitionParameters&,
      // drawable whose geometry actually changed.
  }
  
@@ -246,7 +303,7 @@ index b6e4161ab39..a76bf625065 100644
      if (!renderTiles || renderTiles->empty()) {
          removeAllDrawables();
          return;
-@@ -259,6 +287,243 @@ void RenderPluginStyleLayer::update(gfx::ShaderRegistry& shaders,
+@@ -259,6 +321,248 @@ void RenderPluginStyleLayer::update(gfx::ShaderRegistry& shaders,
      }
  }
  
@@ -317,6 +374,11 @@ index b6e4161ab39..a76bf625065 100644
 +    frameContext.pixels_to_gl_units[1] = parameters.pixelsToGLUnits[1];
 +    frameContext.project_state = &state;
 +    frameContext.project_screen = &projectScreenToPixels;
++    mat4 projMatrix;
++    state.getProjMatrix(projMatrix);
++    std::copy(projMatrix.begin(), projMatrix.end(), frameContext.proj_matrix);
++    frameContext.project_mercator = &projectToMercatorPixels;
++    frameContext.destination = &destinationToLatLng;
 +
 +    mln_plugin_bucket_v1 output{};
 +    output.struct_size = sizeof(output);
@@ -490,7 +552,7 @@ index b6e4161ab39..a76bf625065 100644
  bool RenderPluginStyleLayer::queryIntersectsFeature(const GeometryCoordinates& queryGeometry,
                                                      const GeometryTileFeature& feature,
                                                      float zoom,
-@@ -267,7 +532,9 @@ bool RenderPluginStyleLayer::queryIntersectsFeature(const GeometryCoordinates& q
+@@ -267,7 +571,9 @@ bool RenderPluginStyleLayer::queryIntersectsFeature(const GeometryCoordinates& q
                                                      const mat4& tileMatrix,
                                                      const FeatureState& featureState) const {
      const auto& registration = pluginImpl(baseImpl).registration;

@@ -475,21 +475,19 @@ fn accuracyVertexGlsl(comptime backend: GLSL) []const u8 {
         glslOut(backend, 1, "vec4", "v_fill") ++
         glslOut(backend, 2, "vec4", "v_border") ++
         glslOut(backend, 3, "float", "v_radius_px") ++
-        glslOut(backend, 4, "float", "v_border_w") ++
         "void main() {\n" ++
         glslEvalFloat("accuracy_radius", "a_accuracy_radius", "accuracy_radius", "accuracy_radius_t", "accuracy-radius") ++
         glslEvalFloat("accuracy_border_width", "a_accuracy_border_width", "accuracy_border_width", "accuracy_border_width_t", "accuracy-border-width") ++
         glslEvalColor("vec4", "accuracy_color", "a_accuracy_color_min", "a_accuracy_color_max", "accuracy_color", "accuracy_color_t", "accuracy-color") ++
         glslEvalColor("vec4", "accuracy_border_color", "a_accuracy_border_color_min", "a_accuracy_border_color_max", "accuracy_border_color", "accuracy_border_color_t", "accuracy-border-color") ++
         glslVertexPrologue(backend) ++
-        "    float acc_px = accuracy_radius * px_per_unit / max(a_scale, 1e-6);\n" ++
-        "    float half_px = acc_px + accuracy_border_width + 1.5;\n" ++
-        glslVertexEpilogue(backend) ++
-        "    v_px = corner * half_px;\n" ++
+        "    gl_Position = p;\n" ++
+        glslPinDepth(backend) ++
+        (if (backend == .vulkan) "    applySurfaceTransform();\n" else "") ++
+        "    v_px = corner;\n" ++
         "    v_fill = accuracy_color;\n" ++
         "    v_border = accuracy_border_color;\n" ++
-        "    v_radius_px = acc_px;\n" ++
-        "    v_border_w = accuracy_border_width;\n" ++
+        "    v_radius_px = accuracy_radius * px_per_unit / max(a_scale, 1e-6);\n" ++
         "}\n";
 }
 
@@ -498,15 +496,12 @@ fn accuracyFragmentGlsl(comptime backend: GLSL) []const u8 {
         glslIn(backend, 1, "vec4", "v_fill") ++
         glslIn(backend, 2, "vec4", "v_border") ++
         glslIn(backend, 3, "float", "v_radius_px") ++
-        glslIn(backend, 4, "float", "v_border_w") ++
         (if (backend == .vulkan) "layout(location = 0) out vec4 fragColor;\n" else "") ++
         "void main() {\n" ++
-        "    float d = length(v_px);\n" ++
-        "    float edge = 1.0 - smoothstep(v_radius_px - 0.5, v_radius_px + 0.5, d);\n" ++
-        "    float ring = smoothstep(v_radius_px - v_border_w - 0.5, v_radius_px - v_border_w + 0.5, d);\n" ++
-        "    vec4 color = mix(v_fill, v_border, ring) * edge;\n" ++
-        "    color *= smoothstep(0.0, 1.0, v_radius_px + v_border_w);\n" ++
-        "    fragColor = color;\n" ++
+        // v_px carries the fill (-1) or border (+1) flag from the packed
+        // corner slot; the fan and strip antialias by geometry density.
+        "    float gate = smoothstep(0.0, 1.0, v_radius_px);\n" ++
+        "    fragColor = mix(v_fill, v_border, step(0.0, v_px.x)) * gate;\n" ++
         "}\n";
 }
 
@@ -535,8 +530,7 @@ fn sectorVertexGlsl(comptime backend: GLSL) []const u8 {
         glslVertexPrologue(backend) ++
         "    float half_px = bearing_accuracy_radius + 1.5;\n" ++
         glslVertexEpilogue(backend) ++
-        "    float bearing_rel = radians(bearing) + u.frame.x;\n" ++
-        "    v_dir = vec2(sin(bearing_rel), cos(bearing_rel) * sign(u.camera.y));\n" ++
+        "    v_dir = u.frame.zw;\n" ++
         "    v_half_width = radians(bearing_accuracy);\n" ++
         "    v_radius = bearing_accuracy_radius;\n" ++
         "    v_visible = bearing_visible;\n" ++
@@ -673,8 +667,7 @@ fn arrowVertexGlsl(comptime backend: GLSL) []const u8 {
         "    float outer = puck_radius + puck_border_width;\n" ++
         "    float half_px = outer * 1.8 + 1.5;\n" ++
         glslVertexEpilogue(backend) ++
-        "    float bearing_rel = radians(bearing) + u.frame.x;\n" ++
-        "    v_dir = vec2(sin(bearing_rel), cos(bearing_rel) * sign(u.camera.y));\n" ++
+        "    v_dir = u.frame.zw;\n" ++
         "    v_color = bearing_arrow_color;\n" ++
         "    v_outer = outer;\n" ++
         "    v_visible = bearing_visible;\n" ++
@@ -831,7 +824,6 @@ const accuracy_metal_source =
     "    float4 fill;\n" ++
     "    float4 border;\n" ++
     "    float radius_px;\n" ++
-    "    float border_w;\n" ++
     "};\n" ++
     "vertex AccuracyVaryings accuracyVertex(AccuracyVertex in [[stage_in]],\n" ++
     "    constant AccuracyUBO& u [[buffer(MLN_PLUGIN_UNIFORM_" ++ num(accuracy_uniform_id) ++ "_BINDING)]]) {\n" ++
@@ -843,23 +835,17 @@ const accuracy_metal_source =
     "    float2 encoded = float2(in.a_pos);\n" ++
     msl_transition ++
     msl_project ++
-    "    float acc_px = accuracy_radius * px_per_unit / max(in.a_scale, 1e-6);\n" ++
-    "    float half_px = acc_px + accuracy_border_width + 1.5;\n" ++
-    msl_emit ++
-    "    out.px = corner * half_px;\n" ++
+    "    out.position = p;\n" ++
+    "    out.position.z = 0.0;\n" ++
+    "    out.px = corner;\n" ++
     "    out.fill = accuracy_color;\n" ++
     "    out.border = accuracy_border_color;\n" ++
-    "    out.radius_px = acc_px;\n" ++
-    "    out.border_w = accuracy_border_width;\n" ++
+    "    out.radius_px = accuracy_radius * px_per_unit / max(in.a_scale, 1e-6);\n" ++
     "    return out;\n" ++
     "}\n" ++
     "fragment half4 accuracyFragment(AccuracyVaryings in [[stage_in]]) {\n" ++
-    "    float d = length(in.px);\n" ++
-    "    float edge = 1.0 - smoothstep(in.radius_px - 0.5, in.radius_px + 0.5, d);\n" ++
-    "    float ring = smoothstep(in.radius_px - in.border_w - 0.5, in.radius_px - in.border_w + 0.5, d);\n" ++
-    "    float4 color = mix(in.fill, in.border, ring) * edge;\n" ++
-    "    color *= smoothstep(0.0, 1.0, in.radius_px + in.border_w);\n" ++
-    "    return half4(color);\n" ++
+    "    float gate = smoothstep(0.0, 1.0, in.radius_px);\n" ++
+    "    return half4(mix(in.fill, in.border, step(0.0, in.px.x)) * gate);\n" ++
     "}\n";
 
 const sector_metal_source =
@@ -896,8 +882,7 @@ const sector_metal_source =
     msl_project ++
     "    float half_px = bearing_accuracy_radius + 1.5;\n" ++
     msl_emit ++
-    "    float bearing_rel = radians(bearing) + u.frame.x;\n" ++
-    "    out.dir = float2(sin(bearing_rel), cos(bearing_rel) * sign(u.camera.y));\n" ++
+    "    out.dir = u.frame.zw;\n" ++
     "    out.half_width = radians(bearing_accuracy);\n" ++
     "    out.radius = bearing_accuracy_radius;\n" ++
     "    out.visible = bearing_visible;\n" ++
@@ -1033,8 +1018,7 @@ const arrow_metal_source =
     "    float outer = puck_radius + puck_border_width;\n" ++
     "    float half_px = outer * 1.8 + 1.5;\n" ++
     msl_emit ++
-    "    float bearing_rel = radians(bearing) + u.frame.x;\n" ++
-    "    out.dir = float2(sin(bearing_rel), cos(bearing_rel) * sign(u.camera.y));\n" ++
+    "    out.dir = u.frame.zw;\n" ++
     "    out.color = bearing_arrow_color;\n" ++
     "    out.outer = outer;\n" ++
     "    out.visible = bearing_visible;\n" ++
@@ -1545,20 +1529,30 @@ const property_descriptors = [_]c.mln_plugin_property_descriptor_v1{
 // --------------------------------------------------------------------------
 
 /// Frame-unit grid over the viewport; frameMatrix maps it to NDC.
-const frame_extent: f64 = 8192;
-
-const vertices_per_point = quads_per_point * vertices_per_quad;
+/// Mercator world-pixel projection of one indicator: every drawable's matrix
+/// is the frame projection translated to the puck, and quad vertices expand to
+/// screen size in the vertex shader from it.
+const ring_point_count = 73;
+const accuracy_vertex_count = 1 + ring_point_count * 2;
+const quad_vertex_count = (quads_per_point - 1) * vertices_per_quad;
+const vertices_per_point = accuracy_vertex_count + quad_vertex_count;
+const accuracy_index_count = 72 * 3 + 72 * 6;
+const index_count = accuracy_index_count + (quads_per_point - 1) * indices_per_quad;
+const segment_count = quads_per_point + 1;
 
 const corners = [vertices_per_quad][2]i16{ .{ 0, 0 }, .{ 1, 0 }, .{ 1, 1 }, .{ 0, 1 } };
 
 const Frame = struct {
     vertices: [vertices_per_point]Vertex,
-    segments: [quads_per_point]c.mln_plugin_segment_v1,
+    indices: [index_count]u16,
+    segments: [segment_count]c.mln_plugin_segment_v1,
     drawables: [quads_per_point]c.mln_plugin_drawable_descriptor_v1,
     accuracy_bindings: [4]c.mln_plugin_attribute_binding_v1,
     stream_bindings: [3]c.mln_plugin_attribute_binding_v1,
     stream: c.mln_plugin_vertex_stream_v1,
-    indices: [indices_per_quad]u16,
+    proj_matrix: [16]f32,
+    center: [2]f32,
+    bearing_dir: [2]f32,
 };
 
 fn streamBinding(attribute_id: u32, byte_offset: u32) c.mln_plugin_attribute_binding_v1 {
@@ -1579,6 +1573,7 @@ fn frameStorage() ?*Frame {
         const frame = allocator.create(Frame) catch return null;
         frame.* = .{
             .vertices = undefined,
+            .indices = undefined,
             .segments = undefined,
             .drawables = undefined,
             .accuracy_bindings = .{
@@ -1593,7 +1588,9 @@ fn frameStorage() ?*Frame {
                 streamBinding(2, @offsetOf(Vertex, "start_time")),
             },
             .stream = std.mem.zeroes(c.mln_plugin_vertex_stream_v1),
-            .indices = .{ 0, 1, 2, 0, 2, 3 },
+            .proj_matrix = undefined,
+            .center = undefined,
+            .bearing_dir = undefined,
         };
         frame_storage = frame;
     }
@@ -1611,8 +1608,35 @@ fn findFloat2(properties: []const c.mln_plugin_property_value_v1, comptime name:
     return default;
 }
 
-fn packFrameUnit(value: f64) i16 {
-    return @intFromFloat(std.math.clamp(@round(value), -32768.0, 32767.0));
+fn packOffset(value: f64) i16 {
+    return @intFromFloat(std.math.clamp(@round(value), -16000.0, 16000.0));
+}
+
+fn projectMercator(ctx: *const c.mln_plugin_frame_context_v1, latitude: f64, longitude: f64) [2]f64 {
+    var x: f64 = 0;
+    var y: f64 = 0;
+    ctx.project_mercator.?(ctx, latitude, longitude, &x, &y);
+    return .{ x, y };
+}
+
+fn projectScreen(ctx: *const c.mln_plugin_frame_context_v1, latitude: f64, longitude: f64) [2]f64 {
+    var x: f64 = 0;
+    var y: f64 = 0;
+    ctx.project_screen.?(ctx, latitude, longitude, &x, &y);
+    return .{ x, y };
+}
+
+fn destination(
+    ctx: *const c.mln_plugin_frame_context_v1,
+    latitude: f64,
+    longitude: f64,
+    distance_meters: f64,
+    bearing_deg: f64,
+) [2]f64 {
+    var out_lat: f64 = 0;
+    var out_lng: f64 = 0;
+    ctx.destination.?(ctx, latitude, longitude, distance_meters, bearing_deg, &out_lat, &out_lng);
+    return .{ out_lat, out_lng };
 }
 
 fn buildFrame(
@@ -1624,7 +1648,8 @@ fn buildFrame(
     const out: *c.mln_plugin_bucket_v1 = bucket;
     if (ctx.struct_size < @sizeOf(c.mln_plugin_frame_context_v1) or
         out.struct_size < @sizeOf(c.mln_plugin_bucket_v1) or
-        ctx.project_screen == null or ctx.viewport_width == 0 or ctx.viewport_height == 0 or
+        ctx.project_screen == null or ctx.project_mercator == null or ctx.destination == null or
+        ctx.viewport_width == 0 or ctx.viewport_height == 0 or
         (ctx.property_count != 0 and ctx.properties == null))
     {
         return c.MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
@@ -1634,60 +1659,162 @@ fn buildFrame(
         if (ctx.property_count != 0) ctx.properties[0..ctx.property_count] else &.{};
 
     const position = findFloat2(props, "position", .{ 0, 0 });
-    var screen_x: f64 = 0;
-    var screen_y: f64 = 0;
-    ctx.project_screen.?(ctx, position[0], position[1], &screen_x, &screen_y);
-    const unit_x = screen_x * frame_extent / @as(f64, @floatFromInt(ctx.viewport_width));
-    const unit_y = screen_y * frame_extent / @as(f64, @floatFromInt(ctx.viewport_height));
+    const bearing = findFloat(props, "bearing", 0);
+    const accuracy_radius = findFloat(props, "accuracy-radius", 0);
+    const accuracy_border_width = findFloat(props, "accuracy-border-width", 0);
 
-    // Bake meters to frame units into the accuracy vertices. The shader's
-    // epsilon projection over the frame matrix measures viewport_width /
-    // frame_extent pixels per unit.
+    const center_mercator = projectMercator(ctx, position[0], position[1]);
+    for (&frame.proj_matrix, ctx.proj_matrix) |*dst, value| dst.* = @floatCast(value);
+    frame.center = .{ @floatCast(center_mercator[0]), @floatCast(center_mercator[1]) };
+
+    // The on-screen bearing direction comes from projecting a second point
+    // along the bearing, which keeps arrows and the sector honest under pitch.
+    const far = destination(ctx, position[0], position[1], 1000.0, bearing);
+    const near_screen = projectScreen(ctx, position[0], position[1]);
+    const far_screen = projectScreen(ctx, far[0], far[1]);
+    const delta = [2]f64{ far_screen[0] - near_screen[0], far_screen[1] - near_screen[1] };
+    const delta_len = @max(@sqrt(delta[0] * delta[0] + delta[1] * delta[1]), 1e-9);
+    frame.bearing_dir = .{ @floatCast(delta[0] / delta_len), @floatCast(delta[1] / delta_len) };
+
+    // Meters per mercator world pixel at the position's latitude; the shader's
+    // epsilon projection turns world pixels into screen pixels.
     const cos_latitude = @max(@cos(std.math.degreesToRadians(position[0])), 1e-4);
-    const meters_per_pixel = earth_circumference_meters * cos_latitude / (512.0 * std.math.exp2(ctx.zoom));
-    const px_per_unit = @as(f64, @floatFromInt(ctx.viewport_width)) / frame_extent;
-    const scale: f32 = @floatCast(px_per_unit * @max(meters_per_pixel, 1e-9));
+    const meters_per_unit = earth_circumference_meters * cos_latitude / (512.0 * std.math.exp2(ctx.zoom));
+    const scale: f32 = @floatCast(@max(meters_per_unit, 1e-9));
 
-    const center = [2]i16{ packFrameUnit(unit_x), packFrameUnit(unit_y) };
+    // Screen pixels per world pixel at the position, from the frame matrix,
+    // mirroring the vertex shader's epsilon projection.
+    const px_per_unit = blk: {
+        const m = frame.proj_matrix;
+        const cx: f32 = @floatCast(center_mercator[0]);
+        const cy: f32 = @floatCast(center_mercator[1]);
+        const pw = m[3] * cx + m[7] * cy + m[15];
+        const qw = pw + m[3];
+        const p_ndc_x = (m[0] * cx + m[4] * cy + m[12]) / pw;
+        const p_ndc_y = (m[1] * cx + m[5] * cy + m[13]) / pw;
+        const q_ndc_x = (m[0] * (cx + 1) + m[4] * cy + m[12]) / qw;
+        const q_ndc_y = (m[1] * (cx + 1) + m[5] * cy + m[13]) / qw;
+        const dx = (q_ndc_x - p_ndc_x) * 0.5 * @as(f32, @floatFromInt(ctx.viewport_width));
+        const dy = (q_ndc_y - p_ndc_y) * 0.5 * @as(f32, @floatFromInt(ctx.viewport_height));
+        break :blk @max(@sqrt(dx * dx + dy * dy), 1e-6);
+    };
+
     const start_time: f32 = @floatCast(ctx.time_seconds);
-    for (&frame.vertices, 0..) |*vertex, index| {
+    const border_meters = accuracy_border_width * meters_per_unit / px_per_unit;
+    const inner_radius = @max(accuracy_radius - border_meters, 0.0);
+
+    // The accuracy circle is a ground polygon: a fill fan over the inner
+    // radius and a border strip out to the accuracy radius, so it foreshortens
+    // like terrain under pitch.
+    frame.vertices[0] = .{ .packed_pos = .{ 0, 0 }, .prev_pos = .{ 0, 0 }, .scale = scale, .start_time = start_time };
+    for (0..ring_point_count) |i| {
+        const ring_bearing = @as(f64, @floatFromInt(i)) * (360.0 / 72.0);
+        const outer = destination(ctx, position[0], position[1], accuracy_radius, ring_bearing);
+        const outer_mercator = projectMercator(ctx, outer[0], outer[1]);
+        frame.vertices[1 + i] = .{
+            .packed_pos = .{
+                packOffset((outer_mercator[0] - center_mercator[0]) * 2 + 1),
+                packOffset((outer_mercator[1] - center_mercator[1]) * 2 + 1),
+            },
+            .prev_pos = .{ 0, 0 },
+            .scale = scale,
+            .start_time = start_time,
+        };
+        const inner = destination(ctx, position[0], position[1], inner_radius, ring_bearing);
+        const inner_mercator = projectMercator(ctx, inner[0], inner[1]);
+        frame.vertices[1 + ring_point_count + i] = .{
+            .packed_pos = .{
+                packOffset((inner_mercator[0] - center_mercator[0]) * 2),
+                packOffset((inner_mercator[1] - center_mercator[1]) * 2),
+            },
+            .prev_pos = .{ 0, 0 },
+            .scale = scale,
+            .start_time = start_time,
+        };
+    }
+    for (0..quad_vertex_count) |index| {
         const corner = corners[index % vertices_per_quad];
-        vertex.* = .{
-            .packed_pos = .{ center[0] * 2 + corner[0], center[1] * 2 + corner[1] },
-            .prev_pos = center,
+        frame.vertices[accuracy_vertex_count + index] = .{
+            .packed_pos = .{ corner[0], corner[1] },
+            .prev_pos = .{ 0, 0 },
             .scale = scale,
             .start_time = start_time,
         };
     }
 
-    for (&frame.segments, 0..) |*segment, component| {
-        segment.* = .{
+    var index_cursor: usize = 0;
+    // Border strip between the outer ring (vertices 1..73) and the inner ring
+    // (vertices 74..146).
+    for (1..ring_point_count) |i| {
+        const outer_base: u16 = @intCast(i);
+        const inner_base: u16 = @intCast(ring_point_count + i);
+        frame.indices[index_cursor] = outer_base;
+        frame.indices[index_cursor + 1] = inner_base;
+        frame.indices[index_cursor + 2] = inner_base + 1;
+        frame.indices[index_cursor + 3] = outer_base;
+        frame.indices[index_cursor + 4] = inner_base + 1;
+        frame.indices[index_cursor + 5] = outer_base + 1;
+        index_cursor += 6;
+    }
+    // Fill fan over the inner ring.
+    for (1..ring_point_count) |i| {
+        frame.indices[index_cursor] = 0;
+        frame.indices[index_cursor + 1] = @intCast(ring_point_count + i);
+        frame.indices[index_cursor + 2] = @intCast(ring_point_count + i + 1);
+        index_cursor += 3;
+    }
+    // The five screen-space quads share the quad index pattern.
+    const quad_index_pattern = [indices_per_quad]u16{ 0, 1, 2, 0, 2, 3 };
+    for (0..quads_per_point - 1) |quad| {
+        for (quad_index_pattern, 0..) |value, j| {
+            frame.indices[index_cursor + quad * indices_per_quad + j] =
+                @intCast(accuracy_vertex_count + quad * vertices_per_quad + value);
+        }
+    }
+
+    frame.segments[0] = .{
+        .struct_size = @sizeOf(c.mln_plugin_segment_v1),
+        .vertex_offset = 0,
+        .index_offset = 0,
+        .vertex_length = accuracy_vertex_count,
+        .index_length = @intCast(72 * 6),
+    };
+    frame.segments[1] = .{
+        .struct_size = @sizeOf(c.mln_plugin_segment_v1),
+        .vertex_offset = 0,
+        .index_offset = @intCast(72 * 6),
+        .vertex_length = accuracy_vertex_count,
+        .index_length = @intCast(72 * 3),
+    };
+    for (0..quads_per_point - 1) |quad| {
+        frame.segments[2 + quad] = .{
             .struct_size = @sizeOf(c.mln_plugin_segment_v1),
-            .vertex_offset = @intCast(component * vertices_per_quad),
-            .index_offset = 0,
-            .vertex_length = vertices_per_quad,
+            .vertex_offset = 0,
+            .index_offset = @intCast(accuracy_index_count + quad * indices_per_quad),
+            .vertex_length = vertices_per_point,
             .index_length = indices_per_quad,
         };
     }
-    const drawable_specs = [quads_per_point]struct { key: u64, shader: []const u8 }{
-        .{ .key = drawable_accuracy, .shader = shader_accuracy },
-        .{ .key = drawable_sector, .shader = shader_sector },
-        .{ .key = drawable_shadow, .shader = shader_shadow },
-        .{ .key = drawable_pulse, .shader = shader_pulse },
-        .{ .key = drawable_arrow, .shader = shader_arrow },
-        .{ .key = drawable_puck, .shader = shader_puck },
+
+    const drawable_specs = [quads_per_point]struct { key: u64, shader: []const u8, segment: usize, count: usize }{
+        .{ .key = drawable_accuracy, .shader = shader_accuracy, .segment = 0, .count = 2 },
+        .{ .key = drawable_sector, .shader = shader_sector, .segment = 2, .count = 1 },
+        .{ .key = drawable_shadow, .shader = shader_shadow, .segment = 3, .count = 1 },
+        .{ .key = drawable_pulse, .shader = shader_pulse, .segment = 4, .count = 1 },
+        .{ .key = drawable_arrow, .shader = shader_arrow, .segment = 5, .count = 1 },
+        .{ .key = drawable_puck, .shader = shader_puck, .segment = 6, .count = 1 },
     };
-    for (&frame.drawables, drawable_specs, 0..) |*drawable, spec, component| {
+    for (&frame.drawables, drawable_specs) |*drawable, spec| {
         const bindings: []const c.mln_plugin_attribute_binding_v1 =
-            if (component == component_accuracy) &frame.accuracy_bindings else &frame.stream_bindings;
+            if (spec.key == drawable_accuracy) &frame.accuracy_bindings else &frame.stream_bindings;
         drawable.* = .{
             .struct_size = @sizeOf(c.mln_plugin_drawable_descriptor_v1),
             .drawable_key = spec.key,
             .shader_id = .{ .data = spec.shader.ptr, .size = spec.shader.len },
             .attributes = bindings.ptr,
             .attribute_count = bindings.len,
-            .segments = &frame.segments[component],
-            .segment_count = 1,
+            .segments = &frame.segments[spec.segment],
+            .segment_count = spec.count,
         };
     }
 
@@ -1724,11 +1851,21 @@ fn timeSeconds() f32 {
     return @floatCast(@mod(seconds, 3600.0));
 }
 
-/// The source-free projection: a virtual tile grid of 8192 units over the
-/// viewport, y down, matching the frame-unit vertices build_frame emits.
-fn frameMatrix() [16]f32 {
-    const scale = 2.0 / frame_extent;
-    return .{ scale, 0, 0, 0, 0, -scale, 0, 0, 0, 0, 1, 0, -1, 1, 0, 1 };
+/// The frame projection translated to the puck center, matching the mercator
+/// offsets build_frame packs into the vertices.
+fn frameMatrix(frame: ?*const Frame) [16]f32 {
+    const fallback_scale = 2.0 / 8192.0;
+    const frame_state = frame orelse
+        return .{ fallback_scale, 0, 0, 0, 0, -fallback_scale, 0, 0, 0, 0, 1, 0, -1, 1, 0, 1 };
+    const m = frame_state.proj_matrix;
+    const cx = frame_state.center[0];
+    const cy = frame_state.center[1];
+    return .{
+        m[0],                          m[1],                          m[2],                          m[3],
+        m[4],                          m[5],                          m[6],                          m[7],
+        m[8],                          m[9],                          m[10],                         m[11],
+        m[0] * cx + m[4] * cy + m[12], m[1] * cx + m[5] * cy + m[13], m[2] * cx + m[6] * cy + m[14], m[3] * cx + m[7] * cy + m[15],
+    };
 }
 
 fn writeBlock(
@@ -1739,14 +1876,17 @@ fn writeBlock(
 ) c.mln_plugin_status {
     if (output_size != @sizeOf(T)) return c.MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
     var block: T = std.mem.zeroes(T);
-    block.matrix = frameMatrix();
+    block.matrix = frameMatrix(frame_storage);
     block.camera = .{
         context.pixels_to_gl_units[0],
         context.pixels_to_gl_units[1],
         @floatFromInt(context.viewport_width),
         @floatFromInt(context.viewport_height),
     };
-    block.frame = .{ @floatCast(context.bearing), timeSeconds(), 0, 0 };
+    block.frame = if (frame_storage) |frame|
+        .{ @floatCast(context.bearing), timeSeconds(), frame.bearing_dir[0], frame.bearing_dir[1] }
+    else
+        .{ @floatCast(context.bearing), timeSeconds(), 0, 0 };
     @memcpy(output[0..@sizeOf(T)], std.mem.asBytes(&block));
     return c.MLN_PLUGIN_STATUS_OK;
 }
