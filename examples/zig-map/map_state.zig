@@ -3,6 +3,7 @@ const maplibre = @import("maplibre_native_ffi");
 
 const channel = @import("channel.zig");
 const diagnostics = @import("diagnostics.zig");
+const puck = @import("puck.zig");
 const types = @import("types.zig");
 
 /// Runtime and map, owned for their whole lifetime by the runtime loop thread.
@@ -65,7 +66,7 @@ pub const MapState = struct {
     ) !void {
         commands.drainInto(batch);
         for (batch.items) |command| {
-            try applyCameraCommand(&self.map, command, self.diagnostic_store);
+            try applyCameraCommand(self.allocator, &self.map, command, self.diagnostic_store);
         }
     }
 };
@@ -73,6 +74,7 @@ pub const MapState = struct {
 /// Applies one decoded camera command. Runs on the map's owner thread, so the
 /// read-modify-write commands read the current camera here.
 pub fn applyCameraCommand(
+    allocator: std.mem.Allocator,
     map: *maplibre.MapHandle,
     command: channel.CameraCommand,
     diagnostic_store: *const maplibre.DiagnosticStore,
@@ -148,6 +150,11 @@ pub fn applyCameraCommand(
             "camera reset failed",
             diagnostic_store,
         ),
+        .puck_move => |move| try puck.moveBy(allocator, map, diagnostic_store, move.dx, move.dy),
+        .puck_rotate => |rotate| try puck.rotateBy(allocator, map, diagnostic_store, rotate.delta),
+        .puck_accuracy => |accuracy| try puck.scaleAccuracyBy(allocator, map, diagnostic_store, accuracy.scale),
+        .puck_toggle_bearing => try puck.toggleBearing(allocator, map, diagnostic_store),
+        .puck_toggle_pulse => try puck.togglePulse(allocator, map, diagnostic_store),
     }
 }
 
@@ -166,6 +173,7 @@ pub fn drainEvents(
         const event = try batch.at(index);
         if (event.source_type != .map or event.source_id == null or !std.meta.eql(event.source_id.?, map_id)) continue;
         switch (event.event_type) {
+            .map_style_loaded => try puck.addLayer(allocator, map, null),
             .map_render_update_available => render_update_available = true,
             .map_render_frame_finished => switch (event.payload) {
                 .render_frame => |frame| render_update_available = render_update_available or frame.needs_repaint,
@@ -214,6 +222,7 @@ fn selectEvents(
     map.setEventMask(.{
         .map_render_update_available = true,
         .map_render_frame_finished = true,
+        .map_style_loaded = true,
     }) catch |err| {
         diagnostics.logError("event mask select failed", err, diagnostic_store);
         return types.AppError.EventMaskFailed;

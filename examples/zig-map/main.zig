@@ -9,6 +9,7 @@ const diagnostics = @import("diagnostics.zig");
 const maplibre = @import("maplibre_native_ffi");
 const input = @import("input.zig");
 const map_state = @import("map_state.zig");
+const puck = @import("puck.zig");
 const render = @import("render/mod.zig");
 const types = @import("types.zig");
 const viewport = @import("viewport.zig");
@@ -64,8 +65,10 @@ fn runtimeLoopBody(args: RuntimeLoopArgs, state: *map_state.MapState) !void {
 }
 
 pub fn main(init_args: std.process.Init) !void {
-    const target_mode = (try parseRenderTargetMode(init_args)) orelse return;
+    const parsed = (try parseRenderTargetMode(init_args)) orelse return;
     try validateNativeRenderBackend();
+    try puck.load(init_args.gpa, parsed.plugin_path);
+    const target_mode = parsed.mode;
 
     try maplibre.setLogCallback(.{ .handler = diagnostics.logRecord }, null);
     defer maplibre.clearLogCallback(null) catch {};
@@ -265,11 +268,22 @@ fn appendBackendLabel(buffer: []u8, len: *usize, has_backend: *bool, label: []co
     has_backend.* = true;
 }
 
-fn parseRenderTargetMode(init_args: std.process.Init) !?types.RenderTargetMode {
+const StartupArgs = struct {
+    plugin_path: []const u8,
+    mode: types.RenderTargetMode,
+};
+
+/// The build passes the location-puck plugin library as the first argument and
+/// the render-target mode as the second.
+fn parseRenderTargetMode(init_args: std.process.Init) !?StartupArgs {
     var args = try std.process.Args.Iterator.initAllocator(init_args.minimal.args, init_args.gpa);
     defer args.deinit();
     _ = args.skip();
 
+    const plugin_path = args.next() orelse {
+        printUsage();
+        std.process.exit(1);
+    };
     const mode_arg = args.next() orelse {
         printUsage();
         std.process.exit(1);
@@ -290,12 +304,12 @@ fn parseRenderTargetMode(init_args: std.process.Init) !?types.RenderTargetMode {
         printUsage();
         std.process.exit(1);
     }
-    return mode;
+    return .{ .plugin_path = plugin_path, .mode = mode };
 }
 
 fn printUsage() void {
     std.debug.print(
-        \\Usage: zig-map <mode>
+        \\Usage: zig-map <plugin-library> <mode>
         \\
         \\Modes:
         \\  owned-texture     session-owned texture render target
