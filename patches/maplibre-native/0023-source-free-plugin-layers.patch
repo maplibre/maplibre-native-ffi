@@ -1,0 +1,555 @@
+diff --git a/include/mln/plugin/plugin_api.h b/include/mln/plugin/plugin_api.h
+index 7fe5fee371c..8b73d3d991d 100644
+--- a/include/mln/plugin/plugin_api.h
++++ b/include/mln/plugin/plugin_api.h
+@@ -433,6 +433,52 @@ typedef float (*mln_plugin_query_radius_fn)(const mln_plugin_property_statistics
+  * maps. */
+ typedef uint8_t (*mln_plugin_should_animate_fn)(const mln_plugin_property_value_v1* properties, size_t property_count);
+ 
++/* ------------------------------------------------------------------------- */
++/* Source-free layers                                                        */
++/* ------------------------------------------------------------------------- */
++
++struct mln_plugin_frame_context_v1;
++
++/* Maps a latitude/longitude to logical screen pixels, with y growing
++ * downward. The function and the context's project_state storage are borrowed
++ * for the duration of build_frame. */
++typedef void (*mln_plugin_project_screen_fn)(
++    const struct mln_plugin_frame_context_v1* context, double latitude, double longitude, double* out_x, double* out_y);
++
++/* Borrowed per-frame inputs for a source-free layer's frame callback. All
++ * pointers and nested storage are valid only for the duration of the
++ * callback. */
++typedef struct mln_plugin_frame_context_v1 {
++    uint32_t struct_size;
++    /* Camera-evaluated paint values, in property definition order. */
++    const mln_plugin_property_value_v1* properties;
++    size_t property_count;
++    /* Monotonic frame timestamp in seconds. */
++    double time_seconds;
++    double zoom;
++    double center_latitude;
++    double center_longitude;
++    /* Camera bearing and pitch in radians, matching the uniform context. */
++    double bearing;
++    double pitch;
++    uint32_t viewport_width;
++    uint32_t viewport_height;
++    float pixel_ratio;
++    /* NDC units per logical pixel, matching the uniform context. */
++    float pixels_to_gl_units[2];
++    /* Opaque host storage for project_screen. */
++    const void* project_state;
++    mln_plugin_project_screen_fn project_screen;
++} mln_plugin_frame_context_v1;
++
++/* Per-frame geometry for a source-free layer, called on a render thread once
++ * per rendered frame per map. The callback may run concurrently for different
++ * maps. The views written into the bucket follow the same contract as
++ * finish_layout: they remain plugin-owned, the host copies them after the
++ * callback returns, and they must remain valid until that copy completes. */
++typedef mln_plugin_status (*mln_plugin_build_frame_fn)(const mln_plugin_frame_context_v1* context,
++                                                       mln_plugin_bucket_v1* bucket);
++
+ typedef struct mln_plugin_layer_type_v1 {
+     uint32_t struct_size;
+     mln_plugin_string layer_type;
+@@ -450,6 +496,16 @@ typedef struct mln_plugin_layer_type_v1 {
+     mln_plugin_update_uniform_block_fn update_uniform_block;
+     mln_plugin_query_radius_fn get_query_radius;
+     mln_plugin_should_animate_fn should_animate;
++    /* Optional; introduced after should_animate. source_free must be 0 or 1,
++     * and zero-initialization leaves a layer source-requiring. A layer with
++     * source_free 1 takes no source in the style, cannot declare data-driven
++     * properties, skips the tile layout callbacks, and instead receives its
++     * geometry from build_frame on every rendered frame. Source-free layers
++     * receive no feature hit-testing: query_feature and feature_vertex_ranges
++     * do not apply to them. build_frame is required when source_free is 1 and
++     * ignored otherwise. */
++    uint8_t source_free;
++    mln_plugin_build_frame_fn build_frame;
+ } mln_plugin_layer_type_v1;
+ 
+ typedef struct mln_plugin_descriptor_v1 {
+diff --git a/src/mln/plugin/plugin_registry.cpp b/src/mln/plugin/plugin_registry.cpp
+index 9c53679bc92..3f210c110b4 100644
+--- a/src/mln/plugin/plugin_registry.cpp
++++ b/src/mln/plugin/plugin_registry.cpp
+@@ -436,12 +436,25 @@ mln_plugin_status PluginRegistry::registerPlugin(const mln_plugin_descriptor_v1&
+             error = "plugin layer type is malformed or has no supported backend";
+             return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
+         }
+-        if (!layerType.create_layout || !layerType.layout_feature || !layerType.finish_layout ||
+-            !layerType.destroy_layout || layerType.geometry_type_mask == 0 ||
+-            (layerType.geometry_type_mask & ~validGeometryMask) != 0) {
++        const bool sourceFree = layerType.source_free != 0;
++        if (layerType.source_free > 1) {
++            error = "plugin layer source_free must be 0 or 1";
++            return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
++        }
++        if (!sourceFree && (!layerType.create_layout || !layerType.layout_feature || !layerType.finish_layout ||
++                            !layerType.destroy_layout || layerType.geometry_type_mask == 0 ||
++                            (layerType.geometry_type_mask & ~validGeometryMask) != 0)) {
+             error = "geometry plugin requires source layout callbacks and a valid geometry mask";
+             return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
+         }
++        if (sourceFree && !layerType.build_frame) {
++            error = "source-free plugin layers require a frame callback";
++            return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
++        }
++        if (!sourceFree && layerType.build_frame) {
++            error = "frame callbacks apply only to source-free plugin layers";
++            return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
++        }
+         const auto type = copyString(layerType.layer_type);
+         if (!layerTypeKeys.emplace(type).second) {
+             error = "plugin descriptor contains duplicate layer types";
+@@ -460,6 +473,8 @@ mln_plugin_status PluginRegistry::registerPlugin(const mln_plugin_descriptor_v1&
+         copiedLayerType.queryRadius = layerType.get_query_radius;
+         copiedLayerType.updateUniformBlock = layerType.update_uniform_block;
+         copiedLayerType.shouldAnimate = layerType.should_animate;
++        copiedLayerType.requiresSource = layerType.source_free == 0;
++        copiedLayerType.buildFrame = layerType.build_frame;
+         if (!appendShaders(pluginID,
+                            layerType.shaders,
+                            layerType.shader_count,
+@@ -501,6 +516,10 @@ mln_plugin_status PluginRegistry::registerPlugin(const mln_plugin_descriptor_v1&
+         for (const auto& property : copiedLayerType.properties) {
+             const auto dataDependencies = MLN_PLUGIN_EXPRESSION_FEATURE | MLN_PLUGIN_EXPRESSION_COMPOSITE |
+                                           MLN_PLUGIN_EXPRESSION_FEATURE_STATE;
++            if (!copiedLayerType.requiresSource && (property.expressionCapabilities & dataDependencies) != 0) {
++                error = "source-free plugin layers cannot declare data-driven properties";
++                return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
++            }
+             if ((property.expressionCapabilities & dataDependencies) == 0) continue;
+             const bool bound = std::any_of(
+                 copiedLayerType.shaders.begin(), copiedLayerType.shaders.end(), [&](const auto& shader) {
+diff --git a/src/mln/plugin/plugin_registry.hpp b/src/mln/plugin/plugin_registry.hpp
+index 12b80907cfc..8f7b5574434 100644
+--- a/src/mln/plugin/plugin_registry.hpp
++++ b/src/mln/plugin/plugin_registry.hpp
+@@ -90,6 +90,8 @@ struct LayerType {
+     mln_plugin_query_radius_fn queryRadius = nullptr;
+     mln_plugin_update_uniform_block_fn updateUniformBlock = nullptr;
+     mln_plugin_should_animate_fn shouldAnimate = nullptr;
++    bool requiresSource = true;
++    mln_plugin_build_frame_fn buildFrame = nullptr;
+     bool operator==(const LayerType&) const = default;
+ 
+     const PropertyDefinition* findProperty(const std::string& name) const;
+@@ -101,12 +103,13 @@ struct RegisteredLayer final : LayerType {
+     explicit RegisteredLayer(LayerType definition)
+         : LayerType(std::move(definition)),
+           info{type.c_str(),
+-               style::LayerTypeInfo::Source::Required,
++               requiresSource ? style::LayerTypeInfo::Source::Required : style::LayerTypeInfo::Source::NotRequired,
+                style::LayerTypeInfo::Pass3D::NotRequired,
+-               style::LayerTypeInfo::Layout::Required,
++               requiresSource ? style::LayerTypeInfo::Layout::Required : style::LayerTypeInfo::Layout::NotRequired,
+                style::LayerTypeInfo::FadingTiles::NotRequired,
+                style::LayerTypeInfo::CrossTileIndex::NotRequired,
+-               style::LayerTypeInfo::TileKind::Geometry} {}
++               requiresSource ? style::LayerTypeInfo::TileKind::Geometry
++                              : style::LayerTypeInfo::TileKind::NotRequired} {}
+ 
+     RegisteredLayer(const RegisteredLayer&) = delete;
+     RegisteredLayer& operator=(const RegisteredLayer&) = delete;
+diff --git a/src/mln/plugin/plugin_style_layer_factory.cpp b/src/mln/plugin/plugin_style_layer_factory.cpp
+index b04ffd4adbf..07691347a12 100644
+--- a/src/mln/plugin/plugin_style_layer_factory.cpp
++++ b/src/mln/plugin/plugin_style_layer_factory.cpp
+@@ -11,9 +11,12 @@ const style::LayerTypeInfo* PluginStyleLayerFactory::getTypeInfo() const noexcep
+ 
+ std::unique_ptr<style::Layer> PluginStyleLayerFactory::createLayer(
+     const std::string& id, const style::conversion::Convertible& value) noexcept {
+-    const auto source = getSource(value);
+-    if (!source || source->empty()) return nullptr;
+-    return std::make_unique<style::PluginStyleLayer>(id, *source, registration);
++    if (registration->requiresSource) {
++        const auto source = getSource(value);
++        if (!source || source->empty()) return nullptr;
++        return std::make_unique<style::PluginStyleLayer>(id, *source, registration);
++    }
++    return std::make_unique<style::PluginStyleLayer>(id, std::string{}, registration);
+ }
+ 
+ std::unique_ptr<RenderLayer> PluginStyleLayerFactory::createRenderLayer(Immutable<style::Layer::Impl> impl) noexcept {
+diff --git a/src/mln/renderer/layers/render_plugin_style_layer.cpp b/src/mln/renderer/layers/render_plugin_style_layer.cpp
+index b6e4161ab39..a76bf625065 100644
+--- a/src/mln/renderer/layers/render_plugin_style_layer.cpp
++++ b/src/mln/renderer/layers/render_plugin_style_layer.cpp
+@@ -16,13 +16,17 @@
+ #include <mln/renderer/layer_group.hpp>
+ #include <mln/renderer/layers/plugin_layer_tweaker.hpp>
+ #include <mln/renderer/render_static_data.hpp>
++#include <mln/renderer/update_parameters.hpp>
+ #include <mln/renderer/render_tile.hpp>
+ #include <mln/renderer/render_source.hpp>
+ #include <mln/renderer/paint_parameters.hpp>
+ #include <mln/shaders/program_parameters.hpp>
+ #include <mln/shaders/shader_program_base.hpp>
+ #include <mln/style/plugin_property.hpp>
++#include <mln/util/logging.hpp>
+ 
++#include <chrono>
++#include <cstring>
+ #include <set>
+ 
+ namespace mln {
+@@ -32,8 +36,20 @@ const style::PluginStyleLayer::Impl& pluginImpl(const Immutable<style::Layer::Im
+     return static_cast<const style::PluginStyleLayer::Impl&>(*impl);
+ }
+ 
++void projectScreenToPixels(
++    const mln_plugin_frame_context_v1* context, double latitude, double longitude, double* outX, double* outY) {
++    if (!context || !outX || !outY) return;
++    const auto* state = static_cast<const TransformState*>(context->project_state);
++    if (!state) return;
++    const auto coordinate = state->latLngToScreenCoordinate(LatLng(latitude, longitude));
++    *outX = coordinate.x;
++    *outY = coordinate.y;
++}
++
+ } // namespace
+ 
++RenderPluginStyleLayer::~RenderPluginStyleLayer() = default;
++
+ RenderPluginStyleLayer::RenderPluginStyleLayer(Immutable<style::PluginStyleLayer::Impl> impl)
+     : RenderLayer(makeMutable<style::PluginStyleLayerProperties>(std::move(impl))) {
+     // Unlike generated layers, a plugin layer has no generated evaluated
+@@ -142,14 +158,26 @@ void RenderPluginStyleLayer::layerChanged(const TransitionParameters&,
+     // drawable whose geometry actually changed.
+ }
+ 
++void RenderPluginStyleLayer::prepare(const LayerPrepareParameters& params) {
++    // Source-free layers take no render tiles; the base prepare asserts on a
++    // null source. The frame path reads the camera from update() instead.
++    if (pluginImpl(baseImpl).registration->requiresSource) {
++        RenderLayer::prepare(params);
++    }
++}
++
+ void RenderPluginStyleLayer::update(gfx::ShaderRegistry& shaders,
+                                     gfx::Context& context,
+                                     const TransformState& state,
+-                                    const std::shared_ptr<UpdateParameters>&,
++                                    const std::shared_ptr<UpdateParameters>& updateParameters,
+                                     const PaintParameters& parameters,
+                                     const RenderTree&,
+                                     UniqueChangeRequestVec& changes) {
+     const auto& registration = pluginImpl(baseImpl).registration;
++    if (!registration->requiresSource) {
++        updateFrame(shaders, context, state, updateParameters, parameters, changes);
++        return;
++    }
+     if (!renderTiles || renderTiles->empty()) {
+         removeAllDrawables();
+         return;
+@@ -259,6 +287,243 @@ void RenderPluginStyleLayer::update(gfx::ShaderRegistry& shaders,
+     }
+ }
+ 
++void RenderPluginStyleLayer::updateFrame(gfx::ShaderRegistry& shaders,
++                                         gfx::Context& context,
++                                         const TransformState& state,
++                                         const std::shared_ptr<UpdateParameters>& updateParameters,
++                                         const PaintParameters& parameters,
++                                         UniqueChangeRequestVec& changes) {
++    const auto& registration = pluginImpl(baseImpl).registration;
++    // Resolve this layer's immutable shader definitions once on the render
++    // thread, as in the tile path.
++    if (shaderGroups.empty()) {
++        plugin::registerPluginShaderGroups(shaders, ProgramParameters{parameters.pixelRatio, false}, registration);
++        for (const auto& definition : registration->shaders) {
++            shaderGroups.emplace(definition.id,
++                                 shaders.getShaderGroup(plugin::shaderGroupName(
++                                     registration->pluginID, registration->type, definition.id)));
++        }
++    }
++    if (!layerGroup) {
++        if (auto group = context.createLayerGroup(layerIndex, 8, getID())) {
++            setLayerGroup(std::move(group), changes);
++        } else {
++            return;
++        }
++    }
++    if (!layerTweaker) {
++        layerTweaker = std::make_shared<PluginLayerTweaker>(getID(), evaluatedProperties, registration);
++        layerGroup->addLayerTweaker(layerTweaker);
++    }
++    auto* localLayerGroup = static_cast<LayerGroup*>(layerGroup.get());
++
++    // The property array mirrors the shape should_animate receives during
++    // evaluation.
++    const auto& definitions = registration->properties;
++    const auto& impl = pluginImpl(baseImpl);
++    std::vector<style::PluginPropertyValue::EvaluationStorage> storage(definitions.size());
++    std::vector<mln_plugin_property_value_v1> properties;
++    properties.reserve(definitions.size());
++    auto storageIt = storage.begin();
++    for (const auto& definition : definitions) {
++        const auto propertyIt = evaluatedPluginProperties.find(definition.name);
++        const auto value = propertyIt == evaluatedPluginProperties.end() ? style::defaultPluginPropertyValue(definition)
++                                                                         : propertyIt->second;
++        mln_plugin_property_value_v1 property{};
++        property.struct_size = sizeof(property);
++        property.name = {definition.name.data(), definition.name.size()};
++        property.value = value.evaluate(static_cast<float>(state.getZoom()), definition, *storageIt++);
++        property.explicitly_set = impl.pluginProperties.contains(definition.name);
++        properties.push_back(property);
++    }
++
++    mln_plugin_frame_context_v1 frameContext{};
++    frameContext.struct_size = sizeof(frameContext);
++    frameContext.properties = properties.data();
++    frameContext.property_count = properties.size();
++    frameContext.time_seconds = std::chrono::duration<double>(updateParameters->timePoint.time_since_epoch()).count();
++    frameContext.zoom = state.getZoom();
++    frameContext.center_latitude = state.getLatLng().latitude();
++    frameContext.center_longitude = state.getLatLng().longitude();
++    frameContext.bearing = state.getBearing();
++    frameContext.pitch = state.getPitch();
++    frameContext.viewport_width = state.getSize().width;
++    frameContext.viewport_height = state.getSize().height;
++    frameContext.pixel_ratio = parameters.pixelRatio;
++    frameContext.pixels_to_gl_units[0] = parameters.pixelsToGLUnits[0];
++    frameContext.pixels_to_gl_units[1] = parameters.pixelsToGLUnits[1];
++    frameContext.project_state = &state;
++    frameContext.project_screen = &projectScreenToPixels;
++
++    mln_plugin_bucket_v1 output{};
++    output.struct_size = sizeof(output);
++    if (registration->buildFrame(&frameContext, &output) != MLN_PLUGIN_STATUS_OK) {
++        Log::Error(Event::Style, "Plugin layer '" + getID() + "' failed to build its frame");
++        return;
++    }
++
++    // Copy the frame bucket. Feature ranges do not exist for source-free
++    // layers, and neither does feature hit-testing.
++    if (output.vertex_stream_count == 0 || output.drawable_count == 0 || output.index_count == 0) {
++        removeAllDrawables();
++        frameBucket.reset();
++        frameBinders.clear();
++        return;
++    }
++
++    removeAllDrawables();
++    frameBucket = std::make_shared<PluginBucket>(registration);
++    frameBinders.clear();
++
++    std::set<uint32_t> streamIDs;
++    bool valid = output.struct_size >= sizeof(output) && output.vertex_streams && output.indices && output.drawables;
++    for (size_t i = 0; valid && i < output.vertex_stream_count; ++i) {
++        const auto& stream = output.vertex_streams[i];
++        valid = stream.struct_size >= sizeof(stream) && stream.stride > 0 && stream.vertex_count > 0 && stream.data &&
++                stream.data_size == static_cast<size_t>(stream.stride) * stream.vertex_count &&
++                streamIDs.emplace(stream.stream_id).second;
++        if (valid) {
++            std::vector<uint8_t> copied(stream.data_size);
++            std::memcpy(copied.data(), stream.data, copied.size());
++            frameBucket->vertexStreams.emplace(
++                stream.stream_id,
++                std::make_shared<PluginVertexVector>(std::move(copied), stream.vertex_count, stream.stride));
++        }
++    }
++    if (valid) {
++        std::vector<uint16_t> indices(output.indices, output.indices + output.index_count);
++        frameBucket->indices = std::make_shared<gfx::IndexVectorBase>(std::move(indices));
++    }
++
++    std::map<uint64_t, PluginDrawableDefinition> drawableDefinitions;
++    for (size_t i = 0; valid && i < output.drawable_count; ++i) {
++        const auto& input = output.drawables[i];
++        valid = input.struct_size >= sizeof(input) && input.shader_id.data && input.shader_id.size &&
++                input.attribute_count && input.attributes && input.segment_count && input.segments;
++        if (!valid) break;
++        PluginDrawableDefinition drawable;
++        drawable.key = input.drawable_key;
++        drawable.shaderID.assign(input.shader_id.data, input.shader_id.size);
++        const auto shaderIt = std::find_if(registration->shaders.begin(),
++                                           registration->shaders.end(),
++                                           [&](const auto& shader) { return shader.id == drawable.shaderID; });
++        valid = shaderIt != registration->shaders.end() && !drawableDefinitions.contains(drawable.key);
++        if (!valid) break;
++        std::set<uint32_t> hostAttributeIDs;
++        for (const auto& binding : shaderIt->propertyBindings) {
++            hostAttributeIDs.emplace(binding.minimumAttributeID);
++            hostAttributeIDs.emplace(binding.maximumAttributeID);
++        }
++        for (size_t bindingIndex = 0; valid && bindingIndex < input.attribute_count; ++bindingIndex) {
++            const auto& binding = input.attributes[bindingIndex];
++            const auto streamIt = frameBucket->vertexStreams.find(binding.stream_id);
++            const auto attributeIt = std::find_if(
++                shaderIt->attributes.begin(), shaderIt->attributes.end(), [&](const auto& attribute) {
++                    return attribute.id == binding.attribute_id;
++                });
++            const auto type = attributeIt == shaderIt->attributes.end() ? gfx::AttributeDataType::Invalid
++                                                                        : plugin::attributeType(attributeIt->type);
++            const auto size = gfx::VertexAttribute::getStrideOf(type);
++            valid = binding.struct_size >= sizeof(binding) && streamIt != frameBucket->vertexStreams.end() &&
++                    attributeIt != shaderIt->attributes.end() && size > 0 &&
++                    hostAttributeIDs.find(binding.attribute_id) == hostAttributeIDs.end() &&
++                    binding.byte_offset <= streamIt->second->getRawSize() &&
++                    size <= streamIt->second->getRawSize() - binding.byte_offset;
++            if (valid) {
++                drawable.vertexCount = std::max(drawable.vertexCount, streamIt->second->getRawCount());
++                drawable.attributes.push_back({binding.attribute_id, binding.stream_id, binding.byte_offset, type});
++            }
++        }
++        for (size_t segmentIndex = 0; valid && segmentIndex < input.segment_count; ++segmentIndex) {
++            const auto& segment = input.segments[segmentIndex];
++            valid = segment.struct_size >= sizeof(segment) && segment.index_offset <= output.index_count &&
++                    segment.index_length <= output.index_count - segment.index_offset &&
++                    segment.vertex_offset <= drawable.vertexCount &&
++                    segment.vertex_length <= drawable.vertexCount - segment.vertex_offset;
++            if (valid) {
++                for (size_t index = segment.index_offset; index < segment.index_offset + segment.index_length;
++                     ++index) {
++                    if (output.indices[index] >= segment.vertex_length) {
++                        valid = false;
++                        break;
++                    }
++                }
++            }
++            if (valid) {
++                drawable.segments.emplace_back(
++                    segment.vertex_offset, segment.index_offset, segment.vertex_length, segment.index_length);
++            }
++        }
++        if (valid) {
++            drawableDefinitions.emplace(drawable.key, std::move(drawable));
++        }
++    }
++    if (!valid) {
++        Log::Error(Event::Style, "Plugin layer '" + getID() + "' returned a malformed frame bucket");
++        frameBucket.reset();
++        frameBinders.clear();
++        return;
++    }
++
++    const auto renderPass = RenderPass::Translucent;
++    const auto zoom = static_cast<float>(state.getZoom());
++    for (const auto& [key, definition] : drawableDefinitions) {
++        const auto shaderIt = std::find_if(registration->shaders.begin(),
++                                           registration->shaders.end(),
++                                           [&](const auto& shader) { return shader.id == definition.shaderID; });
++        auto binders = std::make_unique<PluginPaintPropertyBinders>(
++            registration, *shaderIt, definition.key, definition.vertexCount, zoom, *evaluatedPaintSnapshot, nullptr);
++        auto* paintBinders = binders.get();
++        frameBinders.emplace(key, std::move(binders));
++
++        StringIDSetsPair propertiesAsUniforms;
++        auto attributes = context.createVertexAttributeArray();
++        paintBinders->populateVertexAttributes(*attributes, propertiesAsUniforms);
++        const auto shaderGroup = shaderGroups.at(definition.shaderID);
++        const auto shader = shaderGroup ? shaderGroup->getOrCreateShader(context, propertiesAsUniforms)
++                                        : gfx::ShaderPtr{};
++        if (!shader || definition.segments.empty()) {
++            continue;
++        }
++
++        std::size_t vertexCount = 0;
++        gfx::AttributeDataType firstType = gfx::AttributeDataType::Invalid;
++        for (const auto& binding : definition.attributes) {
++            const auto stream = frameBucket->vertexStreams.find(binding.streamID);
++            if (stream == frameBucket->vertexStreams.end()) continue;
++            const auto type = binding.type;
++            if (const auto& attr = attributes->set(binding.attributeID)) {
++                attr->setSharedRawData(stream->second, binding.byteOffset, 0, stream->second->getRawSize(), type);
++            }
++            vertexCount = std::max(vertexCount, stream->second->getRawCount());
++            if (firstType == gfx::AttributeDataType::Invalid) firstType = type;
++        }
++        if (!vertexCount || firstType == gfx::AttributeDataType::Invalid) continue;
++
++        auto builder = context.createDrawableBuilder("plugin/" + registration->type);
++        builder->setShader(std::static_pointer_cast<gfx::ShaderProgramBase>(shader));
++        builder->setRenderPass(renderPass);
++        builder->setEnableDepth(true);
++        builder->setDepthType(gfx::DepthMaskType::ReadOnly);
++        builder->setIs3D(false);
++        builder->setColorMode(gfx::ColorMode::alphaBlended());
++        builder->setCullFaceMode(gfx::CullFaceMode::disabled());
++        builder->setEnableStencil(false);
++        builder->setVertexAttributes(std::move(attributes));
++        builder->setRawVertices({}, vertexCount, firstType);
++        builder->setSegments(
++            gfx::Triangles(), frameBucket->indices, definition.segments.data(), definition.segments.size());
++        builder->flush(context);
++        for (auto& drawable : builder->clearDrawables()) {
++            drawable->setLayerTweaker(layerTweaker);
++            drawable->setBinders(frameBucket, paintBinders);
++            drawable->setData(std::make_unique<plugin::DrawableData>(definition.shaderID));
++            localLayerGroup->addDrawable(std::move(drawable));
++            ++stats.drawablesAdded;
++        }
++    }
++}
++
+ bool RenderPluginStyleLayer::queryIntersectsFeature(const GeometryCoordinates& queryGeometry,
+                                                     const GeometryTileFeature& feature,
+                                                     float zoom,
+@@ -267,7 +532,9 @@ bool RenderPluginStyleLayer::queryIntersectsFeature(const GeometryCoordinates& q
+                                                     const mat4& tileMatrix,
+                                                     const FeatureState& featureState) const {
+     const auto& registration = pluginImpl(baseImpl).registration;
+-    if (!registration->queryFeature) return false;
++    // Source-free layers have no tile feature index, so they answer no
++    // rendered-feature queries.
++    if (!registration->requiresSource || !registration->queryFeature) return false;
+     const plugin::FeatureView pluginFeature(feature);
+     std::vector<mln_plugin_tile_point_v1> query;
+     query.reserve(queryGeometry.size());
+diff --git a/src/mln/renderer/layers/render_plugin_style_layer.hpp b/src/mln/renderer/layers/render_plugin_style_layer.hpp
+index 52d79447b6e..04c21aa8e8d 100644
+--- a/src/mln/renderer/layers/render_plugin_style_layer.hpp
++++ b/src/mln/renderer/layers/render_plugin_style_layer.hpp
+@@ -4,13 +4,19 @@
+ #include <mln/style/layers/plugin_style_layer.hpp>
+ 
+ #include <map>
++#include <memory>
+ 
+ namespace mln {
+ 
++class PluginBucket;
++class PluginPaintPropertyBinders;
++
+ class RenderPluginStyleLayer final : public RenderLayer {
+ public:
+     explicit RenderPluginStyleLayer(Immutable<style::PluginStyleLayer::Impl>);
+-    ~RenderPluginStyleLayer() override = default;
++    ~RenderPluginStyleLayer() override;
++
++    void prepare(const LayerPrepareParameters&) override;
+ 
+     void update(gfx::ShaderRegistry&,
+                 gfx::Context&,
+@@ -37,12 +43,26 @@ private:
+     bool hasTransition() const override;
+     bool hasCrossfade() const override { return false; }
+ 
++    /// The source-free path: geometry arrives from the registration's frame
++    /// callback on every update rather than from tile layout.
++    void updateFrame(gfx::ShaderRegistry&,
++                     gfx::Context&,
++                     const TransformState&,
++                     const std::shared_ptr<UpdateParameters>&,
++                     const PaintParameters&,
++                     UniqueChangeRequestVec&);
++
+     std::map<std::string, style::PluginTransitioningPropertyValue> transitioningPaintProperties;
+     style::PluginPropertyMap evaluatedPluginProperties;
+     std::shared_ptr<const style::PluginPropertyMap> evaluatedPaintSnapshot;
+     std::map<std::string, gfx::ShaderGroupPtr> shaderGroups;
+     /// True while the layer reports an active animation.
+     bool animated = false;
++
++    /// Latest source-free frame bucket and its per-drawable binders, replaced
++    /// on every update after the previous frame's drawables are removed.
++    std::shared_ptr<PluginBucket> frameBucket;
++    std::map<uint64_t, std::unique_ptr<PluginPaintPropertyBinders>> frameBinders;
+ };
+ 
+ } // namespace mln

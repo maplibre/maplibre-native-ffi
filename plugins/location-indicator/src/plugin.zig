@@ -50,13 +50,11 @@ const earth_circumference_meters: f32 = 40075016.68557849;
 
 // Position moves of up to one quarter tile animate over this fixed duration;
 // anything larger teleports.
-const position_transition_seconds: f32 = 0.3;
-const position_transition_stale_seconds: f32 = 10.0;
 
-/// One vertex stream record. `scale` is the equator meters per tile unit at
-/// the layout zoom, baked per vertex. `prev_pos` and `start_time` drive the
-/// position transition: the vertex shader eases from `prev_pos` to the point
-/// packed in `packed_pos` over `position_transition_seconds`.
+/// One vertex stream record. `scale` converts meters to frame units for the
+/// accuracy circle, baked per frame. `prev_pos` and `start_time` drive the
+/// vertex shader's position easing; the frame path emits prev == target, so
+/// host transitions animate the position instead.
 const Vertex = extern struct {
     packed_pos: [2]i16,
     prev_pos: [2]i16,
@@ -81,17 +79,17 @@ const AccuracyUBO = extern struct {
     accuracy_color: [4]f32,
     accuracy_border_color: [4]f32,
     accuracy_radius: f32,
-    accuracy_latitude: f32,
     accuracy_border_width: f32,
     pad0: f32,
     accuracy_radius_t: f32,
-    accuracy_latitude_t: f32,
     accuracy_border_width_t: f32,
     accuracy_color_t: f32,
     accuracy_border_color_t: f32,
     pad1: f32,
     pad2: f32,
     pad3: f32,
+    pad4: f32,
+    pad5: f32,
 };
 
 const SectorUBO = extern struct {
@@ -179,10 +177,9 @@ comptime {
     std.debug.assert(@offsetOf(AccuracyUBO, "accuracy_color") == 96);
     std.debug.assert(@offsetOf(AccuracyUBO, "accuracy_border_color") == 112);
     std.debug.assert(@offsetOf(AccuracyUBO, "accuracy_radius") == 128);
-    std.debug.assert(@offsetOf(AccuracyUBO, "accuracy_latitude") == 132);
-    std.debug.assert(@offsetOf(AccuracyUBO, "accuracy_border_width") == 136);
-    std.debug.assert(@offsetOf(AccuracyUBO, "accuracy_radius_t") == 144);
-    std.debug.assert(@offsetOf(AccuracyUBO, "accuracy_border_color_t") == 160);
+    std.debug.assert(@offsetOf(AccuracyUBO, "accuracy_border_width") == 132);
+    std.debug.assert(@offsetOf(AccuracyUBO, "accuracy_radius_t") == 140);
+    std.debug.assert(@offsetOf(AccuracyUBO, "accuracy_border_color_t") == 152);
 
     std.debug.assert(@sizeOf(SectorUBO) == 160);
     std.debug.assert(@offsetOf(SectorUBO, "bearing_accuracy_color") == 96);
@@ -364,17 +361,17 @@ const accuracy_ubo_members =
     "    vec4 accuracy_color;\n" ++
     "    vec4 accuracy_border_color;\n" ++
     "    float accuracy_radius;\n" ++
-    "    float accuracy_latitude;\n" ++
     "    float accuracy_border_width;\n" ++
     "    float ubo_pad0;\n" ++
     "    float accuracy_radius_t;\n" ++
-    "    float accuracy_latitude_t;\n" ++
     "    float accuracy_border_width_t;\n" ++
     "    float accuracy_color_t;\n" ++
     "    float accuracy_border_color_t;\n" ++
     "    float ubo_pad1;\n" ++
     "    float ubo_pad2;\n" ++
-    "    float ubo_pad3;\n";
+    "    float ubo_pad3;\n" ++
+    "    float ubo_pad4;\n" ++
+    "    float ubo_pad5;\n";
 
 const sector_ubo_members =
     "    mat4 matrix;\n" ++
@@ -448,8 +445,7 @@ const puck_ubo_members =
     "    float puck_border_width_t;\n" ++
     "    float puck_color_t;\n" ++
     "    float puck_border_color_t;\n" ++
-    "    float ubo_pad0;\n" ++
-    "    float ubo_pad1;\n";
+    "    float ubo_pad0;\n";
 
 // Shared vertex prologue for every shader: transition, projection, half-size.
 // Each shader appends its half-size expression and varying writes.
@@ -471,10 +467,9 @@ fn accuracyVertexGlsl(comptime backend: GLSL) []const u8 {
         glslIn(backend, 2, "float", "a_start_time") ++
         glslIn(backend, 3, "float", "a_scale") ++
         guard("accuracy-radius", glslIn(backend, 4, "vec2", "a_accuracy_radius")) ++
-        guard("accuracy-latitude", glslIn(backend, 5, "vec2", "a_accuracy_latitude")) ++
-        guard("accuracy-border-width", glslIn(backend, 6, "vec2", "a_accuracy_border_width")) ++
-        guard("accuracy-color", glslIn(backend, 7, "vec4", "a_accuracy_color_min") ++ glslIn(backend, 8, "vec4", "a_accuracy_color_max")) ++
-        guard("accuracy-border-color", glslIn(backend, 9, "vec4", "a_accuracy_border_color_min") ++ glslIn(backend, 10, "vec4", "a_accuracy_border_color_max")) ++
+        guard("accuracy-border-width", glslIn(backend, 5, "vec2", "a_accuracy_border_width")) ++
+        guard("accuracy-color", glslIn(backend, 6, "vec4", "a_accuracy_color_min") ++ glslIn(backend, 7, "vec4", "a_accuracy_color_max")) ++
+        guard("accuracy-border-color", glslIn(backend, 8, "vec4", "a_accuracy_border_color_min") ++ glslIn(backend, 9, "vec4", "a_accuracy_border_color_max")) ++
         glslUbo(backend, accuracy_uniform_id, "AccuracyUBO", accuracy_ubo_members) ++
         glslOut(backend, 0, "vec2", "v_px") ++
         glslOut(backend, 1, "vec4", "v_fill") ++
@@ -483,12 +478,11 @@ fn accuracyVertexGlsl(comptime backend: GLSL) []const u8 {
         glslOut(backend, 4, "float", "v_border_w") ++
         "void main() {\n" ++
         glslEvalFloat("accuracy_radius", "a_accuracy_radius", "accuracy_radius", "accuracy_radius_t", "accuracy-radius") ++
-        glslEvalFloat("accuracy_latitude", "a_accuracy_latitude", "accuracy_latitude", "accuracy_latitude_t", "accuracy-latitude") ++
         glslEvalFloat("accuracy_border_width", "a_accuracy_border_width", "accuracy_border_width", "accuracy_border_width_t", "accuracy-border-width") ++
         glslEvalColor("vec4", "accuracy_color", "a_accuracy_color_min", "a_accuracy_color_max", "accuracy_color", "accuracy_color_t", "accuracy-color") ++
         glslEvalColor("vec4", "accuracy_border_color", "a_accuracy_border_color_min", "a_accuracy_border_color_max", "accuracy_border_color", "accuracy_border_color_t", "accuracy-border-color") ++
         glslVertexPrologue(backend) ++
-        "    float acc_px = accuracy_radius * px_per_unit / max(a_scale * cos(radians(accuracy_latitude)), 1e-6);\n" ++
+        "    float acc_px = accuracy_radius * px_per_unit / max(a_scale, 1e-6);\n" ++
         "    float half_px = acc_px + accuracy_border_width + 1.5;\n" ++
         glslVertexEpilogue(backend) ++
         "    v_px = corner * half_px;\n" ++
@@ -827,10 +821,9 @@ const accuracy_metal_source =
     mslAttr(2, "float", "a_start_time") ++
     mslAttr(3, "float", "a_scale") ++
     guard("accuracy-radius", mslAttr(4, "float2", "a_accuracy_radius")) ++
-    guard("accuracy-latitude", mslAttr(5, "float2", "a_accuracy_latitude")) ++
-    guard("accuracy-border-width", mslAttr(6, "float2", "a_accuracy_border_width")) ++
-    guard("accuracy-color", mslAttr(7, "float4", "a_accuracy_color_min") ++ mslAttr(8, "float4", "a_accuracy_color_max")) ++
-    guard("accuracy-border-color", mslAttr(9, "float4", "a_accuracy_border_color_min") ++ mslAttr(10, "float4", "a_accuracy_border_color_max")) ++
+    guard("accuracy-border-width", mslAttr(5, "float2", "a_accuracy_border_width")) ++
+    guard("accuracy-color", mslAttr(6, "float4", "a_accuracy_color_min") ++ mslAttr(7, "float4", "a_accuracy_color_max")) ++
+    guard("accuracy-border-color", mslAttr(8, "float4", "a_accuracy_border_color_min") ++ mslAttr(9, "float4", "a_accuracy_border_color_max")) ++
     "};\n" ++
     "struct AccuracyVaryings {\n" ++
     "    float4 position [[position]];\n" ++
@@ -844,14 +837,13 @@ const accuracy_metal_source =
     "    constant AccuracyUBO& u [[buffer(MLN_PLUGIN_UNIFORM_" ++ num(accuracy_uniform_id) ++ "_BINDING)]]) {\n" ++
     "    AccuracyVaryings out;\n" ++
     glslEvalFloat("accuracy_radius", "in.a_accuracy_radius", "accuracy_radius", "accuracy_radius_t", "accuracy-radius") ++
-    glslEvalFloat("accuracy_latitude", "in.a_accuracy_latitude", "accuracy_latitude", "accuracy_latitude_t", "accuracy-latitude") ++
     glslEvalFloat("accuracy_border_width", "in.a_accuracy_border_width", "accuracy_border_width", "accuracy_border_width_t", "accuracy-border-width") ++
     glslEvalColor("float4", "accuracy_color", "in.a_accuracy_color_min", "in.a_accuracy_color_max", "accuracy_color", "accuracy_color_t", "accuracy-color") ++
     glslEvalColor("float4", "accuracy_border_color", "in.a_accuracy_border_color_min", "in.a_accuracy_border_color_max", "accuracy_border_color", "accuracy_border_color_t", "accuracy-border-color") ++
     "    float2 encoded = float2(in.a_pos);\n" ++
     msl_transition ++
     msl_project ++
-    "    float acc_px = accuracy_radius * px_per_unit / max(in.a_scale * cos(radians(accuracy_latitude)), 1e-6);\n" ++
+    "    float acc_px = accuracy_radius * px_per_unit / max(in.a_scale, 1e-6);\n" ++
     "    float half_px = acc_px + accuracy_border_width + 1.5;\n" ++
     msl_emit ++
     "    out.px = corner * half_px;\n" ++
@@ -1222,12 +1214,12 @@ const accuracy_attributes = [_]c.mln_plugin_shader_attribute_v1{
     attribute(2, 2, "a_start_time", c.MLN_PLUGIN_VERTEX_FLOAT),
     attribute(3, 3, "a_scale", c.MLN_PLUGIN_VERTEX_FLOAT),
     attribute(4, 4, "a_accuracy_radius", c.MLN_PLUGIN_VERTEX_FLOAT_X2),
-    attribute(5, 5, "a_accuracy_latitude", c.MLN_PLUGIN_VERTEX_FLOAT_X2),
-    attribute(6, 6, "a_accuracy_border_width", c.MLN_PLUGIN_VERTEX_FLOAT_X2),
-    attribute(7, 7, "a_accuracy_color_min", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
-    attribute(8, 8, "a_accuracy_color_max", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
-    attribute(9, 9, "a_accuracy_border_color_min", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
-    attribute(10, 10, "a_accuracy_border_color_max", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
+    attribute(5, 5, "a_accuracy_border_width", c.MLN_PLUGIN_VERTEX_FLOAT_X2),
+    attribute(6, 6, "a_accuracy_color_min", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
+    attribute(7, 7, "a_accuracy_color_max", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
+    attribute(8, 8, "a_accuracy_border_color_min", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
+    attribute(9, 9, "a_accuracy_border_color_max", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
+    attribute(10, 10, "a_position", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
 };
 
 const sector_attributes = [_]c.mln_plugin_shader_attribute_v1{
@@ -1240,6 +1232,7 @@ const sector_attributes = [_]c.mln_plugin_shader_attribute_v1{
     attribute(6, 6, "a_bearing_visible", c.MLN_PLUGIN_VERTEX_FLOAT_X2),
     attribute(7, 7, "a_bearing_accuracy_color_min", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
     attribute(8, 8, "a_bearing_accuracy_color_max", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
+    attribute(9, 9, "a_position", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
 };
 
 const shadow_attributes = [_]c.mln_plugin_shader_attribute_v1{
@@ -1249,6 +1242,7 @@ const shadow_attributes = [_]c.mln_plugin_shader_attribute_v1{
     attribute(3, 3, "a_shadow_radius", c.MLN_PLUGIN_VERTEX_FLOAT_X2),
     attribute(4, 4, "a_shadow_color_min", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
     attribute(5, 5, "a_shadow_color_max", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
+    attribute(6, 6, "a_position", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
 };
 
 const pulse_attributes = [_]c.mln_plugin_shader_attribute_v1{
@@ -1260,6 +1254,7 @@ const pulse_attributes = [_]c.mln_plugin_shader_attribute_v1{
     attribute(5, 5, "a_pulse_period", c.MLN_PLUGIN_VERTEX_FLOAT_X2),
     attribute(6, 6, "a_pulse_color_min", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
     attribute(7, 7, "a_pulse_color_max", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
+    attribute(8, 8, "a_position", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
 };
 
 const arrow_attributes = [_]c.mln_plugin_shader_attribute_v1{
@@ -1272,6 +1267,7 @@ const arrow_attributes = [_]c.mln_plugin_shader_attribute_v1{
     attribute(6, 6, "a_bearing_visible", c.MLN_PLUGIN_VERTEX_FLOAT_X2),
     attribute(7, 7, "a_bearing_arrow_color_min", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
     attribute(8, 8, "a_bearing_arrow_color_max", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
+    attribute(9, 9, "a_position", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
 };
 
 const puck_attributes = [_]c.mln_plugin_shader_attribute_v1{
@@ -1284,6 +1280,7 @@ const puck_attributes = [_]c.mln_plugin_shader_attribute_v1{
     attribute(6, 6, "a_puck_color_max", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
     attribute(7, 7, "a_puck_border_color_min", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
     attribute(8, 8, "a_puck_border_color_max", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
+    attribute(9, 9, "a_position", c.MLN_PLUGIN_VERTEX_FLOAT_X4),
 };
 
 fn uniformBlock(
@@ -1363,10 +1360,9 @@ fn colorBinding(
 
 const accuracy_property_bindings = [_]c.mln_plugin_shader_property_binding_v1{
     floatBinding("accuracy-radius", accuracy_uniform_id, @offsetOf(AccuracyUBO, "accuracy_radius"), 4, @offsetOf(AccuracyUBO, "accuracy_radius_t")),
-    floatBinding("accuracy-latitude", accuracy_uniform_id, @offsetOf(AccuracyUBO, "accuracy_latitude"), 5, @offsetOf(AccuracyUBO, "accuracy_latitude_t")),
-    floatBinding("accuracy-border-width", accuracy_uniform_id, @offsetOf(AccuracyUBO, "accuracy_border_width"), 6, @offsetOf(AccuracyUBO, "accuracy_border_width_t")),
-    colorBinding("accuracy-color", accuracy_uniform_id, @offsetOf(AccuracyUBO, "accuracy_color"), 7, 8, @offsetOf(AccuracyUBO, "accuracy_color_t")),
-    colorBinding("accuracy-border-color", accuracy_uniform_id, @offsetOf(AccuracyUBO, "accuracy_border_color"), 9, 10, @offsetOf(AccuracyUBO, "accuracy_border_color_t")),
+    floatBinding("accuracy-border-width", accuracy_uniform_id, @offsetOf(AccuracyUBO, "accuracy_border_width"), 5, @offsetOf(AccuracyUBO, "accuracy_border_width_t")),
+    colorBinding("accuracy-color", accuracy_uniform_id, @offsetOf(AccuracyUBO, "accuracy_color"), 6, 7, @offsetOf(AccuracyUBO, "accuracy_color_t")),
+    colorBinding("accuracy-border-color", accuracy_uniform_id, @offsetOf(AccuracyUBO, "accuracy_border_color"), 8, 9, @offsetOf(AccuracyUBO, "accuracy_border_color_t")),
 };
 
 const sector_property_bindings = [_]c.mln_plugin_shader_property_binding_v1{
@@ -1498,10 +1494,27 @@ const default_puck_border_width = 2.0;
 const default_bearing_accuracy_radius = 64.0;
 
 const property_descriptors = [_]c.mln_plugin_property_descriptor_v1{
-    floatProperty("bearing", 0, true, null, null),
+    .{
+        .struct_size = @sizeOf(c.mln_plugin_property_descriptor_v1),
+        .name = str("position"),
+        .type = c.MLN_PLUGIN_VALUE_FLOAT2,
+        .default_value = .{
+            .struct_size = @sizeOf(c.mln_plugin_value),
+            .type = c.MLN_PLUGIN_VALUE_FLOAT2,
+            .data = .{ .float2_value = .{ .x = 0, .y = 0 } },
+        },
+        .expression_capabilities = camera_only_capabilities,
+        .supports_transitions = 1,
+        .has_minimum = 0,
+        .has_maximum = 0,
+        .minimum = 0,
+        .maximum = 0,
+        .enum_values = null,
+        .enum_value_count = 0,
+    },
+    floatProperty("bearing", 0, false, null, null),
     floatProperty("bearing-visible", 0, false, 0, 1),
-    floatProperty("accuracy-radius", 0, true, 0, null),
-    floatProperty("accuracy-latitude", 0, true, -90, 90),
+    floatProperty("accuracy-radius", 0, false, 0, null),
     floatProperty("accuracy-border-width", 0, false, 0, null),
     floatProperty("bearing-accuracy", 0, false, 0, 180),
     floatProperty("bearing-accuracy-radius", default_bearing_accuracy_radius, false, 0, null),
@@ -1521,124 +1534,31 @@ const property_descriptors = [_]c.mln_plugin_property_descriptor_v1{
 };
 
 // --------------------------------------------------------------------------
-// Position transitions
+// Frame building
 //
-// The host cannot help here: position is geometry, not a property, and the
-// layout context carries no tile x/y, so cross-tile position math is
-// impossible. But a move inside one tile arrives right here in layout, so the
-// plugin smooths it: a small process-global registry remembers the previous
-// tile-space position per feature, and the vertex shader eases from it to the
-// new position over a fixed 300 ms. First sightings, stale entries, and large
-// jumps teleport.
+// The layer is source-free: geometry arrives per rendered frame from the
+// host's frame callback, with the camera-evaluated paint values and a screen
+// projection. The position property transitions on the host, so build_frame
+// simply projects the evaluated position and emits the six component quads in
+// frame units: a virtual tile grid of 8192 units over the viewport, mapped to
+// NDC by the frame matrix written in update_uniform_block.
 // --------------------------------------------------------------------------
 
-const PositionTransition = struct {
-    /// Tile-space position the indicator is coming from.
-    prev: [2]f32,
-    /// Tile-space position the indicator is going to.
-    target: [2]f32,
-    /// Monotonic seconds when the move started.
-    start: f32,
-    /// Monotonic seconds of the last layout that touched this entry.
-    seen: f32,
-};
+/// Frame-unit grid over the viewport; frameMatrix maps it to NDC.
+const frame_extent: f64 = 8192;
 
-var position_registry_mutex: std.Io.Mutex = std.Io.Mutex.init;
-var position_registry: std.AutoHashMapUnmanaged(u64, PositionTransition) = .empty;
+const vertices_per_point = quads_per_point * vertices_per_quad;
 
-fn easePosition(t: f32) f32 {
-    const x = std.math.clamp(t, 0.0, 1.0);
-    return x * x * (3.0 - 2.0 * x);
-}
+const corners = [vertices_per_quad][2]i16{ .{ 0, 0 }, .{ 1, 0 }, .{ 1, 1 }, .{ 0, 1 } };
 
-fn transitionPosition(entry: PositionTransition, now: f32) [2]f32 {
-    const t = easePosition((now - entry.start) / position_transition_seconds);
-    return .{
-        entry.prev[0] + (entry.target[0] - entry.prev[0]) * t,
-        entry.prev[1] + (entry.target[1] - entry.prev[1]) * t,
-    };
-}
-
-fn packPrevPos(value: f32) i16 {
-    return @intFromFloat(std.math.clamp(@round(value), -32768.0, 32767.0));
-}
-
-/// Resolves the previous position and start time for one owned point. Keyed
-/// only by feature index, so two maps with a location-puck layer can
-/// cross-talk; the jump threshold makes that benign (the second map simply
-/// never animates). Stale entries are pruned so the registry cannot grow.
-fn resolvePositionTransition(
-    feature_index: u64,
-    x: i16,
-    y: i16,
-    extent: i32,
-    now: f32,
-) struct { prev: [2]i16, start: f32 } {
-    const point = [2]f32{ @floatFromInt(x), @floatFromInt(y) };
-    var prev = point;
-    var start = now - position_transition_seconds;
-
-    std.Io.Threaded.mutexLock(&position_registry_mutex);
-    defer std.Io.Threaded.mutexUnlock(&position_registry_mutex);
-
-    if (position_registry.getPtr(feature_index)) |entry| {
-        if (entry.target[0] == point[0] and entry.target[1] == point[1]) {
-            // An unrelated re-layout keeps the glide in flight.
-            prev = entry.prev;
-            start = entry.start;
-            entry.seen = now;
-        } else {
-            const quarter = @as(f32, @floatFromInt(extent)) / 4.0;
-            if (now - entry.seen < position_transition_stale_seconds and
-                @abs(point[0] - entry.target[0]) < quarter and
-                @abs(point[1] - entry.target[1]) < quarter)
-            {
-                // A move: ease from the currently displayed position, so a
-                // redirect mid-glide does not snap.
-                prev = transitionPosition(entry.*, now);
-                start = now;
-            }
-            entry.* = .{ .prev = prev, .target = point, .start = start, .seen = now };
-        }
-    } else {
-        position_registry.put(allocator, feature_index, .{
-            .prev = prev,
-            .target = point,
-            .start = start,
-            .seen = now,
-        }) catch {};
-    }
-
-    var stale_keys: [16]u64 = undefined;
-    var stale_count: usize = 0;
-    var it = position_registry.iterator();
-    while (it.next()) |entry| {
-        if (now - entry.value_ptr.seen < position_transition_stale_seconds) continue;
-        if (stale_count == stale_keys.len) break;
-        stale_keys[stale_count] = entry.key_ptr.*;
-        stale_count += 1;
-    }
-    for (stale_keys[0..stale_count]) |key| _ = position_registry.remove(key);
-
-    return .{ .prev = .{ packPrevPos(prev[0]), packPrevPos(prev[1]) }, .start = start };
-}
-
-// --------------------------------------------------------------------------
-// Layout instance
-// --------------------------------------------------------------------------
-
-const Layout = struct {
-    extent: i32,
-    zoom: f32,
-    point_count: u32,
-    vertices: std.ArrayList(Vertex),
-    segments: [quads_per_point]std.ArrayList(c.mln_plugin_segment_v1),
-    ranges: std.ArrayList(c.mln_plugin_feature_vertex_range_v1),
-    indices: [indices_per_quad]u16,
-    stream: c.mln_plugin_vertex_stream_v1,
+const Frame = struct {
+    vertices: [vertices_per_point]Vertex,
+    segments: [quads_per_point]c.mln_plugin_segment_v1,
     drawables: [quads_per_point]c.mln_plugin_drawable_descriptor_v1,
     accuracy_bindings: [4]c.mln_plugin_attribute_binding_v1,
     stream_bindings: [3]c.mln_plugin_attribute_binding_v1,
+    stream: c.mln_plugin_vertex_stream_v1,
+    indices: [indices_per_quad]u16,
 };
 
 fn streamBinding(attribute_id: u32, byte_offset: u32) c.mln_plugin_attribute_binding_v1 {
@@ -1650,177 +1570,145 @@ fn streamBinding(attribute_id: u32, byte_offset: u32) c.mln_plugin_attribute_bin
     };
 }
 
-fn createLayout(
-    context: [*c]const c.mln_plugin_layout_context_v1,
-    layout_instance: [*c]?*anyopaque,
-) callconv(.c) c.mln_plugin_status {
-    if (context == null or layout_instance == null) return c.MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
-    const ctx: *const c.mln_plugin_layout_context_v1 = context;
-    if (ctx.struct_size < @sizeOf(c.mln_plugin_layout_context_v1)) return c.MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
-    const layout = allocator.create(Layout) catch return c.MLN_PLUGIN_STATUS_CALLBACK_ERROR;
-    layout.* = .{
-        .extent = @intCast(ctx.extent),
-        .zoom = ctx.zoom,
-        .point_count = 0,
-        .vertices = .empty,
-        .segments = .{ .empty, .empty, .empty, .empty, .empty, .empty },
-        .ranges = .empty,
-        .indices = .{ 0, 1, 2, 0, 2, 3 },
-        .stream = std.mem.zeroes(c.mln_plugin_vertex_stream_v1),
-        .drawables = undefined,
-        .accuracy_bindings = .{
-            streamBinding(0, @offsetOf(Vertex, "packed_pos")),
-            streamBinding(1, @offsetOf(Vertex, "prev_pos")),
-            streamBinding(2, @offsetOf(Vertex, "start_time")),
-            streamBinding(3, @offsetOf(Vertex, "scale")),
-        },
-        .stream_bindings = .{
-            streamBinding(0, @offsetOf(Vertex, "packed_pos")),
-            streamBinding(1, @offsetOf(Vertex, "prev_pos")),
-            streamBinding(2, @offsetOf(Vertex, "start_time")),
-        },
-    };
-    layout_instance.* = layout;
-    return c.MLN_PLUGIN_STATUS_OK;
+// build_frame may run concurrently on several render threads, one per map, so
+// each thread gets its own frame storage.
+threadlocal var frame_storage: ?*Frame = null;
+
+fn frameStorage() ?*Frame {
+    if (frame_storage == null) {
+        const frame = allocator.create(Frame) catch return null;
+        frame.* = .{
+            .vertices = undefined,
+            .segments = undefined,
+            .drawables = undefined,
+            .accuracy_bindings = .{
+                streamBinding(0, @offsetOf(Vertex, "packed_pos")),
+                streamBinding(1, @offsetOf(Vertex, "prev_pos")),
+                streamBinding(2, @offsetOf(Vertex, "start_time")),
+                streamBinding(3, @offsetOf(Vertex, "scale")),
+            },
+            .stream_bindings = .{
+                streamBinding(0, @offsetOf(Vertex, "packed_pos")),
+                streamBinding(1, @offsetOf(Vertex, "prev_pos")),
+                streamBinding(2, @offsetOf(Vertex, "start_time")),
+            },
+            .stream = std.mem.zeroes(c.mln_plugin_vertex_stream_v1),
+            .indices = .{ 0, 1, 2, 0, 2, 3 },
+        };
+        frame_storage = frame;
+    }
+    return frame_storage;
 }
 
-const corners = [vertices_per_quad][2]i16{ .{ 0, 0 }, .{ 1, 0 }, .{ 1, 1 }, .{ 0, 1 } };
+fn findFloat2(properties: []const c.mln_plugin_property_value_v1, comptime name: []const u8, default: [2]f64) [2]f64 {
+    for (properties) |property| {
+        if (property.struct_size < @sizeOf(c.mln_plugin_property_value_v1)) continue;
+        if (property.name.data == null or property.name.size != name.len) continue;
+        if (!std.mem.eql(u8, property.name.data[0..name.len], name)) continue;
+        if (property.value.type != c.MLN_PLUGIN_VALUE_FLOAT2) continue;
+        return .{ property.value.data.float2_value.x, property.value.data.float2_value.y };
+    }
+    return default;
+}
 
-fn layoutFeature(
-    instance: ?*anyopaque,
-    feature: [*c]const c.mln_plugin_feature_v1,
+fn packFrameUnit(value: f64) i16 {
+    return @intFromFloat(std.math.clamp(@round(value), -32768.0, 32767.0));
+}
+
+fn buildFrame(
+    context: [*c]const c.mln_plugin_frame_context_v1,
+    bucket: [*c]c.mln_plugin_bucket_v1,
 ) callconv(.c) c.mln_plugin_status {
-    const layout: *Layout = @ptrCast(@alignCast(instance orelse return c.MLN_PLUGIN_STATUS_INVALID_ARGUMENT));
-    if (feature == null) return c.MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
-    const feat: *const c.mln_plugin_feature_v1 = feature;
-    if (feat.struct_size < @sizeOf(c.mln_plugin_feature_v1) or
-        feat.geometry_type != c.MLN_PLUGIN_GEOMETRY_POINT or
-        (feat.point_count != 0 and feat.points == null))
+    if (context == null or bucket == null) return c.MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
+    const ctx: *const c.mln_plugin_frame_context_v1 = context;
+    const out: *c.mln_plugin_bucket_v1 = bucket;
+    if (ctx.struct_size < @sizeOf(c.mln_plugin_frame_context_v1) or
+        out.struct_size < @sizeOf(c.mln_plugin_bucket_v1) or
+        ctx.project_screen == null or ctx.viewport_width == 0 or ctx.viewport_height == 0 or
+        (ctx.property_count != 0 and ctx.properties == null))
     {
         return c.MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
     }
+    const frame = frameStorage() orelse return c.MLN_PLUGIN_STATUS_CALLBACK_ERROR;
+    const props: []const c.mln_plugin_property_value_v1 =
+        if (ctx.property_count != 0) ctx.properties[0..ctx.property_count] else &.{};
 
-    for (feat.points[0..feat.point_count]) |point| {
-        // Half-open tile ownership keeps a point on a boundary in one tile.
-        if (point.x < 0 or point.y < 0 or point.x >= layout.extent or point.y >= layout.extent) continue;
-        if (layout.point_count >= max_points_per_tile) return c.MLN_PLUGIN_STATUS_CALLBACK_ERROR;
-        layout.point_count += 1;
+    const position = findFloat2(props, "position", .{ 0, 0 });
+    var screen_x: f64 = 0;
+    var screen_y: f64 = 0;
+    ctx.project_screen.?(ctx, position[0], position[1], &screen_x, &screen_y);
+    const unit_x = screen_x * frame_extent / @as(f64, @floatFromInt(ctx.viewport_width));
+    const unit_y = screen_y * frame_extent / @as(f64, @floatFromInt(ctx.viewport_height));
 
-        const base: u32 = @intCast(layout.vertices.items.len);
-        const scale = earth_circumference_meters /
-            (@as(f32, @floatFromInt(layout.extent)) * std.math.exp2(layout.zoom));
-        const transition = resolvePositionTransition(feat.feature_index, point.x, point.y, layout.extent, timeSeconds());
-        for (0..quads_per_point) |component| {
-            for (corners) |corner| {
-                layout.vertices.append(allocator, .{
-                    .packed_pos = .{ point.x * 2 + corner[0], point.y * 2 + corner[1] },
-                    .prev_pos = transition.prev,
-                    .scale = scale,
-                    .start_time = transition.start,
-                }) catch return c.MLN_PLUGIN_STATUS_CALLBACK_ERROR;
-            }
-            layout.segments[component].append(allocator, .{
-                .struct_size = @sizeOf(c.mln_plugin_segment_v1),
-                .vertex_offset = base + @as(u32, @intCast(component)) * vertices_per_quad,
-                .index_offset = 0,
-                .vertex_length = vertices_per_quad,
-                .index_length = indices_per_quad,
-            }) catch return c.MLN_PLUGIN_STATUS_CALLBACK_ERROR;
-        }
-        // The host requires every drawable's feature ranges to cover the whole
-        // shared vertex stream exactly once, so each drawable key gets one
-        // range per component quad.
-        for (0..quads_per_point) |drawable| {
-            for (0..quads_per_point) |component| {
-                layout.ranges.append(allocator, .{
-                    .struct_size = @sizeOf(c.mln_plugin_feature_vertex_range_v1),
-                    .feature_index = feat.feature_index,
-                    .drawable_key = drawable + 1,
-                    .first_vertex = base + @as(u32, @intCast(component)) * vertices_per_quad,
-                    .vertex_count = vertices_per_quad,
-                }) catch return c.MLN_PLUGIN_STATUS_CALLBACK_ERROR;
-            }
-        }
+    // Bake meters to frame units into the accuracy vertices. The shader's
+    // epsilon projection over the frame matrix measures viewport_width /
+    // frame_extent pixels per unit.
+    const cos_latitude = @max(@cos(std.math.degreesToRadians(position[0])), 1e-4);
+    const meters_per_pixel = earth_circumference_meters * cos_latitude / (512.0 * std.math.exp2(ctx.zoom));
+    const px_per_unit = @as(f64, @floatFromInt(ctx.viewport_width)) / frame_extent;
+    const scale: f32 = @floatCast(px_per_unit * @max(meters_per_pixel, 1e-9));
+
+    const center = [2]i16{ packFrameUnit(unit_x), packFrameUnit(unit_y) };
+    const start_time: f32 = @floatCast(ctx.time_seconds);
+    for (&frame.vertices, 0..) |*vertex, index| {
+        const corner = corners[index % vertices_per_quad];
+        vertex.* = .{
+            .packed_pos = .{ center[0] * 2 + corner[0], center[1] * 2 + corner[1] },
+            .prev_pos = center,
+            .scale = scale,
+            .start_time = start_time,
+        };
     }
-    return c.MLN_PLUGIN_STATUS_OK;
-}
 
-fn drawableDescriptor(
-    drawable_key: u64,
-    comptime shader_id: []const u8,
-    bindings: []const c.mln_plugin_attribute_binding_v1,
-    segments: []const c.mln_plugin_segment_v1,
-) c.mln_plugin_drawable_descriptor_v1 {
-    return .{
-        .struct_size = @sizeOf(c.mln_plugin_drawable_descriptor_v1),
-        .drawable_key = drawable_key,
-        .shader_id = str(shader_id),
-        .attributes = bindings.ptr,
-        .attribute_count = bindings.len,
-        .segments = segments.ptr,
-        .segment_count = segments.len,
+    for (&frame.segments, 0..) |*segment, component| {
+        segment.* = .{
+            .struct_size = @sizeOf(c.mln_plugin_segment_v1),
+            .vertex_offset = @intCast(component * vertices_per_quad),
+            .index_offset = 0,
+            .vertex_length = vertices_per_quad,
+            .index_length = indices_per_quad,
+        };
+    }
+    const drawable_specs = [quads_per_point]struct { key: u64, shader: []const u8 }{
+        .{ .key = drawable_accuracy, .shader = shader_accuracy },
+        .{ .key = drawable_sector, .shader = shader_sector },
+        .{ .key = drawable_shadow, .shader = shader_shadow },
+        .{ .key = drawable_pulse, .shader = shader_pulse },
+        .{ .key = drawable_arrow, .shader = shader_arrow },
+        .{ .key = drawable_puck, .shader = shader_puck },
     };
-}
-
-fn finishLayout(
-    instance: ?*anyopaque,
-    bucket: [*c]c.mln_plugin_bucket_v1,
-) callconv(.c) c.mln_plugin_status {
-    const layout: *Layout = @ptrCast(@alignCast(instance orelse return c.MLN_PLUGIN_STATUS_INVALID_ARGUMENT));
-    if (bucket == null) return c.MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
-    const out: *c.mln_plugin_bucket_v1 = bucket;
-    if (out.struct_size < @sizeOf(c.mln_plugin_bucket_v1)) {
-        return c.MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
-    }
-    const empty = layout.vertices.items.len == 0;
-    if (empty) {
-        out.vertex_streams = null;
-        out.vertex_stream_count = 0;
-        out.indices = null;
-        out.index_count = 0;
-        out.drawables = null;
-        out.drawable_count = 0;
-        out.query_radius = 0;
-        out.feature_vertex_ranges = null;
-        out.feature_vertex_range_count = 0;
-        return c.MLN_PLUGIN_STATUS_OK;
+    for (&frame.drawables, drawable_specs, 0..) |*drawable, spec, component| {
+        const bindings: []const c.mln_plugin_attribute_binding_v1 =
+            if (component == component_accuracy) &frame.accuracy_bindings else &frame.stream_bindings;
+        drawable.* = .{
+            .struct_size = @sizeOf(c.mln_plugin_drawable_descriptor_v1),
+            .drawable_key = spec.key,
+            .shader_id = .{ .data = spec.shader.ptr, .size = spec.shader.len },
+            .attributes = bindings.ptr,
+            .attribute_count = bindings.len,
+            .segments = &frame.segments[component],
+            .segment_count = 1,
+        };
     }
 
-    layout.stream = .{
+    frame.stream = .{
         .struct_size = @sizeOf(c.mln_plugin_vertex_stream_v1),
         .stream_id = 0,
-        .data = @ptrCast(layout.vertices.items.ptr),
-        .data_size = layout.vertices.items.len * @sizeOf(Vertex),
-        .vertex_count = @intCast(layout.vertices.items.len),
+        .data = @ptrCast(&frame.vertices),
+        .data_size = @sizeOf(@TypeOf(frame.vertices)),
+        .vertex_count = vertices_per_point,
         .stride = @sizeOf(Vertex),
     };
-    layout.drawables = .{
-        drawableDescriptor(drawable_accuracy, shader_accuracy, &layout.accuracy_bindings, layout.segments[component_accuracy].items),
-        drawableDescriptor(drawable_sector, shader_sector, &layout.stream_bindings, layout.segments[component_sector].items),
-        drawableDescriptor(drawable_shadow, shader_shadow, &layout.stream_bindings, layout.segments[component_shadow].items),
-        drawableDescriptor(drawable_pulse, shader_pulse, &layout.stream_bindings, layout.segments[component_pulse].items),
-        drawableDescriptor(drawable_arrow, shader_arrow, &layout.stream_bindings, layout.segments[component_arrow].items),
-        drawableDescriptor(drawable_puck, shader_puck, &layout.stream_bindings, layout.segments[component_puck].items),
-    };
-    out.vertex_streams = &layout.stream;
+    out.vertex_streams = &frame.stream;
     out.vertex_stream_count = 1;
-    out.indices = &layout.indices;
-    out.index_count = layout.indices.len;
-    out.drawables = &layout.drawables;
-    out.drawable_count = layout.drawables.len;
-    // The optional get_query_radius callback handles the broad phase.
+    out.indices = &frame.indices;
+    out.index_count = frame.indices.len;
+    out.drawables = &frame.drawables;
+    out.drawable_count = frame.drawables.len;
     out.query_radius = 0;
-    out.feature_vertex_ranges = layout.ranges.items.ptr;
-    out.feature_vertex_range_count = layout.ranges.items.len;
+    out.feature_vertex_ranges = null;
+    out.feature_vertex_range_count = 0;
     return c.MLN_PLUGIN_STATUS_OK;
-}
-
-fn destroyLayout(instance: ?*anyopaque) callconv(.c) void {
-    const layout: *Layout = @ptrCast(@alignCast(instance orelse return));
-    layout.vertices.deinit(allocator);
-    for (&layout.segments) |*segments| segments.deinit(allocator);
-    layout.ranges.deinit(allocator);
-    allocator.destroy(layout);
 }
 
 // --------------------------------------------------------------------------
@@ -1836,6 +1724,13 @@ fn timeSeconds() f32 {
     return @floatCast(@mod(seconds, 3600.0));
 }
 
+/// The source-free projection: a virtual tile grid of 8192 units over the
+/// viewport, y down, matching the frame-unit vertices build_frame emits.
+fn frameMatrix() [16]f32 {
+    const scale = 2.0 / frame_extent;
+    return .{ scale, 0, 0, 0, 0, -scale, 0, 0, 0, 0, 1, 0, -1, 1, 0, 1 };
+}
+
 fn writeBlock(
     comptime T: type,
     context: *const c.mln_plugin_uniform_context_v1,
@@ -1844,7 +1739,7 @@ fn writeBlock(
 ) c.mln_plugin_status {
     if (output_size != @sizeOf(T)) return c.MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
     var block: T = std.mem.zeroes(T);
-    block.matrix = context.tile_matrix;
+    block.matrix = frameMatrix();
     block.camera = .{
         context.pixels_to_gl_units[0],
         context.pixels_to_gl_units[1],
@@ -1891,144 +1786,6 @@ fn findFloat(properties: []const c.mln_plugin_property_value_v1, comptime name: 
     return default;
 }
 
-fn projectToScreen(
-    m: *const [16]f64,
-    x: f64,
-    y: f64,
-    viewport_width: f64,
-    viewport_height: f64,
-) [2]f64 {
-    const clip_x = m[0] * x + m[4] * y + m[12];
-    const clip_y = m[1] * x + m[5] * y + m[13];
-    const clip_w = m[3] * x + m[7] * y + m[15];
-    if (clip_w == 0) return .{ 0, 0 };
-    const ndc_x = clip_x / clip_w;
-    const ndc_y = clip_y / clip_w;
-    return .{ (ndc_x * 0.5 + 0.5) * viewport_width, (0.5 - ndc_y * 0.5) * viewport_height };
-}
-
-fn pointInTriangle(px: f64, py: f64, a: [2]f64, b: [2]f64, d: [2]f64) bool {
-    const d1 = (px - b[0]) * (a[1] - b[1]) - (a[0] - b[0]) * (py - b[1]);
-    const d2 = (px - d[0]) * (b[1] - d[1]) - (b[0] - d[0]) * (py - d[1]);
-    const d3 = (px - a[0]) * (d[1] - a[1]) - (d[0] - a[0]) * (py - a[1]);
-    const has_neg = d1 < 0 or d2 < 0 or d3 < 0;
-    const has_pos = d1 > 0 or d2 > 0 or d3 > 0;
-    return !(has_neg and has_pos);
-}
-
-fn queryFeature(
-    feature: [*c]const c.mln_plugin_feature_v1,
-    query_geometry: [*c]const c.mln_plugin_tile_point_v1,
-    query_geometry_count: usize,
-    context: [*c]const c.mln_plugin_query_context_v1,
-    properties: [*c]const c.mln_plugin_property_value_v1,
-    property_count: usize,
-) callconv(.c) u8 {
-    if (feature == null or context == null) return 0;
-    const feat: *const c.mln_plugin_feature_v1 = feature;
-    const ctx: *const c.mln_plugin_query_context_v1 = context;
-    if (feat.struct_size < @sizeOf(c.mln_plugin_feature_v1) or
-        ctx.struct_size < @sizeOf(c.mln_plugin_query_context_v1)) return 0;
-    if (query_geometry_count != 0 and query_geometry == null) return 0;
-    if (property_count != 0 and properties == null) return 0;
-    if (feat.point_count != 0 and feat.points == null) return 0;
-    const props: []const c.mln_plugin_property_value_v1 =
-        if (property_count != 0) properties[0..property_count] else &.{};
-
-    const puck_radius = findFloat(props, "puck-radius", default_puck_radius);
-    const puck_border_width = findFloat(props, "puck-border-width", default_puck_border_width);
-    const bearing_visible = findFloat(props, "bearing-visible", 0);
-    const bearing = findFloat(props, "bearing", 0);
-    const sector_half_width = findFloat(props, "bearing-accuracy", 0);
-    const sector_radius = findFloat(props, "bearing-accuracy-radius", default_bearing_accuracy_radius);
-    // The arrow derives from the puck: apex at 1.8x the outer puck radius.
-    const arrow_outer = puck_radius + puck_border_width;
-
-    const viewport_width: f64 = @floatFromInt(ctx.viewport_width);
-    const viewport_height: f64 = @floatFromInt(ctx.viewport_height);
-    const bearing_rel = std.math.degreesToRadians(bearing) + ctx.bearing;
-    const dir = [2]f64{ @sin(bearing_rel), @cos(bearing_rel) };
-
-    const puck_limit = puck_radius + puck_border_width + 0.5;
-    for (feat.points[0..feat.point_count]) |point| {
-        const feature_screen = projectToScreen(&ctx.tile_matrix, point.x, point.y, viewport_width, viewport_height);
-        for (0..query_geometry_count) |query_index| {
-            const query = query_geometry[query_index];
-            const query_screen = projectToScreen(&ctx.tile_matrix, query.x, query.y, viewport_width, viewport_height);
-            // Offset in screen pixels, y up to match the shader direction
-            // convention.
-            const dx = query_screen[0] - feature_screen[0];
-            const dy = -(query_screen[1] - feature_screen[1]);
-            const distance_squared = dx * dx + dy * dy;
-            if (distance_squared <= puck_limit * puck_limit) return 1;
-            if (bearing_visible > 0 and arrow_outer > 0) {
-                const apex = [2]f64{ dir[0] * arrow_outer * 1.8, dir[1] * arrow_outer * 1.8 };
-                const base = [2]f64{ dir[0] * arrow_outer * 0.5, dir[1] * arrow_outer * 0.5 };
-                const perp = [2]f64{ -dir[1] * arrow_outer * 0.7, dir[0] * arrow_outer * 0.7 };
-                if (pointInTriangle(
-                    dx,
-                    dy,
-                    apex,
-                    .{ base[0] + perp[0], base[1] + perp[1] },
-                    .{ base[0] - perp[0], base[1] - perp[1] },
-                )) return 1;
-            }
-            if (bearing_visible > 0 and sector_half_width > 0 and sector_radius > 0 and
-                distance_squared <= sector_radius * sector_radius)
-            {
-                const distance = @sqrt(distance_squared);
-                const along = dx * dir[0] + dy * dir[1];
-                if (along >= distance * @cos(std.math.degreesToRadians(sector_half_width))) return 1;
-            }
-        }
-    }
-    return 0;
-}
-
-fn radiusContribution(puck_radius: *f32, puck_border: *f32, others: *f32, name: c.mln_plugin_string, value: c.mln_plugin_value) void {
-    if (name.data == null or value.type != c.MLN_PLUGIN_VALUE_FLOAT) return;
-    const property_name = name.data[0..name.size];
-    const v = value.data.float_value;
-    if (std.mem.eql(u8, property_name, "puck-radius")) {
-        puck_radius.* = @max(puck_radius.*, v);
-    } else if (std.mem.eql(u8, property_name, "puck-border-width")) {
-        puck_border.* = @max(puck_border.*, v);
-    } else if (std.mem.eql(u8, property_name, "bearing-accuracy-radius") or
-        std.mem.eql(u8, property_name, "shadow-radius") or
-        std.mem.eql(u8, property_name, "pulse-radius"))
-    {
-        others.* = @max(others.*, v);
-    }
-}
-
-fn getQueryRadius(
-    statistics: [*c]const c.mln_plugin_property_statistics_v1,
-    statistics_count: usize,
-    camera_properties: [*c]const c.mln_plugin_property_value_v1,
-    camera_property_count: usize,
-) callconv(.c) f32 {
-    var puck_radius: f32 = 0;
-    var puck_border: f32 = 0;
-    var others: f32 = 0;
-    if (camera_properties != null) {
-        for (camera_properties[0..camera_property_count]) |property| {
-            if (property.struct_size < @sizeOf(c.mln_plugin_property_value_v1)) continue;
-            radiusContribution(&puck_radius, &puck_border, &others, property.name, property.value);
-        }
-    }
-    if (statistics != null) {
-        for (statistics[0..statistics_count]) |stat| {
-            if (stat.struct_size < @sizeOf(c.mln_plugin_property_statistics_v1)) continue;
-            radiusContribution(&puck_radius, &puck_border, &others, stat.property_name, stat.maximum);
-        }
-    }
-    // The arrow apex reaches 1.8x the outer puck radius.
-    return @max(others, (puck_radius + puck_border) * 1.8);
-}
-
-/// Animation signal for the host's repaint loop: the pulse runs while
-/// `pulse-radius` is above zero. Returning 0 when the pulse is off keeps the
-/// map from burning frames.
 fn shouldAnimate(
     properties: [*c]const c.mln_plugin_property_value_v1,
     property_count: usize,
@@ -2052,14 +1809,16 @@ const layer_type = c.mln_plugin_layer_type_v1{
     .geometry_type_mask = c.MLN_PLUGIN_GEOMETRY_POINT,
     .shaders = &shaders,
     .shader_count = shaders.len,
-    .create_layout = createLayout,
-    .layout_feature = layoutFeature,
-    .finish_layout = finishLayout,
-    .destroy_layout = destroyLayout,
-    .query_feature = queryFeature,
+    .create_layout = null,
+    .layout_feature = null,
+    .finish_layout = null,
+    .destroy_layout = null,
+    .query_feature = null,
     .update_uniform_block = updateUniformBlock,
-    .get_query_radius = getQueryRadius,
+    .get_query_radius = null,
     .should_animate = shouldAnimate,
+    .source_free = 1,
+    .build_frame = buildFrame,
 };
 
 const plugin_descriptor = c.mln_plugin_descriptor_v1{
@@ -2111,16 +1870,4 @@ pub fn registerWith(register_fn: c.mln_plugin_register_function_v1) RegisterErro
             return error.PluginRegistrationFailed;
         },
     }
-}
-
-/// Writes one GeoJSON point feature carrying a location and the feature
-/// properties that the layer's data-driven paint properties read. Bind
-/// `bearing` to ["get","bearing"], `accuracy-radius` to ["get","accuracy"],
-/// and `accuracy-latitude` to ["get","latitude"], then move, rotate, and
-/// rescale the indicator by installing fresh GeoJSON on the source.
-pub fn locationFeatureJson(writer: anytype, lat: f64, lng: f64, bearing: f64, accuracy_m: f64) !void {
-    try writer.print(
-        "{{\"type\":\"Feature\",\"geometry\":{{\"type\":\"Point\",\"coordinates\":[{d},{d}]}},\"properties\":{{\"bearing\":{d},\"accuracy\":{d},\"latitude\":{d}}}}}",
-        .{ lng, lat, bearing, accuracy_m, lat },
-    );
 }

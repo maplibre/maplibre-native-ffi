@@ -126,11 +126,15 @@ results.
 ## Layer plugins
 
 MapLibre Native's plugin API lets native code add style layer types. A plugin
-declares paint properties and shaders for each render backend, lays out tile
-features into vertex data on tile workers, and fills uniform blocks on the
-render thread. The renderer owns the GPU resources and draws the result like any
-other layer, so a style names the layer type and sets its paint properties the
-same way it does for built-in layers.
+declares paint properties and shaders for each render backend and fills uniform
+blocks on the render thread. Geometry arrives one of two ways. A tile-driven
+layer takes a style source and lays out its tile features into vertex data on
+tile workers. A source-free layer takes no source and instead receives a
+per-frame callback with the camera-evaluated paint values and a screen
+projection; its constant properties — position and bearing for a location
+indicator, for example — transition like any built-in paint property, while
+tile-driven data-driven properties never transition. Source-free layers cannot
+declare data-driven properties and receive no feature hit-testing.
 
 This library builds plugin support into its core and exports the registration
 entry point. A plugin registers once per process, before a style that uses its

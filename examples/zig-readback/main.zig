@@ -18,17 +18,13 @@ const height = 512;
 const style_url = "https://tiles.openfreemap.org/styles/bright";
 const park_timeout_milliseconds = 100;
 
-// The location-puck plugin (plugins/location-indicator) adds its indicator
-// over the bright style at the camera center.
-const puck_source_json =
-    "{\"type\":\"geojson\",\"data\":" ++
-    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[-122.4194,37.7749]}," ++
-    "\"properties\":{\"bearing\":35,\"accuracy\":80,\"latitude\":37.7749}}}";
+// The location-puck plugin (plugins/location-indicator) adds its source-free
+// indicator over the bright style at the camera center.
 const puck_layer_json =
-    "{\"id\":\"puck\",\"type\":\"location-puck\",\"source\":\"puck\",\"paint\":{" ++
-    "\"bearing\":[\"get\",\"bearing\"]," ++
-    "\"accuracy-radius\":[\"get\",\"accuracy\"]," ++
-    "\"accuracy-latitude\":[\"get\",\"latitude\"]," ++
+    "{\"id\":\"puck\",\"type\":\"location-puck\",\"paint\":{" ++
+    "\"position\":[37.7749,-122.4194]," ++
+    "\"bearing\":35," ++
+    "\"accuracy-radius\":80," ++
     "\"bearing-accuracy\":25," ++
     "\"bearing-accuracy-radius\":90," ++
     "\"bearing-visible\":1," ++
@@ -116,10 +112,9 @@ fn pumpUntilSessionCloses(
                 !std.meta.eql(event.source_id.?, map_id)) continue;
             switch (event.event_type) {
                 .map_render_update_available => shared.requestRender(),
-                // The plugin source and layer attach once the base style is
-                // live; the still image request then covers them.
+                // The source-free plugin layer attaches once the base style is
+                // live; the still image request then covers it.
                 .map_style_loaded => {
-                    try map.addStyleSourceJson(args.allocator, "puck", puck_source_json);
                     try map.addStyleLayerJson(args.allocator, puck_layer_json, "");
                     try map.requestStillImage();
                 },

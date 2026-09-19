@@ -4,9 +4,15 @@ A MapLibre Native layer plugin, written in Zig, that registers the
 `location-puck` style layer type through the C plugin ABI
 (`mln/plugin/plugin_api.h`). A `location-puck` layer draws a procedural device
 location indicator — puck, white border, bearing arrow, bearing-accuracy sector,
-accuracy circle, shadow, and pulse ring — around each point feature of a GeoJSON
-or vector source. All shapes are drawn analytically in the fragment shaders, so
-the layer needs no sprite images.
+accuracy circle, shadow, and pulse ring — at one geographic position. All shapes
+are drawn analytically in the fragment shaders, so the layer needs no sprite
+images.
+
+The layer is source-free: it takes no source in the style. Its geometry arrives
+on every rendered frame from the plugin's `build_frame` callback, which projects
+the evaluated `position` to screen space. Every paint property is a constant or
+camera expression, so every property — including `position` and `bearing` —
+transitions smoothly over the style's transition duration.
 
 The plugin works on the OpenGL, Vulkan, and Metal backends; each shader ships
 GLSL for OpenGL and Vulkan plus a single Metal source. A WebGPU build registers
@@ -14,82 +20,62 @@ the plugin but has no shader path for its layers.
 
 ## Driving the indicator
 
-Each point feature of the layer's source gets one indicator. The layer reads
-three feature properties through data-driven paint properties, so a caller
-moves, rotates, and rescales the indicator by installing fresh GeoJSON on the
-source — `locationFeatureJson` in `src/plugin.zig` writes a conforming feature,
-and the caller installs it with the GeoJSON source data API:
+Set `position` to the indicator's `[latitude, longitude]`, `bearing` to the
+heading in degrees clockwise from north, and `accuracy-radius` to the horizontal
+accuracy in meters. The host converts meters to pixels from the position's own
+latitude. A typical layer:
 
 ```json
 {
-  "bearing": ["get", "bearing"],
-  "accuracy-radius": ["get", "accuracy"],
-  "accuracy-latitude": ["get", "latitude"]
+  "id": "puck",
+  "type": "location-puck",
+  "paint": {
+    "position": [37.7749, -122.4194],
+    "bearing": 35,
+    "accuracy-radius": 80,
+    "bearing-visible": 1
+  }
 }
 ```
 
-- `bearing` — heading in degrees clockwise from north.
-- `accuracy` — horizontal accuracy in meters; converted to screen pixels with
-  `latitude` and the zoom.
-- `latitude` — latitude of the point in degrees. The layout context carries no
-  tile coordinates, so the caller supplies the latitude for the meters-to-pixels
-  conversion.
+Move, rotate, and rescale the indicator by updating the paint properties — in
+the style or through the layer-property setter — and each change animates over
+the style's transition duration.
 
 Set `bearing-visible` to 1 when the caller has a heading; the default 0 hides
 the arrow and the bearing-accuracy sector, because a bearing accuracy without a
 bearing is meaningless.
-
-Position moves animate automatically: a source update that lands within one
-quarter tile of the previous position glides there over a fixed 300 ms with
-smoothstep easing, and anything larger teleports. The glide state is
-process-global and keyed by feature index, so two maps with a `location-puck`
-layer can cross-talk — the jump threshold makes that benign, since a distant
-second map simply never animates. Entries older than ten seconds are pruned. The
-host cannot smooth position: position is geometry, not a property, and the
-layout context carries no tile coordinates, so the plugin tracks moves itself.
-Callers that want a scripted long-distance glide still push intermediate GeoJSON
-updates.
-
-Two channels drive `bearing`, and they differ on transitions. A data-driven
-`["get", "bearing"]` binding reads the heading per feature and snaps to each new
-value when the source data updates — data-driven values never transition. A
-constant or camera expression, set in the style or through the layer-property
-setter, transitions smoothly over the style's transition duration. Callers that
-want rotation animation use the constant channel; callers that stream live
-headings use the GeoJSON channel.
-
-Every paint property accepts camera expressions; the three above also accept
-feature, composite, and feature-state expressions. All support transitions.
 
 ## Paint properties
 
 Sizes are logical pixels unless noted. Floats accept zero or more unless a
 minimum or maximum is listed; a zero radius hides the component.
 
-| Property                  | Type  | Default              | Description                               |
-| ------------------------- | ----- | -------------------- | ----------------------------------------- |
-| `bearing`                 | float | 0                    | Heading, degrees clockwise from north (F) |
-| `bearing-visible`         | float | 0, max 1             | Shows the arrow and sector when 1         |
-| `accuracy-radius`         | float | 0                    | Accuracy circle radius, meters (F)        |
-| `accuracy-latitude`       | float | 0, −90 to 90         | Latitude for the meters conversion (F)    |
-| `accuracy-border-width`   | float | 0                    | Accuracy circle border width              |
-| `bearing-accuracy`        | float | 0, max 180           | Sector half-width, degrees                |
-| `bearing-accuracy-radius` | float | 64                   | Sector radius                             |
-| `shadow-radius`           | float | 0                    | Shadow ellipse radius                     |
-| `puck-radius`             | float | 8                    | Puck radius; also sizes the arrow         |
-| `puck-border-width`       | float | 2                    | Puck border width; also sizes the arrow   |
-| `pulse-radius`            | float | 0                    | Maximum pulse ring radius                 |
-| `pulse-period`            | float | 1.5, min 0.1         | Pulse period, seconds                     |
-| `puck-color`              | color | `(0.17,0.54,0.94,1)` | Puck fill                                 |
-| `puck-border-color`       | color | white                | Puck border                               |
-| `accuracy-color`          | color | blue, 0.15 alpha     | Accuracy circle fill                      |
-| `accuracy-border-color`   | color | blue, 0.4 alpha      | Accuracy circle border                    |
-| `bearing-accuracy-color`  | color | blue, 0.3 alpha      | Sector fill; fades at the edges           |
-| `bearing-arrow-color`     | color | white                | Arrow fill                                |
-| `shadow-color`            | color | black, 0.25 alpha    | Shadow ellipse                            |
-| `pulse-color`             | color | blue, 0.5 alpha      | Pulse ring; fades out as it expands       |
+| Property                  | Type   | Default              | Description                             |
+| ------------------------- | ------ | -------------------- | --------------------------------------- |
+| `position`                | float2 | `[0, 0]`             | Indicator `[latitude, longitude]`       |
+| `bearing`                 | float  | 0                    | Heading, degrees clockwise from north   |
+| `bearing-visible`         | float  | 0, max 1             | Shows the arrow and sector when 1       |
+| `accuracy-radius`         | float  | 0                    | Accuracy circle radius, meters          |
+| `accuracy-border-width`   | float  | 0                    | Accuracy circle border width            |
+| `bearing-accuracy`        | float  | 0, max 180           | Sector half-width, degrees              |
+| `bearing-accuracy-radius` | float  | 64                   | Sector radius                           |
+| `shadow-radius`           | float  | 0                    | Shadow ellipse radius                   |
+| `puck-radius`             | float  | 8                    | Puck radius; also sizes the arrow       |
+| `puck-border-width`       | float  | 2                    | Puck border width; also sizes the arrow |
+| `pulse-radius`            | float  | 0                    | Maximum pulse ring radius               |
+| `pulse-period`            | float  | 1.5, min 0.1         | Pulse period, seconds                   |
+| `puck-color`              | color  | `(0.17,0.54,0.94,1)` | Puck fill                               |
+| `puck-border-color`       | color  | white                | Puck border                             |
+| `accuracy-color`          | color  | blue, 0.15 alpha     | Accuracy circle fill                    |
+| `accuracy-border-color`   | color  | blue, 0.4 alpha      | Accuracy circle border                  |
+| `bearing-accuracy-color`  | color  | blue, 0.3 alpha      | Sector fill; fades at the edges         |
+| `bearing-arrow-color`     | color  | white                | Arrow fill                              |
+| `shadow-color`            | color  | black, 0.25 alpha    | Shadow ellipse                          |
+| `pulse-color`             | color  | blue, 0.5 alpha      | Pulse ring; fades out as it expands     |
 
-Properties marked (F) accept data-driven expressions.
+Every property accepts camera expressions and transitions; none accepts
+data-driven expressions, which source-free layers cannot declare.
 
 The arrow derives from the puck: its apex sits at 1.8 times the outer puck
 radius (`puck-radius` plus `puck-border-width`), matching the proportion of the
@@ -98,18 +84,14 @@ core indicator's bearing image.
 The components composite bottom to top: accuracy circle, bearing-accuracy
 sector, shadow ellipse, pulse ring, bearing arrow, puck.
 
-## Feature queries
-
-Rendered-feature queries hit-test the puck (radius plus border), the bearing
-arrow triangle, and the bearing-accuracy sector; the arrow and the sector answer
-only while `bearing-visible` is set. The accuracy circle, shadow, and pulse ring
-are not hit-testable. The broad-phase radius is conservative: the maximum of the
-puck, arrow, sector, shadow, and pulse extents.
-
 ## Limitations
 
-- One tile keeps at most 256 points; a denser tile fails its layout and the
-  layer logs an error for that tile.
+- Source-free layers receive no feature hit-testing, so rendered-feature queries
+  never answer for this layer. Hit areas were hit-testable in the tile-driven
+  design; nothing equivalent exists here.
+- The style must contain at least one source for any source-free layer to
+  render, a constraint the plugin ABI inherits from MapLibre Native's render
+  orchestrator.
 - In continuous-mode maps the layer reports needs-repaint on every rendered
   frame while `pulse-radius` is above zero, through the plugin ABI's
   `should_animate` callback; hosts re-render through the normal needs-repaint
