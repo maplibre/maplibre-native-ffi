@@ -20581,14 +20581,11 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
-    private static class mln_plugin_load_library {
+    private static class mln_plugin_get_register_function_v1 {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_INT,
-            mln_buffer_view.layout(),
-            mln_buffer_view.layout()
-        );
+            MapLibreNativeC.C_POINTER    );
 
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_plugin_load_library");
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_plugin_get_register_function_v1");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
     }
@@ -20596,45 +20593,45 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_plugin_load_library(mln_buffer_view path, mln_buffer_view entry_point)
+     * mln_plugin_register_function_v1 mln_plugin_get_register_function_v1()
      * }
      */
-    public static FunctionDescriptor mln_plugin_load_library$descriptor() {
-        return mln_plugin_load_library.DESC;
+    public static FunctionDescriptor mln_plugin_get_register_function_v1$descriptor() {
+        return mln_plugin_get_register_function_v1.DESC;
     }
 
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_plugin_load_library(mln_buffer_view path, mln_buffer_view entry_point)
+     * mln_plugin_register_function_v1 mln_plugin_get_register_function_v1()
      * }
      */
-    public static MethodHandle mln_plugin_load_library$handle() {
-        return mln_plugin_load_library.HANDLE;
+    public static MethodHandle mln_plugin_get_register_function_v1$handle() {
+        return mln_plugin_get_register_function_v1.HANDLE;
     }
 
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_plugin_load_library(mln_buffer_view path, mln_buffer_view entry_point)
+     * mln_plugin_register_function_v1 mln_plugin_get_register_function_v1()
      * }
      */
-    public static MemorySegment mln_plugin_load_library$address() {
-        return mln_plugin_load_library.ADDR;
+    public static MemorySegment mln_plugin_get_register_function_v1$address() {
+        return mln_plugin_get_register_function_v1.ADDR;
     }
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_plugin_load_library(mln_buffer_view path, mln_buffer_view entry_point)
+     * mln_plugin_register_function_v1 mln_plugin_get_register_function_v1()
      * }
      */
-    public static int mln_plugin_load_library(MemorySegment path, MemorySegment entry_point) {
-        var mh$ = mln_plugin_load_library.HANDLE;
+    public static MemorySegment mln_plugin_get_register_function_v1() {
+        var mh$ = mln_plugin_get_register_function_v1.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_plugin_load_library", path, entry_point);
+                traceDowncall("mln_plugin_get_register_function_v1");
             }
-            return (int)mh$.invokeExact(path, entry_point);
+            return (MemorySegment)mh$.invokeExact();
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

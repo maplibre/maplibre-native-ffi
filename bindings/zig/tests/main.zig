@@ -14,7 +14,6 @@ comptime {
     _ = @import("style_sources.zig");
     _ = @import("resources.zig");
     _ = @import("logging.zig");
-    _ = @import("plugin.zig");
     _ = @import("render.zig");
     _ = @import("surface.zig");
 }

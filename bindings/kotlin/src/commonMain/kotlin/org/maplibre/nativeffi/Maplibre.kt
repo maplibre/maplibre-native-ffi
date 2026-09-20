@@ -4,6 +4,7 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.log.LogSeverity
+import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.OpenGLContextProvider
 import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.runtime.NetworkStatus
@@ -50,21 +51,8 @@ public expect object Maplibre {
   public fun latLngForProjectedMeters(meters: ProjectedMeters): LatLng
 
   /**
-   * Loads a layer plugin shared library and registers its layer types.
-   *
-   * [path] names the plugin library and [entryPoint] names the function that the library exports.
-   * The loader opens the library, resolves the entry point, and calls it with the process-wide
-   * plugin register function, so the plugin binary never links this library.
-   *
-   * The call is process-wide: call it on any thread, before any style that uses the plugin's layer
-   * types loads. The library is never unloaded, because registration retains the plugin's callbacks
-   * for the process lifetime. Loading the same plugin again succeeds.
-   *
-   * @throws org.maplibre.nativeffi.error.InvalidArgumentException when [path] or [entryPoint] is
-   *   empty.
-   * @throws org.maplibre.nativeffi.error.NativeErrorException when the operating system cannot load
-   *   the library or resolve the entry point, or when the entry point reports a registration
-   *   failure. The exception's diagnostic carries the OS or plugin message.
+   * Returns the process-lifetime address of the v1 plugin registration function. Pass it to the
+   * plugin's own registration entry point before loading dependent styles.
    */
-  public fun loadPlugin(path: String, entryPoint: String)
+  public fun pluginRegisterFunctionV1(): NativePointer
 }

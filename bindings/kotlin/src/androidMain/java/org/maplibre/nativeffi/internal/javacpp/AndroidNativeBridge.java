@@ -14,10 +14,8 @@ import org.bytedeco.javacpp.annotation.Raw;
 public final class AndroidNativeBridge {
   private AndroidNativeBridge() {}
 
-  @Name("mln_android_plugin_load_library")
-  public static native @Cast("mln_status") int pluginLoadLibrary(
-      @Cast("const mln_buffer_view*") Pointer path,
-      @Cast("const mln_buffer_view*") Pointer entryPoint);
+  @Name("mln_android_plugin_register_function_v1")
+  public static native @Cast("uintptr_t") long pluginRegisterFunctionV1();
 
   @Name("mln_android_init")
   public static native @Cast("mln_status") int initialize(@Raw(withEnv = true) Object context);

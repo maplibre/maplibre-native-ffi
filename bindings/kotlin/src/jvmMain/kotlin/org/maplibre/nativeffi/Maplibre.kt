@@ -8,6 +8,7 @@ import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.log.LogSeverity
+import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.OpenGLContextProvider
 import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.runtime.NetworkStatus
@@ -96,9 +97,8 @@ public actual object Maplibre {
     return NativeAccess.latLngForProjectedMeters(meters)
   }
 
-  /** Loads a layer plugin shared library and registers its layer types. */
-  public actual fun loadPlugin(path: String, entryPoint: String) {
+  public actual fun pluginRegisterFunctionV1(): NativePointer {
     NativeAccess.ensureLoaded()
-    NativeAccess.loadPlugin(path, entryPoint)
+    return NativePointer.ofAddress(NativeAccess.pluginRegisterFunctionV1())
   }
 }

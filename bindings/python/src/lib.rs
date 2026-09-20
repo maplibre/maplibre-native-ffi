@@ -7517,15 +7517,11 @@ fn set_network_status_raw(raw_status: u32) -> PyResult<()> {
     maplibre_core::set_network_status(NetworkStatus::from_raw(raw_status)).map_err(map_error)
 }
 
-/// Loads a layer plugin shared library and registers its layer types.
+/// Returns the process-lifetime address of the v1 plugin registration function.
 #[pyfunction]
-fn load_plugin(path: String, entry_point: String) -> PyResult<()> {
-    let path = maplibre_core::string::string_view(&path);
-    let entry_point = maplibre_core::string::string_view(&entry_point);
-    // SAFETY: path and entry_point are borrowed string views whose storage
-    // lives for this call, and the C API validates them.
-    maplibre_core::check(unsafe { sys::mln_plugin_load_library(path.raw(), entry_point.raw()) })
-        .map_err(map_error)
+fn plugin_register_function_v1() -> usize {
+    // SAFETY: the accessor borrows no data and returns a process-lifetime function.
+    unsafe { sys::mln_plugin_get_register_function_v1() }.expect("registration function") as usize
 }
 
 /// Test helper that calls the C size accessor with a raw map id, which the safe
@@ -8467,7 +8463,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(projected_meters_for_lat_lng, module)?)?;
     module.add_function(wrap_pyfunction!(lat_lng_for_projected_meters, module)?)?;
     module.add_function(wrap_pyfunction!(set_network_status_raw, module)?)?;
-    module.add_function(wrap_pyfunction!(load_plugin, module)?)?;
+    module.add_function(wrap_pyfunction!(plugin_register_function_v1, module)?)?;
     module.add_function(wrap_pyfunction!(set_log_callback, module)?)?;
     module.add_function(wrap_pyfunction!(clear_log_callback, module)?)?;
     module.add_function(wrap_pyfunction!(set_async_log_severity_mask, module)?)?;

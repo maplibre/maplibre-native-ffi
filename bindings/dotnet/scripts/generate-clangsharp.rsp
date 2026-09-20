@@ -32,7 +32,8 @@ mln_style_string_list=MlnStyleStringList
 mln_queried_feature_list=MlnQueriedFeatureList
 --config
 latest-codegen
---exclude
-mln_plugin_get_register_function_v1
 --with-access-specifier
 *=internal
+
+--remap
+mln_plugin_register_function_v1=nint

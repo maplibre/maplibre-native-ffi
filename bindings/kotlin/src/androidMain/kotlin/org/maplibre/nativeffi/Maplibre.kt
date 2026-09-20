@@ -5,10 +5,10 @@ import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.internal.callback.LogCallbackState
 import org.maplibre.nativeffi.internal.javacpp.AndroidNativeBridge
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
-import org.maplibre.nativeffi.internal.javacpp.StringViewScope
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.log.LogSeverity
+import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.OpenGLContextProvider
 import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.render.RenderTargetExtent
@@ -103,14 +103,9 @@ public actual object Maplibre {
     return LatLng(outCoordinate.latitude(), outCoordinate.longitude())
   }
 
-  /** Loads a layer plugin shared library and registers its layer types. */
-  public actual fun loadPlugin(path: String, entryPoint: String) {
+  public actual fun pluginRegisterFunctionV1(): NativePointer {
     NativeAccess.ensureLoaded()
-    StringViewScope(path).use { nativePath ->
-      StringViewScope(entryPoint).use { nativeEntryPoint ->
-        Status.check(AndroidNativeBridge.pluginLoadLibrary(nativePath.view, nativeEntryPoint.view))
-      }
-    }
+    return NativePointer.ofAddress(AndroidNativeBridge.pluginRegisterFunctionV1())
   }
 }
 

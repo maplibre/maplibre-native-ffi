@@ -11,6 +11,7 @@ import 'internal/status/status.dart';
 import 'internal/struct/struct.dart' as native_struct;
 import 'log/log.dart';
 import 'render/targets.dart';
+import 'render/native_pointer.dart';
 
 final class _LogCallbackState extends RetainedCallbackState {
   _LogCallbackState(LogCallback callback, {required bool consume}) {
@@ -182,31 +183,6 @@ final class Maplibre {
     setAsyncLogSeverityMask(LogSeverityMask.defaultMask);
   }
 
-  /// Loads a layer plugin shared library and registers its layer types.
-  ///
-  /// Opens the shared library at [path], resolves [entryPoint], and calls it
-  /// with the process-wide plugin register function. Registration is
-  /// process-wide: call this on any isolate before any style that uses the
-  /// plugin's layer types loads. Loading the same plugin again succeeds
-  /// without effect. The library stays loaded for the rest of the process,
-  /// because registration retains the plugin's callbacks.
-  ///
-  /// An empty [path] or [entryPoint] throws an invalid-argument exception. A
-  /// library that the operating system cannot load, an entry point it cannot
-  /// resolve, or a registration failure the plugin reports throws a
-  /// native-error exception whose diagnostic carries the native message.
-  static void loadPlugin(String path, String entryPoint) {
-    ensureAbiVersion();
-    withNativeArena((arena) {
-      _checkStatus(
-        raw.mln_plugin_load_library(
-          nativeStringView(path, arena).value,
-          nativeStringView(entryPoint, arena).value,
-        ),
-      );
-    });
-  }
-
   static void _checkStatus(int status) {
     ensureAbiVersion();
     checkNativeStatus(status, _c.threadLastErrorMessage);
@@ -266,4 +242,11 @@ final class NetworkStatus {
 
   @override
   String toString() => name == 'unknown' ? 'unknown($rawValue)' : name;
+
+  /// Returns the process-lifetime address of the v1 plugin registration function.
+  /// Pass it to the plugin's own registration entry point before loading dependent styles.
+  static NativePointer pluginRegisterFunctionV1() {
+    ensureAbiVersion();
+    return NativePointer(raw.mln_plugin_get_register_function_v1().address);
+  }
 }

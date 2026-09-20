@@ -200,6 +200,9 @@ import org.maplibre.nativeffi.style.VectorTileEncoding
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
 internal object NativeAccess {
+  fun pluginRegisterFunctionV1(): Long =
+    MapLibreNativeC.mln_plugin_get_register_function_v1().address()
+
   const val EXPECTED_C_ABI_VERSION: Long = 0L
   const val DEFAULT_LOG_SEVERITY_MASK: Int = (1 shl 1) or (1 shl 2)
 
@@ -340,15 +343,6 @@ internal object NativeAccess {
         outCoordinate.get(ValueLayout.JAVA_DOUBLE, Double.SIZE_BYTES.toLong()),
       )
     }
-
-  internal fun loadPlugin(path: String, entryPoint: String) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        pluginLoadLibraryFunction()
-          .invokeNative(stringView(arena, path), stringView(arena, entryPoint)) as Int
-      )
-    }
-  }
 
   internal fun createRuntime(options: RuntimeOptions): NativeRuntime =
     Arena.ofConfined().use { arena ->
@@ -3436,8 +3430,6 @@ internal object NativeAccess {
 
   private fun latLngForProjectedMetersFunction(): MethodHandle =
     downcall("mln_lat_lng_for_projected_meters")
-
-  private fun pluginLoadLibraryFunction(): MethodHandle = downcall("mln_plugin_load_library")
 
   private fun runtimeCreateFunction(): MethodHandle = downcall("mln_runtime_create")
 

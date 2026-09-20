@@ -50,7 +50,7 @@ pub use events::{
 };
 pub use logging::LogRecord;
 pub use options::{MapOptions, MapTileOptions, MapViewportOptions};
-pub use plugin::load_plugin;
+pub use plugin::plugin_register_function_v1;
 pub use query::{
     FeatureStateSelector, QueriedFeature, RenderedFeatureQueryOptions, RenderedQueryGeometry,
     SourceFeatureQueryOptions,

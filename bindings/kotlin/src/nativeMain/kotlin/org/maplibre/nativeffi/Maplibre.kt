@@ -6,6 +6,8 @@ import kotlinx.cinterop.UIntVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.rawValue
+import kotlinx.cinterop.toLong
 import kotlinx.cinterop.value
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.geo.LatLng
@@ -18,7 +20,7 @@ import org.maplibre.nativeffi.internal.c.mln_log_set_async_severity_mask
 import org.maplibre.nativeffi.internal.c.mln_network_status_get
 import org.maplibre.nativeffi.internal.c.mln_network_status_set
 import org.maplibre.nativeffi.internal.c.mln_opengl_supported_context_provider_mask
-import org.maplibre.nativeffi.internal.c.mln_plugin_load_library
+import org.maplibre.nativeffi.internal.c.mln_plugin_get_register_function_v1
 import org.maplibre.nativeffi.internal.c.mln_projected_meters
 import org.maplibre.nativeffi.internal.c.mln_projected_meters_for_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_supported_render_backend_mask
@@ -27,6 +29,7 @@ import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.log.LogSeverity
+import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.OpenGLContextProvider
 import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.runtime.NetworkStatus
@@ -119,15 +122,8 @@ public actual object Maplibre {
     CoreStructs.latLng(outCoordinate)
   }
 
-  /** Loads a layer plugin shared library and registers its layer types. */
-  public actual fun loadPlugin(path: String, entryPoint: String) {
-    memScoped {
-      Status.check(
-        mln_plugin_load_library(
-          CoreStructs.stringView(path, this),
-          CoreStructs.stringView(entryPoint, this),
-        )
-      )
-    }
+  public actual fun pluginRegisterFunctionV1(): NativePointer {
+    loadNativeLibrary()
+    return NativePointer.ofAddress(mln_plugin_get_register_function_v1()!!.rawValue.toLong())
   }
 }

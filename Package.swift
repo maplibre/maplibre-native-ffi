@@ -20,7 +20,6 @@ let testSourceFiles = [
   "MaplibreNativeFFITests/MaplibreTests.swift",
   "MaplibreNativeFFITests/NativeHandleLeakTestSupport.swift",
   "MaplibreNativeFFITests/OfflineTests.swift",
-  "MaplibreNativeFFITests/PluginTests.swift",
   "MaplibreNativeFFITests/ProjectionTests.swift",
   "MaplibreNativeFFITests/QueryTests.swift",
   "MaplibreNativeFFITests/RenderTests.swift",

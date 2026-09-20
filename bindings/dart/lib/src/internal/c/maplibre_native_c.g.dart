@@ -1915,12 +1915,6 @@ external int mln_opengl_surface_set_target(
 @ffi.Native<mln_plugin_register_function_v1 Function()>()
 external mln_plugin_register_function_v1 mln_plugin_get_register_function_v1();
 
-@ffi.Native<ffi.Int32 Function(mln_buffer_view, mln_buffer_view)>()
-external int mln_plugin_load_library(
-  mln_buffer_view path,
-  mln_buffer_view entry_point,
-);
-
 @ffi.Native<mln_premultiplied_rgba8_image Function()>()
 external mln_premultiplied_rgba8_image mln_premultiplied_rgba8_image_default();
 
