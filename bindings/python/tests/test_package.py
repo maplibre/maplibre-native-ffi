@@ -227,6 +227,16 @@ def test_unknown_network_status_setter_raises_invalid_argument() -> None:
     assert raised.value.diagnostic != stale
 
 
+def test_load_plugin_reports_missing_library() -> None:
+    with pytest.raises(mln.NativeError) as raised:
+        mln.load_plugin(
+            "/nonexistent/libmln-plugin-no-such-library.dylib", "mln_plugin_entry"
+        )
+
+    assert raised.value.status == mln.MaplibreStatus.NATIVE_ERROR
+    assert raised.value.diagnostic
+
+
 def test_native_status_conversion_preserves_status_and_diagnostic() -> None:
     with pytest.raises(mln.InvalidArgumentError) as raised:
         _native.set_network_status_raw_unchecked_for_test(999_001)

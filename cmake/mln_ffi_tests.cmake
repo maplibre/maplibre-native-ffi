@@ -162,6 +162,22 @@ function(mln_ffi_add_c_api_test)
   endforeach()
 
   add_executable(mln_ffi_c_api_tests ${test_sources})
+  if(NOT EMSCRIPTEN)
+    add_library(
+      mln_ffi_test_plugin
+      SHARED ${PROJECT_SOURCE_DIR}/src/c_api/tests/plugin_library.c)
+    set_target_properties(
+      mln_ffi_test_plugin
+      PROPERTIES C_STANDARD 23 C_STANDARD_REQUIRED YES C_EXTENSIONS OFF)
+    target_include_directories(
+      mln_ffi_test_plugin
+      PRIVATE ${PROJECT_SOURCE_DIR}/third_party/maplibre-native/include)
+    add_dependencies(mln_ffi_c_api_tests mln_ffi_test_plugin)
+    target_compile_definitions(
+      mln_ffi_c_api_tests
+      PRIVATE MLN_FFI_TEST_PLUGIN_PATH="$<TARGET_FILE:mln_ffi_test_plugin>")
+  endif()
+
   set_target_properties(
     mln_ffi_c_api_tests
     PROPERTIES C_STANDARD 23 C_STANDARD_REQUIRED YES C_EXTENSIONS OFF)

@@ -288,6 +288,26 @@ void main() {
     Maplibre.clearLogCallback();
   });
 
+  test('a plugin load failure surfaces as a native-error exception', () {
+    expect(
+      () => Maplibre.loadPlugin(
+        '/nonexistent/libmaplibre-plugin-missing.dylib',
+        'mln_plugin_entry_point',
+      ),
+      throwsA(
+        isA<NativeErrorException>().having(
+          (error) => error.diagnostic,
+          'diagnostic',
+          isNotEmpty,
+        ),
+      ),
+    );
+    expect(
+      () => Maplibre.loadPlugin('', 'mln_plugin_entry_point'),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+  });
+
   test('render target extents report their physical size through native', () {
     final size = const RenderTargetExtent(
       width: 65,

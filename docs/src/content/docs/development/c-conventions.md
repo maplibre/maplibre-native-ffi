@@ -28,8 +28,10 @@ this library's headers, and the shared library exports upstream's
 `mln_plugin_register_v1`. Upstream owns that contract and versions its structs
 independently of `mln_c_version()`, and a plugin is native code whose callbacks
 run on tile workers and the render thread for the process lifetime. Bindings
-expose the plugin declarations through their raw C layer only, so the generated
-map API of every binding stays the umbrella.
+expose plugin authoring declarations through their raw C layer and provide a
+loader for prebuilt plugin libraries. The loader passes the registration
+function to the plugin entry point and retains the library for the process
+lifetime.
 
 ## ABI Rules
 

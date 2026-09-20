@@ -76,7 +76,7 @@ fi
 fixture_environment=
 if [[ -n "$fixture_dir" ]]; then
   "$adb" -s "$serial" push "$fixture_dir" "$remote_dir/fixtures" >/dev/null
-  fixture_environment="MLN_FFI_TEST_FIXTURE_DIR='$remote_dir/fixtures' "
+  fixture_environment="MLN_FFI_TEST_FIXTURE_DIR='$remote_dir/fixtures' MLN_FFI_TEST_PLUGIN_PATH='$remote_dir/fixtures/libmln_ffi_test_plugin.so' "
 fi
 
 for test_executable in "${test_executables[@]}"; do

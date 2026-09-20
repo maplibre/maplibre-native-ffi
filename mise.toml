@@ -336,6 +336,7 @@ elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-x64-* ]]; 
       \( -name '*.mlt' -o \
       -path "$fixture_source/offline_database/corrupt-immediate.db" \) -print0
   )
+  install -m 755 "$MISE_MONOREPO_ROOT/build/$usage_preset/libmln_ffi_test_plugin.so" "$fixture_dir/libmln_ffi_test_plugin.so"
   export MLN_FFI_TEST_FIXTURE_DIR="$fixture_dir"
   if [[ "$platform" == ohos ]]; then
     exec "$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \

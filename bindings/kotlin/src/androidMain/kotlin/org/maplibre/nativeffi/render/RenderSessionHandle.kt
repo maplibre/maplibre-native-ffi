@@ -13,6 +13,7 @@ import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.javacpp.ByteArrayViewScope
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.javacpp.StringViewScope
 import org.maplibre.nativeffi.internal.javacpp.ownedBuffer
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
@@ -929,24 +930,6 @@ internal class FeatureStateSelectorScope(value: FeatureStateSelector) : AutoClos
     featureId?.close()
     sourceLayerId?.close()
     sourceId.close()
-  }
-}
-
-private class StringViewScope(value: String) : AutoCloseable {
-  private val bytes: BytePointer
-  val view: MaplibreNativeC.mln_buffer_view = MaplibreNativeC.mln_buffer_view()
-
-  init {
-    val utf8 = value.toByteArray(StandardCharsets.UTF_8)
-    bytes = BytePointer(Math.max(utf8.size, 1).toLong())
-    if (utf8.isNotEmpty()) bytes.put(utf8, 0, utf8.size)
-    view.data(if (utf8.isEmpty()) null else bytes)
-    view.size(utf8.size.toLong())
-  }
-
-  override fun close() {
-    view.close()
-    bytes.close()
   }
 }
 

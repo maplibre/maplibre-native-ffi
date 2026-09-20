@@ -341,6 +341,15 @@ internal object NativeAccess {
       )
     }
 
+  internal fun loadPlugin(path: String, entryPoint: String) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        pluginLoadLibraryFunction()
+          .invokeNative(stringView(arena, path), stringView(arena, entryPoint)) as Int
+      )
+    }
+  }
+
   internal fun createRuntime(options: RuntimeOptions): NativeRuntime =
     Arena.ofConfined().use { arena ->
       val nativeOptions = runtimeOptions(options, arena)
@@ -3427,6 +3436,8 @@ internal object NativeAccess {
 
   private fun latLngForProjectedMetersFunction(): MethodHandle =
     downcall("mln_lat_lng_for_projected_meters")
+
+  private fun pluginLoadLibraryFunction(): MethodHandle = downcall("mln_plugin_load_library")
 
   private fun runtimeCreateFunction(): MethodHandle = downcall("mln_runtime_create")
 

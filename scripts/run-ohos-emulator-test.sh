@@ -63,7 +63,7 @@ if [[ -n "$fixture_dir" ]]; then
     hdc -t "$connect_key" shell "mkdir -p '$(dirname "$remote_fixture")'"
     hdc -t "$connect_key" file send "$fixture" "$remote_fixture"
   done < <(find "$fixture_dir" -type f -print0)
-  fixture_environment="MLN_FFI_TEST_FIXTURE_DIR='$remote_dir/fixtures' "
+  fixture_environment="MLN_FFI_TEST_FIXTURE_DIR='$remote_dir/fixtures' MLN_FFI_TEST_PLUGIN_PATH='$remote_dir/fixtures/libmln_ffi_test_plugin.so' "
 fi
 
 for test_executable in "${test_executables[@]}"; do

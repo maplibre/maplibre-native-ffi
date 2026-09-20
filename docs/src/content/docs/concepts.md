@@ -135,9 +135,13 @@ same way it does for built-in layers.
 This library builds plugin support into its core and exports the registration
 entry point. A plugin registers once per process, before a style that uses its
 layer types loads. Registration retains the plugin's callbacks for the rest of
-the process, and those callbacks run on MapLibre's threads, so a plugin is
-native code that links this library directly. Language bindings carry the plugin
-declarations in their raw C layer and add no safe wrapper. The plugin API
+the process, and those callbacks run on MapLibre's threads, so authoring a
+plugin is native work, and language bindings carry the plugin declarations in
+their raw C layer without a safe wrapper. Every binding exposes a loader for
+prebuilt plugins. It opens the shared library and calls its registration entry
+point with the host's register function. The plugin binary has no link
+dependency on the host library. Rust marks loading as unsafe because the caller
+must establish the plugin's ABI compatibility and memory safety. The plugin API
 declares shaders for OpenGL, Vulkan, and Metal; a WebGPU build registers a
 plugin but has no shader path for its layers.
 

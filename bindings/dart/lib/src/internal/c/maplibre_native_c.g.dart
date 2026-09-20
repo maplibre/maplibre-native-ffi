@@ -1912,6 +1912,15 @@ external int mln_opengl_surface_set_target(
   ffi.Pointer<mln_opengl_surface_descriptor> descriptor,
 );
 
+@ffi.Native<mln_plugin_register_function_v1 Function()>()
+external mln_plugin_register_function_v1 mln_plugin_get_register_function_v1();
+
+@ffi.Native<ffi.Int32 Function(mln_buffer_view, mln_buffer_view)>()
+external int mln_plugin_load_library(
+  mln_buffer_view path,
+  mln_buffer_view entry_point,
+);
+
 @ffi.Native<mln_premultiplied_rgba8_image Function()>()
 external mln_premultiplied_rgba8_image mln_premultiplied_rgba8_image_default();
 
@@ -4801,6 +4810,920 @@ final class mln_opengl_surface_descriptor extends ffi.Struct {
   external mln_opengl_context_descriptor context;
 
   external ffi.Pointer<ffi.Void> surface;
+}
+
+final class mln_plugin_attribute_binding_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint32()
+  external int attribute_id;
+
+  @ffi.Uint32()
+  external int stream_id;
+
+  @ffi.Uint32()
+  external int byte_offset;
+
+  static ffi.Pointer<mln_plugin_attribute_binding_v1> $allocate(
+    ffi.Allocator $allocator, {
+    required int struct_size,
+    required int attribute_id,
+    required int stream_id,
+    required int byte_offset,
+  }) => $allocator<mln_plugin_attribute_binding_v1>()
+    ..ref.struct_size = struct_size
+    ..ref.attribute_id = attribute_id
+    ..ref.stream_id = stream_id
+    ..ref.byte_offset = byte_offset;
+}
+
+enum mln_plugin_backend {
+  MLN_PLUGIN_BACKEND_OPENGL(1),
+  MLN_PLUGIN_BACKEND_VULKAN(2),
+  MLN_PLUGIN_BACKEND_METAL(4);
+
+  final int value;
+  const mln_plugin_backend(this.value);
+
+  static mln_plugin_backend fromValue(int value) => switch (value) {
+    1 => MLN_PLUGIN_BACKEND_OPENGL,
+    2 => MLN_PLUGIN_BACKEND_VULKAN,
+    4 => MLN_PLUGIN_BACKEND_METAL,
+    _ => throw ArgumentError('Unknown value for mln_plugin_backend: $value'),
+  };
+}
+
+final class mln_plugin_bucket_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  external ffi.Pointer<mln_plugin_vertex_stream_v1> vertex_streams;
+
+  @ffi.Size()
+  external int vertex_stream_count;
+
+  external ffi.Pointer<ffi.Uint16> indices;
+
+  @ffi.Size()
+  external int index_count;
+
+  external ffi.Pointer<mln_plugin_drawable_descriptor_v1> drawables;
+
+  @ffi.Size()
+  external int drawable_count;
+
+  @ffi.Float()
+  external double query_radius;
+
+  external ffi.Pointer<mln_plugin_feature_vertex_range_v1>
+  feature_vertex_ranges;
+
+  @ffi.Size()
+  external int feature_vertex_range_count;
+
+  static ffi.Pointer<mln_plugin_bucket_v1> $allocate(
+    ffi.Allocator $allocator, {
+    required int struct_size,
+    required ffi.Pointer<mln_plugin_vertex_stream_v1> vertex_streams,
+    required int vertex_stream_count,
+    required ffi.Pointer<ffi.Uint16> indices,
+    required int index_count,
+    required ffi.Pointer<mln_plugin_drawable_descriptor_v1> drawables,
+    required int drawable_count,
+    required double query_radius,
+    required ffi.Pointer<mln_plugin_feature_vertex_range_v1>
+    feature_vertex_ranges,
+    required int feature_vertex_range_count,
+  }) => $allocator<mln_plugin_bucket_v1>()
+    ..ref.struct_size = struct_size
+    ..ref.vertex_streams = vertex_streams
+    ..ref.vertex_stream_count = vertex_stream_count
+    ..ref.indices = indices
+    ..ref.index_count = index_count
+    ..ref.drawables = drawables
+    ..ref.drawable_count = drawable_count
+    ..ref.query_radius = query_radius
+    ..ref.feature_vertex_ranges = feature_vertex_ranges
+    ..ref.feature_vertex_range_count = feature_vertex_range_count;
+}
+
+final class mln_plugin_color extends ffi.Struct {
+  @ffi.Float()
+  external double r;
+
+  @ffi.Float()
+  external double g;
+
+  @ffi.Float()
+  external double b;
+
+  @ffi.Float()
+  external double a;
+
+  static ffi.Pointer<mln_plugin_color> $allocate(
+    ffi.Allocator $allocator, {
+    required double r,
+    required double g,
+    required double b,
+    required double a,
+  }) => $allocator<mln_plugin_color>()
+    ..ref.r = r
+    ..ref.g = g
+    ..ref.b = b
+    ..ref.a = a;
+}
+
+typedef mln_plugin_create_layout_fn =
+    ffi.Pointer<ffi.NativeFunction<mln_plugin_create_layout_fnFunction>>;
+typedef mln_plugin_create_layout_fnFunction =
+    ffi.UnsignedInt Function(
+      ffi.Pointer<mln_plugin_layout_context_v1> context,
+      ffi.Pointer<ffi.Pointer<ffi.Void>> layout_instance,
+    );
+typedef Dartmln_plugin_create_layout_fnFunction =
+    mln_plugin_status Function(
+      ffi.Pointer<mln_plugin_layout_context_v1> context,
+      ffi.Pointer<ffi.Pointer<ffi.Void>> layout_instance,
+    );
+
+final class mln_plugin_descriptor_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint32()
+  external int abi_version;
+
+  external mln_plugin_string plugin_id;
+
+  external mln_plugin_string plugin_version;
+
+  @ffi.Uint32()
+  external int minimum_host_abi;
+
+  @ffi.Uint32()
+  external int maximum_host_abi;
+
+  external ffi.Pointer<mln_plugin_layer_type_v1> layer_types;
+
+  @ffi.Size()
+  external int layer_type_count;
+}
+
+typedef mln_plugin_destroy_layout_fn =
+    ffi.Pointer<ffi.NativeFunction<mln_plugin_destroy_layout_fnFunction>>;
+typedef mln_plugin_destroy_layout_fnFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> layout_instance);
+typedef Dartmln_plugin_destroy_layout_fnFunction =
+    void Function(ffi.Pointer<ffi.Void> layout_instance);
+
+final class mln_plugin_drawable_descriptor_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint64()
+  external int drawable_key;
+
+  external mln_plugin_string shader_id;
+
+  external ffi.Pointer<mln_plugin_attribute_binding_v1> attributes;
+
+  @ffi.Size()
+  external int attribute_count;
+
+  external ffi.Pointer<mln_plugin_segment_v1> segments;
+
+  @ffi.Size()
+  external int segment_count;
+}
+
+final class mln_plugin_feature_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.UnsignedInt()
+  external int geometry_typeAsInt;
+
+  mln_plugin_geometry_type get geometry_type =>
+      mln_plugin_geometry_type.fromValue(geometry_typeAsInt);
+  set geometry_type(mln_plugin_geometry_type value) =>
+      geometry_typeAsInt = value.value;
+
+  @ffi.Uint64()
+  external int feature_index;
+
+  external ffi.Pointer<mln_plugin_tile_point_v1> points;
+
+  @ffi.Size()
+  external int point_count;
+
+  external ffi.Pointer<ffi.Uint32> path_offsets;
+
+  @ffi.Size()
+  external int path_count;
+
+  static ffi.Pointer<mln_plugin_feature_v1> $allocate(
+    ffi.Allocator $allocator, {
+    required int struct_size,
+    required mln_plugin_geometry_type geometry_type,
+    required int feature_index,
+    required ffi.Pointer<mln_plugin_tile_point_v1> points,
+    required int point_count,
+    required ffi.Pointer<ffi.Uint32> path_offsets,
+    required int path_count,
+  }) => $allocator<mln_plugin_feature_v1>()
+    ..ref.struct_size = struct_size
+    ..ref.geometry_type = geometry_type
+    ..ref.feature_index = feature_index
+    ..ref.points = points
+    ..ref.point_count = point_count
+    ..ref.path_offsets = path_offsets
+    ..ref.path_count = path_count;
+}
+
+final class mln_plugin_feature_vertex_range_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint64()
+  external int feature_index;
+
+  @ffi.Uint64()
+  external int drawable_key;
+
+  @ffi.Uint32()
+  external int first_vertex;
+
+  @ffi.Uint32()
+  external int vertex_count;
+
+  static ffi.Pointer<mln_plugin_feature_vertex_range_v1> $allocate(
+    ffi.Allocator $allocator, {
+    required int struct_size,
+    required int feature_index,
+    required int drawable_key,
+    required int first_vertex,
+    required int vertex_count,
+  }) => $allocator<mln_plugin_feature_vertex_range_v1>()
+    ..ref.struct_size = struct_size
+    ..ref.feature_index = feature_index
+    ..ref.drawable_key = drawable_key
+    ..ref.first_vertex = first_vertex
+    ..ref.vertex_count = vertex_count;
+}
+
+typedef mln_plugin_finish_layout_fn =
+    ffi.Pointer<ffi.NativeFunction<mln_plugin_finish_layout_fnFunction>>;
+typedef mln_plugin_finish_layout_fnFunction =
+    ffi.UnsignedInt Function(
+      ffi.Pointer<ffi.Void> layout_instance,
+      ffi.Pointer<mln_plugin_bucket_v1> bucket,
+    );
+typedef Dartmln_plugin_finish_layout_fnFunction =
+    mln_plugin_status Function(
+      ffi.Pointer<ffi.Void> layout_instance,
+      ffi.Pointer<mln_plugin_bucket_v1> bucket,
+    );
+
+final class mln_plugin_float2 extends ffi.Struct {
+  @ffi.Float()
+  external double x;
+
+  @ffi.Float()
+  external double y;
+
+  static ffi.Pointer<mln_plugin_float2> $allocate(
+    ffi.Allocator $allocator, {
+    required double x,
+    required double y,
+  }) => $allocator<mln_plugin_float2>()
+    ..ref.x = x
+    ..ref.y = y;
+}
+
+enum mln_plugin_geometry_type {
+  MLN_PLUGIN_GEOMETRY_POINT(1),
+  MLN_PLUGIN_GEOMETRY_LINESTRING(2),
+  MLN_PLUGIN_GEOMETRY_POLYGON(4);
+
+  final int value;
+  const mln_plugin_geometry_type(this.value);
+
+  static mln_plugin_geometry_type fromValue(int value) => switch (value) {
+    1 => MLN_PLUGIN_GEOMETRY_POINT,
+    2 => MLN_PLUGIN_GEOMETRY_LINESTRING,
+    4 => MLN_PLUGIN_GEOMETRY_POLYGON,
+    _ => throw ArgumentError(
+      'Unknown value for mln_plugin_geometry_type: $value',
+    ),
+  };
+}
+
+final class mln_plugin_layer_type_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  external mln_plugin_string layer_type;
+
+  @ffi.Uint32()
+  external int backend_mask;
+
+  external ffi.Pointer<mln_plugin_property_descriptor_v1> properties;
+
+  @ffi.Size()
+  external int property_count;
+
+  @ffi.Uint32()
+  external int geometry_type_mask;
+
+  external ffi.Pointer<mln_plugin_shader_descriptor_v1> shaders;
+
+  @ffi.Size()
+  external int shader_count;
+
+  external mln_plugin_create_layout_fn create_layout;
+
+  external mln_plugin_layout_feature_fn layout_feature;
+
+  external mln_plugin_finish_layout_fn finish_layout;
+
+  external mln_plugin_destroy_layout_fn destroy_layout;
+
+  external mln_plugin_query_feature_fn query_feature;
+
+  external mln_plugin_update_uniform_block_fn update_uniform_block;
+
+  external mln_plugin_query_radius_fn get_query_radius;
+}
+
+final class mln_plugin_layout_context_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Float()
+  external double zoom;
+
+  @ffi.Uint32()
+  external int extent;
+
+  static ffi.Pointer<mln_plugin_layout_context_v1> $allocate(
+    ffi.Allocator $allocator, {
+    required int struct_size,
+    required double zoom,
+    required int extent,
+  }) => $allocator<mln_plugin_layout_context_v1>()
+    ..ref.struct_size = struct_size
+    ..ref.zoom = zoom
+    ..ref.extent = extent;
+}
+
+typedef mln_plugin_layout_feature_fn =
+    ffi.Pointer<ffi.NativeFunction<mln_plugin_layout_feature_fnFunction>>;
+typedef mln_plugin_layout_feature_fnFunction =
+    ffi.UnsignedInt Function(
+      ffi.Pointer<ffi.Void> layout_instance,
+      ffi.Pointer<mln_plugin_feature_v1> feature,
+    );
+typedef Dartmln_plugin_layout_feature_fnFunction =
+    mln_plugin_status Function(
+      ffi.Pointer<ffi.Void> layout_instance,
+      ffi.Pointer<mln_plugin_feature_v1> feature,
+    );
+
+final class mln_plugin_property_descriptor_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  external mln_plugin_string name;
+
+  @ffi.UnsignedInt()
+  external int typeAsInt;
+
+  mln_plugin_value_type get type => mln_plugin_value_type.fromValue(typeAsInt);
+  set type(mln_plugin_value_type value) => typeAsInt = value.value;
+
+  external mln_plugin_value default_value;
+
+  @ffi.Uint32()
+  external int expression_capabilities;
+
+  @ffi.Uint8()
+  external int supports_transitions;
+
+  @ffi.Uint8()
+  external int has_minimum;
+
+  @ffi.Uint8()
+  external int has_maximum;
+
+  @ffi.Float()
+  external double minimum;
+
+  @ffi.Float()
+  external double maximum;
+
+  external ffi.Pointer<mln_plugin_string> enum_values;
+
+  @ffi.Size()
+  external int enum_value_count;
+}
+
+enum mln_plugin_property_encoding_v1 {
+  MLN_PLUGIN_PROPERTY_ENCODING_FLOAT(1),
+  MLN_PLUGIN_PROPERTY_ENCODING_FLOAT2(2),
+  MLN_PLUGIN_PROPERTY_ENCODING_COLOR(3),
+  MLN_PLUGIN_PROPERTY_ENCODING_ENUM_FLOAT(4);
+
+  final int value;
+  const mln_plugin_property_encoding_v1(this.value);
+
+  static mln_plugin_property_encoding_v1 fromValue(int value) =>
+      switch (value) {
+        1 => MLN_PLUGIN_PROPERTY_ENCODING_FLOAT,
+        2 => MLN_PLUGIN_PROPERTY_ENCODING_FLOAT2,
+        3 => MLN_PLUGIN_PROPERTY_ENCODING_COLOR,
+        4 => MLN_PLUGIN_PROPERTY_ENCODING_ENUM_FLOAT,
+        _ => throw ArgumentError(
+          'Unknown value for mln_plugin_property_encoding_v1: $value',
+        ),
+      };
+}
+
+final class mln_plugin_property_statistics_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  external mln_plugin_string property_name;
+
+  external mln_plugin_value minimum;
+
+  external mln_plugin_value maximum;
+}
+
+final class mln_plugin_property_value_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  external mln_plugin_string name;
+
+  external mln_plugin_value value;
+
+  @ffi.Uint8()
+  external int explicitly_set;
+}
+
+final class mln_plugin_query_context_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Double()
+  external double pixels_to_tile_units;
+
+  @ffi.Double()
+  external double camera_to_center_distance;
+
+  @ffi.Double()
+  external double bearing;
+
+  @ffi.Array.multi([16])
+  external ffi.Array<ffi.Double> tile_matrix;
+
+  @ffi.Uint32()
+  external int viewport_width;
+
+  @ffi.Uint32()
+  external int viewport_height;
+}
+
+typedef mln_plugin_query_feature_fn =
+    ffi.Pointer<ffi.NativeFunction<mln_plugin_query_feature_fnFunction>>;
+typedef mln_plugin_query_feature_fnFunction =
+    ffi.Uint8 Function(
+      ffi.Pointer<mln_plugin_feature_v1> feature,
+      ffi.Pointer<mln_plugin_tile_point_v1> query_geometry,
+      ffi.Size query_geometry_count,
+      ffi.Pointer<mln_plugin_query_context_v1> context,
+      ffi.Pointer<mln_plugin_property_value_v1> properties,
+      ffi.Size property_count,
+    );
+typedef Dartmln_plugin_query_feature_fnFunction =
+    int Function(
+      ffi.Pointer<mln_plugin_feature_v1> feature,
+      ffi.Pointer<mln_plugin_tile_point_v1> query_geometry,
+      int query_geometry_count,
+      ffi.Pointer<mln_plugin_query_context_v1> context,
+      ffi.Pointer<mln_plugin_property_value_v1> properties,
+      int property_count,
+    );
+typedef mln_plugin_query_radius_fn =
+    ffi.Pointer<ffi.NativeFunction<mln_plugin_query_radius_fnFunction>>;
+typedef mln_plugin_query_radius_fnFunction =
+    ffi.Float Function(
+      ffi.Pointer<mln_plugin_property_statistics_v1> statistics,
+      ffi.Size statistics_count,
+      ffi.Pointer<mln_plugin_property_value_v1> camera_properties,
+      ffi.Size camera_property_count,
+    );
+typedef Dartmln_plugin_query_radius_fnFunction =
+    double Function(
+      ffi.Pointer<mln_plugin_property_statistics_v1> statistics,
+      int statistics_count,
+      ffi.Pointer<mln_plugin_property_value_v1> camera_properties,
+      int camera_property_count,
+    );
+typedef mln_plugin_register_function_v1 =
+    ffi.Pointer<ffi.NativeFunction<mln_plugin_register_function_v1Function>>;
+typedef mln_plugin_register_function_v1Function =
+    ffi.UnsignedInt Function(
+      ffi.Pointer<mln_plugin_descriptor_v1> descriptor,
+      ffi.Pointer<ffi.Char> error_message,
+      ffi.Size error_message_capacity,
+    );
+typedef Dartmln_plugin_register_function_v1Function =
+    mln_plugin_status Function(
+      ffi.Pointer<mln_plugin_descriptor_v1> descriptor,
+      ffi.Pointer<ffi.Char> error_message,
+      int error_message_capacity,
+    );
+
+final class mln_plugin_segment_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint32()
+  external int vertex_offset;
+
+  @ffi.Uint32()
+  external int index_offset;
+
+  @ffi.Uint32()
+  external int vertex_length;
+
+  @ffi.Uint32()
+  external int index_length;
+
+  static ffi.Pointer<mln_plugin_segment_v1> $allocate(
+    ffi.Allocator $allocator, {
+    required int struct_size,
+    required int vertex_offset,
+    required int index_offset,
+    required int vertex_length,
+    required int index_length,
+  }) => $allocator<mln_plugin_segment_v1>()
+    ..ref.struct_size = struct_size
+    ..ref.vertex_offset = vertex_offset
+    ..ref.index_offset = index_offset
+    ..ref.vertex_length = vertex_length
+    ..ref.index_length = index_length;
+}
+
+final class mln_plugin_shader_attribute_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint32()
+  external int attribute_id;
+
+  @ffi.Uint32()
+  external int location;
+
+  external mln_plugin_string name;
+
+  @ffi.UnsignedInt()
+  external int typeAsInt;
+
+  mln_plugin_vertex_attribute_type get type =>
+      mln_plugin_vertex_attribute_type.fromValue(typeAsInt);
+  set type(mln_plugin_vertex_attribute_type value) => typeAsInt = value.value;
+}
+
+final class mln_plugin_shader_descriptor_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  external mln_plugin_string shader_id;
+
+  external ffi.Pointer<mln_plugin_shader_source_v1> sources;
+
+  @ffi.Size()
+  external int source_count;
+
+  external ffi.Pointer<mln_plugin_shader_attribute_v1> attributes;
+
+  @ffi.Size()
+  external int attribute_count;
+
+  external ffi.Pointer<mln_plugin_uniform_block_descriptor_v1> uniform_blocks;
+
+  @ffi.Size()
+  external int uniform_block_count;
+
+  external ffi.Pointer<mln_plugin_shader_property_binding_v1> property_bindings;
+
+  @ffi.Size()
+  external int property_binding_count;
+}
+
+final class mln_plugin_shader_property_binding_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  external mln_plugin_string property_name;
+
+  @ffi.UnsignedInt()
+  external int encodingAsInt;
+
+  mln_plugin_property_encoding_v1 get encoding =>
+      mln_plugin_property_encoding_v1.fromValue(encodingAsInt);
+  set encoding(mln_plugin_property_encoding_v1 value) =>
+      encodingAsInt = value.value;
+
+  @ffi.Uint32()
+  external int uniform_id;
+
+  @ffi.Uint32()
+  external int uniform_byte_offset;
+
+  @ffi.Uint32()
+  external int minimum_attribute_id;
+
+  @ffi.Uint32()
+  external int maximum_attribute_id;
+
+  @ffi.Uint32()
+  external int interpolation_uniform_id;
+
+  @ffi.Uint32()
+  external int interpolation_uniform_byte_offset;
+}
+
+final class mln_plugin_shader_source_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.UnsignedInt()
+  external int backendAsInt;
+
+  mln_plugin_backend get backend => mln_plugin_backend.fromValue(backendAsInt);
+  set backend(mln_plugin_backend value) => backendAsInt = value.value;
+
+  external mln_plugin_string vertex_source;
+
+  external mln_plugin_string fragment_source;
+
+  external mln_plugin_string vertex_entry_point;
+
+  external mln_plugin_string fragment_entry_point;
+}
+
+enum mln_plugin_status {
+  MLN_PLUGIN_STATUS_OK(0),
+  MLN_PLUGIN_STATUS_ALREADY_REGISTERED(1),
+  MLN_PLUGIN_STATUS_INVALID_ARGUMENT(2),
+  MLN_PLUGIN_STATUS_UNSUPPORTED_ABI(3),
+  MLN_PLUGIN_STATUS_CONFLICT(4),
+  MLN_PLUGIN_STATUS_NOT_FOUND(5),
+  MLN_PLUGIN_STATUS_CALLBACK_ERROR(6);
+
+  final int value;
+  const mln_plugin_status(this.value);
+
+  static mln_plugin_status fromValue(int value) => switch (value) {
+    0 => MLN_PLUGIN_STATUS_OK,
+    1 => MLN_PLUGIN_STATUS_ALREADY_REGISTERED,
+    2 => MLN_PLUGIN_STATUS_INVALID_ARGUMENT,
+    3 => MLN_PLUGIN_STATUS_UNSUPPORTED_ABI,
+    4 => MLN_PLUGIN_STATUS_CONFLICT,
+    5 => MLN_PLUGIN_STATUS_NOT_FOUND,
+    6 => MLN_PLUGIN_STATUS_CALLBACK_ERROR,
+    _ => throw ArgumentError('Unknown value for mln_plugin_status: $value'),
+  };
+}
+
+final class mln_plugin_string extends ffi.Struct {
+  external ffi.Pointer<ffi.Char> data;
+
+  @ffi.Size()
+  external int size;
+
+  static ffi.Pointer<mln_plugin_string> $allocate(
+    ffi.Allocator $allocator, {
+    required ffi.Pointer<ffi.Char> data,
+    required int size,
+  }) => $allocator<mln_plugin_string>()
+    ..ref.data = data
+    ..ref.size = size;
+}
+
+final class mln_plugin_tile_point_v1 extends ffi.Struct {
+  @ffi.Int16()
+  external int x;
+
+  @ffi.Int16()
+  external int y;
+
+  static ffi.Pointer<mln_plugin_tile_point_v1> $allocate(
+    ffi.Allocator $allocator, {
+    required int x,
+    required int y,
+  }) => $allocator<mln_plugin_tile_point_v1>()
+    ..ref.x = x
+    ..ref.y = y;
+}
+
+final class mln_plugin_uniform_block_descriptor_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint32()
+  external int uniform_id;
+
+  external mln_plugin_string name;
+
+  @ffi.Uint32()
+  external int byte_size;
+
+  @ffi.Uint32()
+  external int stage_mask;
+
+  @ffi.UnsignedInt()
+  external int scopeAsInt;
+
+  mln_plugin_uniform_scope_v1 get scope =>
+      mln_plugin_uniform_scope_v1.fromValue(scopeAsInt);
+  set scope(mln_plugin_uniform_scope_v1 value) => scopeAsInt = value.value;
+}
+
+final class mln_plugin_uniform_context_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Double()
+  external double bearing;
+
+  @ffi.Array.multi([2])
+  external ffi.Array<ffi.Float> pixels_to_gl_units;
+
+  @ffi.Array.multi([16])
+  external ffi.Array<ffi.Float> tile_matrix;
+
+  @ffi.Uint32()
+  external int viewport_width;
+
+  @ffi.Uint32()
+  external int viewport_height;
+
+  @ffi.Float()
+  external double pixels_to_tile_units;
+
+  @ffi.Float()
+  external double camera_to_center_distance;
+
+  @ffi.Float()
+  external double pixel_ratio;
+}
+
+enum mln_plugin_uniform_scope_v1 {
+  MLN_PLUGIN_UNIFORM_DRAWABLE(0),
+  MLN_PLUGIN_UNIFORM_LAYER(1),
+  MLN_PLUGIN_UNIFORM_DRAWABLE_ARRAY(2);
+
+  final int value;
+  const mln_plugin_uniform_scope_v1(this.value);
+
+  static mln_plugin_uniform_scope_v1 fromValue(int value) => switch (value) {
+    0 => MLN_PLUGIN_UNIFORM_DRAWABLE,
+    1 => MLN_PLUGIN_UNIFORM_LAYER,
+    2 => MLN_PLUGIN_UNIFORM_DRAWABLE_ARRAY,
+    _ => throw ArgumentError(
+      'Unknown value for mln_plugin_uniform_scope_v1: $value',
+    ),
+  };
+}
+
+typedef mln_plugin_update_uniform_block_fn =
+    ffi.Pointer<ffi.NativeFunction<mln_plugin_update_uniform_block_fnFunction>>;
+typedef mln_plugin_update_uniform_block_fnFunction =
+    ffi.UnsignedInt Function(
+      ffi.Pointer<mln_plugin_uniform_context_v1> context,
+      ffi.Uint32 uniform_id,
+      ffi.Pointer<ffi.Uint8> output,
+      ffi.Size output_size,
+    );
+typedef Dartmln_plugin_update_uniform_block_fnFunction =
+    mln_plugin_status Function(
+      ffi.Pointer<mln_plugin_uniform_context_v1> context,
+      int uniform_id,
+      ffi.Pointer<ffi.Uint8> output,
+      int output_size,
+    );
+
+final class mln_plugin_value extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.UnsignedInt()
+  external int typeAsInt;
+
+  mln_plugin_value_type get type => mln_plugin_value_type.fromValue(typeAsInt);
+  set type(mln_plugin_value_type value) => typeAsInt = value.value;
+
+  external mln_plugin_value_data data;
+}
+
+final class mln_plugin_value_data extends ffi.Union {
+  @ffi.Float()
+  external double float_value;
+
+  external mln_plugin_float2 float2_value;
+
+  external mln_plugin_color color_value;
+
+  external mln_plugin_string string_value;
+}
+
+enum mln_plugin_value_type {
+  MLN_PLUGIN_VALUE_FLOAT(1),
+  MLN_PLUGIN_VALUE_FLOAT2(2),
+  MLN_PLUGIN_VALUE_COLOR(3),
+  MLN_PLUGIN_VALUE_STRING(4);
+
+  final int value;
+  const mln_plugin_value_type(this.value);
+
+  static mln_plugin_value_type fromValue(int value) => switch (value) {
+    1 => MLN_PLUGIN_VALUE_FLOAT,
+    2 => MLN_PLUGIN_VALUE_FLOAT2,
+    3 => MLN_PLUGIN_VALUE_COLOR,
+    4 => MLN_PLUGIN_VALUE_STRING,
+    _ => throw ArgumentError('Unknown value for mln_plugin_value_type: $value'),
+  };
+}
+
+enum mln_plugin_vertex_attribute_type {
+  MLN_PLUGIN_VERTEX_INT16(1),
+  MLN_PLUGIN_VERTEX_INT16_X2(2),
+  MLN_PLUGIN_VERTEX_UINT16(3),
+  MLN_PLUGIN_VERTEX_UINT16_X2(4),
+  MLN_PLUGIN_VERTEX_FLOAT(5),
+  MLN_PLUGIN_VERTEX_FLOAT_X2(6),
+  MLN_PLUGIN_VERTEX_FLOAT_X3(7),
+  MLN_PLUGIN_VERTEX_FLOAT_X4(8),
+  MLN_PLUGIN_VERTEX_UINT8_X4_NORMALIZED(9);
+
+  final int value;
+  const mln_plugin_vertex_attribute_type(this.value);
+
+  static mln_plugin_vertex_attribute_type fromValue(int value) =>
+      switch (value) {
+        1 => MLN_PLUGIN_VERTEX_INT16,
+        2 => MLN_PLUGIN_VERTEX_INT16_X2,
+        3 => MLN_PLUGIN_VERTEX_UINT16,
+        4 => MLN_PLUGIN_VERTEX_UINT16_X2,
+        5 => MLN_PLUGIN_VERTEX_FLOAT,
+        6 => MLN_PLUGIN_VERTEX_FLOAT_X2,
+        7 => MLN_PLUGIN_VERTEX_FLOAT_X3,
+        8 => MLN_PLUGIN_VERTEX_FLOAT_X4,
+        9 => MLN_PLUGIN_VERTEX_UINT8_X4_NORMALIZED,
+        _ => throw ArgumentError(
+          'Unknown value for mln_plugin_vertex_attribute_type: $value',
+        ),
+      };
+}
+
+final class mln_plugin_vertex_stream_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint32()
+  external int stream_id;
+
+  external ffi.Pointer<ffi.Uint8> data;
+
+  @ffi.Size()
+  external int data_size;
+
+  @ffi.Uint32()
+  external int vertex_count;
+
+  @ffi.Uint32()
+  external int stride;
+
+  static ffi.Pointer<mln_plugin_vertex_stream_v1> $allocate(
+    ffi.Allocator $allocator, {
+    required int struct_size,
+    required int stream_id,
+    required ffi.Pointer<ffi.Uint8> data,
+    required int data_size,
+    required int vertex_count,
+    required int stride,
+  }) => $allocator<mln_plugin_vertex_stream_v1>()
+    ..ref.struct_size = struct_size
+    ..ref.stream_id = stream_id
+    ..ref.data = data
+    ..ref.data_size = data_size
+    ..ref.vertex_count = vertex_count
+    ..ref.stride = stride;
 }
 
 final class mln_premultiplied_rgba8_image extends ffi.Struct {
