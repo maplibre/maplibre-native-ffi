@@ -183,6 +183,13 @@ final class Maplibre {
     setAsyncLogSeverityMask(LogSeverityMask.defaultMask);
   }
 
+  /// Returns the process-lifetime address of the v1 plugin registration function.
+  /// Pass it to the plugin's own registration entry point before loading dependent styles.
+  static NativePointer pluginRegisterFunctionV1() {
+    ensureAbiVersion();
+    return NativePointer(raw.mln_plugin_get_register_function_v1().address);
+  }
+
   static void _checkStatus(int status) {
     ensureAbiVersion();
     checkNativeStatus(status, _c.threadLastErrorMessage);
@@ -242,11 +249,4 @@ final class NetworkStatus {
 
   @override
   String toString() => name == 'unknown' ? 'unknown($rawValue)' : name;
-
-  /// Returns the process-lifetime address of the v1 plugin registration function.
-  /// Pass it to the plugin's own registration entry point before loading dependent styles.
-  static NativePointer pluginRegisterFunctionV1() {
-    ensureAbiVersion();
-    return NativePointer(raw.mln_plugin_get_register_function_v1().address);
-  }
 }
