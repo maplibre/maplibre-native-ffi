@@ -1,0 +1,366 @@
+diff --git a/include/mln/plugin/plugin_api.h b/include/mln/plugin/plugin_api.h
+--- a/include/mln/plugin/plugin_api.h
++++ b/include/mln/plugin/plugin_api.h
+@@ -67,6 +67,8 @@
+     MLN_PLUGIN_VALUE_STRING = 4,
+     /* Two doubles, for properties that carry geographic coordinates. */
+     MLN_PLUGIN_VALUE_DOUBLE2 = 5,
++    /* Degrees in float_value; transitions follow the shortest arc. */
++    MLN_PLUGIN_VALUE_ROTATION = 6,
+ } mln_plugin_value_type;
+ 
+ /* Expression dependencies accepted by a plugin property. */
+@@ -359,6 +361,22 @@
+     uint32_t vertex_count;
+ } mln_plugin_feature_vertex_range_v1;
+ 
++/* Source-free rendered features use the same world-pixel bounding envelopes as
++ * native dynamic layers. Points are Mercator world pixels at the frame zoom.
++ * Each feature is a single GeoJSON Feature; polygons are independent hit areas. */
++typedef struct mln_plugin_query_polygon_v1 {
++    uint32_t struct_size;
++    const mln_plugin_double2* points;
++    size_t point_count;
++} mln_plugin_query_polygon_v1;
++
++typedef struct mln_plugin_frame_feature_v1 {
++    uint32_t struct_size;
++    mln_plugin_string geojson;
++    const mln_plugin_query_polygon_v1* polygons;
++    size_t polygon_count;
++} mln_plugin_frame_feature_v1;
++
+ /* The bucket struct is host-owned. All views written into it, including nested
+  * drawable strings/arrays, indices, vertex bytes and feature ranges, remain
+  * plugin-owned and valid until destroy_layout. On success the host copies them
+@@ -376,6 +394,9 @@
+     float query_radius;
+     const mln_plugin_feature_vertex_range_v1* feature_vertex_ranges;
+     size_t feature_vertex_range_count;
++    /* Frame-only views, copied before the next callback on this thread. */
++    const mln_plugin_frame_feature_v1* frame_features;
++    size_t frame_feature_count;
+ } mln_plugin_bucket_v1;
+ 
+ /*
+@@ -502,6 +523,9 @@
+     double proj_matrix[16];
+     mln_plugin_project_mercator_fn project_mercator;
+     mln_plugin_destination_fn destination;
++    /* Inverse of project_screen, in y-down logical pixels. */
++    void (*unproject_screen)(
++        const struct mln_plugin_frame_context_v1* context, double x, double y, double* latitude, double* longitude);
+ } mln_plugin_frame_context_v1;
+ 
+ /* Per-frame geometry for a source-free layer, called on a render thread once
+diff --git a/src/mln/style/plugin_property.hpp b/src/mln/style/plugin_property.hpp
+--- a/src/mln/style/plugin_property.hpp
++++ b/src/mln/style/plugin_property.hpp
+@@ -3,6 +3,7 @@
+ #include <mln/plugin/plugin_api.h>
+ #include <mln/style/property_value.hpp>
+ #include <mln/style/properties.hpp>
++#include <mln/style/rotation.hpp>
+ #include <mln/style/style_property.hpp>
+ #include <mln/style/transition_options.hpp>
+ #include <mln/util/chrono.hpp>
+@@ -28,6 +29,7 @@
+ class PluginPropertyValue {
+ public:
+     using TypedValue = std::variant<PropertyValue<float>,
++                                    PropertyValue<Rotation>,
+                                     PropertyValue<std::array<float, 2>>,
+                                     PropertyValue<std::array<double, 2>>,
+                                     PropertyValue<Color>,
+@@ -83,6 +85,7 @@
+ 
+ private:
+     using TypedValue = std::variant<Transitioning<PropertyValue<float>>,
++                                    Transitioning<PropertyValue<Rotation>>,
+                                     Transitioning<PropertyValue<std::array<float, 2>>>,
+                                     Transitioning<PropertyValue<std::array<double, 2>>>,
+                                     Transitioning<PropertyValue<Color>>,
+diff --git a/src/mln/style/plugin_property.cpp b/src/mln/style/plugin_property.cpp
+--- a/src/mln/style/plugin_property.cpp
++++ b/src/mln/style/plugin_property.cpp
+@@ -56,6 +56,11 @@
+ T defaultValue(const plugin::PropertyDefinition& definition);
+ 
+ template <>
++Rotation defaultValue<Rotation>(const plugin::PropertyDefinition& definition) {
++    return Rotation{numericValue<double>(definition.defaultValue).value_or(0.0)};
++}
++
++template <>
+ float defaultValue<float>(const plugin::PropertyDefinition& definition) {
+     return numericValue<float>(definition.defaultValue).value_or(0.0f);
+ }
+@@ -100,6 +105,8 @@
+     switch (type) {
+         case MLN_PLUGIN_VALUE_FLOAT:
+             return fn.template operator()<float>();
++        case MLN_PLUGIN_VALUE_ROTATION:
++            return fn.template operator()<Rotation>();
+         case MLN_PLUGIN_VALUE_FLOAT2:
+             return fn.template operator()<std::array<float, 2>>();
+         case MLN_PLUGIN_VALUE_DOUBLE2:
+@@ -129,6 +136,9 @@
+     if constexpr (std::is_same_v<T, float>) {
+         result.type = MLN_PLUGIN_VALUE_FLOAT;
+         result.data.float_value = value;
++    } else if constexpr (std::is_same_v<T, Rotation>) {
++        result.type = MLN_PLUGIN_VALUE_ROTATION;
++        result.data.float_value = static_cast<float>(value.getAngle());
+     } else if constexpr (std::is_same_v<T, std::array<float, 2>>) {
+         result.type = MLN_PLUGIN_VALUE_FLOAT2;
+         result.data.float2_value = {value[0], value[1]};
+@@ -176,7 +186,7 @@
+         return (!definition.minimum || number >= *definition.minimum) &&
+                (!definition.maximum || number <= *definition.maximum);
+     };
+-    if (definition.type == MLN_PLUGIN_VALUE_FLOAT) {
++    if (definition.type == MLN_PLUGIN_VALUE_FLOAT || definition.type == MLN_PLUGIN_VALUE_ROTATION) {
+         const auto number = numericValue<double>(value);
+         if (!number || !inRange(*number)) {
+             error.message = "value is outside the allowed range for plugin property '" + definition.name + "'";
+diff --git a/src/mln/plugin/plugin_registry.cpp b/src/mln/plugin/plugin_registry.cpp
+--- a/src/mln/plugin/plugin_registry.cpp
++++ b/src/mln/plugin/plugin_registry.cpp
+@@ -20,6 +20,7 @@
+ 
+ Value copyValue(const mln_plugin_value& value) {
+     switch (value.type) {
++        case MLN_PLUGIN_VALUE_ROTATION:
+         case MLN_PLUGIN_VALUE_FLOAT:
+             return Value{static_cast<double>(value.data.float_value)};
+         case MLN_PLUGIN_VALUE_FLOAT2:
+@@ -335,6 +336,7 @@
+             return false;
+         }
+         const bool transitionableType = property.type == MLN_PLUGIN_VALUE_FLOAT ||
++                                        property.type == MLN_PLUGIN_VALUE_ROTATION ||
+                                         property.type == MLN_PLUGIN_VALUE_FLOAT2 ||
+                                         property.type == MLN_PLUGIN_VALUE_COLOR ||
+                                         property.type == MLN_PLUGIN_VALUE_DOUBLE2;
+@@ -385,7 +387,7 @@
+             error = "plugin property has an invalid numeric range";
+             return false;
+         }
+-        if (property.type == MLN_PLUGIN_VALUE_FLOAT) {
++        if (property.type == MLN_PLUGIN_VALUE_FLOAT || property.type == MLN_PLUGIN_VALUE_ROTATION) {
+             const auto value = numericValue<double>(defaultValue);
+             if (!value || !inRange(*value)) {
+                 error = "plugin property default is outside its numeric range";
+@@ -500,16 +502,16 @@
+         for (const auto& shader : copiedLayerType.shaders) {
+             for (const auto& binding : shader.propertyBindings) {
+                 const auto* property = copiedLayerType.findProperty(binding.propertyName);
+-                const bool encodingMatches = property != nullptr &&
+-                                             ((property->type == MLN_PLUGIN_VALUE_FLOAT &&
+-                                               binding.encoding == MLN_PLUGIN_PROPERTY_ENCODING_FLOAT) ||
+-                                              (property->type == MLN_PLUGIN_VALUE_FLOAT2 &&
+-                                               binding.encoding == MLN_PLUGIN_PROPERTY_ENCODING_FLOAT2) ||
+-                                              (property->type == MLN_PLUGIN_VALUE_COLOR &&
+-                                               binding.encoding == MLN_PLUGIN_PROPERTY_ENCODING_COLOR) ||
+-                                              (property->type == MLN_PLUGIN_VALUE_STRING &&
+-                                               !property->enumValues.empty() &&
+-                                               binding.encoding == MLN_PLUGIN_PROPERTY_ENCODING_ENUM_FLOAT));
++                const bool encodingMatches =
++                    property != nullptr &&
++                    (((property->type == MLN_PLUGIN_VALUE_FLOAT || property->type == MLN_PLUGIN_VALUE_ROTATION) &&
++                      binding.encoding == MLN_PLUGIN_PROPERTY_ENCODING_FLOAT) ||
++                     (property->type == MLN_PLUGIN_VALUE_FLOAT2 &&
++                      binding.encoding == MLN_PLUGIN_PROPERTY_ENCODING_FLOAT2) ||
++                     (property->type == MLN_PLUGIN_VALUE_COLOR &&
++                      binding.encoding == MLN_PLUGIN_PROPERTY_ENCODING_COLOR) ||
++                     (property->type == MLN_PLUGIN_VALUE_STRING && !property->enumValues.empty() &&
++                      binding.encoding == MLN_PLUGIN_PROPERTY_ENCODING_ENUM_FLOAT));
+                 if (property == nullptr || !encodingMatches) {
+                     error = "plugin shader property binding references an incompatible paint property";
+                     return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
+@@ -594,6 +596,7 @@
+         return value.getDouble() || value.getInt() || value.getUint();
+     };
+     switch (type) {
++        case MLN_PLUGIN_VALUE_ROTATION:
+         case MLN_PLUGIN_VALUE_FLOAT:
+             return numeric();
+         case MLN_PLUGIN_VALUE_STRING:
+diff --git a/src/mln/renderer/layers/render_plugin_style_layer.hpp b/src/mln/renderer/layers/render_plugin_style_layer.hpp
+--- a/src/mln/renderer/layers/render_plugin_style_layer.hpp
++++ b/src/mln/renderer/layers/render_plugin_style_layer.hpp
+@@ -2,6 +2,7 @@
+ 
+ #include <mln/renderer/render_layer.hpp>
+ #include <mln/style/layers/plugin_style_layer.hpp>
++#include <mln/util/feature.hpp>
+ 
+ #include <map>
+ #include <memory>
+@@ -34,7 +35,10 @@
+                                 const mat4&,
+                                 const FeatureState&) const override;
+ 
++    void populateDynamicRenderFeatureIndex(DynamicFeatureIndex&) const override;
++
+ private:
++    bool copyFrameFeatures(const mln_plugin_bucket_v1&);
+     void transition(const TransitionParameters&) override;
+     void evaluate(const PropertyEvaluationParameters&) override;
+     void layerChanged(const TransitionParameters&,
+@@ -61,6 +65,8 @@
+ 
+     // Owns frame geometry and binders while drawables reference them.
+     std::shared_ptr<PluginBucket> frameBucket;
++    using FrameFeature = std::pair<std::shared_ptr<Feature>, std::shared_ptr<mapbox::geometry::multi_polygon<int64_t>>>;
++    std::vector<FrameFeature> frameFeatures;
+ };
+ 
+ } // namespace mln
+diff --git a/src/mln/renderer/layers/render_plugin_style_layer.cpp b/src/mln/renderer/layers/render_plugin_style_layer.cpp
+--- a/src/mln/renderer/layers/render_plugin_style_layer.cpp
++++ b/src/mln/renderer/layers/render_plugin_style_layer.cpp
+@@ -1,5 +1,6 @@
+ #include <mln/renderer/layers/render_plugin_style_layer.hpp>
+ 
++#include <mln/geometry/feature_index.hpp>
+ #include <mln/gfx/context.hpp>
+ #include <mln/gfx/color_mode.hpp>
+ #include <mln/gfx/cull_face_mode.hpp>
+@@ -22,6 +23,7 @@
+ #include <mln/renderer/paint_parameters.hpp>
+ #include <mln/shaders/program_parameters.hpp>
+ #include <mln/shaders/shader_program_base.hpp>
++#include <mln/style/conversion/geojson.hpp>
+ #include <mln/style/plugin_property.hpp>
+ #include <mln/util/logging.hpp>
+ #include <mln/util/projection.hpp>
+@@ -29,6 +31,7 @@
+ #include <mapbox/cheap_ruler.hpp>
+ 
+ #include <chrono>
++#include <cmath>
+ #include <cstring>
+ #include <set>
+ 
+@@ -51,6 +54,15 @@
+     const auto coordinate = state->latLngToScreenCoordinate(unwrapped);
+     *outX = coordinate.x;
+     *outY = state->getSize().height - coordinate.y;
++}
++
++void unprojectScreen(
++    const mln_plugin_frame_context_v1* context, double x, double y, double* latitude, double* longitude) {
++    if (!context || !latitude || !longitude || !context->project_state) return;
++    const auto& state = *static_cast<const TransformState*>(context->project_state);
++    const auto position = state.screenCoordinateToLatLng({x, state.getSize().height - y});
++    *latitude = position.latitude();
++    *longitude = position.longitude();
+ }
+ 
+ void projectToMercatorPixels(
+@@ -83,6 +95,43 @@
+ } // namespace
+ 
+ RenderPluginStyleLayer::~RenderPluginStyleLayer() = default;
++
++void RenderPluginStyleLayer::populateDynamicRenderFeatureIndex(DynamicFeatureIndex& index) const {
++    for (const auto& [feature, envelope] : frameFeatures) index.insert(feature, envelope);
++}
++
++bool RenderPluginStyleLayer::copyFrameFeatures(const mln_plugin_bucket_v1& output) {
++    if (output.frame_feature_count && !output.frame_features) return false;
++    for (size_t i = 0; i < output.frame_feature_count; ++i) {
++        const auto& input = output.frame_features[i];
++        if (input.struct_size < sizeof(input) || !input.geojson.data || (input.polygon_count && !input.polygons))
++            return false;
++        style::conversion::Error error;
++        auto json = style::conversion::parseGeoJSON(std::string(input.geojson.data, input.geojson.size), error);
++        if (!json || !json->is<GeoJSONFeature>()) return false;
++        auto feature = std::make_shared<Feature>(json->get<GeoJSONFeature>());
++        feature->sourceLayer = getID();
++        auto envelope = std::make_shared<mapbox::geometry::multi_polygon<int64_t>>();
++        for (size_t j = 0; j < input.polygon_count; ++j) {
++            const auto& polygon = input.polygons[j];
++            if (polygon.struct_size < sizeof(polygon) || polygon.point_count < 3 || !polygon.points) return false;
++            mapbox::geometry::linear_ring<int64_t> ring;
++            for (size_t k = 0; k < polygon.point_count; ++k) {
++                const auto& point = polygon.points[k];
++                // A strict bound avoids undefined conversion at INT64_MAX rounded to double.
++                constexpr double limit = 9223372036854775808.0;
++                if (!std::isfinite(point.x) || !std::isfinite(point.y) || point.x <= -limit || point.x >= limit ||
++                    point.y <= -limit || point.y >= limit)
++                    return false;
++                ring.emplace_back(static_cast<int64_t>(point.x), static_cast<int64_t>(point.y));
++            }
++            ring.push_back(ring.front());
++            envelope->push_back({std::move(ring)});
++        }
++        frameFeatures.emplace_back(std::move(feature), std::move(envelope));
++    }
++    return true;
++}
+ 
+ RenderPluginStyleLayer::RenderPluginStyleLayer(Immutable<style::PluginStyleLayer::Impl> impl)
+     : RenderLayer(makeMutable<style::PluginStyleLayerProperties>(std::move(impl))) {
+@@ -393,6 +442,8 @@
+     std::copy(projMatrix.begin(), projMatrix.end(), frameContext.proj_matrix);
+     frameContext.project_mercator = &projectToMercatorPixels;
+     frameContext.destination = &destinationToLatLng;
++    frameContext.unproject_screen = &unprojectScreen;
++    frameFeatures.clear();
+ 
+     mln_plugin_bucket_v1 output{};
+     output.struct_size = sizeof(output);
+@@ -400,22 +451,24 @@
+         Log::Error(Event::Style, "Plugin layer '" + getID() + "' failed to build its frame");
+         removeAllDrawables();
+         frameBucket.reset();
++        frameFeatures.clear();
+         return;
+     }
+ 
+-    // Copy the frame bucket. Feature ranges do not exist for source-free
+-    // layers, and neither does feature hit-testing.
++    // Copy geometry and query snapshots before another plugin callback runs.
+     if (output.vertex_stream_count == 0 || output.drawable_count == 0 || output.index_count == 0) {
+         removeAllDrawables();
+         frameBucket.reset();
++        frameFeatures.clear();
+         return;
+     }
+ 
+     auto nextBucket = std::make_shared<PluginBucket>(registration);
+-    if (!nextBucket->copyGeometry(output) || output.feature_vertex_range_count != 0) {
++    if (!nextBucket->copyGeometry(output) || output.feature_vertex_range_count != 0 || !copyFrameFeatures(output)) {
+         Log::Error(Event::Style, "Plugin layer '" + getID() + "' returned a malformed frame bucket");
+         removeAllDrawables();
+         frameBucket.reset();
++        frameFeatures.clear();
+         return;
+     }
+     const auto zoom = static_cast<float>(state.getZoom());
+diff --git a/src/mln/renderer/buckets/plugin_bucket.cpp b/src/mln/renderer/buckets/plugin_bucket.cpp
+--- a/src/mln/renderer/buckets/plugin_bucket.cpp
++++ b/src/mln/renderer/buckets/plugin_bucket.cpp
+@@ -72,6 +72,7 @@
+     value.struct_size = sizeof(value);
+     value.type = type;
+     switch (type) {
++        case MLN_PLUGIN_VALUE_ROTATION:
+         case MLN_PLUGIN_VALUE_FLOAT:
+             value.data.float_value = input[0];
+             break;
+@@ -532,9 +533,9 @@
+         }
+     }
+     if (valid) {
+-        std::vector<uint16_t> indices;
+-        if (output.index_count) indices.assign(output.indices, output.indices + output.index_count);
+-        this->indices = std::make_shared<gfx::IndexVectorBase>(std::move(indices));
++        std::vector<uint16_t> copiedIndices;
++        if (output.index_count) copiedIndices.assign(output.indices, output.indices + output.index_count);
++        indices = std::make_shared<gfx::IndexVectorBase>(std::move(copiedIndices));
+     }
+ 
+     std::set<uint64_t> drawableKeys;

@@ -95,6 +95,9 @@ jobs:
         run: mise run //bindings/zig:test linux-gnu-x64-egl
       - env:
           MISE_TASK_SKIP: //:build
+        run: mise run //plugins/location-indicator:test linux-gnu-x64-egl
+      - env:
+          MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build linux-gnu-x64-egl
       - env:
           MISE_TASK_SKIP: //:build
@@ -182,6 +185,9 @@ jobs:
       - env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-gnu-x64-vulkan
+      - env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //plugins/location-indicator:test linux-gnu-x64-vulkan
       - env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build linux-gnu-x64-vulkan

@@ -133,13 +133,21 @@ the callback on every rendered frame, drawing through the same shaders and
 uniform tweaker as tile-driven layers. The frame context carries the
 camera-evaluated paint values, a y-down screen projection, a mercator world
 projection, a ground-offset destination helper, and the frame's full projection
-matrix. Source-free layers cannot declare data-driven properties and receive no
-feature hit-testing. This patch is local-only: it is not upstreamed, and no
+matrix. Frame and tile geometry share validation. Unchanged frame geometry
+retains its drawables and paint bindings. Source-free layers also render in
+styles with no sources. They cannot declare data-driven properties and receive
+no feature hit-testing. This patch is local-only: it is not upstreamed, and no
 upstream PR exists.
 
 `0024-premultiply-plugin-default-colors.patch` premultiplies registered plugin
 default colors when they are adopted into the style system, matching the
 premultiplied-alpha `Color` invariant that style-parsed colors already honor.
+This patch is local-only: it is not upstreamed, and no upstream PR exists.
+
+`0025-plugin-rotation-and-frame-queries.patch` adds native rotation properties,
+inverse screen projection, and source-free feature snapshots to the plugin ABI.
+Rotation transitions follow the shortest arc. Frame queries use the native
+dynamic feature index and copy the plugin's GeoJSON and world-pixel envelopes.
 This patch is local-only: it is not upstreamed, and no upstream PR exists.
 
 Each patch is the squashed diff of its upstream branch, applied on top of the

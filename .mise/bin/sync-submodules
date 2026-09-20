@@ -72,6 +72,7 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0022-plugin-animated-layers.patch"
   "$repo_root/patches/maplibre-native/0023-source-free-plugin-layers.patch"
   "$repo_root/patches/maplibre-native/0024-premultiply-plugin-default-colors.patch"
+  "$repo_root/patches/maplibre-native/0025-plugin-rotation-and-frame-queries.patch"
 )
 
 # The patches overlap, so no single patch reverses cleanly on its own once the

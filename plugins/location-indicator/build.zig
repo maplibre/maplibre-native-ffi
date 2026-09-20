@@ -27,4 +27,6 @@ pub fn build(b: *std.Build) void {
         .system_root = maplibre_build.maybeSystemRootPath(b),
     });
     b.installArtifact(library);
+    const tests = b.addTest(.{ .root_module = library.root_module });
+    b.step("test", "Test frame geometry").dependOn(&b.addRunArtifact(tests).step);
 }

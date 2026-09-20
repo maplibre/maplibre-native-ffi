@@ -1,5 +1,7 @@
 #define MLN_BUILDING_C
 
+#include <cstring>
+#include <limits>
 #include <string>
 
 #include "maplibre_native_c/plugin.h"
@@ -22,15 +24,20 @@ namespace {
 
 // LoadLibraryW takes UTF-16; plugin paths are UTF-8 on the C boundary.
 std::wstring utf16FromUtf8(const std::string& utf8) {
+  if (utf8.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    return {};
+  }
   const int length = MultiByteToWideChar(
-    CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), nullptr, 0
+    CP_UTF8, MB_ERR_INVALID_CHARS, utf8.data(), static_cast<int>(utf8.size()),
+    nullptr, 0
   );
   if (length <= 0) {
     return {};
   }
   std::wstring utf16(static_cast<size_t>(length), L'\0');
   MultiByteToWideChar(
-    CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), utf16.data(), length
+    CP_UTF8, MB_ERR_INVALID_CHARS, utf8.data(), static_cast<int>(utf8.size()),
+    utf16.data(), length
   );
   return utf16;
 }
@@ -83,6 +90,7 @@ mln_status loadPluginLibrary(
   );
   if (entry == nullptr) {
     const std::string message = lastErrorMessage("GetProcAddress failed");
+    FreeLibrary(library);
     mln::core::set_thread_error(message.c_str());
     return MLN_STATUS_NATIVE_ERROR;
   }
@@ -99,7 +107,9 @@ mln_status loadPluginLibrary(
   void* symbol = dlsym(library, entry_point.c_str());
   const char* error = dlerror();
   if (error != nullptr || symbol == nullptr) {
-    mln::core::set_thread_error(error != nullptr ? error : "dlsym failed");
+    const std::string message = error != nullptr ? error : "dlsym failed";
+    dlclose(library);
+    mln::core::set_thread_error(message.c_str());
     return MLN_STATUS_NATIVE_ERROR;
   }
   const auto entry = reinterpret_cast<plugin_entry_point>(symbol);
@@ -108,6 +118,7 @@ mln_status loadPluginLibrary(
   char plugin_error[256] = "";
   const mln_plugin_status status =
     entry(&mln_plugin_register_v1, plugin_error, sizeof(plugin_error));
+  plugin_error[sizeof(plugin_error) - 1] = '\0';
   switch (status) {
     case MLN_PLUGIN_STATUS_OK:
     case MLN_PLUGIN_STATUS_ALREADY_REGISTERED:
@@ -137,6 +148,15 @@ mln_status mln_plugin_load_library(
     }
     if (entry_point.data == nullptr || entry_point.size == 0) {
       mln::core::set_thread_error("plugin entry point is empty");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (
+      std::memchr(path.data, '\0', path.size) != nullptr ||
+      std::memchr(entry_point.data, '\0', entry_point.size) != nullptr
+    ) {
+      mln::core::set_thread_error(
+        "plugin path and entry point must contain no NUL bytes"
+      );
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     return loadPluginLibrary(

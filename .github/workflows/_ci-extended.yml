@@ -95,6 +95,9 @@ jobs:
         run: mise run //bindings/zig:test linux-gnu-x64-egl
       - env:
           MISE_TASK_SKIP: //:build
+        run: mise run //plugins/location-indicator:test linux-gnu-x64-egl
+      - env:
+          MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build linux-gnu-x64-egl
       - env:
           MISE_TASK_SKIP: //:build
@@ -184,6 +187,9 @@ jobs:
         run: mise run //bindings/zig:test linux-gnu-x64-vulkan
       - env:
           MISE_TASK_SKIP: //:build
+        run: mise run //plugins/location-indicator:test linux-gnu-x64-vulkan
+      - env:
+          MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build linux-gnu-x64-vulkan
       - env:
           MISE_TASK_SKIP: //:build
@@ -263,6 +269,9 @@ jobs:
       - env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-gnu-arm64-egl
+      - env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //plugins/location-indicator:test linux-gnu-arm64-egl
       - env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build linux-gnu-arm64-egl
@@ -346,6 +355,9 @@ jobs:
       - env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-gnu-arm64-vulkan
+      - env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //plugins/location-indicator:test linux-gnu-arm64-vulkan
       - env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build linux-gnu-arm64-vulkan
@@ -637,6 +649,9 @@ jobs:
         run: mise run //bindings/zig:test macos-arm64-metal
       - env:
           MISE_TASK_SKIP: //:build
+        run: mise run //plugins/location-indicator:test macos-arm64-metal
+      - env:
+          MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build macos-arm64-metal
       - env:
           MISE_TASK_SKIP: //:build
@@ -716,6 +731,9 @@ jobs:
         run: mise run //bindings/zig:test macos-arm64-vulkan
       - env:
           MISE_TASK_SKIP: //:build
+        run: mise run //plugins/location-indicator:test macos-arm64-vulkan
+      - env:
+          MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build macos-arm64-vulkan
       - env:
           MISE_TASK_SKIP: //:build
@@ -787,6 +805,9 @@ jobs:
       - env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test macos-arm64-egl
+      - env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //plugins/location-indicator:test macos-arm64-egl
       - env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build macos-arm64-egl
@@ -1466,6 +1487,9 @@ jobs:
         run: mise run //bindings/zig:test windows-x64-wgl
       - env:
           MISE_TASK_SKIP: //:build
+        run: mise run //plugins/location-indicator:test windows-x64-wgl
+      - env:
+          MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build windows-x64-wgl
       - env:
           MISE_TASK_SKIP: //:build
@@ -1534,6 +1558,9 @@ jobs:
       - env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test windows-x64-vulkan
+      - env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //plugins/location-indicator:test windows-x64-vulkan
       - env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build windows-x64-vulkan

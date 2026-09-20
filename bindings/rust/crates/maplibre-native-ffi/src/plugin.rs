@@ -20,8 +20,15 @@ use crate::Result;
 /// [`ErrorKind::NativeError`](crate::ErrorKind::NativeError) carrying the OS or
 /// plugin diagnostic when the library fails to load, the entry point fails to
 /// resolve, or registration fails.
-pub fn load_plugin(path: &str, entry_point: &str) -> Result<()> {
-    maplibre_core::plugin::load_plugin(path, entry_point)
+///
+/// # Safety
+///
+/// The library must be compatible with this host's plugin ABI. Its entry point
+/// must have the declared registration signature, and its initialization and
+/// callbacks must uphold Rust's memory and thread safety requirements.
+pub unsafe fn load_plugin(path: &str, entry_point: &str) -> Result<()> {
+    // SAFETY: the caller supplies the core loader's safety guarantees.
+    unsafe { maplibre_core::plugin::load_plugin(path, entry_point) }
 }
 
 #[cfg(test)]
@@ -31,8 +38,10 @@ mod tests {
 
     #[test]
     fn loading_a_missing_plugin_library_reports_a_native_error() {
+        // SAFETY: the missing path cannot load or execute plugin code.
         let error =
-            load_plugin("/nonexistent/maplibre-plugin.dylib", "mln_plugin_entry").unwrap_err();
+            unsafe { load_plugin("/nonexistent/maplibre-plugin.dylib", "mln_plugin_entry") }
+                .unwrap_err();
 
         assert_eq!(error.kind(), ErrorKind::NativeError);
         assert!(!error.diagnostic().is_empty());

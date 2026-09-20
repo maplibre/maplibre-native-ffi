@@ -4882,6 +4882,11 @@ final class mln_plugin_bucket_v1 extends ffi.Struct {
   @ffi.Size()
   external int feature_vertex_range_count;
 
+  external ffi.Pointer<mln_plugin_frame_feature_v1> frame_features;
+
+  @ffi.Size()
+  external int frame_feature_count;
+
   static ffi.Pointer<mln_plugin_bucket_v1> $allocate(
     ffi.Allocator $allocator, {
     required int struct_size,
@@ -4895,6 +4900,8 @@ final class mln_plugin_bucket_v1 extends ffi.Struct {
     required ffi.Pointer<mln_plugin_feature_vertex_range_v1>
     feature_vertex_ranges,
     required int feature_vertex_range_count,
+    required ffi.Pointer<mln_plugin_frame_feature_v1> frame_features,
+    required int frame_feature_count,
   }) => $allocator<mln_plugin_bucket_v1>()
     ..ref.struct_size = struct_size
     ..ref.vertex_streams = vertex_streams
@@ -4905,8 +4912,23 @@ final class mln_plugin_bucket_v1 extends ffi.Struct {
     ..ref.drawable_count = drawable_count
     ..ref.query_radius = query_radius
     ..ref.feature_vertex_ranges = feature_vertex_ranges
-    ..ref.feature_vertex_range_count = feature_vertex_range_count;
+    ..ref.feature_vertex_range_count = feature_vertex_range_count
+    ..ref.frame_features = frame_features
+    ..ref.frame_feature_count = frame_feature_count;
 }
+
+typedef mln_plugin_build_frame_fn =
+    ffi.Pointer<ffi.NativeFunction<mln_plugin_build_frame_fnFunction>>;
+typedef mln_plugin_build_frame_fnFunction =
+    ffi.UnsignedInt Function(
+      ffi.Pointer<mln_plugin_frame_context_v1> context,
+      ffi.Pointer<mln_plugin_bucket_v1> bucket,
+    );
+typedef Dartmln_plugin_build_frame_fnFunction =
+    mln_plugin_status Function(
+      ffi.Pointer<mln_plugin_frame_context_v1> context,
+      ffi.Pointer<mln_plugin_bucket_v1> bucket,
+    );
 
 final class mln_plugin_color extends ffi.Struct {
   @ffi.Float()
@@ -4970,12 +4992,50 @@ final class mln_plugin_descriptor_v1 extends ffi.Struct {
   external int layer_type_count;
 }
 
+typedef mln_plugin_destination_fn =
+    ffi.Pointer<ffi.NativeFunction<mln_plugin_destination_fnFunction>>;
+typedef mln_plugin_destination_fnFunction =
+    ffi.Void Function(
+      ffi.Pointer<mln_plugin_frame_context_v1> context,
+      ffi.Double latitude,
+      ffi.Double longitude,
+      ffi.Double distance_meters,
+      ffi.Double bearing_deg,
+      ffi.Pointer<ffi.Double> out_latitude,
+      ffi.Pointer<ffi.Double> out_longitude,
+    );
+typedef Dartmln_plugin_destination_fnFunction =
+    void Function(
+      ffi.Pointer<mln_plugin_frame_context_v1> context,
+      double latitude,
+      double longitude,
+      double distance_meters,
+      double bearing_deg,
+      ffi.Pointer<ffi.Double> out_latitude,
+      ffi.Pointer<ffi.Double> out_longitude,
+    );
 typedef mln_plugin_destroy_layout_fn =
     ffi.Pointer<ffi.NativeFunction<mln_plugin_destroy_layout_fnFunction>>;
 typedef mln_plugin_destroy_layout_fnFunction =
     ffi.Void Function(ffi.Pointer<ffi.Void> layout_instance);
 typedef Dartmln_plugin_destroy_layout_fnFunction =
     void Function(ffi.Pointer<ffi.Void> layout_instance);
+
+final class mln_plugin_double2 extends ffi.Struct {
+  @ffi.Double()
+  external double x;
+
+  @ffi.Double()
+  external double y;
+
+  static ffi.Pointer<mln_plugin_double2> $allocate(
+    ffi.Allocator $allocator, {
+    required double x,
+    required double y,
+  }) => $allocator<mln_plugin_double2>()
+    ..ref.x = x
+    ..ref.y = y;
+}
 
 final class mln_plugin_drawable_descriptor_v1 extends ffi.Struct {
   @ffi.Uint32()
@@ -5101,6 +5161,82 @@ final class mln_plugin_float2 extends ffi.Struct {
     ..ref.y = y;
 }
 
+final class mln_plugin_frame_context_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  external ffi.Pointer<mln_plugin_property_value_v1> properties;
+
+  @ffi.Size()
+  external int property_count;
+
+  @ffi.Double()
+  external double time_seconds;
+
+  @ffi.Double()
+  external double zoom;
+
+  @ffi.Double()
+  external double center_latitude;
+
+  @ffi.Double()
+  external double center_longitude;
+
+  @ffi.Double()
+  external double bearing;
+
+  @ffi.Double()
+  external double pitch;
+
+  @ffi.Uint32()
+  external int viewport_width;
+
+  @ffi.Uint32()
+  external int viewport_height;
+
+  @ffi.Float()
+  external double pixel_ratio;
+
+  @ffi.Array.multi([2])
+  external ffi.Array<ffi.Float> pixels_to_gl_units;
+
+  external ffi.Pointer<ffi.Void> project_state;
+
+  external mln_plugin_project_screen_fn project_screen;
+
+  @ffi.Array.multi([16])
+  external ffi.Array<ffi.Double> proj_matrix;
+
+  external mln_plugin_project_mercator_fn project_mercator;
+
+  external mln_plugin_destination_fn destination;
+
+  external ffi.Pointer<
+    ffi.NativeFunction<
+      ffi.Void Function(
+        ffi.Pointer<mln_plugin_frame_context_v1> context,
+        ffi.Double x,
+        ffi.Double y,
+        ffi.Pointer<ffi.Double> latitude,
+        ffi.Pointer<ffi.Double> longitude,
+      )
+    >
+  >
+  unproject_screen;
+}
+
+final class mln_plugin_frame_feature_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  external mln_plugin_string geojson;
+
+  external ffi.Pointer<mln_plugin_query_polygon_v1> polygons;
+
+  @ffi.Size()
+  external int polygon_count;
+}
+
 enum mln_plugin_geometry_type {
   MLN_PLUGIN_GEOMETRY_POINT(1),
   MLN_PLUGIN_GEOMETRY_LINESTRING(2),
@@ -5156,6 +5292,11 @@ final class mln_plugin_layer_type_v1 extends ffi.Struct {
   external mln_plugin_query_radius_fn get_query_radius;
 
   external mln_plugin_should_animate_fn should_animate;
+
+  @ffi.Uint8()
+  external int source_free;
+
+  external mln_plugin_build_frame_fn build_frame;
 }
 
 final class mln_plugin_layout_context_v1 extends ffi.Struct {
@@ -5190,6 +5331,42 @@ typedef Dartmln_plugin_layout_feature_fnFunction =
     mln_plugin_status Function(
       ffi.Pointer<ffi.Void> layout_instance,
       ffi.Pointer<mln_plugin_feature_v1> feature,
+    );
+typedef mln_plugin_project_mercator_fn =
+    ffi.Pointer<ffi.NativeFunction<mln_plugin_project_mercator_fnFunction>>;
+typedef mln_plugin_project_mercator_fnFunction =
+    ffi.Void Function(
+      ffi.Pointer<mln_plugin_frame_context_v1> context,
+      ffi.Double latitude,
+      ffi.Double longitude,
+      ffi.Pointer<ffi.Double> out_x,
+      ffi.Pointer<ffi.Double> out_y,
+    );
+typedef Dartmln_plugin_project_mercator_fnFunction =
+    void Function(
+      ffi.Pointer<mln_plugin_frame_context_v1> context,
+      double latitude,
+      double longitude,
+      ffi.Pointer<ffi.Double> out_x,
+      ffi.Pointer<ffi.Double> out_y,
+    );
+typedef mln_plugin_project_screen_fn =
+    ffi.Pointer<ffi.NativeFunction<mln_plugin_project_screen_fnFunction>>;
+typedef mln_plugin_project_screen_fnFunction =
+    ffi.Void Function(
+      ffi.Pointer<mln_plugin_frame_context_v1> context,
+      ffi.Double latitude,
+      ffi.Double longitude,
+      ffi.Pointer<ffi.Double> out_x,
+      ffi.Pointer<ffi.Double> out_y,
+    );
+typedef Dartmln_plugin_project_screen_fnFunction =
+    void Function(
+      ffi.Pointer<mln_plugin_frame_context_v1> context,
+      double latitude,
+      double longitude,
+      ffi.Pointer<ffi.Double> out_x,
+      ffi.Pointer<ffi.Double> out_y,
     );
 
 final class mln_plugin_property_descriptor_v1 extends ffi.Struct {
@@ -5317,6 +5494,27 @@ typedef Dartmln_plugin_query_feature_fnFunction =
       ffi.Pointer<mln_plugin_property_value_v1> properties,
       int property_count,
     );
+
+final class mln_plugin_query_polygon_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  external ffi.Pointer<mln_plugin_double2> points;
+
+  @ffi.Size()
+  external int point_count;
+
+  static ffi.Pointer<mln_plugin_query_polygon_v1> $allocate(
+    ffi.Allocator $allocator, {
+    required int struct_size,
+    required ffi.Pointer<mln_plugin_double2> points,
+    required int point_count,
+  }) => $allocator<mln_plugin_query_polygon_v1>()
+    ..ref.struct_size = struct_size
+    ..ref.points = points
+    ..ref.point_count = point_count;
+}
+
 typedef mln_plugin_query_radius_fn =
     ffi.Pointer<ffi.NativeFunction<mln_plugin_query_radius_fnFunction>>;
 typedef mln_plugin_query_radius_fnFunction =
@@ -5652,6 +5850,8 @@ final class mln_plugin_value_data extends ffi.Union {
 
   external mln_plugin_float2 float2_value;
 
+  external mln_plugin_double2 double2_value;
+
   external mln_plugin_color color_value;
 
   external mln_plugin_string string_value;
@@ -5661,7 +5861,9 @@ enum mln_plugin_value_type {
   MLN_PLUGIN_VALUE_FLOAT(1),
   MLN_PLUGIN_VALUE_FLOAT2(2),
   MLN_PLUGIN_VALUE_COLOR(3),
-  MLN_PLUGIN_VALUE_STRING(4);
+  MLN_PLUGIN_VALUE_STRING(4),
+  MLN_PLUGIN_VALUE_DOUBLE2(5),
+  MLN_PLUGIN_VALUE_ROTATION(6);
 
   final int value;
   const mln_plugin_value_type(this.value);
@@ -5671,6 +5873,8 @@ enum mln_plugin_value_type {
     2 => MLN_PLUGIN_VALUE_FLOAT2,
     3 => MLN_PLUGIN_VALUE_COLOR,
     4 => MLN_PLUGIN_VALUE_STRING,
+    5 => MLN_PLUGIN_VALUE_DOUBLE2,
+    6 => MLN_PLUGIN_VALUE_ROTATION,
     _ => throw ArgumentError('Unknown value for mln_plugin_value_type: $value'),
   };
 }

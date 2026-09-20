@@ -501,6 +501,17 @@ static mln_plugin_status square_free_build_frame(
 static const mln_plugin_property_descriptor_v1 square_free_properties[] = {
   {
     .struct_size = sizeof(mln_plugin_property_descriptor_v1),
+    .name = SQUARE_STRING("square-bearing"),
+    .type = MLN_PLUGIN_VALUE_ROTATION,
+    .default_value =
+      {sizeof(mln_plugin_value),
+       MLN_PLUGIN_VALUE_ROTATION,
+       {.float_value = 350.0f}},
+    .expression_capabilities = MLN_PLUGIN_EXPRESSION_CAMERA,
+    .supports_transitions = 1,
+  },
+  {
+    .struct_size = sizeof(mln_plugin_property_descriptor_v1),
     .name = SQUARE_STRING("square-radius"),
     .type = MLN_PLUGIN_VALUE_FLOAT,
     .default_value =
@@ -579,6 +590,8 @@ static mln_plugin_status square_free_update_uniform_block(
   return MLN_PLUGIN_STATUS_OK;
 }
 
+static float square_free_bearing;
+
 static mln_plugin_status square_free_build_frame(
   const mln_plugin_frame_context_v1* context, mln_plugin_bucket_v1* bucket
 ) {
@@ -639,29 +652,63 @@ static mln_plugin_status square_free_build_frame(
   bucket->query_radius = 0.0f;
   bucket->feature_vertex_ranges = NULL;
   bucket->feature_vertex_range_count = 0;
+  for (size_t i = 0; i < context->property_count; ++i) {
+    if (context->properties[i].value.type == MLN_PLUGIN_VALUE_ROTATION)
+      square_free_bearing = context->properties[i].value.data.float_value;
+  }
+  static mln_plugin_double2 points[4];
+  static mln_plugin_query_polygon_v1 polygon;
+  static mln_plugin_frame_feature_v1 feature;
+  for (size_t i = 0; i < 4; ++i) {
+    double latitude, longitude;
+    context->unproject_screen(
+      context, context->viewport_width / 2.0 + (corners[i][0] ? 4 : -4),
+      context->viewport_height / 2.0 + (corners[i][1] ? 4 : -4), &latitude,
+      &longitude
+    );
+    context->project_mercator(
+      context, latitude, longitude, &points[i].x, &points[i].y
+    );
+  }
+  polygon = (mln_plugin_query_polygon_v1){sizeof(polygon), points, 4};
+  feature = (mln_plugin_frame_feature_v1){
+    .struct_size = sizeof(feature),
+    .geojson = SQUARE_STRING(
+      "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":["
+      "0,0]},\"properties\":{}}"
+    ),
+    .polygons = &polygon,
+    .polygon_count = 1,
+  };
+  bucket->frame_features = &feature;
+  bucket->frame_feature_count = 1;
   return MLN_PLUGIN_STATUS_OK;
 }
 
 static mln_plugin_status register_square_plugin(void) {
   char error[256] = "";
-  const mln_plugin_status status =
-    mln_plugin_register_v1(&square_descriptor, error, sizeof(error));
+  const mln_plugin_status status = mln_plugin_get_register_function_v1()(
+    &square_descriptor, error, sizeof(error)
+  );
   TEST_ASSERT_EQUAL_STRING("", error);
   return status;
-}
-
-// The accessor exists for consumers that cannot take the entry point's
-// address; it must hand out exactly that entry point.
-static void register_function_accessor_returns_the_entry_point(void) {
-  const mln_plugin_register_function_v1 register_fn =
-    mln_plugin_get_register_function_v1();
-  TEST_ASSERT_TRUE(register_fn != NULL);
-  TEST_ASSERT_EQUAL_PTR(&mln_plugin_register_v1, register_fn);
 }
 
 // The loader reports bad arguments and OS load failures through the status
 // and thread diagnostic channel without touching the registry.
 static void plugin_load_library_rejects_bad_arguments(void) {
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_plugin_load_library(
+      MLN_BUFFER_LITERAL("plugin\0suffix"), MLN_BUFFER_LITERAL("register")
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_plugin_load_library(
+      MLN_BUFFER_LITERAL("plugin"), MLN_BUFFER_LITERAL("register\0suffix")
+    )
+  );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_plugin_load_library(
@@ -694,12 +741,9 @@ static void plugin_load_library_rejects_bad_arguments(void) {
   TEST_ASSERT_GREATER_THAN_size_t(0, strlen(mln_thread_last_error_message()));
 }
 
-// The source-free square takes no source key; the style keeps a source
-// because source-free layers render only when the style has at least one.
+// A source-free layer must render in a style with no sources.
 static const char square_free_style_json[] =
-  "{\"version\":8,\"sources\":{\"points\":{\"type\":\"geojson\",\"data\":"
-  "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
-  "\"coordinates\":[0,0]},\"properties\":{}}}},"
+  "{\"version\":8,\"sources\":{},"
   "\"layers\":[{\"id\":\"bg\",\"type\":\"background\","
   "\"paint\":{\"background-color\":\"#ff0000\"}},"
   "{\"id\":\"square\",\"type\":\"ffi-test-square-free\","
@@ -759,6 +803,106 @@ static void a_source_free_layer_renders_through_the_c_api(void) {
   TEST_ASSERT_UINT8_WITHIN(8, 127, center[1]);
   TEST_ASSERT_UINT8_WITHIN(8, 0, center[2]);
   TEST_ASSERT_EQUAL_UINT8(255, pixels[0]);
+
+  mln_rendered_query_geometry query =
+    mln_rendered_query_geometry_point((mln_screen_point){32, 32});
+  mln_queried_feature_list hits = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_render_session_query_rendered_features(
+                     fixture.session, &query, NULL, &hits
+                   )
+  );
+  size_t hit_count = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_queried_feature_list_count(hits, &hit_count)
+  );
+  TEST_ASSERT_EQUAL_size_t(1, hit_count);
+  mln_queried_feature_list_destroy(hits);
+  hits = MLN_HANDLE_NULL;
+  query = mln_rendered_query_geometry_point((mln_screen_point){0, 0});
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_render_session_query_rendered_features(
+                     fixture.session, &query, NULL, &hits
+                   )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_queried_feature_list_count(hits, &hit_count)
+  );
+  TEST_ASSERT_EQUAL_size_t(0, hit_count);
+  mln_queried_feature_list_destroy(hits);
+  hits = MLN_HANDLE_NULL;
+
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 350.0f, square_free_bearing);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_layer_property(
+                     map, MLN_BUFFER_LITERAL("square"),
+                     MLN_BUFFER_LITERAL("square-bearing-transition"),
+                     MLN_BUFFER_LITERAL("{\"duration\":200}")
+                   )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_layer_property(
+      map, MLN_BUFFER_LITERAL("square"), MLN_BUFFER_LITERAL("square-bearing"),
+      MLN_BUFFER_LITERAL("370")
+    )
+  );
+  bool rotation_finished = false;
+  bool rotation_intermediate = false;
+  for (unsigned attempt = 0; attempt < 2000 && !rotation_finished; ++attempt) {
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
+    mln_render_result result;
+    bool repaint;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_render_session_render_update(fixture.session, &result, &repaint)
+    );
+    TEST_ASSERT_TRUE_MESSAGE(
+      square_free_bearing >= 349.99f || square_free_bearing <= 10.01f,
+      "rotation took the long arc through south"
+    );
+    rotation_intermediate |=
+      (square_free_bearing > 350.1f && square_free_bearing < 359.9f) ||
+      (square_free_bearing > 0.1f && square_free_bearing < 9.9f);
+    rotation_finished = square_free_bearing == 10.0f;
+    if (!rotation_finished) mln_test_sleep_millisecond();
+  }
+  TEST_ASSERT_TRUE(rotation_finished);
+  TEST_ASSERT_TRUE_MESSAGE(
+    rotation_intermediate, "rotation skipped interpolation"
+  );
+
+  // Geometry stays identical while a bound paint uniform changes.
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_layer_property(
+      map, MLN_BUFFER_LITERAL("square"), MLN_BUFFER_LITERAL("square-color"),
+      MLN_BUFFER_LITERAL("\"#0000ff\"")
+    )
+  );
+  bool updated = false;
+  for (unsigned int attempt = 0; attempt < 2000 && !updated; ++attempt) {
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
+    mln_render_result result;
+    bool repaint;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_render_session_render_update(fixture.session, &result, &repaint)
+    );
+    if (result == MLN_RENDER_RESULT_RENDERED) {
+      mln_texture_image_info info = {.size = sizeof(info)};
+      TEST_ASSERT_EQUAL_INT(
+        MLN_STATUS_OK, mln_texture_read_premultiplied_rgba8(
+                         fixture.session, pixels, sizeof(pixels), &info
+                       )
+      );
+      updated = center[2] == 255 && center[0] == 0 && center[1] == 0;
+    }
+    if (!updated) mln_test_sleep_millisecond();
+  }
+  TEST_ASSERT_TRUE_MESSAGE(
+    updated, "retained plugin geometry did not receive its updated paint"
+  );
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
@@ -840,7 +984,6 @@ static void a_registered_layer_type_renders_through_the_c_api(void) {
 
 void run_plugin_layer_abi_tests(void) {
   UnitySetTestFile(__FILE__);
-  RUN_TEST(register_function_accessor_returns_the_entry_point);
   RUN_TEST(plugin_load_library_rejects_bad_arguments);
 #if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
   RUN_TEST(a_source_free_layer_renders_through_the_c_api);

@@ -21,3 +21,11 @@ zig build \
   -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 '''
+
+[tasks.test]
+extends = "ffi:preset"
+run = '''
+zig build test \
+  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
+'''

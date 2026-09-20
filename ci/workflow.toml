@@ -45,6 +45,7 @@ platforms = ["linux-gnu", "macos", "windows"]
 exclude = ["windows-arm64-wgl", "windows-arm64-vulkan"]
 commands = [
   { task = "//bindings/zig:test" },
+  { task = "//plugins/location-indicator:test" },
   { task = "//examples/zig-map:build" },
   { task = "//examples/zig-readback:run" },
 ]

@@ -76,7 +76,8 @@ mln_plugin_get_register_function_v1(void) MLN_NOEXCEPT;
  *
  * Returns:
  * - MLN_STATUS_OK when the plugin registered or was already registered.
- * - MLN_STATUS_INVALID_ARGUMENT when path or entry_point is empty.
+ * - MLN_STATUS_INVALID_ARGUMENT when path or entry_point is empty or contains a
+ * NUL byte, or when a Windows path is not valid UTF-8.
  * - MLN_STATUS_NATIVE_ERROR when the operating system cannot load the library
  *   or resolve the entry point, or when the entry point reports a registration
  *   failure; the thread diagnostic carries the OS or plugin message.

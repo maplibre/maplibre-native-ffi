@@ -1,8 +1,6 @@
-diff --git a/include/mln/plugin/plugin_api.h b/include/mln/plugin/plugin_api.h
-index 7fe5fee371c..80db38ef804 100644
 --- a/include/mln/plugin/plugin_api.h
 +++ b/include/mln/plugin/plugin_api.h
-@@ -65,6 +65,8 @@ typedef enum mln_plugin_value_type {
+@@ -65,6 +65,8 @@
      MLN_PLUGIN_VALUE_FLOAT2 = 2,
      MLN_PLUGIN_VALUE_COLOR = 3,
      MLN_PLUGIN_VALUE_STRING = 4,
@@ -11,7 +9,7 @@ index 7fe5fee371c..80db38ef804 100644
  } mln_plugin_value_type;
  
  /* Expression dependencies accepted by a plugin property. */
-@@ -94,6 +96,11 @@ typedef struct mln_plugin_float2 {
+@@ -94,6 +96,11 @@
      float y;
  } mln_plugin_float2;
  
@@ -23,7 +21,7 @@ index 7fe5fee371c..80db38ef804 100644
  typedef struct mln_plugin_color {
      float r;
      float g;
-@@ -104,6 +111,7 @@ typedef struct mln_plugin_color {
+@@ -104,6 +111,7 @@
  typedef union mln_plugin_value_data {
      float float_value;
      mln_plugin_float2 float2_value;
@@ -31,7 +29,7 @@ index 7fe5fee371c..80db38ef804 100644
      mln_plugin_color color_value;
      mln_plugin_string string_value;
  } mln_plugin_value_data;
-@@ -433,6 +441,75 @@ typedef float (*mln_plugin_query_radius_fn)(const mln_plugin_property_statistics
+@@ -433,6 +441,75 @@
   * maps. */
  typedef uint8_t (*mln_plugin_should_animate_fn)(const mln_plugin_property_value_v1* properties, size_t property_count);
  
@@ -97,7 +95,7 @@ index 7fe5fee371c..80db38ef804 100644
 +} mln_plugin_frame_context_v1;
 +
 +/* Per-frame geometry for a source-free layer, called on a render thread once
-+ * per rendered frame per map. The callback may run concurrently for different
++ * per rendered frame per layer. The callback may run concurrently for different
 + * maps. The views written into the bucket follow the same contract as
 + * finish_layout: they remain plugin-owned, the host copies them after the
 + * callback returns, and they must remain valid until that copy completes. */
@@ -107,7 +105,7 @@ index 7fe5fee371c..80db38ef804 100644
  typedef struct mln_plugin_layer_type_v1 {
      uint32_t struct_size;
      mln_plugin_string layer_type;
-@@ -450,6 +527,16 @@ typedef struct mln_plugin_layer_type_v1 {
+@@ -450,6 +527,16 @@
      mln_plugin_update_uniform_block_fn update_uniform_block;
      mln_plugin_query_radius_fn get_query_radius;
      mln_plugin_should_animate_fn should_animate;
@@ -124,11 +122,114 @@ index 7fe5fee371c..80db38ef804 100644
  } mln_plugin_layer_type_v1;
  
  typedef struct mln_plugin_descriptor_v1 {
-diff --git a/src/mln/plugin/plugin_registry.cpp b/src/mln/plugin/plugin_registry.cpp
-index 9c53679bc92..3f4225ad4d3 100644
+--- a/src/mln/layout/plugin_layout.cpp
++++ b/src/mln/layout/plugin_layout.cpp
+@@ -79,101 +79,7 @@
+     }
+ 
+     auto bucket = std::make_shared<PluginBucket>(registration);
+-    std::set<uint32_t> streamIDs;
+-    bool valid = output.struct_size >= sizeof(output) && std::isfinite(output.query_radius) &&
+-                 output.query_radius >= 0.0f && (output.vertex_stream_count == 0 || output.vertex_streams) &&
+-                 (output.index_count == 0 || output.indices) && (output.drawable_count == 0 || output.drawables) &&
+-                 (output.feature_vertex_range_count == 0 || output.feature_vertex_ranges);
+-    for (size_t i = 0; valid && i < output.vertex_stream_count; ++i) {
+-        const auto& stream = output.vertex_streams[i];
+-        valid = stream.struct_size >= sizeof(stream) && stream.stride > 0 && stream.vertex_count > 0 && stream.data &&
+-                stream.vertex_count <= std::numeric_limits<size_t>::max() / stream.stride &&
+-                stream.data_size == static_cast<size_t>(stream.stride) * stream.vertex_count &&
+-                streamIDs.emplace(stream.stream_id).second;
+-        if (valid) {
+-            std::vector<uint8_t> copied(stream.data_size);
+-            std::memcpy(copied.data(), stream.data, copied.size());
+-            bucket->vertexStreams.emplace(
+-                stream.stream_id,
+-                std::make_shared<PluginVertexVector>(std::move(copied), stream.vertex_count, stream.stride));
+-        }
+-    }
+-    if (valid) {
+-        std::vector<uint16_t> indices;
+-        if (output.index_count) indices.assign(output.indices, output.indices + output.index_count);
+-        bucket->indices = std::make_shared<gfx::IndexVectorBase>(std::move(indices));
+-    }
+-
+-    std::set<uint64_t> drawableKeys;
+-    for (size_t i = 0; valid && i < output.drawable_count; ++i) {
+-        const auto& input = output.drawables[i];
+-        valid = input.struct_size >= sizeof(input) && input.shader_id.data && input.shader_id.size &&
+-                input.attribute_count && input.attributes && input.segment_count && input.segments &&
+-                drawableKeys.emplace(input.drawable_key).second;
+-        PluginDrawableDefinition drawable;
+-        if (!valid) break;
+-        drawable.key = input.drawable_key;
+-        drawable.shaderID.assign(input.shader_id.data, input.shader_id.size);
+-        const auto shaderIt = std::find_if(registration->shaders.begin(),
+-                                           registration->shaders.end(),
+-                                           [&](const auto& shader) { return shader.id == drawable.shaderID; });
+-        std::set<uint32_t> hostAttributeIDs;
+-        if (shaderIt != registration->shaders.end()) {
+-            for (const auto& binding : shaderIt->propertyBindings) {
+-                hostAttributeIDs.emplace(binding.minimumAttributeID);
+-                hostAttributeIDs.emplace(binding.maximumAttributeID);
+-            }
+-        }
+-        valid = shaderIt != registration->shaders.end() &&
+-                input.attribute_count + hostAttributeIDs.size() == shaderIt->attributes.size();
+-        if (!valid) break;
+-        std::set<uint32_t> boundAttributeIDs;
+-        std::optional<std::size_t> drawableVertexCount;
+-        for (size_t bindingIndex = 0; valid && bindingIndex < input.attribute_count; ++bindingIndex) {
+-            const auto& binding = input.attributes[bindingIndex];
+-            valid = binding.struct_size >= sizeof(binding);
+-            if (!valid) break;
+-            const auto streamIt = bucket->vertexStreams.find(binding.stream_id);
+-            const auto attributeIt = std::find_if(
+-                shaderIt->attributes.begin(), shaderIt->attributes.end(), [&](const auto& attribute) {
+-                    return attribute.id == binding.attribute_id;
+-                });
+-            const auto type = attributeIt == shaderIt->attributes.end() ? gfx::AttributeDataType::Invalid
+-                                                                        : plugin::attributeType(attributeIt->type);
+-            const auto size = gfx::VertexAttribute::getStrideOf(type);
+-            valid = streamIt != bucket->vertexStreams.end() && attributeIt != shaderIt->attributes.end() && size > 0 &&
+-                    hostAttributeIDs.find(binding.attribute_id) == hostAttributeIDs.end() &&
+-                    binding.byte_offset <= streamIt->second->getRawSize() &&
+-                    size <= streamIt->second->getRawSize() - binding.byte_offset &&
+-                    boundAttributeIDs.emplace(binding.attribute_id).second &&
+-                    (!drawableVertexCount || *drawableVertexCount == streamIt->second->getRawCount());
+-            if (valid) {
+-                drawableVertexCount = streamIt->second->getRawCount();
+-                drawable.attributes.push_back({binding.attribute_id, binding.stream_id, binding.byte_offset, type});
+-            }
+-        }
+-        if (drawableVertexCount) drawable.vertexCount = *drawableVertexCount;
+-        for (size_t segmentIndex = 0; valid && segmentIndex < input.segment_count; ++segmentIndex) {
+-            const auto& segment = input.segments[segmentIndex];
+-            valid = segment.struct_size >= sizeof(segment) &&
+-                    validRange(segment.index_offset, segment.index_length, output.index_count) && drawableVertexCount &&
+-                    validRange(segment.vertex_offset, segment.vertex_length, *drawableVertexCount);
+-            if (valid) {
+-                for (size_t index = segment.index_offset; index < segment.index_offset + segment.index_length;
+-                     ++index) {
+-                    if (output.indices[index] >= segment.vertex_length) {
+-                        valid = false;
+-                        break;
+-                    }
+-                }
+-            }
+-            if (valid) {
+-                drawable.segments.emplace_back(
+-                    segment.vertex_offset, segment.index_offset, segment.vertex_length, segment.index_length);
+-            }
+-        }
+-        if (valid) bucket->drawables.push_back(std::move(drawable));
+-    }
++    bool valid = bucket->copyGeometry(output);
+ 
+     std::map<uint64_t, std::size_t> drawableVertexCounts;
+     for (const auto& drawable : bucket->drawables) drawableVertexCounts.emplace(drawable.key, drawable.vertexCount);
 --- a/src/mln/plugin/plugin_registry.cpp
 +++ b/src/mln/plugin/plugin_registry.cpp
-@@ -25,6 +25,8 @@ Value copyValue(const mln_plugin_value& value) {
+@@ -25,6 +25,8 @@
          case MLN_PLUGIN_VALUE_FLOAT2:
              return Value{mapbox::base::ValueArray{static_cast<double>(value.data.float2_value.x),
                                                    static_cast<double>(value.data.float2_value.y)}};
@@ -137,7 +238,7 @@ index 9c53679bc92..3f4225ad4d3 100644
          case MLN_PLUGIN_VALUE_COLOR:
              return Value{mapbox::base::ValueArray{static_cast<double>(value.data.color_value.r),
                                                    static_cast<double>(value.data.color_value.g),
-@@ -334,7 +336,8 @@ bool appendProperties(const mln_plugin_property_descriptor_v1* properties,
+@@ -334,7 +336,8 @@
          }
          const bool transitionableType = property.type == MLN_PLUGIN_VALUE_FLOAT ||
                                          property.type == MLN_PLUGIN_VALUE_FLOAT2 ||
@@ -147,7 +248,7 @@ index 9c53679bc92..3f4225ad4d3 100644
          if (property.supports_transitions && !transitionableType) {
              error = "plugin transitions require an interpolatable paint property";
              return false;
-@@ -436,12 +439,25 @@ mln_plugin_status PluginRegistry::registerPlugin(const mln_plugin_descriptor_v1&
+@@ -436,10 +439,23 @@
              error = "plugin layer type is malformed or has no supported backend";
              return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
          }
@@ -163,20 +264,18 @@ index 9c53679bc92..3f4225ad4d3 100644
 +                            !layerType.destroy_layout || layerType.geometry_type_mask == 0 ||
 +                            (layerType.geometry_type_mask & ~validGeometryMask) != 0)) {
              error = "geometry plugin requires source layout callbacks and a valid geometry mask";
-             return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
-         }
++            return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
++        }
 +        if (sourceFree && !layerType.build_frame) {
 +            error = "source-free plugin layers require a frame callback";
 +            return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
 +        }
 +        if (!sourceFree && layerType.build_frame) {
 +            error = "frame callbacks apply only to source-free plugin layers";
-+            return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
-+        }
+             return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
+         }
          const auto type = copyString(layerType.layer_type);
-         if (!layerTypeKeys.emplace(type).second) {
-             error = "plugin descriptor contains duplicate layer types";
-@@ -460,6 +476,8 @@ mln_plugin_status PluginRegistry::registerPlugin(const mln_plugin_descriptor_v1&
+@@ -460,6 +476,8 @@
          copiedLayerType.queryRadius = layerType.get_query_radius;
          copiedLayerType.updateUniformBlock = layerType.update_uniform_block;
          copiedLayerType.shouldAnimate = layerType.should_animate;
@@ -185,7 +284,7 @@ index 9c53679bc92..3f4225ad4d3 100644
          if (!appendShaders(pluginID,
                             layerType.shaders,
                             layerType.shader_count,
-@@ -501,6 +519,10 @@ mln_plugin_status PluginRegistry::registerPlugin(const mln_plugin_descriptor_v1&
+@@ -501,6 +519,10 @@
          for (const auto& property : copiedLayerType.properties) {
              const auto dataDependencies = MLN_PLUGIN_EXPRESSION_FEATURE | MLN_PLUGIN_EXPRESSION_COMPOSITE |
                                            MLN_PLUGIN_EXPRESSION_FEATURE_STATE;
@@ -196,7 +295,7 @@ index 9c53679bc92..3f4225ad4d3 100644
              if ((property.expressionCapabilities & dataDependencies) == 0) continue;
              const bool bound = std::any_of(
                  copiedLayerType.shaders.begin(), copiedLayerType.shaders.end(), [&](const auto& shader) {
-@@ -577,9 +599,10 @@ bool PluginRegistry::valueMatches(mln_plugin_value_type type, const Value& value
+@@ -577,9 +599,10 @@
          case MLN_PLUGIN_VALUE_STRING:
              return value.getString() != nullptr;
          case MLN_PLUGIN_VALUE_FLOAT2:
@@ -208,11 +307,9 @@ index 9c53679bc92..3f4225ad4d3 100644
              return array && array->size() == size && std::all_of(array->begin(), array->end(), [](const auto& item) {
                         return item.getDouble() || item.getInt() || item.getUint();
                     });
-diff --git a/src/mln/plugin/plugin_registry.hpp b/src/mln/plugin/plugin_registry.hpp
-index 12b80907cfc..8f7b5574434 100644
 --- a/src/mln/plugin/plugin_registry.hpp
 +++ b/src/mln/plugin/plugin_registry.hpp
-@@ -90,6 +90,8 @@ struct LayerType {
+@@ -90,6 +90,8 @@
      mln_plugin_query_radius_fn queryRadius = nullptr;
      mln_plugin_update_uniform_block_fn updateUniformBlock = nullptr;
      mln_plugin_should_animate_fn shouldAnimate = nullptr;
@@ -221,7 +318,7 @@ index 12b80907cfc..8f7b5574434 100644
      bool operator==(const LayerType&) const = default;
  
      const PropertyDefinition* findProperty(const std::string& name) const;
-@@ -101,12 +103,13 @@ struct RegisteredLayer final : LayerType {
+@@ -101,12 +103,13 @@
      explicit RegisteredLayer(LayerType definition)
          : LayerType(std::move(definition)),
            info{type.c_str(),
@@ -238,11 +335,9 @@ index 12b80907cfc..8f7b5574434 100644
  
      RegisteredLayer(const RegisteredLayer&) = delete;
      RegisteredLayer& operator=(const RegisteredLayer&) = delete;
-diff --git a/src/mln/plugin/plugin_style_layer_factory.cpp b/src/mln/plugin/plugin_style_layer_factory.cpp
-index b04ffd4adbf..07691347a12 100644
 --- a/src/mln/plugin/plugin_style_layer_factory.cpp
 +++ b/src/mln/plugin/plugin_style_layer_factory.cpp
-@@ -11,9 +11,12 @@ const style::LayerTypeInfo* PluginStyleLayerFactory::getTypeInfo() const noexcep
+@@ -11,9 +11,12 @@
  
  std::unique_ptr<style::Layer> PluginStyleLayerFactory::createLayer(
      const std::string& id, const style::conversion::Convertible& value) noexcept {
@@ -258,8 +353,168 @@ index b04ffd4adbf..07691347a12 100644
  }
  
  std::unique_ptr<RenderLayer> PluginStyleLayerFactory::createRenderLayer(Immutable<style::Layer::Impl> impl) noexcept {
-diff --git a/src/mln/renderer/layers/render_plugin_style_layer.cpp b/src/mln/renderer/layers/render_plugin_style_layer.cpp
-index b6e4161ab39..697863d291d 100644
+--- a/src/mln/renderer/buckets/plugin_bucket.cpp
++++ b/src/mln/renderer/buckets/plugin_bucket.cpp
+@@ -1,6 +1,7 @@
+ #include <mln/renderer/buckets/plugin_bucket.hpp>
+ 
+ #include <mln/plugin/plugin_registry.hpp>
++#include <mln/plugin/plugin_conversion.hpp>
+ #include <mln/renderer/render_layer.hpp>
+ #include <mln/style/plugin_property.hpp>
+ #include <mln/tile/geometry_tile_data.hpp>
+@@ -510,4 +511,130 @@
+     return drawable == layer->second.end() ? nullptr : &drawable->second;
+ }
+ 
++bool PluginBucket::copyGeometry(const mln_plugin_bucket_v1& output) {
++    std::set<uint32_t> streamIDs;
++    bool valid = output.struct_size >= sizeof(output) && std::isfinite(output.query_radius) &&
++                 output.query_radius >= 0.0f && (output.vertex_stream_count == 0 || output.vertex_streams) &&
++                 (output.index_count == 0 || output.indices) && (output.drawable_count == 0 || output.drawables) &&
++                 (output.feature_vertex_range_count == 0 || output.feature_vertex_ranges);
++    for (size_t i = 0; valid && i < output.vertex_stream_count; ++i) {
++        const auto& stream = output.vertex_streams[i];
++        valid = stream.struct_size >= sizeof(stream) && stream.stride > 0 && stream.vertex_count > 0 && stream.data &&
++                stream.vertex_count <= std::numeric_limits<size_t>::max() / stream.stride &&
++                stream.data_size == static_cast<size_t>(stream.stride) * stream.vertex_count &&
++                streamIDs.emplace(stream.stream_id).second;
++        if (valid) {
++            std::vector<uint8_t> copied(stream.data_size);
++            std::memcpy(copied.data(), stream.data, copied.size());
++            vertexStreams.emplace(
++                stream.stream_id,
++                std::make_shared<PluginVertexVector>(std::move(copied), stream.vertex_count, stream.stride));
++        }
++    }
++    if (valid) {
++        std::vector<uint16_t> indices;
++        if (output.index_count) indices.assign(output.indices, output.indices + output.index_count);
++        this->indices = std::make_shared<gfx::IndexVectorBase>(std::move(indices));
++    }
++
++    std::set<uint64_t> drawableKeys;
++    for (size_t i = 0; valid && i < output.drawable_count; ++i) {
++        const auto& input = output.drawables[i];
++        valid = input.struct_size >= sizeof(input) && input.shader_id.data && input.shader_id.size &&
++                input.attribute_count && input.attributes && input.segment_count && input.segments &&
++                drawableKeys.emplace(input.drawable_key).second;
++        PluginDrawableDefinition drawable;
++        if (!valid) break;
++        drawable.key = input.drawable_key;
++        drawable.shaderID.assign(input.shader_id.data, input.shader_id.size);
++        const auto shaderIt = std::find_if(registration->shaders.begin(),
++                                           registration->shaders.end(),
++                                           [&](const auto& shader) { return shader.id == drawable.shaderID; });
++        std::set<uint32_t> hostAttributeIDs;
++        if (shaderIt != registration->shaders.end()) {
++            for (const auto& binding : shaderIt->propertyBindings) {
++                hostAttributeIDs.emplace(binding.minimumAttributeID);
++                hostAttributeIDs.emplace(binding.maximumAttributeID);
++            }
++        }
++        valid = shaderIt != registration->shaders.end() &&
++                input.attribute_count + hostAttributeIDs.size() == shaderIt->attributes.size();
++        if (!valid) break;
++        std::set<uint32_t> boundAttributeIDs;
++        std::optional<std::size_t> drawableVertexCount;
++        for (size_t bindingIndex = 0; valid && bindingIndex < input.attribute_count; ++bindingIndex) {
++            const auto& binding = input.attributes[bindingIndex];
++            valid = binding.struct_size >= sizeof(binding);
++            if (!valid) break;
++            const auto streamIt = vertexStreams.find(binding.stream_id);
++            const auto attributeIt = std::find_if(
++                shaderIt->attributes.begin(), shaderIt->attributes.end(), [&](const auto& attribute) {
++                    return attribute.id == binding.attribute_id;
++                });
++            const auto type = attributeIt == shaderIt->attributes.end() ? gfx::AttributeDataType::Invalid
++                                                                        : plugin::attributeType(attributeIt->type);
++            const auto size = gfx::VertexAttribute::getStrideOf(type);
++            valid = streamIt != vertexStreams.end() && attributeIt != shaderIt->attributes.end() && size > 0 &&
++                    hostAttributeIDs.find(binding.attribute_id) == hostAttributeIDs.end() &&
++                    binding.byte_offset <= streamIt->second->getRawSize() &&
++                    size <= streamIt->second->getRawSize() - binding.byte_offset &&
++                    boundAttributeIDs.emplace(binding.attribute_id).second &&
++                    (!drawableVertexCount || *drawableVertexCount == streamIt->second->getRawCount());
++            if (valid) {
++                drawableVertexCount = streamIt->second->getRawCount();
++                drawable.attributes.push_back({binding.attribute_id, binding.stream_id, binding.byte_offset, type});
++            }
++        }
++        if (drawableVertexCount) drawable.vertexCount = *drawableVertexCount;
++        for (size_t segmentIndex = 0; valid && segmentIndex < input.segment_count; ++segmentIndex) {
++            const auto& segment = input.segments[segmentIndex];
++            valid = segment.struct_size >= sizeof(segment) &&
++                    (segment.index_offset <= output.index_count && segment.index_length <= output.index_count - segment.index_offset) && drawableVertexCount &&
++                    (segment.vertex_offset <= *drawableVertexCount && segment.vertex_length <= *drawableVertexCount - segment.vertex_offset);
++            if (valid) {
++                for (size_t index = segment.index_offset; index < segment.index_offset + segment.index_length;
++                     ++index) {
++                    if (output.indices[index] >= segment.vertex_length) {
++                        valid = false;
++                        break;
++                    }
++                }
++            }
++            if (valid) {
++                drawable.segments.emplace_back(
++                    segment.vertex_offset, segment.index_offset, segment.vertex_length, segment.index_length);
++            }
++        }
++        if (valid) drawables.push_back(std::move(drawable));
++    }
++
++    return valid;
++}
++
++bool PluginBucket::hasSameGeometry(const PluginBucket& other) const {
++    if (vertexStreams.size() != other.vertexStreams.size() || drawables.size() != other.drawables.size() ||
++        indices->vector() != other.indices->vector()) return false;
++    for (const auto& [id, stream] : vertexStreams) {
++        const auto found = other.vertexStreams.find(id);
++        if (found == other.vertexStreams.end()) return false;
++        const auto& candidate = found->second;
++        if (stream->getRawSize() != candidate->getRawSize() || stream->getRawCount() != candidate->getRawCount() ||
++            std::memcmp(stream->getRawData(), candidate->getRawData(), stream->getRawSize() * stream->getRawCount()) != 0)
++            return false;
++    }
++    for (std::size_t i = 0; i < drawables.size(); ++i) {
++        const auto& a = drawables[i];
++        const auto& b = other.drawables[i];
++        if (a.key != b.key || a.shaderID != b.shaderID || a.attributes != b.attributes ||
++            a.vertexCount != b.vertexCount || a.segments.size() != b.segments.size()) return false;
++        for (std::size_t j = 0; j < a.segments.size(); ++j) {
++            const auto& x = a.segments[j];
++            const auto& y = b.segments[j];
++            if (x.vertexOffset != y.vertexOffset || x.vertexLength != y.vertexLength ||
++                x.indexOffset != y.indexOffset || x.indexLength != y.indexLength) return false;
++        }
++    }
++    return true;
++}
++
+ } // namespace mln
+--- a/src/mln/renderer/buckets/plugin_bucket.hpp
++++ b/src/mln/renderer/buckets/plugin_bucket.hpp
+@@ -170,6 +170,7 @@
+     uint32_t streamID = 0;
+     uint32_t byteOffset = 0;
+     gfx::AttributeDataType type = gfx::AttributeDataType::Invalid;
++    bool operator==(const PluginAttributeBinding&) const = default;
+ };
+ 
+ struct PluginDrawableDefinition {
+@@ -185,6 +186,10 @@
+     explicit PluginBucket(plugin::RegisteredLayerPtr registration_)
+         : registration(std::move(registration_)) {}
+     ~PluginBucket() override = default;
++
++    // Validates and copies plugin geometry into a new bucket.
++    bool copyGeometry(const mln_plugin_bucket_v1&);
++    bool hasSameGeometry(const PluginBucket&) const;
+ 
+     void upload(gfx::UploadPass&) override { uploaded = true; }
+     bool hasData() const override { return indices && !indices->empty() && !drawables.empty(); }
 --- a/src/mln/renderer/layers/render_plugin_style_layer.cpp
 +++ b/src/mln/renderer/layers/render_plugin_style_layer.cpp
 @@ -16,13 +16,20 @@
@@ -273,9 +528,10 @@ index b6e4161ab39..697863d291d 100644
  #include <mln/shaders/program_parameters.hpp>
  #include <mln/shaders/shader_program_base.hpp>
  #include <mln/style/plugin_property.hpp>
+-
 +#include <mln/util/logging.hpp>
 +#include <mln/util/projection.hpp>
- 
++
 +#include <mapbox/cheap_ruler.hpp>
 +
 +#include <chrono>
@@ -283,7 +539,7 @@ index b6e4161ab39..697863d291d 100644
  #include <set>
  
  namespace mln {
-@@ -32,8 +39,51 @@ const style::PluginStyleLayer::Impl& pluginImpl(const Immutable<style::Layer::Im
+@@ -32,7 +39,50 @@
      return static_cast<const style::PluginStyleLayer::Impl&>(*impl);
  }
  
@@ -329,13 +585,12 @@ index b6e4161ab39..697863d291d 100644
 +}
 +
  } // namespace
- 
-+RenderPluginStyleLayer::~RenderPluginStyleLayer() = default;
 +
++RenderPluginStyleLayer::~RenderPluginStyleLayer() = default;
+ 
  RenderPluginStyleLayer::RenderPluginStyleLayer(Immutable<style::PluginStyleLayer::Impl> impl)
      : RenderLayer(makeMutable<style::PluginStyleLayerProperties>(std::move(impl))) {
-     // Unlike generated layers, a plugin layer has no generated evaluated
-@@ -142,14 +192,26 @@ void RenderPluginStyleLayer::layerChanged(const TransitionParameters&,
+@@ -142,14 +192,26 @@
      // drawable whose geometry actually changed.
  }
  
@@ -363,7 +618,7 @@ index b6e4161ab39..697863d291d 100644
      if (!renderTiles || renderTiles->empty()) {
          removeAllDrawables();
          return;
-@@ -259,6 +321,248 @@ void RenderPluginStyleLayer::update(gfx::ShaderRegistry& shaders,
+@@ -259,6 +321,168 @@
      }
  }
  
@@ -444,6 +699,8 @@ index b6e4161ab39..697863d291d 100644
 +    output.struct_size = sizeof(output);
 +    if (registration->buildFrame(&frameContext, &output) != MLN_PLUGIN_STATUS_OK) {
 +        Log::Error(Event::Style, "Plugin layer '" + getID() + "' failed to build its frame");
++        removeAllDrawables();
++        frameBucket.reset();
 +        return;
 +    }
 +
@@ -452,114 +709,32 @@ index b6e4161ab39..697863d291d 100644
 +    if (output.vertex_stream_count == 0 || output.drawable_count == 0 || output.index_count == 0) {
 +        removeAllDrawables();
 +        frameBucket.reset();
-+        frameBinders.clear();
 +        return;
 +    }
 +
-+    removeAllDrawables();
-+    frameBucket = std::make_shared<PluginBucket>(registration);
-+    frameBinders.clear();
-+
-+    std::set<uint32_t> streamIDs;
-+    bool valid = output.struct_size >= sizeof(output) && output.vertex_streams && output.indices && output.drawables;
-+    for (size_t i = 0; valid && i < output.vertex_stream_count; ++i) {
-+        const auto& stream = output.vertex_streams[i];
-+        valid = stream.struct_size >= sizeof(stream) && stream.stride > 0 && stream.vertex_count > 0 && stream.data &&
-+                stream.data_size == static_cast<size_t>(stream.stride) * stream.vertex_count &&
-+                streamIDs.emplace(stream.stream_id).second;
-+        if (valid) {
-+            std::vector<uint8_t> copied(stream.data_size);
-+            std::memcpy(copied.data(), stream.data, copied.size());
-+            frameBucket->vertexStreams.emplace(
-+                stream.stream_id,
-+                std::make_shared<PluginVertexVector>(std::move(copied), stream.vertex_count, stream.stride));
-+        }
-+    }
-+    if (valid) {
-+        std::vector<uint16_t> indices(output.indices, output.indices + output.index_count);
-+        frameBucket->indices = std::make_shared<gfx::IndexVectorBase>(std::move(indices));
-+    }
-+
-+    std::map<uint64_t, PluginDrawableDefinition> drawableDefinitions;
-+    for (size_t i = 0; valid && i < output.drawable_count; ++i) {
-+        const auto& input = output.drawables[i];
-+        valid = input.struct_size >= sizeof(input) && input.shader_id.data && input.shader_id.size &&
-+                input.attribute_count && input.attributes && input.segment_count && input.segments;
-+        if (!valid) break;
-+        PluginDrawableDefinition drawable;
-+        drawable.key = input.drawable_key;
-+        drawable.shaderID.assign(input.shader_id.data, input.shader_id.size);
-+        const auto shaderIt = std::find_if(registration->shaders.begin(),
-+                                           registration->shaders.end(),
-+                                           [&](const auto& shader) { return shader.id == drawable.shaderID; });
-+        valid = shaderIt != registration->shaders.end() && !drawableDefinitions.contains(drawable.key);
-+        if (!valid) break;
-+        std::set<uint32_t> hostAttributeIDs;
-+        for (const auto& binding : shaderIt->propertyBindings) {
-+            hostAttributeIDs.emplace(binding.minimumAttributeID);
-+            hostAttributeIDs.emplace(binding.maximumAttributeID);
-+        }
-+        for (size_t bindingIndex = 0; valid && bindingIndex < input.attribute_count; ++bindingIndex) {
-+            const auto& binding = input.attributes[bindingIndex];
-+            const auto streamIt = frameBucket->vertexStreams.find(binding.stream_id);
-+            const auto attributeIt = std::find_if(
-+                shaderIt->attributes.begin(), shaderIt->attributes.end(), [&](const auto& attribute) {
-+                    return attribute.id == binding.attribute_id;
-+                });
-+            const auto type = attributeIt == shaderIt->attributes.end() ? gfx::AttributeDataType::Invalid
-+                                                                        : plugin::attributeType(attributeIt->type);
-+            const auto size = gfx::VertexAttribute::getStrideOf(type);
-+            valid = binding.struct_size >= sizeof(binding) && streamIt != frameBucket->vertexStreams.end() &&
-+                    attributeIt != shaderIt->attributes.end() && size > 0 &&
-+                    hostAttributeIDs.find(binding.attribute_id) == hostAttributeIDs.end() &&
-+                    binding.byte_offset <= streamIt->second->getRawSize() &&
-+                    size <= streamIt->second->getRawSize() - binding.byte_offset;
-+            if (valid) {
-+                drawable.vertexCount = std::max(drawable.vertexCount, streamIt->second->getRawCount());
-+                drawable.attributes.push_back({binding.attribute_id, binding.stream_id, binding.byte_offset, type});
-+            }
-+        }
-+        for (size_t segmentIndex = 0; valid && segmentIndex < input.segment_count; ++segmentIndex) {
-+            const auto& segment = input.segments[segmentIndex];
-+            valid = segment.struct_size >= sizeof(segment) && segment.index_offset <= output.index_count &&
-+                    segment.index_length <= output.index_count - segment.index_offset &&
-+                    segment.vertex_offset <= drawable.vertexCount &&
-+                    segment.vertex_length <= drawable.vertexCount - segment.vertex_offset;
-+            if (valid) {
-+                for (size_t index = segment.index_offset; index < segment.index_offset + segment.index_length;
-+                     ++index) {
-+                    if (output.indices[index] >= segment.vertex_length) {
-+                        valid = false;
-+                        break;
-+                    }
-+                }
-+            }
-+            if (valid) {
-+                drawable.segments.emplace_back(
-+                    segment.vertex_offset, segment.index_offset, segment.vertex_length, segment.index_length);
-+            }
-+        }
-+        if (valid) {
-+            drawableDefinitions.emplace(drawable.key, std::move(drawable));
-+        }
-+    }
-+    if (!valid) {
++    auto nextBucket = std::make_shared<PluginBucket>(registration);
++    if (!nextBucket->copyGeometry(output) || output.feature_vertex_range_count != 0) {
 +        Log::Error(Event::Style, "Plugin layer '" + getID() + "' returned a malformed frame bucket");
++        removeAllDrawables();
 +        frameBucket.reset();
-+        frameBinders.clear();
 +        return;
 +    }
-+
-+    const auto renderPass = RenderPass::Translucent;
 +    const auto zoom = static_cast<float>(state.getZoom());
-+    for (const auto& [key, definition] : drawableDefinitions) {
++    if (frameBucket && !layerGroup->empty() && frameBucket->hasSameGeometry(*nextBucket) &&
++        !frameBucket->synchronizePaint(getID(), evaluatedPaintSnapshot, zoom)) {
++        return;
++    }
++    removeAllDrawables();
++    frameBucket = std::move(nextBucket);
++    const auto renderPass = RenderPass::Translucent;
++    for (const auto& definition : frameBucket->drawables) {
 +        const auto shaderIt = std::find_if(registration->shaders.begin(),
 +                                           registration->shaders.end(),
 +                                           [&](const auto& shader) { return shader.id == definition.shaderID; });
-+        auto binders = std::make_unique<PluginPaintPropertyBinders>(
-+            registration, *shaderIt, definition.key, definition.vertexCount, zoom, *evaluatedPaintSnapshot, nullptr);
-+        auto* paintBinders = binders.get();
-+        frameBinders.emplace(key, std::move(binders));
++        auto [binder, inserted] = frameBucket->paintPropertyBinders[getID()].try_emplace(
++            definition.key, registration, *shaderIt, definition.key, definition.vertexCount,
++            zoom, *evaluatedPaintSnapshot, nullptr);
++        auto* paintBinders = &binder->second;
 +
 +        StringIDSetsPair propertiesAsUniforms;
 +        auto attributes = context.createVertexAttributeArray();
@@ -612,7 +787,7 @@ index b6e4161ab39..697863d291d 100644
  bool RenderPluginStyleLayer::queryIntersectsFeature(const GeometryCoordinates& queryGeometry,
                                                      const GeometryTileFeature& feature,
                                                      float zoom,
-@@ -267,7 +571,9 @@ bool RenderPluginStyleLayer::queryIntersectsFeature(const GeometryCoordinates& q
+@@ -267,7 +491,9 @@
                                                      const mat4& tileMatrix,
                                                      const FeatureState& featureState) const {
      const auto& registration = pluginImpl(baseImpl).registration;
@@ -623,8 +798,6 @@ index b6e4161ab39..697863d291d 100644
      const plugin::FeatureView pluginFeature(feature);
      std::vector<mln_plugin_tile_point_v1> query;
      query.reserve(queryGeometry.size());
-diff --git a/src/mln/renderer/layers/render_plugin_style_layer.hpp b/src/mln/renderer/layers/render_plugin_style_layer.hpp
-index 52d79447b6e..04c21aa8e8d 100644
 --- a/src/mln/renderer/layers/render_plugin_style_layer.hpp
 +++ b/src/mln/renderer/layers/render_plugin_style_layer.hpp
 @@ -4,13 +4,19 @@
@@ -634,10 +807,10 @@ index 52d79447b6e..04c21aa8e8d 100644
 +#include <memory>
  
  namespace mln {
- 
++
 +class PluginBucket;
 +class PluginPaintPropertyBinders;
-+
+ 
  class RenderPluginStyleLayer final : public RenderLayer {
  public:
      explicit RenderPluginStyleLayer(Immutable<style::PluginStyleLayer::Impl>);
@@ -648,7 +821,7 @@ index 52d79447b6e..04c21aa8e8d 100644
  
      void update(gfx::ShaderRegistry&,
                  gfx::Context&,
-@@ -37,12 +43,26 @@ private:
+@@ -37,12 +43,24 @@
      bool hasTransition() const override;
      bool hasCrossfade() const override { return false; }
  
@@ -668,18 +841,76 @@ index 52d79447b6e..04c21aa8e8d 100644
      /// True while the layer reports an active animation.
      bool animated = false;
 +
-+    /// Latest source-free frame bucket and its per-drawable binders, replaced
-+    /// on every update after the previous frame's drawables are removed.
++    // Owns frame geometry and binders while drawables reference them.
 +    std::shared_ptr<PluginBucket> frameBucket;
-+    std::map<uint64_t, std::unique_ptr<PluginPaintPropertyBinders>> frameBinders;
  };
  
  } // namespace mln
-diff --git a/src/mln/style/conversion/constant.cpp b/src/mln/style/conversion/constant.cpp
-index 880b0d15c37..752712b3403 100644
+--- a/src/mln/renderer/render_orchestrator.cpp
++++ b/src/mln/renderer/render_orchestrator.cpp
+@@ -457,33 +457,39 @@
+                 continue;
+             }
+ 
+-            // Handle layers without source.
+-            if (layerIsVisible && zoomFitsLayer && sourceImpl.get() == sourceImpls->at(0).get()) {
+-                if (backgroundLayerAsColor && layer.baseImpl == layerImpls->front()) {
+-                    const auto& solidBackground = layer.getSolidBackground();
+-                    if (solidBackground) {
+-                        renderTreeParameters->backgroundColor = *solidBackground;
+-                        continue; // This layer is shown with background color,
+-                                  // and it shall not be added to render items.
+-                    }
+-                }
+-                renderItemsEmplaceHint = layerRenderItems.emplace_hint(
+-                    renderItemsEmplaceHint, layer, nullptr, static_cast<uint32_t>(index));
+-                updateList[index] = true;
+-            }
+         }
+         tileParameters.isUpdateSynchronous = sourceImpl->isUpdateSynchronous();
+         source->update(sourceImpl, filteredLayersForSource, sourceNeedsRendering, sourceNeedsRelayout, tileParameters);
+         filteredLayersForSource.clear();
+ 
+-        // Update all layers with their new renderability status, if it changed.
+-        for (size_t i = 0; i < updateList.size(); i++) {
+-            if (orderedLayers[i].get().isLayerRenderable() != updateList[i]) {
+-                orderedLayers[i].get().markLayerRenderable(updateList[i], changes);
++    }
++
++    // Source-free layers also render when the style has no sources.
++    for (std::size_t index = 0; index < orderedLayers.size(); ++index) {
++        RenderLayer& layer = orderedLayers[index];
++        const auto* layerInfo = layer.baseImpl->getTypeInfo();
++        renderTreeParameters->has3D |= (layerInfo->pass3d == LayerTypeInfo::Pass3D::Required);
++        if (layerInfo->source != LayerTypeInfo::Source::NotRequired ||
++            layer.baseImpl->visibility == style::VisibilityType::None ||
++            !layer.supportsZoom(zoomHistory.lastZoom)) {
++            continue;
++        }
++        if (backgroundLayerAsColor && layer.baseImpl == layerImpls->front()) {
++            if (const auto& solidBackground = layer.getSolidBackground()) {
++                renderTreeParameters->backgroundColor = *solidBackground;
++                continue;
+             }
+         }
+-        addChanges(changes);
+-    }
++        renderItemsEmplaceHint = layerRenderItems.emplace_hint(
++            renderItemsEmplaceHint, layer, nullptr, static_cast<uint32_t>(index));
++        updateList[index] = true;
++    }
++    for (size_t i = 0; i < updateList.size(); i++) {
++        if (orderedLayers[i].get().isLayerRenderable() != updateList[i]) {
++            orderedLayers[i].get().markLayerRenderable(updateList[i], changes);
++        }
++    }
++    addChanges(changes);
+ 
+     renderTreeParameters->loaded = updateParameters->styleLoaded && isLoaded();
+     if (!isMapModeContinuous && !renderTreeParameters->loaded) {
 --- a/src/mln/style/conversion/constant.cpp
 +++ b/src/mln/style/conversion/constant.cpp
-@@ -229,6 +229,8 @@ std::optional<std::array<float, N>> Converter<std::array<float, N>>::operator()(
+@@ -229,6 +229,8 @@
      return result;
  }
  
@@ -688,37 +919,31 @@ index 880b0d15c37..752712b3403 100644
  template std::optional<std::array<float, 2>> Converter<std::array<float, 2>>::operator()(const Convertible&,
                                                                                           Error&) const;
  template std::optional<std::array<float, 3>> Converter<std::array<float, 3>>::operator()(const Convertible&,
-diff --git a/src/mln/style/conversion/function.cpp b/src/mln/style/conversion/function.cpp
-index faaf2f928ca..8bf31713857 100644
 --- a/src/mln/style/conversion/function.cpp
 +++ b/src/mln/style/conversion/function.cpp
-@@ -142,6 +142,8 @@ template std::optional<PropertyExpression<Position>> convertFunctionToExpression
+@@ -141,6 +141,8 @@
+                                                                                            Error&,
                                                                                             bool);
  template std::optional<PropertyExpression<RasterResamplingType>> convertFunctionToExpression<RasterResamplingType>(
-     const Convertible&, Error&, bool);
-+template std::optional<PropertyExpression<std::array<double, 2>>> convertFunctionToExpression<std::array<double, 2>>(
 +    const Convertible&, Error&, bool);
++template std::optional<PropertyExpression<std::array<double, 2>>> convertFunctionToExpression<std::array<double, 2>>(
+     const Convertible&, Error&, bool);
  template std::optional<PropertyExpression<std::array<float, 2>>> convertFunctionToExpression<std::array<float, 2>>(
      const Convertible&, Error&, bool);
- template std::optional<PropertyExpression<std::array<float, 4>>> convertFunctionToExpression<std::array<float, 4>>(
-diff --git a/src/mln/style/conversion/property_value.cpp b/src/mln/style/conversion/property_value.cpp
-index b145e360813..2d457cd3403 100644
 --- a/src/mln/style/conversion/property_value.cpp
 +++ b/src/mln/style/conversion/property_value.cpp
-@@ -71,6 +71,8 @@ template std::optional<PropertyValue<float>> Converter<PropertyValue<float>>::op
+@@ -70,6 +70,8 @@
+                                                                                          bool,
                                                                                           bool) const;
  template std::optional<PropertyValue<std::array<float, 2>>> Converter<PropertyValue<std::array<float, 2>>>::operator()(
-     conversion::Convertible const&, conversion::Error&, bool, bool) const;
-+template std::optional<PropertyValue<std::array<double, 2>>> Converter<PropertyValue<std::array<double, 2>>>::operator()(
 +    conversion::Convertible const&, conversion::Error&, bool, bool) const;
++template std::optional<PropertyValue<std::array<double, 2>>> Converter<PropertyValue<std::array<double, 2>>>::operator()(
+     conversion::Convertible const&, conversion::Error&, bool, bool) const;
  template std::optional<PropertyValue<std::array<float, 4>>> Converter<PropertyValue<std::array<float, 4>>>::operator()(
      conversion::Convertible const&, conversion::Error&, bool, bool) const;
- template std::optional<PropertyValue<std::vector<float>>> Converter<PropertyValue<std::vector<float>>>::operator()(
-diff --git a/src/mln/style/expression/value.cpp b/src/mln/style/expression/value.cpp
-index 644235ae178..fd1d348456c 100644
 --- a/src/mln/style/expression/value.cpp
 +++ b/src/mln/style/expression/value.cpp
-@@ -367,6 +367,10 @@ template type::Type valueTypeToExpressionType<Rotation>();
+@@ -367,6 +367,10 @@
  template type::Type valueTypeToExpressionType<std::array<float, 2>>();
  template struct ValueConverter<std::array<float, 2>>;
  
@@ -729,15 +954,12 @@ index 644235ae178..fd1d348456c 100644
  template type::Type valueTypeToExpressionType<std::array<float, 4>>();
  template struct ValueConverter<std::array<float, 4>>;
  
-diff --git a/src/mln/style/plugin_property.cpp b/src/mln/style/plugin_property.cpp
-index 3e9185c9ba3..413324f98d0 100644
 --- a/src/mln/style/plugin_property.cpp
 +++ b/src/mln/style/plugin_property.cpp
-@@ -69,6 +69,15 @@ std::array<float, 2> defaultValue<std::array<float, 2>>(const plugin::PropertyDe
-     return result;
+@@ -70,6 +70,15 @@
  }
  
-+template <>
+ template <>
 +std::array<double, 2> defaultValue<std::array<double, 2>>(const plugin::PropertyDefinition& definition) {
 +    std::array<double, 2> result{};
 +    if (const auto* array = definition.defaultValue.getArray(); array && array->size() == result.size()) {
@@ -746,10 +968,11 @@ index 3e9185c9ba3..413324f98d0 100644
 +    return result;
 +}
 +
- template <>
++template <>
  Color defaultValue<Color>(const plugin::PropertyDefinition& definition) {
      std::array<float, 4> result{};
-@@ -92,6 +101,8 @@ auto withPropertyType(mln_plugin_value_type type, Fn&& fn) {
+     if (const auto* array = definition.defaultValue.getArray(); array && array->size() == result.size()) {
+@@ -92,6 +101,8 @@
              return fn.template operator()<float>();
          case MLN_PLUGIN_VALUE_FLOAT2:
              return fn.template operator()<std::array<float, 2>>();
@@ -758,7 +981,7 @@ index 3e9185c9ba3..413324f98d0 100644
          case MLN_PLUGIN_VALUE_COLOR:
              return fn.template operator()<Color>();
          case MLN_PLUGIN_VALUE_STRING:
-@@ -120,6 +131,9 @@ mln_plugin_value toPluginValue(const T& value, PluginPropertyValue::EvaluationSt
+@@ -120,6 +131,9 @@
      } else if constexpr (std::is_same_v<T, std::array<float, 2>>) {
          result.type = MLN_PLUGIN_VALUE_FLOAT2;
          result.data.float2_value = {value[0], value[1]};
@@ -768,11 +991,9 @@ index 3e9185c9ba3..413324f98d0 100644
      } else if constexpr (std::is_same_v<T, Color>) {
          result.type = MLN_PLUGIN_VALUE_COLOR;
          result.data.color_value = {value.r, value.g, value.b, value.a};
-diff --git a/src/mln/style/plugin_property.hpp b/src/mln/style/plugin_property.hpp
-index 7c11ee74405..ebeca5e849c 100644
 --- a/src/mln/style/plugin_property.hpp
 +++ b/src/mln/style/plugin_property.hpp
-@@ -29,6 +29,7 @@ class PluginPropertyValue {
+@@ -29,6 +29,7 @@
  public:
      using TypedValue = std::variant<PropertyValue<float>,
                                      PropertyValue<std::array<float, 2>>,
@@ -780,7 +1001,7 @@ index 7c11ee74405..ebeca5e849c 100644
                                      PropertyValue<Color>,
                                      PropertyValue<std::string>>;
  
-@@ -83,6 +84,7 @@ public:
+@@ -83,6 +84,7 @@
  private:
      using TypedValue = std::variant<Transitioning<PropertyValue<float>>,
                                      Transitioning<PropertyValue<std::array<float, 2>>>,

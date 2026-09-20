@@ -130,24 +130,26 @@ declares paint properties and shaders for each render backend and fills uniform
 blocks on the render thread. Geometry arrives one of two ways. A tile-driven
 layer takes a style source and lays out its tile features into vertex data on
 tile workers. A source-free layer takes no source and instead receives a
-per-frame callback with the camera-evaluated paint values and a screen
-projection; its constant properties — position and bearing for a location
-indicator, for example — transition like any built-in paint property, while
-tile-driven data-driven properties never transition. Source-free layers cannot
-declare data-driven properties and receive no feature hit-testing.
+per-frame callback with the camera-evaluated paint values and projection inputs;
+its constant properties — position and bearing for a location indicator, for
+example — transition like any built-in paint property, while tile-driven
+data-driven properties never transition. Source-free layers cannot declare
+data-driven properties. They can return GeoJSON features and world-pixel hit
+envelopes for rendered-feature queries. Rotation properties use the native
+shortest-arc transition behavior.
 
 This library builds plugin support into its core and exports the registration
 entry point. A plugin registers once per process, before a style that uses its
 layer types loads. Registration retains the plugin's callbacks for the rest of
 the process, and those callbacks run on MapLibre's threads, so authoring a
 plugin is native work, and language bindings carry the plugin declarations in
-their raw C layer without a safe wrapper. Loading a prebuilt plugin is open to
-every binding: a plugin shared library exports an entry point that takes the
-register function, and the consumer obtains that function from
-`mln_plugin_get_register_function_v1` and hands it over, so the plugin binary
-never links the host library. The plugin API declares shaders for OpenGL,
-Vulkan, and Metal; a WebGPU build registers a plugin but has no shader path for
-its layers.
+their raw C layer without a safe wrapper. Every binding exposes a loader for
+prebuilt plugins. It opens the shared library and calls its registration entry
+point with the host's register function. The plugin binary has no link
+dependency on the host library. Rust marks loading as unsafe because the caller
+must establish the plugin's ABI compatibility and memory safety. The plugin API
+declares shaders for OpenGL, Vulkan, and Metal; a WebGPU build registers a
+plugin but has no shader path for its layers.
 
 ## Language bindings
 
