@@ -52,6 +52,31 @@ int _dispatchLogRecord(
 }
 
 void main() {
+  test('plugin registration accessor reaches the native registry', () {
+    final address = Maplibre.pluginRegisterFunctionV1().address;
+    final register =
+        Pointer<
+              NativeFunction<raw.mln_plugin_register_function_v1Function>
+            >.fromAddress(address)
+            .asFunction<
+              int Function(
+                Pointer<raw.mln_plugin_descriptor_v1>,
+                Pointer<Char>,
+                int,
+              )
+            >();
+    final diagnostic = calloc<Char>(256);
+    try {
+      expect(
+        register(nullptr, diagnostic, 256),
+        raw.mln_plugin_status.MLN_PLUGIN_STATUS_INVALID_ARGUMENT.value,
+      );
+      expect(diagnostic.cast<Utf8>().toDartString(), isNotEmpty);
+    } finally {
+      calloc.free(diagnostic);
+    }
+  });
+
   test('map options carry FastPFOR decoding to native', () {
     expect(const MapOptions().fastPforEnabled, isFalse);
     expect(const MapOptions(fastPforEnabled: true), isNot(const MapOptions()));

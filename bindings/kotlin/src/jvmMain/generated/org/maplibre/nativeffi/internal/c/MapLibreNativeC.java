@@ -20580,4 +20580,62 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
            throw new AssertionError("should not reach here", ex$);
         }
     }
+
+    private static class mln_plugin_get_register_function_v1 {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_POINTER    );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_plugin_get_register_function_v1");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_plugin_register_function_v1 mln_plugin_get_register_function_v1()
+     * }
+     */
+    public static FunctionDescriptor mln_plugin_get_register_function_v1$descriptor() {
+        return mln_plugin_get_register_function_v1.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_plugin_register_function_v1 mln_plugin_get_register_function_v1()
+     * }
+     */
+    public static MethodHandle mln_plugin_get_register_function_v1$handle() {
+        return mln_plugin_get_register_function_v1.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_plugin_register_function_v1 mln_plugin_get_register_function_v1()
+     * }
+     */
+    public static MemorySegment mln_plugin_get_register_function_v1$address() {
+        return mln_plugin_get_register_function_v1.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_plugin_register_function_v1 mln_plugin_get_register_function_v1()
+     * }
+     */
+    public static MemorySegment mln_plugin_get_register_function_v1() {
+        var mh$ = mln_plugin_get_register_function_v1.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_plugin_get_register_function_v1");
+            }
+            return (MemorySegment)mh$.invokeExact();
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
 }

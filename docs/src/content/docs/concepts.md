@@ -136,10 +136,16 @@ This library builds plugin support into its core and exports the registration
 entry point. A plugin registers once per process, before a style that uses its
 layer types loads. Registration retains the plugin's callbacks for the rest of
 the process, and those callbacks run on MapLibre's threads, so a plugin is
-native code that links this library directly. Language bindings carry the plugin
-declarations in their raw C layer and add no safe wrapper. The plugin API
-declares shaders for OpenGL, Vulkan, and Metal; a WebGPU build registers a
-plugin but has no shader path for its layers.
+native code. Language bindings expose the registration function for plugin
+integrations; plugin authoring uses the raw C contract. The plugin API declares
+shaders for OpenGL, Vulkan, and Metal; a WebGPU build registers a plugin but has
+no shader path for its layers.
+
+Plugin integrations obtain the host's registration function through
+`mln_plugin_get_register_function_v1()` and pass it to their own registration
+entry point. The integration loads the plugin and keeps its code loaded for the
+process lifetime. The plugin registers its descriptors through the supplied
+function, into the host's copy of MapLibre Native.
 
 ## Language bindings
 

@@ -112,6 +112,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/c_api/logging.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/map.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/network.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/plugin.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/render_session.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/runtime.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/surface.cpp

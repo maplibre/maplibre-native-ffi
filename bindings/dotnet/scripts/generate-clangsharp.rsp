@@ -1,5 +1,7 @@
 --include-directory
 ../../include/maplibre_native_c
+--include-directory
+../../third_party/maplibre-native/include
 --language
 c
 -std
@@ -32,3 +34,6 @@ mln_queried_feature_list=MlnQueriedFeatureList
 latest-codegen
 --with-access-specifier
 *=internal
+
+--remap
+mln_plugin_register_function_v1=nint

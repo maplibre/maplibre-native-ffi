@@ -62,6 +62,14 @@ abstract class GenerateJvmJextractBindingsTask : DefaultTask() {
   @get:PathSensitive(PathSensitivity.RELATIVE)
   abstract val cHeaders: DirectoryProperty
 
+  @get:InputDirectory
+  @get:PathSensitive(PathSensitivity.RELATIVE)
+  abstract val upstreamPluginHeaders: DirectoryProperty
+
+  @get:InputFile
+  @get:PathSensitive(PathSensitivity.RELATIVE)
+  abstract val umbrellaHeader: RegularFileProperty
+
   @get:InputFile
   @get:PathSensitive(PathSensitivity.NONE)
   abstract val jextractExecutable: RegularFileProperty
@@ -88,7 +96,9 @@ abstract class GenerateJvmJextractBindingsTask : DefaultTask() {
           "@${includes.get().asFile.absolutePath}",
           "-I",
           cHeaders.get().asFile.absolutePath,
-          cHeaders.get().file("maplibre_native_c.h").asFile.absolutePath,
+          "-I",
+          upstreamPluginHeaders.get().asFile.absolutePath,
+          umbrellaHeader.get().asFile.absolutePath,
         )
       }
       .assertNormalExitValue()
@@ -164,6 +174,9 @@ val generateJvmJextractBindings =
     dependsOn(extractJextract)
     includes = layout.projectDirectory.file("src/jextract/maplibre-native-c.includes")
     cHeaders = checkedInCHeaders
+    upstreamPluginHeaders =
+      rootProject.layout.projectDirectory.dir("third_party/maplibre-native/include")
+    umbrellaHeader = layout.projectDirectory.file("src/jextract/jextract-umbrella.h")
     jextractExecutable = layout.file(provider { jextractExecutableFile.get() })
     jextractArchiveSha256 = jextractDistribution.sha256
     outputDirectory = checkedInJextractSources

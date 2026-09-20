@@ -490,8 +490,9 @@ static const char square_style_json[] =
 
 static mln_plugin_status register_square_plugin(void) {
   char error[256] = "";
-  const mln_plugin_status status =
-    mln_plugin_register_v1(&square_descriptor, error, sizeof(error));
+  const mln_plugin_status status = mln_plugin_get_register_function_v1()(
+    &square_descriptor, error, sizeof(error)
+  );
   TEST_ASSERT_EQUAL_STRING("", error);
   return status;
 }

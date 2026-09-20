@@ -28,8 +28,14 @@ this library's headers, and the shared library exports upstream's
 `mln_plugin_register_v1`. Upstream owns that contract and versions its structs
 independently of `mln_c_version()`, and a plugin is native code whose callbacks
 run on tile workers and the render thread for the process lifetime. Bindings
-expose the plugin declarations through their raw C layer only, so the generated
-map API of every binding stays the umbrella.
+expose the registration function for plugin integrations; plugin authoring uses
+the raw C contract.
+
+Plugin integrations obtain the host's registration function through
+`mln_plugin_get_register_function_v1()` and pass it to their own registration
+entry point. The integration loads the plugin and keeps its code loaded for the
+process lifetime. The plugin registers its descriptors through the supplied
+function, into the host's copy of MapLibre Native.
 
 ## ABI Rules
 

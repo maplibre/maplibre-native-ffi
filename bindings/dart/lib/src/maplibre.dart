@@ -11,6 +11,7 @@ import 'internal/status/status.dart';
 import 'internal/struct/struct.dart' as native_struct;
 import 'log/log.dart';
 import 'render/targets.dart';
+import 'render/native_pointer.dart';
 
 final class _LogCallbackState extends RetainedCallbackState {
   _LogCallbackState(LogCallback callback, {required bool consume}) {
@@ -180,6 +181,13 @@ final class Maplibre {
   /// Restores MapLibre Native's default async log severity mask.
   static void restoreDefaultAsyncLogSeverityMask() {
     setAsyncLogSeverityMask(LogSeverityMask.defaultMask);
+  }
+
+  /// Returns the process-lifetime address of the v1 plugin registration function.
+  /// Pass it to the plugin's own registration entry point before loading dependent styles.
+  static NativePointer pluginRegisterFunctionV1() {
+    ensureAbiVersion();
+    return NativePointer(raw.mln_plugin_get_register_function_v1().address);
   }
 
   static void _checkStatus(int status) {

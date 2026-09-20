@@ -1,7 +1,7 @@
 """Process-global entry points for the Python binding."""
 
 from . import _native
-from .render import OpenGLContextProvider, RenderBackend
+from .render import NativePointer, OpenGLContextProvider, RenderBackend
 from .runtime import NetworkStatus
 
 EXPECTED_C_ABI_VERSION: int = int(_native.expected_c_abi_version())
@@ -33,3 +33,11 @@ def set_network_status(status: NetworkStatus) -> None:
         status if isinstance(status, NetworkStatus) else NetworkStatus(status)
     )
     _native.set_network_status_raw(network_status_value.native_code)
+
+
+def plugin_register_function_v1() -> NativePointer:
+    """Return the process-lifetime address of the v1 plugin registration function.
+
+    Pass it to the plugin's own registration entry point before loading dependent styles.
+    """
+    return NativePointer(_native.plugin_register_function_v1())

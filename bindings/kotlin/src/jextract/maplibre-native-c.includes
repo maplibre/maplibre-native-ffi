@@ -269,6 +269,9 @@
 --include-struct mln_unit_bezier
 --include-struct mln_vec3
 
+# include/maplibre_native_c/plugin.h
+--include-function mln_plugin_get_register_function_v1
+
 # include/maplibre_native_c/projection.h
 --include-constant MLN_STYLE_IMAGE_OPTION_CONTENT
 --include-function mln_lat_lng_for_projected_meters

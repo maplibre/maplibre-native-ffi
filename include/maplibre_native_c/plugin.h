@@ -13,8 +13,14 @@
  * This header stays outside maplibre_native_c.h on purpose. Plugin authoring
  * is a separate contract from the map API: upstream versions its structs
  * independently, its callbacks run on tile workers and the render thread for
- * the rest of the process, and it is for native code that links this library
- * directly. Language bindings expose it through their raw C layer only.
+ * the rest of the process, and plugin authoring uses native code. Language
+ * bindings expose the registration function for plugin integrations.
+ *
+ * A plugin integration calls its own registration entry point with the
+ * function returned by mln_plugin_get_register_function_v1(). The plugin
+ * registers its descriptors through that pointer, into this library's copy
+ * of MapLibre Native. The integration owns loading the plugin and keeping
+ * its code loaded for the process lifetime.
  *
  * A plugin registers once per process, before any style that uses its layer
  * types loads, into the copy of MapLibre Native that this library carries.
@@ -29,5 +35,27 @@
 #define MAPLIBRE_NATIVE_C_PLUGIN_H
 
 #include <mln/plugin/plugin_api.h>  // IWYU pragma: export
+
+#include "base.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * Returns the process-wide mln_plugin_register_v1 entry point; never null.
+ *
+ * The accessor exists for consumers that cannot take a C function's address,
+ * such as managed-language bindings over this library. Such a consumer obtains
+ * the register function here and passes it to the entry point of a plugin
+ * shared library, which registers its layer types through the pointer. See
+ * the file-top comment for the loading pattern.
+ */
+MLN_API mln_plugin_register_function_v1
+mln_plugin_get_register_function_v1(void) MLN_NOEXCEPT;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // MAPLIBRE_NATIVE_C_PLUGIN_H
