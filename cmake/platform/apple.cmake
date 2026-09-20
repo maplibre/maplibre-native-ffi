@@ -31,8 +31,6 @@ function(mln_ffi_apple_is_simulator out_var)
   endif()
 endfunction()
 
-# Mac Catalyst builds the iOS surface against the macOS SDK; the toolchain file
-# selects it the same way.
 function(mln_ffi_apple_is_maccatalyst out_var)
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS"
      AND CMAKE_OSX_SYSROOT MATCHES "[Mm]ac[Oo][Ss][Xx]")
@@ -71,8 +69,7 @@ function(mln_ffi_configure_platform_dependencies target)
         MLN_FFI_TEST_SUPPORTED TRUE)
   elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     if(MLN_FFI_APPLE_MACCATALYST)
-      # A Catalyst binary runs on the build host, so the suite runs directly.
-      # Zig has no Catalyst ABI, so the Zig binding leaves this target out.
+      # Zig has no Catalyst ABI.
       set_target_properties(
         ${target}
         PROPERTIES

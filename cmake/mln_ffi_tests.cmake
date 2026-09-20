@@ -235,8 +235,6 @@ function(mln_ffi_add_c_api_test)
     return()
   endif()
 
-  # A Mac Catalyst binary runs on the host; the other Apple mobile presets run
-  # through a simulator.
   mln_ffi_apple_is_maccatalyst(MLN_FFI_APPLE_MACCATALYST)
   if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$" AND NOT MLN_FFI_APPLE_MACCATALYST)
     add_test(

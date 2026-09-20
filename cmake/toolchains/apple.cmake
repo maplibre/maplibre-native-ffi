@@ -1,6 +1,5 @@
-# Mac Catalyst is the iOS SDK surface built against the macOS SDK, which CMake
-# has no platform for: an iOS system name combined with the macosx sysroot
-# selects it, and the `macabi` compiler target carries the rest.
+# CMake has no Mac Catalyst platform: the iOS system name with the macosx
+# sysroot selects it, and the `macabi` compiler target carries the rest.
 string(TOLOWER "${CMAKE_OSX_SYSROOT}" MLN_FFI_APPLE_SYSROOT_NAME)
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS"
    AND MLN_FFI_APPLE_SYSROOT_NAME MATCHES "macosx")
@@ -11,9 +10,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS"
     set(CMAKE_${MLN_FFI_APPLE_LANGUAGE}_COMPILER_TARGET
         "${MLN_FFI_APPLE_TRIPLE}")
   endforeach()
-  # CMake wraps every iOS executable in an app bundle. Its placeholder bundle
-  # has no identifier, and a Catalyst process launched from one cannot reach
-  # the Metal shader compiler service; a bare executable runs on the host.
+  # A Catalyst process in CMake's placeholder app bundle cannot reach the
+  # Metal shader compiler service.
   set(CMAKE_MACOSX_BUNDLE OFF)
 endif()
 list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES CMAKE_OSX_DEPLOYMENT_TARGET

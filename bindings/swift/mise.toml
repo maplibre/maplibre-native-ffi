@@ -48,9 +48,8 @@ case "$usage_preset" in
       --triple arm64-apple-tvos14.3
     ;;
   ios-maccatalyst-*)
-    # The target rather than the product: a product build also compiles the
-    # DocC plugin's dependencies, whose manifests leave SwiftPM a Catalyst
-    # floor the compiler rejects.
+    # A product build also compiles the DocC plugin's dependencies, whose
+    # manifests leave SwiftPM a Catalyst floor the compiler rejects.
     exec swift build \
       --target MaplibreNativeFFI \
       --scratch-path ".build/$usage_preset" \
@@ -130,8 +129,8 @@ case "$usage_preset" in
       120
     ;;
   ios-maccatalyst-*)
-    # swift test loads the bundle into a macOS helper, which rejects a Catalyst
-    # image, so the simulator executable stands in and runs directly.
+    # swift test loads the bundle into a macOS helper, which rejects a
+    # Catalyst image.
     swift build \
       --product MaplibreNativeFFIIOSSimulatorTests \
       --scratch-path ".build/$usage_preset" \
