@@ -285,6 +285,12 @@
       "cacheVariables": { "CMAKE_OSX_SYSROOT": "iphonesimulator" }
     },
     {
+      "name": "ios-maccatalyst-arm64-metal",
+      "displayName": "iOS Mac Catalyst ARM64 Metal",
+      "inherits": ["_ios-arm64", "_metal"],
+      "cacheVariables": { "CMAKE_OSX_SYSROOT": "macosx" }
+    },
+    {
       "name": "tvos-arm64-metal",
       "displayName": "tvOS ARM64 Metal",
       "inherits": ["_tvos-arm64", "_metal"],
@@ -456,6 +462,13 @@
     {
       "name": "ios-simulator-arm64-metal",
       "configurePreset": "ios-simulator-arm64-metal",
+      "targets": ["install"],
+      "configuration": "Release",
+      "jobs": 0
+    },
+    {
+      "name": "ios-maccatalyst-arm64-metal",
+      "configurePreset": "ios-maccatalyst-arm64-metal",
       "targets": ["install"],
       "configuration": "Release",
       "jobs": 0
@@ -642,6 +655,11 @@
       "inherits": "_test-base"
     },
     {
+      "name": "ios-maccatalyst-arm64-metal",
+      "configurePreset": "ios-maccatalyst-arm64-metal",
+      "inherits": "_test-base"
+    },
+    {
       "name": "tvos-simulator-arm64-metal",
       "configurePreset": "tvos-simulator-arm64-metal",
       "inherits": "_test-base"
@@ -759,6 +777,12 @@
     {
       "name": "ios-simulator-arm64-metal",
       "configurePreset": "ios-simulator-arm64-metal",
+      "generators": ["TGZ"],
+      "configurations": ["Release"]
+    },
+    {
+      "name": "ios-maccatalyst-arm64-metal",
+      "configurePreset": "ios-maccatalyst-arm64-metal",
       "generators": ["TGZ"],
       "configurations": ["Release"]
     },
@@ -963,6 +987,13 @@
       "steps": [
         { "type": "configure", "name": "ios-simulator-arm64-metal" },
         { "type": "build", "name": "ios-simulator-arm64-metal" }
+      ]
+    },
+    {
+      "name": "ios-maccatalyst-arm64-metal",
+      "steps": [
+        { "type": "configure", "name": "ios-maccatalyst-arm64-metal" },
+        { "type": "build", "name": "ios-maccatalyst-arm64-metal" }
       ]
     },
     {

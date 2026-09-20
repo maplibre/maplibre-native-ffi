@@ -31,6 +31,17 @@ function(mln_ffi_apple_is_simulator out_var)
   endif()
 endfunction()
 
+# Mac Catalyst builds the iOS surface against the macOS SDK; the toolchain file
+# selects it the same way.
+function(mln_ffi_apple_is_maccatalyst out_var)
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS"
+     AND CMAKE_OSX_SYSROOT MATCHES "[Mm]ac[Oo][Ss][Xx]")
+    set(${out_var} TRUE PARENT_SCOPE)
+  else()
+    set(${out_var} FALSE PARENT_SCOPE)
+  endif()
+endfunction()
+
 function(mln_ffi_configure_platform_dependencies target)
   # `c++` is named rather than bundled: Apple ships libc++ as a system library
   # with a stable ABI, so the archive can leave it to the platform.
@@ -51,6 +62,7 @@ function(mln_ffi_configure_platform_dependencies target)
       MLN_FFI_SHARED_SUPPORTED TRUE)
 
   mln_ffi_apple_is_simulator(MLN_FFI_APPLE_SIMULATOR)
+  mln_ffi_apple_is_maccatalyst(MLN_FFI_APPLE_MACCATALYST)
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set_target_properties(
       ${target}
@@ -58,7 +70,15 @@ function(mln_ffi_configure_platform_dependencies target)
         MLN_FFI_TARGET_PLATFORM macos-arm64 MLN_FFI_ZIG_TARGET aarch64-macos
         MLN_FFI_TEST_SUPPORTED TRUE)
   elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    if(MLN_FFI_APPLE_SIMULATOR)
+    if(MLN_FFI_APPLE_MACCATALYST)
+      # A Catalyst binary runs on the build host, so the suite runs directly.
+      # Zig has no Catalyst ABI, so the Zig binding leaves this target out.
+      set_target_properties(
+        ${target}
+        PROPERTIES
+          MLN_FFI_TARGET_PLATFORM ios-maccatalyst-arm64 MLN_FFI_ZIG_TARGET ""
+          MLN_FFI_TEST_SUPPORTED TRUE)
+    elseif(MLN_FFI_APPLE_SIMULATOR)
       set_target_properties(
         ${target}
         PROPERTIES

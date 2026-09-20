@@ -106,7 +106,7 @@ Use persistent PR labels to add coverage to either PR tier:
 
 | Label        | Additional coverage                                               |
 | ------------ | ----------------------------------------------------------------- |
-| `ci:apple`   | All macOS backends and iOS/tvOS device and simulator targets      |
+| `ci:apple`   | All macOS backends and the iOS, Mac Catalyst, and tvOS targets    |
 | `ci:android` | All Android ABIs/backends and multi-ABI packaging                 |
 | `ci:linux`   | Linux ARM64 and musl variants                                     |
 | `ci:windows` | Windows ARM64 variants                                            |

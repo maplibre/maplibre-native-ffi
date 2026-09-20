@@ -1,9 +1,29 @@
+# Mac Catalyst is the iOS SDK surface built against the macOS SDK, which CMake
+# has no platform for: an iOS system name combined with the macosx sysroot
+# selects it, and the `macabi` compiler target carries the rest.
+string(TOLOWER "${CMAKE_OSX_SYSROOT}" MLN_FFI_APPLE_SYSROOT_NAME)
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS"
+   AND MLN_FFI_APPLE_SYSROOT_NAME MATCHES "macosx")
+  set(MLN_FFI_APPLE_MACCATALYST ON)
+  set(MLN_FFI_APPLE_TRIPLE
+      "arm64-apple-ios${CMAKE_OSX_DEPLOYMENT_TARGET}-macabi")
+  foreach(MLN_FFI_APPLE_LANGUAGE C CXX OBJC OBJCXX)
+    set(CMAKE_${MLN_FFI_APPLE_LANGUAGE}_COMPILER_TARGET
+        "${MLN_FFI_APPLE_TRIPLE}")
+  endforeach()
+  # CMake wraps every iOS executable in an app bundle. Its placeholder bundle
+  # has no identifier, and a Catalyst process launched from one cannot reach
+  # the Metal shader compiler service; a bare executable runs on the host.
+  set(CMAKE_MACOSX_BUNDLE OFF)
+endif()
+list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES CMAKE_OSX_DEPLOYMENT_TARGET
+     CMAKE_OSX_SYSROOT)
+
 if(NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
   return()
 endif()
 
-list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES MLN_FFI_XTOOL_SDK_BUNDLE
-     CMAKE_OSX_DEPLOYMENT_TARGET CMAKE_OSX_SYSROOT)
+list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES MLN_FFI_XTOOL_SDK_BUNDLE)
 
 set(MLN_FFI_XTOOL_SDK_BUNDLE
     "$ENV{HOME}/.swiftpm/swift-sdks/darwin.artifactbundle"
@@ -13,8 +33,12 @@ if(NOT EXISTS "${MLN_FFI_XTOOL_SDK_BUNDLE}/toolset/bin/ld64.lld")
     FATAL_ERROR "No xtool Darwin SDK found; run `xtool.AppImage sdk install`")
 endif()
 
-string(TOLOWER "${CMAKE_OSX_SYSROOT}" MLN_FFI_XTOOL_SYSROOT_NAME)
-if(MLN_FFI_XTOOL_SYSROOT_NAME MATCHES "iphonesimulator")
+set(MLN_FFI_XTOOL_SYSROOT_NAME "${MLN_FFI_APPLE_SYSROOT_NAME}")
+if(MLN_FFI_APPLE_MACCATALYST)
+  set(MLN_FFI_XTOOL_TRIPLE "${MLN_FFI_APPLE_TRIPLE}")
+  set(MLN_FFI_XTOOL_SYSROOT
+      "${MLN_FFI_XTOOL_SDK_BUNDLE}/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk")
+elseif(MLN_FFI_XTOOL_SYSROOT_NAME MATCHES "iphonesimulator")
   set(CMAKE_SYSTEM_NAME iOS)
   set(MLN_FFI_XTOOL_TRIPLE
       "arm64-apple-ios${CMAKE_OSX_DEPLOYMENT_TARGET}-simulator")

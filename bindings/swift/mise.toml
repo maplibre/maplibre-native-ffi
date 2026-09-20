@@ -47,6 +47,16 @@ case "$usage_preset" in
       --sdk "$(xcrun --sdk appletvos --show-sdk-path)" \
       --triple arm64-apple-tvos14.3
     ;;
+  ios-maccatalyst-*)
+    # The target rather than the product: a product build also compiles the
+    # DocC plugin's dependencies, whose manifests leave SwiftPM a Catalyst
+    # floor the compiler rejects.
+    exec swift build \
+      --target MaplibreNativeFFI \
+      --scratch-path ".build/$usage_preset" \
+      --sdk "$(xcrun --sdk macosx --show-sdk-path)" \
+      --triple arm64-apple-ios14.3-macabi
+    ;;
   ios-*)
     echo "The Swift binding builds for an iOS device with ios-arm64-metal; simulator coverage comes from //bindings/swift:test." >&2
     exit 2
@@ -71,7 +81,8 @@ arg "[configuration]" default="debug" {
 '''
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # The preset selects the runner: an iOS or tvOS simulator preset builds the test
-# bundle and spawns it on a simulator, and host presets run in process.
+# bundle and spawns it on a simulator, a Mac Catalyst preset builds the same
+# executable and runs it on the host, and host presets run in process.
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
@@ -118,8 +129,24 @@ case "$usage_preset" in
       .build/tvos-simulator/arm64-apple-tvos-simulator/debug/MaplibreNativeFFIIOSSimulatorTests \
       120
     ;;
+  ios-maccatalyst-*)
+    # swift test loads the bundle into a macOS helper, which rejects a Catalyst
+    # image, so the simulator executable stands in and runs directly.
+    swift build \
+      --product MaplibreNativeFFIIOSSimulatorTests \
+      --scratch-path ".build/$usage_preset" \
+      -c "$usage_configuration" \
+      --sdk "$(xcrun --sdk macosx --show-sdk-path)" \
+      --triple arm64-apple-ios14.3-macabi \
+      -Xswiftc -enable-testing \
+      -Xlinker -rpath \
+      -Xlinker "$native_install_dir/lib" \
+      -Xlinker -rpath \
+      -Xlinker "$(xcode-select -p)/Platforms/MacOSX.platform/Developer/Library/Frameworks"
+    exec ".build/$usage_preset/arm64-apple-ios-macabi/$usage_configuration/MaplibreNativeFFIIOSSimulatorTests"
+    ;;
   ios-* | tvos-*)
-    echo "The Swift binding tests need a runnable target; test an ios-simulator or tvos-simulator preset instead of $usage_preset." >&2
+    echo "The Swift binding tests need a runnable target; test an ios-simulator, tvos-simulator, or ios-maccatalyst preset instead of $usage_preset." >&2
     exit 2
     ;;
 esac
