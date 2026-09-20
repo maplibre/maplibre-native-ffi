@@ -37,6 +37,8 @@ def platform(preset: str) -> str:
         return "linux-musl"
     if preset.startswith("ios-simulator-"):
         return "ios-simulator"
+    if preset.startswith("ios-maccatalyst-"):
+        return "ios-maccatalyst"
     if preset.startswith("tvos-simulator-"):
         return "tvos-simulator"
     return preset.split("-", 1)[0]
@@ -64,7 +66,14 @@ def runner(preset: str) -> str:
         # The Zig toolchain selects the libc. These images stay pinned so the
         # graphics headers and loaders used at build time stay reproducible.
         return "ubuntu-24.04-arm" if target_architecture == "arm64" else "ubuntu-24.04"
-    if target_platform in {"macos", "ios", "ios-simulator", "tvos", "tvos-simulator"}:
+    if target_platform in {
+        "macos",
+        "ios",
+        "ios-simulator",
+        "ios-maccatalyst",
+        "tvos",
+        "tvos-simulator",
+    }:
         return "macos-26"
     if target_platform == "windows":
         return "windows-11-arm" if target_architecture == "arm64" else "windows-2022"
@@ -182,6 +191,9 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
                 f"mise run //bindings/dart:build:mobile {preset}",
             ]
         )
+    elif target_platform == "ios-maccatalyst":
+        # Kotlin/Native and Zig have no Mac Catalyst target.
+        commands.append(f"mise run //bindings/swift:test {preset}")
     elif target_platform == "tvos":
         commands.extend(
             [

@@ -235,7 +235,8 @@ function(mln_ffi_add_c_api_test)
     return()
   endif()
 
-  if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$")
+  mln_ffi_apple_is_maccatalyst(MLN_FFI_APPLE_MACCATALYST)
+  if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$" AND NOT MLN_FFI_APPLE_MACCATALYST)
     add_test(
       NAME c-api
       COMMAND
@@ -269,7 +270,7 @@ function(mln_ffi_add_c_api_test)
       "MLN_FFI_TEST_FIXTURE_DIR=${PROJECT_SOURCE_DIR}/third_party/maplibre-native/test/fixtures")
   if(CMAKE_SYSTEM_NAME STREQUAL "tvOS")
     list(APPEND test_environment "MLN_FFI_SIMULATOR_RUNTIME=tvOS")
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_APPLE_MACCATALYST)
     list(APPEND test_environment "MLN_FFI_SIMULATOR_RUNTIME=iOS")
   endif()
   get_target_property(vulkan_icd_file mln_ffi_render_dependencies

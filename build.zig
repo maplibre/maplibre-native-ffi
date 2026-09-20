@@ -24,6 +24,7 @@ pub const RenderBackend = enum {
 
 const ArtifactDescriptor = struct {
     renderBackend: []const u8,
+    targetPlatform: []const u8,
     zigTarget: []const u8,
 };
 
@@ -118,6 +119,7 @@ pub fn renderBackend(b: *std.Build, install_dir: std.Build.LazyPath) RenderBacke
 
 pub fn nativeTarget(b: *std.Build, install_dir: std.Build.LazyPath) std.Build.ResolvedTarget {
     const descriptor = installedArtifactDescriptor(b, install_dir);
+    if (descriptor.zigTarget.len == 0) std.debug.panic("the native artifact targets a platform Zig cannot build for: {s}", .{descriptor.targetPlatform});
     const artifact_query = std.Target.Query.parse(.{ .arch_os_abi = descriptor.zigTarget }) catch
         std.debug.panic("invalid Zig target in native artifact descriptor: {s}", .{descriptor.zigTarget});
     const artifact_target = b.resolveTargetQuery(artifact_query);

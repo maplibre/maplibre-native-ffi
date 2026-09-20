@@ -5,7 +5,14 @@ from __future__ import annotations
 from ci.workflow import platform, preset_sets
 
 PLATFORMS = {
-    "apple": {"macos", "ios", "ios-simulator", "tvos", "tvos-simulator"},
+    "apple": {
+        "macos",
+        "ios",
+        "ios-simulator",
+        "ios-maccatalyst",
+        "tvos",
+        "tvos-simulator",
+    },
     "android": {"android"},
     "linux": {"linux-gnu", "linux-musl"},
     "windows": {"windows"},

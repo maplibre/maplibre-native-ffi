@@ -101,7 +101,8 @@ Requirements:
   emulator through the shared runners in `scripts/`
   (`run-android-emulator-test.sh`, `run-ohos-emulator-test.sh`, which boot the
   emulator on demand), iOS and tvOS simulator presets build a test bundle and
-  spawn it on a simulator, and Emscripten presets run in headless Chromium.
+  spawn it on a simulator, Mac Catalyst presets run that bundle on the host, and
+  Emscripten presets run in headless Chromium.
 - A preset that a binding cannot build or run MUST fail with a message that
   names what the binding supports. A device preset with no runner, such as
   `ios-arm64-metal` or `tvos-arm64-metal`, fails the same way and points at a

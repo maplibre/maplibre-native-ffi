@@ -90,7 +90,12 @@ let targets: [Target] = [
 
 let package = Package(
   name: "maplibre-native-ffi",
-  platforms: [.macOS("14.3"), .iOS("14.3"), .tvOS("14.3")],
+  platforms: [
+    .macOS("14.3"),
+    .iOS("14.3"),
+    .macCatalyst("14.3"),
+    .tvOS("14.3"),
+  ],
   products: products,
   dependencies: [
     .package(

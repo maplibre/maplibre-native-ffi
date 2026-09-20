@@ -919,6 +919,38 @@ jobs:
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
     if: contains(fromJSON(inputs.jobs), 'target-ios-simulator-arm64-metal')
+  target-ios-maccatalyst-arm64-metal:
+    name: target / ios-maccatalyst-arm64-metal
+    runs-on: macos-26
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        id: setup
+        with:
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+          target: ios-maccatalyst-arm64-metal
+          gradle: false
+      - run: mise run test ios-maccatalyst-arm64-metal
+      - name: Archive native artifact
+        run: mise run archive-native ios-maccatalyst-arm64-metal
+      - name: Install packaged native artifact
+        run: mise run install-native-package ios-maccatalyst-arm64-metal build/packages/native/dist/maplibre-native-c-ios-maccatalyst-arm64-metal.tar.gz
+      - env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //bindings/swift:test ios-maccatalyst-arm64-metal
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-ios-maccatalyst-arm64-metal-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-ios-maccatalyst-arm64-metal.tar.gz
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+    if: contains(fromJSON(inputs.jobs), 'target-ios-maccatalyst-arm64-metal')
   target-tvos-arm64-metal:
     name: target / tvos-arm64-metal
     runs-on: macos-26
@@ -1766,6 +1798,7 @@ jobs:
       - target-macos-arm64-egl
       - target-ios-arm64-metal
       - target-ios-simulator-arm64-metal
+      - target-ios-maccatalyst-arm64-metal
       - target-tvos-arm64-metal
       - target-tvos-simulator-arm64-metal
       - target-android-arm-egl
@@ -1787,7 +1820,7 @@ jobs:
     steps:
       - name: Require every coverage job
         env:
-          EXPECTED: '["android-multi", "docs", "hygiene", "kotlin-maven", "target-android-arm-egl", "target-android-arm-vulkan", "target-android-arm64-egl", "target-android-arm64-vulkan", "target-android-x64-egl", "target-android-x64-vulkan", "target-emscripten-wasm32-webgl", "target-emscripten-wasm32-webgpu", "target-ios-arm64-metal", "target-ios-simulator-arm64-metal", "target-linux-gnu-arm64-egl", "target-linux-gnu-arm64-vulkan", "target-linux-gnu-x64-egl", "target-linux-gnu-x64-vulkan", "target-linux-musl-arm64-egl", "target-linux-musl-arm64-vulkan", "target-linux-musl-x64-egl", "target-linux-musl-x64-vulkan", "target-macos-arm64-egl", "target-macos-arm64-metal", "target-macos-arm64-vulkan", "target-ohos-arm64-egl", "target-ohos-arm64-vulkan", "target-ohos-x64-egl", "target-ohos-x64-vulkan", "target-tvos-arm64-metal", "target-tvos-simulator-arm64-metal", "target-windows-arm64-vulkan", "target-windows-arm64-wgl", "target-windows-x64-vulkan", "target-windows-x64-wgl"]'
+          EXPECTED: '["android-multi", "docs", "hygiene", "kotlin-maven", "target-android-arm-egl", "target-android-arm-vulkan", "target-android-arm64-egl", "target-android-arm64-vulkan", "target-android-x64-egl", "target-android-x64-vulkan", "target-emscripten-wasm32-webgl", "target-emscripten-wasm32-webgpu", "target-ios-arm64-metal", "target-ios-maccatalyst-arm64-metal", "target-ios-simulator-arm64-metal", "target-linux-gnu-arm64-egl", "target-linux-gnu-arm64-vulkan", "target-linux-gnu-x64-egl", "target-linux-gnu-x64-vulkan", "target-linux-musl-arm64-egl", "target-linux-musl-arm64-vulkan", "target-linux-musl-x64-egl", "target-linux-musl-x64-vulkan", "target-macos-arm64-egl", "target-macos-arm64-metal", "target-macos-arm64-vulkan", "target-ohos-arm64-egl", "target-ohos-arm64-vulkan", "target-ohos-x64-egl", "target-ohos-x64-vulkan", "target-tvos-arm64-metal", "target-tvos-simulator-arm64-metal", "target-windows-arm64-vulkan", "target-windows-arm64-wgl", "target-windows-x64-vulkan", "target-windows-x64-wgl"]'
           RESULTS: ${{ toJSON(needs) }}
           SELECTED: ${{ inputs.jobs }}
         run: |
