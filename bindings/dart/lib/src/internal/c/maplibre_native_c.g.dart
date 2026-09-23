@@ -5148,6 +5148,12 @@ final class mln_plugin_layer_type_v1 extends ffi.Struct {
   external mln_plugin_update_uniform_block_fn update_uniform_block;
 
   external mln_plugin_query_radius_fn get_query_radius;
+
+  @ffi.Uint8()
+  external int enable_stencil_overlap_dedup;
+
+  @ffi.Uint8()
+  external int enable_near_clipped_matrix;
 }
 
 final class mln_plugin_layout_context_v1 extends ffi.Struct {
