@@ -26,7 +26,7 @@ let swiftMapIOSTarget: Target = xtoolBuild
 
 let package = Package(
   name: "swift-map",
-  platforms: [.macOS("14.3"), .iOS("14.3")],
+  platforms: [.macOS("14.3"), .iOS("15.5")],
   products: [
     .executable(name: "swift-map", targets: ["SwiftMap"]),
     xtoolBuild

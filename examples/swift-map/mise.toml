@@ -34,7 +34,7 @@ swift build \
   --product swift-map-ios \
   --scratch-path .build/ios-simulator \
   {{ "--swift-sdk arm64-apple-ios-simulator" if os() == "linux" else "--sdk \"$(xcrun --sdk iphonesimulator --show-sdk-path)\"" }} \
-  --triple arm64-apple-ios14.3-simulator
+  --triple arm64-apple-ios15.5-simulator
 '''
 
 [tasks."build:ios"]
@@ -50,7 +50,7 @@ swift build \
   --product swift-map-ios \
   --scratch-path .build/ios \
   --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
-  --triple arm64-apple-ios14.3
+  --triple arm64-apple-ios15.5
 {% endif %}
 '''
 
