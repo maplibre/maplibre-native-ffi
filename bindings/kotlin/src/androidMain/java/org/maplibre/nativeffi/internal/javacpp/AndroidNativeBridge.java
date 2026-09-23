@@ -10,9 +10,37 @@ import org.bytedeco.javacpp.annotation.Raw;
 /** Android-only JavaCPP helpers for JNI context and borrowed arrays. */
 @Properties(
     inherit = MaplibreNativeCConfig.class,
-    value = @Platform(include = {"android_image_bridge.h", "plugin_bridge.h"}))
+    value = @Platform(include = {"android_image_bridge.h", "plugin_bridge.h", "camera_bridge.h"}))
 public final class AndroidNativeBridge {
   private AndroidNativeBridge() {}
+
+  @Name("mln_android_map_get_camera")
+  public static native @Cast("mln_status") int mapGetCamera(
+      @Cast("mln_map") long map, double[] out);
+
+  @Name("mln_android_projection_get_camera")
+  public static native @Cast("mln_status") int projectionGetCamera(
+      @Cast("mln_map_projection") long projection, double[] out);
+
+  @Name("mln_android_map_pixel_for_lat_lng")
+  public static native @Cast("mln_status") int mapPixelForLatLng(
+      @Cast("mln_map") long map, double latitude, double longitude, double[] out);
+
+  @Name("mln_android_projection_pixel_for_lat_lng")
+  public static native @Cast("mln_status") int projectionPixelForLatLng(
+      @Cast("mln_map_projection") long projection, double latitude, double longitude, double[] out);
+
+  @Name("mln_android_map_lat_lng_for_pixel")
+  public static native @Cast("mln_status") int mapLatLngForPixel(
+      @Cast("mln_map") long map, double x, double y, boolean unwrapped, double[] out);
+
+  @Name("mln_android_projection_lat_lng_for_pixel")
+  public static native @Cast("mln_status") int projectionLatLngForPixel(
+      @Cast("mln_map_projection") long projection,
+      double x,
+      double y,
+      boolean unwrapped,
+      double[] out);
 
   @Name("mln_android_plugin_register_function_v1")
   public static native @Cast("uintptr_t") long pluginRegisterFunctionV1();
