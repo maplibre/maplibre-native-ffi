@@ -45,6 +45,26 @@ type StyleSourceInfo struct {
 	RasterEncoding  *StyleRasterDEMEncoding
 }
 
+// StyleLayerInfo contains copied metadata for one style layer.
+//
+// Type is the style-spec layer type, such as "line". SourceID is nil when the
+// layer type takes no source, and SourceLayer is nil when the layer names none.
+type StyleLayerInfo struct {
+	ID          string
+	Type        string
+	SourceID    *string
+	SourceLayer *string
+}
+
+// Equal reports whether two copied layer infos hold the same field values.
+// Absent optional fields stay distinct from present empty values.
+func (info StyleLayerInfo) Equal(other StyleLayerInfo) bool {
+	return info.ID == other.ID &&
+		info.Type == other.Type &&
+		equalPointer(info.SourceID, other.SourceID) &&
+		equalPointer(info.SourceLayer, other.SourceLayer)
+}
+
 // StyleSourceTileJSON contains the retained TileJSON fields of an inline tile source.
 type StyleSourceTileJSON struct {
 	TileURLs []string
@@ -2038,6 +2058,51 @@ func (m *MapHandle) StyleLayerIDs() ([]string, error) {
 		return nil, err
 	}
 	return styleIDListStrings(list)
+}
+
+// StyleLayers returns copied metadata for every style layer in style order.
+func (m *MapHandle) StyleLayers() ([]StyleLayerInfo, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	var list C.mln_style_layer_list
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_list_style_layers(C.mln_map(ptr), &list))
+	}); err != nil {
+		return nil, err
+	}
+	return styleLayerListInfos(list)
+}
+
+func styleLayerListInfos(list C.mln_style_layer_list) ([]StyleLayerInfo, error) {
+	defer C.mln_style_layer_list_destroy(list)
+	var count C.size_t
+	if err := checkNative(func() int32 { return int32(C.mln_style_layer_list_count(list, &count)) }); err != nil {
+		return nil, err
+	}
+	layers := make([]StyleLayerInfo, int(count))
+	for i := range layers {
+		raw := C.mln_style_layer_info_default()
+		if err := checkNative(func() int32 {
+			return int32(C.mln_style_layer_list_get(list, C.size_t(i), &raw))
+		}); err != nil {
+			return nil, err
+		}
+		layer := StyleLayerInfo{ID: goStringView(raw.id), Type: goStringView(raw._type)}
+		if raw.source_id.size > 0 {
+			sourceID := goStringView(raw.source_id)
+			layer.SourceID = &sourceID
+		}
+		if raw.source_layer.size > 0 {
+			sourceLayer := goStringView(raw.source_layer)
+			layer.SourceLayer = &sourceLayer
+		}
+		layers[i] = layer
+	}
+	return layers, nil
 }
 
 // MoveStyleLayer moves one style layer before another layer. Passing an empty

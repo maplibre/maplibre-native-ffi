@@ -2386,14 +2386,7 @@ mod tests {
             &mut runtime,
             RuntimeEventType::MapStyleLoaded
         ));
-        // Contains rather than equals: MapLibre adds its own annotation layer to
-        // every style it loads.
-        assert!(
-            map.style_layer_ids()
-                .unwrap()
-                .iter()
-                .any(|id| id == "rewritten")
-        );
+        assert_eq!(map.style_layer_ids().unwrap(), ["rewritten"]);
 
         runtime.clear_resource_transform().unwrap();
         map.set_style_url(&format!("{origin}/__fixture/original-after-clear.json"))
@@ -2402,12 +2395,7 @@ mod tests {
             &mut runtime,
             RuntimeEventType::MapStyleLoaded
         ));
-        assert!(
-            map.style_layer_ids()
-                .unwrap()
-                .iter()
-                .any(|id| id == "original-after-clear")
-        );
+        assert_eq!(map.style_layer_ids().unwrap(), ["original-after-clear"]);
 
         map.close().unwrap();
         runtime.close().unwrap();

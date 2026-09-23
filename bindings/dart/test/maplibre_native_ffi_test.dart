@@ -1822,12 +1822,9 @@ void main() {
       throwsA(isA<MaplibreException>()),
     );
 
-    final sourceIds = map.listStyleSourceIds();
-    expect(sourceIds, contains('org.maplibre.annotations'));
-    expect(
-      map.listStyleLayerIds(),
-      contains('org.maplibre.annotations.points'),
-    );
+    expect(map.listStyleSourceIds(), isEmpty);
+    expect(map.listStyleLayerIds(), isEmpty);
+    expect(map.listStyleLayers(), isEmpty);
     expect(map.styleSourceExists('missing-source'), isFalse);
     expect(map.styleLayerExists('missing-layer'), isFalse);
     expect(map.removeStyleSource('missing-source'), isFalse);
@@ -2267,6 +2264,40 @@ void main() {
     expect(TileScheme.fromRaw(91).rawValue, 91);
     expect(VectorTileEncoding.fromRaw(92).rawValue, 92);
     expect(RasterDemEncoding.fromRaw(93).rawValue, 93);
+  });
+
+  test('BND-105 style layer listing copies the layer stack in order', () {
+    final runtime = RuntimeHandle.create();
+    addTearDown(runtime.close);
+    final map = runtime.createMap();
+    addTearDown(map.close);
+    map.setStyleJson(
+      _jsonBytes(
+        '{"version":8,'
+        '"sources":{"roads":{"type":"vector",'
+        '"tiles":["https://example.com/{z}/{x}/{y}.mvt"]}},'
+        '"layers":['
+        '{"id":"road-lines","type":"line","source":"roads",'
+        '"source-layer":"transportation"},'
+        '{"id":"backdrop","type":"background"}'
+        ']}',
+      ),
+    );
+
+    final layers = map.listStyleLayers();
+
+    expect(layers, const [
+      StyleLayerInfo(
+        id: 'road-lines',
+        type: 'line',
+        sourceId: 'roads',
+        sourceLayer: 'transportation',
+      ),
+      StyleLayerInfo(id: 'backdrop', type: 'background'),
+    ]);
+    expect(layers[1].sourceId, isNull);
+    expect(layers[1].sourceLayer, isNull);
+    expect(layers.map((layer) => layer.id), map.listStyleLayerIds());
   });
 
   test('style source volatility round-trips through the public API', () {

@@ -639,6 +639,7 @@
 --include-function mln_map_invalidate_custom_geometry_source_tile
 --include-function mln_map_invalidate_custom_mvt_vector_source_tile
 --include-function mln_map_list_style_layer_ids
+--include-function mln_map_list_style_layers
 --include-function mln_map_list_style_source_ids
 --include-function mln_map_move_style_layer
 --include-function mln_map_remove_style_image
@@ -671,10 +672,14 @@
 --include-function mln_style_id_list_count
 --include-function mln_style_id_list_destroy
 --include-function mln_style_id_list_get
+--include-function mln_style_layer_list_count
+--include-function mln_style_layer_list_destroy
+--include-function mln_style_layer_list_get
 --include-function mln_style_string_list_count
 --include-function mln_style_string_list_destroy
 --include-function mln_style_string_list_get
 --include-function mln_style_image_info_default
+--include-function mln_style_layer_info_default
 --include-function mln_style_image_options_default
 --include-function mln_style_tile_source_options_default
 --include-function mln_style_transition_options_default
@@ -685,6 +690,7 @@
 --include-struct mln_premultiplied_rgba8_image
 --include-struct mln_style_image_info
 --include-struct mln_style_image_options
+--include-struct mln_style_layer_info
 --include-struct mln_style_source_info
 --include-struct mln_style_tile_source_options
 --include-struct mln_style_transition_options

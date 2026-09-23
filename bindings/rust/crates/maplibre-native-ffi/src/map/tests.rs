@@ -192,6 +192,40 @@ fn style_setters_accept_valid_input_and_reject_embedded_nul() {
 }
 
 #[test]
+// Spec coverage: BND-105.
+fn style_layers_copy_the_layer_stack_in_style_order() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let style = serde_json::to_vec(&json!({
+        "version": 8,
+        "sources": {
+            "tiles": {"type": "vector", "tiles": ["https://example.com/{z}/{x}/{y}.pbf"]},
+        },
+        "layers": [
+            {"id": "roads", "type": "line", "source": "tiles", "source-layer": "transportation"},
+            {"id": "background", "type": "background"},
+        ],
+    }))
+    .unwrap();
+    map.set_style_json(&style).unwrap();
+
+    let layers = map.style_layers().unwrap();
+
+    assert_eq!(layers.len(), 2);
+    assert_eq!(layers[0].id, "roads");
+    assert_eq!(layers[0].layer_type, "line");
+    assert_eq!(layers[0].source_id.as_deref(), Some("tiles"));
+    assert_eq!(layers[0].source_layer.as_deref(), Some("transportation"));
+    assert_eq!(layers[1].id, "background");
+    assert_eq!(layers[1].layer_type, "background");
+    assert_eq!(layers[1].source_id, None);
+    assert_eq!(layers[1].source_layer, None);
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
 // Spec coverage: BND-101.
 fn loaded_style_document_and_url_read_back_what_was_loaded() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();

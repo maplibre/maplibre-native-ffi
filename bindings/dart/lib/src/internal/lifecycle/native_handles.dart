@@ -35,6 +35,9 @@ extension type const NativeOfflineRegionList(int raw) implements NativeHandle {}
 /// Style id list handle id.
 extension type const NativeStyleIdList(int raw) implements NativeHandle {}
 
+/// Style layer list handle id.
+extension type const NativeStyleLayerList(int raw) implements NativeHandle {}
+
 /// Style string list handle id.
 extension type const NativeStyleStringList(int raw) implements NativeHandle {}
 

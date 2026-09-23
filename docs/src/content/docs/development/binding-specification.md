@@ -571,6 +571,22 @@ volatile tile-backed source does not store fetched tiles in persistent storage.
 Other source types retain the value for inspection without changing their
 loading behavior.
 
+### Style layer listing
+
+Style layer listing returns the whole layer stack in style order as one copied,
+language-owned list of layer information values. Each value carries the layer
+ID, the style-spec layer type, an optional source ID, and an optional
+source-layer. The native layer-list handle is an internal copy mechanism and
+MUST NOT appear in the public API.
+
+An absent source ID means that the layer type takes no source, and an absent
+source-layer means that the layer names none. A binding represents each absence
+through its ordinary optional value rather than an empty string.
+
+Bindings copy every string before returning and destroy the native list on
+success and on copy failure. A returned list remains valid after later style
+changes, style replacement, and map release.
+
 ## Callbacks And Requests
 
 Callbacks and request handles preserve C lifetimes while protecting

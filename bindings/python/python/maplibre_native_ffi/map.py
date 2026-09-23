@@ -52,6 +52,7 @@ from .style import (
     StyleImage,
     StyleImageInfo,
     StyleImageOptions,
+    StyleLayerInfo,
     StyleLayerVisibility,
     StyleSourceInfo,
     StyleSourceType,
@@ -958,6 +959,12 @@ class MapHandle(NativeHandleMixin):
     def list_style_layer_ids(self) -> tuple[str, ...]:
         """Return style layer IDs in style order."""
         return tuple(self._native.list_style_layer_ids())
+
+    def list_style_layers(self) -> tuple[StyleLayerInfo, ...]:
+        """Return every style layer's ID, type, and source binding in style order."""
+        return tuple(
+            StyleLayerInfo._from_native(raw) for raw in self._native.list_style_layers()
+        )
 
     def move_style_layer(
         self,

@@ -22,6 +22,7 @@ extern "C" {
 
 typedef uint64_t mln_style_id_list;
 typedef uint64_t mln_style_string_list;
+typedef uint64_t mln_style_layer_list;
 typedef uint64_t mln_geojson_source_data;
 
 /**
@@ -258,6 +259,21 @@ typedef struct mln_style_source_info {
   /** DEM encoding, meaningful when fields contains RASTER_ENCODING. */
   uint32_t raster_encoding;
 } mln_style_source_info;
+
+/**
+ * One style layer borrowed from a style layer list.
+ *
+ * Views remain valid until the owner list is destroyed. type is a static
+ * style-spec layer type string. source_id is empty for a layer type that takes
+ * no source, and source_layer is empty when the layer names none.
+ */
+typedef struct mln_style_layer_info {
+  uint32_t size;
+  mln_buffer_view id;
+  mln_buffer_view type;
+  mln_buffer_view source_id;
+  mln_buffer_view source_layer;
+} mln_style_layer_info;
 
 /** Options for vector and raster tile sources. */
 typedef struct mln_style_tile_source_options {
@@ -568,6 +584,9 @@ mln_style_image_options_default(void) MLN_NOEXCEPT;
 /** Returns default runtime style image metadata. */
 MLN_API mln_style_image_info mln_style_image_info_default(void) MLN_NOEXCEPT;
 
+/** Returns a default style layer descriptor. */
+MLN_API mln_style_layer_info mln_style_layer_info_default(void) MLN_NOEXCEPT;
+
 /** Returns default global style transition options. */
 MLN_API mln_style_transition_options
 mln_style_transition_options_default(void) MLN_NOEXCEPT;
@@ -635,6 +654,40 @@ MLN_API mln_status mln_style_string_list_get(
 /** Destroys a style string list handle. Null is accepted as a no-op. */
 MLN_API void mln_style_string_list_destroy(
   mln_style_string_list list
+) MLN_NOEXCEPT;
+
+/**
+ * Gets the number of layers in a style layer list handle.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when list is null or not live, or out_count is
+ *   null.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_style_layer_list_count(
+  mln_style_layer_list list, size_t* out_count
+) MLN_NOEXCEPT;
+
+/**
+ * Borrows one layer descriptor from a style layer list handle.
+ *
+ * On success, out_layer receives views into list-owned storage. The views
+ * remain valid until the list is destroyed.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when list is null or not live, index is out of
+ *   range, out_layer is null, or out_layer->size is too small.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_style_layer_list_get(
+  mln_style_layer_list list, size_t index, mln_style_layer_info* out_layer
+) MLN_NOEXCEPT;
+
+/** Destroys a style layer list handle. Null is accepted as a no-op. */
+MLN_API void mln_style_layer_list_destroy(
+  mln_style_layer_list list
 ) MLN_NOEXCEPT;
 
 /**
@@ -1838,6 +1891,29 @@ MLN_API mln_status mln_map_get_style_layer_type(
  */
 MLN_API mln_status mln_map_list_style_layer_ids(
   mln_map map, mln_style_id_list* out_layer_ids
+) MLN_NOEXCEPT;
+
+/**
+ * Copies the ID, type, source ID, and source-layer of every style layer in
+ * style order.
+ *
+ * The list is a snapshot: later style changes leave it unchanged. On success,
+ * *out_layers receives an owned list handle. Read it from any thread with
+ * mln_style_layer_list_count() and mln_style_layer_list_get(), and destroy it
+ * with mln_style_layer_list_destroy(). A host that mirrors the loaded style
+ * reads the whole layer stack in this one owner-thread call instead of one
+ * call per layer and field.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_layers is
+ *   null, or *out_layers is not null.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_list_style_layers(
+  mln_map map, mln_style_layer_list* out_layers
 ) MLN_NOEXCEPT;
 
 /**

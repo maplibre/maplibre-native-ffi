@@ -111,6 +111,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_for_pixel_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_layer_ids
+import org.maplibre.nativeffi.internal.c.mln_map_list_style_layers
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids
 import org.maplibre.nativeffi.internal.c.mln_map_meters_per_pixel_at_latitude
 import org.maplibre.nativeffi.internal.c.mln_map_move_by
@@ -190,6 +191,7 @@ import org.maplibre.nativeffi.internal.lifecycle.mapProjectionHandle
 import org.maplibre.nativeffi.internal.lifecycle.ownedBufferHandle
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.lifecycle.styleIdListHandle
+import org.maplibre.nativeffi.internal.lifecycle.styleLayerListHandle
 import org.maplibre.nativeffi.internal.lifecycle.styleStringListHandle
 import org.maplibre.nativeffi.internal.memory.CSize
 import org.maplibre.nativeffi.internal.memory.CSizeVar
@@ -226,6 +228,7 @@ import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerInfo
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
@@ -1179,6 +1182,15 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     outList.value = 0uL
     Status.check(mln_map_list_style_layer_ids(state.requireLive().rawHandleValue, outList.ptr))
     StyleStructs.styleIdList(outList.value.asHandle("mln_map_list_style_ids", ::styleIdListHandle))
+  }
+
+  public actual fun styleLayers(): List<StyleLayerInfo> = memScoped {
+    val outList = alloc<ULongVar>()
+    outList.value = 0uL
+    Status.check(mln_map_list_style_layers(state.requireLive().rawHandleValue, outList.ptr))
+    StyleStructs.styleLayerList(
+      outList.value.asHandle("mln_map_list_style_layers", ::styleLayerListHandle)
+    )
   }
 
   public actual fun moveStyleLayer(layerId: String, beforeLayerId: String) {

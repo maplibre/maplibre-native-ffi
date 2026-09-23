@@ -45,8 +45,8 @@ pub use logging::{LogRecord, clear_log_callback, set_async_log_severity_mask, se
 pub use map::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, MapAttachRef,
     MapHandle, RasterDemEncoding, SourceInfo, SourceType, StyleImage, StyleImageInfo,
-    StyleImageOptions, StyleImageTextFit, StyleLayerVisibility, StyleTransitionOptions,
-    TileJsonInfo, TileScheme, TileSourceOptions, VectorTileEncoding,
+    StyleImageOptions, StyleImageTextFit, StyleLayerInfo, StyleLayerVisibility,
+    StyleTransitionOptions, TileJsonInfo, TileScheme, TileSourceOptions, VectorTileEncoding,
 };
 pub use maplibre_core::{
     AmbientCacheOperation, CameraChangeMode, ConstrainMode, Error, ErrorKind, LogEvent,

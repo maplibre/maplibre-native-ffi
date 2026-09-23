@@ -1866,6 +1866,14 @@ public sealed unsafe class MapHandle : IDisposable
         return CopyStyleIdList(list);
     }
 
+    /// <summary>Lists every style layer in style order as one copied snapshot.</summary>
+    public StyleLayerInfo[] StyleLayers()
+    {
+        MlnStyleLayerList list = default;
+        NativeStatus.Check(NativeMethods.mln_map_list_style_layers(Handle, &list));
+        return CopyStyleLayerList(list);
+    }
+
     /// <summary>Moves a style layer before another layer, or to the top when beforeLayerId is empty.</summary>
     public void MoveStyleLayer(string layerId, string beforeLayerId)
     {
@@ -2330,6 +2338,50 @@ public sealed unsafe class MapHandle : IDisposable
         finally
         {
             NativeMethods.mln_style_id_list_destroy(list);
+        }
+    }
+
+    private static StyleLayerInfo[] CopyStyleLayerList(MlnStyleLayerList list)
+    {
+        if (list.IsNull)
+        {
+            return [];
+        }
+
+        try
+        {
+            nuint count = 0;
+            NativeStatus.Check(NativeMethods.mln_style_layer_list_count(list, &count));
+            var layers = new StyleLayerInfo[checked((int)count)];
+            for (var index = 0; index < layers.Length; index++)
+            {
+                var native = NativeMethods.mln_style_layer_info_default();
+                NativeStatus.Check(
+                    NativeMethods.mln_style_layer_list_get(list, (nuint)index, &native)
+                );
+                layers[index] = new StyleLayerInfo(
+                    RuntimeStructs.CopyUtf8((sbyte*)native.id.data, native.id.size),
+                    RuntimeStructs.CopyUtf8((sbyte*)native.type.data, native.type.size),
+                    native.source_id.size == 0
+                        ? null
+                        : RuntimeStructs.CopyUtf8(
+                            (sbyte*)native.source_id.data,
+                            native.source_id.size
+                        ),
+                    native.source_layer.size == 0
+                        ? null
+                        : RuntimeStructs.CopyUtf8(
+                            (sbyte*)native.source_layer.data,
+                            native.source_layer.size
+                        )
+                );
+            }
+
+            return layers;
+        }
+        finally
+        {
+            NativeMethods.mln_style_layer_list_destroy(list);
         }
     }
 

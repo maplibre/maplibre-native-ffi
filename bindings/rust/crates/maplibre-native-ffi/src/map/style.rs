@@ -8,8 +8,8 @@ pub(crate) use maplibre_core::style::{
 pub use maplibre_core::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind,
     RasterDemEncoding, SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions,
-    StyleImageTextFit, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo, TileScheme,
-    TileSourceOptions, VectorTileEncoding,
+    StyleImageTextFit, StyleLayerInfo, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo,
+    TileScheme, TileSourceOptions, VectorTileEncoding,
 };
 use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_core::ptr::const_ptr_or_null;
@@ -1594,6 +1594,22 @@ impl super::MapHandle {
         // SAFETY: On success, the C API returns an owned style ID list handle;
         // core copies and releases it.
         unsafe { maplibre_core::style::copy_style_id_list(out.into_live("mln_style_id_list")?) }
+    }
+
+    /// Copies the ID, type, source ID, and source-layer of every style layer in
+    /// style order.
+    pub fn style_layers(&self) -> Result<Vec<StyleLayerInfo>> {
+        let map = self.inner.native()?;
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_layer_list>::new();
+        // SAFETY: map is live and out is a null-initialized out-pointer owned by
+        // this call. On success the returned handle is wrapped and destroyed by
+        // the copying helper below.
+        maplibre_core::check(unsafe { sys::mln_map_list_style_layers(map, out.as_mut_ptr()) })?;
+        // SAFETY: On success, the C API returns an owned style layer list handle;
+        // core copies and releases it.
+        unsafe {
+            maplibre_core::style::copy_style_layer_list(out.into_live("mln_style_layer_list")?)
+        }
     }
 }
 
