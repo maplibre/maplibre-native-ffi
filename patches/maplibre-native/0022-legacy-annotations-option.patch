@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 7e59ec9..63aca8a 100644
+index 77756c64ef19..4e3ba384640a 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
@@ -10,7 +10,7 @@ index 7e59ec9..63aca8a 100644
  option(MLN_WITH_CLANG_TIDY "Build with clang-tidy checks enabled" OFF)
  option(MLN_WITH_COVERAGE "Enable code coverage collection" OFF)
  option(MLN_WITH_QT "Build MapLibre Native Qt bindings" OFF)
-@@ -135,6 +136,13 @@ endif()
+@@ -156,6 +157,13 @@ endif()
  
  include(cmake/plugins.cmake)
  
@@ -25,7 +25,7 @@ index 7e59ec9..63aca8a 100644
  if(MLN_CREATE_AMALGAMATION)
      target_compile_options(mbgl-core PRIVATE
 diff --git a/platform/default/src/mln/layermanager/layer_manager.cpp b/platform/default/src/mln/layermanager/layer_manager.cpp
-index bfad3df..891b56d 100644
+index bfad3dfcd8c6..891b56de761e 100644
 --- a/platform/default/src/mln/layermanager/layer_manager.cpp
 +++ b/platform/default/src/mln/layermanager/layer_manager.cpp
 @@ -123,7 +123,7 @@ LayerManager* LayerManager::get() noexcept {

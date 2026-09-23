@@ -123,14 +123,15 @@ at commit `02d9a4b2ccb4f3d15cdca438fd08ea6fa2cd530b`.
 CMake option. Turning it off compiles the legacy annotation manager as disabled,
 so a loaded style no longer gains the `org.maplibre.annotations` source and its
 symbol layer. The C API exposes no annotation entry points and builds with the
-option off. Upstream: not yet opened.
+option off. Upstream:
+[maplibre-native#4675](https://github.com/maplibre/maplibre-native/pull/4675).
 
 `0023-sourceless-style-rendering.patch` renders a style that has no sources. The
 orchestrator added layers that take no source while it updated the first source,
 so a style with none produced no render items and no background color, and a
 style load whose parse added no layer published no update to the renderer. The
-legacy annotation source hid both, because it joined every style. Upstream: not
-yet opened.
+legacy annotation source hid both, because it joined every style. Upstream:
+[maplibre-native#4674](https://github.com/maplibre/maplibre-native/pull/4674).
 
 Each patch is the squashed diff of its upstream branch, applied on top of the
 patches before it, so a patch that adds a test next to an earlier patch's test
