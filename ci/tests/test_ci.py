@@ -50,8 +50,13 @@ def pr(draft=False, labels=(), author="contributor", action="synchronize"):
     }
 
 
-def api_run(run_id=90, head="b" * 40, event="pull_request"):
-    return {"id": run_id, "head_sha": head, "event": event}
+def api_run(run_id=90, head="b" * 40, event="pull_request", run_attempt=1):
+    return {
+        "id": run_id,
+        "head_sha": head,
+        "event": event,
+        "run_attempt": run_attempt,
+    }
 
 
 def proof(
@@ -201,9 +206,10 @@ class CoverageTest(unittest.TestCase):
             ("extended", pr(True, ["ci:apple", "unrelated"], action="labeled")),
             ("extended", pr(True, ["ci:full"], action="labeled")),
         ):
-            for result in ("success", "failure"):
+            for result, run_attempt in (("success", 1), ("failure", 2)):
                 api = fake_api(
-                    jobs=[proof(result, selection=scope(group, "pull_request", event))]
+                    runs=[api_run(run_attempt=run_attempt)],
+                    jobs=[proof(result, selection=scope(group, "pull_request", event))],
                 )
                 selection = plan(group, "pull_request", event, ENV, api)
                 self.assertEqual(selection["mode"], "reuse")
@@ -261,8 +267,21 @@ class CoverageTest(unittest.TestCase):
                 plan("extended", "pull_request", event, env, api)["mode"], "run"
             )
 
+    def test_attempt_one_failure_is_not_final_evidence(self):
+        event = pr(True, ["ci:apple"], action="labeled")
+        api = fake_api(
+            runs=[api_run(run_attempt=1)],
+            jobs=[proof("failure", selection="apple")],
+        )
+        self.assertEqual(
+            plan("extended", "pull_request", event, ENV, api)["mode"], "run"
+        )
+
     def test_latest_actual_failure_cannot_be_hidden_by_an_older_success(self):
-        api = fake_api(runs=[api_run(80), api_run(90)], jobs=[proof("failure")])
+        api = fake_api(
+            runs=[api_run(80), api_run(90, run_attempt=2)],
+            jobs=[proof("failure")],
+        )
         selection = plan(
             "ready", "pull_request", pr(action="ready_for_review"), ENV, api
         )
@@ -271,7 +290,12 @@ class CoverageTest(unittest.TestCase):
         # A later omitted/restated run is not evidence of executed coverage.
         api = Mock(
             side_effect=[
-                {"workflow_runs": [api_run(90), api_run(80)]},
+                {
+                    "workflow_runs": [
+                        api_run(90, run_attempt=2),
+                        api_run(80, run_attempt=2),
+                    ]
+                },
                 {
                     "total_count": 1,
                     "jobs": [{**proof(), "name": "ci-required (ready)"}],
