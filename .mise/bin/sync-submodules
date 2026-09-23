@@ -71,6 +71,7 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0023-sourceless-style-rendering.patch"
   "$repo_root/patches/maplibre-native/0024-render-update-publication.patch"
   "$repo_root/patches/maplibre-native/0025-vertex-buffer-upload-timestamps.patch"
+  "$repo_root/patches/maplibre-native/0026-empty-symbol-placement.patch"
 )
 
 # The patches overlap, so no single patch reverses cleanly on its own once the

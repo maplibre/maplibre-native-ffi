@@ -212,7 +212,7 @@ final class RenderUpdate {
   final RenderResult result;
 
   /// Whether the map asked for another frame while it rendered this one, as
-  /// during an ongoing camera transition.
+  /// during an ongoing paint transition.
   ///
   /// This is the same signal that
   /// [RuntimeEventType.mapRenderFrameFinished] carries in its

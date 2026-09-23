@@ -1066,7 +1066,7 @@ pub struct RenderUpdate {
     /// variant names.
     pub result: RenderResult,
     /// Whether the map asked for another frame while it rendered this one, as
-    /// during an ongoing camera transition. Set only when `result` is
+    /// during an ongoing paint transition. Set only when `result` is
     /// [`RenderResult::Rendered`]; false for every other outcome. This is the
     /// same signal the render-frame-finished event carries, delivered here
     /// without the event round trip, so a host can re-arm its frame loop

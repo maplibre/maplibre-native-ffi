@@ -137,6 +137,12 @@ uninitialized timestamp can suppress uploads after feature-state changes. The
 patch includes the upstream resource regression. Upstream:
 [maplibre-native#4679](https://github.com/maplibre/maplibre-native/pull/4679),
 at commit `02ddb45fbfad`.
+`0026-empty-symbol-placement.patch` clears deferred symbol placement and query
+state when no layers supply placement data. Source fade bookkeeping and paint
+transitions continue, and symbols that return receive a fresh placement. Native
+regressions cover repeated background-only frames, paint transitions, and symbol
+removal and reappearance within the placement update interval. See
+[issue #735](https://github.com/maplibre/maplibre-native-ffi/issues/735).
 
 Each patch is the squashed diff of its upstream branch, applied on top of the
 patches before it, so a patch that adds a test next to an earlier patch's test
