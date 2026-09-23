@@ -587,9 +587,11 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         return try setTarget(self.*, c.mln_opengl_borrowed_texture_set_target, &raw);
     }
 
-    /// Renders the latest available map render update. The map retains its
-    /// latest update, so repeated calls re-render it and report `.rendered`
-    /// again. Every other result names the wake to wait for: `.no_update` and
+    /// Drains queued render-thread work and renders each update once per target.
+    /// Repeated calls report `.no_update` until map state or the target changes.
+    /// Request a map repaint and pump the runtime to redraw a continuous map
+    /// on demand; request a still image for a static map.
+    /// Every other result names the wake to wait for: `.no_update` and
     /// `.size_pending` resolve on a render-update-available event, and
     /// `.target_not_ready` resolves when the host changes the render target
     /// or on a later retry after a backoff.

@@ -1935,23 +1935,6 @@ class ForwardingRendererObserver final : public mln::RendererObserver {
   mln::ActorRef<mln::RendererObserver> delegate_;
 };
 
-// Map mutations a render session reaches for from its own owner thread. The
-// mailbox on the map's run loop keeps mln::Map single-threaded, and closing it
-// during map teardown turns late messages into no-ops.
-class MapCommands {
- public:
-  explicit MapCommands(mln::Map& map) : map_(map) {}
-
-  auto set_size(uint32_t width, uint32_t height) -> void {
-    map_.setSize(mln::Size{width, height});
-  }
-
-  auto trigger_repaint() -> void { map_.triggerRepaint(); }
-
- private:
-  mln::Map& map_;
-};
-
 class HeadlessFrontend final : public mln::RendererFrontend {
  public:
   // The thread pool tag must be a default-constructed identity, unique per map.
@@ -1991,6 +1974,10 @@ class HeadlessFrontend final : public mln::RendererFrontend {
       const std::scoped_lock lock(latest_update_mutex_);
       latest_update_ = std::move(update);
     }
+    notify_render_update_available();
+  }
+
+  auto notify_render_update_available() -> void {
     if (!mln::core::event_selected(
           event_state_->mask, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
         )) {
@@ -2042,6 +2029,27 @@ class HeadlessFrontend final : public mln::RendererFrontend {
   mln::TaggedScheduler thread_pool_;
   mutable std::mutex latest_update_mutex_;
   std::shared_ptr<mln::UpdateParameters> latest_update_;
+};
+
+// Map commands that a render session posts from its own owner thread. The
+// mailbox on the map's run loop keeps mln::Map single-threaded, and closing it
+// during map teardown turns late messages into no-ops.
+class MapCommands {
+ public:
+  MapCommands(mln::Map& map, HeadlessFrontend& frontend)
+      : map_(map), frontend_(frontend) {}
+
+  auto set_size(uint32_t width, uint32_t height) -> void {
+    map_.setSize(mln::Size{width, height});
+  }
+
+  auto render_work_available() -> void {
+    frontend_.notify_render_update_available();
+  }
+
+ private:
+  mln::Map& map_;
+  HeadlessFrontend& frontend_;
 };
 
 auto validate_map_options(const mln_map_options* options) -> mln_status {
@@ -3761,7 +3769,8 @@ auto create_map(
     );
     owned_map->callback_sources->attach(*owned_map->map);
 
-    owned_map->commands = std::make_unique<MapCommands>(*owned_map->map);
+    owned_map->commands =
+      std::make_unique<MapCommands>(*owned_map->map, *owned_map->frontend);
     owned_map->command_mailbox =
       std::make_shared<mln::Mailbox>(runtime_run_loop(live_runtime));
     owned_map->command_ref.emplace(
@@ -3988,7 +3997,7 @@ auto map_scale_factor(mln_map map) -> double {
 }
 
 // Map-thread only. The render path posts through map_post_set_size() and
-// map_post_trigger_repaint() instead.
+// map_post_render_work_available() instead.
 auto map_native(MapObject* map) -> mln::Map* { return map->map.get(); }
 
 // Both posting helpers hold the map table's mutex across the liveness check and
@@ -4006,14 +4015,14 @@ auto map_post_set_size(mln_map map, uint32_t width, uint32_t height)
   return MLN_STATUS_OK;
 }
 
-auto map_post_trigger_repaint(mln_map map) -> mln_status {
+auto map_post_render_work_available(mln_map map) -> mln_status {
   const std::scoped_lock lock(handle_table<MapObject>().mutex());
   MapObject* live = nullptr;
   const auto status = validate_map_live_locked(map, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  live->command_ref->invoke(&MapCommands::trigger_repaint);
+  live->command_ref->invoke(&MapCommands::render_work_available);
   return MLN_STATUS_OK;
 }
 

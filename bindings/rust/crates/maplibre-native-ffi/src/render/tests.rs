@@ -3649,7 +3649,7 @@ fn sustained_render_loop_outlasts_the_graphics_queue_depth() {
     const TARGET_FRAMES: u32 = 256;
     let mut rendered_frames = 0;
     let mut step = 0;
-    while rendered_frames < TARGET_FRAMES && step < 200 {
+    while rendered_frames < TARGET_FRAMES && step < TARGET_FRAMES {
         let mut camera = CameraOptions::default();
         camera.center = Some(LatLng::new(37.0, -122.0));
         camera.zoom = Some(10.0 + f64::from(step % 8) * 0.25);
@@ -3804,10 +3804,7 @@ fn render_update_reports_size_pending_until_the_map_applies_a_resize() {
     .expect("Metal or Vulkan owned texture test session should attach when supported");
 
     load_query_style(&mut runtime, &map, &session);
-    assert_eq!(
-        session.render_update().unwrap().result,
-        RenderResult::Rendered
-    );
+    session.create_projection().unwrap();
 
     session.resize(96, 48, 1.0).unwrap();
     // A pending size is not a rendered frame, so it never asks for a repaint.
@@ -4128,6 +4125,65 @@ fn render_update_without_pending_update_reports_no_update_and_keeps_session_live
     )
     .expect("Metal or Vulkan owned texture test session should attach when supported");
 
+    assert_eq!(
+        session.render_update().unwrap().result,
+        RenderResult::NoUpdate
+    );
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+fn render_update_consumes_map_state_and_redraws_after_repaint_or_target_change() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let (_context, session) = create_owned_texture_session(
+        &map.attach_ref().unwrap(),
+        RenderTargetExtent::new(64, 64, 1.0),
+    )
+    .expect("an owned texture test session should attach when supported");
+    map.set_style_json(CLUSTER_BASE_STYLE_JSON.as_bytes())
+        .unwrap();
+    assert!(wait_for_runtime_event(
+        &mut runtime,
+        RuntimeEventType::MapRenderUpdateAvailable
+    ));
+    assert_eq!(
+        session.render_update().unwrap().result,
+        RenderResult::Rendered
+    );
+
+    // Repeated calls can service queued work without submitting the same frame.
+    let update = session.render_update().unwrap();
+    assert_eq!(update.result, RenderResult::NoUpdate);
+    assert!(!update.needs_repaint);
+    session.create_projection().unwrap();
+
+    map.request_repaint().unwrap();
+    assert!(wait_for_runtime_event(
+        &mut runtime,
+        RuntimeEventType::MapRenderUpdateAvailable
+    ));
+    assert_eq!(
+        session.render_update().unwrap().result,
+        RenderResult::Rendered
+    );
+    assert_eq!(
+        session.render_update().unwrap().result,
+        RenderResult::NoUpdate
+    );
+
+    // A target change needs a frame even before a new map update arrives.
+    session.resize(64, 64, 1.0).unwrap();
+    assert_eq!(
+        session.render_update().unwrap().result,
+        RenderResult::Rendered
+    );
     assert_eq!(
         session.render_update().unwrap().result,
         RenderResult::NoUpdate

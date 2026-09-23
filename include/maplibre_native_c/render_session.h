@@ -73,19 +73,22 @@ typedef enum mln_render_result : uint32_t {
 /**
  * Renders the map's latest render update into the session's render target.
  *
+ * Drains queued render-thread work before deciding whether a frame is needed.
  * A surface session presents the frame. A texture session writes it into the
- * target texture.
+ * target texture. Each update renders once per target. Resize and target
+ * replacement allow the latest update to render again. For a surface expose
+ * on a continuous map, call mln_map_request_repaint() and pump the runtime;
+ * for a static map, request another still image.
  *
  * *out_result reports which of these outcomes the call reached, and each one
  * names the wake that a host waits for before it calls again:
  *
- * - MLN_RENDER_RESULT_RENDERED means the target holds a new frame. The map
- *   retains its latest update, so a host redraws on demand after a resize or a
- *   surface expose and gates a frame loop on
- *   MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
- * - MLN_RENDER_RESULT_NO_UPDATE means the call produced no frame. The map
- *   has no update yet, a static map is waiting for style or tile data, or the
- *   Metal backend has not created an owned texture. Wait for
+ * - MLN_RENDER_RESULT_RENDERED means the target holds a new frame. Gate a
+ *   frame loop on MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
+ * - MLN_RENDER_RESULT_NO_UPDATE means the call produced no frame. The latest
+ *   update already rendered, the map has no update yet, a static map is waiting
+ *   for style or tile data, or the Metal backend has not created an owned
+ *   texture. Wait for
  *   MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
  * - MLN_RENDER_RESULT_SIZE_PENDING means the session resized and the map,
  *   which applies its size on its own thread, is still behind. The map

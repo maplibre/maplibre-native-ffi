@@ -1867,8 +1867,11 @@ impl RenderSessionHandle {
 
     /// Processes the latest map render update for this render target.
     ///
-    /// The map retains its latest update, so repeated calls re-render it and
-    /// report [`RenderResult::Rendered`] again. Every other result names the
+    /// Drains queued render-thread work and renders each update once per target.
+    /// Repeated calls report [`RenderResult::NoUpdate`] until map state or the
+    /// target changes. Request a map repaint and pump the runtime to redraw a
+    /// continuous map on demand; request a still image for a static map.
+    /// Every other result names the
     /// wake to wait for: [`RenderResult::NoUpdate`] and
     /// [`RenderResult::SizePending`] resolve on a render-update-available
     /// event, and [`RenderResult::TargetNotReady`] resolves when the host

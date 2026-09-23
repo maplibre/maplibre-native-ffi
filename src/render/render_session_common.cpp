@@ -867,17 +867,17 @@ auto register_render_session(std::shared_ptr<mln_render_session_object> session)
 }
 
 void RenderSessionScheduler::schedule(std::function<void()>&& task) {
-  auto request_repaint = std::function<void()>{};
+  auto notify_work = std::function<void()>{};
   {
     const auto lock = std::scoped_lock{mutex_};
     const auto was_empty = queue_.empty();
     queue_.push_back(std::move(task));
     if (was_empty && !draining_) {
-      request_repaint = repaint_request_;
+      notify_work = work_available_;
     }
   }
-  if (request_repaint) {
-    request_repaint();
+  if (notify_work) {
+    notify_work();
   }
 }
 
@@ -917,18 +917,18 @@ auto RenderSessionScheduler::drain() -> void {
 }
 
 RenderSessionScheduler::DrainGuard::~DrainGuard() {
-  auto request_repaint = std::function<void()>{};
+  auto notify_work = std::function<void()>{};
   {
     const auto lock = std::scoped_lock{scheduler_.mutex_};
     if (scheduler_.draining_) {
       scheduler_.draining_ = false;
       if (!scheduler_.queue_.empty()) {
-        request_repaint = scheduler_.repaint_request_;
+        notify_work = scheduler_.work_available_;
       }
     }
   }
-  if (request_repaint) {
-    request_repaint();
+  if (notify_work) {
+    notify_work();
   }
 }
 
@@ -938,11 +938,11 @@ auto RenderSessionScheduler::discard() -> void {
   batch.swap(queue_);
 }
 
-auto RenderSessionScheduler::set_repaint_request(
-  std::function<void()> repaint_request
+auto RenderSessionScheduler::set_work_available_callback(
+  std::function<void()> work_available
 ) -> void {
   const auto lock = std::scoped_lock{mutex_};
-  repaint_request_ = std::move(repaint_request);
+  work_available_ = std::move(work_available);
 }
 
 // Only the attaching thread destroys a session, so the borrowed object stays
@@ -1009,8 +1009,8 @@ auto attach_render_session(
     return attach_status;
   }
   try {
-    session->scheduler.set_repaint_request([map]() {
-      static_cast<void>(map_post_trigger_repaint(map));
+    session->scheduler.set_work_available_callback([map]() {
+      static_cast<void>(map_post_render_work_available(map));
     });
     // Set before priming: renderer_backend() dispatches on kind.
     session->kind = kind;
@@ -1027,7 +1027,7 @@ auto attach_render_session(
     const auto size_status =
       map_post_set_size(map, session->width, session->height);
     if (size_status != MLN_STATUS_OK) {
-      session->scheduler.set_repaint_request({});
+      session->scheduler.set_work_available_callback({});
       static_cast<void>(map_detach_render_target_session(map, handle));
       return size_status;
     }
@@ -1035,7 +1035,7 @@ auto attach_render_session(
 
     *out_session = register_render_session(std::move(session));
   } catch (...) {
-    session->scheduler.set_repaint_request({});
+    session->scheduler.set_work_available_callback({});
     static_cast<void>(map_detach_render_target_session(map, handle));
     throw;
   }
@@ -1108,6 +1108,7 @@ auto render_session_resize(
     live->renderer.reset();
     reset_pushed_feature_state(*live);
   }
+  live->rendered_update.reset();
   live->rendered_generation = 0;
   live->rendered_transform.reset();
   live->width = width;
@@ -1202,6 +1203,7 @@ auto render_session_set_target(
     live->renderer.reset();
     reset_pushed_feature_state(*live);
   }
+  live->rendered_update.reset();
   live->rendered_generation = 0;
   live->rendered_transform.reset();
   live->width = extent.width;
@@ -1284,6 +1286,12 @@ auto render_session_render_update(
   auto update = map_latest_update(live->map);
   if (!update) {
     *out_result = MLN_RENDER_RESULT_NO_UPDATE;
+    return MLN_STATUS_OK;
+  }
+
+  // A scheduler wake can deliver cleanup or superseded work. Acquire a target
+  // only when map state or the target changed since the last completed frame.
+  if (update == live->rendered_update) {
     return MLN_STATUS_OK;
   }
 
@@ -1408,6 +1416,7 @@ auto render_session_render_update(
       return MLN_STATUS_OK;
     }
   }
+  live->rendered_update = update;
   live->rendered_transform = update->transformState;
   live->rendered_generation = live->generation;
   *out_result = MLN_RENDER_RESULT_RENDERED;
@@ -1445,7 +1454,7 @@ auto render_session_detach(mln_render_session session) -> mln_status {
     return MLN_STATUS_INVALID_STATE;
   }
 
-  live->scheduler.set_repaint_request({});
+  live->scheduler.set_work_available_callback({});
 
   // Tear the renderer down before releasing the map's slot. The renderer holds
   // the map's forwarding observer, which the map's frontend owns; releasing the
@@ -1467,6 +1476,7 @@ auto render_session_detach(mln_render_session session) -> mln_status {
     return detach_status;
   }
   live->attached = false;
+  live->rendered_update.reset();
   live->rendered_generation = 0;
   live->rendered_transform.reset();
   live->texture.rendered_native_texture = nullptr;
