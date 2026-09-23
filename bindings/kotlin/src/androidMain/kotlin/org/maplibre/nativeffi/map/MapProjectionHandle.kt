@@ -5,8 +5,10 @@ import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.internal.javacpp.AndroidNativeBridge
 import org.maplibre.nativeffi.internal.javacpp.ByteArrayViewScope
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.javacpp.readCameraSnapshot
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
@@ -23,11 +25,10 @@ public actual class MapProjectionHandle internal constructor(private val handleI
   public actual val camera: CameraOptions
     get() {
       NativeAccess.ensureLoaded()
-      MaplibreNativeC.mln_camera_options_default().use { outCamera ->
-        withLiveHandle { handle ->
-          Status.check(MaplibreNativeC.mln_map_projection_get_camera(handle, outCamera))
+      return withLiveHandle { handle ->
+        readCameraSnapshot { outCamera ->
+          AndroidNativeBridge.projectionGetCamera(handle, outCamera)
         }
-        return projectionCameraOptions(outCamera)
       }
     }
 
@@ -87,52 +88,40 @@ public actual class MapProjectionHandle internal constructor(private val handleI
 
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
     NativeAccess.ensureLoaded()
-    MaplibreNativeC.mln_screen_point().use { outPoint ->
-      withLiveHandle { handle ->
-        Status.check(
-          MaplibreNativeC.mln_map_projection_pixel_for_lat_lng(
-            handle,
-            MaplibreNativeC.mln_lat_lng()
-              .latitude(coordinate.latitude)
-              .longitude(coordinate.longitude),
-            outPoint,
-          )
+    val out = DoubleArray(2)
+    withLiveHandle { handle ->
+      Status.check(
+        AndroidNativeBridge.projectionPixelForLatLng(
+          handle,
+          coordinate.latitude,
+          coordinate.longitude,
+          out,
         )
-      }
-      return ScreenPoint(outPoint.x(), outPoint.y())
+      )
     }
+    return ScreenPoint(out[0], out[1])
   }
 
   public actual fun latLngForPixel(point: ScreenPoint): LatLng {
     NativeAccess.ensureLoaded()
-    MaplibreNativeC.mln_lat_lng().use { outCoordinate ->
-      withLiveHandle { handle ->
-        Status.check(
-          MaplibreNativeC.mln_map_projection_lat_lng_for_pixel(
-            handle,
-            MaplibreNativeC.mln_screen_point().x(point.x).y(point.y),
-            outCoordinate,
-          )
-        )
-      }
-      return LatLng(outCoordinate.latitude(), outCoordinate.longitude())
+    val out = DoubleArray(2)
+    withLiveHandle { handle ->
+      Status.check(
+        AndroidNativeBridge.projectionLatLngForPixel(handle, point.x, point.y, false, out)
+      )
     }
+    return LatLng(out[0], out[1])
   }
 
   public actual fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng {
     NativeAccess.ensureLoaded()
-    MaplibreNativeC.mln_lat_lng().use { outCoordinate ->
-      withLiveHandle { handle ->
-        Status.check(
-          MaplibreNativeC.mln_map_projection_lat_lng_for_pixel_unwrapped(
-            handle,
-            MaplibreNativeC.mln_screen_point().x(point.x).y(point.y),
-            outCoordinate,
-          )
-        )
-      }
-      return LatLng(outCoordinate.latitude(), outCoordinate.longitude())
+    val out = DoubleArray(2)
+    withLiveHandle { handle ->
+      Status.check(
+        AndroidNativeBridge.projectionLatLngForPixel(handle, point.x, point.y, true, out)
+      )
     }
+    return LatLng(out[0], out[1])
   }
 
   public actual fun metersPerPixelAtLatitude(latitude: Double): Double {
@@ -158,40 +147,6 @@ public actual class MapProjectionHandle internal constructor(private val handleI
   }
 
   private fun <T> withLiveHandle(block: (Long) -> T): T = core.withLive { block(handleId) }
-}
-
-private fun projectionCameraOptions(value: MaplibreNativeC.mln_camera_options): CameraOptions {
-  val fields = value.fields()
-  return CameraOptions().apply {
-    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_CENTER) != 0) {
-      center = LatLng(value.latitude(), value.longitude())
-    }
-    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0) {
-      centerAltitude = value.center_altitude()
-    }
-    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_PADDING) != 0) {
-      val padding = value.padding()
-      this.padding = EdgeInsets(padding.top(), padding.left(), padding.bottom(), padding.right())
-    }
-    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_ANCHOR) != 0) {
-      anchor = ScreenPoint(value.anchor().x(), value.anchor().y())
-    }
-    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_ZOOM) != 0) {
-      zoom = value.zoom()
-    }
-    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_BEARING) != 0) {
-      bearing = value.bearing()
-    }
-    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_PITCH) != 0) {
-      pitch = value.pitch()
-    }
-    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_ROLL) != 0) {
-      roll = value.roll()
-    }
-    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_FOV) != 0) {
-      fieldOfView = value.field_of_view()
-    }
-  }
 }
 
 private class ProjectionCameraOptionsScope(value: CameraOptions) : AutoCloseable {

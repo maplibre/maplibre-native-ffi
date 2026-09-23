@@ -28,6 +28,7 @@ import org.maplibre.nativeffi.internal.javacpp.GeoJsonSourceOptionsScope
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.javacpp.ownedBuffer
+import org.maplibre.nativeffi.internal.javacpp.readCameraSnapshot
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
@@ -1478,9 +1479,8 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
   public actual val camera: CameraOptions
     get() {
       NativeAccess.ensureLoaded()
-      MaplibreNativeC.mln_camera_options_default().use { outCamera ->
-        Status.check(MaplibreNativeC.mln_map_get_camera(requireLiveHandle(), outCamera))
-        return cameraOptions(outCamera)
+      return readCameraSnapshot { outCamera ->
+        AndroidNativeBridge.mapGetCamera(requireLiveHandle(), outCamera)
       }
     }
 
@@ -1760,40 +1760,34 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
 
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
     NativeAccess.ensureLoaded()
-    MaplibreNativeC.mln_screen_point().use { outPoint ->
-      Status.check(
-        MaplibreNativeC.mln_map_pixel_for_lat_lng(requireLiveHandle(), latLng(coordinate), outPoint)
+    val out = DoubleArray(2)
+    Status.check(
+      AndroidNativeBridge.mapPixelForLatLng(
+        requireLiveHandle(),
+        coordinate.latitude,
+        coordinate.longitude,
+        out,
       )
-      return screenPoint(outPoint)
-    }
+    )
+    return ScreenPoint(out[0], out[1])
   }
 
   public actual fun latLngForPixel(point: ScreenPoint): LatLng {
     NativeAccess.ensureLoaded()
-    MaplibreNativeC.mln_lat_lng().use { outCoordinate ->
-      Status.check(
-        MaplibreNativeC.mln_map_lat_lng_for_pixel(
-          requireLiveHandle(),
-          screenPoint(point),
-          outCoordinate,
-        )
-      )
-      return latLng(outCoordinate)
-    }
+    val out = DoubleArray(2)
+    Status.check(
+      AndroidNativeBridge.mapLatLngForPixel(requireLiveHandle(), point.x, point.y, false, out)
+    )
+    return LatLng(out[0], out[1])
   }
 
   public actual fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng {
     NativeAccess.ensureLoaded()
-    MaplibreNativeC.mln_lat_lng().use { outCoordinate ->
-      Status.check(
-        MaplibreNativeC.mln_map_lat_lng_for_pixel_unwrapped(
-          requireLiveHandle(),
-          screenPoint(point),
-          outCoordinate,
-        )
-      )
-      return latLng(outCoordinate)
-    }
+    val out = DoubleArray(2)
+    Status.check(
+      AndroidNativeBridge.mapLatLngForPixel(requireLiveHandle(), point.x, point.y, true, out)
+    )
+    return LatLng(out[0], out[1])
   }
 
   public actual fun pixelsForLatLngs(coordinates: List<LatLng>): List<ScreenPoint> {
