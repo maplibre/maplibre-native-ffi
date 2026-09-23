@@ -1,25 +1,13 @@
 include_guard(GLOBAL)
 
 function(mln_ffi_configure_apple_toolchain_defaults)
-  if(DEFINED CMAKE_SYSTEM_NAME)
-    if(NOT CMAKE_SYSTEM_NAME MATCHES "^(Darwin|iOS|tvOS|watchOS|visionOS)$")
-      return()
-    endif()
-  elseif(NOT CMAKE_HOST_APPLE)
-    return()
-  endif()
-
-  if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-    if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$")
-      # Match MapLibre Native's vendored CMake, which currently forces this
-      # value through maplibre-tile-spec even for iOS builds. tvOS shares the
-      # same numeric floor.
-      set(CMAKE_OSX_DEPLOYMENT_TARGET "14.3"
-          CACHE STRING "Minimum ${CMAKE_SYSTEM_NAME} deployment target" FORCE)
-    elseif(NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
-      set(CMAKE_OSX_DEPLOYMENT_TARGET "14.3"
-          CACHE STRING "Minimum macOS deployment target" FORCE)
-    endif()
+  # MapLibre Native defaults and enforces the macOS floor itself, but it leaves
+  # iOS and tvOS to the caller. Default both to its iOS floor before the Apple
+  # toolchain derives compiler targets from this value.
+  if(NOT CMAKE_OSX_DEPLOYMENT_TARGET
+     AND CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "15.5"
+        CACHE STRING "Minimum ${CMAKE_SYSTEM_NAME} deployment target" FORCE)
   endif()
 endfunction()
 

@@ -190,7 +190,7 @@ index 6d3a30b5a56c..fc9c5e04e5e2 100644
      }
  
 diff --git a/include/mln/style/layer.hpp b/include/mln/style/layer.hpp
-index 2e71f747dff3..d60e51b56ac2 100644
+index 48ecc7e054fe..37dca723b7f3 100644
 --- a/include/mln/style/layer.hpp
 +++ b/include/mln/style/layer.hpp
 @@ -3,6 +3,7 @@
@@ -9330,7 +9330,7 @@ index d2a14998ebcf..1979a09d3fb9 100644
    MLNTransition transition;
    transition.duration =
 diff --git a/platform/darwin/src/NSExpression+MLNAdditions.mm b/platform/darwin/src/NSExpression+MLNAdditions.mm
-index ec34cac76e14..706960f6bb94 100644
+index 9104a1a1c6a7..38e38fb54241 100644
 --- a/platform/darwin/src/NSExpression+MLNAdditions.mm
 +++ b/platform/darwin/src/NSExpression+MLNAdditions.mm
 @@ -81,6 +81,7 @@ + (void)installFunctions {
@@ -9357,7 +9357,7 @@ index ec34cac76e14..706960f6bb94 100644
  /**
   A placeholder for a method that evaluates an interpolation expression.
   */
-@@ -725,6 +735,7 @@ + (instancetype)expressionWithMLNJSONObject:(id)object {
+@@ -723,6 +733,7 @@ + (instancetype)expressionWithMLNJSONObject:(id)object {
        @"ceil" : @"ceiling:",
        @"^" : @"raise:toPower:",
        @"distance" : @"mgl_distanceFrom:",
@@ -9365,7 +9365,7 @@ index ec34cac76e14..706960f6bb94 100644
        @"upcase" : @"uppercase:",
        @"downcase" : @"lowercase:",
        @"let" : @"MLN_LET",
-@@ -1086,6 +1097,7 @@ - (id)mgl_jsonExpressionObject {
+@@ -1084,6 +1095,7 @@ - (id)mgl_jsonExpressionObject {
        @"mgl_tan:" : @"tan",
        @"mgl_log2:" : @"log2",
        @"mgl_distanceFrom:" : @"distance",
@@ -9374,10 +9374,10 @@ index ec34cac76e14..706960f6bb94 100644
        // argument.
        @"MLN_LET" : @"let",
 diff --git a/platform/darwin/test/MLNExpressionTests.mm b/platform/darwin/test/MLNExpressionTests.mm
-index 2f79fce33f02..bf97f7e92874 100644
+index 6c1b3919af3a..77b3512a230c 100644
 --- a/platform/darwin/test/MLNExpressionTests.mm
 +++ b/platform/darwin/test/MLNExpressionTests.mm
-@@ -953,6 +953,16 @@ - (void)testShapeDistanceExpressionObject {
+@@ -932,6 +932,16 @@ - (void)testShapeDistanceExpressionObject {
    }
  }
  
@@ -12306,7 +12306,7 @@ index c0edbd41cbaf..4503c42994cc 100644
  bool isConstant(const Expression& expression) {
      const auto kind = expression.getKind();
 diff --git a/src/mln/style/layer.cpp b/src/mln/style/layer.cpp
-index cec0388c4c94..9724b8692b72 100644
+index e7f411b8ac4b..3d0aea108bec 100644
 --- a/src/mln/style/layer.cpp
 +++ b/src/mln/style/layer.cpp
 @@ -1,12 +1,15 @@
@@ -12382,7 +12382,7 @@ index cec0388c4c94..9724b8692b72 100644
          result["layout"] = mapbox::base::ValueObject{std::make_pair("visibility", "none")};
      }
  
-@@ -221,6 +263,29 @@ std::optional<conversion::Error> Layer::setVisibility(const conversion::Converti
+@@ -230,6 +272,29 @@ std::optional<conversion::Error> Layer::setVisibility(const conversion::Converti
          return std::nullopt;
      }
  
@@ -13667,7 +13667,7 @@ index e6db64d96edd..b3f3fcd7f485 100644
      float getQueryPadding(const std::unordered_map<std::string, const RenderLayer*>&) override;
  
 diff --git a/src/mln/tile/geometry_tile_worker.cpp b/src/mln/tile/geometry_tile_worker.cpp
-index a69df5a24d12..19b23bb8f226 100644
+index b540e303c5c3..885d61897eab 100644
 --- a/src/mln/tile/geometry_tile_worker.cpp
 +++ b/src/mln/tile/geometry_tile_worker.cpp
 @@ -161,12 +161,14 @@ void GeometryTileWorker::setData(std::unique_ptr<const GeometryTileData> data_,
@@ -13675,7 +13675,7 @@ index a69df5a24d12..19b23bb8f226 100644
  
  void GeometryTileWorker::setLayers(std::vector<Immutable<LayerProperties>> layers_,
 +                                   std::shared_ptr<const GlobalStateMap> globalState_,
-                                    std::set<std::string> availableImages_,
+                                    Immutable<std::set<std::string>> availableImages_,
                                     uint64_t correlationID_) {
      MLN_TRACE_FUNC();
  
@@ -13706,18 +13706,18 @@ index a69df5a24d12..19b23bb8f226 100644
                  }
  
 diff --git a/src/mln/tile/geometry_tile_worker.hpp b/src/mln/tile/geometry_tile_worker.hpp
-index 7420f1c72521..4e388f7297c9 100644
+index 77a317ee3cab..d488206f5739 100644
 --- a/src/mln/tile/geometry_tile_worker.hpp
 +++ b/src/mln/tile/geometry_tile_worker.hpp
-@@ -52,6 +52,7 @@ public:
+@@ -53,6 +53,7 @@ public:
      void setObserver(TileObserver* observer);
  
      void setLayers(std::vector<Immutable<style::LayerProperties>>,
 +                   std::shared_ptr<const GlobalStateMap> globalState_,
-                    std::set<std::string> availableImages,
+                    Immutable<std::set<std::string>> availableImages,
                     uint64_t correlationID);
      void setData(std::unique_ptr<const GeometryTileData>,
-@@ -111,6 +112,9 @@ private:
+@@ -112,6 +113,9 @@ private:
      std::optional<std::vector<Immutable<style::LayerProperties>>> layers;
      std::optional<std::unique_ptr<const GeometryTileData>> data;
  
@@ -13778,7 +13778,7 @@ index 13615273b175..f21ee089d369 100644
      virtual float getQueryPadding(const std::unordered_map<std::string, const RenderLayer*>&);
  
 diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
-index b3b772c02f3d..7016af355937 100644
+index c1bf83adaacf..868619667cf0 100644
 --- a/test/CMakeLists.txt
 +++ b/test/CMakeLists.txt
 @@ -60,6 +60,7 @@ add_library(

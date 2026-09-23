@@ -80,19 +80,17 @@ function(mln_ffi_configure_platform target)
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/run_loop.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/string_stdlib.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/thread.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/timer.cpp)
-  set(MLN_FFI_OHOS_SOURCES
-      ${PROJECT_SOURCE_DIR}/src/platform/ohos/http_file_source.cpp
-      ${PROJECT_SOURCE_DIR}/src/platform/ohos/image.cpp
-      ${PROJECT_SOURCE_DIR}/src/platform/ohos/logging_hilog.cpp)
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/timer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/ohos/src/http_file_source.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/ohos/src/image.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/ohos/src/logging_hilog.cpp)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_OHOS_SOURCES})
-  mln_ffi_target_project_sources(${target} ${MLN_FFI_OHOS_SOURCES})
 
   target_include_directories(
     ${target}
     BEFORE
-    PRIVATE ${PROJECT_SOURCE_DIR}/src/platform/ohos/compat)
+    PRIVATE ${MLN_FFI_SOURCE_DIR}/platform/ohos/compat)
 
   target_include_directories(
     ${target}

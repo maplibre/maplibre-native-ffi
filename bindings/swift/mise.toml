@@ -38,14 +38,14 @@ case "$usage_preset" in
       --product MaplibreNativeFFI \
       --scratch-path .build/ios \
       --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
-      --triple arm64-apple-ios14.3
+      --triple arm64-apple-ios15.5
     ;;
   tvos-arm64-metal)
     exec swift build \
       --product MaplibreNativeFFI \
       --scratch-path .build/tvos \
       --sdk "$(xcrun --sdk appletvos --show-sdk-path)" \
-      --triple arm64-apple-tvos14.3
+      --triple arm64-apple-tvos15.5
     ;;
   ios-maccatalyst-*)
     # A product build also compiles the DocC plugin's dependencies, whose
@@ -54,7 +54,7 @@ case "$usage_preset" in
       --target MaplibreNativeFFI \
       --scratch-path ".build/$usage_preset" \
       --sdk "$(xcrun --sdk macosx --show-sdk-path)" \
-      --triple arm64-apple-ios14.3-macabi
+      --triple arm64-apple-ios15.5-macabi
     ;;
   ios-*)
     echo "The Swift binding builds for an iOS device with ios-arm64-metal; simulator coverage comes from //bindings/swift:test." >&2
@@ -96,7 +96,7 @@ case "$usage_preset" in
       --product MaplibreNativeFFIIOSSimulatorTests \
       --scratch-path .build/ios-simulator \
       --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
-      --triple arm64-apple-ios14.3-simulator \
+      --triple arm64-apple-ios15.5-simulator \
       -Xswiftc -enable-testing \
       -Xlinker -rpath \
       -Xlinker "$native_install_dir/lib" \
@@ -116,7 +116,7 @@ case "$usage_preset" in
       --product MaplibreNativeFFIIOSSimulatorTests \
       --scratch-path .build/tvos-simulator \
       --sdk "$(xcrun --sdk appletvsimulator --show-sdk-path)" \
-      --triple arm64-apple-tvos14.3-simulator \
+      --triple arm64-apple-tvos15.5-simulator \
       -Xswiftc -enable-testing \
       -Xlinker -rpath \
       -Xlinker "$native_install_dir/lib" \
@@ -136,7 +136,7 @@ case "$usage_preset" in
       --scratch-path ".build/$usage_preset" \
       -c "$usage_configuration" \
       --sdk "$(xcrun --sdk macosx --show-sdk-path)" \
-      --triple arm64-apple-ios14.3-macabi \
+      --triple arm64-apple-ios15.5-macabi \
       -Xswiftc -enable-testing \
       -Xlinker -rpath \
       -Xlinker "$native_install_dir/lib" \

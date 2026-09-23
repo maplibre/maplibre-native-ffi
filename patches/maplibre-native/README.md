@@ -61,25 +61,16 @@ regressions cover all five shaders using the existing glyph fixture. See
 Upstream:
 [maplibre-native#4625](https://github.com/maplibre/maplibre-native/pull/4625).
 
-`0012-vulkan-surface-acquire-timeout.patch` lets a surface resource bound
-swapchain image acquisition. When the bound expires, the frame aborts with
-`SurfaceNotReady` before it records or submits GPU work. Android's Vulkan loader
-tells an app-owned BufferQueue to wait for a free buffer only when the timeout
-is finite, and it reports buffer starvation under an unbounded acquire as a lost
-surface. The Android native surface target uses a 16 ms bound, and the C API
-reports the target as not ready, so the host retries with the same render
-session. The patch includes a Native regression that injects acquisition stalls
-and checks that frame fences remain usable for later GPU submissions. See
-[maplibre-compose#1370](https://github.com/maplibre/maplibre-compose/issues/1370).
-
 `0014-global-state.patch` adds the `global-state` expression, root `state`
 defaults, and Native's runtime state APIs. State changes update dependent paint
 properties, filters, layout, and color ramps. The patch includes the upstream
 tests and render fixtures. It carries Taiyu Yoshizawa's (NEKOYASAN) existing
 [maplibre-native#4516](https://github.com/maplibre/maplibre-native/pull/4516),
-at commit `844751cacb9b32e971076f24fb74a3ec8db1c2ea`, as an unmodified diff from
-base `1805fa27a55c59c84d72831ded4fa5cf0a042e25`. The C API exposes the runtime
-state setter and snapshot getter.
+at commit `c8a0cf203a3d5ec3ca9e26cbcf7c18b974886ab3`, as its diff from base
+`87a97ff582c71f4a4dacef45c2844691a93303a7`. The only change passes the tile
+worker's available images as the shared immutable set that
+[maplibre-native#4651](https://github.com/maplibre/maplibre-native/pull/4651)
+introduced. The C API exposes the runtime state setter and snapshot getter.
 
 `0015-independent-camera-animations.patch` lets partial camera commands animate
 independently. Replacing a property preserves the timing of other properties,
@@ -115,9 +106,10 @@ at commit `363acddb8471dc344cb17dac1e2637e17cff5535`.
 with an angular half-width, a radius in logical pixels, and a color that fades
 toward the outer edge. The paint properties support zoom expressions and
 transitions. The patch includes the upstream conversion test and three render
-fixtures with their binary reference images. Upstream:
+fixtures with their binary reference images. It carries the closed
 [maplibre-native#4644](https://github.com/maplibre/maplibre-native/pull/4644),
-at commit `02d9a4b2ccb4f3d15cdca438fd08ea6fa2cd530b`.
+at commit `02d9a4b2ccb4f3d15cdca438fd08ea6fa2cd530b`, until a location indicator
+plugin can replace the core layer.
 
 Each patch is the squashed diff of its upstream branch, applied on top of the
 patches before it, so a patch that adds a test next to an earlier patch's test
