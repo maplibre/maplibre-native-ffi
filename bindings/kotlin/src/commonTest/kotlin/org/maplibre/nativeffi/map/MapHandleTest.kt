@@ -42,6 +42,7 @@ import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerInfo
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileScheme
@@ -709,6 +710,51 @@ class MapHandleTest {
     }
   }
 
+  // BND-105: the layer stack lists in style order with optional source fields.
+  @Test
+  fun styleLayersListTheLayerStackInStyleOrder() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      map.setStyleJson(
+        """
+        {
+          "version": 8,
+          "sources": {
+            "tiles": {"type": "vector", "tiles": ["https://example.invalid/{z}/{x}/{y}.pbf"]}
+          },
+          "layers": [
+            {"id": "roads", "type": "line", "source": "tiles", "source-layer": "transportation"},
+            {"id": "sky", "type": "background"}
+          ]
+        }
+        """
+          .trimIndent()
+          .encodeToByteArray()
+      )
+
+      assertEquals(
+        listOf(
+          StyleLayerInfo("roads", "line", "tiles", "transportation"),
+          StyleLayerInfo("sky", "background", null, null),
+        ),
+        map.styleLayers(),
+      )
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
   @Test
   fun styleImageCanBeSetCopiedInspectedAndRemoved() {
     val runtime = RuntimeHandle.create(RuntimeOptions())
@@ -1246,6 +1292,32 @@ class MapHandleTest {
           1e-10,
         )
       }
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun metersPerPixelMatchesProjectionAndFollowsZoom() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map = MapHandle.create(runtime, MapOptions().apply { mapMode = MapMode.STATIC })
+
+    try {
+      val latitude = 45.0
+      map.jumpTo(
+        CameraOptions().apply {
+          center = LatLng(latitude, 0.0)
+          zoom = 4.0
+        }
+      )
+      val metersPerPixel = map.metersPerPixelAtLatitude(latitude)
+      map.createProjection().use { projection ->
+        assertEquals(metersPerPixel, projection.metersPerPixelAtLatitude(latitude), 1e-9)
+      }
+
+      map.jumpTo(CameraOptions().apply { zoom = 5.0 })
+      assertEquals(metersPerPixel / 2.0, map.metersPerPixelAtLatitude(latitude), 1e-9)
     } finally {
       map.close()
       runtime.close()

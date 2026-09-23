@@ -135,6 +135,21 @@ public actual class MapProjectionHandle internal constructor(private val handleI
     }
   }
 
+  public actual fun metersPerPixelAtLatitude(latitude: Double): Double {
+    NativeAccess.ensureLoaded()
+    val outMetersPerPixel = doubleArrayOf(0.0)
+    withLiveHandle { handle ->
+      Status.check(
+        MaplibreNativeC.mln_map_projection_meters_per_pixel_at_latitude(
+          handle,
+          latitude,
+          outMetersPerPixel,
+        )
+      )
+    }
+    return outMetersPerPixel[0]
+  }
+
   public actual val isClosed: Boolean
     get() = core.isReleased()
 

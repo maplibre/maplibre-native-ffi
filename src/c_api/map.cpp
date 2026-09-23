@@ -215,6 +215,36 @@ auto mln_style_id_list_destroy(mln_style_id_list list) noexcept -> void {
   mln::core::style_id_list_destroy(list);
 }
 
+auto mln_style_layer_info_default() noexcept -> mln_style_layer_info {
+  return mln_style_layer_info{
+    .size = sizeof(mln_style_layer_info),
+    .id = {},
+    .type = {},
+    .source_id = {},
+    .source_layer = {}
+  };
+}
+
+auto mln_style_layer_list_count(
+  mln_style_layer_list list, size_t* out_count
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::style_layer_list_count(list, out_count);
+  });
+}
+
+auto mln_style_layer_list_get(
+  mln_style_layer_list list, size_t index, mln_style_layer_info* out_layer
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::style_layer_list_get(list, index, out_layer);
+  });
+}
+
+auto mln_style_layer_list_destroy(mln_style_layer_list list) noexcept -> void {
+  mln::core::style_layer_list_destroy(list);
+}
+
 auto mln_style_string_list_count(
   mln_style_string_list list, size_t* out_count
 ) noexcept -> mln_status {
@@ -775,6 +805,14 @@ auto mln_map_list_style_layer_ids(
   });
 }
 
+auto mln_map_list_style_layers(
+  mln_map map, mln_style_layer_list* out_layers
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_list_style_layers(map, out_layers);
+  });
+}
+
 auto mln_map_move_style_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) noexcept -> mln_status {
@@ -1153,6 +1191,16 @@ auto mln_map_lat_lngs_for_pixels_unwrapped(
   });
 }
 
+auto mln_map_meters_per_pixel_at_latitude(
+  mln_map map, double latitude, double* out_meters_per_pixel
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_meters_per_pixel_at_latitude(
+      map, latitude, out_meters_per_pixel
+    );
+  });
+}
+
 auto mln_map_projection_create(
   mln_map map, mln_map_projection* out_projection
 ) noexcept -> mln_status {
@@ -1235,6 +1283,16 @@ auto mln_map_projection_lat_lng_for_pixel_unwrapped(
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_projection_lat_lng_for_pixel_unwrapped(
       projection, point, out_coordinate
+    );
+  });
+}
+
+auto mln_map_projection_meters_per_pixel_at_latitude(
+  mln_map_projection projection, double latitude, double* out_meters_per_pixel
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_projection_meters_per_pixel_at_latitude(
+      projection, latitude, out_meters_per_pixel
     );
   });
 }

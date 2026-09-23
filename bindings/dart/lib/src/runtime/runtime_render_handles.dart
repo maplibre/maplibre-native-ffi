@@ -139,6 +139,22 @@ final class MapProjectionHandle {
     });
   }
 
+  /// Gets the ground distance in meters covered by one logical pixel at
+  /// [latitude] for this projection helper's zoom.
+  double metersPerPixelAtLatitude(double latitude) {
+    return withNativeArena((arena) {
+      final outMetersPerPixel = arena<Double>();
+      _check(
+        raw.mln_map_projection_meters_per_pixel_at_latitude(
+          _handle.raw,
+          latitude,
+          outMetersPerPixel,
+        ),
+      );
+      return outMetersPerPixel.value;
+    });
+  }
+
   /// Explicitly destroys this projection helper.
   void close() {
     _state.close(

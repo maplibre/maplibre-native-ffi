@@ -2403,6 +2403,21 @@ impl MapHandle {
         lat_lng_to_py(py, coordinate)
     }
 
+    fn meters_per_pixel_at_latitude(&self, latitude: f64) -> PyResult<f64> {
+        let state = self.state();
+        let mut meters_per_pixel = 0.0;
+        // SAFETY: The C API validates the map pointer, latitude, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_meters_per_pixel_at_latitude(
+                state.handle(),
+                latitude,
+                &mut meters_per_pixel,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(meters_per_pixel)
+    }
+
     fn pixels_for_lat_lngs(
         &self,
         py: Python<'_>,
@@ -3460,6 +3475,25 @@ impl MapHandle {
         unsafe { maplibre_core::style::copy_style_id_list(native) }.map_err(map_error)
     }
 
+    fn list_style_layers(&self, py: Python<'_>) -> PyResult<Py<PyList>> {
+        let state = self.state();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_layer_list>::new();
+        // SAFETY: The C API validates the map pointer and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_list_style_layers(state.handle(), out.as_mut_ptr())
+        })
+        .map_err(map_error)?;
+        let native = out.into_live("mln_style_layer_list").map_err(map_error)?;
+        // SAFETY: native is an owned style layer list returned by native.
+        let layers =
+            unsafe { maplibre_core::style::copy_style_layer_list(native) }.map_err(map_error)?;
+        let list = PyList::empty(py);
+        for layer in layers {
+            list.append(style_layer_info_to_py(py, layer)?)?;
+        }
+        Ok(list.unbind())
+    }
+
     fn move_style_layer(&self, layer_id: String, before_layer_id: Option<String>) -> PyResult<()> {
         let state = self.state();
         let layer_id = maplibre_core::string::string_view(&layer_id);
@@ -4160,6 +4194,22 @@ impl MapProjectionHandle {
         })
         .map_err(map_error)?;
         lat_lng_to_py(py, coordinate)
+    }
+
+    fn meters_per_pixel_at_latitude(&self, latitude: f64) -> PyResult<f64> {
+        let state = self.state();
+        let mut meters_per_pixel = 0.0;
+        // SAFETY: The C API validates the projection pointer, latitude, and
+        // output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_meters_per_pixel_at_latitude(
+                state.handle(),
+                latitude,
+                &mut meters_per_pixel,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(meters_per_pixel)
     }
 
     #[getter]
@@ -6539,6 +6589,18 @@ fn queried_features_to_py(
         list.append(queried_feature_to_py(py, feature)?)?;
     }
     Ok(list.unbind())
+}
+
+fn style_layer_info_to_py(
+    py: Python<'_>,
+    layer: maplibre_core::StyleLayerInfo,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("id", layer.id)?;
+    dict.set_item("type", layer.layer_type)?;
+    dict.set_item("source_id", layer.source_id)?;
+    dict.set_item("source_layer", layer.source_layer)?;
+    Ok(dict.into_any().unbind())
 }
 
 fn source_info_to_py(py: Python<'_>, info: maplibre_core::SourceInfo) -> PyResult<Py<PyAny>> {

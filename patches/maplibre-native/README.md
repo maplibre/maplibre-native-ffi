@@ -119,13 +119,27 @@ fixtures with their binary reference images. Upstream:
 [maplibre-native#4644](https://github.com/maplibre/maplibre-native/pull/4644),
 at commit `02d9a4b2ccb4f3d15cdca438fd08ea6fa2cd530b`.
 
-`0022-render-update-publication.patch` publishes render updates after image and
-source removal, source insertion, tile-selection changes, transition changes,
-and completed style parsing. Generated layer transition setters also refresh the
-style's immutable layer collection. See
+`0022-legacy-annotations-option.patch` adds the `MLN_WITH_LEGACY_ANNOTATIONS`
+CMake option. Turning it off compiles the legacy annotation manager as disabled,
+so a loaded style no longer gains the `org.maplibre.annotations` source and its
+symbol layer. The C API exposes no annotation entry points and builds with the
+option off. Upstream:
+[maplibre-native#4675](https://github.com/maplibre/maplibre-native/pull/4675).
+
+`0023-sourceless-style-rendering.patch` renders a style that has no sources. The
+orchestrator added layers that take no source while it updated the first source,
+so a style with none produced no render items and no background color, and a
+style load whose parse added no layer published no update to the renderer. The
+legacy annotation source hid both, because it joined every style. Upstream:
+[maplibre-native#4674](https://github.com/maplibre/maplibre-native/pull/4674).
+
+`0024-render-update-publication.patch` publishes render updates after image and
+source removal, source insertion, tile-selection changes, and transition
+changes. Generated layer transition setters also refresh the style's immutable
+layer collection. See
 [issue #736](https://github.com/maplibre/maplibre-native-ffi/issues/736).
 
-`0023-vertex-buffer-upload-timestamps.patch` initializes vertex buffer upload
+`0025-vertex-buffer-upload-timestamps.patch` initializes vertex buffer upload
 timestamps and preserves them during moves in Metal, Vulkan, and WebGPU. An
 uninitialized timestamp can suppress uploads after feature-state changes. The
 patch includes the upstream resource regression. Upstream:
@@ -142,11 +156,12 @@ before applying the list again. A pin bump, an edit to a patch, and a dropped
 patch all take effect on a worktree that still carries the old version. A patch
 that no longer applies fails the sync rather than being skipped.
 
-A sync records the pinned commit and a hash of the worktree's diff against it in
-the submodule's git directory, and a later sync that finds the same record
-leaves the worktree alone. Local edits to the submodule worktree, including
-edits inside a nested vendor submodule, change that record and are discarded by
-the next sync's checkout. When such an edit sits outside every listed patch's
-paths, the sync prints the path first. A forced checkout also removes an
-untracked file that sits where a new pin adds a tracked one, and the sync
-removes a file that a listed patch adds before applying that patch again.
+A sync records the pinned commit, a hash of the worktree's diff against it, and
+a hash of the patch list in the submodule's git directory, and a later sync that
+finds the same record leaves the worktree alone. Local edits to the submodule
+worktree, including edits inside a nested vendor submodule, change that record
+and are discarded by the next sync's checkout. When such an edit sits outside
+every listed patch's paths, the sync prints the path first. A forced checkout
+also removes an untracked file that sits where a new pin adds a tracked one, and
+the sync removes a file that a listed patch adds before applying that patch
+again.

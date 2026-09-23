@@ -194,6 +194,40 @@ fn style_setters_accept_valid_input_and_reject_embedded_nul() {
 }
 
 #[test]
+// Spec coverage: BND-105.
+fn style_layers_copy_the_layer_stack_in_style_order() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let style = serde_json::to_vec(&json!({
+        "version": 8,
+        "sources": {
+            "tiles": {"type": "vector", "tiles": ["https://example.com/{z}/{x}/{y}.pbf"]},
+        },
+        "layers": [
+            {"id": "roads", "type": "line", "source": "tiles", "source-layer": "transportation"},
+            {"id": "background", "type": "background"},
+        ],
+    }))
+    .unwrap();
+    map.set_style_json(&style).unwrap();
+
+    let layers = map.style_layers().unwrap();
+
+    assert_eq!(layers.len(), 2);
+    assert_eq!(layers[0].id, "roads");
+    assert_eq!(layers[0].layer_type, "line");
+    assert_eq!(layers[0].source_id.as_deref(), Some("tiles"));
+    assert_eq!(layers[0].source_layer.as_deref(), Some("transportation"));
+    assert_eq!(layers[1].id, "background");
+    assert_eq!(layers[1].layer_type, "background");
+    assert_eq!(layers[1].source_id, None);
+    assert_eq!(layers[1].source_layer, None);
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
 // Spec coverage: BND-101.
 fn loaded_style_document_and_url_read_back_what_was_loaded() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
@@ -1314,6 +1348,38 @@ fn unwrapped_coordinate_conversions_preserve_visible_world_copies() {
     assert!((-180.0..=180.0).contains(&projection.lat_lng_for_pixel(points[1]).unwrap().longitude));
     let projected_right = projection.lat_lng_for_pixel_unwrapped(points[1]).unwrap();
     assert!((projected_right.longitude - right.longitude).abs() < 1e-10);
+    projection.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-103, BND-104.
+fn meters_per_pixel_agrees_between_map_and_projection_and_follows_zoom() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let mut camera = CameraOptions::default();
+    camera.center = Some(LatLng::new(45.0, 0.0));
+    camera.zoom = Some(3.0);
+    map.jump_to(&camera).unwrap();
+
+    let at_zoom_3 = map.meters_per_pixel_at_latitude(45.0).unwrap();
+    let projection = map.create_projection().unwrap();
+    let projected = projection.meters_per_pixel_at_latitude(45.0).unwrap();
+    assert!((projected - at_zoom_3).abs() <= at_zoom_3 * 1e-12);
+
+    camera.zoom = Some(4.0);
+    map.jump_to(&camera).unwrap();
+    let at_zoom_4 = map.meters_per_pixel_at_latitude(45.0).unwrap();
+    assert!((at_zoom_4 * 2.0 - at_zoom_3).abs() <= at_zoom_3 * 1e-12);
+
+    let error = map.meters_per_pixel_at_latitude(91.0).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    let error = projection
+        .meters_per_pixel_at_latitude(f64::NAN)
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+
     projection.close().unwrap();
     map.close().unwrap();
     runtime.close().unwrap();

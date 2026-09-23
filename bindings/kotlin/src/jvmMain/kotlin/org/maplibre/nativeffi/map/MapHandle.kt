@@ -38,6 +38,7 @@ import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerInfo
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
@@ -433,6 +434,11 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     return NativeAccess.styleLayerIds(requireLiveHandle())
   }
 
+  public actual fun styleLayers(): List<StyleLayerInfo> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleLayers(requireLiveHandle())
+  }
+
   public actual fun moveStyleLayer(layerId: String, beforeLayerId: String) {
     NativeAccess.ensureLoaded()
     NativeAccess.moveStyleLayer(requireLiveHandle(), layerId, beforeLayerId)
@@ -795,6 +801,11 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   public actual fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): List<LatLng> {
     NativeAccess.ensureLoaded()
     return NativeAccess.latLngsForPixelsUnwrapped(requireLiveHandle(), points)
+  }
+
+  public actual fun metersPerPixelAtLatitude(latitude: Double): Double {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.metersPerPixelAtLatitude(requireLiveHandle(), latitude)
   }
 
   public actual fun attachMetalOwnedTexture(

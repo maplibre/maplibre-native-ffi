@@ -677,6 +677,14 @@ pub const MapHandle = enum(c.mln_map) {
         return try copyStyleIdList(allocator, list, diagnosticStore(self));
     }
 
+    /// Copies the whole style layer stack in style order.
+    pub fn listStyleLayers(self: *MapHandle, allocator: std.mem.Allocator) status.Error!values.StyleLayerInfoList {
+        var list: c.mln_style_layer_list = 0;
+        try status.checkStatus(c.mln_map_list_style_layers(try native(self), &list), diagnosticStore(self));
+        defer c.mln_style_layer_list_destroy(list);
+        return try copyStyleLayerList(allocator, list, diagnosticStore(self));
+    }
+
     pub fn addStyleSourceJson(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -2015,6 +2023,17 @@ pub const MapHandle = enum(c.mln_map) {
         return values.latLngFromNative(coordinate);
     }
 
+    /// Reads the ground distance in meters covered by one logical map pixel at
+    /// a latitude for the current map zoom.
+    pub fn metersPerPixelAtLatitude(self: *MapHandle, latitude: f64) status.Error!f64 {
+        var meters_per_pixel: f64 = undefined;
+        try status.checkStatus(
+            c.mln_map_meters_per_pixel_at_latitude(try native(self), latitude, &meters_per_pixel),
+            diagnosticStore(self),
+        );
+        return meters_per_pixel;
+    }
+
     pub fn pixelsForLatLngs(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -2730,6 +2749,56 @@ fn copyStyleIdList(
             const data: [*]const u8 = @ptrCast(view.data orelse return error.NativeError);
             break :blk try allocator.dupe(u8, data[0..view.size]);
         };
+        initialized += 1;
+    }
+    return .{ .allocator = allocator, .items = items };
+}
+
+fn copyStyleLayerView(allocator: std.mem.Allocator, view: c.mln_buffer_view) status.Error![]const u8 {
+    if (view.size == 0) return try allocator.dupe(u8, "");
+    const data: [*]const u8 = @ptrCast(view.data orelse return error.NativeError);
+    return try allocator.dupe(u8, data[0..view.size]);
+}
+
+fn copyOptionalStyleLayerView(allocator: std.mem.Allocator, view: c.mln_buffer_view) status.Error!?[]const u8 {
+    if (view.size == 0) return null;
+    return try copyStyleLayerView(allocator, view);
+}
+
+fn copyStyleLayerInfo(allocator: std.mem.Allocator, raw: c.mln_style_layer_info) status.Error!values.StyleLayerInfo {
+    const id = try copyStyleLayerView(allocator, raw.id);
+    errdefer allocator.free(id);
+    const layer_type = try copyStyleLayerView(allocator, raw.type);
+    errdefer allocator.free(layer_type);
+    const source_id = try copyOptionalStyleLayerView(allocator, raw.source_id);
+    errdefer if (source_id) |value| allocator.free(value);
+    const source_layer = try copyOptionalStyleLayerView(allocator, raw.source_layer);
+    return .{
+        .allocator = allocator,
+        .id = id,
+        .type = layer_type,
+        .source_id = source_id,
+        .source_layer = source_layer,
+    };
+}
+
+fn copyStyleLayerList(
+    allocator: std.mem.Allocator,
+    list: c.mln_style_layer_list,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+) status.Error!values.StyleLayerInfoList {
+    var count: usize = 0;
+    try status.checkStatus(c.mln_style_layer_list_count(list, &count), diagnostic_store);
+    const items = try allocator.alloc(values.StyleLayerInfo, count);
+    var initialized: usize = 0;
+    errdefer {
+        for (items[0..initialized]) |*item| item.deinit();
+        allocator.free(items);
+    }
+    for (items, 0..) |*item, index| {
+        var raw = c.mln_style_layer_info_default();
+        try status.checkStatus(c.mln_style_layer_list_get(list, index, &raw), diagnostic_store);
+        item.* = try copyStyleLayerInfo(allocator, raw);
         initialized += 1;
     }
     return .{ .allocator = allocator, .items = items };

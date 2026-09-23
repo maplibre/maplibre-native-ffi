@@ -118,6 +118,27 @@ test "unwrapped coordinate conversions preserve visible world copies" {
     try expectLatLngApprox(right, projected_right);
 }
 
+test "meters per pixel agrees between map and projection and follows zoom" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    try map.jumpTo(.{ .center = .{ .latitude = 45.0, .longitude = 0.0 }, .zoom = 3.0 });
+    const at_zoom_3 = try map.metersPerPixelAtLatitude(45.0);
+
+    var projection = try maplibre.MapProjectionHandle.create(&map);
+    defer projection.close() catch @panic("projection close failed");
+    try testing.expectApproxEqRel(at_zoom_3, try projection.metersPerPixelAtLatitude(45.0), 1e-12);
+
+    try map.jumpTo(.{ .zoom = 4.0 });
+    const at_zoom_4 = try map.metersPerPixelAtLatitude(45.0);
+    try testing.expectApproxEqRel(at_zoom_3, at_zoom_4 * 2.0, 1e-12);
+
+    try testing.expectError(error.InvalidArgument, map.metersPerPixelAtLatitude(91.0));
+    try testing.expectError(error.InvalidArgument, projection.metersPerPixelAtLatitude(std.math.nan(f64)));
+}
+
 test "standalone projection converts and updates camera" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");

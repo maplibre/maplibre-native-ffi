@@ -123,6 +123,20 @@ void main() {
         const ProjectionModeOptions(axonometric: true, xSkew: 0.5),
         const ProjectionModeOptions(axonometric: true, xSkew: 0.5),
       ),
+      (
+        const StyleLayerInfo(
+          id: 'roads',
+          type: 'line',
+          sourceId: 'streets',
+          sourceLayer: 'transportation',
+        ),
+        const StyleLayerInfo(
+          id: 'roads',
+          type: 'line',
+          sourceId: 'streets',
+          sourceLayer: 'transportation',
+        ),
+      ),
     ];
 
     for (final (left, right) in equalPairs) {
@@ -130,6 +144,10 @@ void main() {
       expect(left.hashCode, right.hashCode);
     }
     expect(const CameraOptions(zoom: 3), isNot(const CameraOptions(zoom: 4)));
+    expect(
+      const StyleLayerInfo(id: 'roads', type: 'line', sourceId: 'streets'),
+      isNot(const StyleLayerInfo(id: 'roads', type: 'line')),
+    );
     expect(
       GeoJsonSourceOptions(cluster: true, clusterRadius: 50),
       GeoJsonSourceOptions(cluster: true, clusterRadius: 50),

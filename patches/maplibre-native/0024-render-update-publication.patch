@@ -1,15 +1,7 @@
 diff --git a/src/mln/style/style_impl.cpp b/src/mln/style/style_impl.cpp
 --- a/src/mln/style/style_impl.cpp
 +++ b/src/mln/style/style_impl.cpp
-@@ -149,6 +149,7 @@
-     fontFaces = parser.fontFaces;
-     loaded = true;
-     observer->onStyleLoaded();
-+    observer->onUpdate();
- }
- 
- std::string Style::Impl::getJSON() const {
-@@ -160,7 +161,10 @@
+@@ -160,7 +160,10 @@
  }
  
  void Style::Impl::setTransitionOptions(const TransitionOptions& options) {
@@ -20,7 +12,7 @@ diff --git a/src/mln/style/style_impl.cpp b/src/mln/style/style_impl.cpp
  }
  
  namespace {
-@@ -254,6 +258,7 @@
+@@ -254,6 +257,7 @@
      if (fileSource) {
          item->loadDescription(*fileSource);
      }
@@ -28,7 +20,7 @@ diff --git a/src/mln/style/style_impl.cpp b/src/mln/style/style_impl.cpp
  }
  
  std::unique_ptr<Source> Style::Impl::removeSource(const std::string& id) {
-@@ -269,6 +274,7 @@
+@@ -269,6 +273,7 @@
  
      if (source) {
          source->setObserver(nullptr);
@@ -36,7 +28,7 @@ diff --git a/src/mln/style/style_impl.cpp b/src/mln/style/style_impl.cpp
      }
  
      return source;
-@@ -410,6 +416,7 @@
+@@ -410,6 +415,7 @@
      }
      newImages->erase(found);
      images = std::move(newImages);
@@ -874,39 +866,18 @@ diff --git a/src/mln/style/layers/layer.cpp.ejs b/src/mln/style/layers/layer.cpp
 diff --git a/test/style/style.test.cpp b/test/style/style.test.cpp
 --- a/test/style/style.test.cpp
 +++ b/test/style/style.test.cpp
-@@ -4,6 +4,8 @@
+@@ -4,6 +4,7 @@
  #include <mln/test/fixture_log_observer.hpp>
  
  #include <mln/style/style_impl.hpp>
-+#include <mln/style/observer.hpp>
 +#include <mln/style/layers/line_layer_impl.hpp>
  #include <mln/style/source_impl.hpp>
  #include <mln/style/sources/vector_source.hpp>
  #include <mln/style/layer.hpp>
-@@ -473,3 +475,42 @@
+@@ -473,3 +474,22 @@
      EXPECT_FALSE(!!style.getImage("two"));
      EXPECT_FALSE(!!style.getImage("four"));
  }
-+
-+TEST(Style, PublishesCompletedParse) {
-+    util::RunLoop loop;
-+    auto fileSource = std::make_shared<StubFileSource>();
-+    Style::Impl style{fileSource, 1.0, {Scheduler::GetBackground(), {}}};
-+    struct Observer final : style::Observer {
-+        Style::Impl& style;
-+        bool publishedLoaded = false;
-+        std::string publishedGlyphURL;
-+        explicit Observer(Style::Impl& style_) : style(style_) {}
-+        void onUpdate() override {
-+            publishedLoaded = style.isLoaded();
-+            publishedGlyphURL = style.getGlyphURL();
-+        }
-+    } observer{style};
-+    style.setObserver(&observer);
-+    style.loadJSON(R"({"version":8,"sources":{},"layers":[],"glyphs":"https://example.com/{fontstack}/{range}.pbf"})");
-+    EXPECT_TRUE(observer.publishedLoaded);
-+    EXPECT_EQ("https://example.com/{fontstack}/{range}.pbf", observer.publishedGlyphURL);
-+}
 +
 +TEST(Style, LayerTransitionRefreshesImmutableCollection) {
 +    util::RunLoop loop;

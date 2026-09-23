@@ -106,6 +106,23 @@ struct StyleStringListObject {
   std::vector<std::string> values;
 };
 
+struct StyleLayerRecord {
+  std::string id;
+  const char* type = "";
+  std::string source_id;
+  std::string source_layer;
+};
+
+struct StyleLayerListObject {
+  std::vector<StyleLayerRecord> layers;
+};
+
+template <>
+struct HandleTraits<StyleLayerListObject> {
+  static constexpr auto kind = HandleKind::StyleLayerList;
+  static constexpr auto leasable = false;
+};
+
 template <>
 struct HandleTraits<StyleStringListObject> {
   static constexpr auto kind = HandleKind::StyleStringList;
@@ -4239,6 +4256,56 @@ auto style_id_list_destroy(mln_style_id_list list) -> void {
   static_cast<void>(handle_table<StyleIdListObject>().remove(list));
 }
 
+auto style_layer_list_count(mln_style_layer_list list, size_t* out_count)
+  -> mln_status {
+  if (out_count == nullptr) {
+    set_thread_error("out_count must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto& table = handle_table<StyleLayerListObject>();
+  const std::scoped_lock lock(table.mutex());
+  const auto* live_list = table.resolve_locked(list);
+  if (live_list == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  *out_count = live_list->layers.size();
+  return MLN_STATUS_OK;
+}
+
+auto style_layer_list_get(
+  mln_style_layer_list list, size_t index, mln_style_layer_info* out_layer
+) -> mln_status {
+  if (out_layer == nullptr || out_layer->size < sizeof(mln_style_layer_info)) {
+    set_thread_error("out_layer must not be null and must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto& table = handle_table<StyleLayerListObject>();
+  const std::scoped_lock lock(table.mutex());
+  const auto* live_list = table.resolve_locked(list);
+  if (live_list == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (index >= live_list->layers.size()) {
+    set_thread_error("index is out of range");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  const auto& record = live_list->layers.at(index);
+  *out_layer = mln_style_layer_info{};
+  out_layer->size = sizeof(mln_style_layer_info);
+  out_layer->id = string_view_from_string(record.id);
+  out_layer->type = string_view_from_literal(record.type);
+  out_layer->source_id = string_view_from_string(record.source_id);
+  out_layer->source_layer = string_view_from_string(record.source_layer);
+  return MLN_STATUS_OK;
+}
+
+auto style_layer_list_destroy(mln_style_layer_list list) -> void {
+  static_cast<void>(handle_table<StyleLayerListObject>().remove(list));
+}
+
 auto style_string_list_count(mln_style_string_list list, size_t* out_count)
   -> mln_status {
   if (out_count == nullptr) {
@@ -6442,6 +6509,35 @@ auto map_list_style_layer_ids(mln_map map, mln_style_id_list* out_layer_ids)
   return create_style_id_list(std::move(ids), out_layer_ids);
 }
 
+auto map_list_style_layers(mln_map map, mln_style_layer_list* out_layers)
+  -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (out_layers == nullptr || *out_layers != MLN_HANDLE_NULL) {
+    set_thread_error(
+      "out_layers must not be null and *out_layers must be the null handle"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto list = std::make_shared<StyleLayerListObject>();
+  for (const auto* layer : live->map->getStyle().getLayers()) {
+    list->layers.push_back(
+      StyleLayerRecord{
+        .id = layer->getID(),
+        .type = layer->getTypeInfo()->type,
+        .source_id = layer->getSourceID(),
+        .source_layer = layer->getSourceLayer(),
+      }
+    );
+  }
+  *out_layers = handle_table<StyleLayerListObject>().insert(std::move(list));
+  return MLN_STATUS_OK;
+}
+
 auto map_move_style_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) -> mln_status {
@@ -7605,6 +7701,49 @@ auto map_lat_lngs_for_pixels_unwrapped(
   );
 }
 
+namespace {
+
+auto validate_latitude(double latitude) -> mln_status {
+  if (!std::isfinite(latitude) || latitude < -90.0 || latitude > 90.0) {
+    set_thread_error("latitude must be finite and within [-90, 90]");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto meters_per_pixel_at_latitude(
+  const mln::CameraOptions& camera, double latitude,
+  double* out_meters_per_pixel
+) -> mln_status {
+  if (out_meters_per_pixel == nullptr) {
+    set_thread_error("out_meters_per_pixel must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto latitude_status = validate_latitude(latitude);
+  if (latitude_status != MLN_STATUS_OK) {
+    return latitude_status;
+  }
+  *out_meters_per_pixel = mln::Projection::getMetersPerPixelAtLatitude(
+    latitude, camera.zoom.value_or(0.0)
+  );
+  return MLN_STATUS_OK;
+}
+
+}  // namespace
+
+auto map_meters_per_pixel_at_latitude(
+  mln_map map, double latitude, double* out_meters_per_pixel
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  return meters_per_pixel_at_latitude(
+    live->map->getCameraOptions(), latitude, out_meters_per_pixel
+  );
+}
+
 auto map_projection_create(mln_map map, mln_map_projection* out_projection)
   -> mln_status {
   if (out_projection == nullptr) {
@@ -7818,6 +7957,19 @@ auto map_projection_lat_lng_for_pixel_unwrapped(
 ) -> mln_status {
   return map_projection_lat_lng_for_pixel_with_wrap_mode(
     projection, point, out_coordinate, mln::LatLng::Unwrapped
+  );
+}
+
+auto map_projection_meters_per_pixel_at_latitude(
+  mln_map_projection projection, double latitude, double* out_meters_per_pixel
+) -> mln_status {
+  return with_map_projection(
+    projection,
+    [latitude, out_meters_per_pixel](mln::MapProjection& live) -> mln_status {
+      return meters_per_pixel_at_latitude(
+        live.getCamera(), latitude, out_meters_per_pixel
+      );
+    }
   );
 }
 

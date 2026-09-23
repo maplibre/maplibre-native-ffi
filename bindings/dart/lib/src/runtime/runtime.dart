@@ -2444,6 +2444,22 @@ final class MapHandle {
     });
   }
 
+  /// Gets the ground distance in meters covered by one logical pixel at
+  /// [latitude] for the current zoom.
+  double metersPerPixelAtLatitude(double latitude) {
+    return withNativeArena((arena) {
+      final outMetersPerPixel = arena<Double>();
+      _check(
+        raw.mln_map_meters_per_pixel_at_latitude(
+          _handle.raw,
+          latitude,
+          outMetersPerPixel,
+        ),
+      );
+      return outMetersPerPixel.value;
+    });
+  }
+
   /// Converts geographic coordinates to screen points.
   List<ScreenPoint> pixelsForLatLngs(List<LatLng> coordinates) {
     return withNativeArena((arena) {
@@ -3902,6 +3918,16 @@ final class MapHandle {
       outList.value = 0;
       _check(raw.mln_map_list_style_layer_ids(_handle.raw, outList));
       return _copyStyleIdList(NativeStyleIdList(outList.value));
+    });
+  }
+
+  /// Copies every style layer in style order.
+  List<StyleLayerInfo> listStyleLayers() {
+    return withNativeArena((arena) {
+      final outList = arena<Uint64>();
+      outList.value = 0;
+      _check(raw.mln_map_list_style_layers(_handle.raw, outList));
+      return _copyStyleLayerList(NativeStyleLayerList(outList.value));
     });
   }
 

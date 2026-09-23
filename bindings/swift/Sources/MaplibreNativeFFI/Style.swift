@@ -432,6 +432,17 @@ public struct StyleSourceInfo: Equatable, Sendable {
   }
 }
 
+/// A copied snapshot of one style layer's identity and source binding.
+public struct StyleLayerInfo: Equatable, Sendable {
+  public let id: String
+  /// The style-spec layer type, such as `"line"` or `"background"`.
+  public let type: String
+  /// The source the layer reads, absent when the layer type takes no source.
+  public let sourceId: String?
+  /// The source layer the layer reads, absent when the layer names none.
+  public let sourceLayer: String?
+}
+
 public enum LocationIndicatorImageKind: UInt32, Sendable, Hashable {
   case top = 0
   case bearing = 1
@@ -1436,6 +1447,11 @@ public extension MapHandle {
 
   func styleLayerIds() throws -> [String] {
     try mapNativeFailure { try NativeStyle.layerIds(requireLiveHandle()) }
+  }
+
+  /// Returns every style layer in style order as one copied snapshot.
+  func styleLayers() throws -> [StyleLayerInfo] {
+    try mapNativeFailure { try NativeStyle.layers(requireLiveHandle()) }
   }
 
   func moveStyleLayer(_ layerId: String, beforeLayerId: String? = nil) throws {

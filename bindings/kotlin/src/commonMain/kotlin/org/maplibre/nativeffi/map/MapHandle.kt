@@ -34,6 +34,7 @@ import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerInfo
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
@@ -272,6 +273,12 @@ public expect class MapHandle : AutoCloseable {
 
   public fun styleLayerIds(): List<String>
 
+  /**
+   * Copies every style layer in style order. The returned list remains valid after later style
+   * changes and after this map closes.
+   */
+  public fun styleLayers(): List<StyleLayerInfo>
+
   public fun moveStyleLayer(layerId: String, beforeLayerId: String)
 
   public fun styleLayerJson(layerId: String): ByteArray?
@@ -489,6 +496,12 @@ public expect class MapHandle : AutoCloseable {
 
   /** Converts screen points to unwrapped coordinates that preserve their visible world copies. */
   public fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): List<LatLng>
+
+  /**
+   * Reads the ground distance in meters covered by one logical pixel at [latitude] for the current
+   * map zoom.
+   */
+  public fun metersPerPixelAtLatitude(latitude: Double): Double
 
   /**
    * Attaches a render target to this map, returning the map's one live render session.

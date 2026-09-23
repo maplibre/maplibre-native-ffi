@@ -90,6 +90,7 @@ import org.maplibre.nativeffi.internal.c.mln_screen_point
 import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_style_image_info
 import org.maplibre.nativeffi.internal.c.mln_style_image_options
+import org.maplibre.nativeffi.internal.c.mln_style_layer_info
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options
 import org.maplibre.nativeffi.internal.c.mln_style_transition_options
@@ -116,6 +117,7 @@ import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
 import org.maplibre.nativeffi.internal.lifecycle.NativeResourceRequest
 import org.maplibre.nativeffi.internal.lifecycle.NativeRuntime
 import org.maplibre.nativeffi.internal.lifecycle.NativeStyleIdList
+import org.maplibre.nativeffi.internal.lifecycle.NativeStyleLayerList
 import org.maplibre.nativeffi.internal.lifecycle.NativeStyleStringList
 import org.maplibre.nativeffi.internal.lifecycle.NativeWakeSource
 import org.maplibre.nativeffi.internal.status.Status
@@ -192,6 +194,7 @@ import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleImageTextFit
+import org.maplibre.nativeffi.style.StyleLayerInfo
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileJson
 import org.maplibre.nativeffi.style.TileScheme
@@ -1277,6 +1280,14 @@ internal object NativeAccess {
       styleIdList(NativeStyleIdList(outList.get(ValueLayout.JAVA_LONG, 0)))
     }
 
+  internal fun styleLayers(map: NativeMap): List<StyleLayerInfo> =
+    Arena.ofConfined().use { arena ->
+      val outList = arena.allocate(ValueLayout.JAVA_LONG)
+      outList.set(ValueLayout.JAVA_LONG, 0, 0L)
+      Status.check(mapListStyleLayersFunction().invokeNative(map, outList) as Int)
+      styleLayerList(NativeStyleLayerList(outList.get(ValueLayout.JAVA_LONG, 0)))
+    }
+
   internal fun addHillshadeLayer(
     map: NativeMap,
     layerId: String,
@@ -2191,6 +2202,15 @@ internal object NativeAccess {
     }
   }
 
+  internal fun metersPerPixelAtLatitude(map: NativeMap, latitude: Double): Double =
+    Arena.ofConfined().use { arena ->
+      val outMetersPerPixel = arena.allocate(ValueLayout.JAVA_DOUBLE)
+      Status.check(
+        MapLibreNativeC.mln_map_meters_per_pixel_at_latitude(map.raw, latitude, outMetersPerPixel)
+      )
+      outMetersPerPixel.get(ValueLayout.JAVA_DOUBLE, 0)
+    }
+
   internal fun attachMetalOwnedTexture(
     map: NativeMap,
     descriptor: MetalOwnedTextureDescriptor,
@@ -2712,6 +2732,22 @@ internal object NativeAccess {
           .invokeNative(projection, screenPoint(point, arena), outCoordinate) as Int
       )
       latLng(outCoordinate)
+    }
+
+  internal fun projectionMetersPerPixelAtLatitude(
+    projection: NativeMapProjection,
+    latitude: Double,
+  ): Double =
+    Arena.ofConfined().use { arena ->
+      val outMetersPerPixel = arena.allocate(ValueLayout.JAVA_DOUBLE)
+      Status.check(
+        MapLibreNativeC.mln_map_projection_meters_per_pixel_at_latitude(
+          projection.raw,
+          latitude,
+          outMetersPerPixel,
+        )
+      )
+      outMetersPerPixel.get(ValueLayout.JAVA_DOUBLE, 0)
     }
 
   internal fun setResourceTransformResponseUrl(response: MemorySegment, value: String): Int =
@@ -3646,6 +3682,15 @@ internal object NativeAccess {
   private fun styleIdListGetFunction(): MethodHandle = downcall("mln_style_id_list_get")
 
   private fun styleIdListDestroyFunction(): MethodHandle = downcall("mln_style_id_list_destroy")
+
+  private fun mapListStyleLayersFunction(): MethodHandle = downcall("mln_map_list_style_layers")
+
+  private fun styleLayerListCountFunction(): MethodHandle = downcall("mln_style_layer_list_count")
+
+  private fun styleLayerListGetFunction(): MethodHandle = downcall("mln_style_layer_list_get")
+
+  private fun styleLayerListDestroyFunction(): MethodHandle =
+    downcall("mln_style_layer_list_destroy")
 
   private fun queriedFeatureListCountFunction(): MethodHandle =
     downcall("mln_queried_feature_list_count")
@@ -5134,6 +5179,34 @@ internal object NativeAccess {
     } finally {
       styleIdListDestroyFunction().invokeNative(list)
     }
+
+  private fun styleLayerList(list: NativeStyleLayerList): List<StyleLayerInfo> =
+    try {
+      check(!list.isNull) { "mln_map_list_style_layers returned the null handle" }
+      Arena.ofConfined().use { arena ->
+        val outCount = arena.allocate(ValueLayout.JAVA_LONG)
+        Status.check(styleLayerListCountFunction().invokeNative(list, outCount) as Int)
+        val count = Math.toIntExact(outCount.get(ValueLayout.JAVA_LONG, 0))
+        List(count) { index ->
+          val outLayer = mln_style_layer_info.allocate(arena)
+          mln_style_layer_info.size(outLayer, mln_style_layer_info.sizeof().toInt())
+          Status.check(
+            styleLayerListGetFunction().invokeNative(list, index.toLong(), outLayer) as Int
+          )
+          styleLayerInfo(outLayer)
+        }
+      }
+    } finally {
+      styleLayerListDestroyFunction().invokeNative(list)
+    }
+
+  private fun styleLayerInfo(segment: MemorySegment): StyleLayerInfo =
+    StyleLayerInfo(
+      stringView(mln_style_layer_info.id(segment)),
+      stringView(mln_style_layer_info.type(segment)),
+      stringView(mln_style_layer_info.source_id(segment)).ifEmpty { null },
+      stringView(mln_style_layer_info.source_layer(segment)).ifEmpty { null },
+    )
 
   private fun queriedFeatureList(list: NativeQueriedFeatureList): List<QueriedFeature> =
     try {

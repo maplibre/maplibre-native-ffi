@@ -1098,10 +1098,23 @@ external int mln_map_list_style_layer_ids(
   ffi.Pointer<mln_style_id_list> out_layer_ids,
 );
 
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_style_layer_list>)>()
+external int mln_map_list_style_layers(
+  int map,
+  ffi.Pointer<mln_style_layer_list> out_layers,
+);
+
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_style_id_list>)>()
 external int mln_map_list_style_source_ids(
   int map,
   ffi.Pointer<mln_style_id_list> out_source_ids,
+);
+
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Double, ffi.Pointer<ffi.Double>)>()
+external int mln_map_meters_per_pixel_at_latitude(
+  int map,
+  double latitude,
+  ffi.Pointer<ffi.Double> out_meters_per_pixel,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Double, ffi.Double)>()
@@ -1209,6 +1222,15 @@ external int mln_map_projection_lat_lng_for_pixel_unwrapped(
   int projection,
   mln_screen_point point,
   ffi.Pointer<mln_lat_lng> out_coordinate,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_map_projection, ffi.Double, ffi.Pointer<ffi.Double>)
+>()
+external int mln_map_projection_meters_per_pixel_at_latitude(
+  int projection,
+  double latitude,
+  ffi.Pointer<ffi.Double> out_meters_per_pixel,
 );
 
 @ffi.Native<
@@ -2495,6 +2517,31 @@ external mln_style_image_info mln_style_image_info_default();
 
 @ffi.Native<mln_style_image_options Function()>()
 external mln_style_image_options mln_style_image_options_default();
+
+@ffi.Native<mln_style_layer_info Function()>()
+external mln_style_layer_info mln_style_layer_info_default();
+
+@ffi.Native<ffi.Int32 Function(mln_style_layer_list, ffi.Pointer<ffi.Size>)>()
+external int mln_style_layer_list_count(
+  int list,
+  ffi.Pointer<ffi.Size> out_count,
+);
+
+@ffi.Native<ffi.Void Function(mln_style_layer_list)>()
+external void mln_style_layer_list_destroy(int list);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_style_layer_list,
+    ffi.Size,
+    ffi.Pointer<mln_style_layer_info>,
+  )
+>()
+external int mln_style_layer_list_get(
+  int list,
+  int index,
+  ffi.Pointer<mln_style_layer_info> out_layer,
+);
 
 @ffi.Native<ffi.Int32 Function(mln_style_string_list, ffi.Pointer<ffi.Size>)>()
 external int mln_style_string_list_count(
@@ -7097,6 +7144,22 @@ enum mln_style_image_text_fit {
     ),
   };
 }
+
+final class mln_style_layer_info extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  external mln_buffer_view id;
+
+  external mln_buffer_view type;
+
+  external mln_buffer_view source_id;
+
+  external mln_buffer_view source_layer;
+}
+
+typedef mln_style_layer_list = ffi.Uint64;
+typedef Dartmln_style_layer_list = int;
 
 enum mln_style_layer_visibility {
   MLN_STYLE_LAYER_VISIBILITY_VISIBLE(0),

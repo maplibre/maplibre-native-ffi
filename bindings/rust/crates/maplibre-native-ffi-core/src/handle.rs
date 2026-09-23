@@ -45,6 +45,7 @@ native_handle!(
     sys::mln_offline_region_list,
     sys::mln_style_id_list,
     sys::mln_style_string_list,
+    sys::mln_style_layer_list,
     sys::mln_queried_feature_list,
 );
 
@@ -301,6 +302,13 @@ native_guard!(
     sys::mln_style_string_list_destroy,
     "mln_style_string_list",
     style_string_list
+);
+native_guard!(
+    StyleLayerListGuard,
+    sys::mln_style_layer_list,
+    sys::mln_style_layer_list_destroy,
+    "mln_style_layer_list",
+    style_layer_list
 );
 native_guard!(
     QueriedFeatureListGuard,

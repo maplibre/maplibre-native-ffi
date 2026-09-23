@@ -650,4 +650,13 @@ public extension MapHandle {
       ).map(LatLng.init(native:))
     }
   }
+
+  /// Returns the ground distance in meters covered by one logical map pixel at
+  /// a latitude for the current map zoom.
+  func metersPerPixel(atLatitude latitude: Double) throws -> Double {
+    try mapNativeFailure { try NativeMap.metersPerPixelAtLatitude(
+      requireLiveHandle(),
+      latitude: latitude
+    ) }
+  }
 }

@@ -52,6 +52,7 @@ from .style import (
     StyleImage,
     StyleImageInfo,
     StyleImageOptions,
+    StyleLayerInfo,
     StyleLayerVisibility,
     StyleSourceInfo,
     StyleSourceType,
@@ -464,6 +465,10 @@ class MapProjectionHandle(NativeHandleMixin):
 
         raw = self._native.lat_lng_for_pixel_unwrapped(point.x, point.y)
         return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
+
+    def meters_per_pixel_at_latitude(self, latitude: float) -> float:
+        """Return meters per logical pixel at a latitude for the helper camera zoom."""
+        return self._native.meters_per_pixel_at_latitude(latitude)
 
 
 class MapHandle(NativeHandleMixin):
@@ -954,6 +959,12 @@ class MapHandle(NativeHandleMixin):
     def list_style_layer_ids(self) -> tuple[str, ...]:
         """Return style layer IDs in style order."""
         return tuple(self._native.list_style_layer_ids())
+
+    def list_style_layers(self) -> tuple[StyleLayerInfo, ...]:
+        """Return every style layer's ID, type, and source binding in style order."""
+        return tuple(
+            StyleLayerInfo._from_native(raw) for raw in self._native.list_style_layers()
+        )
 
     def move_style_layer(
         self,
@@ -1491,6 +1502,10 @@ class MapHandle(NativeHandleMixin):
 
         raw = self._native.lat_lng_for_pixel_unwrapped(point.x, point.y)
         return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
+
+    def meters_per_pixel_at_latitude(self, latitude: float) -> float:
+        """Return meters per logical pixel at a latitude for the current camera zoom."""
+        return self._native.meters_per_pixel_at_latitude(latitude)
 
     def pixels_for_lat_lngs(
         self,
