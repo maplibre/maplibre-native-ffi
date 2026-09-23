@@ -9,7 +9,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.Maplibre
-import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.error.InvalidArgumentException
@@ -221,7 +220,7 @@ class RenderSessionHandleTest {
   }
 
   @Test
-  fun renderUpdateReportsNeedsRepaintDuringCameraTransition() {
+  fun renderUpdateReportsNeedsRepaintDuringPaintTransition() {
     Maplibre.setLogCallback(LogCallback { true })
     Maplibre.setAsyncLogSeverities(emptySet())
     try {
@@ -244,10 +243,12 @@ class RenderSessionHandleTest {
         assertEquals(RenderResult.RENDERED, update.result)
         assertFalse(update.needsRepaint)
 
-        map.easeTo(
-          CameraOptions().apply { zoom = 4.0 },
-          AnimationOptions().apply { durationMs = 60_000.0 },
+        map.setLayerProperty(
+          "bg",
+          "background-color-transition",
+          """{"duration":60000}""".encodeToByteArray(),
         )
+        map.setLayerProperty("bg", "background-color", "\"#0000ff\"".encodeToByteArray())
 
         var sawRepaintRequest = false
         for (attempt in 0 until 500) {
