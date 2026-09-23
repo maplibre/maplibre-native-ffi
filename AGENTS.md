@@ -123,7 +123,7 @@ succeed.
 Extended CI retains `ci-required`; baseline and ready each have one additional
 required check; see
 [CI coverage](docs/src/content/docs/development/overview.md#ci-coverage) for the
-branch protection configuration. For CI, ABI, shared toolchain, dependency, or
+branch protection configuration. For CI, shared toolchain, dependency, or
 publishing changes, request full coverage with
 `gh pr edit <number> --add-label 'ci:full'`.
 
