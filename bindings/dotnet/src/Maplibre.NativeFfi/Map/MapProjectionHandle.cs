@@ -146,6 +146,23 @@ public sealed unsafe class MapProjectionHandle : IDisposable
         });
     }
 
+    /// <summary>Gets the ground distance in meters covered by one logical pixel at a latitude for this projection snapshot's zoom.</summary>
+    public double MetersPerPixelAtLatitude(double latitude)
+    {
+        return state.WithLive(handle =>
+        {
+            double metersPerPixel = 0;
+            NativeStatus.Check(
+                NativeMethods.mln_map_projection_meters_per_pixel_at_latitude(
+                    handle,
+                    latitude,
+                    &metersPerPixel
+                )
+            );
+            return metersPerPixel;
+        });
+    }
+
     /// <summary>Destroys the projection after active calls complete.</summary>
     public void Close()
     {

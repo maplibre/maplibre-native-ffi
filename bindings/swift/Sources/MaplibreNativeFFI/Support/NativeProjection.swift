@@ -75,6 +75,20 @@ enum NativeProjection {
     return output.value
   }
 
+  static func metersPerPixelAtLatitude(
+    _ projection: NativeMapProjectionHandle,
+    latitude: Double
+  ) throws -> Double {
+    let output = try NativeMemory.withTemporary(0.0) { metersPerPixel in
+      try checkStatus(mln_map_projection_meters_per_pixel_at_latitude(
+        projection.raw,
+        latitude,
+        metersPerPixel
+      ))
+    }
+    return output.value
+  }
+
   static func projectedMetersForLatLng(_ coordinate: NativeLatLng) throws
     -> NativeProjectedMeters
   {

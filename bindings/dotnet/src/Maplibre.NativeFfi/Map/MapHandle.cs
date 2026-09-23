@@ -533,6 +533,16 @@ public sealed unsafe class MapHandle : IDisposable
         return CoreStructs.FromNative(coordinate);
     }
 
+    /// <summary>Gets the ground distance in meters covered by one logical pixel at a latitude for the current zoom.</summary>
+    public double MetersPerPixelAtLatitude(double latitude)
+    {
+        double metersPerPixel = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_meters_per_pixel_at_latitude(Handle, latitude, &metersPerPixel)
+        );
+        return metersPerPixel;
+    }
+
     /// <summary>Converts geographic coordinates to screen pixels using the current map projection.</summary>
     public ScreenPoint[] PixelsForLatLngs(IReadOnlyList<LatLng> coordinates)
     {

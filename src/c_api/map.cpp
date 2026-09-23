@@ -1153,6 +1153,16 @@ auto mln_map_lat_lngs_for_pixels_unwrapped(
   });
 }
 
+auto mln_map_meters_per_pixel_at_latitude(
+  mln_map map, double latitude, double* out_meters_per_pixel
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_meters_per_pixel_at_latitude(
+      map, latitude, out_meters_per_pixel
+    );
+  });
+}
+
 auto mln_map_projection_create(
   mln_map map, mln_map_projection* out_projection
 ) noexcept -> mln_status {
@@ -1235,6 +1245,16 @@ auto mln_map_projection_lat_lng_for_pixel_unwrapped(
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_projection_lat_lng_for_pixel_unwrapped(
       projection, point, out_coordinate
+    );
+  });
+}
+
+auto mln_map_projection_meters_per_pixel_at_latitude(
+  mln_map_projection projection, double latitude, double* out_meters_per_pixel
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_projection_meters_per_pixel_at_latitude(
+      projection, latitude, out_meters_per_pixel
     );
   });
 }

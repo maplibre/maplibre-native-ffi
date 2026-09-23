@@ -491,6 +491,12 @@ public expect class MapHandle : AutoCloseable {
   public fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): List<LatLng>
 
   /**
+   * Reads the ground distance in meters covered by one logical pixel at [latitude] for the current
+   * map zoom.
+   */
+  public fun metersPerPixelAtLatitude(latitude: Double): Double
+
+  /**
    * Attaches a render target to this map, returning the map's one live render session.
    *
    * The calling thread becomes the session's owner thread for the session's lifetime, and it need

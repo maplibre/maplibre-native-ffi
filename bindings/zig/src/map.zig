@@ -2015,6 +2015,17 @@ pub const MapHandle = enum(c.mln_map) {
         return values.latLngFromNative(coordinate);
     }
 
+    /// Reads the ground distance in meters covered by one logical map pixel at
+    /// a latitude for the current map zoom.
+    pub fn metersPerPixelAtLatitude(self: *MapHandle, latitude: f64) status.Error!f64 {
+        var meters_per_pixel: f64 = undefined;
+        try status.checkStatus(
+            c.mln_map_meters_per_pixel_at_latitude(try native(self), latitude, &meters_per_pixel),
+            diagnosticStore(self),
+        );
+        return meters_per_pixel;
+    }
+
     pub fn pixelsForLatLngs(
         self: *MapHandle,
         allocator: std.mem.Allocator,

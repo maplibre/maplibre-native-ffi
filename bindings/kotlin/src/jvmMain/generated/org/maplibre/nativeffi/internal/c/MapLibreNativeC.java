@@ -9116,6 +9116,68 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
+    private static class mln_map_meters_per_pixel_at_latitude {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_DOUBLE,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_meters_per_pixel_at_latitude");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_meters_per_pixel_at_latitude(mln_map map, double latitude, double *out_meters_per_pixel)
+     * }
+     */
+    public static FunctionDescriptor mln_map_meters_per_pixel_at_latitude$descriptor() {
+        return mln_map_meters_per_pixel_at_latitude.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_meters_per_pixel_at_latitude(mln_map map, double latitude, double *out_meters_per_pixel)
+     * }
+     */
+    public static MethodHandle mln_map_meters_per_pixel_at_latitude$handle() {
+        return mln_map_meters_per_pixel_at_latitude.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_meters_per_pixel_at_latitude(mln_map map, double latitude, double *out_meters_per_pixel)
+     * }
+     */
+    public static MemorySegment mln_map_meters_per_pixel_at_latitude$address() {
+        return mln_map_meters_per_pixel_at_latitude.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_meters_per_pixel_at_latitude(mln_map map, double latitude, double *out_meters_per_pixel)
+     * }
+     */
+    public static int mln_map_meters_per_pixel_at_latitude(long map, double latitude, MemorySegment out_meters_per_pixel) {
+        var mh$ = mln_map_meters_per_pixel_at_latitude.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_meters_per_pixel_at_latitude", map, latitude, out_meters_per_pixel);
+            }
+            return (int)mh$.invokeExact(map, latitude, out_meters_per_pixel);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mln_thread_last_error_message {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_POINTER    );
@@ -10125,6 +10187,68 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
                 traceDowncall("mln_map_projection_lat_lng_for_pixel_unwrapped", projection, point, out_coordinate);
             }
             return (int)mh$.invokeExact(projection, point, out_coordinate);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_projection_meters_per_pixel_at_latitude {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_DOUBLE,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_projection_meters_per_pixel_at_latitude");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_projection_meters_per_pixel_at_latitude(mln_map_projection projection, double latitude, double *out_meters_per_pixel)
+     * }
+     */
+    public static FunctionDescriptor mln_map_projection_meters_per_pixel_at_latitude$descriptor() {
+        return mln_map_projection_meters_per_pixel_at_latitude.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_projection_meters_per_pixel_at_latitude(mln_map_projection projection, double latitude, double *out_meters_per_pixel)
+     * }
+     */
+    public static MethodHandle mln_map_projection_meters_per_pixel_at_latitude$handle() {
+        return mln_map_projection_meters_per_pixel_at_latitude.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_projection_meters_per_pixel_at_latitude(mln_map_projection projection, double latitude, double *out_meters_per_pixel)
+     * }
+     */
+    public static MemorySegment mln_map_projection_meters_per_pixel_at_latitude$address() {
+        return mln_map_projection_meters_per_pixel_at_latitude.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_projection_meters_per_pixel_at_latitude(mln_map_projection projection, double latitude, double *out_meters_per_pixel)
+     * }
+     */
+    public static int mln_map_projection_meters_per_pixel_at_latitude(long projection, double latitude, MemorySegment out_meters_per_pixel) {
+        var mh$ = mln_map_projection_meters_per_pixel_at_latitude.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_projection_meters_per_pixel_at_latitude", projection, latitude, out_meters_per_pixel);
+            }
+            return (int)mh$.invokeExact(projection, latitude, out_meters_per_pixel);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

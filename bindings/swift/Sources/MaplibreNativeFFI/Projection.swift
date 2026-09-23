@@ -160,6 +160,19 @@ public final class MapProjectionHandle: @unchecked Sendable {
       }
     }
   }
+
+  /// Returns the ground distance in meters covered by one logical map pixel at
+  /// a latitude for the helper camera zoom.
+  public func metersPerPixel(atLatitude latitude: Double) throws -> Double {
+    try mapNativeFailure {
+      try handle.withLive { projection in
+        try NativeProjection.metersPerPixelAtLatitude(
+          projection,
+          latitude: latitude
+        )
+      }
+    }
+  }
 }
 
 public extension Maplibre {

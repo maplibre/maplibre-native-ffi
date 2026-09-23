@@ -1104,6 +1104,13 @@ external int mln_map_list_style_source_ids(
   ffi.Pointer<mln_style_id_list> out_source_ids,
 );
 
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Double, ffi.Pointer<ffi.Double>)>()
+external int mln_map_meters_per_pixel_at_latitude(
+  int map,
+  double latitude,
+  ffi.Pointer<ffi.Double> out_meters_per_pixel,
+);
+
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Double, ffi.Double)>()
 external int mln_map_move_by(int map, double delta_x, double delta_y);
 
@@ -1209,6 +1216,15 @@ external int mln_map_projection_lat_lng_for_pixel_unwrapped(
   int projection,
   mln_screen_point point,
   ffi.Pointer<mln_lat_lng> out_coordinate,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_map_projection, ffi.Double, ffi.Pointer<ffi.Double>)
+>()
+external int mln_map_projection_meters_per_pixel_at_latitude(
+  int projection,
+  double latitude,
+  ffi.Pointer<ffi.Double> out_meters_per_pixel,
 );
 
 @ffi.Native<

@@ -797,6 +797,11 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     return NativeAccess.latLngsForPixelsUnwrapped(requireLiveHandle(), points)
   }
 
+  public actual fun metersPerPixelAtLatitude(latitude: Double): Double {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.metersPerPixelAtLatitude(requireLiveHandle(), latitude)
+  }
+
   public actual fun attachMetalOwnedTexture(
     descriptor: MetalOwnedTextureDescriptor
   ): RenderSessionHandle {

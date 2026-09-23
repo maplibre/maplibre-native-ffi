@@ -197,6 +197,23 @@ impl MapProjectionHandle {
         })?;
         Ok(LatLng::from_native(raw_coordinate))
     }
+
+    /// Reads the ground distance in meters covered by one logical map pixel at
+    /// a latitude for the helper camera zoom.
+    pub fn meters_per_pixel_at_latitude(&self, latitude: f64) -> Result<f64> {
+        let projection = self.inner.native()?;
+        let mut meters_per_pixel = 0.0;
+        // SAFETY: projection is live and meters_per_pixel is writable output
+        // storage.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_meters_per_pixel_at_latitude(
+                projection,
+                latitude,
+                &mut meters_per_pixel,
+            )
+        })?;
+        Ok(meters_per_pixel)
+    }
 }
 
 #[cfg(test)]

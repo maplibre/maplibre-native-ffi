@@ -60,8 +60,10 @@ class DescriptorValidationTest {
     try {
       val invalidCoordinate = LatLng(Double.NaN, 0.0)
       assertInvalidCoordinateDiagnostic { map.pixelForLatLng(invalidCoordinate) }
+      assertInvalidCoordinateDiagnostic { map.metersPerPixelAtLatitude(91.0) }
       projection = map.createProjection()
       assertInvalidCoordinateDiagnostic { projection.pixelForLatLng(invalidCoordinate) }
+      assertInvalidCoordinateDiagnostic { projection.metersPerPixelAtLatitude(91.0) }
       assertInvalidCoordinateDiagnostic { Maplibre.projectedMetersForLatLng(invalidCoordinate) }
     } finally {
       projection?.close()
