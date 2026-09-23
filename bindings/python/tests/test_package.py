@@ -1725,6 +1725,34 @@ def test_style_layer_metadata_move_and_removal_public_api() -> None:
         assert "background-b" not in map_handle.list_style_layer_ids()
 
 
+def test_list_style_layers_copies_the_layer_stack_in_style_order() -> None:
+    """BND-105: the layer list carries each layer's type and optional source binding."""
+    style_json = b"""
+    {
+      "version": 8,
+      "sources": {
+        "tiles": {"type": "vector", "tiles": ["https://example.com/{z}/{x}/{y}.pbf"]}
+      },
+      "layers": [
+        {"id": "roads", "type": "line", "source": "tiles", "source-layer": "transportation"},
+        {"id": "background", "type": "background"}
+      ]
+    }
+    """
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json(style_json)
+
+        assert map_handle.list_style_layers() == (
+            style.StyleLayerInfo(
+                id="roads",
+                type="line",
+                source_id="tiles",
+                source_layer="transportation",
+            ),
+            style.StyleLayerInfo(id="background", type="background"),
+        )
+
+
 def test_map_viewport_and_tile_options_round_trip_public_values() -> None:
     viewport = map_module.MapViewportOptions(
         north_orientation=map_module.NorthOrientation.RIGHT,

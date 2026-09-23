@@ -346,6 +346,19 @@ pub struct TileJsonInfo {
     pub bounds: Option<LatLngBounds>,
 }
 
+/// Copied identity and source binding for one style layer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct StyleLayerInfo {
+    pub id: String,
+    /// Style-spec layer type, such as `line` or `background`.
+    pub layer_type: String,
+    /// Source ID, or `None` when the layer type takes no source.
+    pub source_id: Option<String>,
+    /// Source-layer, or `None` when the layer names none.
+    pub source_layer: Option<String>,
+}
+
 /// Copied retained metadata for one style source.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
@@ -722,6 +735,60 @@ pub unsafe fn copy_style_id_list(handle: sys::mln_style_id_list) -> crate::Resul
         ids.push(unsafe { crate::string::copy_string_view(view) }?);
     }
     Ok(ids)
+}
+
+/// Copies an owned native style layer list into owned Rust values.
+///
+/// # Safety
+///
+/// `handle` must be a live `mln_style_layer_list` owned by the caller and
+/// returned by the matching C API. This function takes ownership of the handle
+/// and releases it before returning, including on copy errors.
+pub unsafe fn copy_style_layer_list(
+    handle: sys::mln_style_layer_list,
+) -> crate::Result<Vec<StyleLayerInfo>> {
+    // SAFETY: handle is an owned style layer list returned by C and released by
+    // the guard.
+    let list = unsafe { crate::handle::style_layer_list(handle) }?;
+    let mut count = 0;
+    // SAFETY: list is live and count points to writable storage.
+    crate::check(unsafe { sys::mln_style_layer_list_count(list.handle(), &mut count) })?;
+
+    let mut layers = Vec::with_capacity(count);
+    for index in 0..count {
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut layer = unsafe { sys::mln_style_layer_info_default() };
+        // SAFETY: list is live, index is in range, and layer is writable.
+        crate::check(unsafe { sys::mln_style_layer_list_get(list.handle(), index, &mut layer) })?;
+        // SAFETY: The borrowed views remain valid until the list guard drops.
+        let id = unsafe { crate::string::copy_string_view(layer.id) }?;
+        // SAFETY: The borrowed views remain valid until the list guard drops.
+        let layer_type = unsafe { crate::string::copy_string_view(layer.type_) }?;
+        // SAFETY: The borrowed views remain valid until the list guard drops.
+        let source_id = unsafe { copy_optional_string_view(layer.source_id) }?;
+        // SAFETY: The borrowed views remain valid until the list guard drops.
+        let source_layer = unsafe { copy_optional_string_view(layer.source_layer) }?;
+        layers.push(StyleLayerInfo {
+            id,
+            layer_type,
+            source_id,
+            source_layer,
+        });
+    }
+    Ok(layers)
+}
+
+/// Copies a borrowed view, mapping an empty view to `None`.
+///
+/// # Safety
+///
+/// `view` must describe readable memory for its size, or be empty.
+unsafe fn copy_optional_string_view(view: sys::mln_buffer_view) -> crate::Result<Option<String>> {
+    if view.size == 0 {
+        return Ok(None);
+    }
+    // SAFETY: The caller guarantees view describes readable memory.
+    unsafe { crate::string::copy_string_view(view) }.map(Some)
 }
 
 /// Copies an owned native style string list into owned Rust strings.

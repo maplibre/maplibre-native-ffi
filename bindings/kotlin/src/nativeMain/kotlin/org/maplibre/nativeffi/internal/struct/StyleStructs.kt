@@ -64,6 +64,11 @@ import org.maplibre.nativeffi.internal.c.mln_style_id_list_get
 import org.maplibre.nativeffi.internal.c.mln_style_image_info
 import org.maplibre.nativeffi.internal.c.mln_style_image_options
 import org.maplibre.nativeffi.internal.c.mln_style_image_options_default
+import org.maplibre.nativeffi.internal.c.mln_style_layer_info
+import org.maplibre.nativeffi.internal.c.mln_style_layer_info_default
+import org.maplibre.nativeffi.internal.c.mln_style_layer_list_count
+import org.maplibre.nativeffi.internal.c.mln_style_layer_list_destroy
+import org.maplibre.nativeffi.internal.c.mln_style_layer_list_get
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_style_string_list_count
 import org.maplibre.nativeffi.internal.c.mln_style_string_list_destroy
@@ -73,6 +78,7 @@ import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options_default
 import org.maplibre.nativeffi.internal.c.mln_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_style_transition_options_default
 import org.maplibre.nativeffi.internal.lifecycle.NativeStyleIdList
+import org.maplibre.nativeffi.internal.lifecycle.NativeStyleLayerList
 import org.maplibre.nativeffi.internal.lifecycle.NativeStyleStringList
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.memory.CSize
@@ -89,6 +95,7 @@ import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleImageTextFit
+import org.maplibre.nativeffi.style.StyleLayerInfo
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileJson
 import org.maplibre.nativeffi.style.TileScheme
@@ -405,6 +412,43 @@ internal object StyleStructs {
     getter: (ULong, CSize, CPointer<mln_buffer_view>) -> Int,
     destroyer: (ULong) -> Unit,
   ): List<String> = styleIdList(list, counter, getter, destroyer)
+
+  fun styleLayerList(list: NativeStyleLayerList): List<StyleLayerInfo> =
+    styleLayerList(
+      list.rawHandleValue,
+      counter = ::mln_style_layer_list_count,
+      getter = ::mln_style_layer_list_get,
+      destroyer = ::mln_style_layer_list_destroy,
+    )
+
+  fun styleLayerList(
+    list: ULong,
+    counter: (ULong, CPointer<CSizeVar>) -> Int,
+    getter: (ULong, CSize, CPointer<mln_style_layer_info>) -> Int,
+    destroyer: (ULong) -> Unit,
+  ): List<StyleLayerInfo> =
+    try {
+      memScoped {
+        val outCount = alloc<CSizeVar>()
+        Status.check(counter(list, outCount.ptr))
+        List(checkedInt(outCount.value.toULong(), "style layer count")) { index ->
+          val outLayer = alloc<mln_style_layer_info>()
+          mln_style_layer_info_default().place(outLayer.ptr)
+          Status.check(getter(list, index.toCSize(), outLayer.ptr))
+          styleLayerInfo(outLayer)
+        }
+      }
+    } finally {
+      destroyer(list)
+    }
+
+  private fun styleLayerInfo(value: mln_style_layer_info): StyleLayerInfo =
+    StyleLayerInfo(
+      CoreStructs.stringView(value.id),
+      CoreStructs.stringView(value.type),
+      CoreStructs.stringView(value.source_id).ifEmpty { null },
+      CoreStructs.stringView(value.source_layer).ifEmpty { null },
+    )
 
   fun sourceInfo(
     value: mln_style_source_info,

@@ -60,6 +60,7 @@ import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleImageTextFit
+import org.maplibre.nativeffi.style.StyleLayerInfo
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileJson
@@ -1021,6 +1022,17 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
       val list = outList.get()
       require(list != 0L) { "mln_map_list_style_layer_ids returned the null handle" }
       return styleIdList(list)
+    }
+  }
+
+  public actual fun styleLayers(): List<StyleLayerInfo> {
+    NativeAccess.ensureLoaded()
+    LongPointer(1).use { outList ->
+      outList.put(0, 0L)
+      Status.check(MaplibreNativeC.mln_map_list_style_layers(requireLiveHandle(), outList))
+      val list = outList.get()
+      require(list != 0L) { "mln_map_list_style_layers returned the null handle" }
+      return styleLayerList(list)
     }
   }
 
@@ -2052,6 +2064,27 @@ private fun styleIdList(list: Long): List<String> =
     }
   } finally {
     MaplibreNativeC.mln_style_id_list_destroy(list)
+  }
+
+private fun styleLayerList(list: Long): List<StyleLayerInfo> =
+  try {
+    SizeTPointer(1).use { outCount ->
+      Status.check(MaplibreNativeC.mln_style_layer_list_count(list, outCount))
+      List(Math.toIntExact(outCount.get())) { index ->
+        MaplibreNativeC.mln_style_layer_info().use { outLayer ->
+          outLayer.size(outLayer.sizeof())
+          Status.check(MaplibreNativeC.mln_style_layer_list_get(list, index.toLong(), outLayer))
+          StyleLayerInfo(
+            stringView(outLayer.id()),
+            stringView(outLayer.type()),
+            stringView(outLayer.source_id()).ifEmpty { null },
+            stringView(outLayer.source_layer()).ifEmpty { null },
+          )
+        }
+      }
+    }
+  } finally {
+    MaplibreNativeC.mln_style_layer_list_destroy(list)
   }
 
 private fun styleStringList(list: Long): List<String> =

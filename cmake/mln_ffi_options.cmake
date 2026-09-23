@@ -6,6 +6,11 @@ function(mln_ffi_configure_options)
       CACHE BOOL "Build MapLibre Native PMTiles support" FORCE)
   set(MLN_WITH_PLUGINS ON
       CACHE BOOL "Build MapLibre Native plugin layer support" FORCE)
+  # The C API exposes no annotation entry points, so the source and layer that
+  # the legacy annotation manager adds to every style would only leak through
+  # the style listing and lookup entry points.
+  set(MLN_WITH_LEGACY_ANNOTATIONS OFF
+      CACHE BOOL "Build MapLibre Native legacy annotations" FORCE)
 
   set(MLN_FFI_RENDER_BACKEND ""
       CACHE STRING "Render backend for this wrapper build")

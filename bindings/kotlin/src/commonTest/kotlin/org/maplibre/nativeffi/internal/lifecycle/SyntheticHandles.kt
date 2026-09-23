@@ -34,5 +34,8 @@ internal object SyntheticHandles {
   fun queriedFeatureList(ordinal: Long = 1): NativeQueriedFeatureList =
     NativeQueriedFeatureList(kind(0x0F) or ordinal)
 
+  fun styleLayerList(ordinal: Long = 1): NativeStyleLayerList =
+    NativeStyleLayerList(kind(0x10) or ordinal)
+
   private fun kind(value: Int): Long = value.toLong() shl 56
 }

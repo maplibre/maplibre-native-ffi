@@ -41,6 +41,7 @@ import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerInfo
 import org.maplibre.nativeffi.style.TileSourceOptions
 
 @OptIn(ExperimentalForeignApi::class)
@@ -188,6 +189,62 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
         )
       }
 
+      assertEquals(1, destroys)
+    }
+  }
+
+  @Test
+  fun styleLayerListCopiesLayersAndDestroysNativeHandle() {
+    var destroys = 0
+    val layers = memScoped {
+      StyleStructs.styleLayerList(
+        SyntheticHandles.styleLayerList().rawHandleValue,
+        counter = { _, outCount ->
+          outCount[0] = 2.toCSize()
+          MaplibreStatus.OK.nativeCode
+        },
+        getter = { _, index, outLayer ->
+          val native = outLayer.pointed
+          if (index.toInt() == 0) {
+            CoreStructs.setStringView(native.id, "roads", this)
+            CoreStructs.setStringView(native.type, "line", this)
+            CoreStructs.setStringView(native.source_id, "tiles", this)
+            CoreStructs.setStringView(native.source_layer, "transportation", this)
+          } else {
+            CoreStructs.setStringView(native.id, "background", this)
+            CoreStructs.setStringView(native.type, "background", this)
+          }
+          MaplibreStatus.OK.nativeCode
+        },
+        destroyer = { destroys++ },
+      )
+    }
+
+    assertEquals(
+      listOf(
+        StyleLayerInfo("roads", "line", "tiles", "transportation"),
+        StyleLayerInfo("background", "background", null, null),
+      ),
+      layers,
+    )
+    assertEquals(1, destroys)
+  }
+
+  @Test
+  fun styleLayerListDestroysNativeHandleWhenCopyFails() {
+    memScoped {
+      var destroys = 0
+      assertFailsWith<IllegalArgumentException> {
+        StyleStructs.styleLayerList(
+          SyntheticHandles.styleLayerList().rawHandleValue,
+          counter = { _, outCount ->
+            outCount[0] = (Int.MAX_VALUE.toULong() + 1UL).toCSize()
+            MaplibreStatus.OK.nativeCode
+          },
+          getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
+          destroyer = { destroys++ },
+        )
+      }
       assertEquals(1, destroys)
     }
   }

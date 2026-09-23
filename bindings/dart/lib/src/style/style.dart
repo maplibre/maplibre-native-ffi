@@ -197,6 +197,45 @@ final class SourceInfo {
   final RasterDemEncoding? rasterDemEncoding;
 }
 
+/// Style layer information copied from the style layer stack.
+final class StyleLayerInfo {
+  /// Creates style layer information.
+  const StyleLayerInfo({
+    required this.id,
+    required this.type,
+    this.sourceId,
+    this.sourceLayer,
+  });
+
+  /// Layer ID.
+  final String id;
+
+  /// Style-spec layer type, such as `line` or `background`.
+  final String type;
+
+  /// Source ID, absent when the layer type takes no source.
+  final String? sourceId;
+
+  /// Source-layer, absent when the layer names none.
+  final String? sourceLayer;
+
+  @override
+  bool operator ==(Object other) =>
+      other is StyleLayerInfo &&
+      other.id == id &&
+      other.type == type &&
+      other.sourceId == sourceId &&
+      other.sourceLayer == sourceLayer;
+
+  @override
+  int get hashCode => Object.hash(id, type, sourceId, sourceLayer);
+
+  @override
+  String toString() =>
+      'StyleLayerInfo[id=$id,type=$type,sourceId=$sourceId,'
+      'sourceLayer=$sourceLayer]';
+}
+
 /// Retained TileJSON fields for an inline tile source.
 final class ParsedTileJson {
   /// Creates copied inline TileJSON metadata.

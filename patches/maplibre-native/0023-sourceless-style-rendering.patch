@@ -1,0 +1,92 @@
+diff --git a/src/mln/map/map_impl.cpp b/src/mln/map/map_impl.cpp
+index 2fb7a9e..42695bd 100644
+--- a/src/mln/map/map_impl.cpp
++++ b/src/mln/map/map_impl.cpp
+@@ -162,6 +162,10 @@ void Map::Impl::onStyleLoaded() {
+     if (LayerManager::annotationsEnabled) {
+         annotationManager.onStyleLoaded();
+     }
++    // The renderer sees a loaded style only through an update. Adding a layer
++    // publishes one, but a parse that adds none, with the camera already set,
++    // publishes nothing on its own.
++    onUpdate();
+ 
+     observer.onDidFinishLoadingStyle();
+ 
+diff --git a/src/mln/renderer/render_orchestrator.cpp b/src/mln/renderer/render_orchestrator.cpp
+index d74eb5c..36b5ec2 100644
+--- a/src/mln/renderer/render_orchestrator.cpp
++++ b/src/mln/renderer/render_orchestrator.cpp
+@@ -366,6 +366,25 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
+     // Track which layers are flagged for rendering
+     std::vector<bool> updateList(orderedLayers.size());
+ 
++    // A layer without a source becomes a render item once per tree. The first
++    // source's pass adds it, and a style with no sources adds it below.
++    const auto addSourcelessLayer = [&](RenderLayer& layer, std::size_t index, bool renderable) {
++        if (!renderable) {
++            return;
++        }
++        if (backgroundLayerAsColor && layer.baseImpl == layerImpls->front()) {
++            const auto& solidBackground = layer.getSolidBackground();
++            if (solidBackground) {
++                renderTreeParameters->backgroundColor = *solidBackground;
++                return; // This layer is shown with background color,
++                        // and it shall not be added to render items.
++            }
++        }
++        renderItemsEmplaceHint = layerRenderItems.emplace_hint(
++            renderItemsEmplaceHint, layer, nullptr, static_cast<uint32_t>(index));
++        updateList[index] = true;
++    };
++
+     // Update all sources and initialize renderItems.
+     for (const auto& sourceImpl : *sourceImpls) {
+         MLN_TRACE_ZONE(update source);
+@@ -402,18 +421,8 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
+             }
+ 
+             // Handle layers without source.
+-            if (layerIsVisible && zoomFitsLayer && sourceImpl.get() == sourceImpls->at(0).get()) {
+-                if (backgroundLayerAsColor && layer.baseImpl == layerImpls->front()) {
+-                    const auto& solidBackground = layer.getSolidBackground();
+-                    if (solidBackground) {
+-                        renderTreeParameters->backgroundColor = *solidBackground;
+-                        continue; // This layer is shown with background color,
+-                                  // and it shall not be added to render items.
+-                    }
+-                }
+-                renderItemsEmplaceHint = layerRenderItems.emplace_hint(
+-                    renderItemsEmplaceHint, layer, nullptr, static_cast<uint32_t>(index));
+-                updateList[index] = true;
++            if (sourceImpl.get() == sourceImpls->at(0).get()) {
++                addSourcelessLayer(layer, index, layerIsVisible && zoomFitsLayer);
+             }
+         }
+         tileParameters.isUpdateSynchronous = sourceImpl->isUpdateSynchronous();
+@@ -429,6 +438,25 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
+         addChanges(changes);
+     }
+ 
++    if (sourceImpls->empty()) {
++        for (std::size_t index = 0; index < orderedLayers.size(); ++index) {
++            RenderLayer& layer = orderedLayers[index];
++            const auto* layerInfo = layer.baseImpl->getTypeInfo();
++            if (layerInfo->source != LayerTypeInfo::Source::NotRequired) {
++                continue;
++            }
++            renderTreeParameters->has3D |= (layerInfo->pass3d == LayerTypeInfo::Pass3D::Required);
++            const bool layerIsVisible = layer.baseImpl->visibility != style::VisibilityType::None;
++            addSourcelessLayer(layer, index, layerIsVisible && layer.supportsZoom(zoomHistory.lastZoom));
++        }
++        for (size_t i = 0; i < updateList.size(); i++) {
++            if (orderedLayers[i].get().isLayerRenderable() != updateList[i]) {
++                orderedLayers[i].get().markLayerRenderable(updateList[i], changes);
++            }
++        }
++        addChanges(changes);
++    }
++
+     renderTreeParameters->loaded = updateParameters->styleLoaded && isLoaded();
+     if (!isMapModeContinuous && !renderTreeParameters->loaded) {
+         return nullptr;

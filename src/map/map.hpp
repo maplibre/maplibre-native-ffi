@@ -77,6 +77,12 @@ auto style_id_list_get(
   mln_style_id_list list, size_t index, mln_buffer_view* out_id
 ) -> mln_status;
 auto style_id_list_destroy(mln_style_id_list list) -> void;
+auto style_layer_list_count(mln_style_layer_list list, size_t* out_count)
+  -> mln_status;
+auto style_layer_list_get(
+  mln_style_layer_list list, size_t index, mln_style_layer_info* out_layer
+) -> mln_status;
+auto style_layer_list_destroy(mln_style_layer_list list) -> void;
 auto style_string_list_count(mln_style_string_list list, size_t* out_count)
   -> mln_status;
 auto style_string_list_get(
@@ -272,6 +278,8 @@ auto map_get_style_layer_type(
   bool* out_found
 ) -> mln_status;
 auto map_list_style_layer_ids(mln_map map, mln_style_id_list* out_layer_ids)
+  -> mln_status;
+auto map_list_style_layers(mln_map map, mln_style_layer_list* out_layers)
   -> mln_status;
 auto map_move_style_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id

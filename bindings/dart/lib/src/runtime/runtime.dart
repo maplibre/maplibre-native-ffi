@@ -3905,6 +3905,16 @@ final class MapHandle {
     });
   }
 
+  /// Copies every style layer in style order.
+  List<StyleLayerInfo> listStyleLayers() {
+    return withNativeArena((arena) {
+      final outList = arena<Uint64>();
+      outList.value = 0;
+      _check(raw.mln_map_list_style_layers(_handle.raw, outList));
+      return _copyStyleLayerList(NativeStyleLayerList(outList.value));
+    });
+  }
+
   /// Explicitly destroys this map.
   ///
   /// Destroying the map releases every custom-geometry source it still holds,

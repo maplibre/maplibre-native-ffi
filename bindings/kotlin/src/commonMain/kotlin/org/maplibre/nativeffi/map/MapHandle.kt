@@ -34,6 +34,7 @@ import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerInfo
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
@@ -271,6 +272,12 @@ public expect class MapHandle : AutoCloseable {
   public fun styleLayerType(layerId: String): String?
 
   public fun styleLayerIds(): List<String>
+
+  /**
+   * Copies every style layer in style order. The returned list remains valid after later style
+   * changes and after this map closes.
+   */
+  public fun styleLayers(): List<StyleLayerInfo>
 
   public fun moveStyleLayer(layerId: String, beforeLayerId: String)
 
