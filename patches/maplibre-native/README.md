@@ -119,6 +119,12 @@ fixtures with their binary reference images. Upstream:
 [maplibre-native#4644](https://github.com/maplibre/maplibre-native/pull/4644),
 at commit `02d9a4b2ccb4f3d15cdca438fd08ea6fa2cd530b`.
 
+`0022-render-update-publication.patch` publishes render updates after image and
+source removal, source insertion, tile-selection changes, transition changes,
+and completed style parsing. Generated layer transition setters also refresh the
+style's immutable layer collection. See
+[issue #736](https://github.com/maplibre/maplibre-native-ffi/issues/736).
+
 Each patch is the squashed diff of its upstream branch, applied on top of the
 patches before it, so a patch that adds a test next to an earlier patch's test
 carries that placement rather than the branch's own context.

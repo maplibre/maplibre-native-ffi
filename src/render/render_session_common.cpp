@@ -1533,7 +1533,8 @@ auto render_session_clear_data(mln_render_session session) -> mln_status {
   auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mln::gfx::BackendScope{*backend};
   live->renderer->clearData();
-  return MLN_STATUS_OK;
+  reset_pushed_feature_state(*live);
+  return map_post_trigger_repaint(live->map);
 }
 
 auto render_session_dump_debug_logs(mln_render_session session) -> mln_status {

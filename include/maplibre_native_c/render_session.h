@@ -214,6 +214,10 @@ mln_render_session_reduce_memory_use(mln_render_session session) MLN_NOEXCEPT;
 /**
  * Clears renderer data for the session.
  *
+ * The next frame rebuilds renderer data and restores the map's feature state.
+ * Continuous maps publish a render update. Static and tile maps rebuild when
+ * the host requests a still image.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live.

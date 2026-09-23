@@ -1,4 +1,6 @@
 use std::cell::Cell;
+
+mod invalidation;
 use std::error::Error as StdError;
 #[cfg(not(target_os = "emscripten"))]
 use std::ffi::CStr;

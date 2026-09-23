@@ -968,6 +968,9 @@ MLN_API mln_status mln_map_get_size(
  * latest update when mln_runtime_drain_events() reports
  * MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE. That type is the map's only
  * invalidation report, so select it in the event mask of every rendered map.
+ * Coalesce notifications into a pending frame for the latest state. Several
+ * mutations can share a notification, and asynchronous work or transitions
+ * can publish further updates after a mutation returns.
  * Repaint requests do not produce
  * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED or
  * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED events.
