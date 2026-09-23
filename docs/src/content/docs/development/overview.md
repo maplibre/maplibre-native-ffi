@@ -228,12 +228,13 @@ extended workflow combines platform labels into one selection. It builds each
 selected target once and includes every producer needed by Android multi-ABI
 packaging. Extended coverage can repeat targets covered by baseline or ready CI.
 
-State changes reuse actual success or failure only for the same tested merge
-commit and complete coverage scope. Adding or removing a platform changes the
-scope; unrelated labels preserve it. Omitted checks and restated verdicts never
-prove that tests ran. Missing or cancelled coverage executes again, as does an
-explicit workflow rerun. Selected jobs must succeed; only unselected jobs may be
-skipped.
+State changes reuse actual success, or a failure after its one retry, only for
+the same tested merge commit and complete coverage scope. Adding or removing a
+platform changes the scope; unrelated labels preserve it. Omitted checks and
+restated verdicts never prove that tests ran. Missing or cancelled coverage
+executes again, as does an explicit workflow rerun. An attempt-1 failure is also
+missing evidence, because CI retry may replace it. Selected jobs must succeed;
+only unselected jobs may be skipped.
 
 The extended workflow, `CI` (`ci.yml`), runs every target and complete packaging
 verification on main, manual runs, Dependabot PRs, and PRs with `ci:full`. All
