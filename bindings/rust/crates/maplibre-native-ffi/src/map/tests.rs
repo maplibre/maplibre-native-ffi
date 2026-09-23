@@ -4,6 +4,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
+mod invalidation;
+
 use crate::events::{RuntimeEventPayload, RuntimeEventSource, RuntimeEventType};
 use crate::{
     BoundsConstraint, CameraChangeMode, CustomGeometrySourceOptions, CustomMvtVectorSourceOptions,

@@ -3889,12 +3889,15 @@ auto map_set_feature_state(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  live->feature_state.set(
-    string_from_view(selector->source_id),
-    feature_state_source_layer(*selector),
-    string_from_view(selector->feature_id), *state_object
-  );
-  live->map->triggerRepaint();
+  if (
+    live->feature_state.set(
+      string_from_view(selector->source_id),
+      feature_state_source_layer(*selector),
+      string_from_view(selector->feature_id), *state_object
+    )
+  ) {
+    live->map->triggerRepaint();
+  }
   return MLN_STATUS_OK;
 }
 
@@ -3934,17 +3937,20 @@ auto map_remove_feature_state(
     return selector_status;
   }
 
-  live->feature_state.remove(
-    string_from_view(selector->source_id),
-    feature_state_source_layer(*selector),
-    optional_selector_string(
-      *selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, selector->feature_id
-    ),
-    optional_selector_string(
-      *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
+  if (
+    live->feature_state.remove(
+      string_from_view(selector->source_id),
+      feature_state_source_layer(*selector),
+      optional_selector_string(
+        *selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, selector->feature_id
+      ),
+      optional_selector_string(
+        *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
+      )
     )
-  );
-  live->map->triggerRepaint();
+  ) {
+    live->map->triggerRepaint();
+  }
   return MLN_STATUS_OK;
 }
 
