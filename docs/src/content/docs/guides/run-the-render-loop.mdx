@@ -51,10 +51,13 @@ render-frame-finished. It selects them before the map loads a style, as
 The helper compares each event's source against the map before interpreting the
 event. Every map in one runtime shares the queue. It requests a frame after a
 render update and after a finished frame with its repaint flag set. Repaint
-frames advance camera animations and label placement.
+frames advance paint transitions and label placement. Camera animations advance
+on the map's owner thread and publish their own render updates.
 
-A display-paced host stops pumping when it stops requesting frames. Request a
-frame after every map change. This lets an idle loop process the change.
+Call the pump on every display callback, including callbacks with no pending
+frame. The pending flag controls drawing; queued map work still needs a pump.
+A host that suspends display callbacks while idle uses a dedicated pump thread,
+as described below, so runtime wakes can request the next frame.
 
 Draw a pending frame after draining events. The render call reports which
 outcome it reached. A no-update result and a pending-size result both mean that
@@ -63,7 +66,7 @@ at startup and after an attach or resize. A target-not-ready result means that
 the render target had no frame to draw into, so the next turn tries again.
 
 A rendered frame clears the pending flag, unless the map asked for another
-frame while rendering this one, as during a camera transition. The render call
+frame while rendering this one, as during a paint transition. The render call
 returns that repaint flag directly, so the loop re-arms in the same turn
 instead of waiting for the frame's events to arrive.
 
