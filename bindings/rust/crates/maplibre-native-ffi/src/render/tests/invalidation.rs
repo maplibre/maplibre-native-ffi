@@ -132,7 +132,9 @@ fn removing_a_style_image_updates_pattern_pixels_from_render_events() {
         RenderTargetExtent::new(64, 64, 1.0),
     )
     .unwrap();
-    map.set_style_json(br##"{"version":8,"transition":{"duration":0},"sources":{},"layers":[{"id":"pattern","type":"background","paint":{"background-pattern":"swatch"}}]}"##).unwrap();
+    // Shared WebGL contexts preserve the color buffer. An opaque background
+    // makes removal visible without relying on a framebuffer clear.
+    map.set_style_json(br##"{"version":8,"transition":{"duration":0},"sources":{},"layers":[{"id":"base","type":"background","paint":{"background-color":"#0000ff"}},{"id":"pattern","type":"background","paint":{"background-pattern":"swatch"}}]}"##).unwrap();
     let image = crate::PremultipliedRgba8Image::new(
         crate::TextureImageInfo::new(2, 2, 8, 16),
         [255, 0, 0, 255].repeat(4),
@@ -142,7 +144,7 @@ fn removing_a_style_image_updates_pattern_pixels_from_render_events() {
     assert_eq!(center_pixel(&session), [255, 0, 0, 255]);
     map.remove_style_image("swatch").unwrap();
     render_to_idle(&mut runtime, &session);
-    assert_eq!(center_pixel(&session), [0, 0, 0, 0]);
+    assert_eq!(center_pixel(&session), [0, 0, 255, 255]);
     session.close().unwrap();
     map.close().unwrap();
     runtime.close().unwrap();

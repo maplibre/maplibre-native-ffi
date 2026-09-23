@@ -125,6 +125,13 @@ and completed style parsing. Generated layer transition setters also refresh the
 style's immutable layer collection. See
 [issue #736](https://github.com/maplibre/maplibre-native-ffi/issues/736).
 
+`0023-vertex-buffer-upload-timestamps.patch` initializes vertex buffer upload
+timestamps and preserves them during moves in Metal, Vulkan, and WebGPU. An
+uninitialized timestamp can suppress uploads after feature-state changes. The
+patch includes the upstream resource regression. Upstream:
+[maplibre-native#4679](https://github.com/maplibre/maplibre-native/pull/4679),
+at commit `02ddb45fbfad`.
+
 Each patch is the squashed diff of its upstream branch, applied on top of the
 patches before it, so a patch that adds a test next to an earlier patch's test
 carries that placement rather than the branch's own context.

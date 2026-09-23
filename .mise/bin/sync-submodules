@@ -70,6 +70,7 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0017-location-indicator-top-image-hit-testing.patch"
   "$repo_root/patches/maplibre-native/0021-location-indicator-bearing-accuracy.patch"
   "$repo_root/patches/maplibre-native/0022-render-update-publication.patch"
+  "$repo_root/patches/maplibre-native/0023-vertex-buffer-upload-timestamps.patch"
 )
 
 # The patches overlap, so no single patch reverses cleanly on its own once the
