@@ -594,11 +594,12 @@ app_error render_target_finish_frame(render_target* target) {
 }
 
 static app_error render_update_owned(
-  render_target* target, bool* out_rendered
+  render_target* target, bool* out_completed
 ) {
-  bool rendered = false;
-  MAP_TRY(render_session_render_update(&target->session, &rendered));
-  if (!rendered) {
+  mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
+  MAP_TRY(render_session_render_update(&target->session, &result));
+  if (result != MLN_RENDER_RESULT_RENDERED) {
+    *out_completed = result != MLN_RENDER_RESULT_TARGET_NOT_READY;
     return APP_OK;
   }
 
@@ -631,31 +632,37 @@ static app_error render_update_owned(
   // pass finished; finish_frame releases it.
   target->as.owned.pending_frame = frame;
   target->as.owned.has_pending_frame = true;
-  *out_rendered = true;
+  *out_completed = true;
   return APP_OK;
 }
 
 app_error render_target_render_update(
   render_target* target, [[maybe_unused]] viewport current_viewport,
-  bool* out_rendered
+  bool* out_completed
 ) {
-  *out_rendered = false;
+  *out_completed = false;
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
-      return render_update_owned(target, out_rendered);
+      return render_update_owned(target, out_completed);
     case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
-      bool rendered = false;
-      MAP_TRY(render_session_render_update(&target->session, &rendered));
-      if (!rendered) {
+      mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
+      MAP_TRY(render_session_render_update(&target->session, &result));
+      if (result != MLN_RENDER_RESULT_RENDERED) {
+        *out_completed = result != MLN_RENDER_RESULT_TARGET_NOT_READY;
         return APP_OK;
       }
-      return vulkan_compositor_present_image_view(
+      MAP_TRY(vulkan_compositor_present_image_view(
         &target->as.borrowed.compositor, target->as.borrowed.image.view,
-        out_rendered
-      );
+        out_completed
+      ));
+      return APP_OK;
     }
-    case RENDER_TARGET_MODE_NATIVE_SURFACE:
-      return render_session_render_update(&target->session, out_rendered);
+    case RENDER_TARGET_MODE_NATIVE_SURFACE: {
+      mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
+      MAP_TRY(render_session_render_update(&target->session, &result));
+      *out_completed = result != MLN_RENDER_RESULT_TARGET_NOT_READY;
+      return APP_OK;
+    }
   }
   return APP_ERROR_BACKEND_SETUP_FAILED;
 }

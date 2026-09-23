@@ -80,11 +80,13 @@ internal class AndroidMapView(context: Context) :
   }
 
   override fun surfaceRedrawNeeded(holder: SurfaceHolder) {
+    runtimeLoop?.requestRepaint()
     requestRender()
   }
 
   override fun surfaceRedrawNeededAsync(holder: SurfaceHolder, drawingFinished: Runnable) {
     pendingDrawingFinished += drawingFinished
+    runtimeLoop?.requestRepaint()
     requestRender()
     if (!canRenderFrame()) {
       finishPendingDrawing()
@@ -104,8 +106,7 @@ internal class AndroidMapView(context: Context) :
             contextRebuildSpent = false
             finishPendingDrawing()
           } else {
-            // The map applies its logical size on the runtime loop's next pump, so an attach is
-            // followed by frames with nothing to render.
+            // Retry a target that has no drawable; map work wakes the loop separately.
             loop.renderRequest.set()
           }
         }

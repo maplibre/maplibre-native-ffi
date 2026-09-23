@@ -250,7 +250,10 @@ const MetalOwnedTextureBackend = struct {
         viewport: types.Viewport,
     ) !bool {
         _ = viewport;
-        if (!try self.session.renderUpdate(diagnostic_store)) return false;
+        const result = try self.session.renderUpdate(diagnostic_store);
+        if (result != .rendered) {
+            return result != .target_not_ready;
+        }
         const texture = switch (self.session) {
             .texture => |*texture| texture,
             else => return false,
@@ -349,7 +352,10 @@ const MetalBorrowedTextureBackend = struct {
         viewport: types.Viewport,
     ) !bool {
         _ = viewport;
-        if (!try self.session.renderUpdate(diagnostic_store)) return false;
+        const result = try self.session.renderUpdate(diagnostic_store);
+        if (result != .rendered) {
+            return result != .target_not_ready;
+        }
         return try self.compositor.drawMetalTexture(self.borrowed_texture.value.?);
     }
 };
@@ -390,7 +396,7 @@ const MetalSurfaceBackend = struct {
         self: *MetalSurfaceBackend,
         diagnostic_store: ?*const maplibre.DiagnosticStore,
     ) !bool {
-        return try self.session.renderUpdate(diagnostic_store);
+        return (try self.session.renderUpdate(diagnostic_store)) != .target_not_ready;
     }
 
     fn attachRenderTarget(

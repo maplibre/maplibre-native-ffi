@@ -132,8 +132,8 @@ final class MetalMapView: UIView {
     do {
       // Consume first, so a request published during the render survives.
       if channels.consumeRenderRequest() {
-        let rendered = try renderTarget.renderUpdate()
-        if !rendered {
+        let completed = try renderTarget.renderUpdate()
+        if !completed {
           channels.setRenderRequest()
         }
       }

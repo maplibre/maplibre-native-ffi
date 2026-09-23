@@ -42,11 +42,10 @@ void run_one_frame(
   bool needs_repaint = false;
   const mln_status status =
     mln_render_session_render_update(session, &result, &needs_repaint);
-  // A rendered frame clears the request unless the map asked for another
-  // frame while rendering it. Any other result keeps the frame pending for
-  // the next turn.
-  if (status == MLN_STATUS_OK && result == MLN_RENDER_RESULT_RENDERED) {
-    *pending = needs_repaint;
+  // Map-driven outcomes wait for an update event. Only an unavailable target
+  // needs a display-paced retry.
+  if (status == MLN_STATUS_OK) {
+    *pending = needs_repaint || result == MLN_RENDER_RESULT_TARGET_NOT_READY;
   }
   // #endregion render
 }

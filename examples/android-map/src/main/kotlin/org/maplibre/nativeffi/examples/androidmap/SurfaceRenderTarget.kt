@@ -12,7 +12,7 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
  */
 internal class SurfaceRenderTarget private constructor(private val session: RenderSessionHandle) :
   AutoCloseable {
-  fun renderUpdate(): Boolean = session.renderUpdate().result == RenderResult.RENDERED
+  fun renderUpdate(): Boolean = session.renderUpdate().result != RenderResult.TARGET_NOT_READY
 
   /**
    * Follows the host viewport and the surface [graphics] presents through now, keeping the session

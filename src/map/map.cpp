@@ -2047,6 +2047,8 @@ class MapCommands {
     frontend_.notify_render_update_available();
   }
 
+  auto trigger_repaint() -> void { map_.triggerRepaint(); }
+
  private:
   mln::Map& map_;
   HeadlessFrontend& frontend_;
@@ -4000,7 +4002,7 @@ auto map_scale_factor(mln_map map) -> double {
 // map_post_render_work_available() instead.
 auto map_native(MapObject* map) -> mln::Map* { return map->map.get(); }
 
-// Both posting helpers hold the map table's mutex across the liveness check and
+// Posting helpers hold the map table's mutex across the liveness check and
 // the send, so the map cannot be retired in between. Mailbox::push takes only
 // its own mutex and the run loop's, so there is no path back to this lock.
 auto map_post_set_size(mln_map map, uint32_t width, uint32_t height)
@@ -4023,6 +4025,17 @@ auto map_post_render_work_available(mln_map map) -> mln_status {
     return status;
   }
   live->command_ref->invoke(&MapCommands::render_work_available);
+  return MLN_STATUS_OK;
+}
+
+auto map_post_trigger_repaint(mln_map map) -> mln_status {
+  const std::scoped_lock lock(handle_table<MapObject>().mutex());
+  MapObject* live = nullptr;
+  const auto status = validate_map_live_locked(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  live->command_ref->invoke(&MapCommands::trigger_repaint);
   return MLN_STATUS_OK;
 }
 
