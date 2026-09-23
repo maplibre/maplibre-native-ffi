@@ -245,6 +245,29 @@ func (projection *MapProjectionHandle) LatLngForPixelUnwrapped(point ScreenPoint
 	return goLatLng(coordinate), nil
 }
 
+// MetersPerPixelAtLatitude returns the ground distance in meters covered by one
+// logical map pixel at a latitude for the helper camera zoom.
+func (projection *MapProjectionHandle) MetersPerPixelAtLatitude(latitude float64) (float64, error) {
+	ptr, release, err := projection.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+	defer projection.state.KeepAlive()
+
+	var metersPerPixel C.double
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_projection_meters_per_pixel_at_latitude(
+			C.mln_map_projection(ptr),
+			C.double(latitude),
+			&metersPerPixel,
+		))
+	}); err != nil {
+		return 0, err
+	}
+	return float64(metersPerPixel), nil
+}
+
 // ProjectedMetersForLatLng converts a geographic coordinate to Spherical
 // Mercator projected meters.
 func ProjectedMetersForLatLng(coordinate LatLng) (ProjectedMeters, error) {

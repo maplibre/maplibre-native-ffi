@@ -2671,6 +2671,24 @@ def test_unwrapped_coordinate_conversions_preserve_visible_world_copies() -> Non
             )
 
 
+def test_meters_per_pixel_matches_projection_and_follows_zoom() -> None:
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=3.0))
+        meters = map_handle.meters_per_pixel_at_latitude(45.0)
+
+        with map_handle.create_projection() as projection:
+            assert projection.meters_per_pixel_at_latitude(45.0) == pytest.approx(
+                meters
+            )
+
+        map_handle.jump_to(camera.CameraOptions(zoom=4.0))
+        assert map_handle.meters_per_pixel_at_latitude(45.0) == pytest.approx(
+            meters / 2.0
+        )
+        with pytest.raises(mln.InvalidArgumentError):
+            map_handle.meters_per_pixel_at_latitude(91.0)
+
+
 def test_map_projection_converts_coordinates_and_closes() -> None:
     coordinate = geo.LatLng(0.0, 0.0)
     meters = map_module.projected_meters_for_lat_lng(coordinate)

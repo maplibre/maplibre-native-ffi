@@ -396,6 +396,9 @@ auto map_lat_lngs_for_pixels_unwrapped(
   mln_map map, const mln_screen_point* points, size_t point_count,
   mln_lat_lng* out_coordinates
 ) -> mln_status;
+auto map_meters_per_pixel_at_latitude(
+  mln_map map, double latitude, double* out_meters_per_pixel
+) -> mln_status;
 auto map_projection_create(mln_map map, mln_map_projection* out_projection)
   -> mln_status;
 auto map_projection_create_from_transform(
@@ -427,6 +430,9 @@ auto map_projection_lat_lng_for_pixel(
 auto map_projection_lat_lng_for_pixel_unwrapped(
   mln_map_projection projection, mln_screen_point point,
   mln_lat_lng* out_coordinate
+) -> mln_status;
+auto map_projection_meters_per_pixel_at_latitude(
+  mln_map_projection projection, double latitude, double* out_meters_per_pixel
 ) -> mln_status;
 auto projected_meters_for_lat_lng(
   mln_lat_lng coordinate, mln_projected_meters* out_meters

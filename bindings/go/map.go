@@ -1116,6 +1116,24 @@ func (m *MapHandle) LatLngsForPixelsUnwrapped(points []ScreenPoint) ([]LatLng, e
 	return goLatLngSlice(rawCoordinates), nil
 }
 
+// MetersPerPixelAtLatitude returns the ground distance in meters covered by one
+// logical map pixel at a latitude for the current map zoom.
+func (m *MapHandle) MetersPerPixelAtLatitude(latitude float64) (float64, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	var raw C.double
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_meters_per_pixel_at_latitude(C.mln_map(ptr), C.double(latitude), &raw))
+	}); err != nil {
+		return 0, err
+	}
+	return float64(raw), nil
+}
+
 // Close destroys this map. A successful close makes later calls no-ops. A
 // failed close leaves the native handle live so callers can retry on the owner
 // thread. Close discards this map's queued runtime events and its recorded

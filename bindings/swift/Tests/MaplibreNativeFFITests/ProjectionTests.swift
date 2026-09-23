@@ -78,6 +78,41 @@ import Testing
   #expect(abs(projectedRight.longitude - right.longitude) < 0.0000000001)
 }
 
+@Test func metersPerPixelMatchesProjectionAndFollowsZoom() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 256, height: 256)
+  )
+  defer { try? map.close() }
+  try map.jump(to: CameraOptions(
+    center: LatLng(latitude: 45, longitude: 0),
+    zoom: 3
+  ))
+
+  let metersPerPixel = try map.metersPerPixel(atLatitude: 45)
+  let projection = try MapProjectionHandle(map: map)
+  defer { try? projection.close() }
+  let projected = try projection.metersPerPixel(atLatitude: 45)
+  #expect(abs(projected - metersPerPixel) < metersPerPixel * 1e-9)
+
+  try map.jump(to: CameraOptions(zoom: 4))
+  let zoomedIn = try map.metersPerPixel(atLatitude: 45)
+  #expect(abs(zoomedIn - metersPerPixel / 2) < metersPerPixel * 1e-9)
+
+  do {
+    _ = try map.metersPerPixel(atLatitude: 91)
+    Issue.record("latitude 91 should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidArgument)
+    #expect(error.rawStatus != nil)
+  } catch {
+    Issue.record("unexpected error: \(error)")
+  }
+}
+
 @Test func mapProjectionSetVisibleCoordinatesRejectsEmptyInputBeforeCallingC(
 ) throws {
   let runtime =

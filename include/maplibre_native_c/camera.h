@@ -858,6 +858,26 @@ MLN_API mln_status mln_map_lat_lngs_for_pixels_unwrapped(
   mln_lat_lng* out_coordinates
 ) MLN_NOEXCEPT;
 
+/**
+ * Reads the ground distance covered by one logical map pixel at a latitude for
+ * the current map zoom.
+ *
+ * MapLibre Native computes the scale, including its zoom and latitude clamps.
+ * Hosts can use it to draw scale bars or convert between meters and pixels.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live,
+ *   out_meters_per_pixel is null, or latitude is not finite or falls outside
+ *   the range from -90 to 90 degrees.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_meters_per_pixel_at_latitude(
+  mln_map map, double latitude, double* out_meters_per_pixel
+) MLN_NOEXCEPT;
+
 #ifdef __cplusplus
 }
 #endif

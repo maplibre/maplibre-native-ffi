@@ -2403,6 +2403,21 @@ impl MapHandle {
         lat_lng_to_py(py, coordinate)
     }
 
+    fn meters_per_pixel_at_latitude(&self, latitude: f64) -> PyResult<f64> {
+        let state = self.state();
+        let mut meters_per_pixel = 0.0;
+        // SAFETY: The C API validates the map pointer, latitude, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_meters_per_pixel_at_latitude(
+                state.handle(),
+                latitude,
+                &mut meters_per_pixel,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(meters_per_pixel)
+    }
+
     fn pixels_for_lat_lngs(
         &self,
         py: Python<'_>,
@@ -4160,6 +4175,22 @@ impl MapProjectionHandle {
         })
         .map_err(map_error)?;
         lat_lng_to_py(py, coordinate)
+    }
+
+    fn meters_per_pixel_at_latitude(&self, latitude: f64) -> PyResult<f64> {
+        let state = self.state();
+        let mut meters_per_pixel = 0.0;
+        // SAFETY: The C API validates the projection pointer, latitude, and
+        // output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_meters_per_pixel_at_latitude(
+                state.handle(),
+                latitude,
+                &mut meters_per_pixel,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(meters_per_pixel)
     }
 
     #[getter]

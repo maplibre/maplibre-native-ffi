@@ -1852,6 +1852,19 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     }
   }
 
+  public actual fun metersPerPixelAtLatitude(latitude: Double): Double {
+    NativeAccess.ensureLoaded()
+    val outMetersPerPixel = doubleArrayOf(0.0)
+    Status.check(
+      MaplibreNativeC.mln_map_meters_per_pixel_at_latitude(
+        requireLiveHandle(),
+        latitude,
+        outMetersPerPixel,
+      )
+    )
+    return outMetersPerPixel[0]
+  }
+
   public actual fun attachMetalOwnedTexture(
     descriptor: MetalOwnedTextureDescriptor
   ): RenderSessionHandle = RenderSessionHandle.attachMetalOwnedTexture(this, descriptor)

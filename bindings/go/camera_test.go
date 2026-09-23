@@ -543,6 +543,9 @@ func TestMapCameraCommandsReportNativeValidation(t *testing.T) {
 	if err := m.SetFreeCameraOptions(invalidFreeCamera); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetFreeCameraOptions(invalid orientation) error = %v, want ErrInvalidArgument", err)
 	}
+	if _, err := m.MetersPerPixelAtLatitude(91); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("MetersPerPixelAtLatitude(91) error = %v, want ErrInvalidArgument", err)
+	}
 }
 
 func TestMapViewportTileAndProjectionOptionsRoundTrip(t *testing.T) {

@@ -1253,6 +1253,32 @@ class MapHandleTest {
   }
 
   @Test
+  fun metersPerPixelMatchesProjectionAndFollowsZoom() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map = MapHandle.create(runtime, MapOptions().apply { mapMode = MapMode.STATIC })
+
+    try {
+      val latitude = 45.0
+      map.jumpTo(
+        CameraOptions().apply {
+          center = LatLng(latitude, 0.0)
+          zoom = 4.0
+        }
+      )
+      val metersPerPixel = map.metersPerPixelAtLatitude(latitude)
+      map.createProjection().use { projection ->
+        assertEquals(metersPerPixel, projection.metersPerPixelAtLatitude(latitude), 1e-9)
+      }
+
+      map.jumpTo(CameraOptions().apply { zoom = 5.0 })
+      assertEquals(metersPerPixel / 2.0, map.metersPerPixelAtLatitude(latitude), 1e-9)
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
   fun emptyBatchConversionsFromAnotherThreadReportWrongThread() {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     val map = MapHandle.create(runtime, MapOptions())

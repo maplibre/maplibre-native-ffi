@@ -112,6 +112,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_layer_ids
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids
+import org.maplibre.nativeffi.internal.c.mln_map_meters_per_pixel_at_latitude
 import org.maplibre.nativeffi.internal.c.mln_map_move_by
 import org.maplibre.nativeffi.internal.c.mln_map_move_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_move_style_layer
@@ -1950,6 +1951,18 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
       )
     )
     CoreStructs.latLngArray(outCoordinates, pointSnapshot.size)
+  }
+
+  public actual fun metersPerPixelAtLatitude(latitude: Double): Double = memScoped {
+    val outMetersPerPixel = alloc<DoubleVar>()
+    Status.check(
+      mln_map_meters_per_pixel_at_latitude(
+        state.requireLive().rawHandleValue,
+        latitude,
+        outMetersPerPixel.ptr,
+      )
+    )
+    outMetersPerPixel.value
   }
 
   public actual fun attachMetalOwnedTexture(

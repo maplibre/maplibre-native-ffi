@@ -1317,6 +1317,38 @@ fn unwrapped_coordinate_conversions_preserve_visible_world_copies() {
     runtime.close().unwrap();
 }
 
+#[test]
+// Spec coverage: BND-103, BND-104.
+fn meters_per_pixel_agrees_between_map_and_projection_and_follows_zoom() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let mut camera = CameraOptions::default();
+    camera.center = Some(LatLng::new(45.0, 0.0));
+    camera.zoom = Some(3.0);
+    map.jump_to(&camera).unwrap();
+
+    let at_zoom_3 = map.meters_per_pixel_at_latitude(45.0).unwrap();
+    let projection = map.create_projection().unwrap();
+    let projected = projection.meters_per_pixel_at_latitude(45.0).unwrap();
+    assert!((projected - at_zoom_3).abs() <= at_zoom_3 * 1e-12);
+
+    camera.zoom = Some(4.0);
+    map.jump_to(&camera).unwrap();
+    let at_zoom_4 = map.meters_per_pixel_at_latitude(45.0).unwrap();
+    assert!((at_zoom_4 * 2.0 - at_zoom_3).abs() <= at_zoom_3 * 1e-12);
+
+    let error = map.meters_per_pixel_at_latitude(91.0).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    let error = projection
+        .meters_per_pixel_at_latitude(f64::NAN)
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+
+    projection.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
 /// Camera events drained from one runtime queue, in arrival order.
 #[derive(Default)]
 struct CameraEventTally {

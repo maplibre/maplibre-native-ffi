@@ -7599,6 +7599,49 @@ auto map_lat_lngs_for_pixels_unwrapped(
   );
 }
 
+namespace {
+
+auto validate_latitude(double latitude) -> mln_status {
+  if (!std::isfinite(latitude) || latitude < -90.0 || latitude > 90.0) {
+    set_thread_error("latitude must be finite and within [-90, 90]");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto meters_per_pixel_at_latitude(
+  const mln::CameraOptions& camera, double latitude,
+  double* out_meters_per_pixel
+) -> mln_status {
+  if (out_meters_per_pixel == nullptr) {
+    set_thread_error("out_meters_per_pixel must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto latitude_status = validate_latitude(latitude);
+  if (latitude_status != MLN_STATUS_OK) {
+    return latitude_status;
+  }
+  *out_meters_per_pixel = mln::Projection::getMetersPerPixelAtLatitude(
+    latitude, camera.zoom.value_or(0.0)
+  );
+  return MLN_STATUS_OK;
+}
+
+}  // namespace
+
+auto map_meters_per_pixel_at_latitude(
+  mln_map map, double latitude, double* out_meters_per_pixel
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  return meters_per_pixel_at_latitude(
+    live->map->getCameraOptions(), latitude, out_meters_per_pixel
+  );
+}
+
 auto map_projection_create(mln_map map, mln_map_projection* out_projection)
   -> mln_status {
   if (out_projection == nullptr) {
@@ -7812,6 +7855,19 @@ auto map_projection_lat_lng_for_pixel_unwrapped(
 ) -> mln_status {
   return map_projection_lat_lng_for_pixel_with_wrap_mode(
     projection, point, out_coordinate, mln::LatLng::Unwrapped
+  );
+}
+
+auto map_projection_meters_per_pixel_at_latitude(
+  mln_map_projection projection, double latitude, double* out_meters_per_pixel
+) -> mln_status {
+  return with_map_projection(
+    projection,
+    [latitude, out_meters_per_pixel](mln::MapProjection& live) -> mln_status {
+      return meters_per_pixel_at_latitude(
+        live.getCamera(), latitude, out_meters_per_pixel
+      );
+    }
   );
 }
 

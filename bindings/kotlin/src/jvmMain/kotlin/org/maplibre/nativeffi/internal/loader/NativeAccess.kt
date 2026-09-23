@@ -2191,6 +2191,15 @@ internal object NativeAccess {
     }
   }
 
+  internal fun metersPerPixelAtLatitude(map: NativeMap, latitude: Double): Double =
+    Arena.ofConfined().use { arena ->
+      val outMetersPerPixel = arena.allocate(ValueLayout.JAVA_DOUBLE)
+      Status.check(
+        MapLibreNativeC.mln_map_meters_per_pixel_at_latitude(map.raw, latitude, outMetersPerPixel)
+      )
+      outMetersPerPixel.get(ValueLayout.JAVA_DOUBLE, 0)
+    }
+
   internal fun attachMetalOwnedTexture(
     map: NativeMap,
     descriptor: MetalOwnedTextureDescriptor,
@@ -2712,6 +2721,22 @@ internal object NativeAccess {
           .invokeNative(projection, screenPoint(point, arena), outCoordinate) as Int
       )
       latLng(outCoordinate)
+    }
+
+  internal fun projectionMetersPerPixelAtLatitude(
+    projection: NativeMapProjection,
+    latitude: Double,
+  ): Double =
+    Arena.ofConfined().use { arena ->
+      val outMetersPerPixel = arena.allocate(ValueLayout.JAVA_DOUBLE)
+      Status.check(
+        MapLibreNativeC.mln_map_projection_meters_per_pixel_at_latitude(
+          projection.raw,
+          latitude,
+          outMetersPerPixel,
+        )
+      )
+      outMetersPerPixel.get(ValueLayout.JAVA_DOUBLE, 0)
     }
 
   internal fun setResourceTransformResponseUrl(response: MemorySegment, value: String): Int =

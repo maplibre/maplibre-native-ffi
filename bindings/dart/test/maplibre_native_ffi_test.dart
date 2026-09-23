@@ -1022,6 +1022,40 @@ void main() {
     );
   });
 
+  test('meters per pixel matches the projection and halves per zoom level', () {
+    final runtime = RuntimeHandle.create();
+    final map = runtime.createMap(
+      options: const MapOptions(width: 512, height: 512),
+    );
+    addTearDown(() {
+      map.close();
+      runtime.close();
+    });
+    map.jumpTo(const CameraOptions(center: LatLng(0, 0), zoom: 3));
+    final projection = map.createProjection();
+    addTearDown(projection.close);
+
+    final metersPerPixel = map.metersPerPixelAtLatitude(45);
+    expect(
+      projection.metersPerPixelAtLatitude(45),
+      closeTo(metersPerPixel, 1e-10),
+    );
+    map.jumpTo(const CameraOptions(zoom: 4));
+    expect(
+      map.metersPerPixelAtLatitude(45),
+      closeTo(metersPerPixel / 2, 1e-10),
+    );
+
+    expect(
+      () => map.metersPerPixelAtLatitude(91),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+    expect(
+      () => projection.metersPerPixelAtLatitude(91),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+  });
+
   test('custom geometry tile callbacks reach their isolate', () async {
     final deliveredTiles = <CanonicalTileId>[];
     final callback =

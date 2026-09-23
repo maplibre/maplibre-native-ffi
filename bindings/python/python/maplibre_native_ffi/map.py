@@ -465,6 +465,10 @@ class MapProjectionHandle(NativeHandleMixin):
         raw = self._native.lat_lng_for_pixel_unwrapped(point.x, point.y)
         return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
 
+    def meters_per_pixel_at_latitude(self, latitude: float) -> float:
+        """Return meters per logical pixel at a latitude for the helper camera zoom."""
+        return self._native.meters_per_pixel_at_latitude(latitude)
+
 
 class MapHandle(NativeHandleMixin):
     """Owner-thread map handle."""
@@ -1491,6 +1495,10 @@ class MapHandle(NativeHandleMixin):
 
         raw = self._native.lat_lng_for_pixel_unwrapped(point.x, point.y)
         return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
+
+    def meters_per_pixel_at_latitude(self, latitude: float) -> float:
+        """Return meters per logical pixel at a latitude for the current camera zoom."""
+        return self._native.meters_per_pixel_at_latitude(latitude)
 
     def pixels_for_lat_lngs(
         self,
