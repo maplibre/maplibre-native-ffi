@@ -58,7 +58,7 @@ class RenderUpdate:
 
     ``result`` names the wake to wait for before rendering again.
     ``needs_repaint`` reports whether the map asked for another frame while it
-    rendered this one, as during an ongoing camera transition. It is set only
+    rendered this one, as during an ongoing paint transition. It is set only
     when ``result`` is ``RENDERED``, and reads false for every other outcome.
     """
 
@@ -757,7 +757,7 @@ class RenderSessionHandle(NativeHandleMixin):
           and retry.
 
         ``needs_repaint`` reports whether the map asked for another frame
-        while it rendered this one, as during an ongoing camera transition.
+        while it rendered this one, as during an ongoing paint transition.
         It is set only when ``result`` is ``RENDERED``. This is the same signal
         the ``RuntimeEventType.MAP_RENDER_FRAME_FINISHED`` event carries in its
         ``needs_repaint`` field, delivered here without the event round trip,

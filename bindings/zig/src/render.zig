@@ -157,7 +157,7 @@ pub const RenderUpdate = struct {
     /// Which outcome the call reached.
     result: RenderResult,
     /// Whether the map asked for another frame while it rendered this one, as
-    /// during an ongoing camera transition. True only when `result` is
+    /// during an ongoing paint transition. True only when `result` is
     /// `.rendered`; this is the same signal that a map-render-frame-finished
     /// event carries in its `needs_repaint` field, delivered without the
     /// event round trip.

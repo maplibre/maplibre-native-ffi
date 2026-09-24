@@ -102,13 +102,13 @@ typedef enum mln_render_result : uint32_t {
  * still image requested before that lands reports
  * MLN_RENDER_RESULT_SIZE_PENDING.
  *
- * *out_needs_repaint reports whether the map asked for another frame while it
- * rendered this one, as during an ongoing camera transition. It is set only
- * when *out_result is MLN_RENDER_RESULT_RENDERED, and reads false for every
- * other outcome. This is the same signal that
- * MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED carries in its needs_repaint
- * field, delivered here without the event round trip, so a host can re-arm its
- * frame loop before it drains events.
+ * *out_needs_repaint reports the renderer's need for another frame, such as
+ * during a paint transition. It is true only when *out_result is
+ * MLN_RENDER_RESULT_RENDERED. It matches the needs_repaint field of
+ * MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED. Camera animations advance
+ * separately on the map's owner thread. Pump the runtime and gate rendering
+ * on MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE to receive fresh updates
+ * for both camera animations and renderer transitions.
  *
  * Returns:
  * - MLN_STATUS_OK on success, with *out_result and *out_needs_repaint set.

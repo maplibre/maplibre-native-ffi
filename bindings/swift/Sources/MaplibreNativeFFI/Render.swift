@@ -561,7 +561,7 @@ public struct RenderUpdate: Equatable, Sendable {
   /// Which outcome the call reached.
   public let result: RenderResult
   /// Whether the map asked for another frame while it rendered this one, as
-  /// during an ongoing camera transition. True only when ``result`` is
+  /// during an ongoing paint transition. True only when ``result`` is
   /// ``RenderResult/rendered``; the same signal the map
   /// render-frame-finished event carries in ``RenderFrameEvent/needsRepaint``,
   /// delivered here without the event round trip.
