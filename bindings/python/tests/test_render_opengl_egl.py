@@ -685,9 +685,8 @@ def test_egl_borrowed_texture_set_target_hands_over_a_replacement() -> None:
                         ),
                         "the replacement texture was never rendered into",
                     )
-                    assert (
-                        session.render_update().result == render.RenderResult.RENDERED
-                    )
+                    map_handle.request_repaint()
+                    render_until_update(runtime, session)
 
                     # Both textures belong to their owner: the session
                     # neither released the outgoing one nor took over

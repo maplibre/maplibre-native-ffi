@@ -6,6 +6,7 @@ import android.view.Choreographer
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import org.maplibre.nativeffi.render.RenderResult
 
 /**
  * The render loop.
@@ -102,12 +103,14 @@ internal class AndroidMapView(context: Context) :
       try {
         val target = ensureRenderTarget(loop)
         if (target != null && loop.renderRequest.consume()) {
-          if (target.renderUpdate()) {
-            contextRebuildSpent = false
-            finishPendingDrawing()
-          } else {
-            // Retry a target that has no drawable; map work wakes the loop separately.
-            loop.renderRequest.set()
+          when (target.renderUpdate()) {
+            RenderResult.RENDERED -> {
+              contextRebuildSpent = false
+              finishPendingDrawing()
+            }
+            RenderResult.TARGET_NOT_READY -> loop.renderRequest.set()
+            RenderResult.NO_UPDATE,
+            RenderResult.SIZE_PENDING -> Unit
           }
         }
       } catch (error: RuntimeException) {

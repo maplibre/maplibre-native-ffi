@@ -504,7 +504,7 @@ struct mln_render_session_object {
   double scale_factor = 1.0;
   uint64_t generation = 1;
   uint64_t rendered_generation = 0;
-  std::shared_ptr<const mln::UpdateParameters> rendered_update;
+  std::weak_ptr<const mln::UpdateParameters> rendered_update;
   std::optional<mln::TransformState> rendered_transform;
   bool attached = true;
 

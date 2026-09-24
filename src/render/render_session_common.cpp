@@ -1291,7 +1291,7 @@ auto render_session_render_update(
 
   // A scheduler wake can deliver cleanup or superseded work. Acquire a target
   // only when map state or the target changed since the last completed frame.
-  if (update == live->rendered_update) {
+  if (update == live->rendered_update.lock()) {
     return MLN_STATUS_OK;
   }
 

@@ -184,6 +184,7 @@ final class MetalMapView: UIView {
     guard !isShutDown else { return }
     refreshViewport()
     if viewVisible, appForeground {
+      channels.push(.requestRepaint)
       channels.setRenderRequest()
       startHostLoop()
     }
