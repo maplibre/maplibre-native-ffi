@@ -82,12 +82,11 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     if (!renderRequest.consume()) {
       return NativeSurfaceRenderResult.Skipped
     }
-    if (attached.session.renderUpdate().result == RenderResult.RENDERED) {
+    val result = attached.session.renderUpdate().result
+    if (result == RenderResult.RENDERED) {
       return NativeSurfaceRenderResult.Rendered
     }
-    // The map applies a new logical size on the runtime loop's next pump, so an attach or resize
-    // is followed by frames with nothing to render.
-    requestRender()
+    if (result == RenderResult.TARGET_NOT_READY) requestRender()
     return NativeSurfaceRenderResult.Skipped
   }
 

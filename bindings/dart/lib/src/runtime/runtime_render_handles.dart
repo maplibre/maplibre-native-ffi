@@ -412,12 +412,11 @@ final class RenderSessionHandle {
   ///
   /// [RenderUpdate.result] names the wake to wait for before calling again:
   ///
-  /// - [RenderResult.rendered]: the target holds a new frame. The map retains
-  ///   its latest update, so a host redraws on demand after a resize or a
-  ///   surface expose, and gates a frame loop on
-  ///   [RuntimeEventType.mapRenderUpdateAvailable].
-  /// - [RenderResult.noUpdate]: the call produced no frame. The map has no update
-  ///   yet, a static map is waiting for style or tile data, or the Metal backend
+  /// - [RenderResult.rendered]: the target holds a new frame. Each update
+  ///   renders once per target. Request a map repaint and pump the runtime to
+  ///   redraw a continuous map on demand; request a still image for a static map.
+  /// - [RenderResult.noUpdate]: the call drained queued render-thread work
+  ///   without a frame. The latest update already rendered, the map has no update yet, a static map is waiting for style or tile data, or the Metal backend
   ///   has not created an owned texture. Wait for
   ///   [RuntimeEventType.mapRenderUpdateAvailable].
   /// - [RenderResult.sizePending]: this session resized and the map, which

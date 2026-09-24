@@ -92,11 +92,13 @@ public expect class RenderSessionHandle : AutoCloseable {
   /**
    * Renders the latest available map render update into this session's render target.
    *
-   * The map retains its latest update, so repeated calls re-render it and report
-   * [RenderResult.RENDERED] again. Every other result names the wake to wait for:
-   * [RenderResult.NO_UPDATE] and [RenderResult.SIZE_PENDING] resolve on a render-update-available
-   * event, and [RenderResult.TARGET_NOT_READY] resolves when the host changes the render target or
-   * on a later retry after a backoff.
+   * Drains queued render-thread work and renders each update once per target. Repeated calls report
+   * [RenderResult.NO_UPDATE] until map state or the target changes. Request a map repaint and pump
+   * the runtime to redraw a continuous map on demand; request a still image for a static map. Every
+   * other result names the wake to wait for: [RenderResult.NO_UPDATE] and
+   * [RenderResult.SIZE_PENDING] resolve on a render-update-available event, and
+   * [RenderResult.TARGET_NOT_READY] resolves when the host changes the render target or on a later
+   * retry after a backoff.
    *
    * [RenderUpdate.needsRepaint] reports whether the map asked for another frame while rendering
    * this one, so a host can re-arm its frame loop before it drains events.

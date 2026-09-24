@@ -195,8 +195,9 @@ impl RenderTarget {
                 session,
                 compositor,
             } => {
-                if session.render_update()?.result != RenderResult::Rendered {
-                    return Ok(false);
+                let result = session.render_update()?.result;
+                if result != RenderResult::Rendered {
+                    return Ok(result != RenderResult::TargetNotReady);
                 }
                 let frame = session.acquire_opengl_owned_texture_frame()?;
                 let draw_result = compositor.draw_frame(opengl, &frame);
@@ -217,14 +218,15 @@ impl RenderTarget {
                 compositor,
                 texture,
             } => {
-                if session.render_update()?.result != RenderResult::Rendered {
-                    return Ok(false);
+                let result = session.render_update()?.result;
+                if result != RenderResult::Rendered {
+                    return Ok(result != RenderResult::TargetNotReady);
                 }
                 compositor.draw_texture(opengl, texture.texture())?;
                 Ok(true)
             }
             Self::Surface { session } => {
-                Ok(session.render_update()?.result == RenderResult::Rendered)
+                Ok(session.render_update()?.result != RenderResult::TargetNotReady)
             }
         }
     }

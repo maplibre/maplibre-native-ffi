@@ -71,7 +71,7 @@ final class RuntimeLoopThread: Thread {
     defer { try? wake.close() }
     channels.publish(attachRef: attachRef, wake: wake)
 
-    var batch: [CameraCommand] = []
+    var batch: [MapCommand] = []
 
     while !channels.isShutdownRequested, channels.failureMessage == nil {
       channels.drainCommands(into: &batch)

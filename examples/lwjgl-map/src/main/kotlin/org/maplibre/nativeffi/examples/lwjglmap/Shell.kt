@@ -119,16 +119,14 @@ internal object Shell {
               glfwWaitEventsTimeout(IDLE_WAIT_SECONDS)
               continue
             }
-            // The map applies a new logical size on the runtime loop's next pump, so a resize is
-            // followed by frames with nothing to render.
-            var rendered = false
+            var completed = false
             if (renderRequest.consume()) {
-              rendered = render(target)
-              if (!rendered) {
+              completed = render(target)
+              if (!completed) {
                 renderRequest.set()
               }
             }
-            if (!rendered) {
+            if (!completed) {
               glfwWaitEventsTimeout(IDLE_WAIT_SECONDS)
             }
           }

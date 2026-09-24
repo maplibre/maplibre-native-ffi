@@ -60,9 +60,10 @@ A host that suspends display callbacks while idle uses a dedicated pump thread,
 as described below, so runtime wakes can request the next frame.
 
 Draw a pending frame after draining events. The render call reports which
-outcome it reached. A no-update result and a pending-size result both mean that
-the map has not published an update for the session's extent, which is expected
-at startup and after an attach or resize. A target-not-ready result means that
+outcome it reached. A no-update result means that queued work produced no new
+frame. A pending-size result means that the map has not applied the session's
+extent. Both clear the pending flag and wait for a render-update-available
+event. A target-not-ready result means that
 the render target had no frame to draw into, so the next turn tries again.
 
 A rendered frame clears the pending flag, unless the map asked for another

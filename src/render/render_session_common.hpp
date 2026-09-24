@@ -251,9 +251,10 @@ class RenderSessionScheduler final : public mln::Scheduler {
   // Drops queued work without running it, for detach.
   auto discard() -> void;
 
-  // Requests a host frame when work makes an idle queue nonempty. Cleared
+  // Wakes the render owner when work makes an idle queue nonempty. Cleared
   // before detach so late worker results are discarded.
-  auto set_repaint_request(std::function<void()> repaint_request) -> void;
+  auto set_work_available_callback(std::function<void()> work_available)
+    -> void;
 
  private:
   // Reopens the queue and wakes pending work if drain() exits through an
@@ -274,7 +275,7 @@ class RenderSessionScheduler final : public mln::Scheduler {
 
   std::mutex mutex_;
   std::vector<std::function<void()>> queue_;
-  std::function<void()> repaint_request_;
+  std::function<void()> work_available_;
   bool draining_ = false;
   mapbox::base::WeakPtrFactory<mln::Scheduler> weak_factory_{this};
   // Do not add members here, see `WeakPtrFactory`
@@ -503,6 +504,7 @@ struct mln_render_session_object {
   double scale_factor = 1.0;
   uint64_t generation = 1;
   uint64_t rendered_generation = 0;
+  std::weak_ptr<const mln::UpdateParameters> rendered_update;
   std::optional<mln::TransformState> rendered_transform;
   bool attached = true;
 

@@ -188,11 +188,11 @@ func run(mode renderTargetMode) (result error) {
 		}
 
 		if shared.consumeRenderRequest() && !view.empty() && running {
-			rendered, err := state.renderUpdate()
+			completed, err := state.renderUpdate()
 			if err != nil {
 				return err
 			}
-			if rendered {
+			if completed {
 				didWork = true
 			} else {
 				shared.requestRender()

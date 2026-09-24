@@ -515,6 +515,9 @@ auto map_native(MapObject* map) -> mln::Map*;
 // MLN_STATUS_INVALID_ARGUMENT when the map handle is null or no longer live.
 auto map_post_set_size(mln_map map, uint32_t width, uint32_t height)
   -> mln_status;
+// Wake the render owner to service queued tasks without creating map state.
+auto map_post_render_work_available(mln_map map) -> mln_status;
+// Publish fresh map state after renderer resources have been reset.
 auto map_post_trigger_repaint(mln_map map) -> mln_status;
 auto map_latest_update(mln_map map) -> std::shared_ptr<mln::UpdateParameters>;
 // Copies the map's coalesced feature-state snapshot. Callable from a render

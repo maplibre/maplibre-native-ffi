@@ -31,9 +31,9 @@ app_error render_session_resize(
 }
 
 app_error render_session_render_update(
-  render_session* session, bool* out_rendered
+  render_session* session, mln_render_result* out_result
 ) {
-  *out_rendered = false;
+  *out_result = MLN_RENDER_RESULT_NO_UPDATE;
   if (session->kind == RENDER_SESSION_NONE) {
     return APP_OK;
   }
@@ -49,7 +49,7 @@ app_error render_session_render_update(
     return is_surface ? APP_ERROR_SURFACE_RENDER_FAILED
                       : APP_ERROR_TEXTURE_RENDER_FAILED;
   }
-  *out_rendered = result == MLN_RENDER_RESULT_RENDERED;
+  *out_result = result;
   return APP_OK;
 }
 

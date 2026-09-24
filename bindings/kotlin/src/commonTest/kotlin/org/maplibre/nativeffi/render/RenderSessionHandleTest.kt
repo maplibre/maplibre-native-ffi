@@ -302,7 +302,7 @@ class RenderSessionHandleTest {
         assertEquals(MaplibreStatus.WRONG_THREAD, sessionCallWrongThread.status)
         assertTrue(sessionCallDiagnostic.isNotBlank())
 
-        assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
+        session.renderUpdate()
         assertEquals(sessionCallDiagnostic, sessionCallWrongThread.diagnostic)
 
         val sessionCloseWrongThread = failureFromBackgroundThread { session.close() }
