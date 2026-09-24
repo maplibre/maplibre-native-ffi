@@ -7,7 +7,12 @@ use std::ffi::CStr;
 use std::ffi::CString;
 #[cfg(target_os = "windows")]
 use std::ffi::c_char;
-#[cfg(any(target_os = "linux", target_os = "android", target_os = "windows"))]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "android",
+    target_os = "macos",
+    target_os = "windows"
+))]
 use std::ffi::c_void;
 use std::marker::PhantomData;
 use std::rc::Rc;
@@ -29,9 +34,12 @@ use serde_json::{Value as JsonValue, json};
 mod webgl_gl;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use glutin_egl_sys::egl;
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use glutin_egl_sys::egl::types::{EGLConfig, EGLContext, EGLDisplay, EGLSurface, EGLint};
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(target_os = "macos")]
+#[path = "tests/egl_macos.rs"]
+mod egl;
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
+use self::egl::types::{EGLConfig, EGLContext, EGLDisplay, EGLSurface, EGLint};
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 use libloading::Library;
 use static_assertions::assert_not_impl_any;
 #[cfg(target_os = "emscripten")]
@@ -123,7 +131,7 @@ fn has_opengl_test_context_backend() -> bool {
         return false;
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
     {
         crate::supported_opengl_context_providers().contains(OpenGLContextProviderMask::EGL)
     }
@@ -138,11 +146,12 @@ fn has_opengl_test_context_backend() -> bool {
     #[cfg(not(any(
         target_os = "linux",
         target_os = "android",
+        target_os = "macos",
         target_os = "windows",
         target_os = "emscripten"
     )))]
     {
-        // The Rust test helper implements Linux EGL, Windows WGL, and browser WebGL.
+        // The Rust test helper implements EGL, Windows WGL, and browser WebGL.
         false
     }
 }
@@ -420,7 +429,7 @@ struct OpenGLTestContext {
     descriptor: OpenGLContextDescriptor,
     surface_handle: NativePointer,
     gl: gl_api::Context,
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
     platform: EglTestContext,
     #[cfg(target_os = "windows")]
     platform: WglTestContext,
@@ -428,7 +437,7 @@ struct OpenGLTestContext {
     platform: WebGlTestContext,
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 struct EglTestContext {
     egl: egl::Egl,
     _lib: Library,
@@ -438,7 +447,7 @@ struct EglTestContext {
     context: EGLContext,
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 impl EglTestContext {
     fn new() -> std::result::Result<Self, Box<dyn StdError>> {
         let lib = load_egl_library()?;
@@ -552,7 +561,7 @@ impl EglTestContext {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 impl Drop for EglTestContext {
     fn drop(&mut self) {
         unsafe {
@@ -574,7 +583,7 @@ impl Drop for EglTestContext {
 /// This fixture creates no context and makes none current: naming dedicated
 /// ownership is what asks the session to create its own context and keep it
 /// current between renders.
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 struct DedicatedEglTestSurface {
     egl: egl::Egl,
     _lib: Library,
@@ -583,7 +592,7 @@ struct DedicatedEglTestSurface {
     surface: EGLSurface,
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 impl DedicatedEglTestSurface {
     fn new(width: u32, height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
         let lib = load_egl_library()?;
@@ -642,7 +651,7 @@ impl DedicatedEglTestSurface {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 impl Drop for DedicatedEglTestSurface {
     fn drop(&mut self) {
         unsafe {
@@ -653,16 +662,40 @@ impl Drop for DedicatedEglTestSurface {
 }
 
 /// Opens and initializes the EGL display the OpenGL fixtures render through.
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 fn open_egl_display(egl: &egl::Egl) -> std::result::Result<EGLDisplay, Box<dyn StdError>> {
-    // A desktop Linux run without a display server needs Mesa's surfaceless
-    // platform. Device EGL implementations ship no such platform, so they take
-    // the default display.
+    // macOS uses ANGLE Metal; desktop Linux uses surfaceless Mesa.
+    // Android and OpenHarmony use their window system's default display.
     #[cfg(any(target_env = "ohos", target_os = "android"))]
     let display = unsafe { egl.GetDisplay(egl::DEFAULT_DISPLAY as *mut c_void) };
     #[cfg(any(target_env = "ohos", target_os = "android"))]
     let display_operation = "eglGetDisplay";
-    #[cfg(not(any(target_env = "ohos", target_os = "android")))]
+    #[cfg(target_os = "macos")]
+    let display = {
+        const EGL_PLATFORM_ANGLE_ANGLE: u32 = 0x3202;
+        const EGL_PLATFORM_ANGLE_TYPE_ANGLE: EGLint = 0x3203;
+        const EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE: EGLint = 0x3489;
+        const EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE: EGLint = 0x3209;
+        const EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE: EGLint = 0x320A;
+        if !egl.GetPlatformDisplayEXT.is_loaded() {
+            return Err("eglGetPlatformDisplayEXT is unavailable".into());
+        }
+        let attributes = [
+            EGL_PLATFORM_ANGLE_TYPE_ANGLE,
+            EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE,
+            EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE,
+            EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE,
+            egl::NONE as EGLint,
+        ];
+        unsafe {
+            egl.GetPlatformDisplayEXT(
+                EGL_PLATFORM_ANGLE_ANGLE,
+                egl::DEFAULT_DISPLAY as *mut c_void,
+                attributes.as_ptr(),
+            )
+        }
+    };
+    #[cfg(all(target_os = "linux", not(target_env = "ohos")))]
     let display = {
         const EGL_PLATFORM_SURFACELESS_MESA: u32 = 0x31DD;
         if !egl.GetPlatformDisplayEXT.is_loaded() {
@@ -698,7 +731,7 @@ fn open_egl_display(egl: &egl::Egl) -> std::result::Result<EGLDisplay, Box<dyn S
 
 /// Chooses a pbuffer-capable OpenGL ES 3 config, which the C API requires of
 /// every EGL context descriptor.
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 fn choose_egl_pbuffer_config(
     egl: &egl::Egl,
     display: EGLDisplay,
@@ -744,14 +777,17 @@ fn choose_egl_pbuffer_config(
     Ok(config)
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 fn load_egl_library() -> std::result::Result<Library, Box<dyn StdError>> {
-    unsafe { Library::new("libEGL.so.1") }
-        .or_else(|_| unsafe { Library::new("libEGL.so") })
-        .map_err(|error| format!("failed to load libEGL: {error}").into())
+    #[cfg(target_os = "macos")]
+    let library = unsafe { Library::new("libEGL.dylib") };
+    #[cfg(not(target_os = "macos"))]
+    let library =
+        unsafe { Library::new("libEGL.so.1") }.or_else(|_| unsafe { Library::new("libEGL.so") });
+    library.map_err(|error| format!("failed to load libEGL: {error}").into())
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 fn load_egl_bindings(lib: &Library) -> std::result::Result<egl::Egl, Box<dyn StdError>> {
     type EglGetProcAddress = unsafe extern "system" fn(*const c_void) -> *const c_void;
 
@@ -1827,7 +1863,7 @@ impl OpenGLTestContext {
         Self::new_platform(width, height)
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
     fn new_platform(_width: u32, _height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
         let platform = EglTestContext::new()?;
         let gl = unsafe {
@@ -1892,6 +1928,7 @@ impl OpenGLTestContext {
     #[cfg(not(any(
         target_os = "linux",
         target_os = "android",
+        target_os = "macos",
         target_os = "windows",
         target_os = "emscripten"
     )))]
@@ -1908,7 +1945,7 @@ impl OpenGLTestContext {
     }
 
     fn make_current(&self) -> std::result::Result<(), Box<dyn StdError>> {
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
         {
             self.platform.make_current()?;
             Ok(())
@@ -1926,6 +1963,7 @@ impl OpenGLTestContext {
         #[cfg(not(any(
             target_os = "linux",
             target_os = "android",
+            target_os = "macos",
             target_os = "windows",
             target_os = "emscripten"
         )))]
@@ -2673,7 +2711,7 @@ fn opengl_surface_session_renders_with_platform_context() {
 /// A dedicated session owns its thread's OpenGL context: it creates a context
 /// that joins no share group, keeps it current between renders, and gives the
 /// thread back when it closes.
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 #[test]
 // Spec coverage: BND-162.
 fn dedicated_opengl_surface_session_renders_and_keeps_its_context_current() {

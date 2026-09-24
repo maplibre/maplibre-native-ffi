@@ -1015,6 +1015,7 @@ dependencies = [
  "ash",
  "bindgen",
  "bitflags 2.13.0",
+ "gl_generator",
  "glow",
  "glutin_egl_sys",
  "libloading",
