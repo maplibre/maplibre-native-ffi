@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       previous_tag:
-        description: Previous tag used to generate release notes
+        description: Previous tag in the release family, linked from the release notes
         default: ""
         required: false
         type: string
@@ -89,7 +89,13 @@ jobs:
           pattern: native-package-*-${{ env.PUBLISH_SHA }}
           path: build/packages/native/release
           merge-multiple: true
+      - name: Record the publish time
+        id: publish
+        run: echo "timestamp=$(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_OUTPUT"
       - name: Prepare assets
+        env:
+          PUBLISH_PREVIOUS_TAG: ${{ inputs.previous_tag }}
+          PUBLISH_TIMESTAMP: ${{ steps.publish.outputs.timestamp }}
         run: >-
           mise run --no-deps ci:prepare-native-package "$PUBLISH_CHANNEL"
           build/packages/native/release "$PUBLISH_VERSION"
@@ -119,13 +125,11 @@ jobs:
         with:
           tag_name: ${{ inputs.tag }}
           target_commitish: ${{ inputs.sha }}
-          name: ${{ inputs.release && format('Native package {0}', inputs.version) || 'Native package snapshot' }}
+          name: ${{ inputs.release && format('Native package {0}', inputs.version) || format('Native package snapshot {0}', steps.publish.outputs.timestamp) }}
           body_path: build/packages/native/release/RELEASE_NOTES.md
           draft: ${{ inputs.release }}
           prerelease: ${{ !inputs.release }}
           make_latest: false
-          generate_release_notes: ${{ inputs.release && inputs.previous_tag != '' }}
-          previous_tag: ${{ inputs.previous_tag }}
           overwrite_files: true
           fail_on_unmatched_files: true
           files: |

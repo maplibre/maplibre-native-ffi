@@ -145,21 +145,29 @@ class NativePackageReleaseTest(unittest.TestCase):
         create_archive(archive, self.preset, sha or self.sha)
         return archive
 
-    def prepare(self, channel: str, version: str | None = None) -> None:
+    def prepare(
+        self, channel: str, version: str | None = None, **overrides: str
+    ) -> None:
         environment = {
             "CI_RUN_URL": "https://github.com/maplibre/repo/actions/runs/1",
             "GITHUB_REPOSITORY": "maplibre/repo",
             "GITHUB_RUN_ID": "2",
+            "PUBLISH_PREVIOUS_TAG": "core/v0.202607.0",
             "PUBLISH_SHA": self.sha,
+            "PUBLISH_TAG": f"core/v{self.version}",
+            "PUBLISH_TIMESTAMP": "2026-08-07 01:01 UTC",
+            **overrides,
         }
         with mock.patch.dict(os.environ, environment, clear=False):
             prepare_assets(
                 self.release_dir, channel, version or self.version, self.repository
             )
 
-    def assert_assets(self, channel: str, version: str, title: str) -> None:
+    def assert_assets(
+        self, channel: str, version: str, title: str, **overrides: str
+    ) -> str:
         archive = self.archive()
-        self.prepare(channel, version)
+        self.prepare(channel, version, **overrides)
 
         with tarfile.open(archive, "r:gz") as package:
             root = f"maplibre-native-c-{self.preset}"
@@ -180,6 +188,7 @@ class NativePackageReleaseTest(unittest.TestCase):
         self.assertEqual(name, archive.name)
         self.assertIn(title, notes)
         self.assertIn(f"/commit/{self.sha}", notes)
+        return notes
 
     def test_refuses_an_incomplete_native_release(self) -> None:
         self.write_presets("linux-gnu-x64-egl", self.preset)
@@ -223,12 +232,30 @@ class NativePackageReleaseTest(unittest.TestCase):
             self.prepare("release")
 
     def test_release_assets_include_version_provenance_and_checksums(self) -> None:
-        self.assert_assets("release", self.version, f"Native package {self.version}.")
+        notes = self.assert_assets(
+            "release", self.version, f"Native package {self.version}."
+        )
+
+        self.assertIn(f"/compare/core/v0.202607.0...core/v{self.version}", notes)
+
+    def test_first_release_notes_omit_the_changelog(self) -> None:
+        notes = self.assert_assets(
+            "release",
+            self.version,
+            f"Native package {self.version}.",
+            PUBLISH_PREVIOUS_TAG="",
+        )
+
+        self.assertNotIn("/compare/", notes)
 
     def test_snapshot_assets_include_version_provenance_and_checksums(self) -> None:
-        self.assert_assets(
-            "snapshot", "0.0.0-dev.202608070101", "Unstable native package snapshot."
+        notes = self.assert_assets(
+            "snapshot",
+            "0.0.0-dev.202608070101",
+            "Unstable native package snapshot, published 2026-08-07 01:01 UTC.",
         )
+
+        self.assertNotIn("/compare/", notes)
 
 
 if __name__ == "__main__":
