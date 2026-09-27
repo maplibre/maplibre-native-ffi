@@ -22,6 +22,7 @@ pub const WindowLayer = extern struct {
 extern "c" fn mln_test_autorelease_pool_push() ?*anyopaque;
 extern "c" fn mln_test_autorelease_pool_pop(pool: *anyopaque) void;
 extern "c" fn mln_test_create_metal_layer() ?*anyopaque;
+extern "c" fn mln_test_metal_layer_uses_bgra8(layer: *anyopaque) bool;
 extern "c" fn mln_test_create_metal_texture(device: *anyopaque, width: u32, height: u32) ?*anyopaque;
 extern "c" fn mln_test_metal_texture_clear_rgba8(texture: *anyopaque, r: u8, g: u8, b: u8, a: u8) bool;
 extern "c" fn mln_test_metal_texture_read_pixel_rgba8(texture: *anyopaque, x: u32, y: u32, out_rgba: [*c]u8) bool;
@@ -33,6 +34,10 @@ extern "c" fn mln_test_destroy_window_metal_layer(window_layer: *WindowLayer) vo
 
 pub fn createLayer() !*anyopaque {
     return mln_test_create_metal_layer() orelse return error.MetalLayerUnavailable;
+}
+
+pub fn layerUsesBgra8(layer: *anyopaque) bool {
+    return mln_test_metal_layer_uses_bgra8(layer);
 }
 
 pub fn createTexture(device: *anyopaque, width: u32, height: u32) !*anyopaque {

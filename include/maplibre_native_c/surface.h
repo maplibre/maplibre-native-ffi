@@ -109,8 +109,10 @@ mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
  * the session's graphics resources on the calling thread, so the host resources
  * named by descriptor must be usable there. The session retains
  * descriptor->layer and optional descriptor->context.device, and renders into
- * and presents through the layer. On success, *out_session receives a handle
- * the caller destroys with mln_render_session_destroy().
+ * and presents through the layer. It configures the layer with the session's
+ * device, MTLPixelFormatBGRA8Unorm, and the physical drawable size.
+ * On success, *out_session receives a handle the caller destroys with
+ * mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -230,7 +232,8 @@ MLN_API mln_status mln_webgpu_surface_attach(
  * Use this when a host destroys and recreates its surface while the map lives
  * on. The presentation surface is replaced in place, so the session keeps its
  * renderer along with the tile pyramid, glyph and image atlases, and symbol
- * placement. Map-owned feature state is unchanged.
+ * placement. Map-owned feature state is unchanged. The replacement layer is
+ * configured as described in mln_metal_surface_attach().
  *
  * descriptor->context must name the graphics context or device the session
  * attached with; a null Metal device names none and is accepted. A target on a
@@ -253,8 +256,6 @@ MLN_API mln_status mln_webgpu_surface_attach(
  * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
  *   null or invalid, or descriptor->context names a device other than the
  *   session's.
- * - MLN_STATUS_UNSUPPORTED when descriptor->format differs from the session's;
- *   destroy the session and attach again to change it.
  * - MLN_STATUS_INVALID_STATE when the session is detached.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.

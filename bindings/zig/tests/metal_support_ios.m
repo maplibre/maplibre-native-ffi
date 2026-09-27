@@ -35,6 +35,10 @@ void* mln_test_create_metal_layer(void) {
   return [[CAMetalLayer layer] retain];
 }
 
+bool mln_test_metal_layer_uses_bgra8(void* layer) {
+  return [(CAMetalLayer*)layer pixelFormat] == MTLPixelFormatBGRA8Unorm;
+}
+
 void* mln_test_create_metal_texture(
   void* device, uint32_t width, uint32_t height
 ) {
