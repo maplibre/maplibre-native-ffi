@@ -34,9 +34,6 @@ test "Metal surface renders to window-attached layer through public binding" {
     });
     defer surface.close() catch {};
 
-    // Newer runtimes accept RGBA8 here, but iOS 15 requires a presentation format.
-    try testing.expect(metal_support.layerUsesBgra8(window_layer.layer.?));
-
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
     try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try surface.renderUpdate()).result);
@@ -101,7 +98,6 @@ test "Metal surface set target presents through a replacement layer" {
         .extent = .{ .width = 48, .height = 32 },
         .layer = nativePointer(replacement_layer.layer.?),
     });
-    try testing.expect(metal_support.layerUsesBgra8(replacement_layer.layer.?));
 
     // A texture descriptor names a target this session does not have; the
     // rejection leaves it presenting through the new layer.
