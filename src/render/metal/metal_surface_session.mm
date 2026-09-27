@@ -151,10 +151,10 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
               MTL::TextureUsageShaderRead | MTL::TextureUsageShaderWrite |
               MTL::TextureUsageRenderTarget
             );
+          stencilTexture->create();
         }
       }
 
-      depthTexture->create();
       if (auto* depthTarget = renderPassDescriptor->depthAttachment()) {
         depthTarget->setTexture(
           // The texture was created by mln::mtl::Context above.
@@ -163,7 +163,6 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
             ->getMetalTexture()
         );
       }
-      stencilTexture->create();
       if (auto* stencilTarget = renderPassDescriptor->stencilAttachment()) {
         stencilTarget->setTexture(
           // The texture was created by mln::mtl::Context above.
