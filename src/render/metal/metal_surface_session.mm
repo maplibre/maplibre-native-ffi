@@ -35,7 +35,9 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
     )
         : backend(backend_), layer(NS::RetainPtr(layer_)) {
       layer->setDevice(backend.getDevice().get());
-      layer->setPixelFormat(MTL::PixelFormatRGBA8Unorm);
+      // BGRA8 is a supported CAMetalLayer format on every Apple target.
+      // RGBA8 textures are valid offscreen but fail here on iOS 15.
+      layer->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
       layer->setFramebufferOnly(false);
       setSize(size_);
     }
@@ -68,7 +70,7 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
 
       layer = NS::RetainPtr(layer_);
       layer->setDevice(backend.getDevice().get());
-      layer->setPixelFormat(MTL::PixelFormatRGBA8Unorm);
+      layer->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
       layer->setFramebufferOnly(false);
       setSize(size_);
     }
@@ -119,27 +121,40 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
             MTL::TextureUsageRenderTarget
           );
 
-        stencilTexture = context.createTexture2D();
-        stencilTexture->setSize(size);
-        stencilTexture->setFormat(
-          mln::gfx::TexturePixelType::Stencil,
-          mln::gfx::TextureChannelDataType::UnsignedByte
-        );
-        stencilTexture->setSamplerConfiguration(
-          {.filter = mln::gfx::TextureFilterType::Linear,
-           .wrapU = mln::gfx::TextureWrapType::Clamp,
-           .wrapV = mln::gfx::TextureWrapType::Clamp}
-        );
+        depthTexture->create();
         // The texture was created by mln::mtl::Context above.
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-        static_cast<mln::mtl::Texture2D*>(stencilTexture.get())
-          ->setUsage(
-            MTL::TextureUsageShaderRead | MTL::TextureUsageShaderWrite |
-            MTL::TextureUsageRenderTarget
+        const auto depthFormat =
+          static_cast<mln::mtl::Texture2D*>(depthTexture.get())
+            ->getMetalTexture()
+            ->pixelFormat();
+        if (depthFormat == MTL::PixelFormatDepth32Float_Stencil8) {
+          // Native uses a combined format on simulators and Intel Macs.
+          // Metal requires both attachments to reference the same texture.
+          stencilTexture = depthTexture;
+        } else {
+          stencilTexture = context.createTexture2D();
+          stencilTexture->setSize(size);
+          stencilTexture->setFormat(
+            mln::gfx::TexturePixelType::Stencil,
+            mln::gfx::TextureChannelDataType::UnsignedByte
           );
+          stencilTexture->setSamplerConfiguration(
+            {.filter = mln::gfx::TextureFilterType::Linear,
+             .wrapU = mln::gfx::TextureWrapType::Clamp,
+             .wrapV = mln::gfx::TextureWrapType::Clamp}
+          );
+          // The texture was created by mln::mtl::Context above.
+          // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
+          static_cast<mln::mtl::Texture2D*>(stencilTexture.get())
+            ->setUsage(
+              MTL::TextureUsageShaderRead | MTL::TextureUsageShaderWrite |
+              MTL::TextureUsageRenderTarget
+            );
+          stencilTexture->create();
+        }
       }
 
-      depthTexture->create();
       if (auto* depthTarget = renderPassDescriptor->depthAttachment()) {
         depthTarget->setTexture(
           // The texture was created by mln::mtl::Context above.
@@ -148,7 +163,6 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
             ->getMetalTexture()
         );
       }
-      stencilTexture->create();
       if (auto* stencilTarget = renderPassDescriptor->stencilAttachment()) {
         stencilTarget->setTexture(
           // The texture was created by mln::mtl::Context above.
