@@ -607,6 +607,15 @@ pub const MapHandle = enum(c.mln_map) {
         return submitAllocatedQuery(values.StringList, self, allocator, copyStringListResult, c.mln_map_list_style_layer_ids, .{try native(self)});
     }
 
+    /// Copies the whole style layer stack in style order.
+    pub fn listStyleLayers(self: *MapHandle, allocator: std.mem.Allocator) status.Error!completion.Future(values.StyleLayerEntryList) {
+        return submitAllocatedQuery(values.StyleLayerEntryList, self, allocator, copyStyleLayerEntries, c.mln_map_list_style_layers, .{try native(self)});
+    }
+
+    pub fn metersPerPixelAtLatitude(self: *MapHandle, latitude: f64) status.Error!completion.Future(f64) {
+        return submitQuery(f64, self, completion.value(f64), c.mln_map_meters_per_pixel_at_latitude, .{ try native(self), latitude });
+    }
+
     pub fn addStyleSourceJson(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -2173,6 +2182,29 @@ fn copyStyleSourceTileUrlsResult(result: *const c.mln_completion_result, allocat
         const views = raw.tile_urls[0..raw.tile_url_count];
         for (views, items) |view, *item| {
             item.* = try copyView(allocator.*, view);
+            initialized += 1;
+        }
+    }
+    return .{ .allocator = allocator.*, .items = items };
+}
+
+fn copyStyleLayerEntries(result: *const c.mln_completion_result, allocator: *std.mem.Allocator) status.Error!values.StyleLayerEntryList {
+    const items = try allocator.alloc(values.StyleLayerEntry, result.value_count);
+    errdefer allocator.free(items);
+    var initialized: usize = 0;
+    errdefer for (items[0..initialized]) |*item| item.deinit();
+    if (result.value_count != 0) {
+        const pointer = result.value orelse return error.NativeError;
+        const entries = @as([*]align(1) const c.mln_style_layer_entry, @ptrCast(pointer))[0..result.value_count];
+        for (entries, items) |entry, *item| {
+            const id = try copyView(allocator.*, entry.id);
+            errdefer allocator.free(id);
+            const layer_type = try copyView(allocator.*, entry.type);
+            errdefer allocator.free(layer_type);
+            const source_id = try copyPresentView(allocator.*, entry.source_id);
+            errdefer if (source_id) |value| allocator.free(value);
+            const source_layer = try copyPresentView(allocator.*, entry.source_layer);
+            item.* = .{ .allocator = allocator.*, .id = id, .type = layer_type, .source_id = source_id, .source_layer = source_layer };
             initialized += 1;
         }
     }

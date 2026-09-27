@@ -34,6 +34,12 @@ public expect class MapProjectionHandle : AutoCloseable {
   /** Converts a screen point to an unwrapped coordinate that preserves its visible world copy. */
   public fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng
 
+  /**
+   * Reads the ground distance in meters covered by one logical pixel at [latitude] for the helper
+   * camera zoom.
+   */
+  public fun metersPerPixelAtLatitude(latitude: Double): Double
+
   public val isClosed: Boolean
 
   /** Closes the projection after waiting for projection calls already running on other threads. */

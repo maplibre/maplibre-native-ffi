@@ -69,6 +69,56 @@ func TestDedicatedStyleLayerHelpers(t *testing.T) {
 	requireStyleCommandFailed(t, completion, err)
 }
 
+const layerListStyleJSON = `{"version":8,"sources":{"tiles":{"type":"vector",` +
+	`"tiles":["https://example.com/{z}/{x}/{y}.pbf"]}},"layers":[` +
+	`{"id":"roads","type":"line","source":"tiles","source-layer":"transportation"},` +
+	`{"id":"bg","type":"background"}]}`
+
+// BND-105: style layer listing copies the whole layer stack in style order,
+// with absent source fields as nil rather than empty strings.
+func TestStyleLayersListsLayerStackInStyleOrder(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := awaitForTest(runtime.NewMap())
+	if err != nil {
+		_ = closeRuntimeForTest(runtime)
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := closeMapForTest(m); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := closeRuntimeForTest(runtime); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if _, err := awaitForTest(m.SetStyleJSON([]byte(layerListStyleJSON))); err != nil {
+		t.Fatalf("SetStyleJSON(): %v", err)
+	}
+	layers, err := awaitForTest(m.StyleLayers())
+	if err != nil {
+		t.Fatalf("StyleLayers(): %v", err)
+	}
+	want := []StyleLayerEntry{
+		{ID: "roads", Type: "line", SourceID: optionPtr("tiles"), SourceLayer: optionPtr("transportation")},
+		{ID: "bg", Type: "background"},
+	}
+	if len(layers) != len(want) {
+		t.Fatalf("StyleLayers() = %+v, want %d layers", layers, len(want))
+	}
+	for i := range want {
+		if !layers[i].Equal(want[i]) {
+			t.Errorf("StyleLayers()[%d] = %+v, want %+v", i, layers[i], want[i])
+		}
+	}
+	if layers[1].SourceID != nil || layers[1].SourceLayer != nil {
+		t.Errorf("background layer source fields = (%v, %v), want both absent", layers[1].SourceID, layers[1].SourceLayer)
+	}
+}
+
 const layerAccessorStyleJSON = `{"version":8,"sources":{"geo":{"type":"geojson",` +
 	`"data":{"type":"FeatureCollection","features":[]}}},"layers":[` +
 	`{"id":"bg","type":"background"},{"id":"fill","type":"fill","source":"geo"}]}`

@@ -3320,6 +3320,20 @@ auto map_get_style_layer_info(
   return MLN_STATUS_OK;
 }
 
+auto map_list_style_layers(
+  MapObject& live, std::vector<StyleLayerRecord>& layers
+) -> mln_status {
+  for (const auto* layer : map_native(live).getStyle().getLayers()) {
+    layers.push_back(
+      {.id = layer->getID(),
+       .type = layer->getTypeInfo()->type,
+       .source_id = layer->getSourceID(),
+       .source_layer = layer->getSourceLayer()}
+    );
+  }
+  return MLN_STATUS_OK;
+}
+
 auto map_list_style_layer_ids(
   MapObject& live, std::vector<std::string>& out_layer_ids
 ) -> mln_status {

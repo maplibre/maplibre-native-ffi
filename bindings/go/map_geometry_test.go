@@ -2,6 +2,7 @@ package maplibre
 
 import (
 	"errors"
+	"math"
 	"testing"
 )
 
@@ -149,5 +150,60 @@ func TestUnwrappedCoordinateConversionsPreserveVisibleWorldCopies(t *testing.T) 
 	}
 	if projectedRight.Longitude != right.Longitude {
 		t.Fatalf("projection longitude = %f, want %f", projectedRight.Longitude, right.Longitude)
+	}
+}
+
+func TestMetersPerPixelMatchesProjectionAndFollowsZoom(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := awaitForTest(runtime.NewMap())
+	if err != nil {
+		_ = closeRuntimeForTest(runtime)
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := closeMapForTest(m); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := closeRuntimeForTest(runtime); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if _, err := awaitForTest(m.UpdateCamera(CameraUpdate{Camera: CameraOptions{}.WithCenter(LatLng{Latitude: 45, Longitude: 0}).WithZoom(3)})); err != nil {
+		t.Fatalf("JumpTo(): %v", err)
+	}
+	metersPerPixel, err := awaitForTest(m.MetersPerPixelAtLatitude(45))
+	if err != nil {
+		t.Fatalf("MetersPerPixelAtLatitude(): %v", err)
+	}
+	projection, err := awaitForTest(m.NewProjection())
+	if err != nil {
+		t.Fatalf("NewProjection(): %v", err)
+	}
+	defer func() {
+		if err := projection.Close(); err != nil {
+			t.Errorf("Projection Close(): %v", err)
+		}
+	}()
+	projected, err := projection.MetersPerPixelAtLatitude(45)
+	if err != nil {
+		t.Fatalf("projection MetersPerPixelAtLatitude(): %v", err)
+	}
+	if math.Abs(projected-metersPerPixel) > 1e-9*metersPerPixel {
+		t.Fatalf("projection meters per pixel = %f, want %f", projected, metersPerPixel)
+	}
+
+	if _, err := awaitForTest(m.UpdateCamera(CameraUpdate{Camera: CameraOptions{}.WithZoom(4)})); err != nil {
+		t.Fatalf("JumpTo(zoom 4): %v", err)
+	}
+	zoomedIn, err := awaitForTest(m.MetersPerPixelAtLatitude(45))
+	if err != nil {
+		t.Fatalf("MetersPerPixelAtLatitude(zoom 4): %v", err)
+	}
+	if math.Abs(zoomedIn-metersPerPixel/2) > 1e-9*metersPerPixel {
+		t.Fatalf("zoom 4 meters per pixel = %f, want %f", zoomedIn, metersPerPixel/2)
 	}
 }

@@ -507,6 +507,30 @@ func TestQueriedFeatureEqualComparesFieldValues(t *testing.T) {
 	)
 }
 
+func TestStyleLayerEntryEqualComparesFieldValues(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"StyleLayerEntry",
+		func() StyleLayerEntry {
+			return StyleLayerEntry{
+				ID:          "roads",
+				Type:        "line",
+				SourceID:    optionPtr("tiles"),
+				SourceLayer: optionPtr("transportation"),
+			}
+		},
+		StyleLayerEntry.Equal,
+		[]func(*StyleLayerEntry){
+			func(o *StyleLayerEntry) { o.ID = "rails" },
+			func(o *StyleLayerEntry) { o.Type = "fill" },
+			func(o *StyleLayerEntry) { o.SourceID = optionPtr("other") },
+			func(o *StyleLayerEntry) { o.SourceID = nil },
+			func(o *StyleLayerEntry) { o.SourceLayer = optionPtr("water") },
+			func(o *StyleLayerEntry) { o.SourceLayer = nil },
+		},
+	)
+}
+
 func TestQueriedFeatureEqualComparesCopiedBuffersByContent(t *testing.T) {
 	feature := []byte(`{"type":"Feature"}`)
 	state := []byte(`{"hover":true}`)

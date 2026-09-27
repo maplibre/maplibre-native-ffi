@@ -578,6 +578,13 @@ fn py_offline_region_status(
     offline_region_status_to_py(py, &raw)
 }
 
+/// Returns the process-lifetime plugin registration function address.
+#[pyfunction]
+fn plugin_register_function_v1() -> usize {
+    // SAFETY: this accessor borrows no data.
+    unsafe { sys::mln_plugin_get_register_function_v1() }.expect("registration function") as usize
+}
+
 fn copied_string_view(view: sys::mln_buffer_view) -> PyResult<String> {
     unsafe { maplibre_core::string::copy_string_view(view) }.map_err(map_error)
 }
@@ -2233,6 +2240,22 @@ impl MapHandle {
         )
     }
 
+    fn meters_per_pixel_at_latitude(&self, py: Python<'_>, latitude: f64) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_map_meters_per_pixel_at_latitude(state.handle(), latitude, completion)
+            },
+            |py, result| {
+                Ok(completion_value::<f64>(result)?
+                    .into_pyobject(py)?
+                    .into_any()
+                    .unbind())
+            },
+        )
+    }
+
     fn pixels_for_lat_lngs(
         &self,
         py: Python<'_>,
@@ -3103,6 +3126,26 @@ impl MapHandle {
         )
     }
 
+    fn list_style_layers(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        submit_python_future(
+            py,
+            |completion| unsafe { sys::mln_map_list_style_layers(state.handle(), completion) },
+            |py, result| {
+                let list = PyList::empty(py);
+                for entry in completion_slice::<sys::mln_style_layer_entry>(result)? {
+                    let dict = PyDict::new(py);
+                    dict.set_item("id", copied_string_view(entry.id)?)?;
+                    dict.set_item("type", copied_string_view(entry.type_)?)?;
+                    dict.set_item("source_id", optional_string_view(entry.source_id)?)?;
+                    dict.set_item("source_layer", optional_string_view(entry.source_layer)?)?;
+                    list.append(dict)?;
+                }
+                Ok(list.into_any().unbind())
+            },
+        )
+    }
+
     fn list_style_layer_ids(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         self.submit_map_operation(
             py,
@@ -3734,6 +3777,22 @@ impl MapProjectionHandle {
         });
         maplibre_core::check(status).map_err(map_error)?;
         lat_lng_to_py(py, coordinate)
+    }
+
+    fn meters_per_pixel_at_latitude(&self, latitude: f64) -> PyResult<f64> {
+        let state = self.state();
+        let mut meters_per_pixel = 0.0;
+        // SAFETY: The C API validates the projection pointer, latitude, and
+        // output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_meters_per_pixel_at_latitude(
+                state.handle(),
+                latitude,
+                &mut meters_per_pixel,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(meters_per_pixel)
     }
 
     #[getter]
@@ -6083,6 +6142,18 @@ fn queried_features_to_py(
     Ok(list.unbind())
 }
 
+fn style_layer_info_to_py(
+    py: Python<'_>,
+    layer: maplibre_core::StyleLayerEntry,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("id", layer.id)?;
+    dict.set_item("type", layer.layer_type)?;
+    dict.set_item("source_id", layer.source_id)?;
+    dict.set_item("source_layer", layer.source_layer)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn source_info_to_py(py: Python<'_>, info: maplibre_core::SourceInfo) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("source_type", info.raw_source_type)?;
@@ -7951,6 +8022,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(projected_meters_for_lat_lng, module)?)?;
     module.add_function(wrap_pyfunction!(lat_lng_for_projected_meters, module)?)?;
     module.add_function(wrap_pyfunction!(set_network_status_raw, module)?)?;
+    module.add_function(wrap_pyfunction!(plugin_register_function_v1, module)?)?;
     module.add_function(wrap_pyfunction!(set_log_callback, module)?)?;
     module.add_function(wrap_pyfunction!(clear_log_callback, module)?)?;
     module.add_function(wrap_pyfunction!(set_async_log_severity_mask, module)?)?;

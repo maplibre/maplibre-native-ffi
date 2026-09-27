@@ -1079,6 +1079,68 @@ void main() {
     },
   );
 
+  test('style layer entries survive replacement and map close', () async {
+    final runtime = RuntimeHandle.create();
+    final map = await runtime.createMap();
+    await map.setStyleJson(
+      _jsonBytes(
+        '{"version":8,"sources":{},"layers":[{"id":"first","type":"background"},{"id":"second","type":"background"}]}',
+      ),
+    );
+    final entries = await map.listStyleLayers();
+    await map.setStyleJson(_jsonBytes(_emptyStyleJson));
+    expect(await map.listStyleLayers(), isEmpty);
+    await map.close();
+    await runtime.close();
+    expect(entries.map((entry) => entry.id), ['first', 'second']);
+    expect(entries.map((entry) => entry.type), ['background', 'background']);
+    expect(
+      entries.every(
+        (entry) => entry.sourceId == null && entry.sourceLayer == null,
+      ),
+      isTrue,
+    );
+  });
+
+  test(
+    'meters per pixel matches the projection and halves per zoom level',
+    () async {
+      final runtime = RuntimeHandle.create();
+      final map = await runtime.createMap(
+        options: const MapOptions(width: 512, height: 512),
+      );
+      addTearDown(() async {
+        await map.close();
+        await runtime.close();
+      });
+      await map.updateCamera(
+        const CameraOptions(center: LatLng(0, 0), zoom: 3),
+      );
+      final projection = await map.createProjection();
+      addTearDown(projection.close);
+
+      final metersPerPixel = await map.metersPerPixelAtLatitude(45);
+      expect(
+        projection.metersPerPixelAtLatitude(45),
+        closeTo(metersPerPixel, 1e-10),
+      );
+      await map.updateCamera(const CameraOptions(zoom: 4));
+      expect(
+        await map.metersPerPixelAtLatitude(45),
+        closeTo(metersPerPixel / 2, 1e-10),
+      );
+
+      expect(
+        () => map.metersPerPixelAtLatitude(91),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => projection.metersPerPixelAtLatitude(91),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+    },
+  );
+
   test('custom geometry tile callbacks reach their isolate', () async {
     final deliveredTiles = <CanonicalTileId>[];
     final callback =
@@ -2189,11 +2251,8 @@ void main() {
       );
 
       final sourceIds = await map.listStyleSourceIds();
-      expect(sourceIds, contains('org.maplibre.annotations'));
-      expect(
-        await map.listStyleLayerIds(),
-        contains('org.maplibre.annotations.points'),
-      );
+      expect(sourceIds, isEmpty);
+      expect(await map.listStyleLayerIds(), isEmpty);
       // Existence is answered by the info getters' found flag, and removing a
       // missing object fails with not-found.
       expect(await map.getStyleSourceInfo('missing-source'), isNull);

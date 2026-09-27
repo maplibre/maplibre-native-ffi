@@ -708,3 +708,13 @@ func mapSnapshotByIDForTest(id nativeMap) error {
 		return int32(C.mln_map_snapshot_get(C.mln_map(id), &raw))
 	})
 }
+
+// MetersPerPixelAtLatitude queries meters per logical pixel at the current zoom.
+func (m *MapHandle) MetersPerPixelAtLatitude(latitude float64) (*Future[float64], error) {
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_meters_per_pixel_at_latitude(raw, C.double(latitude), completion))
+	}, func(result *C.mln_completion_result) (float64, error) {
+		value, err := completionValue[C.double](result)
+		return float64(value), err
+	})
+}

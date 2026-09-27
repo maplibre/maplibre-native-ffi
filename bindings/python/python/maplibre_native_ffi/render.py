@@ -331,7 +331,7 @@ class RenderFrameResult:
     """Owned terminal result for one accepted frame demand.
 
     ``needs_repaint`` reports whether the map asked for another frame while it
-    rendered this one, as during an ongoing camera transition. It is set only
+    rendered this one, as during an ongoing paint transition. It is set only
     when ``disposition`` is ``RENDERED``, and reads false for every other
     outcome.
     """

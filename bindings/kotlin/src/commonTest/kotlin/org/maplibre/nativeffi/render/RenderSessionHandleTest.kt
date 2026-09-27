@@ -10,10 +10,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.coroutines.Deferred
-import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.CameraUpdate
-import org.maplibre.nativeffi.camera.CameraUpdateMode
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
@@ -207,7 +205,7 @@ class RenderSessionHandleTest {
   }
 
   @Test
-  fun renderedFrameResultsReportNeedsRepaintDuringCameraTransition(): Unit = runSuspendTest {
+  fun renderedFrameResultsReportNeedsRepaintDuringPaintTransition(): Unit = runSuspendTest {
     withOwnedTextureSession { runtime, map, owned ->
       val session = owned.session
       session.completeOnDriver(map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray()))
@@ -215,13 +213,14 @@ class RenderSessionHandleTest {
       session.renderUntilSettled()
 
       session.completeOnDriver(
-        map.updateCamera(
-          CameraUpdate(
-            mode = CameraUpdateMode.EASE,
-            camera = CameraOptions().apply { zoom = 4.0 },
-            animation = AnimationOptions().apply { durationMs = 60_000.0 },
-          )
+        map.setLayerProperty(
+          "bg",
+          "background-color-transition",
+          """{"duration":60000}""".encodeToByteArray(),
         )
+      )
+      session.completeOnDriver(
+        map.setLayerProperty("bg", "background-color", "\"#0000ff\"".encodeToByteArray())
       )
       session.completeOnDriver(runtime.barrier())
 

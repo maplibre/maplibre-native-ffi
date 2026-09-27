@@ -3833,6 +3833,38 @@ final class MapHandle {
     });
   }
 
+  /// Queries meters per logical pixel at the current zoom.
+  Future<double> metersPerPixelAtLatitude(double latitude) => _startMapValue(
+    copyKind:
+        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+    elementSize: sizeOf<Double>(),
+    start: (completion) => raw.mln_map_meters_per_pixel_at_latitude(
+      _handle.raw,
+      latitude,
+      completion,
+    ),
+    decode: (result) => result.value.cast<Double>().value,
+  );
+
+  /// Copies the layer stack in style order.
+  Future<List<StyleLayerEntry>> listStyleLayers() => _startMapValue(
+    copyKind: raw
+        .mln_adapter_completion_copy_kind
+        .MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYERS,
+    elementSize: sizeOf<raw.mln_style_layer_entry>(),
+    start: (completion) =>
+        raw.mln_map_list_style_layers(_handle.raw, completion),
+    decode: (result) => List.generate(result.value_count, (index) {
+      final entry = result.value.cast<raw.mln_style_layer_entry>()[index];
+      return StyleLayerEntry(
+        id: _copyStringView(entry.id) ?? '',
+        type: _copyStringView(entry.type) ?? '',
+        sourceId: _copyStringView(entry.source_id),
+        sourceLayer: _copyStringView(entry.source_layer),
+      );
+    }),
+  );
+
   /// Copies fixed style layer metadata, or null when no layer has [layerId].
   Future<LayerInfo?> getStyleLayerInfo(String layerId) => _startMapValue(
     copyKind: raw

@@ -200,25 +200,34 @@ def commit_url(sha: str) -> str:
     return f"{server_url}/{repository}/commit/{sha}"
 
 
+def compare_url(previous_tag: str, tag: str) -> str:
+    server_url = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
+    repository = required_env("GITHUB_REPOSITORY")
+    return f"{server_url}/{repository}/compare/{previous_tag}...{tag}"
+
+
 def write_notes(
     release_dir: pathlib.Path, channel: str, sha: str, version: str
 ) -> None:
-    title = (
-        "Unstable native package snapshot."
-        if channel == "snapshot"
-        else f"Native package {version}."
-    )
-    notes = "\n".join(
-        [
-            title,
+    if channel == "snapshot":
+        published = required_env("PUBLISH_TIMESTAMP")
+        lines = [f"Unstable native package snapshot, published {published}."]
+    else:
+        lines = [f"Native package {version}."]
+    lines += [
+        "",
+        f"Commit: {commit_url(sha)}",
+        f"CI run: {required_env('CI_RUN_URL')}",
+        f"Publishing run: {workflow_url()}",
+    ]
+    previous_tag = os.environ.get("PUBLISH_PREVIOUS_TAG")
+    if channel == "release" and previous_tag:
+        lines += [
             "",
-            f"Commit: {commit_url(sha)}",
-            f"CI run: {required_env('CI_RUN_URL')}",
-            f"Publishing run: {workflow_url()}",
-            "",
+            f"Full changelog: {compare_url(previous_tag, required_env('PUBLISH_TAG'))}",
         ]
-    )
-    (release_dir / RELEASE_NOTES_NAME).write_text(notes, encoding="utf-8")
+    lines.append("")
+    (release_dir / RELEASE_NOTES_NAME).write_text("\n".join(lines), encoding="utf-8")
 
 
 def prepare_assets(

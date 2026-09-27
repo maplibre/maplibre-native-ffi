@@ -224,4 +224,17 @@ enum NativeMap {
       }
     }
   }
+
+  static func metersPerPixelAtLatitude(
+    _ map: NativeMapHandle,
+    latitude: Double
+  ) throws -> NativeFuture<Double> {
+    try NativeCompletion.start({ mln_map_meters_per_pixel_at_latitude(
+      map.raw,
+      latitude,
+      $0
+    ) }) {
+      try NativeCompletion.value($0, as: Double.self)
+    }
+  }
 }

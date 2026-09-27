@@ -101,7 +101,8 @@ Requirements:
   emulator through the shared runners in `scripts/`
   (`run-android-emulator-test.sh`, `run-ohos-emulator-test.sh`, which boot the
   emulator on demand), iOS and tvOS simulator presets build a test bundle and
-  spawn it on a simulator, and Emscripten presets run in headless Chromium.
+  spawn it on a simulator, Mac Catalyst presets run that bundle on the host, and
+  Emscripten presets run in headless Chromium.
 - A preset that a binding cannot build or run MUST fail with a message that
   names what the binding supports. A device preset with no runner, such as
   `ios-arm64-metal` or `tvos-arm64-metal`, fails the same way and points at a
@@ -574,6 +575,21 @@ with that ID. The applied value is observable through the source metadata query.
 A volatile tile-backed source does not store fetched tiles in persistent
 storage. Other source types retain the value for inspection without changing
 their loading behavior.
+
+### Style layer listing
+
+Style layer listing returns the whole layer stack in style order as one copied,
+language-owned list of layer information values. Each value carries the layer
+ID, the style-spec layer type, an optional source ID, and an optional
+source-layer. The query MUST use a typed completion and copy every entry before
+the callback returns.
+
+An absent source ID means that the layer type takes no source, and an absent
+source-layer means that the layer names none. A binding represents each absence
+through its ordinary optional value rather than an empty string.
+
+Bindings own every returned string. A returned list remains valid after later
+style changes, style replacement, and map release.
 
 ## Callbacks And Requests
 

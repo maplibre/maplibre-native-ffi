@@ -16,10 +16,26 @@ directly when useful.
 include/                 # public C API headers
   maplibre_native_c.h    # public umbrella header
   maplibre_native_c/     # public domain headers
+    plugin.h             # layer plugin registration, outside the umbrella
 src/
   c_api/                 # exported C definitions and C boundary validation
   <subsystem>/           # implementation semantics
 ```
+
+`plugin.h` stays outside the umbrella. It includes MapLibre Native's
+`mln/plugin/plugin_api.h`, which the install copies next to this library's
+headers, and the shared library exports upstream's `mln_plugin_register_v1`.
+Upstream owns that contract and versions its structs independently of
+`mln_c_version()`, and a plugin is native code whose callbacks run on tile
+workers and the render thread for the process lifetime. Bindings expose the
+registration function for plugin integrations; plugin authoring uses the raw C
+contract.
+
+Plugin integrations obtain the host's registration function through
+`mln_plugin_get_register_function_v1()` and pass it to their own registration
+entry point. The integration loads the plugin and keeps its code loaded for the
+process lifetime. The plugin registers its descriptors through the supplied
+function, into the host's copy of MapLibre Native.
 
 ## ABI Rules
 
@@ -97,8 +113,8 @@ drives the graphics API the way a host does. An artifact carries the C API and
 nothing else that loads, so repackaging it copies no implementation along, and a
 host that loads its own still runs one: handles that one copy mints are opaque
 pointers another copy does not own. An artifact carries the C API's own headers
-alone, because the headers that a host builds surface descriptors against arrive
-with the implementation that it loads.
+and the plugin header, because the headers that a host builds surface
+descriptors against arrive with the implementation that it loads.
 
 A local stand-in for the implementation, its headers included, reaches the
 install tree through the CMake `loader` component, which a full installation and
@@ -240,6 +256,12 @@ Pick the category from what the function reads or writes:
   against it. The call returns after the worker is ready. Runtime creation is
   the model; wrapping startup in a completion only adds an observer and a typed
   result transfer before the root object exists.
+
+The meters-per-pixel calculation on a live map is a parameterized, ordered
+query; the same calculation on a detached projection is immediate. Style layer
+listing is an ordered query with a variable-length completion payload. Plugin
+registration is immediate process-global setup and must precede styles that use
+its layer types.
 
 Offer a published snapshot and an ordered completion for the same state only
 when each form does distinct work, as camera does: the snapshot serves

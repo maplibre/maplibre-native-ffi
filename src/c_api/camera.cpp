@@ -334,3 +334,13 @@ auto mln_map_set_free_camera_options(
     );
   });
 }
+
+auto mln_map_meters_per_pixel_at_latitude(
+  mln_map map, double latitude, const mln_completion* completion
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_meters_per_pixel_at_latitude(
+      map, latitude, completion
+    );
+  });
+}

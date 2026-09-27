@@ -1,8 +1,38 @@
+diff --git a/src/mln/gl/context.hpp b/src/mln/gl/context.hpp
+index 23b93b120525..e6691f91e582 100644
+--- a/src/mln/gl/context.hpp
++++ b/src/mln/gl/context.hpp
+@@ -9,6 +9,7 @@
+ #include <mln/gl/object.hpp>
+ #include <mln/gl/state.hpp>
+ #include <mln/gl/value.hpp>
++#include <mln/gl/defines.hpp>
+ #include <mln/gl/framebuffer.hpp>
+ #include <mln/gl/resource_pool.hpp>
+ #include <mln/gl/vertex_array.hpp>
+@@ -36,6 +37,17 @@ class VertexArray;
+ class Debugging;
+ } // namespace extension
+ 
++/// Reads and clears every pending GL error; true if one was GL_OUT_OF_MEMORY.
++/// The call being checked must not be wrapped in MBGL_CHECK_ERROR, which
++/// consumes the error in debug builds.
++inline bool hadOutOfMemoryError() {
++    bool outOfMemory = false;
++    for (auto error = platform::glGetError(); error != GL_NO_ERROR; error = platform::glGetError()) {
++        outOfMemory |= error == GL_OUT_OF_MEMORY;
++    }
++    return outOfMemory;
++}
++
+ class Context final : public gfx::Context {
+ public:
+     Context(RendererBackend&);
 diff --git a/src/mln/gl/resource_pool.cpp b/src/mln/gl/resource_pool.cpp
-index 5c9fb64..df311df 100644
+index 5c9fb6452090..ee4e0def7812 100644
 --- a/src/mln/gl/resource_pool.cpp
 +++ b/src/mln/gl/resource_pool.cpp
-@@ -145,15 +145,18 @@ TextureID Texture2DPool::allocateGLMemory(const Texture2DDesc& desc) {
+@@ -145,16 +145,16 @@ TextureID Texture2DPool::allocateGLMemory(const Texture2DDesc& desc) {
      // Bind to TU 0 and upload
      context->activeTextureUnit = 0;
      context->texture[0] = id;
@@ -15,9 +45,7 @@ index 5c9fb64..df311df 100644
 -                                  Enum<gfx::TexturePixelType>::to(desc.pixelFormat),
 -                                  Enum<gfx::TextureChannelDataType>::to(desc.channelType),
 -                                  nullptr));
-+    // Attribute only errors from this allocation to allocation failure.
-+    while (glGetError() != GL_NO_ERROR) {
-+    }
+-    if (glGetError()) {
 +    glTexImage2D(GL_TEXTURE_2D,
 +                 0,
 +                 Enum<gfx::TexturePixelType>::sizedFor(desc.pixelFormat, desc.channelType),
@@ -27,14 +55,25 @@ index 5c9fb64..df311df 100644
 +                 Enum<gfx::TexturePixelType>::to(desc.pixelFormat),
 +                 Enum<gfx::TextureChannelDataType>::to(desc.channelType),
 +                 nullptr);
-     if (glGetError()) {
++    if (hadOutOfMemoryError()) {
          throw std::bad_alloc();
      }
+ 
 diff --git a/src/mln/gl/uniform_buffer_gl.cpp b/src/mln/gl/uniform_buffer_gl.cpp
-index 3ebafe8..0797706 100644
+index 3ebafe82ffab..6f0ff4a264f8 100644
 --- a/src/mln/gl/uniform_buffer_gl.cpp
 +++ b/src/mln/gl/uniform_buffer_gl.cpp
-@@ -89,9 +89,9 @@ UniformBufferGL::UniformBufferGL(const UniformBufferGL& other)
+@@ -84,14 +84,19 @@ UniformBufferGL::UniformBufferGL(const UniformBufferGL& other)
+ #endif
+       managedBuffer(other.managedBuffer.allocator, this) {
+     MLN_TRACE_ALLOC_CONST_BUFFER(uniqueDebugId, other.size);
++    context.renderingStats().numUniformBuffers++;
++    context.renderingStats().memUniformBuffers += size;
++    context.renderingStats().totalBuffers++;
++    context.renderingStats().numBuffers++;
++    context.renderingStats().memBuffers += size;
+     managedBuffer.setOwner(this);
+     if (other.isManagedAllocation) {
          managedBuffer.allocate(other.managedBuffer.getContents().data(), other.size);
      } else {
          MBGL_CHECK_ERROR(glGenBuffers(1, &localID));
@@ -46,30 +85,152 @@ index 3ebafe8..0797706 100644
      }
  }
 diff --git a/src/mln/gl/upload_pass.cpp b/src/mln/gl/upload_pass.cpp
-index 2eb6ef7..3940ae2 100644
+index 2eb6ef73045e..6c6082f92086 100644
 --- a/src/mln/gl/upload_pass.cpp
 +++ b/src/mln/gl/upload_pass.cpp
-@@ -35,7 +35,10 @@ std::unique_ptr<gfx::VertexBufferResource> UploadPass::createVertexBufferResourc
+@@ -35,8 +35,8 @@ std::unique_ptr<gfx::VertexBufferResource> UploadPass::createVertexBufferResourc
      // NOLINTNEXTLINE(performance-move-const-arg)
      UniqueBuffer result{std::move(id), {commandEncoder.context}};
      commandEncoder.context.vertexBuffer = result;
 -    MBGL_CHECK_ERROR(glBufferData(GL_ARRAY_BUFFER, size, data, Enum<gfx::BufferUsageType>::to(usage)));
-+    // Attribute only errors from this allocation to allocation failure.
-+    while (glGetError() != GL_NO_ERROR) {
-+    }
+-    if (glGetError()) {
 +    glBufferData(GL_ARRAY_BUFFER, size, data, Enum<gfx::BufferUsageType>::to(usage));
-     if (glGetError()) {
++    if (hadOutOfMemoryError()) {
          throw std::bad_alloc();
      }
-@@ -63,7 +66,10 @@ std::unique_ptr<gfx::IndexBufferResource> UploadPass::createIndexBufferResource(
+     return std::make_unique<gl::VertexBufferResource>(std::move(result), static_cast<int>(size));
+@@ -63,8 +63,8 @@ std::unique_ptr<gfx::IndexBufferResource> UploadPass::createIndexBufferResource(
      UniqueBuffer result{std::move(id), {commandEncoder.context}};
      commandEncoder.context.bindVertexArray = 0;
      commandEncoder.context.globalVertexArrayState.indexBuffer = result;
 -    MBGL_CHECK_ERROR(glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, data, Enum<gfx::BufferUsageType>::to(usage)));
-+    // Attribute only errors from this allocation to allocation failure.
-+    while (glGetError() != GL_NO_ERROR) {
-+    }
+-    if (glGetError()) {
 +    glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, data, Enum<gfx::BufferUsageType>::to(usage));
-     if (glGetError()) {
++    if (hadOutOfMemoryError()) {
          throw std::bad_alloc();
      }
+     return std::make_unique<gl::IndexBufferResource>(std::move(result), static_cast<int>(size));
+diff --git a/test/gl/context.test.cpp b/test/gl/context.test.cpp
+index 93783c0363aa..fbe2701c52dd 100644
+--- a/test/gl/context.test.cpp
++++ b/test/gl/context.test.cpp
+@@ -6,7 +6,12 @@
+ #include <mln/gl/context.hpp>
+ #include <mln/style/layers/custom_layer.hpp>
+ #include <mln/gl/defines.hpp>
++#include <mln/gl/headless_backend.hpp>
+ #include <mln/gl/renderable_resource.hpp>
++#include <mln/gl/uniform_buffer_gl.hpp>
++#include <mln/gfx/types.hpp>
++#include <mln/gfx/upload_pass.hpp>
++#include <mln/gl/upload_pass.hpp>
+ #include <mln/map/map.hpp>
+ #include <mln/map/map_options.hpp>
+ #include <mln/platform/gl_functions.hpp>
+@@ -19,6 +24,10 @@
+ #include <mln/util/mat4.hpp>
+ #include <mln/util/run_loop.hpp>
+ 
++#include <array>
++#include <cstring>
++#include <vector>
++
+ using namespace mln;
+ using namespace mln::style;
+ using namespace mln::platform;
+@@ -124,4 +133,56 @@ TEST(GLContextMode, Shared) {
+     test::checkImage("test/fixtures/shared_context", frontend.render(map).image, 0.5, 0.1);
+ }
+ 
++TEST(GLContext, BufferAllocationIgnoresEarlierErrors) {
++    gl::HeadlessBackend backend{{32, 32}};
++    gfx::BackendScope scope{backend};
++
++    gl::Context context{backend};
++    auto commandEncoder = context.createCommandEncoder();
++    auto uploadPass = commandEncoder->createUploadPass("upload", backend.getDefaultRenderable());
++    auto& glUploadPass = static_cast<gl::UploadPass&>(*uploadPass);
++
++    const std::array<float, 6> vertices = {{0.0f, 0.5f, 0.5f, -0.5f, -0.5f, -0.5f}};
++    const std::array<uint16_t, 3> indices = {{0, 1, 2}};
++
++    glBindBuffer(0, 0);
++    EXPECT_NO_THROW(glUploadPass.createVertexBufferResource(
++        vertices.data(), vertices.size() * sizeof(float), gfx::BufferUsageType::StaticDraw, false));
++    EXPECT_EQ(glGetError(), GL_NO_ERROR);
++
++    glBindBuffer(0, 0);
++    EXPECT_NO_THROW(glUploadPass.createIndexBufferResource(
++        indices.data(), indices.size() * sizeof(uint16_t), gfx::BufferUsageType::StaticDraw, false));
++    EXPECT_EQ(glGetError(), GL_NO_ERROR);
++}
++
++TEST(GLContext, UniformBufferCloneCopiesLargeBuffer) {
++    gl::HeadlessBackend backend{{32, 32}};
++    gfx::BackendScope scope{backend};
++
++    gl::Context context{backend};
++
++    constexpr std::size_t size = 16384;
++    std::vector<uint8_t> data(size);
++    for (std::size_t i = 0; i < size; ++i) {
++        data[i] = static_cast<uint8_t>(i % 251);
++    }
++
++    auto buffer = context.createUniformBuffer(data.data(), size, /*persistent=*/false, /*ssbo=*/false);
++    ASSERT_TRUE(buffer);
++    auto& glBuffer = static_cast<gl::UniformBufferGL&>(*buffer);
++    ASSERT_EQ(glGetError(), GL_NO_ERROR);
++
++    auto clone = glBuffer.clone();
++    EXPECT_EQ(glGetError(), GL_NO_ERROR);
++
++    MBGL_CHECK_ERROR(glBindBuffer(GL_COPY_READ_BUFFER, clone.getID()));
++    const auto* contents = static_cast<const uint8_t*>(
++        MBGL_CHECK_ERROR(glMapBufferRange(GL_COPY_READ_BUFFER, 0, size, GL_MAP_READ_BIT)));
++    ASSERT_NE(contents, nullptr);
++    EXPECT_EQ(0, std::memcmp(contents, data.data(), size));
++    MBGL_CHECK_ERROR(glUnmapBuffer(GL_COPY_READ_BUFFER));
++    MBGL_CHECK_ERROR(glBindBuffer(GL_COPY_READ_BUFFER, 0));
++}
++
+ #endif
+diff --git a/test/gl/resource_pool.test.cpp b/test/gl/resource_pool.test.cpp
+index 8cae45e2e373..e50ca47112c5 100644
+--- a/test/gl/resource_pool.test.cpp
++++ b/test/gl/resource_pool.test.cpp
+@@ -7,8 +7,11 @@
+ #include <mln/gfx/types.hpp>
+ #include <mln/gl/headless_backend.hpp>
+ #include <mln/gl/context.hpp>
++#include <mln/gl/defines.hpp>
++#include <mln/platform/gl_functions.hpp>
+ 
+ using namespace mln;
++using namespace mln::platform;
+ 
+ namespace {
+ 
+@@ -120,4 +123,22 @@ TEST(ResourcePool, TexturePool) {
+     EXPECT_TRUE(context.empty(true));
+ }
+ 
++TEST(ResourcePool, TextureAllocationIgnoresEarlierErrors) {
++    gl::HeadlessBackend backend{{32, 32}};
++    gfx::BackendScope scope{backend};
++
++    gl::Context context{backend};
++    auto& pool = context.getTexturePool();
++
++    glBindBuffer(0, 0);
++
++    gl::TextureID id = 0;
++    EXPECT_NO_THROW(id = pool.alloc(makeDescOneMB()));
++    EXPECT_EQ(glGetError(), GL_NO_ERROR);
++
++    pool.release(id);
++    context.reduceMemoryUsage();
++    context.renderingStats().numActiveTextures = 0;
++}
++
+ #endif

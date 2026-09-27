@@ -118,3 +118,13 @@ auto mln_lat_lng_for_projected_meters(
     return mln::core::lat_lng_for_projected_meters(meters, out_coordinate);
   });
 }
+
+auto mln_map_projection_meters_per_pixel_at_latitude(
+  mln_map_projection projection, double latitude, double* out_meters_per_pixel
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_projection_meters_per_pixel_at_latitude(
+      projection, latitude, out_meters_per_pixel
+    );
+  });
+}

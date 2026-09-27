@@ -2,6 +2,7 @@
 // structs, unknown raw masks/enums, and preinitialized outputs hidden by
 // bindings.
 
+#include <math.h>
 #include <stdint.h>
 
 #include "abi_tests.h"
@@ -455,6 +456,19 @@ static void map_coordinate_conversion_rejects_invalid_arguments(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_lat_lngs_for_pixels_unwrapped(fixture.map, NULL, 1, &operation)
+  );
+  double meters_per_pixel = 0.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_meters_per_pixel_at_latitude(fixture.map, 0.0, NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_meters_per_pixel_at_latitude(fixture.map, 91.0, &meters_per_pixel)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_meters_per_pixel_at_latitude(fixture.map, NAN, &meters_per_pixel)
   );
   destroy_map_fixture(fixture);
 }

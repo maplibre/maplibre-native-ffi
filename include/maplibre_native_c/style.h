@@ -277,6 +277,21 @@ typedef struct mln_style_source_info {
   uint32_t raster_encoding;
 } mln_style_source_info;
 
+/**
+ * One style layer borrowed for a list completion callback.
+ *
+ * Views remain valid until the completion callback returns. type is the
+ * style-spec layer type string. source_id is empty for a layer type that takes
+ * no source, and source_layer is empty when the layer names none.
+ */
+typedef struct mln_style_layer_entry {
+  uint32_t size;
+  mln_buffer_view id;
+  mln_buffer_view type;
+  mln_buffer_view source_id;
+  mln_buffer_view source_layer;
+} mln_style_layer_entry;
+
 /** Complete source metadata borrowed for a completion callback. */
 typedef struct mln_style_source_result {
   uint32_t size;
@@ -1831,6 +1846,22 @@ MLN_API mln_status mln_map_get_style_layer_info(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_list_style_layer_ids(
+  mln_map map, const mln_completion* completion
+) MLN_NOEXCEPT;
+
+/**
+ * Starts an ordered query of every style layer in style order.
+ *
+ * The completion borrows mln_style_layer_entry[value_count]. Copy retained
+ * entries and their string views before the callback returns.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the query was accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is not live or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_list_style_layers(
   mln_map map, const mln_completion* completion
 ) MLN_NOEXCEPT;
 

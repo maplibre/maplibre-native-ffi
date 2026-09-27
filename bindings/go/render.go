@@ -485,7 +485,7 @@ type RenderFrameResult struct {
 	ExtentGeneration    uint64
 	FrameGeneration     uint64
 	// NeedsRepaint reports whether the map asked for another frame while it
-	// rendered this one, as during an ongoing camera transition. It is true
+	// rendered this one, as during an ongoing paint transition. It is true
 	// only when Disposition is RenderResultRendered and reads false for every
 	// other outcome. This is the same signal a
 	// RuntimeEventMapRenderFrameFinished event carries in its NeedsRepaint

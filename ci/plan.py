@@ -50,6 +50,11 @@ def previous_verdict(
             "failure",
         }:
             return None
+        # Attempt 1 failures are still eligible for the one CI retry. Restating
+        # that verdict on a newer run can remain the required check after the
+        # retry succeeds.
+        if job["conclusion"] == "failure" and run.get("run_attempt", 1) == 1:
+            return None
         return {"result": job["conclusion"], "url": job["html_url"]}
     # A bounded lookup is an optimization. Missing evidence executes coverage.
     return None

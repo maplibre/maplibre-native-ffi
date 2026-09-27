@@ -45,6 +45,7 @@ import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerEntry
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileScheme
@@ -892,6 +893,76 @@ class MapHandleTest {
     } finally {
       map.close()
       runtime.close()
+    }
+  }
+
+  @Test
+  fun metersPerPixelQueryObservesCameraCommands(): Unit = runSuspendTest {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map = MapHandle.create(runtime, MapOptions()).await()
+    try {
+      map.updateCamera(CameraUpdate(camera = CameraOptions().apply { zoom = 3.0 })).awaitCommitted()
+      val projection = map.createProjection().await()
+      try {
+        val meters = map.metersPerPixelAtLatitude(45.0).await()
+        assertEquals(meters, projection.metersPerPixelAtLatitude(45.0), 1e-10)
+        map
+          .updateCamera(CameraUpdate(camera = CameraOptions().apply { zoom = 4.0 }))
+          .awaitCommitted()
+        assertEquals(meters / 2, map.metersPerPixelAtLatitude(45.0).await(), 1e-10)
+        assertEquals(meters, projection.metersPerPixelAtLatitude(45.0), 1e-10)
+      } finally {
+        projection.close()
+      }
+    } finally {
+      map.close().await()
+      runtime.close().await()
+    }
+  }
+
+  // BND-105: the layer stack lists in style order with optional source fields.
+  @Test
+  fun styleLayersListTheLayerStackInStyleOrder(): Unit = runSuspendTest {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+            mapMode = MapMode.STATIC
+          },
+        )
+        .await()
+
+    try {
+      map.setStyleJson(
+        """
+        {
+          "version": 8,
+          "sources": {
+            "tiles": {"type": "vector", "tiles": ["https://example.invalid/{z}/{x}/{y}.pbf"]}
+          },
+          "layers": [
+            {"id": "roads", "type": "line", "source": "tiles", "source-layer": "transportation"},
+            {"id": "sky", "type": "background"}
+          ]
+        }
+        """
+          .trimIndent()
+          .encodeToByteArray()
+      )
+
+      assertEquals(
+        listOf(
+          StyleLayerEntry("roads", "line", "tiles", "transportation"),
+          StyleLayerEntry("sky", "background", null, null),
+        ),
+        map.styleLayers().await(),
+      )
+    } finally {
+      map.close().await()
+      runtime.close().await()
     }
   }
 

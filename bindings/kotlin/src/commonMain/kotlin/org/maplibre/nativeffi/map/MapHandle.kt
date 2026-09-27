@@ -40,6 +40,7 @@ import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerEntry
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
@@ -404,6 +405,12 @@ public expect class MapHandle {
 
   /** Returns one layer's copied metadata, or null when no layer carries [layerId]. */
   public fun styleLayerInfo(layerId: String): Deferred<LayerInfo?>
+
+  /** Copies every layer's identity and source in style order. */
+  public fun styleLayers(): Deferred<List<StyleLayerEntry>>
+
+  /** Queries meters per logical pixel at the current zoom. */
+  public fun metersPerPixelAtLatitude(latitude: Double): Deferred<Double>
 
   public fun styleLayerIds(): Deferred<List<String>>
 

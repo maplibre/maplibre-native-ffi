@@ -55,6 +55,7 @@ struct AdapterCompletionRecord {
   mln_style_source_result style_source{};
   mln_style_source_tile_urls_result style_source_tile_urls{};
   mln_style_layer_result style_layer{};
+  std::vector<mln_style_layer_entry> style_layers;
   mln_style_image_result style_image{};
   mln_style_image_stretches_result image_stretches{};
   std::vector<mln_image_stretch> stretch_x;
@@ -285,6 +286,19 @@ auto copy_completion_value(
         record.views.push_back(copy_view(record, url));
       record.style_source_tile_urls.tile_urls = record.views.data();
       record.view.result.value = &record.style_source_tile_urls;
+      break;
+    }
+    case MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYERS: {
+      const auto* entries =
+        static_cast<const mln_style_layer_entry*>(result.value);
+      record.style_layers.assign(entries, entries + result.value_count);
+      for (auto& entry : record.style_layers) {
+        entry.id = copy_view(record, entry.id);
+        entry.type = copy_view(record, entry.type);
+        entry.source_id = copy_view(record, entry.source_id);
+        entry.source_layer = copy_view(record, entry.source_layer);
+      }
+      record.view.result.value = record.style_layers.data();
       break;
     }
     case MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER: {
@@ -724,7 +738,7 @@ extern "C" MLN_API auto mln_adapter_completion_create(
       out_completion->callback != nullptr ||
       out_completion->user_data != nullptr ||
       out_completion->release_user_data != nullptr || listener == nullptr ||
-      copy_kind > MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS
+      copy_kind > MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYERS
     ) {
       mln::core::set_thread_error("completion adapter arguments are invalid");
       return MLN_STATUS_INVALID_ARGUMENT;

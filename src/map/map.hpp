@@ -59,6 +59,7 @@ enum class StyleOperationKind : uint32_t {
   ImageCoordinates,
   LayerInfo,
   LayerIds,
+  Layers,
   LayerJson,
   LightProperty,
   GlobalState,
@@ -69,10 +70,18 @@ enum class StyleOperationKind : uint32_t {
   LayerSourceId
 };
 
+struct StyleLayerRecord {
+  std::string id;
+  std::string type;
+  std::string source_id;
+  std::string source_layer;
+};
+
 struct StyleOperationResult {
   bool found = false;
   mln_style_source_info source_info{};
   mln_style_layer_info layer_info{};
+  std::vector<StyleLayerRecord> layers;
   mln_style_image_info image_info{};
   mln_style_transition_options transition_options{};
   std::string bytes;
@@ -124,10 +133,12 @@ enum class GeometryOperationKind : uint32_t {
   PixelForCoordinate,
   CoordinateForPixel,
   PixelsForCoordinates,
-  CoordinatesForPixels
+  CoordinatesForPixels,
+  MetersPerPixel
 };
 
 struct GeometryOperationResult {
+  double meters_per_pixel = 0;
   mln_camera_options camera{};
   mln_lat_lng_bounds bounds{};
   mln_screen_point point{};
@@ -512,6 +523,16 @@ auto map_projection_lat_lng_for_pixel(
 auto map_projection_lat_lng_for_pixel_unwrapped(
   mln_map_projection projection, mln_screen_point point,
   mln_lat_lng* out_coordinate
+) -> mln_status;
+auto map_meters_per_pixel_at_latitude(
+  mln_map map, double latitude, const mln_completion* completion
+) -> mln_status;
+auto map_list_style_layers(
+  MapObject& live, std::vector<StyleLayerRecord>& layers
+) -> mln_status;
+
+auto map_projection_meters_per_pixel_at_latitude(
+  mln_map_projection projection, double latitude, double* out_meters_per_pixel
 ) -> mln_status;
 auto projected_meters_for_lat_lng(
   mln_lat_lng coordinate, mln_projected_meters* out_meters

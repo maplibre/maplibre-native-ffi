@@ -7,9 +7,9 @@ pub(crate) use maplibre_core::style::{
 };
 pub use maplibre_core::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, SourceInfo,
-    SourceType, StyleImage, StyleImageInfo, StyleImageOptions, StyleImageTextFit, StyleLayerInfo,
-    StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo, TileScheme, TileSourceOptions,
-    VectorTileEncoding,
+    SourceType, StyleImage, StyleImageInfo, StyleImageOptions, StyleImageTextFit, StyleLayerEntry,
+    StyleLayerInfo, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo, TileScheme,
+    TileSourceOptions, VectorTileEncoding,
 };
 use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_core::ptr::const_ptr_or_null;
@@ -761,7 +761,7 @@ impl super::MapHandle {
     /// Copies one style source's attribution.
     ///
     /// The completion carries no value when no source has the ID, and when the
-    /// source carries no attribution. [`MapHandle::style_source_info`] reads
+    /// source carries no attribution. [`Self::style_source_info`] reads
     /// the attribution together with the rest of a source's metadata.
     pub fn style_source_attribution(
         &self,
@@ -782,7 +782,7 @@ impl super::MapHandle {
     ///
     /// The completion carries no value when no source has the ID, and when the
     /// source carries inline TileJSON instead of a URL.
-    /// [`MapHandle::style_source_info`] reads the URL together with the rest of
+    /// [`Self::style_source_info`] reads the URL together with the rest of
     /// a source's metadata.
     pub fn style_source_url(&self, source_id: &str) -> Result<NativeFuture<Option<String>>> {
         let source_id = maplibre_core::string::string_view(source_id);
@@ -800,7 +800,7 @@ impl super::MapHandle {
     ///
     /// The completion carries no value when no source has the ID, and an empty
     /// sequence when the source loads its TileJSON from a URL or carries no
-    /// inline TileJSON. [`MapHandle::style_source_info`] reads the tile URLs
+    /// inline TileJSON. [`Self::style_source_info`] reads the tile URLs
     /// together with the rest of a source's metadata.
     pub fn style_source_tile_urls(
         &self,
@@ -1425,6 +1425,23 @@ impl super::MapHandle {
                 sys::mln_map_get_style_layer_info(map, layer_id.raw(), completion)
             },
             copy_layer_info,
+        )
+    }
+
+    /// Copies every layer's identity and source in style order.
+    pub fn style_layers(&self) -> Result<NativeFuture<Vec<crate::StyleLayerEntry>>> {
+        self.submit_query(
+            // SAFETY: map and completion are valid for this submission.
+            |map, completion| unsafe { sys::mln_map_list_style_layers(map, completion) },
+            |result| {
+                crate::completion::copy_slice::<sys::mln_style_layer_entry>(result)?
+                    .into_iter()
+                    .map(|entry| {
+                        // SAFETY: all entry views are borrowed for this completion.
+                        unsafe { maplibre_core::style::style_layer_entry_from_native(&entry) }
+                    })
+                    .collect()
+            },
         )
     }
 

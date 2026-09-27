@@ -34,8 +34,8 @@ mod style;
 pub use style::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, SourceInfo,
     SourceType, StyleImage, StyleImageInfo, StyleImageOptions, StyleImageStretches,
-    StyleImageTextFit, StyleLayerInfo, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo,
-    TileScheme, TileSourceOptions, VectorTileEncoding,
+    StyleImageTextFit, StyleLayerEntry, StyleLayerInfo, StyleLayerVisibility,
+    StyleTransitionOptions, TileJsonInfo, TileScheme, TileSourceOptions, VectorTileEncoding,
 };
 
 #[derive(Debug)]
@@ -364,6 +364,17 @@ impl MapHandle {
         self.submit_command(move |map, completion| unsafe {
             sys::mln_map_apply_camera_delta(map, &raw, completion)
         })
+    }
+
+    /// Queries meters per logical pixel at the current zoom.
+    pub fn meters_per_pixel_at_latitude(&self, latitude: f64) -> Result<NativeFuture<f64>> {
+        self.submit_query(
+            // SAFETY: map is live and completion is valid for the submission.
+            move |map, completion| unsafe {
+                sys::mln_map_meters_per_pixel_at_latitude(map, latitude, completion)
+            },
+            crate::completion::copy_value::<f64>,
+        )
     }
 
     /// Starts an ordered camera query.

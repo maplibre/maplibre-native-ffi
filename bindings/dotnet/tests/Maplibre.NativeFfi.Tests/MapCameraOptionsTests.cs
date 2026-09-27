@@ -11,6 +11,62 @@ public sealed class MapCameraOptionsTests
 {
     private const int CoordinatePrecision = 10;
 
+    [Fact]
+    public async Task MetersPerPixelQueryObservesCommandsAndProjectionStaysDetached()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
+        var cancellation = TestContext.Current.CancellationToken;
+        await map.UpdateCameraAsync(
+            new CameraUpdate { Camera = new CameraOptions { Zoom = 3 } },
+            cancellation
+        );
+        using var projection = await map.CreateProjectionAsync();
+        var meters = await map.MetersPerPixelAtLatitudeAsync(45, cancellation);
+        Assert.Equal(meters, projection.MetersPerPixelAtLatitude(45), CoordinatePrecision);
+        await map.UpdateCameraAsync(
+            new CameraUpdate { Camera = new CameraOptions { Zoom = 4 } },
+            cancellation
+        );
+        Assert.Equal(
+            meters / 2,
+            await map.MetersPerPixelAtLatitudeAsync(45, cancellation),
+            CoordinatePrecision
+        );
+        Assert.Equal(meters, projection.MetersPerPixelAtLatitude(45), CoordinatePrecision);
+    }
+
+    [Fact]
+    public async Task LayerListCopiesOrderedEntriesAcrossStyleReplacement()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(runtime, new MapOptions());
+        var cancellation = TestContext.Current.CancellationToken;
+        await map.SetStyleJsonAsync(
+            """{"version":8,"sources":{},"layers":[{"id":"first","type":"background"},{"id":"second","type":"background"}]}"""u8.ToArray(),
+            cancellation
+        );
+        var layers = await map.StyleLayersAsync(cancellation);
+        await map.SetStyleJsonAsync(
+            """{"version":8,"sources":{},"layers":[]}"""u8.ToArray(),
+            cancellation
+        );
+        Assert.Equal(new[] { "first", "second" }, layers.Select(layer => layer.Id));
+        Assert.All(
+            layers,
+            layer =>
+            {
+                Assert.Equal("background", layer.Type);
+                Assert.Null(layer.SourceId);
+                Assert.Null(layer.SourceLayer);
+            }
+        );
+        Assert.Empty(await map.StyleLayersAsync(cancellation));
+    }
+
     private static void AssertClose(LatLng expected, LatLng actual)
     {
         Assert.Equal(expected.Latitude, actual.Latitude, CoordinatePrecision);

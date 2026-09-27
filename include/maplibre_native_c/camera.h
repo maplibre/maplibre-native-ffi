@@ -574,6 +574,23 @@ MLN_API mln_status mln_map_lat_lngs_for_pixels_unwrapped(
   const mln_completion* completion
 ) MLN_NOEXCEPT;
 
+/**
+ * Starts an ordered query of meters per logical pixel at a latitude and the
+ * current map zoom. The completion borrows one double.
+ *
+ * MapLibre Native computes the scale, including its zoom and latitude clamps.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the query was accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is not live, completion is invalid,
+ *   or latitude is not finite or outside [-90, 90].
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_meters_per_pixel_at_latitude(
+  mln_map map, double latitude, const mln_completion* completion
+) MLN_NOEXCEPT;
+
 #ifdef __cplusplus
 }
 #endif

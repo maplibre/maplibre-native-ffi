@@ -694,7 +694,7 @@ static void dedicated_egl_texture_uses_a_readback_only_core_worker(void) {
 }
 
 // The repaint flag a rendered frame result carries: a settled static map
-// reports false, and a running camera transition reports true.
+// reports false, and a running paint transition reports true.
 static void frame_results_report_whether_the_map_needs_another_frame(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -780,16 +780,21 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
   }
   TEST_ASSERT_TRUE(saw_no_update);
 
-  // A long camera transition asks for another frame from every rendered one.
-  mln_camera_update update = mln_camera_update_default();
-  update.mode = MLN_CAMERA_UPDATE_MODE_EASE;
-  update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
-  update.camera.zoom = 4.0;
-  update.animation.fields = MLN_ANIMATION_OPTION_DURATION;
-  update.animation.duration_ms = 60000.0;
-  TEST_ASSERT_EQUAL_INT(
+  // A paint transition asks for another frame from every rendered one.
+  MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK,
-    mln_map_update_camera(map, &update, MLN_TEST_DISCARD_COMPLETION)
+    mln_map_set_layer_property(
+      map, MLN_BUFFER_LITERAL("bg"),
+      MLN_BUFFER_LITERAL("background-color-transition"),
+      MLN_BUFFER_LITERAL("{\"duration\":60000}"), &completion.descriptor
+    )
+  );
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_set_layer_property(
+      map, MLN_BUFFER_LITERAL("bg"), MLN_BUFFER_LITERAL("background-color"),
+      MLN_BUFFER_LITERAL("\"#0000ff\""), &completion.descriptor
+    )
   );
 
   bool saw_repaint_request = false;

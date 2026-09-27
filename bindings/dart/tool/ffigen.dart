@@ -17,9 +17,10 @@ void main(List<String> args) {
   final headerRoot = repoRoot.resolve('include/');
   final publicHeader = headerRoot.resolve('maplibre_native_c.h');
   final publicHeaderDir = headerRoot.resolve('maplibre_native_c/');
-  // The callback adapter is a public header outside the umbrella, so it needs
-  // its own entry point.
+  // The callback adapter and plugin headers are public headers outside the
+  // umbrella, so each needs its own entry point.
   final adapterHeader = publicHeaderDir.resolve('callback_adapter.h');
+  final pluginHeader = publicHeaderDir.resolve('plugin.h');
 
   FfiGenerator(
     output: Output(
@@ -37,7 +38,7 @@ void main(List<String> args) {
 ''',
     ),
     headers: Headers(
-      entryPoints: [publicHeader, adapterHeader],
+      entryPoints: [publicHeader, adapterHeader, pluginHeader],
       // Keep generation to the repository's own headers so that transitively
       // included system and Vulkan declarations stay out of the bindings.
       include: (header) =>
@@ -45,6 +46,8 @@ void main(List<String> args) {
           header.toString().startsWith(publicHeaderDir.toString()),
       compilerOptions: [
         '-I${headerRoot.toFilePath()}',
+        // plugin.h includes upstream's mln/plugin/plugin_api.h.
+        '-I${repoRoot.resolve('third_party/maplibre-native/include/').toFilePath()}',
         '-I${repoRoot.resolve('third_party/maplibre-native/vendor/Vulkan-Headers/include/').toFilePath()}',
         // libclang does not ship its own builtin headers, so point it at the
         // resource directory of the clang on PATH.

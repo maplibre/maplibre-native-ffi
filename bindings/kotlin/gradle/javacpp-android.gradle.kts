@@ -42,6 +42,9 @@ val javaCppConfigSources =
     "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/AndroidNativeBridge.java",
   )
 val checkedInCHeaders = rootProject.layout.projectDirectory.dir("include")
+// plugin_bridge.h includes upstream's mln/plugin/plugin_api.h from the submodule.
+val upstreamPluginHeaders =
+  rootProject.layout.projectDirectory.dir("third_party/maplibre-native/include")
 val generatedJavaCppSources =
   layout.buildDirectory.dir("generated/sources/javacpp/androidMain/java")
 val generatedJavaCppClasses = layout.buildDirectory.dir("classes/javacppGenerated")
@@ -83,7 +86,7 @@ val generateJavaCppBindings =
     args(
       "-classpath",
       classpath.asPath,
-      "-Dplatform.includepath=${checkedInCHeaders.asFile.absolutePath}",
+      "-Dplatform.includepath=${listOf(checkedInCHeaders.asFile, upstreamPluginHeaders.asFile).joinToString(File.pathSeparator)}",
       "-d",
       generatedJavaCppSources.get().asFile.absolutePath,
       "-nogenerate",
@@ -184,7 +187,7 @@ androidTargets.forEach { target ->
         "-properties",
         target.javaCppPlatform,
         "-Dplatform.compiler=${ndkCompiler.get().asFile.absolutePath}",
-        "-Dplatform.includepath=${listOf(checkedInCHeaders.asFile, javaCppAndroidIncludes.asFile).joinToString(File.pathSeparator)}",
+        "-Dplatform.includepath=${listOf(checkedInCHeaders.asFile, upstreamPluginHeaders.asFile, javaCppAndroidIncludes.asFile).joinToString(File.pathSeparator)}",
         "-Dplatform.linkpath=${installDir.dir("lib").asFile.absolutePath}",
         "-d",
         javaCppNativeBuild.get().asFile.absolutePath,

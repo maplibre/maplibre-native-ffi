@@ -815,7 +815,7 @@ public struct RenderFrameResult: Sendable, Hashable {
   public let extentGeneration: UInt64
   public let frameGeneration: UInt64
   /// Whether the map asked for another frame while it rendered this one, as
-  /// during an ongoing camera transition. Set only when ``result`` is
+  /// during an ongoing paint transition. Set only when ``result`` is
   /// ``RenderResult/rendered``, and false for every other outcome. This is
   /// the same signal the map render-frame-finished event carries in
   /// ``RenderFrameEvent/needsRepaint``, delivered with the frame result so a

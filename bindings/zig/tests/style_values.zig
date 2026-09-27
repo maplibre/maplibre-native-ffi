@@ -20,6 +20,73 @@ test "style ID lists are copied into owned Zig output" {
     try support.expectListContains(layer_ids, "point-circle");
 }
 
+// BND-105: style layer listing copies the layer stack in style order.
+test "style layer lists are copied into owned Zig output in style order" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.resolve(maplibre.MapHandle, try maplibre.MapHandle.create(&runtime, .{}));
+    defer support.closeMap(&map) catch @panic("map close failed");
+    try support.expectCommitted(try map.setStyleJson(
+        \\{"version":8,"sources":{"tiles":{"type":"vector","tiles":["http://example.invalid/{z}/{x}/{y}.pbf"]}},
+        \\"layers":[{"id":"roads","type":"line","source":"tiles","source-layer":"transportation"},
+        \\{"id":"sky","type":"background"}]}
+    ));
+    try testing.expect(try support.waitForEvent(&runtime, .map_style_loaded));
+
+    var layers = try support.resolve(maplibre.StyleLayerEntryList, try map.listStyleLayers(testing.allocator));
+    defer layers.deinit();
+    try testing.expectEqual(@as(usize, 2), layers.items.len);
+
+    const roads = layers.items[0];
+    try testing.expectEqualStrings("roads", roads.id);
+    try testing.expectEqualStrings("line", roads.type);
+    try testing.expectEqualStrings("tiles", roads.source_id.?);
+    try testing.expectEqualStrings("transportation", roads.source_layer.?);
+
+    const sky = layers.items[1];
+    try testing.expectEqualStrings("sky", sky.id);
+    try testing.expectEqualStrings("background", sky.type);
+    try testing.expect(sky.source_id == null);
+    try testing.expect(sky.source_layer == null);
+}
+
+test "style layer infos compare copied strings by content" {
+    var left = maplibre.StyleLayerEntry{
+        .allocator = testing.allocator,
+        .id = try testing.allocator.dupe(u8, "roads"),
+        .type = try testing.allocator.dupe(u8, "line"),
+        .source_id = try testing.allocator.dupe(u8, "tiles"),
+        .source_layer = try testing.allocator.dupe(u8, "transportation"),
+    };
+    defer left.deinit();
+    var right = maplibre.StyleLayerEntry{
+        .allocator = testing.allocator,
+        .id = try testing.allocator.dupe(u8, "roads"),
+        .type = try testing.allocator.dupe(u8, "line"),
+        .source_id = try testing.allocator.dupe(u8, "tiles"),
+        .source_layer = try testing.allocator.dupe(u8, "transportation"),
+    };
+    defer right.deinit();
+    try testing.expect(left.eql(right));
+
+    var other_type = right;
+    other_type.type = "fill";
+    try testing.expect(!left.eql(other_type));
+
+    var absent_source_layer = right;
+    absent_source_layer.source_layer = null;
+    var empty_source_layer = right;
+    empty_source_layer.source_layer = "";
+    try testing.expect(!absent_source_layer.eql(empty_source_layer));
+
+    var left_items = [_]maplibre.StyleLayerEntry{left};
+    var right_items = [_]maplibre.StyleLayerEntry{right};
+    const left_list = maplibre.StyleLayerEntryList{ .allocator = testing.allocator, .items = left_items[0..] };
+    const right_list = maplibre.StyleLayerEntryList{ .allocator = testing.allocator, .items = right_items[0..] };
+    try testing.expect(left_list.eql(right_list));
+    try testing.expect(!left_list.eql(.{ .allocator = testing.allocator, .items = right_items[0..0] }));
+}
+
 test "style layer JSON helpers manage lifecycle and order" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");

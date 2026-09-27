@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import org.bytedeco.javacpp.BytePointer
+import org.bytedeco.javacpp.DoublePointer
 import org.bytedeco.javacpp.LongPointer
 import org.bytedeco.javacpp.Pointer
 import org.maplibre.nativeffi.NativeAccess
@@ -31,6 +32,7 @@ import org.maplibre.nativeffi.internal.javacpp.ByteArrayViewScope
 import org.maplibre.nativeffi.internal.javacpp.GeoJsonSourceOptionsScope
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.javacpp.readCameraSnapshot
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
@@ -66,6 +68,7 @@ import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleImageTextFit
+import org.maplibre.nativeffi.style.StyleLayerEntry
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileJson
@@ -1472,13 +1475,11 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
 
   public actual fun cameraSnapshot(): CameraSnapshot {
     NativeAccess.ensureLoaded()
-    MaplibreNativeC.mln_camera_options_default().use { outCamera ->
-      val outGeneration = longArrayOf(0L)
-      Status.check(
-        MaplibreNativeC.mln_map_camera_snapshot_get(requireLiveHandle(), outCamera, outGeneration)
-      )
-      return CameraSnapshot(outGeneration[0], cameraOptions(outCamera))
+    val generation = longArrayOf(0L)
+    val camera = readCameraSnapshot { out ->
+      AndroidNativeBridge.mapGetCamera(requireLiveHandle(), out, generation)
     }
+    return CameraSnapshot(generation[0], camera)
   }
 
   public actual fun updateCamera(update: CameraUpdate): Deferred<CommandCompletion> =
@@ -1726,6 +1727,35 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
         },
       )
     }
+
+  public actual fun metersPerPixelAtLatitude(latitude: Double): Deferred<Double> =
+    CompletionBridge.submit(
+      { result -> DoublePointer(result.value()).get() },
+      { completion ->
+        MaplibreNativeC.mln_map_meters_per_pixel_at_latitude(
+          requireLiveHandle(),
+          latitude,
+          completion,
+        )
+      },
+    )
+
+  public actual fun styleLayers(): Deferred<List<StyleLayerEntry>> =
+    CompletionBridge.submit(
+      { result ->
+        val entries = MaplibreNativeC.mln_style_layer_entry(result.value())
+        List(Math.toIntExact(result.value_count())) { index ->
+          val entry = entries.position(index.toLong())
+          StyleLayerEntry(
+            stringView(entry.id()),
+            stringView(entry.type()),
+            optionalStringView(entry.source_id()),
+            optionalStringView(entry.source_layer()),
+          )
+        }
+      },
+      { completion -> MaplibreNativeC.mln_map_list_style_layers(requireLiveHandle(), completion) },
+    )
 
   public actual fun attachMetalOwnedTexture(
     descriptor: MetalOwnedTextureDescriptor,

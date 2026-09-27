@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.map
 
 import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.DoubleVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.ULongVar
@@ -94,8 +95,10 @@ import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_for_pixel_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_layer_ids
+import org.maplibre.nativeffi.internal.c.mln_map_list_style_layers
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids
 import org.maplibre.nativeffi.internal.c.mln_map_loaded_style_json
+import org.maplibre.nativeffi.internal.c.mln_map_meters_per_pixel_at_latitude
 import org.maplibre.nativeffi.internal.c.mln_map_move_style_layer
 import org.maplibre.nativeffi.internal.c.mln_map_options
 import org.maplibre.nativeffi.internal.c.mln_map_options_default
@@ -154,6 +157,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_update_camera
 import org.maplibre.nativeffi.internal.c.mln_screen_point
 import org.maplibre.nativeffi.internal.c.mln_style_image_result
 import org.maplibre.nativeffi.internal.c.mln_style_image_stretches_result
+import org.maplibre.nativeffi.internal.c.mln_style_layer_entry
 import org.maplibre.nativeffi.internal.c.mln_style_layer_result
 import org.maplibre.nativeffi.internal.c.mln_style_source_result
 import org.maplibre.nativeffi.internal.c.mln_style_source_tile_urls_result
@@ -198,6 +202,7 @@ import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerEntry
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
@@ -1687,6 +1692,39 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) {
       )
     }
   }
+
+  public actual fun metersPerPixelAtLatitude(latitude: Double): Deferred<Double> =
+    CompletionBridge.submit(
+      { result -> result.pointed.value!!.reinterpret<DoubleVar>().pointed.value },
+      { completion ->
+        mln_map_meters_per_pixel_at_latitude(
+          state.requireLive().rawHandleValue,
+          latitude,
+          completion,
+        )
+      },
+    )
+
+  public actual fun styleLayers(): Deferred<List<StyleLayerEntry>> =
+    CompletionBridge.submit(
+      { result ->
+        val count = result.pointed.value_count.toInt()
+        if (count == 0) emptyList()
+        else {
+          val entries = result.pointed.value!!.reinterpret<mln_style_layer_entry>()
+          List(count) { index ->
+            val entry = entries[index]
+            StyleLayerEntry(
+              CoreStructs.stringView(entry.id),
+              CoreStructs.stringView(entry.type),
+              CoreStructs.stringView(entry.source_id).ifEmpty { null },
+              CoreStructs.stringView(entry.source_layer).ifEmpty { null },
+            )
+          }
+        }
+      },
+      { completion -> mln_map_list_style_layers(state.requireLive().rawHandleValue, completion) },
+    )
 
   public actual fun attachMetalOwnedTexture(
     descriptor: MetalOwnedTextureDescriptor,

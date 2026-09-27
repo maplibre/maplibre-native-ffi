@@ -243,6 +243,20 @@ namespace Maplibre.NativeFfi.Internal.C
         public uint raster_encoding;
     }
 
+    internal partial struct mln_style_layer_entry
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        public mln_buffer_view id;
+
+        public mln_buffer_view type;
+
+        public mln_buffer_view source_id;
+
+        public mln_buffer_view source_layer;
+    }
+
     internal unsafe partial struct mln_style_source_result
     {
         [NativeTypeName("uint32_t")]
@@ -766,6 +780,9 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_list_style_layer_ids([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_completion *")] mln_completion* completion);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_list_style_layers([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_move_style_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);

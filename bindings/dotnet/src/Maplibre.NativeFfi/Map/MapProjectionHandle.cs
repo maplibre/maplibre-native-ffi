@@ -44,6 +44,16 @@ public sealed unsafe class MapProjectionHandle : IDisposable
     /// <summary>Whether this wrapper has successfully closed its native handle.</summary>
     public bool IsClosed => state.IsClosed;
 
+    /// <summary>Reads meters per logical pixel from this detached projection.</summary>
+    public double MetersPerPixelAtLatitude(double latitude)
+    {
+        double value = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_projection_meters_per_pixel_at_latitude(Handle, latitude, &value)
+        );
+        return value;
+    }
+
     /// <summary>Copies the projection camera, observing every earlier projection setter.</summary>
     public CameraOptions GetCamera()
     {

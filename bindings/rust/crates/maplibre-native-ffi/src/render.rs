@@ -1224,7 +1224,7 @@ pub struct RenderFrameResult {
     pub extent_generation: u64,
     pub frame_generation: u64,
     /// Whether the map asked for another frame while it rendered this one, as
-    /// during an ongoing camera transition. Set only when `disposition` is
+    /// during an ongoing paint transition. Set only when `disposition` is
     /// [`FrameDisposition::Rendered`]; false for every other outcome. This is
     /// the same signal the render-frame-finished event carries, delivered with
     /// the frame result so a host can re-arm its frame loop without the

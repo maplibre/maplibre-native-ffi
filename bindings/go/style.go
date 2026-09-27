@@ -71,6 +71,26 @@ type StyleLayerInfo struct {
 	SourceLayer string
 }
 
+// StyleLayerEntry contains copied metadata for one style layer.
+//
+// Type is the style-spec layer type, such as "line". SourceID is nil when the
+// layer type takes no source, and SourceLayer is nil when the layer names none.
+type StyleLayerEntry struct {
+	ID          string
+	Type        string
+	SourceID    *string
+	SourceLayer *string
+}
+
+// Equal reports whether two copied layer infos hold the same field values.
+// Absent optional fields stay distinct from present empty values.
+func (info StyleLayerEntry) Equal(other StyleLayerEntry) bool {
+	return info.ID == other.ID &&
+		info.Type == other.Type &&
+		equalPointer(info.SourceID, other.SourceID) &&
+		equalPointer(info.SourceLayer, other.SourceLayer)
+}
+
 // StyleSourceTileJSON contains the retained TileJSON fields of an inline tile source.
 type StyleSourceTileJSON struct {
 	TileURLs []string
@@ -1407,6 +1427,32 @@ func (m *MapHandle) RemoveStyleLayer(layerID string) (*Future[CommandCompletion]
 	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
 		return int32(C.mln_map_remove_style_layer(raw, layerView.raw(), completion))
 	}, completionCommand)
+}
+
+// StyleLayers returns copied metadata for every style layer in style order.
+func (m *MapHandle) StyleLayers() (*Future[[]StyleLayerEntry], error) {
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_list_style_layers(raw, completion))
+	}, func(result *C.mln_completion_result) ([]StyleLayerEntry, error) {
+		entries, err := completionSlice[C.mln_style_layer_entry](result)
+		if err != nil {
+			return nil, err
+		}
+		layers := make([]StyleLayerEntry, len(entries))
+		for i, raw := range entries {
+			layer := StyleLayerEntry{ID: goStringView(raw.id), Type: goStringView(raw._type)}
+			if raw.source_id.size > 0 {
+				value := goStringView(raw.source_id)
+				layer.SourceID = &value
+			}
+			if raw.source_layer.size > 0 {
+				value := goStringView(raw.source_layer)
+				layer.SourceLayer = &value
+			}
+			layers[i] = layer
+		}
+		return layers, nil
+	})
 }
 
 // MoveStyleLayer moves one style layer before another layer. Passing an empty

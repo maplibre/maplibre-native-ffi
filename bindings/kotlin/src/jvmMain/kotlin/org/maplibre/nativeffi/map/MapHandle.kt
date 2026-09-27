@@ -49,6 +49,7 @@ import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerEntry
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
@@ -821,6 +822,12 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     NativeAccess.ensureLoaded()
     return NativeAccess.latLngsForPixels(requireLiveHandle(), points, unwrapped = true)
   }
+
+  public actual fun metersPerPixelAtLatitude(latitude: Double): Deferred<Double> =
+    NativeAccess.metersPerPixelAtLatitude(requireLiveHandle(), latitude)
+
+  public actual fun styleLayers(): Deferred<List<StyleLayerEntry>> =
+    NativeAccess.styleLayers(requireLiveHandle())
 
   public actual fun attachMetalOwnedTexture(
     descriptor: MetalOwnedTextureDescriptor,

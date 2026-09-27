@@ -432,6 +432,14 @@ public struct StyleSourceInfo: Equatable, Sendable {
   }
 }
 
+/// Copied identity and source binding for one layer in style order.
+public struct StyleLayerEntry: Equatable, Sendable {
+  public let id: String
+  public let type: String
+  public let sourceId: String?
+  public let sourceLayer: String?
+}
+
 /// A copied snapshot of the fixed metadata for one style layer.
 public struct StyleLayerInfo: Equatable, Sendable {
   /// The layer's style-spec type string, such as `"fill"`.
@@ -1307,6 +1315,30 @@ public extension MapHandle {
       { mln_map_get_style_layer_info($0, $1.view(layerId), $2) },
       convert: Self.copyStyleLayerInfo
     )
+  }
+
+  func styleLayers() async throws -> [StyleLayerEntry] {
+    try await styleQuery({ mln_map_list_style_layers($0, $2) }) { result in
+      try NativeCompletion.values(result, as: mln_style_layer_entry.self)
+        .map { entry in
+          try StyleLayerEntry(
+            id: NativeString.copyUTF8(data: entry.id.data, size: entry.id.size),
+            type: NativeString.copyUTF8(
+              data: entry.type.data,
+              size: entry.type.size
+            ),
+            sourceId: entry.source_id.size == 0 ? nil : NativeString.copyUTF8(
+              data: entry.source_id.data,
+              size: entry.source_id.size
+            ),
+            sourceLayer: entry.source_layer.size == 0 ? nil : NativeString
+              .copyUTF8(
+                data: entry.source_layer.data,
+                size: entry.source_layer.size
+              )
+          )
+        }
+    }
   }
 
   func styleLayerIds() async throws -> [String] {

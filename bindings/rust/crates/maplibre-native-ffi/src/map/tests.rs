@@ -248,6 +248,74 @@ fn style_setters_accept_valid_input_and_reject_embedded_nul() {
 }
 
 #[test]
+fn meters_per_pixel_is_ordered_and_projection_is_detached() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
+    let mut camera = CameraOptions::default();
+    camera.zoom = Some(3.0);
+    let mut update = CameraUpdate::default();
+    update.camera = camera.clone();
+    map.update_camera(&update).unwrap();
+    let projection = crate::completion::blocking(map.create_projection());
+    let meters = crate::completion::blocking(map.meters_per_pixel_at_latitude(45.0));
+    assert_eq!(
+        meters,
+        projection.meters_per_pixel_at_latitude(45.0).unwrap()
+    );
+    camera.zoom = Some(4.0);
+    let mut update = CameraUpdate::default();
+    update.camera = camera.clone();
+    map.update_camera(&update).unwrap();
+    assert_eq!(
+        meters / 2.0,
+        crate::completion::blocking(map.meters_per_pixel_at_latitude(45.0))
+    );
+    assert_eq!(
+        meters,
+        projection.meters_per_pixel_at_latitude(45.0).unwrap()
+    );
+    projection.close().unwrap();
+    map.close_and_wait();
+    runtime.close_and_wait();
+}
+
+#[test]
+// Spec coverage: BND-105.
+fn style_layers_copy_the_layer_stack_in_style_order() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
+    let style = serde_json::to_vec(&json!({
+        "version": 8,
+        "sources": {
+            "tiles": {"type": "vector", "tiles": ["https://example.com/{z}/{x}/{y}.pbf"]},
+        },
+        "layers": [
+            {"id": "roads", "type": "line", "source": "tiles", "source-layer": "transportation"},
+            {"id": "background", "type": "background"},
+        ],
+    }))
+    .unwrap();
+    map.set_style_json(&style).unwrap();
+
+    let layers = crate::completion::blocking(map.style_layers());
+
+    assert_eq!(layers.len(), 2);
+    assert_eq!(layers[0].id, "roads");
+    assert_eq!(layers[0].layer_type, "line");
+    assert_eq!(layers[0].source_id.as_deref(), Some("tiles"));
+    assert_eq!(layers[0].source_layer.as_deref(), Some("transportation"));
+    assert_eq!(layers[1].id, "background");
+    assert_eq!(layers[1].layer_type, "background");
+    assert_eq!(layers[1].source_id, None);
+    assert_eq!(layers[1].source_layer, None);
+
+    crate::completion::blocking(Ok(map.close().unwrap()));
+    crate::completion::blocking(Ok(runtime.close().unwrap()));
+}
+
+#[test]
 // Spec coverage: BND-101.
 fn loaded_style_document_and_url_read_back_what_was_loaded() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
@@ -2059,3 +2127,5 @@ fn global_state_defaults_updates_and_style_replacement() {
     map.close_and_wait();
     runtime.close_and_wait();
 }
+
+mod invalidation;

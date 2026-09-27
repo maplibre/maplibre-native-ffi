@@ -34,6 +34,9 @@ import Testing
   #expect(abs((created.center?.longitude ?? 0) - 20) < 0.000001)
   #expect(abs((created.zoom ?? 0) - 3) < 0.000001)
 
+  let meters = try await map.metersPerPixel(atLatitude: 45)
+  #expect(try projection.metersPerPixel(atLatitude: 45) == meters)
+
   // A synchronous conversion round-trips within tolerance.
   let point = try projection.pixel(for: LatLng(latitude: 10, longitude: 20))
   let coordinate = try projection.latLng(for: point)
@@ -45,6 +48,9 @@ import Testing
     center: LatLng(latitude: 1, longitude: 2),
     zoom: 5
   ))
+  #expect(try projection.metersPerPixel(atLatitude: 45) == meters / 4)
+  #expect(try await map.metersPerPixel(atLatitude: 45) == meters)
+
   let updated = try projection.camera()
   #expect(abs((updated.center?.latitude ?? 0) - 1) < 0.000001)
   #expect(abs((updated.center?.longitude ?? 0) - 2) < 0.000001)

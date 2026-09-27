@@ -560,6 +560,18 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
     }
 
+    /// <summary>Gets the ground distance in meters covered by one logical pixel at a latitude for the current zoom.</summary>
+    public Task<double> MetersPerPixelAtLatitudeAsync(
+        double latitude,
+        CancellationToken cancellationToken = default
+    ) =>
+        RunMapOperationAsync(
+            completion =>
+                NativeMethods.mln_map_meters_per_pixel_at_latitude(Handle, latitude, completion),
+            result => NativeCompletion.Value<double>(result),
+            cancellationToken
+        );
+
     /// <summary>Converts geographic coordinates to screen pixels using the current map projection.</summary>
     public Task<ScreenPoint[]> PixelsForLatLngsAsync(
         IReadOnlyList<LatLng> coordinates,
@@ -1894,6 +1906,41 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             )
             .WaitAsync(cancellationToken);
     }
+
+    /// <summary>Copies every layer's identity and source in style order.</summary>
+    public Task<StyleLayerEntry[]> StyleLayersAsync(
+        CancellationToken cancellationToken = default
+    ) =>
+        RunMapOperationAsync(
+            completion => NativeMethods.mln_map_list_style_layers(Handle, completion),
+            result =>
+            {
+                var entries = NativeCompletion.Values<mln_style_layer_entry>(result);
+                var layers = new StyleLayerEntry[entries.Length];
+                for (var i = 0; i < layers.Length; i++)
+                {
+                    var entry = entries[i];
+                    layers[i] = new StyleLayerEntry(
+                        RuntimeStructs.CopyUtf8((sbyte*)entry.id.data, entry.id.size),
+                        RuntimeStructs.CopyUtf8((sbyte*)entry.type.data, entry.type.size),
+                        entry.source_id.size == 0
+                            ? null
+                            : RuntimeStructs.CopyUtf8(
+                                (sbyte*)entry.source_id.data,
+                                entry.source_id.size
+                            ),
+                        entry.source_layer.size == 0
+                            ? null
+                            : RuntimeStructs.CopyUtf8(
+                                (sbyte*)entry.source_layer.data,
+                                entry.source_layer.size
+                            )
+                    );
+                }
+                return layers;
+            },
+            cancellationToken
+        );
 
     /// <summary>Lists style layer IDs in style order.</summary>
     public Task<string[]> StyleLayerIdsAsync(CancellationToken cancellationToken = default) =>

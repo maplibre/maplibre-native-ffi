@@ -874,6 +874,29 @@ private func addMvtSourceReportingItsRelease(
   }
 }
 
+// BND-105: the layer stack is one copied list with absent fields as nil.
+@Test func styleLayersListTheWholeStackInStyleOrder() async throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 1, height: 1)
+  )
+  defer { try? map.closeBlockingForTests() }
+
+  try await map.setStyleJSON(jsonData("""
+  {"version":8,"sources":{"tiles":{"type":"vector",  "tiles":["https://example.com/{z}/{x}/{y}.pbf"]}},  "layers":[{"id":"bg","type":"background"},  {"id":"roads","type":"line","source":"tiles","source-layer":"road"}]}
+  """))
+
+  #expect(try await map.styleLayers() == [
+    StyleLayerEntry(id: "bg", type: "background", sourceId: nil,
+                    sourceLayer: nil),
+    StyleLayerEntry(id: "roads", type: "line", sourceId: "tiles",
+                    sourceLayer: "road"),
+  ])
+}
+
 @Test func geoJSONSourceOptionsMaterializeFieldMaskAndClusterProperties(
 ) throws {
   let options = StyleGeoJSONSourceOptions(

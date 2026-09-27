@@ -458,7 +458,7 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L483_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L484_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]

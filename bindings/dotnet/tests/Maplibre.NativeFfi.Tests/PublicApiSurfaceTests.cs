@@ -184,6 +184,7 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Style.StyleImageInfo",
             "Maplibre.NativeFfi.Style.StyleImageOptions",
             "Maplibre.NativeFfi.Style.StyleImageTextFit",
+            "Maplibre.NativeFfi.Style.StyleLayerEntry",
             "Maplibre.NativeFfi.Style.StyleLayerVisibility",
             "Maplibre.NativeFfi.Style.StyleTransitionOptions",
             "Maplibre.NativeFfi.Style.TileJson",

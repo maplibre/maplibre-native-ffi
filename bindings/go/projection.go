@@ -232,3 +232,17 @@ func LatLngForProjectedMeters(meters ProjectedMeters) (LatLng, error) {
 	}
 	return goLatLng(coordinate), nil
 }
+
+// MetersPerPixelAtLatitude reads meters per logical pixel from the detached projection.
+func (projection *MapProjectionHandle) MetersPerPixelAtLatitude(latitude float64) (float64, error) {
+	ptr, err := projection.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer projection.state.KeepAlive()
+	var value C.double
+	err = checkNative(func() int32 {
+		return int32(C.mln_map_projection_meters_per_pixel_at_latitude(C.mln_map_projection(ptr), C.double(latitude), &value))
+	})
+	return float64(value), err
+}

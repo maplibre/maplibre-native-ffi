@@ -313,7 +313,11 @@ auto render_frame_payload(const mln::MapObserver::RenderFrameStatus& status)
     .mode = to_c_render_mode(status.mode),
     .needs_repaint = status.needsRepaint,
     .placement_changed = status.placementChanged,
-    .stats = to_c_rendering_stats(status.renderingStats)
+    // Native always attaches the frame's stats; a missing pointer reports
+    // zeroed counters rather than reading through null.
+    .stats = status.renderingStats != nullptr
+               ? to_c_rendering_stats(*status.renderingStats)
+               : mln_rendering_stats{}
   };
   return payload;
 }
@@ -617,14 +621,16 @@ class ForwardingRendererObserver final : public mln::RendererObserver {
 
   void onDidFinishRenderingFrame(
     RenderMode mode, bool repaint_needed, bool placement_changed,
-    const mln::gfx::RenderingStats& stats
+    std::shared_ptr<mln::gfx::RenderingStats> stats
   ) override {
-    // The name carries three overloads; mln::Map::Impl implements only this
-    // one.
+    // The name carries four overloads; mln::Map::Impl implements only this
+    // one, and it schedules the next update from it.
     void (mln::RendererObserver::*method)(
-      RenderMode, bool, bool, const mln::gfx::RenderingStats&
+      RenderMode, bool, bool, std::shared_ptr<mln::gfx::RenderingStats>
     ) = &mln::RendererObserver::onDidFinishRenderingFrame;
-    delegate_.invoke(method, mode, repaint_needed, placement_changed, stats);
+    delegate_.invoke(
+      method, mode, repaint_needed, placement_changed, std::move(stats)
+    );
   }
 
   void onDidFinishRenderingMap() override {
@@ -2440,6 +2446,7 @@ auto start_style_operation(
         auto tile_urls = mln_style_source_tile_urls_result{};
         auto source = mln_style_source_result{};
         auto layer = mln_style_layer_result{};
+        auto layers = std::vector<mln_style_layer_entry>{};
         auto image = mln_style_image_result{};
         const auto fill_views = [&result, &views]() -> void {
           views.reserve(result->strings.size());
@@ -2468,6 +2475,25 @@ auto start_style_operation(
               value = &source;
               count = 1;
             }
+            break;
+          case StyleOperationKind::Layers:
+            layers.reserve(result->layers.size());
+            for (const auto& entry : result->layers) {
+              layers.push_back(
+                {.size = sizeof(mln_style_layer_entry),
+                 .id = {.data = entry.id.data(), .size = entry.id.size()},
+                 .type = {.data = entry.type.data(), .size = entry.type.size()},
+                 .source_id =
+                   {.data = entry.source_id.data(),
+                    .size = entry.source_id.size()},
+                 .source_layer = {
+                   .data = entry.source_layer.data(),
+                   .size = entry.source_layer.size()
+                 }}
+              );
+            }
+            value = layers.data();
+            count = layers.size();
             break;
           case StyleOperationKind::LayerInfo:
             if (result->found) {
@@ -2635,6 +2661,9 @@ auto start_geometry_operation(
           const void* pointer = nullptr;
           auto count = std::size_t{1};
           switch (kind) {
+            case GeometryOperationKind::MetersPerPixel:
+              pointer = &value.meters_per_pixel;
+              break;
             case GeometryOperationKind::CameraForBounds:
             case GeometryOperationKind::CameraForCoordinates:
             case GeometryOperationKind::CameraForGeometry:
@@ -3579,12 +3608,15 @@ auto map_set_feature_state(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  live.feature_state.set(
-    feature_state_string_from_view(selector->source_id),
-    feature_state_source_layer(*selector),
-    feature_state_string_from_view(selector->feature_id), *state_object
-  );
-  live.map->triggerRepaint();
+  if (
+    live.feature_state.set(
+      feature_state_string_from_view(selector->source_id),
+      feature_state_source_layer(*selector),
+      feature_state_string_from_view(selector->feature_id), *state_object
+    )
+  ) {
+    live.map->triggerRepaint();
+  }
   return MLN_STATUS_OK;
 }
 
@@ -3617,17 +3649,20 @@ auto map_remove_feature_state(
     return selector_status;
   }
 
-  live.feature_state.remove(
-    feature_state_string_from_view(selector->source_id),
-    feature_state_source_layer(*selector),
-    optional_selector_string(
-      *selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, selector->feature_id
-    ),
-    optional_selector_string(
-      *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
+  if (
+    live.feature_state.remove(
+      feature_state_string_from_view(selector->source_id),
+      feature_state_source_layer(*selector),
+      optional_selector_string(
+        *selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, selector->feature_id
+      ),
+      optional_selector_string(
+        *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
+      )
     )
-  );
-  live.map->triggerRepaint();
+  ) {
+    live.map->triggerRepaint();
+  }
   return MLN_STATUS_OK;
 }
 
@@ -4503,6 +4538,70 @@ auto map_projection_lat_lng_for_pixel_unwrapped(
 ) -> mln_status {
   return projection_lat_lng_for_pixel(
     projection, point, out_coordinate, mln::LatLng::Unwrapped
+  );
+}
+
+namespace {
+
+auto validate_latitude(double latitude) -> mln_status {
+  if (!std::isfinite(latitude) || latitude < -90.0 || latitude > 90.0) {
+    set_thread_error("latitude must be finite and within [-90, 90]");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto meters_per_pixel_at_latitude(
+  const mln::CameraOptions& camera, double latitude,
+  double* out_meters_per_pixel
+) -> mln_status {
+  if (out_meters_per_pixel == nullptr) {
+    set_thread_error("out_meters_per_pixel must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto latitude_status = validate_latitude(latitude);
+  if (latitude_status != MLN_STATUS_OK) {
+    return latitude_status;
+  }
+  *out_meters_per_pixel = mln::Projection::getMetersPerPixelAtLatitude(
+    latitude, camera.zoom.value_or(0.0)
+  );
+  return MLN_STATUS_OK;
+}
+
+}  // namespace
+
+auto map_meters_per_pixel_at_latitude(
+  mln_map map, double latitude, const mln_completion* completion
+) -> mln_status {
+  const auto status = validate_latitude(latitude);
+  if (status != MLN_STATUS_OK) return status;
+  return start_geometry_operation(
+    map, GeometryOperationKind::MetersPerPixel,
+    [latitude](MapObject& live, GeometryOperationResult& result) {
+      return meters_per_pixel_at_latitude(
+        live.map->getCameraOptions(), latitude, &result.meters_per_pixel
+      );
+    },
+    completion
+  );
+}
+
+auto map_projection_meters_per_pixel_at_latitude(
+  mln_map_projection projection, double latitude, double* out_meters_per_pixel
+) -> mln_status {
+  if (out_meters_per_pixel == nullptr) {
+    set_thread_error("out_meters_per_pixel must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto status = validate_latitude(latitude);
+  if (status != MLN_STATUS_OK) return status;
+  return with_projection(
+    projection, [latitude, out_meters_per_pixel](mln::MapProjection& live) {
+      *out_meters_per_pixel = mln::Projection::getMetersPerPixelAtLatitude(
+        latitude, live.getCamera().zoom.value_or(0.0)
+      );
+    }
   );
 }
 

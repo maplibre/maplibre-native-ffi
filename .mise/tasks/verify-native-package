@@ -20,7 +20,8 @@ where the loader is part of the platform at a fixed location.
 The headers a host builds surface descriptors against belong to that same
 implementation. An artifact carrying its own copy redistributes a snapshot that
 can disagree with the implementation a host actually loads, so the package holds
-the C API's headers and nothing else.
+the C API's headers and nothing else. MapLibre Native's plugin header is the one
+addition: it is the contract of a symbol the library itself exports.
 """
 
 from __future__ import annotations
@@ -89,6 +90,9 @@ PACKAGED_LIBRARY_STEM = "maplibre-native-c"
 # What the include directory holds: the umbrella header and the domain headers
 # beside it.
 PACKAGED_HEADER_ENTRIES = frozenset({"maplibre_native_c.h", "maplibre_native_c"})
+# MapLibre Native's plugin header, which include/maplibre_native_c/plugin.h
+# includes at upstream's path, and the directories that lead to it.
+PACKAGED_PLUGIN_HEADER = pathlib.PurePath("mln/plugin/plugin_api.h")
 
 BUILD_HOST_PATH = "names a build-host path"
 PRIVATE_EXPORT = "exports a private symbol"
@@ -212,10 +216,16 @@ def vendored_header(relative: pathlib.PurePath) -> bool:
     parts = relative.parts
     if "include" not in parts:
         return False
-    entry = parts[parts.index("include") + 1]
     # An archive built on macOS carries an AppleDouble sidecar beside each file,
     # which belongs to whatever it sits next to.
-    return entry.removeprefix("._") not in PACKAGED_HEADER_ENTRIES
+    under_include = pathlib.PurePath(
+        *(part.removeprefix("._") for part in parts[parts.index("include") + 1 :])
+    )
+    if under_include.parts[0] in PACKAGED_HEADER_ENTRIES:
+        return False
+    return under_include != PACKAGED_PLUGIN_HEADER and not (
+        under_include.parts and under_include in PACKAGED_PLUGIN_HEADER.parents
+    )
 
 
 def image_format(binary: pathlib.Path) -> str | None:

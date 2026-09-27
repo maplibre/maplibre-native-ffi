@@ -1,106 +1,313 @@
 diff --git a/platform/default/src/mln/storage/local_file_request.cpp b/platform/default/src/mln/storage/local_file_request.cpp
-index 8c6cf43..325e1aa 100644
+index 0e6ff6cfffb3..34acf3b2255c 100644
 --- a/platform/default/src/mln/storage/local_file_request.cpp
 +++ b/platform/default/src/mln/storage/local_file_request.cpp
-@@ -5,6 +5,10 @@
+@@ -1,12 +1,13 @@
+ #include <mln/storage/file_source_request.hpp>
+ #include <mln/storage/response.hpp>
++#include <mln/util/filesystem.hpp>
+ #include <mln/util/io.hpp>
+ 
++#if MLN_HAS_STD_FILESYSTEM
++#include <system_error>
++#else
  #include <sys/types.h>
  #include <sys/stat.h>
- 
-+#if defined(_WIN32)
-+#include <filesystem>
-+#endif
-+
- #if defined(_WIN32) && !defined(S_ISDIR)
- #define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+-
+-#if defined(_WIN32) && !defined(S_ISDIR)
+-#define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
  #endif
-@@ -15,8 +19,14 @@ void requestLocalFile(const std::string& path,
+ 
+ namespace mln {
+@@ -15,12 +16,26 @@ void requestLocalFile(const std::string& path,
                        const ActorRef<FileSourceRequest>& req,
                        const std::optional<std::pair<uint64_t, uint64_t>>& dataRange) {
      Response response;
-+#if defined(_WIN32)
-+    const auto nativePath = std::filesystem::u8path(path);
-+    struct _stat64 buf;
-+    int result = _wstat64(nativePath.c_str(), &buf);
++#if MLN_HAS_STD_FILESYSTEM
++    std::error_code error;
++    std::filesystem::file_status status;
++    try {
++        status = std::filesystem::status(util::pathFromUTF8(path), error);
++    } catch (const std::filesystem::filesystem_error& exception) {
++        response.error = std::make_unique<Response::Error>(Response::Error::Reason::Other, exception.what());
++        req.invoke(&FileSourceRequest::setResponse, response);
++        return;
++    }
++    const bool notFound = status.type() == std::filesystem::file_type::not_found;
++    const bool isDirectory = std::filesystem::is_directory(status);
 +#else
      struct stat buf;
-     int result = stat(path.c_str(), &buf);
+-    int result = stat(path.c_str(), &buf);
++    const int result = stat(path.c_str(), &buf);
++    const bool notFound = result == -1 && errno == ENOENT;
++    const bool isDirectory = result == 0 && S_ISDIR(buf.st_mode);
 +#endif
  
-     if (result == 0 && (S_IFDIR & buf.st_mode)) {
+-    if (result == 0 && (S_IFDIR & buf.st_mode)) {
+-        response.error = std::make_unique<Response::Error>(Response::Error::Reason::NotFound);
+-    } else if (result == -1 && errno == ENOENT) {
++    if (notFound || isDirectory) {
          response.error = std::make_unique<Response::Error>(Response::Error::Reason::NotFound);
+     } else {
+         auto data = util::readFile(path, dataRange);
 diff --git a/platform/default/src/mln/storage/local_file_source.cpp b/platform/default/src/mln/storage/local_file_source.cpp
-index e855e06..26f9c84 100644
+index 303da926a3d5..468f912089d7 100644
 --- a/platform/default/src/mln/storage/local_file_source.cpp
 +++ b/platform/default/src/mln/storage/local_file_source.cpp
-@@ -34,8 +34,16 @@ public:
+@@ -11,10 +11,24 @@
+ #include <mln/util/url.hpp>
+ #include <mln/storage/resource_options.hpp>
+ 
++#include <cctype>
++#include <string>
++
+ namespace {
+ bool acceptsURL(const std::string& url) {
+     return url.starts_with(mln::util::FILE_PROTOCOL);
+ }
++
++std::string pathFromFileURL(const std::string& url) {
++    auto path = mln::util::percentDecode(url.substr(std::char_traits<char>::length(mln::util::FILE_PROTOCOL)));
++#if defined(_WIN32)
++    // file:///C:/path minus the scheme is /C:/path, which Windows rejects.
++    if (path.size() >= 3 && path[0] == '/' && path[2] == ':' && std::isalpha(static_cast<unsigned char>(path[1]))) {
++        path.erase(0, 1);
++    }
++#endif
++    return path;
++}
+ } // namespace
+ 
+ namespace mln {
+@@ -33,9 +47,7 @@ public:
+             return;
          }
  
-         // Cut off the protocol and prefix with path.
+-        // Cut off the protocol and prefix with path.
 -        const auto path = mln::util::percentDecode(
-+        auto path = mln::util::percentDecode(
-             resource.url.substr(std::char_traits<char>::length(util::FILE_PROTOCOL)));
-+#if defined(_WIN32)
-+        // A canonical Windows file URI is file:///C:/path. Removing file://
-+        // leaves /C:/path, but the Windows filesystem APIs expect C:/path.
-+        if (path.size() >= 3 && path[0] == '/' && path[2] == ':' &&
-+            ((path[1] >= 'A' && path[1] <= 'Z') || (path[1] >= 'a' && path[1] <= 'z'))) {
-+            path.erase(0, 1);
-+        }
-+#endif
+-            resource.url.substr(std::char_traits<char>::length(util::FILE_PROTOCOL)));
++        const auto path = pathFromFileURL(resource.url);
          requestLocalFile(path, req, resource.dataRange);
      }
  
-diff --git a/src/mln/util/io.cpp b/src/mln/util/io.cpp
-index af44566..e705eea 100644
---- a/src/mln/util/io.cpp
-+++ b/src/mln/util/io.cpp
-@@ -8,6 +8,10 @@
- #include <sstream>
- #include <fstream>
+diff --git a/src/mln/util/filesystem.hpp b/src/mln/util/filesystem.hpp
+index c6ae696e0d4f..0648f8782b66 100644
+--- a/src/mln/util/filesystem.hpp
++++ b/src/mln/util/filesystem.hpp
+@@ -2,8 +2,39 @@
  
-+#if defined(_WIN32)
+ #include <string>
+ 
++// libc++ filesystem requires macOS 10.15, iOS/tvOS 13, or watchOS 6.
++// Check the deployment target, not the SDK version used to compile.
++#if defined(__APPLE__) &&                                                                                            \
++    ((defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) &&                                                      \
++      __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 101500) ||                                                     \
++     (defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__) &&                                                     \
++      __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__ < 130000) ||                                                    \
++     (defined(__ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__ < 130000) || \
++     (defined(__ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__) &&                                                      \
++      __ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__ < 60000))
++#define MLN_HAS_STD_FILESYSTEM 0
++#else
++#define MLN_HAS_STD_FILESYSTEM 1
++#endif
++
++#if MLN_HAS_STD_FILESYSTEM
 +#include <filesystem>
 +#endif
 +
- #if defined(__GNUC__) && !defined(WIN32)
- #define MBGL_FOPEN_MODE_WBE "wbe"
- #else
-@@ -17,6 +21,14 @@
  namespace mln {
  namespace util {
- 
-+#if defined(_WIN32)
-+namespace {
-+std::filesystem::path pathFromUTF8(const std::string& path) {
-+    return std::filesystem::u8path(path);
-+}
-+} // namespace
-+#endif
+ bool is_absolute_path(std::string path);
 +
- IOException::IOException(int err, const std::string &msg)
-     : std::runtime_error(msg + ": " + std::strerror(errno)),
-       code(err) {}
-@@ -36,7 +48,11 @@ void write_file(const std::string &filename, const std::string &data) {
++#if defined(_WIN32)
++/// The narrow std::filesystem::path constructor decodes with the active code
++/// page on Windows, so the UTF-8 bytes go through the char8_t constructor.
++inline std::filesystem::path pathFromUTF8(const std::string& path) {
++    return std::filesystem::path(std::u8string(reinterpret_cast<const char8_t*>(path.data()), path.size()));
+ }
++#else
++inline const std::string& pathFromUTF8(const std::string& path) {
++    return path;
++}
++#endif
++} // namespace util
+ } // namespace mln
+diff --git a/src/mln/util/io.cpp b/src/mln/util/io.cpp
+index 687222dabe04..fe12fae3ab89 100644
+--- a/src/mln/util/io.cpp
++++ b/src/mln/util/io.cpp
+@@ -1,4 +1,5 @@
+ #include <mln/util/io.hpp>
++#include <mln/util/filesystem.hpp>
+ #include <mln/util/instrumentation.hpp>
+ 
+ #include <cstdio>
+@@ -36,7 +37,7 @@ void write_file(const std::string &filename, const std::string &data) {
  std::string read_file(const std::string &filename) {
      MLN_TRACE_FUNC();
  
-+#if defined(_WIN32)
-+    std::ifstream file(pathFromUTF8(filename), std::ios::binary);
-+#else
-     std::ifstream file(filename, std::ios::binary);
-+#endif
+-    std::ifstream file(filename, std::ios::binary);
++    std::ifstream file(util::pathFromUTF8(filename), std::ios::binary);
      if (file.good()) {
          std::stringstream data;
          data << file.rdbuf();
-@@ -50,7 +66,11 @@ std::optional<std::string> readFile(const std::string &filename,
+@@ -50,7 +51,7 @@ std::optional<std::string> readFile(const std::string &filename,
                                      const std::optional<std::pair<uint64_t, uint64_t>> &dataRange) {
      MLN_TRACE_FUNC();
  
-+#if defined(_WIN32)
-+    std::ifstream file(pathFromUTF8(filename), std::ios::binary);
-+#else
-     std::ifstream file(filename, std::ios::binary);
-+#endif
+-    std::ifstream file(filename, std::ios::binary);
++    std::ifstream file(util::pathFromUTF8(filename), std::ios::binary);
      if (file.good()) {
          if (dataRange) {
              size_t size = static_cast<size_t>(dataRange->second - dataRange->first + 1);
+@@ -79,11 +80,11 @@ void deleteFile(const std::string &filename) {
+ void copyFile(const std::string &destination, const std::string &source) {
+     MLN_TRACE_FUNC();
+ 
+-    std::ifstream src(source, std::ios::binary);
++    std::ifstream src(util::pathFromUTF8(source), std::ios::binary);
+     if (!src.good()) {
+         throw IOException(errno, "Cannot read file " + source);
+     }
+-    std::ofstream dst(destination, std::ios::binary);
++    std::ofstream dst(util::pathFromUTF8(destination), std::ios::binary);
+     if (!dst.good()) {
+         throw IOException(errno, "Cannot write file " + destination);
+     }
+diff --git a/test/storage/local_file_source.test.cpp b/test/storage/local_file_source.test.cpp
+index 8d47bb6f2ff0..85e4d8027038 100644
+--- a/test/storage/local_file_source.test.cpp
++++ b/test/storage/local_file_source.test.cpp
+@@ -1,35 +1,49 @@
+ #include <mln/storage/local_file_source.hpp>
+ #include <mln/storage/resource.hpp>
+ #include <mln/storage/resource_options.hpp>
++#include <mln/util/constants.hpp>
+ #include <mln/util/platform.hpp>
+ #include <mln/util/run_loop.hpp>
++#include <mln/util/scoped.hpp>
+ 
+ #include <climits>
+ #include <cstdint>
++#include <filesystem>
++#include <fstream>
++#include <string>
+ #include <gtest/gtest.h>
+ 
+ #if defined(WIN32)
+ #include <Windows.h>
+ #ifndef PATH_MAX
+ #define PATH_MAX MAX_PATH
+-#endif /* PATH_MAX */
+-#else
+-#include <unistd.h>
++#endif
+ #endif
+ 
+ namespace {
+ 
++std::string fileURL(const std::filesystem::path& path) {
++    const auto generic = path.generic_u8string();
++    const std::string bytes(reinterpret_cast<const char*>(generic.data()), generic.size());
++
++    constexpr char hex[] = "0123456789ABCDEF";
++    std::string encoded;
++    for (unsigned char byte : bytes) {
++        if ((byte >= 'A' && byte <= 'Z') || (byte >= 'a' && byte <= 'z') || (byte >= '0' && byte <= '9') ||
++            byte == '-' || byte == '.' || byte == '_' || byte == '~' || byte == '/' || byte == ':') {
++            encoded += static_cast<char>(byte);
++        } else {
++            encoded += '%';
++            encoded += hex[byte >> 4];
++            encoded += hex[byte & 0xF];
++        }
++    }
++
++    return std::string(mln::util::FILE_PROTOCOL) + (encoded.starts_with('/') ? "" : "/") + encoded;
++}
++
+ std::string toAbsoluteURL(const std::string& fileName) {
+-    char buff[PATH_MAX + 1];
+-#ifdef _MSC_VER
+-    char* cwd = _getcwd(buff, PATH_MAX + 1);
+-#else
+-    char* cwd = getcwd(buff, PATH_MAX + 1);
+-#endif
+-    // NOLINTNEXTLINE(clang-analyzer-nullability.NullPassedToNonnull)
+-    std::string url = {mln::util::FILE_PROTOCOL + std::string(cwd) + "/test/fixtures/storage/assets/" + fileName};
+-    assert(url.size() <= PATH_MAX);
+-    return url;
++    return fileURL(std::filesystem::current_path() / "test" / "fixtures" / "storage" / "assets" / fileName);
+ }
+ 
+ } // namespace
+@@ -78,6 +92,56 @@ TEST(LocalFileSource, NonEmptyFile) {
+     loop.run();
+ }
+ 
++TEST(LocalFileSource, NonASCIIPath) {
++    const auto root = std::filesystem::temp_directory_path() / "mln-local-file-source-non-ascii";
++
++    const Scoped cleanup([&] {
++        std::error_code error;
++        std::filesystem::remove_all(root, error);
++    });
++
++    std::error_code error;
++    std::filesystem::remove_all(root, error);
++
++    const auto directory = root / u8"ké 地図";
++    ASSERT_TRUE(std::filesystem::create_directories(directory));
++
++    const std::string body = "content is here\n";
++    const auto file = directory / u8"スタイル.json";
++    {
++        std::ofstream out(file, std::ios::binary);
++        ASSERT_TRUE(out.good());
++        out << body;
++    }
++
++    util::RunLoop loop;
++
++    LocalFileSource fs(ResourceOptions::Default(), ClientOptions());
++
++    std::unique_ptr<AsyncRequest> req = fs.request(Resource::style(fileURL(file)), [&](Response res) {
++        req.reset();
++        EXPECT_EQ(nullptr, res.error);
++        ASSERT_TRUE(res.data.get());
++        EXPECT_EQ(body, *res.data);
++        loop.stop();
++    });
++
++    loop.run();
++}
++
++#if defined(_WIN32)
++TEST(LocalFileSource, InvalidUTF8Path) {
++    util::RunLoop loop;
++    LocalFileSource fs(ResourceOptions::Default(), ClientOptions());
++    auto req = fs.request(Resource::style("file:///C:/%FF.json"), [&](Response res) {
++        EXPECT_NE(nullptr, res.error);
++        EXPECT_EQ(nullptr, res.data);
++        loop.stop();
++    });
++    loop.run();
++}
++#endif
++
+ TEST(LocalFileSource, PartialFile) {
+     util::RunLoop loop;
+ 
+@@ -154,7 +218,9 @@ TEST(LocalFileSource, URLEncoding) {
+ 
+     LocalFileSource fs(ResourceOptions::Default(), ClientOptions());
+ 
+-    std::unique_ptr<AsyncRequest> req = fs.request({Resource::Unknown, toAbsoluteURL("%6eonempty")}, [&](Response res) {
++    const std::string url = toAbsoluteURL("") + "%6eonempty";
++
++    std::unique_ptr<AsyncRequest> req = fs.request({Resource::Unknown, url}, [&](Response res) {
+         req.reset();
+         EXPECT_EQ(nullptr, res.error);
+         ASSERT_TRUE(res.data.get());

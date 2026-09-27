@@ -207,6 +207,28 @@ class TileJsonInfo:
 
 
 @dataclass(frozen=True, slots=True)
+class StyleLayerEntry:
+    """Copied identity and source binding for one style layer."""
+
+    id: str
+    type: str
+    """Style-spec layer type, such as ``line`` or ``background``."""
+    source_id: str | None = None
+    """Source ID, or None when the layer type takes no source."""
+    source_layer: str | None = None
+    """Source-layer, or None when the layer names none."""
+
+    @classmethod
+    def _from_native(cls, raw: dict[str, Any]) -> StyleLayerEntry:
+        return cls(
+            id=raw["id"],
+            type=raw["type"],
+            source_id=raw["source_id"],
+            source_layer=raw["source_layer"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class StyleSourceInfo:
     """Copied retained metadata for one style source."""
 

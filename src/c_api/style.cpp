@@ -1407,6 +1407,20 @@ auto mln_map_get_style_layer_info(
   });
 }
 
+auto mln_map_list_style_layers(
+  mln_map map, const mln_completion* completion
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return operation(
+      map, mln::core::StyleOperationKind::Layers,
+      [](mln::core::MapObject& live, mln::core::StyleOperationResult& result) {
+        return mln::core::map_list_style_layers(live, result.layers);
+      },
+      completion
+    );
+  });
+}
+
 auto mln_map_list_style_layer_ids(
   mln_map map, const mln_completion* completion
 ) noexcept -> mln_status {

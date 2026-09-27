@@ -149,6 +149,19 @@ pub const MapProjectionHandle = enum(c.mln_map_projection) {
 
     /// Closes the projection before returning. Synchronous, callable from any
     /// thread.
+    /// Reads the ground distance in meters covered by one logical map pixel at
+    /// a latitude for the helper camera zoom.
+    pub fn metersPerPixelAtLatitude(self: *MapProjectionHandle, latitude: f64) status.Error!f64 {
+        var meters_per_pixel: f64 = undefined;
+        const lease = try projectionLease(self.*);
+        defer lease.release();
+        try status.checkStatus(
+            c.mln_map_projection_meters_per_pixel_at_latitude(lease.native, latitude, &meters_per_pixel),
+            lease.diagnostic_store,
+        );
+        return meters_per_pixel;
+    }
+
     pub fn close(self: *MapProjectionHandle) status.Error!void {
         const projection_close = try beginProjectionClose(self.*) orelse return;
         status.checkStatus(c.mln_map_projection_close(projection_close.native), projection_close.diagnostic_store) catch |err| {

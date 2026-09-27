@@ -36,6 +36,21 @@ fn useAndCloseProjectionOnThread(
     out_error.* = null;
 }
 
+test "meters per pixel query observes camera commands and preserves detached scale" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
+    try support.expectCommitted(try map.updateCamera(.{ .camera = .{ .zoom = 3 } }));
+    var projection = try support.resolve(maplibre.MapProjectionHandle, try maplibre.MapProjectionHandle.create(&map));
+    defer projection.close() catch @panic("projection close failed");
+    const meters = try support.resolve(f64, try map.metersPerPixelAtLatitude(45));
+    try testing.expectApproxEqAbs(meters, try projection.metersPerPixelAtLatitude(45), 1e-10);
+    try support.expectCommitted(try map.updateCamera(.{ .camera = .{ .zoom = 4 } }));
+    try testing.expectApproxEqAbs(meters / 2, try support.resolve(f64, try map.metersPerPixelAtLatitude(45)), 1e-10);
+    try testing.expectApproxEqAbs(meters, try projection.metersPerPixelAtLatitude(45), 1e-10);
+}
+
 test "map projection mode updates snapshot fields through public binding" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");

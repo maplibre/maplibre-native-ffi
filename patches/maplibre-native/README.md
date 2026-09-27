@@ -40,15 +40,6 @@ zoom changes with a cached glyph range. See
 Upstream:
 [maplibre-native#4580](https://github.com/maplibre/maplibre-native/pull/4580).
 
-`0010-background-drawable-replacement.patch` recreates background drawables when
-a style change replaces their property updater. This keeps the drawables and
-their uniform buffers associated with the same updater after same-ID layer
-replacement, paint changes, and solid/pattern changes. The patch includes Native
-pixel-readback regression tests. See
-[issue #709](https://github.com/maplibre/maplibre-native-ffi/issues/709).
-Upstream:
-[maplibre-native#4616](https://github.com/maplibre/maplibre-native/pull/4616).
-
 `0011-opengl-uniform-block-order.patch` declares shared uniform blocks before
 fragment-only blocks in five OpenGL shaders. SwiftShader otherwise reads
 incorrect paint values and renders symbols, dashed lines, and patterned
@@ -58,29 +49,16 @@ regressions cover all five shaders using the existing glyph fixture. See
 Upstream:
 [maplibre-native#4625](https://github.com/maplibre/maplibre-native/pull/4625).
 
-`0012-vulkan-surface-acquire-timeout.patch` lets a surface resource bound
-swapchain image acquisition. When the bound expires, the frame aborts with
-`SurfaceNotReady` before it records or submits GPU work. Android's Vulkan loader
-tells an app-owned BufferQueue to wait for a free buffer only when the timeout
-is finite, and it reports buffer starvation under an unbounded acquire as a lost
-surface. The Android native surface target uses a 16 ms bound, and the C API
-reports the target as not ready, so the host retries with the same render
-session. The patch includes a Native regression that injects acquisition stalls
-and checks that frame fences remain usable for later GPU submissions. See
-[maplibre-compose#1370](https://github.com/maplibre/maplibre-compose/issues/1370).
-
-`0013-projection-from-transform-state.patch` adds a standalone projection
-constructor that copies a transform state. The C API uses it to expose the
-projection of the update that a render session rendered.
-
 `0014-global-state.patch` adds the `global-state` expression, root `state`
 defaults, and Native's runtime state APIs. State changes update dependent paint
 properties, filters, layout, and color ramps. The patch includes the upstream
 tests and render fixtures. It carries Taiyu Yoshizawa's (NEKOYASAN) existing
 [maplibre-native#4516](https://github.com/maplibre/maplibre-native/pull/4516),
-at commit `cf1e6ec24755d433958d667379a16f33b583dfb5`, as an unmodified diff from
-base `9ee6f1c3b5b97fc2cba1c1042cadef87fa158476`. The C API exposes the runtime
-state setter and snapshot getter.
+at commit `c8a0cf203a3d5ec3ca9e26cbcf7c18b974886ab3`, as its diff from base
+`87a97ff582c71f4a4dacef45c2844691a93303a7`. The only change passes the tile
+worker's available images as the shared immutable set that
+[maplibre-native#4651](https://github.com/maplibre/maplibre-native/pull/4651)
+introduced. The C API exposes the runtime state setter and snapshot getter.
 
 `0015-independent-camera-animations.patch` lets partial camera commands animate
 independently. Replacing a property preserves the timing of other properties,
@@ -101,7 +79,7 @@ indicator's evaluated paint properties each frame so that accuracy-circle fill
 and border colors reach their transition targets. It includes the upstream
 pixel-readback regression. Upstream:
 [maplibre-native#4639](https://github.com/maplibre/maplibre-native/pull/4639),
-at commit `8691b96715179b5e7eb37b05317fec3dac8c3a57`.
+at commit `7176ab92c871b4f99f96755d4e2ce11b73bfcceb`.
 
 `0017-location-indicator-top-image-hit-testing.patch` includes the location
 indicator's top image in rendered-feature queries. Each top and bearing image
@@ -110,40 +88,54 @@ longitude-latitude geometry. The patch includes the upstream regression for a
 top-only indicator and checks that shadow and accuracy-circle coverage outside
 the image stays excluded. Upstream:
 [maplibre-native#4640](https://github.com/maplibre/maplibre-native/pull/4640),
-at commit `eceb218a7fd7913991f2ae37a8fa6cd6290c7d65`.
-
-`0018-location-indicator-missing-images.patch` disables each location-indicator
-image drawable while it has no texture. The upstream regression checks that an
-indicator with no images and zero accuracy radius submits no draw calls.
-Upstream:
-[maplibre-native#4641](https://github.com/maplibre/maplibre-native/pull/4641),
-at commit `4cbaf989cc9c769b0f7710b430a92c8744539e93`.
-
-`0019-webgpu-location-indicator-uniform-binding.patch` makes the WebGPU
-location-indicator shaders read their uniform buffer from binding 4, where the
-renderer supplies it. Upstream:
-[maplibre-native#4642](https://github.com/maplibre/maplibre-native/pull/4642),
-at commit `64c8fc02c92f4cb97ae99a1caa5662b2678c817b`.
-
-`0020-webgpu-required-bindings.patch` skips a WebGPU drawable when a required
-bind-group layout or resource is missing, or bind-group creation fails. This
-prevents a draw from using a previous drawable's incompatible bindings.
-Upstream:
-[maplibre-native#4643](https://github.com/maplibre/maplibre-native/pull/4643),
-at commit `a4123bae78a50b8b3b9bcb482bfb6973efa0262e`.
+at commit `363acddb8471dc344cb17dac1e2637e17cff5535`.
 
 `0021-location-indicator-bearing-accuracy.patch` adds a bearing-accuracy sector
 with an angular half-width, a radius in logical pixels, and a color that fades
 toward the outer edge. The paint properties support zoom expressions and
 transitions. The patch includes the upstream conversion test and three render
-fixtures with their binary reference images. Upstream:
+fixtures with their binary reference images. It carries the closed
 [maplibre-native#4644](https://github.com/maplibre/maplibre-native/pull/4644),
-at commit `593fc79db52c24b3ed75e7afd1f294ec71acdcf7`.
+at commit `02d9a4b2ccb4f3d15cdca438fd08ea6fa2cd530b`, until a location indicator
+plugin can replace the core layer.
 
-The location-indicator patches preserve the upstream changes and adapt patch
-context and test placement to the pinned source and existing patches. The
-bearing-accuracy patch retains binding 4 from #4642 and places its projection
-accessor beside the pinned source's existing accessors.
+`0022-legacy-annotations-option.patch` adds the `MLN_WITH_LEGACY_ANNOTATIONS`
+CMake option. Turning it off compiles the legacy annotation manager as disabled,
+so a loaded style no longer gains the `org.maplibre.annotations` source and its
+symbol layer. The C API exposes no annotation entry points and builds with the
+option off. Upstream:
+[maplibre-native#4675](https://github.com/maplibre/maplibre-native/pull/4675).
+
+`0023-sourceless-style-rendering.patch` renders a style that has no sources. The
+orchestrator added layers that take no source while it updated the first source,
+so a style with none produced no render items and no background color, and a
+style load whose parse added no layer published no update to the renderer. The
+legacy annotation source hid both, because it joined every style. Upstream:
+[maplibre-native#4674](https://github.com/maplibre/maplibre-native/pull/4674).
+
+`0024-render-update-publication.patch` publishes render updates after image and
+source removal, source insertion, tile-selection changes, and transition
+changes. Generated layer transition setters also refresh the style's immutable
+layer collection. See
+[issue #736](https://github.com/maplibre/maplibre-native-ffi/issues/736).
+
+`0025-vertex-buffer-upload-timestamps.patch` initializes vertex buffer upload
+timestamps and preserves them during moves in Metal, Vulkan, and WebGPU. An
+uninitialized timestamp can suppress uploads after feature-state changes. The
+patch includes the upstream resource regression. Upstream:
+[maplibre-native#4679](https://github.com/maplibre/maplibre-native/pull/4679),
+at commit `02ddb45fbfad`.
+
+`0026-empty-symbol-placement.patch` clears deferred symbol placement and query
+state when no layers supply placement data. Source fade bookkeeping and paint
+transitions continue, and symbols that return receive a fresh placement. Native
+regressions cover repeated background-only frames, paint transitions, and symbol
+removal and reappearance within the placement update interval. See
+[issue #735](https://github.com/maplibre/maplibre-native-ffi/issues/735).
+
+Each patch is the squashed diff of its upstream branch, applied on top of the
+patches before it, so a patch that adds a test next to an earlier patch's test
+carries that placement rather than the branch's own context.
 
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
@@ -151,9 +143,12 @@ before applying the list again. A pin bump, an edit to a patch, and a dropped
 patch all take effect on a worktree that still carries the old version. A patch
 that no longer applies fails the sync rather than being skipped.
 
-Local edits to the submodule worktree, including edits inside a nested vendor
-submodule, are discarded by the same checkout, and a sync runs it whenever the
-worktree carries a tracked change that no listed patch accounts for. The sync
-prints those paths first. A forced checkout also removes an untracked file that
-sits where a new pin adds a tracked one, and the sync removes a file that a
-listed patch adds before applying that patch again.
+A sync records the pinned commit, a hash of the worktree's diff against it, and
+a hash of the patch list in the submodule's git directory, and a later sync that
+finds the same record leaves the worktree alone. Local edits to the submodule
+worktree, including edits inside a nested vendor submodule, change that record
+and are discarded by the next sync's checkout. When such an edit sits outside
+every listed patch's paths, the sync prints the path first. A forced checkout
+also removes an untracked file that sits where a new pin adds a tracked one, and
+the sync removes a file that a listed patch adds before applying that patch
+again.

@@ -113,6 +113,7 @@ import org.maplibre.nativeffi.internal.c.mln_style_image_info
 import org.maplibre.nativeffi.internal.c.mln_style_image_options
 import org.maplibre.nativeffi.internal.c.mln_style_image_result
 import org.maplibre.nativeffi.internal.c.mln_style_image_stretches_result
+import org.maplibre.nativeffi.internal.c.mln_style_layer_entry
 import org.maplibre.nativeffi.internal.c.mln_style_layer_info
 import org.maplibre.nativeffi.internal.c.mln_style_layer_result
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
@@ -224,6 +225,7 @@ import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleImageTextFit
+import org.maplibre.nativeffi.style.StyleLayerEntry
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileJson
@@ -233,6 +235,9 @@ import org.maplibre.nativeffi.style.VectorTileEncoding
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
 internal object NativeAccess {
+  fun pluginRegisterFunctionV1(): Long =
+    MapLibreNativeC.mln_plugin_get_register_function_v1().address()
+
   const val EXPECTED_C_ABI_VERSION: Long = 0L
   const val DEFAULT_LOG_SEVERITY_MASK: Int = (1 shl 1) or (1 shl 2)
 
@@ -1232,6 +1237,31 @@ internal object NativeAccess {
       { completion -> MapLibreNativeC.mln_map_list_style_layer_ids(map.raw, completion) },
     )
 
+  internal fun styleLayers(map: NativeMap): Deferred<List<StyleLayerEntry>> =
+    CompletionBridge.submit(
+      { result ->
+        val count = Math.toIntExact(mln_completion_result.value_count(result))
+        if (count == 0) emptyList()
+        else {
+          val entries = completionValue(result, count * mln_style_layer_entry.sizeof())
+          List(count) { index ->
+            val entry =
+              entries.asSlice(
+                index * mln_style_layer_entry.sizeof(),
+                mln_style_layer_entry.sizeof(),
+              )
+            StyleLayerEntry(
+              stringView(mln_style_layer_entry.id(entry)),
+              stringView(mln_style_layer_entry.type(entry)),
+              optionalStringView(mln_style_layer_entry.source_id(entry)),
+              optionalStringView(mln_style_layer_entry.source_layer(entry)),
+            )
+          }
+        }
+      },
+      { completion -> MapLibreNativeC.mln_map_list_style_layers(map.raw, completion) },
+    )
+
   internal fun addHillshadeLayer(
     map: NativeMap,
     layerId: String,
@@ -1999,6 +2029,14 @@ internal object NativeAccess {
     }
   }
 
+  internal fun metersPerPixelAtLatitude(map: NativeMap, latitude: Double): Deferred<Double> =
+    CompletionBridge.submit(
+      { result -> completionValue(result, 8).get(ValueLayout.JAVA_DOUBLE, 0) },
+      { completion ->
+        MapLibreNativeC.mln_map_meters_per_pixel_at_latitude(map.raw, latitude, completion)
+      },
+    )
+
   internal fun attachMetalOwnedTexture(
     map: NativeMap,
     descriptor: MetalOwnedTextureDescriptor,
@@ -2597,6 +2635,22 @@ internal object NativeAccess {
         )
       )
       latLng(outCoordinate)
+    }
+
+  internal fun projectionMetersPerPixelAtLatitude(
+    projection: NativeMapProjection,
+    latitude: Double,
+  ): Double =
+    Arena.ofConfined().use { arena ->
+      val outMetersPerPixel = arena.allocate(ValueLayout.JAVA_DOUBLE)
+      Status.check(
+        MapLibreNativeC.mln_map_projection_meters_per_pixel_at_latitude(
+          projection.raw,
+          latitude,
+          outMetersPerPixel,
+        )
+      )
+      outMetersPerPixel.get(ValueLayout.JAVA_DOUBLE, 0)
     }
 
   internal fun setResourceTransformResponseUrl(response: MemorySegment, value: String): Int =

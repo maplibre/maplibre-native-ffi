@@ -129,7 +129,7 @@ pub const FrameResult = struct {
     extent_generation: u64,
     frame_generation: u64,
     /// Whether the map asked for another frame while it rendered this one, as
-    /// during an ongoing camera transition. Set only when `disposition` is
+    /// during an ongoing paint transition. Set only when `disposition` is
     /// `.rendered`, and false for every other outcome.
     needs_repaint: bool,
 };

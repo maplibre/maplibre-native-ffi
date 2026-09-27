@@ -13,6 +13,19 @@ final class MapProjectionHandle {
 
   final NativeHandleState<NativeMapProjection> _state;
 
+  /// Reads meters per logical pixel from this detached projection.
+  double metersPerPixelAtLatitude(double latitude) => withNativeArena((arena) {
+    final out = arena<Double>();
+    _check(
+      raw.mln_map_projection_meters_per_pixel_at_latitude(
+        _handle.raw,
+        latitude,
+        out,
+      ),
+    );
+    return out.value;
+  });
+
   /// Whether this projection helper has been closed by the Dart binding.
   bool get isClosed => _state.isClosed;
 
@@ -315,7 +328,7 @@ final class RenderFrameResult {
   final int frameGeneration;
 
   /// Whether the map asked for another frame while it rendered this one, as
-  /// during an ongoing camera transition.
+  /// during an ongoing paint transition.
   ///
   /// Meaningful only when [disposition] is [RenderResult.rendered]; it reads
   /// false for every other outcome.

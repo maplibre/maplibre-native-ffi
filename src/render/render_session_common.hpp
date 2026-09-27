@@ -264,9 +264,10 @@ class RenderSessionScheduler final : public mln::Scheduler {
   // Drops queued work without running it, for detach.
   auto discard() -> void;
 
-  // Requests a host frame when work makes an idle queue nonempty. Cleared
+  // Wakes the render owner when work makes an idle queue nonempty. Cleared
   // before detach so late worker results are discarded.
-  auto set_repaint_request(std::function<void()> repaint_request) -> void;
+  auto set_work_available_callback(std::function<void()> work_available)
+    -> void;
 
  private:
   // Reopens the queue and wakes pending work if drain() exits through an
@@ -287,7 +288,7 @@ class RenderSessionScheduler final : public mln::Scheduler {
 
   std::mutex mutex_;
   std::vector<std::function<void()>> queue_;
-  std::function<void()> repaint_request_;
+  std::function<void()> work_available_;
   bool draining_ = false;
   mapbox::base::WeakPtrFactory<mln::Scheduler> weak_factory_{this};
   // Do not add members here, see `WeakPtrFactory`
@@ -437,9 +438,12 @@ class SessionFrameObserver final : public mln::RendererObserver {
     delegate_->onWillStartRenderingFrame();
   }
 
+  // The renderer reports frames through the shared-pointer overload, and
+  // mln::Map::Impl implements only that one, so the delegate receives the
+  // same pointer rather than a copy of the stats.
   void onDidFinishRenderingFrame(
     RenderMode mode, bool repaint, bool placement_changed,
-    const mln::gfx::RenderingStats& stats
+    std::shared_ptr<mln::gfx::RenderingStats> stats
   ) override {
     if (suppress_frame_callbacks_) {
       return;
@@ -448,7 +452,7 @@ class SessionFrameObserver final : public mln::RendererObserver {
     frame_completed_ = true;
     if (delegate_ != nullptr) {
       delegate_->onDidFinishRenderingFrame(
-        mode, repaint, placement_changed, stats
+        mode, repaint, placement_changed, std::move(stats)
       );
     }
   }

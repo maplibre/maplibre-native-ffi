@@ -106,7 +106,7 @@ Use persistent PR labels to add coverage to either PR tier:
 
 | Label        | Additional coverage                                               |
 | ------------ | ----------------------------------------------------------------- |
-| `ci:apple`   | All macOS backends and iOS/tvOS device and simulator targets      |
+| `ci:apple`   | All macOS backends and the iOS, Mac Catalyst, and tvOS targets    |
 | `ci:android` | All Android ABIs/backends and multi-ABI packaging                 |
 | `ci:linux`   | Linux ARM64 and musl variants                                     |
 | `ci:windows` | Windows ARM64 variants                                            |
@@ -123,7 +123,7 @@ succeed.
 Extended CI retains `ci-required`; baseline and ready each have one additional
 required check; see
 [CI coverage](docs/src/content/docs/development/overview.md#ci-coverage) for the
-branch protection configuration. For CI, ABI, shared toolchain, dependency, or
+branch protection configuration. For CI, shared toolchain, dependency, or
 publishing changes, request full coverage with
 `gh pr edit <number> --add-label 'ci:full'`.
 

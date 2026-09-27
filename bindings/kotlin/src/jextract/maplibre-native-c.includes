@@ -244,6 +244,7 @@
 --include-function mln_map_projection_get_camera
 --include-function mln_map_projection_lat_lng_for_pixel
 --include-function mln_map_projection_lat_lng_for_pixel_unwrapped
+--include-function mln_map_projection_meters_per_pixel_at_latitude
 --include-function mln_map_projection_pixel_for_lat_lng
 --include-function mln_map_projection_set_camera
 --include-function mln_map_projection_set_visible_coordinates
@@ -651,6 +652,7 @@
 --include-function mln_map_invalidate_custom_geometry_source_tile
 --include-function mln_map_invalidate_custom_mvt_vector_source_tile
 --include-function mln_map_list_style_layer_ids
+--include-function mln_map_list_style_layers
 --include-function mln_map_list_style_source_ids
 --include-function mln_map_move_style_layer
 --include-function mln_map_remove_style_image
@@ -748,3 +750,7 @@
 --include-function mln_map_set_global_state_property
 --include-function mln_map_get_global_state
 --include-function mln_render_session_projection_create
+
+--include-struct mln_style_layer_entry
+--include-function mln_map_meters_per_pixel_at_latitude
+--include-function mln_plugin_get_register_function_v1

@@ -105,5 +105,8 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_lat_lngs_for_pixels_unwrapped([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_screen_point *")] mln_screen_point* points, [NativeTypeName("size_t")] nuint point_count, [NativeTypeName("const mln_completion *")] mln_completion* completion);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_meters_per_pixel_at_latitude([NativeTypeName("mln_map")] MlnMap map, double latitude, [NativeTypeName("const mln_completion *")] mln_completion* completion);
     }
 }

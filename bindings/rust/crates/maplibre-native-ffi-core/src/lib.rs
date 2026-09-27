@@ -15,6 +15,7 @@ pub mod events;
 pub mod handle;
 pub mod logging;
 pub mod options;
+pub mod plugin;
 pub mod ptr;
 pub mod query;
 pub mod render;
@@ -47,6 +48,7 @@ pub use events::{
 };
 pub use logging::LogRecord;
 pub use options::{MapOptions, MapTileOptions, MapViewportOptions};
+pub use plugin::plugin_register_function_v1;
 pub use query::{
     FeatureStateSelector, QueriedFeature, RenderedFeatureQueryOptions, RenderedQueryGeometry,
     SourceFeatureQueryOptions,
@@ -61,7 +63,7 @@ pub use runtime::{
 };
 pub use style::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, SourceInfo, StyleImage, StyleImageOptions,
-    StyleLayerInfo, StyleTransitionOptions, TileJsonInfo, TileSourceOptions,
+    StyleLayerEntry, StyleLayerInfo, StyleTransitionOptions, TileJsonInfo, TileSourceOptions,
 };
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, PremultipliedRgba8Image, ProjectedMeters, Quaternion,

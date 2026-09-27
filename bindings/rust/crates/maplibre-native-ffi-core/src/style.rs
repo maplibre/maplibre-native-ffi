@@ -347,6 +347,45 @@ pub struct TileJsonInfo {
     pub bounds: Option<LatLngBounds>,
 }
 
+/// Copied identity and source binding for one style layer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct StyleLayerEntry {
+    pub id: String,
+    /// Style-spec layer type, such as `line` or `background`.
+    pub layer_type: String,
+    /// Source ID, or `None` when the layer type takes no source.
+    pub source_id: Option<String>,
+    /// Source-layer, or `None` when the layer names none.
+    pub source_layer: Option<String>,
+}
+
+/// Copies one callback-borrowed layer entry.
+///
+/// # Safety
+/// All views must remain readable for this call.
+pub unsafe fn style_layer_entry_from_native(
+    entry: &sys::mln_style_layer_entry,
+) -> crate::Result<StyleLayerEntry> {
+    // SAFETY: the caller guarantees each view's lifetime.
+    unsafe {
+        Ok(StyleLayerEntry {
+            id: crate::string::copy_string_view(entry.id)?,
+            layer_type: crate::string::copy_string_view(entry.type_)?,
+            source_id: if entry.source_id.size == 0 {
+                None
+            } else {
+                Some(crate::string::copy_string_view(entry.source_id)?)
+            },
+            source_layer: if entry.source_layer.size == 0 {
+                None
+            } else {
+                Some(crate::string::copy_string_view(entry.source_layer)?)
+            },
+        })
+    }
+}
+
 /// Copied retained metadata for one style source.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]

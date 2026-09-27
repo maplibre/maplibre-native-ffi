@@ -100,7 +100,7 @@ typedef struct mln_render_frame_result {
   uint64_t frame_generation;
   /**
    * Whether the map asked for another frame while it rendered this one, as
-   * during an ongoing camera transition. Set only when disposition is
+   * during an ongoing paint transition. Set only when disposition is
    * MLN_RENDER_RESULT_RENDERED, and false for every other outcome. This is the
    * same signal that MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED carries in
    * its needs_repaint field, delivered with the frame result so a host can
