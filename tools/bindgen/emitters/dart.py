@@ -354,9 +354,6 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
                 0,
                 (values.public(plan.result), values.copy(plan.result, "nativeResult")),
             )
-        invalidates = any(
-            plan.name == handle.abandon for handle in values.bound.handles.values()
-        )
         public = (
             returns[0][0]
             if len(returns) == 1
@@ -380,7 +377,6 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
                 if plan.result
                 else f"\n      {call};"
             )
-            + ("\n      _invalidateBorrowedViews();" if invalidates else "")
             + (f"\n      return {result};" if result else "")
         )
         if plan.registrations:
@@ -694,8 +690,6 @@ def generate(api: Api | BoundApi) -> str:
             chunks.append("  _NativeCallbackPorts get _callbackPorts;\n")
         if any("_callbackReleases" in body for body in bodies):
             chunks.append("  NativeCallbackReleases get _callbackReleases;\n")
-        if any("_invalidateBorrowedViews();" in body for body in bodies):
-            chunks.append("  void _invalidateBorrowedViews();\n")
         chunks.extend(bodies)
         chunks.append("}\n")
         if owner in generated_mixins:

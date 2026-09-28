@@ -6776,8 +6776,6 @@ mixin _GeneratedRenderSessionOperations implements Finalizable {
 
   NativeHandleState<NativeRenderSession> get _state;
 
-  void _invalidateBorrowedViews();
-
   Future<void> metalBorrowedTextureSetTarget(
     MetalBorrowedTextureDescriptor descriptor,
   ) => startNativeCompletion(
@@ -6850,7 +6848,6 @@ mixin _GeneratedRenderSessionOperations implements Finalizable {
     final outResult = arena<raw.mln_render_abandon_result>();
     outResult.ref.size = sizeOf<raw.mln_render_abandon_result>();
     _check(raw.mln_render_session_abandon(_handle.raw, outResult));
-    _invalidateBorrowedViews();
     return _readRenderAbandonResult(outResult.ref);
   });
 

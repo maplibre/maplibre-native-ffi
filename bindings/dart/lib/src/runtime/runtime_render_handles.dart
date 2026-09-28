@@ -59,12 +59,6 @@ final class RenderSessionHandle with _GeneratedRenderSessionOperations {
   final NativeHandleState<NativeRenderSession> _state;
   @override
   NativeRenderSession get _handle => _state.handle;
-  bool _viewsInvalid = false;
-  @override
-  void _invalidateBorrowedViews() {
-    _viewsInvalid = true;
-  }
-
   bool get isClosed => _state.isClosed;
 }
 
@@ -91,20 +85,13 @@ final class AcquiredFrame with _GeneratedAcquiredFrameOperations {
   AcquiredFrame._(this._session, NativeAcquiredFrame handle)
     : _state = NativeHandleState(handle, 'AcquiredFrame');
 
+  // Keeps the parent session reachable while the frame lives.
+  // ignore: unused_field
   final RenderSessionHandle _session;
   @override
   final NativeHandleState<NativeAcquiredFrame> _state;
   @override
-  NativeAcquiredFrame get _handle {
-    _checkOpen();
-    return _state.handle;
-  }
-
-  void _checkOpen() {
-    if (_state.isClosed || _session.isClosed || _session._viewsInvalid) {
-      throwInvalidState('acquired frame has already been released');
-    }
-  }
+  NativeAcquiredFrame get _handle => _state.handle;
 }
 
 /// Render-session attachment operations on an any-thread map handle.
