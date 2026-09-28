@@ -5,19 +5,24 @@ import Testing
 
 @Test func offlineRegionDefinitionsMaterializeTileAndGeometryDescriptors(
 ) throws {
-  let tileDefinition = OfflineRegionDefinition.tilePyramid(
-    styleURL: "https://example.com/style.json",
-    bounds: LatLngBounds(
-      southwest: LatLng(latitude: -1, longitude: -2),
-      northeast: LatLng(latitude: 3, longitude: 4)
-    ),
-    minZoom: 1,
-    maxZoom: 5,
-    pixelRatio: 2,
-    includeIdeographs: true
-  )
+  let tileDefinition = OfflineRegionDefinition
+    .tilePyramid(OfflineTilePyramidRegionDefinition(
+      styleUrl: "https://example.com/style.json",
+      bounds: LatLngBounds(
+        southwest: LatLng(latitude: -1, longitude: -2),
+        northeast: LatLng(latitude: 3, longitude: 4)
+      ),
+      minZoom: 1,
+      maxZoom: 5,
+      pixelRatio: 2,
+      includeIdeographs: true
+    ))
 
-  try tileDefinition.nativeDefinition.withNativeDefinition { native in
+  let tileDefinitionArena = NativeInputArena()
+  defer { withExtendedLifetime(tileDefinitionArena) {} }
+  try withUnsafePointer(to: tileDefinition
+    .nativeValue(arena: tileDefinitionArena))
+  { native in
     #expect(native.pointee.type == MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
       .rawValue)
     #expect(String(cString: native.pointee.data.tile_pyramid.style_url) ==
@@ -27,16 +32,23 @@ import Testing
     #expect(native.pointee.data.tile_pyramid.include_ideographs)
   }
 
-  let geometryDefinition = OfflineRegionDefinition.geometry(
-    styleURL: "asset://style.json",
-    geometry: Data(#"{"type":"LineString","coordinates":[[2,1],[4,3]]}"#.utf8),
-    minZoom: 0,
-    maxZoom: .infinity,
-    pixelRatio: 1,
-    includeIdeographs: false
-  )
+  let geometryDefinition = OfflineRegionDefinition
+    .geometry(OfflineGeometryRegionDefinition(
+      styleUrl: "asset://style.json",
+      geometry: Data(
+        #"{"type":"LineString","coordinates":[[2,1],[4,3]]}"#.utf8
+      ),
+      minZoom: 0,
+      maxZoom: .infinity,
+      pixelRatio: 1,
+      includeIdeographs: false
+    ))
 
-  try geometryDefinition.nativeDefinition.withNativeDefinition { native in
+  let geometryDefinitionArena = NativeInputArena()
+  defer { withExtendedLifetime(geometryDefinitionArena) {} }
+  try withUnsafePointer(to: geometryDefinition
+    .nativeValue(arena: geometryDefinitionArena))
+  { native in
     #expect(native.pointee.type == MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
       .rawValue)
     #expect(String(cString: native.pointee.data.geometry.style_url) ==
@@ -50,33 +62,37 @@ import Testing
 
 @Test func offlineRegionInfoCopiesDefinitionAndMetadata() throws {
   let metadata = [UInt8]("metadata".utf8)
-  let definition = OfflineRegionDefinition.tilePyramid(
-    styleURL: "asset://style.json",
-    bounds: LatLngBounds(
-      southwest: LatLng(latitude: 0, longitude: 1),
-      northeast: LatLng(latitude: 2, longitude: 3)
-    ),
-    minZoom: 2,
-    maxZoom: 6,
-    pixelRatio: 1,
-    includeIdeographs: false
-  )
+  let definition = OfflineRegionDefinition
+    .tilePyramid(OfflineTilePyramidRegionDefinition(
+      styleUrl: "asset://style.json",
+      bounds: LatLngBounds(
+        southwest: LatLng(latitude: 0, longitude: 1),
+        northeast: LatLng(latitude: 2, longitude: 3)
+      ),
+      minZoom: 2,
+      maxZoom: 6,
+      pixelRatio: 1,
+      includeIdeographs: false
+    ))
 
-  let copied = try definition.nativeDefinition
-    .withNativeDefinition { definition in
-      try metadata.withUnsafeBufferPointer { metadata in
-        var raw = mln_offline_region_info()
-        raw.size = UInt32(MemoryLayout<mln_offline_region_info>.size)
-        raw.id = 42
-        raw.definition = definition.pointee
-        raw.metadata = metadata.baseAddress
-        raw.metadata_size = metadata.count
-        return try NativeOfflineRegionInfo(copying: raw)
-      }
+  let arena = NativeInputArena()
+  defer { withExtendedLifetime(arena) {} }
+  let copied = try withUnsafePointer(to: definition
+    .nativeValue(arena: arena))
+  { definition in
+    try metadata.withUnsafeBufferPointer { metadata in
+      var raw = mln_offline_region_info()
+      raw.size = UInt32(MemoryLayout<mln_offline_region_info>.size)
+      raw.id = 42
+      raw.definition = definition.pointee
+      raw.metadata = metadata.baseAddress
+      raw.metadata_size = metadata.count
+      return try OfflineRegionInfo(raw: raw)
     }
+  }
 
   #expect(copied.id == 42)
-  #expect(copied.definition == definition.nativeDefinition)
+  #expect(copied.definition == definition)
   #expect(copied.metadata == Data(metadata))
 }
 
@@ -86,16 +102,8 @@ import Testing
   definition.data.geometry = mln_offline_geometry_region_definition()
   definition.data.geometry.geometry = mln_buffer_view(data: nil, size: 1)
 
-  do {
-    _ = try NativeOfflineRegionDefinition(copying: definition)
-    Issue.record("missing geometry should throw")
-  } catch let failure as NativeStatusFailure {
-    #expect(!failure.isNativeStatus)
-    #expect(failure.rawStatus == MLN_STATUS_NATIVE_ERROR.rawValue)
-    #expect(failure
-      .diagnostic == "offline geometry buffer has nil data with non-zero size")
-  } catch {
-    Issue.record("unexpected error: \(error)")
+  #expect(throws: NativeStringError.self) {
+    try OfflineRegionDefinition(raw: definition)
   }
 
   var info = mln_offline_region_info()
@@ -103,55 +111,116 @@ import Testing
   info.metadata = nil
   info.metadata_size = 1
 
+  #expect(throws: NativeStringError.self) { try OfflineRegionInfo(raw: info) }
+}
+
+/// An offline region's whole lifecycle over the runtime's own database, and
+/// the not-found status every mutation reports for an id no region carries.
+@Test func offlineRegionLifecycleReportsNotFoundForAMissingId() async throws {
+  let runtime =
+    try Maplibre.runtimeCreate(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
+
+  try await runtime.setMaximumAmbientCacheSize(size: 8 << 20)
+  try await runtime.runAmbientCacheOperation(operation: .clear)
+
+  let definition = OfflineRegionDefinition
+    .tilePyramid(OfflineTilePyramidRegionDefinition(
+      styleUrl: "asset://style.json",
+      bounds: LatLngBounds(
+        southwest: LatLng(latitude: 0, longitude: 0),
+        northeast: LatLng(latitude: 1, longitude: 1)
+      ),
+      minZoom: 0,
+      maxZoom: 2,
+      pixelRatio: 1,
+      includeIdeographs: false
+    ))
+  let created = try await runtime.offlineRegionCreate(
+    definition: definition,
+    metadata: Data("first".utf8)
+  )
+  #expect(created.definition == definition)
+  #expect(created.metadata == Data("first".utf8))
+
+  let updated = try await runtime.offlineRegionUpdateMetadata(
+    regionId: created.id,
+    metadata: Data("second".utf8)
+  )
+  #expect(updated.id == created.id)
+  #expect(updated.metadata == Data("second".utf8))
+  #expect(try await runtime.offlineRegionGet(regionId: created.id) == updated)
+  #expect(try await runtime.offlineRegionsList().contains(updated))
+
+  let status = try await runtime.offlineRegionGetStatus(regionId: created.id)
+  #expect(status.downloadState == .inactive)
+
+  try await runtime.offlineRegionSetObserved(
+    regionId: created.id,
+    observed: true
+  )
+  try await runtime.offlineRegionInvalidate(regionId: created.id)
+  try await runtime.offlineRegionDelete(regionId: created.id)
+  #expect(try await runtime.offlineRegionGet(regionId: created.id) == nil)
+
+  // Every mutation reports the missing region through its completion.
+  let missing = created.id
+  await expectNotFound { try await runtime.offlineRegionUpdateMetadata(
+    regionId: missing, metadata: Data()
+  ) }
+  await expectNotFound {
+    try await runtime.offlineRegionGetStatus(regionId: missing)
+  }
+  await expectNotFound {
+    try await runtime.offlineRegionSetObserved(
+      regionId: missing,
+      observed: false
+    )
+  }
+  await expectNotFound {
+    try await runtime.offlineRegionSetDownloadState(
+      regionId: missing, state: .inactive
+    )
+  }
+  await expectNotFound {
+    try await runtime.offlineRegionInvalidate(regionId: missing)
+  }
+  await expectNotFound {
+    try await runtime.offlineRegionDelete(regionId: missing)
+  }
+}
+
+private func expectNotFound(
+  _ body: () async throws -> some Any,
+  sourceLocation: SourceLocation = #_sourceLocation
+) async {
   do {
-    _ = try NativeOfflineRegionInfo(copying: info)
-    Issue.record("missing metadata should throw")
-  } catch let failure as NativeStatusFailure {
-    #expect(!failure.isNativeStatus)
-    #expect(failure.rawStatus == MLN_STATUS_NATIVE_ERROR.rawValue)
-    #expect(failure.diagnostic == "offline region metadata is null")
+    _ = try await body()
+    Issue.record(
+      "a missing region should report not found",
+      sourceLocation: sourceLocation
+    )
+  } catch let error as MaplibreError {
+    #expect(error.kind == .notFound, sourceLocation: sourceLocation)
+    #expect(
+      error.rawStatus == MLN_STATUS_NOT_FOUND.rawValue,
+      sourceLocation: sourceLocation
+    )
   } catch {
-    Issue.record("unexpected error: \(error)")
+    Issue.record(
+      "unexpected error: \(error)", sourceLocation: sourceLocation
+    )
   }
 }
 
-@Test func setMaximumAmbientCacheSizeReportsCompletion() throws {
+@Test func closedRuntimeRejectsOfflineCallsThroughSwiftHandleState(
+) async throws {
   let runtime =
-    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  defer { try? runtime.close() }
-
-  let operationId = try runtime.setMaximumAmbientCacheSizeStart(8 << 20)
-  #expect(operationId != 0)
-
-  let event = try pumpUntilEvent(
-    runtime,
-    waitingFor: "the cache size operation to complete"
-  ) { event in
-    guard case let .offlineOperationCompleted(completed) = event.payload else {
-      return false
-    }
-    return completed.operationId == operationId
-  }
-  guard case let .offlineOperationCompleted(completed) = try #require(event)
-    .payload
-  else {
-    Issue.record("the completion event lost its payload")
-    return
-  }
-  // MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE; the public API
-  // carries operation kinds as raw C values.
-  #expect(completed.operationKind == 12)
-  #expect(completed.resultStatus == 0)
-  try runtime.discardOfflineOperation(operationId)
-}
-
-@Test func closedRuntimeRejectsOfflineCallsThroughSwiftHandleState() throws {
-  let runtime =
-    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  try runtime.close()
+    try Maplibre.runtimeCreate(options: RuntimeOptions(cachePath: ":memory:"))
+  try await runtime.close()
 
   do {
-    _ = try runtime.offlineRegionsListStart()
+    _ = try await runtime.offlineRegionsList()
     Issue.record("closed runtime should throw")
   } catch let error as MaplibreError {
     #expect(error.kind == .invalidState)

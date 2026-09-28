@@ -14,9 +14,8 @@ struct SwiftMapApp: App {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-  static let willTerminateMapViews = Notification
-    .Name("SwiftMapWillTerminateMapViews")
   private var window: NSWindow?
+  private var mapView: MetalMapView?
 
   func applicationDidFinishLaunching(_: Notification) {
     NSApp.setActivationPolicy(.regular)
@@ -31,15 +30,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     true
   }
 
+  /// Native teardown is asynchronous, so the reply waits for it rather than
+  /// letting the process exit while the runtime is still releasing.
   func applicationShouldTerminate(_: NSApplication) -> NSApplication
     .TerminateReply
   {
-    NotificationCenter.default.post(
-      name: Self.willTerminateMapViews,
-      object: nil
-    )
-    clearCAPILogging()
-    return .terminateNow
+    guard let mapView else {
+      clearCAPILogging()
+      return .terminateNow
+    }
+    Task { @MainActor in
+      await mapView.shutdown()
+      clearCAPILogging()
+      NSApp.reply(toApplicationShouldTerminate: true)
+    }
+    return .terminateLater
   }
 
   private func createWindow() {
@@ -51,7 +56,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       defer: false
     )
     window.title = "MapLibre Swift Map"
-    window.contentView = MetalMapView(mode: swiftMapConfiguration.mode)
+    let mapView = MetalMapView(mode: swiftMapConfiguration.mode)
+    self.mapView = mapView
+    window.contentView = mapView
     window.center()
     window.makeKeyAndOrderFront(nil)
     self.window = window

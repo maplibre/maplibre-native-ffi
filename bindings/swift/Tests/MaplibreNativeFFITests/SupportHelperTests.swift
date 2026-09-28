@@ -3,87 +3,11 @@ import Foundation
 @testable import MaplibreNativeFFI
 import Testing
 
-private final class LockedBox<Value>: @unchecked Sendable {
-  private let lock = NSLock()
-  private var value: Value
-
-  init(_ value: Value) {
-    self.value = value
-  }
-
-  func update(_ body: (inout Value) -> Void) {
-    lock.withLock {
-      body(&value)
-    }
-  }
-
-  func read<Result>(_ body: (Value) -> Result) -> Result {
-    lock.withLock {
-      body(value)
-    }
-  }
-}
-
-@Test func nativeCStringRejectsEmbeddedNul() throws {
-  do {
-    _ = try NativeString.withCString("a\0b") { _ in true }
-    Issue.record("embedded NUL should throw")
-  } catch let error as NativeStringError {
-    #expect(error.message.contains("embedded NUL"))
-  }
-}
-
-@Test func nativeStringViewUsesUtf8ByteCountAndAllowsNulBytes() throws {
-  let observed = try NativeString.withStringView("é\0") { view in
-    let bytes = UnsafeBufferPointer(
-      start: UnsafeRawPointer(view.data).assumingMemoryBound(to: UInt8.self),
-      count: view.size
-    )
-    return Array(bytes)
-  }
-
-  #expect(observed == Array("é\0".utf8))
-}
-
-@Test func nativeMemoryTemporaryReturnsMutatedValue() throws {
-  let output = try NativeMemory.withTemporary(UInt32(1)) { pointer in
-    pointer.pointee = 42
-    return "done"
-  }
-
-  #expect(output.value == 42)
-  #expect(output.result == "done")
-}
-
-@Test func nativeDescriptorMaterializerProvidesScopedPointer() throws {
-  struct TinyDescriptor: Equatable {
-    var size: UInt32
-    var value: UInt32
-  }
-
-  let descriptor = NativeDescriptorMaterializer(TinyDescriptor(
-    size: 8,
-    value: 99
-  ))
-  let copied = try descriptor.withNativeDescriptor { pointer in
-    pointer.pointee
-  }
-
-  #expect(copied == TinyDescriptor(size: 8, value: 99))
-}
-
-@Test func nativeHandleFactoryReportsSwiftNullHandleFailure() throws {
-  do {
-    let _: NativeMapHandle = try NativeHandleFactory
-      .create(nullDiagnostic: "factory returned null") { _ in }
-    Issue.record("null handle should throw")
-  } catch let failure as NativeStatusFailure {
-    #expect(!failure.isNativeStatus)
-    #expect(failure.rawStatus == MLN_STATUS_NATIVE_ERROR.rawValue)
-    #expect(failure.diagnostic == "factory returned null")
-  } catch {
-    Issue.record("unexpected error: \(error)")
-  }
+@Test func nativeArenaPreservesCountedUtf8AndRejectsCStringNul() throws {
+  let arena = NativeInputArena()
+  #expect(throws: NativeStringError.self) { try arena.cString("a\0b") }
+  let view = arena.view("é\0")
+  #expect(try NativeString.copyUTF8(data: view.data, size: view.size) == "é\0")
 }
 
 @Test func nativeStringCopyUTF8RejectsInvalidBytes() throws {
@@ -105,22 +29,6 @@ private final class LockedBox<Value>: @unchecked Sendable {
   }
 }
 
-@Test func nativeResultGuardReleasesExactlyOnce() throws {
-  let releases = LockedBox(0)
-  let handle = SyntheticHandles.resourceRequest()
-  let guardHandle = try NativeResultGuard(
-    typeName: "test_result",
-    handle: handle
-  ) { _ in
-    releases.update { $0 += 1 }
-  }
-
-  guardHandle.close()
-  guardHandle.close()
-
-  #expect(releases.read { $0 } == 1)
-}
-
 @Test func nativeHandleStateCloseIsIdempotentAfterSuccess() throws {
   let closes = LockedBox(0)
   let state = try NativeHandleState(
@@ -137,6 +45,21 @@ private final class LockedBox<Value>: @unchecked Sendable {
 
   #expect(state.isClosed)
   #expect(closes.read { $0 } == 1)
+}
+
+@Test func nativeHandleReadReservesOwnerUntilCopyCompletes() throws {
+  let state = try NativeHandleState(
+    typeName: "test_handle",
+    handle: SyntheticHandles.resourceRequest(0x2)
+  )
+  let access = try state.borrow()
+  #expect(throws: NativeStatusFailure.self) {
+    try state.closeOnce { _ in Issue.record("reserved owner was released") }
+  }
+  #expect(!state.isClosed)
+  access.end()
+  try state.closeOnce { _ in }
+  #expect(state.isClosed)
 }
 
 @Test func nativeHandleStateConcurrentCloseDestroysOnce() throws {
@@ -231,7 +154,12 @@ private final class LockedBox<Value>: @unchecked Sendable {
 
 @Test func nativeHandleStateReportsLeaksWithoutDestroying() throws {
   let leaks = LockedBox([NativeHandleLeak]())
-  let leaked = SyntheticHandles.resourceRequest(0x3)
+  struct UnretiredHandle: NativeHandle {
+    let raw: UInt64; func disposeAbandoned() -> Bool {
+      false
+    }
+  }
+  let leaked = UnretiredHandle(raw: 3)
 
   try NativeHandleLeakTestSupport.withHandler({ leak in
     leaks.update { $0.append(leak) }
@@ -248,4 +176,18 @@ private final class LockedBox<Value>: @unchecked Sendable {
       handle: leaked.raw
     )])
   }
+}
+
+@Test func repeatedInlineCloseClaimsDecisionAndReleasesOnce() throws {
+  let state = try NativeHandleState(
+    typeName: "request",
+    handle: SyntheticHandles.resourceRequest(99),
+    pendingDecision: true
+  )
+  let releases = LockedBox(0)
+  try state.closeOnce { _ in releases.update { $0 += 1 } }
+  try state.closeOnce { _ in releases.update { $0 += 1 } }
+  #expect(state.finishDecision(accepted: false))
+  #expect(state.isClosed)
+  #expect(releases.value == 1)
 }

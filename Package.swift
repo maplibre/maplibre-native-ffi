@@ -10,6 +10,7 @@ import PackageDescription
 let testDependencies: [Target.Dependency] = [
   "MaplibreNativeFFI",
   "CMaplibreNativeC",
+  "GraphicsSupport",
 ]
 
 let testSourceFiles = [
@@ -20,6 +21,7 @@ let testSourceFiles = [
   "MaplibreNativeFFITests/MaplibreTests.swift",
   "MaplibreNativeFFITests/NativeHandleLeakTestSupport.swift",
   "MaplibreNativeFFITests/OfflineTests.swift",
+  "MaplibreNativeFFITests/OwnedTextureFixture.swift",
   "MaplibreNativeFFITests/ProjectionTests.swift",
   "MaplibreNativeFFITests/QueryTests.swift",
   "MaplibreNativeFFITests/RenderTests.swift",
@@ -30,7 +32,6 @@ let testSourceFiles = [
   "MaplibreNativeFFITests/SupportHelperTests.swift",
   "MaplibreNativeFFITests/SyntheticHandles.swift",
   "MaplibreNativeFFITests/ValueTests.swift",
-  "MaplibreNativeFFITests/WakeSourceTests.swift",
 ]
 
 let products: [Product] = [
@@ -42,6 +43,16 @@ let products: [Product] = [
 ]
 
 let targets: [Target] = [
+  .target(
+    name: "GraphicsSupport",
+    path: "tests/graphics",
+    cSettings: [
+      .headerSearchPath(
+        "../../third_party/maplibre-native/vendor/Vulkan-Headers/include"
+      ),
+    ],
+    linkerSettings: [.linkedLibrary("dl", .when(platforms: [.linux]))]
+  ),
   .systemLibrary(
     name: "CMaplibreNativeC",
     path: "bindings/swift/Sources/CMaplibreNativeC",

@@ -3,40 +3,30 @@ import Foundation
 @testable import MaplibreNativeFFI
 import Testing
 
-@Test func renderedQueryGeometryMaterializesNativeShapes() throws {
-  try RenderedQueryGeometry.point(ScreenPoint(x: 1, y: 2)).nativeGeometry
-    .withNativeGeometry { geometry in
-      #expect(geometry.pointee.type == MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT
-        .rawValue)
-      #expect(geometry.pointee.data.point.x == 1)
-      #expect(geometry.pointee.data.point.y == 2)
-    }
-
-  try RenderedQueryGeometry.lineString([
-    ScreenPoint(x: 1, y: 2),
-    ScreenPoint(x: 3, y: 4),
-  ]).nativeGeometry
-    .withNativeGeometry { geometry in
-      #expect(geometry.pointee
-        .type == MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING.rawValue)
-      #expect(geometry.pointee.data.line_string.point_count == 2)
-      #expect(geometry.pointee.data.line_string.points![1].x == 3)
-    }
-}
-
-@Test func renderedQueryLineStringRejectsEmptyInputBeforeCallingC() throws {
-  do {
-    try RenderedQueryGeometry.lineString([]).nativeGeometry
-      .withNativeGeometry { _ in }
-    Issue.record("empty line string should throw")
-  } catch let failure as NativeStatusFailure {
-    #expect(!failure.isNativeStatus)
-    #expect(failure.rawStatus == MLN_STATUS_INVALID_ARGUMENT.rawValue)
-    #expect(failure
-      .diagnostic ==
-      "rendered query line string geometry must contain at least one point")
-  } catch {
-    Issue.record("unexpected error: \(error)")
+@Test func renderedQueryGeometryCopiesTaggedArraysAndPreservesUnknownTags(
+) throws {
+  let copied: RenderedQueryGeometry = try {
+    let arena = NativeInputArena()
+    defer { withExtendedLifetime(arena) {} }
+    let geometry = RenderedQueryGeometry.lineString(ScreenLineString(points: [
+      ScreenPoint(x: 1, y: 2), ScreenPoint(x: 3, y: 4),
+    ]))
+    let raw = try geometry.nativeValue(arena: arena)
+    #expect(raw.type == MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING.rawValue)
+    return try RenderedQueryGeometry(raw: raw)
+  }()
+  #expect(copied == .lineString(ScreenLineString(points: [
+    ScreenPoint(x: 1, y: 2), ScreenPoint(x: 3, y: 4),
+  ])))
+  var unknown = mln_rendered_query_geometry()
+  unknown.type = 9876
+  let captured = try RenderedQueryGeometry(raw: unknown)
+  #expect(captured.data == .unknown(
+    9876,
+    Data(repeating: 0, count: MemoryLayout.size(ofValue: unknown.data))
+  ))
+  #expect(throws: (any Error).self) {
+    try captured.nativeValue(arena: NativeInputArena())
   }
 }
 
@@ -46,7 +36,10 @@ import Testing
     filter: Data(#"["==","kind","road"]"#.utf8)
   )
 
-  try options.nativeOptions.withNativeOptions { native in
+  let arena = NativeInputArena()
+  defer { withExtendedLifetime(arena) {} }
+  try withUnsafePointer(to: options.nativeValue(arena: arena)) { pointer in
+    let native: Optional = pointer
     #expect(native != nil)
     #expect(native!.pointee
       .fields == MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS.rawValue)
@@ -69,7 +62,10 @@ import Testing
     filter: Data(#"["has","class"]"#.utf8)
   )
 
-  try options.nativeOptions.withNativeOptions { native in
+  let arena = NativeInputArena()
+  defer { withExtendedLifetime(arena) {} }
+  try withUnsafePointer(to: options.nativeValue(arena: arena)) { pointer in
+    let native: Optional = pointer
     #expect(native != nil)
     #expect(native!.pointee
       .fields == MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS.rawValue)
@@ -94,7 +90,9 @@ import Testing
     stateKey: "hover"
   )
 
-  try selector.nativeSelector.withNativeSelector { native in
+  let arena = NativeInputArena()
+  let converted = try selector.nativeValue(arena: arena)
+  try withUnsafePointer(to: converted) { native in
     #expect(native.pointee.fields == (
       MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID.rawValue |
         MLN_FEATURE_STATE_SELECTOR_FEATURE_ID.rawValue |
@@ -121,4 +119,52 @@ import Testing
     #expect(featureId == "id")
     #expect(stateKey == "hover")
   }
+}
+
+private func featureStateObject(
+  _ map: MapHandle,
+  selector: FeatureStateSelector
+) async throws -> [String: Any] {
+  let bytes = try await map.getFeatureState(selector: selector)
+  return try #require(
+    JSONSerialization.jsonObject(with: bytes) as? [String: Any]
+  )
+}
+
+/// Feature state belongs to the map store: a committed set reads back through
+/// an ordered get, a keyed remove drops only that key, and a source-wide
+/// remove clears the rest, all without a render session or a loaded source.
+@Test func mapFeatureStateRoundTripsWithoutARenderSession() async throws {
+  let runtime =
+    try Maplibre.runtimeCreate(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await runtime
+    .mapCreate(options: MapOptions(initialExtent: LogicalExtent(
+      width: 64,
+      height: 64,
+      scaleFactor: 1
+    )))
+  defer { try? map.closeBlockingForTests() }
+
+  let feature = FeatureStateSelector(sourceId: "geo", featureId: "f1")
+  // Missing state reads as an empty JSON object.
+  #expect(try await featureStateObject(map, selector: feature).isEmpty)
+
+  try await map.setFeatureState(
+    selector: feature,
+    state: Data(#"{"hover":true,"rank":2}"#.utf8)
+  )
+  let stored = try await featureStateObject(map, selector: feature)
+  #expect(stored["hover"] as? Bool == true)
+  #expect(stored["rank"] as? Int == 2)
+
+  try await map.removeFeatureState(selector: FeatureStateSelector(
+    sourceId: "geo", featureId: "f1", stateKey: "hover"
+  ))
+  let trimmed = try await featureStateObject(map, selector: feature)
+  #expect(Set(trimmed.keys) == ["rank"])
+
+  try await map
+    .removeFeatureState(selector: FeatureStateSelector(sourceId: "geo"))
+  #expect(try await featureStateObject(map, selector: feature).isEmpty)
 }

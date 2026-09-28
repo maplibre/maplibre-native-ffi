@@ -1,9 +1,9 @@
 [tools]
-"core:swift" = { version = "{{vars.swift_version}}", os = ["linux/x64"] }
+"core:swift" = { version = "{{vars.swift_version}}", os = ["linux"] }
 # Carries the libxml2.so.2 the Swift toolchain links, for distros that ship only
 # libxml2.so.16. .mise/bin/swift-libxml2-env.sh puts it on the loader path and
 # explains why; the tasks below source it.
-"conda:libxml2" = { version = "{{vars.libxml2_version}}", os = ["linux/x64"] }
+"conda:libxml2" = { version = "{{vars.libxml2_version}}", os = ["linux"] }
 "github:xtool-org/xtool" = { version = "{{vars.xtool_version}}", os = ["linux"] }
 
 [tasks.build]

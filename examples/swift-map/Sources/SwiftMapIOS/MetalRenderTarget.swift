@@ -40,9 +40,9 @@ final class MetalGraphicsContext {
   }
 }
 
-/// The render session for the host `CAMetalLayer`. Attach records the calling
-/// thread as the session's owner, so every call here runs on the render loop
-/// thread that owns the view and its layer.
+/// The render session for the host `CAMetalLayer`. The display link services
+/// driver work on the graphics thread. Every operation remains isolated to the
+/// main actor.
 @MainActor
 final class MetalRenderTarget {
   private let session: RenderSessionHandle
@@ -51,39 +51,73 @@ final class MetalRenderTarget {
     self.session = session
   }
 
-  /// Attaches a session against the map the runtime loop published.
+  /// Attaches a session against the map owned by the view.
   static func attach(
-    attachRef: MapAttachRef,
+    map: MapHandle,
     graphics: MetalGraphicsContext,
     viewport: Viewport
-  ) throws -> MetalRenderTarget {
-    let session = try attachRef.attachMetalSurface(MetalSurfaceDescriptor(
-      extent: viewport.extent,
-      context: graphics.contextDescriptor,
-      layer: graphics.layerPointer
-    ))
-    return MetalRenderTarget(session: session)
-  }
-
-  func resize(_ viewport: Viewport) throws {
-    try session.resize(
-      width: viewport.logicalWidth,
-      height: viewport.logicalHeight,
-      scaleFactor: viewport.scaleFactor
+  ) async throws -> MetalRenderTarget {
+    let driverRelay = DriverRelay()
+    let attachment = try map.metalSurfaceAttach(
+      descriptor: MetalSurfaceDescriptor(
+        extent: viewport.extent,
+        context: graphics.contextDescriptor,
+        layer: graphics.layerPointer
+      ),
+      options: .init(
+        driver: .callerGraphicsThread,
+        driverWorkWake: driverRelay.wake
+      )
     )
+    let session = attachment.session
+    do {
+      driverRelay.session = session
+      _ = try session.serviceDriverWork(maxWork: 0)
+      try await attachment.completion.value
+      return MetalRenderTarget(session: session)
+    } catch {
+      _ = try? session.abandon()
+      try? session.close()
+      throw error
+    }
   }
 
-  /// Services a render request. False requests a target retry.
-  func renderUpdate() throws -> Bool {
-    try session.renderUpdate().result != .targetNotReady
+  func resize(_ viewport: Viewport) async throws {
+    try await session.resize(extent: viewport.extent)
   }
 
-  func finishFrame() throws {
-    // The Metal surface path needs no per-iteration host upkeep here.
+  /// Services graphics work, submits one display-link-paced frame demand, and
+  /// reports whether the loop may rest. It reports false when no frame reached
+  /// the screen and when the map asked for another frame while this one
+  /// rendered, so the loop demands one more.
+  func renderFrame() throws -> Bool {
+    try session.requestFrame(demand: FrameDemand(flags: [.ifNeeded, .present]))
+    _ = try session.serviceDriverWork(maxWork: 0)
+    let batch: RenderFrameBatchHandle
+    do { batch = try session.drainFrameResults() }
+    catch let error as MaplibreError
+      where error.kind == .notReady { return false }
+    defer { try? batch.close() }
+    let count = try batch.count()
+    guard count > 0 else { return false }
+    let result = try batch.get(index: count - 1)
+    guard result.disposition == .rendered else { return false }
+    return !result.needsRepaint
   }
 
-  func close() throws {
-    try session.close()
+  func close() async throws {
+    do {
+      try await session.detach()
+      try session.close()
+    } catch {
+      abandon()
+      throw error
+    }
+  }
+
+  func abandon() {
+    _ = try? session.abandon()
+    try? session.close()
   }
 }
 
@@ -95,4 +129,14 @@ private func nativePointer(_ object: AnyObject) -> NativePointer {
 
 private func metalError(_ message: String) -> MaplibreError {
   MaplibreError(kind: .nativeError, rawStatus: nil, diagnostic: message)
+}
+
+@MainActor
+private final class DriverRelay {
+  weak var session: RenderSessionHandle?
+  var wake: Wake {
+    Wake(callback: { [self] in Task { @MainActor in
+      _ = try? session?.serviceDriverWork(maxWork: 0)
+    } })
+  }
 }

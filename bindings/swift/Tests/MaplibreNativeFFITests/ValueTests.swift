@@ -17,6 +17,6 @@ import Testing
   #expect(copied == Data(#"{"type":"Point","coordinates":[2,1]}"#.utf8))
 
   let empty = arena.view(Data())
-  #expect(empty.data == nil)
+  #expect(empty.data != nil)
   #expect(empty.size == 0)
 }
