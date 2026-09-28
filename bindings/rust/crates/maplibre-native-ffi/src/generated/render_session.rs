@@ -1,6 +1,66 @@
 // Generated from C headers by tools/bindgen. Do not edit.
 use super::*;
 
+#[derive(Debug)]
+pub(crate) struct RenderSessionHandleState {
+    pub(crate) handle: crate::handle::ConcurrentNativeHandle<sys::mln_render_session>,
+    id: u64,
+    _parent: std::sync::Arc<crate::MapHandleState>,
+}
+impl RenderSessionHandleState {
+    pub(crate) fn native(&self) -> Result<sys::mln_render_session> {
+        maplibre_core::callback::check("", 0)?;
+        self.handle
+            .live_handle()
+            .ok_or_else(|| crate::handle::closed_handle_error("RenderSessionHandle"))
+    }
+}
+impl Drop for RenderSessionHandleState {
+    fn drop(&mut self) {
+        self.handle
+            .finalize_with(|raw| unsafe { maplibre_core::generated::render_session_dispose(raw) });
+    }
+}
+/// Owns one `mln_render_session` native handle.
+pub struct RenderSessionHandle {
+    pub(crate) inner: std::sync::Arc<RenderSessionHandleState>,
+}
+impl std::fmt::Debug for RenderSessionHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RenderSessionHandle")
+            .field("closed", &self.is_closed())
+            .finish()
+    }
+}
+impl RenderSessionHandle {
+    pub(crate) fn from_native(
+        raw: sys::mln_render_session,
+        parent: std::sync::Arc<crate::MapHandleState>,
+    ) -> Result<Self> {
+        // SAFETY: raw came from an accepted ownership transfer of this handle type.
+        let handle = unsafe {
+            crate::handle::ConcurrentNativeHandle::from_handle(raw, "mln_render_session")
+        }?;
+        Ok(Self {
+            inner: std::sync::Arc::new(RenderSessionHandleState {
+                handle,
+                id: raw.0,
+                _parent: parent,
+            }),
+        })
+    }
+
+    /// Returns the native handle value, which event sources report for this handle.
+    pub fn id(&self) -> u64 {
+        self.inner.id
+    }
+
+    /// Reports whether an explicit release, close, or disposal consumed this handle.
+    pub fn is_closed(&self) -> bool {
+        self.inner.handle.is_closed()
+    }
+}
+
 impl RenderSessionHandle {
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.

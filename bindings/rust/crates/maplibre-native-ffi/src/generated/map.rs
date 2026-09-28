@@ -1,6 +1,64 @@
 // Generated from C headers by tools/bindgen. Do not edit.
 use super::*;
 
+#[derive(Debug)]
+pub(crate) struct MapHandleState {
+    pub(crate) handle: crate::handle::ConcurrentNativeHandle<sys::mln_map>,
+    id: u64,
+    _parent: std::sync::Arc<crate::RuntimeHandleState>,
+}
+impl MapHandleState {
+    pub(crate) fn native(&self) -> Result<sys::mln_map> {
+        maplibre_core::callback::check("", 0)?;
+        self.handle
+            .live_handle()
+            .ok_or_else(|| crate::handle::closed_handle_error("MapHandle"))
+    }
+}
+impl Drop for MapHandleState {
+    fn drop(&mut self) {
+        self.handle
+            .finalize_with(|raw| unsafe { maplibre_core::generated::map_dispose(raw) });
+    }
+}
+/// Owns one `mln_map` native handle.
+pub struct MapHandle {
+    pub(crate) inner: std::sync::Arc<MapHandleState>,
+}
+impl std::fmt::Debug for MapHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MapHandle")
+            .field("closed", &self.is_closed())
+            .finish()
+    }
+}
+impl MapHandle {
+    pub(crate) fn from_native(
+        raw: sys::mln_map,
+        parent: std::sync::Arc<crate::RuntimeHandleState>,
+    ) -> Result<Self> {
+        // SAFETY: raw came from an accepted ownership transfer of this handle type.
+        let handle = unsafe { crate::handle::ConcurrentNativeHandle::from_handle(raw, "mln_map") }?;
+        Ok(Self {
+            inner: std::sync::Arc::new(MapHandleState {
+                handle,
+                id: raw.0,
+                _parent: parent,
+            }),
+        })
+    }
+
+    /// Returns the native handle value, which event sources report for this handle.
+    pub fn id(&self) -> u64 {
+        self.inner.id
+    }
+
+    /// Reports whether an explicit release, close, or disposal consumed this handle.
+    pub fn is_closed(&self) -> bool {
+        self.inner.handle.is_closed()
+    }
+}
+
 impl MapHandle {
     /// Calls `mln_map_add_color_relief_layer` using its header execution and ownership contract.
     pub fn add_color_relief_layer(
@@ -103,7 +161,7 @@ impl MapHandle {
     pub fn add_geojson_source_data(
         &self,
         binding_arg_1: &str,
-        binding_arg_2: &crate::GeoJsonSourceDataHandle,
+        binding_arg_2: &crate::GeojsonSourceDataHandle,
     ) -> Result<NativeFuture<crate::CommandCompletion>> {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let native = self.inner.native()?;
@@ -112,7 +170,7 @@ impl MapHandle {
             data: (binding_arg_1).as_bytes().as_ptr().cast(),
             size: (binding_arg_1).as_bytes().len(),
         };
-        let binding_arg_2_native = binding_arg_2.native()?;
+        let binding_arg_2_native = binding_arg_2.inner.native()?;
         crate::completion::submit_command(|completion| unsafe {
             sys::mln_map_add_geojson_source_data(
                 native,
@@ -1927,7 +1985,7 @@ impl MapHandle {
     pub fn set_geojson_source_data(
         &self,
         binding_arg_1: &str,
-        binding_arg_2: &crate::GeoJsonSourceDataHandle,
+        binding_arg_2: &crate::GeojsonSourceDataHandle,
     ) -> Result<NativeFuture<crate::CommandCompletion>> {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let native = self.inner.native()?;
@@ -1936,7 +1994,7 @@ impl MapHandle {
             data: (binding_arg_1).as_bytes().as_ptr().cast(),
             size: (binding_arg_1).as_bytes().len(),
         };
-        let binding_arg_2_native = binding_arg_2.native()?;
+        let binding_arg_2_native = binding_arg_2.inner.native()?;
         crate::completion::submit_command(|completion| unsafe {
             sys::mln_map_set_geojson_source_data(
                 native,

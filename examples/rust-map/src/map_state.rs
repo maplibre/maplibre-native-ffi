@@ -169,7 +169,7 @@ impl MapState {
     }
 
     pub fn drain_events(&self) -> maplibre_native_ffi::Result<bool> {
-        let source = self.map.id().get();
+        let source = self.map.id();
         Ok(self
             .runtime
             .drain_events()?

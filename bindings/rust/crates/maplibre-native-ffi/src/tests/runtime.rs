@@ -1115,7 +1115,7 @@ fn resource_provider_error_response_becomes_copied_loading_failure_event() {
     // The copy stays intact after the drain that ends the batch's window.
     let _ = runtime.drain_events().unwrap().get().unwrap().events;
 
-    assert_eq!(event.source, map_id.get());
+    assert_eq!(event.source, map_id);
     assert_eq!(event.r#type, RuntimeEventType::MapLoadingFailed);
     assert_eq!(event.message, copied_message);
     assert!(event.message.contains("provider failed"));
@@ -1487,7 +1487,7 @@ fn a_drain_reports_map_events_in_queue_order_and_copies_outlive_the_drain() {
         .into_iter()
         .find(|event| event.r#type == RuntimeEventType::MapLoadingFailed)
         .expect("a malformed style should queue a loading-failed event");
-    assert_eq!(owned.source, map_id.get());
+    assert_eq!(owned.source, map_id);
 
     // A later drain leaves the copied event readable.
     assert!(
@@ -1499,7 +1499,7 @@ fn a_drain_reports_map_events_in_queue_order_and_copies_outlive_the_drain() {
             .events
             .is_empty()
     );
-    assert_eq!(owned.source, map_id.get());
+    assert_eq!(owned.source, map_id);
     assert_eq!(owned.r#type, RuntimeEventType::MapLoadingFailed);
     assert!(!owned.message.is_empty());
 

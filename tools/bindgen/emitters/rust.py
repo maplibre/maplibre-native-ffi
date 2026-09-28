@@ -27,21 +27,6 @@ SCALARS = {
     "size_t": "usize",
     "uint8_t": "u8",
 }
-# Hand-written Rust owners and the modules that define them. Other public
-# handles without a parent get a generated owner.
-HANDWRITTEN_OWNERS = {
-    "mln_geojson_source_data": ("geojson", "GeoJsonSourceDataHandle"),
-    "mln_acquired_frame": ("frame", "AcquiredFrameHandle"),
-    "mln_map": ("map", "MapHandle"),
-    "mln_map_projection": ("projection", "MapProjectionHandle"),
-    "mln_runtime": ("runtime", "RuntimeHandle"),
-    "mln_render_session": ("render", "RenderSessionHandle"),
-}
-
-
-HANDLE_TYPES = {
-    native: "crate::" + owner for native, (_, owner) in HANDWRITTEN_OWNERS.items()
-}
 
 
 def adopt_owned(owned, raw, value_types):
@@ -207,12 +192,22 @@ def result_rule(
     )
 
 
-def owner_access(value_types, native, expression):
-    module, _ = value_types.owners[native]
-    return (
-        f"{expression}.native()?"
-        if module in {"frame", "geojson"} or module.startswith("owned_")
-        else f"{expression}.inner.native()?"
+def owner_access(expression):
+    return f"{expression}.inner.native()?"
+
+
+def reads_receiver(plan: OperationPlan) -> bool:
+    """A counted read keeps a borrowed view or copied storage live for the call."""
+    from .rust_dynamic_values import dynamic
+
+    def borrowed(value):
+        target = value.element if value.kind == "reference" else value
+        return "owner" in {value.lifetime, target.lifetime} or dynamic(target)
+
+    return bool(
+        plan.receiver
+        and not plan.consumes
+        and (plan.view or any(borrowed(output.value) for output in plan.outputs))
     )
 
 
@@ -263,8 +258,9 @@ def operation(api: Api, plan: OperationPlan, value_types) -> tuple[str, str, set
     )
     if receiver is not None and receiver not in value_types.owners:
         raise Unsupported(f"receiver {receiver} needs a generated runtime adapter")
-    module, _owner = value_types.owners[receiver] if receiver else ("global", None)
-    native_receiver = owner_access(value_types, receiver, "self") if receiver else ""
+    module = value_types.owners[receiver] if receiver else "global"
+    native_receiver = owner_access("self") if receiver else ""
+    read = reads_receiver(plan)
     parameters = function.parameters[1:] if receiver else function.parameters
     locals_by_name = {
         parameter.name: f"binding_arg_{index}"
@@ -404,7 +400,7 @@ def operation(api: Api, plan: OperationPlan, value_types) -> tuple[str, str, set
             if not public:
                 raise Unsupported(f"{value_plan.native}: owner runtime unavailable")
             signature.append(f"{local}: &{public}")
-            access = owner_access(value_types, value_plan.native, local)
+            access = owner_access(local)
             setup.append(f"let {local}_native = {access};")
             args.append(f"{local}_native")
         elif value_plan and value_plan.kind in {"scalar", "native_pointer"}:
@@ -551,7 +547,7 @@ def operation(api: Api, plan: OperationPlan, value_types) -> tuple[str, str, set
                 "crate::generated::", "maplibre_core::generated::"
             )
             if dynamic(value):
-                if not module.startswith("owned_"):
+                if not read:
                     raise Unsupported(
                         "borrowed output record needs its native owner scope"
                     )
@@ -630,10 +626,6 @@ def operation(api: Api, plan: OperationPlan, value_types) -> tuple[str, str, set
             )
             body = [*setup, f"let value = unsafe {{ {call} }};", f"Ok({copied})"]
     else:
-        if module == "projection":
-            raise Unsupported(
-                "completion receiver/output combination needs another runtime adapter"
-            )
         if execution == "command":
             if plan.result is not None:
                 raise Unsupported("command receipt cannot discard a value payload")
@@ -671,19 +663,15 @@ def operation(api: Api, plan: OperationPlan, value_types) -> tuple[str, str, set
             ]
         else:
             body = [*native_setup, *setup, expression]
-    if module.startswith("owned_") and not consuming:
+    if read:
         body[0:1] = [
-            "let binding_read = self.handle.read_handle()?;",
+            "let binding_read = self.inner.handle.read_handle()?;",
             "let native = binding_read.native;",
         ]
     if consuming:
         if not receiver:
             raise Unsupported("consumption requires an owned receiver")
-        handle = (
-            "self.handle"
-            if module == "frame" or module.startswith("owned_") or module == "geojson"
-            else "self.inner.handle"
-        )
+        handle = "self.inner.handle"
         # Input conversion can fail before the close reservation is acquired.
         call_body = [
             line
@@ -705,17 +693,17 @@ def operation(api: Api, plan: OperationPlan, value_types) -> tuple[str, str, set
         + ("native.0" if receiver else "0")
         + ")?;"
     )
+    admitted = 2 if read else 1 if receiver else 0
     if not consuming:
-        body.insert(
-            2 if module.startswith("owned_") else 1 if receiver else 0, admission
-        )
+        body.insert(admitted, admission)
+        admitted += 1
     if plan.owned_outputs and receiver is None:
         body.insert(1, "maplibre_core::validate_abi_version()?;")
     generic = ""
     if plan.view:
         handle = plan.view.owner
         body.insert(
-            2,
+            admitted,
             f"let _scope = unsafe {{ maplibre_core::handle::NativeViewScope::begin(native, sys::{handle.view_begin}, sys::{handle.view_end}) }}?;",
         )
         body[-1] = f"let value = {output}; Ok(callback(&value))"
@@ -762,6 +750,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     chunks, generated, unsupported, values = defaultdict(list), [], {}, set()
     bound = compile_api(api)
     api = bound.source
+    from . import rust_owners
     from .rust_values import Values
 
     value_types = Values(bound)
@@ -769,34 +758,11 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         if value.kind == "enum":
             value_types.add(value)
     value_types.direct_callbacks = {}
-    value_types.owners = dict(HANDWRITTEN_OWNERS)
-    value_types.handle_types = dict(HANDLE_TYPES)
-    owned_declarations = []
-    for handle in bound.handles.values():
-        if (
-            handle.native in HANDLE_TYPES
-            or handle.parent
-            or any(
-                callback.decision and callback.decision.handle.native == handle.native
-                for callback in bound.callbacks.values()
-            )
-        ):
-            continue
-        dispose = bound.operations_by_name.get(handle.dispose)
-        if dispose is None:
-            continue
-        if (
-            len(dispose.function.parameters) != 1
-            or dispose.function.return_type.kind != "void"
-        ):
-            continue
-        owner = pascal(handle.native) + "Handle"
-        module = "owned_" + handle.native
-        value_types.owners[handle.native] = (module, owner)
-        value_types.handle_types[handle.native] = "crate::" + owner
-        owned_declarations.append(
-            f'#[derive(Debug)] pub struct {owner} {{ handle: crate::handle::ConcurrentNativeHandle<sys::{handle.native}> }}\nimpl {owner} {{ pub(crate) fn from_native(raw: sys::{handle.native}) -> Result<Self> {{ Ok(Self {{ handle: unsafe {{ crate::handle::ConcurrentNativeHandle::from_handle(raw, "{handle.native}") }}? }}) }} fn native(&self) -> Result<sys::{handle.native}> {{ maplibre_core::callback::check("", 0)?; self.handle.live_handle().ok_or_else(|| crate::handle::closed_handle_error("{owner}")) }} }}\nimpl Drop for {owner} {{ fn drop(&mut self) {{ self.handle.finalize_with(|raw| {{ unsafe {{ sys::{handle.dispose}(raw) }}; Ok(()) }}); }} }}'
-        )
+    owners = rust_owners.owned_handles(bound)
+    value_types.owners = {native: rust_owners.module_name(native) for native in owners}
+    value_types.handle_types = {
+        native: "crate::" + rust_owners.owner_name(native) for native in owners
+    }
     unsupported.update(
         {name: "\n".join(reasons) for name, reasons in bound.unsupported.items()}
     )
@@ -812,30 +778,31 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
             value_types.used = previous_values
             unsupported[function.name] = f"{function.location}: {error}"
     marker = "// Generated from C headers by tools/bindgen. Do not edit.\n"
-    files = {
-        (
-            f"crates/maplibre-native-ffi/src/{module}/generated.rs"
-            if module != "frame"
-            else "crates/maplibre-native-ffi/src/render/frame_generated.rs"
-        ): marker
-        + "use super::*;\n\n"
-        + (
-            f"impl {next(owner for name, owner in value_types.owners.values() if name == module)} {{\n"
-            if module != "global"
-            else ""
+    root = "crates/maplibre-native-ffi/src/generated"
+    files = {}
+    for native, handle in owners.items():
+        module = rust_owners.module_name(native)
+        body = chunks.pop(module, [])
+        files[f"{root}/{module}.rs"] = (
+            marker
+            + "use super::*;\n\n"
+            + rust_owners.declaration(bound, handle)
+            + (
+                f"\nimpl {rust_owners.owner_name(native)} {{\n"
+                + "\n".join(body)
+                + "}\n"
+                if body
+                else ""
+            )
         )
-        + "\n".join(body)
-        + ("}\n" if module != "global" else "")
-        for module, body in chunks.items()
-    }
-    owned_bodies = [
-        files.pop(path).removeprefix(marker + "use super::*;\n\n")
-        for path in list(files)
-        if "/owned_" in path
-    ]
-    files["crates/maplibre-native-ffi/src/owned_generated.rs"] = (
-        marker + "use super::*;\n" + "\n".join(owned_declarations + owned_bodies)
-    )
+    modules = [rust_owners.module_name(native) for native in owners]
+    if global_body := chunks.pop("global", []):
+        files[f"{root}/global.rs"] = (
+            marker + "use super::*;\n\n" + "\n".join(global_body)
+        )
+        modules.append("global")
+    assert not chunks, f"operations without an owner module: {sorted(chunks)}"
+    files[f"{root}/mod.rs"] = marker + rust_owners.module_index(owners, modules)
     disposers = [
         f"#[doc(hidden)]\npub unsafe fn {handle.native.removeprefix('mln_')}_dispose(native: maplibre_native_ffi_sys::{handle.native}) -> crate::Result<()> {{ crate::check(unsafe {{ maplibre_native_ffi_sys::{handle.dispose}(native) }}) }}\n"
         for handle in bound.handles.values()

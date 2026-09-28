@@ -1,6 +1,57 @@
 // Generated from C headers by tools/bindgen. Do not edit.
 use super::*;
 
+#[derive(Debug)]
+pub(crate) struct RuntimeHandleState {
+    pub(crate) handle: crate::handle::ConcurrentNativeHandle<sys::mln_runtime>,
+    id: u64,
+}
+impl RuntimeHandleState {
+    pub(crate) fn native(&self) -> Result<sys::mln_runtime> {
+        maplibre_core::callback::check("", 0)?;
+        self.handle
+            .live_handle()
+            .ok_or_else(|| crate::handle::closed_handle_error("RuntimeHandle"))
+    }
+}
+impl Drop for RuntimeHandleState {
+    fn drop(&mut self) {
+        self.handle
+            .finalize_with(|raw| unsafe { maplibre_core::generated::runtime_dispose(raw) });
+    }
+}
+/// Owns one `mln_runtime` native handle.
+pub struct RuntimeHandle {
+    pub(crate) inner: std::sync::Arc<RuntimeHandleState>,
+}
+impl std::fmt::Debug for RuntimeHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RuntimeHandle")
+            .field("closed", &self.is_closed())
+            .finish()
+    }
+}
+impl RuntimeHandle {
+    pub(crate) fn from_native(raw: sys::mln_runtime) -> Result<Self> {
+        // SAFETY: raw came from an accepted ownership transfer of this handle type.
+        let handle =
+            unsafe { crate::handle::ConcurrentNativeHandle::from_handle(raw, "mln_runtime") }?;
+        Ok(Self {
+            inner: std::sync::Arc::new(RuntimeHandleState { handle, id: raw.0 }),
+        })
+    }
+
+    /// Returns the native handle value, which event sources report for this handle.
+    pub fn id(&self) -> u64 {
+        self.inner.id
+    }
+
+    /// Reports whether an explicit release, close, or disposal consumed this handle.
+    pub fn is_closed(&self) -> bool {
+        self.inner.handle.is_closed()
+    }
+}
+
 impl RuntimeHandle {
     /// Calls `mln_map_create` using its header execution and ownership contract.
     pub fn map_create(

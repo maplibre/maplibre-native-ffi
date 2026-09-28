@@ -38,15 +38,31 @@ mln_status mln_map_move(mln_map map, mln_new_point native, mln_new_point arena, 
             (root / "values.rs").write_text(
                 files["crates/maplibre-native-ffi-core/src/generated.rs"]
             )
-            (root / "operations.rs").write_text(
-                files["crates/maplibre-native-ffi/src/map/generated.rs"]
+            owners = root / "generated"
+            owners.mkdir()
+            prefix = "crates/maplibre-native-ffi/src/generated/"
+            self.assertEqual(
+                {
+                    path.removeprefix(prefix)
+                    for path in files
+                    if path.startswith(prefix)
+                },
+                {"map.rs", "mod.rs"},
             )
+            for path, source in files.items():
+                if path.startswith(prefix):
+                    (owners / path.removeprefix(prefix)).write_text(source)
             (root / "lib.rs").write_text("""
-#![allow(dead_code, non_camel_case_types)]
+#![allow(dead_code, non_camel_case_types, unused_imports)]
 extern crate self as maplibre_native_ffi_sys;
-extern crate self as maplibre_core;
+extern crate self as maplibre_native_ffi_core;
 #[derive(Clone, Copy)]
 pub struct mln_new_point { pub type_: f64, pub self_: f64, pub str_: f64 }
+#[derive(Clone, Copy, Debug)]
+pub struct mln_map(pub u64);
+pub unsafe fn mln_map_release(_: mln_map) {}
+pub unsafe fn mln_map_match(_: mln_map, _: *const ()) -> i32 { 0 }
+pub unsafe fn mln_map_move(_: mln_map, _: mln_new_point, _: mln_new_point, _: mln_new_point, _: *const ()) -> i32 { 0 }
 pub mod values {
     pub trait NativeValue: Sized {
         type Raw;
@@ -54,38 +70,48 @@ pub mod values {
         fn from_native(value: Self::Raw) -> Self;
     }
 }
-mod generated { include!("values.rs"); }
+pub mod generated { include!("values.rs"); }
 pub use generated::*;
 type Result<T> = std::result::Result<T, ()>;
 struct NativeFuture<T>(std::marker::PhantomData<T>);
 struct CommandCompletion;
 mod completion {
     pub fn copy_value<T>(_: ()) -> super::Result<T> { unimplemented!() }
+    pub fn ready<T>(_: T) -> super::NativeFuture<T> { unimplemented!() }
     pub fn submit<T>(_: impl Fn(*const ()) -> i32, _: impl Fn(()) -> super::Result<T>) -> super::Result<super::NativeFuture<T>> { unimplemented!() }
     pub fn submit_command(_: impl Fn(*const ()) -> i32) -> super::Result<super::NativeFuture<super::CommandCompletion>> { unimplemented!() }
 }
 mod callback { pub fn check(_: &str, _: u64) -> super::Result<()> { Ok(()) } }
-mod sys {
-    pub use crate::mln_new_point;
-    #[derive(Clone, Copy)] pub struct mln_map(pub u64);
-    pub unsafe fn mln_map_release(_: mln_map) {}
-    pub unsafe fn mln_map_match(_: mln_map, _: *const ()) -> i32 { 0 }
-    pub unsafe fn mln_map_move(_: mln_map, _: mln_new_point, _: mln_new_point, _: mln_new_point, _: *const ()) -> i32 { 0 }
+mod handle {
+    #[derive(Debug)]
+    pub struct ConcurrentNativeHandle<T: Copy>(std::cell::Cell<Option<T>>);
+    impl<T: Copy> ConcurrentNativeHandle<T> {
+        pub unsafe fn from_handle(raw: T, _: &str) -> super::Result<Self> { Ok(Self(std::cell::Cell::new(Some(raw)))) }
+        pub fn live_handle(&self) -> Option<T> { self.0.get() }
+        pub fn is_closed(&self) -> bool { self.0.get().is_none() }
+        pub fn close_with<R>(&self, close: impl FnOnce(T) -> super::Result<R>) -> super::Result<Option<R>> {
+            let Some(raw) = self.0.get() else { return Ok(None) };
+            let result = close(raw)?;
+            self.0.set(None);
+            Ok(Some(result))
+        }
+        pub fn finalize_with(&mut self, dispose: impl FnOnce(T) -> super::Result<()>) {
+            if let Some(raw) = self.0.take() { let _ = dispose(raw); }
+        }
+    }
+    pub fn closed_handle_error(_: &str) {}
 }
-mod map {
-    use super::*;
-    struct TestHandle;
-    impl TestHandle { fn close_with<R>(&self, f: impl FnOnce(sys::mln_map) -> Result<R>) -> Result<Option<R>> { f(sys::mln_map(1)).map(Some) } }
-    struct Inner { handle: TestHandle }
-    impl Inner { fn native(&self) -> Result<sys::mln_map> { Ok(sys::mln_map(1)) } }
-    struct MapHandle { inner: Inner }
-    mod operations { include!("operations.rs"); }
-}
+#[path = "generated/mod.rs"]
+mod owners;
 fn main() {
     let point = NewPoint::new(1.0, 2.0, 3.0);
     let raw = values::NativeValue::to_native(point);
     assert_eq!((raw.type_, raw.self_, raw.str_), (1.0, 2.0, 3.0));
     assert_eq!(NewPoint::from_native(raw), point);
+    let map = owners::MapHandle::from_native(mln_map(7)).unwrap();
+    assert_eq!(map.id(), 7);
+    map.release().unwrap();
+    assert!(map.is_closed());
 }
 """)
             binary = root / "probe"

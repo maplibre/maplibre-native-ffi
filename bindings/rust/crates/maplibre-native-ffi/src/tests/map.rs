@@ -1225,7 +1225,7 @@ fn collect_style_load_event_types(
     let deadline = std::time::Instant::now() + Duration::from_secs(5);
     loop {
         for event in runtime.drain_events().unwrap().get().unwrap().events {
-            if event.source == map.id().get() {
+            if event.source == map.id() {
                 types.push(event.r#type);
             }
         }
@@ -1262,7 +1262,7 @@ fn collect_gated_style_load_event_types(
         .unwrap()
         .events
         .into_iter()
-        .filter(|event| event.source == map.id().get())
+        .filter(|event| event.source == map.id())
         .map(|event| event.r#type)
         .collect()
 }

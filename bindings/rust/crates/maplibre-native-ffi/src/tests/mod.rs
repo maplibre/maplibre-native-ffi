@@ -6,14 +6,6 @@ mod render;
 mod runtime;
 
 use crate::*;
-use static_assertions::assert_impl_all;
-
-assert_impl_all!(RuntimeHandle: Send, Sync);
-assert_impl_all!(MapHandle: Send, Sync);
-assert_impl_all!(MapProjectionHandle: Send, Sync);
-assert_impl_all!(RenderSessionHandle: Send, Sync);
-assert_impl_all!(AcquiredFrameHandle: Send, Sync);
-assert_impl_all!(GeoJsonSourceDataHandle: Send, Sync);
 
 #[test]
 

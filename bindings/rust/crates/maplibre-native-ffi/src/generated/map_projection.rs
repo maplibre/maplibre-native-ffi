@@ -1,6 +1,58 @@
 // Generated from C headers by tools/bindgen. Do not edit.
 use super::*;
 
+#[derive(Debug)]
+pub(crate) struct MapProjectionHandleState {
+    pub(crate) handle: crate::handle::ConcurrentNativeHandle<sys::mln_map_projection>,
+    id: u64,
+}
+impl MapProjectionHandleState {
+    pub(crate) fn native(&self) -> Result<sys::mln_map_projection> {
+        maplibre_core::callback::check("", 0)?;
+        self.handle
+            .live_handle()
+            .ok_or_else(|| crate::handle::closed_handle_error("MapProjectionHandle"))
+    }
+}
+impl Drop for MapProjectionHandleState {
+    fn drop(&mut self) {
+        self.handle
+            .finalize_with(|raw| unsafe { maplibre_core::generated::map_projection_dispose(raw) });
+    }
+}
+/// Owns one `mln_map_projection` native handle.
+pub struct MapProjectionHandle {
+    pub(crate) inner: std::sync::Arc<MapProjectionHandleState>,
+}
+impl std::fmt::Debug for MapProjectionHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MapProjectionHandle")
+            .field("closed", &self.is_closed())
+            .finish()
+    }
+}
+impl MapProjectionHandle {
+    pub(crate) fn from_native(raw: sys::mln_map_projection) -> Result<Self> {
+        // SAFETY: raw came from an accepted ownership transfer of this handle type.
+        let handle = unsafe {
+            crate::handle::ConcurrentNativeHandle::from_handle(raw, "mln_map_projection")
+        }?;
+        Ok(Self {
+            inner: std::sync::Arc::new(MapProjectionHandleState { handle, id: raw.0 }),
+        })
+    }
+
+    /// Returns the native handle value, which event sources report for this handle.
+    pub fn id(&self) -> u64 {
+        self.inner.id
+    }
+
+    /// Reports whether an explicit release, close, or disposal consumed this handle.
+    pub fn is_closed(&self) -> bool {
+        self.inner.handle.is_closed()
+    }
+}
+
 impl MapProjectionHandle {
     /// Calls `mln_map_projection_close` using its header execution and ownership contract.
     pub fn close(&self) -> Result<()> {

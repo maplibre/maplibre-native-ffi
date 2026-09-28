@@ -117,7 +117,7 @@ pub fn free_camera_options_default() -> Result<maplibre_core::generated::FreeCam
 pub fn geojson_source_data_create(
     binding_arg_0: &[u8],
     binding_arg_1: Option<&maplibre_core::generated::GeojsonSourceOptions>,
-) -> Result<crate::GeoJsonSourceDataHandle> {
+) -> Result<crate::GeojsonSourceDataHandle> {
     // SAFETY: input storage lives through submission; callback values are copied before return.
     maplibre_core::callback::check("mln_geojson_source_data_create", 0)?;
     maplibre_core::validate_abi_version()?;
@@ -139,7 +139,7 @@ pub fn geojson_source_data_create(
             &mut binding_arg_2,
         )
     })?;
-    Ok(crate::GeoJsonSourceDataHandle::from_native(binding_arg_2)?)
+    Ok(crate::GeojsonSourceDataHandle::from_native(binding_arg_2)?)
 }
 
 /// Calls `mln_geojson_source_options_default` using its header execution and ownership contract.
