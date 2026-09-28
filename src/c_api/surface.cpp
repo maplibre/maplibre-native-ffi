@@ -26,68 +26,92 @@ auto mln_webgpu_surface_descriptor_default(void) noexcept
 
 auto mln_metal_surface_attach(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::metal_surface_attach(map, descriptor, out_session);
+    return mln::core::metal_surface_attach_start(
+      map, descriptor, options, out_session, completion
+    );
   });
 }
 
 auto mln_vulkan_surface_attach(
   mln_map map, const mln_vulkan_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::vulkan_surface_attach(map, descriptor, out_session);
+    return mln::core::vulkan_surface_attach_start(
+      map, descriptor, options, out_session, completion
+    );
   });
 }
 
 auto mln_opengl_surface_attach(
   mln_map map, const mln_opengl_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::opengl_surface_attach(map, descriptor, out_session);
+    return mln::core::opengl_surface_attach_start(
+      map, descriptor, options, out_session, completion
+    );
   });
 }
 
 auto mln_webgpu_surface_attach(
   mln_map map, const mln_webgpu_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::webgpu_surface_attach(map, descriptor, out_session);
+    return mln::core::webgpu_surface_attach_start(
+      map, descriptor, options, out_session, completion
+    );
   });
 }
 
 auto mln_metal_surface_set_target(
-  mln_render_session session, const mln_metal_surface_descriptor* descriptor
+  mln_render_session session, const mln_metal_surface_descriptor* descriptor,
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::metal_surface_set_target(session, descriptor);
+    return mln::core::metal_surface_set_target_start(
+      session, descriptor, completion
+    );
   });
 }
 
 auto mln_vulkan_surface_set_target(
-  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor
+  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor,
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::vulkan_surface_set_target(session, descriptor);
+    return mln::core::vulkan_surface_set_target_start(
+      session, descriptor, completion
+    );
   });
 }
 
 auto mln_opengl_surface_set_target(
-  mln_render_session session, const mln_opengl_surface_descriptor* descriptor
+  mln_render_session session, const mln_opengl_surface_descriptor* descriptor,
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::opengl_surface_set_target(session, descriptor);
+    return mln::core::opengl_surface_set_target_start(
+      session, descriptor, completion
+    );
   });
 }
 
 auto mln_webgpu_surface_set_target(
-  mln_render_session session, const mln_webgpu_surface_descriptor* descriptor
+  mln_render_session session, const mln_webgpu_surface_descriptor* descriptor,
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::webgpu_surface_set_target(session, descriptor);
+    return mln::core::webgpu_surface_set_target_start(
+      session, descriptor, completion
+    );
   });
 }
