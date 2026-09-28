@@ -34,15 +34,15 @@ use glutin_egl_sys::egl::types::{EGLConfig, EGLContext, EGLDisplay, EGLSurface, 
 #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 use libloading::Library;
 #[cfg(target_os = "macos")]
-#[path = "tests/egl_macos.rs"]
+#[path = "render/egl_macos.rs"]
 mod egl;
 #[cfg(target_os = "macos")]
 use self::egl::types::{EGLConfig, EGLContext, EGLDisplay, EGLSurface, EGLint};
-use static_assertions::assert_impl_all;
 #[cfg(target_os = "emscripten")]
 use webgl_gl as gl_api;
 
 use super::*;
+use crate::test_support::CloseAndWait;
 use crate::test_support::await_runtime_barrier;
 use crate::{
     ErrorKind, MapHandle, OpenglContextProviderFlag, RenderBackendFlag, RuntimeHandle, ScreenBox,
@@ -50,9 +50,6 @@ use crate::{
 };
 use maplibre_core::generated::RenderResult as FrameDisposition;
 use maplibre_core::generated::*;
-
-assert_impl_all!(RenderSessionHandle: Send, Sync);
-assert_impl_all!(AcquiredFrameHandle: Send, Sync);
 
 const FEATURE_STATE_STYLE_JSON: &str = r#"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}}]}}},"layers":[{"id":"circle","type":"circle","source":"point","paint":{"circle-radius":["case",["boolean",["feature-state","hover"],false],10,5]}}]}"#;
 const QUERY_STYLE_JSON: &str = r##"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","geometry":{"type":"Point","coordinates":[-122.4194,37.7749]},"properties":{"kind":"capital","visible":true}}]}}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}},{"id":"point-circle","type":"circle","source":"point","paint":{"circle-color":"#f97316","circle-radius":12}}]}"##;
@@ -3303,7 +3300,7 @@ fn sustained_frame_demands_outlast_the_texture_ring_depth() {
 
 #[test]
 
-fn cloned_session_controls_can_be_used_from_another_thread() {
+fn session_controls_can_be_used_from_another_thread() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
@@ -3314,10 +3311,12 @@ fn cloned_session_controls_can_be_used_from_another_thread() {
     );
     let (_context, session) =
         create_owned_texture_session(&map, RenderTargetExtent::new(32, 32, 1.0)).unwrap();
-    let clone = session.clone();
-    let snapshot = std::thread::spawn(move || clone.get_snapshot().unwrap())
-        .join()
-        .unwrap();
+    let snapshot = std::thread::scope(|scope| {
+        scope
+            .spawn(|| session.get_snapshot().unwrap())
+            .join()
+            .unwrap()
+    });
     assert_eq!(snapshot.state, crate::RenderSessionState::Attached);
 
     close_session(session);
@@ -3674,7 +3673,7 @@ fn caller_driver_work_belongs_to_the_thread_that_claimed_it() {
     // The OpenGL context is bound to the thread that made it, so the fixture,
     // every driver service call, and teardown stay on the spawned thread. Only
     // the session control handle, which is Send, crosses back.
-    let (attached_sender, attached) = std::sync::mpsc::channel::<RenderSessionHandle>();
+    let (attached_sender, attached) = std::sync::mpsc::channel::<Arc<RenderSessionHandle>>();
     let (finished_sender, finished) = std::sync::mpsc::channel::<()>();
     let graphics_map = &map;
     std::thread::scope(move |scope| {
@@ -3688,9 +3687,10 @@ fn caller_driver_work_belongs_to_the_thread_that_claimed_it() {
                 render_frame(&session, false).disposition,
                 FrameDisposition::Rendered
             );
-            attached_sender.send(session.clone()).unwrap();
+            let session = Arc::new(session);
+            attached_sender.send(Arc::clone(&session)).unwrap();
             finished.recv().unwrap();
-            close_session(session);
+            close_session(Arc::into_inner(session).unwrap());
             drop(context);
         });
 

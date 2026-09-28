@@ -77,13 +77,4 @@ impl MapHandle {
     pub fn id(&self) -> MapId {
         self.inner.id
     }
-
-    #[cfg(test)]
-    pub(crate) fn close_and_wait(self) {
-        let completion = self.release().expect("native close submission failed");
-        crate::completion::blocking(Ok(completion));
-    }
 }
-
-#[cfg(test)]
-mod tests;

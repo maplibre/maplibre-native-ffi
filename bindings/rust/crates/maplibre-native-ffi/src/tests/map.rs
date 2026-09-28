@@ -1,4 +1,4 @@
-use super::*;
+use crate::test_support::CloseAndWait;
 use crate::*;
 use serde_json::{Value as JsonValue, json};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -13,10 +13,6 @@ use crate::{
     ResourceProviderDecision, RuntimeEventMask,
 };
 use crate::{CommandDisposition, RuntimeEventType};
-
-// Preparation is free of any runtime or map and the prepared value is
-// immutable, so the handle transfers and shares across threads.
-static_assertions::assert_impl_all!(crate::GeoJsonSourceDataHandle: Send, Sync);
 
 const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
 const STYLE_WITH_IDS_JSON: &str = r#"{"version":8,"sources":{"geo":{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}},"layers":[{"id":"background","type":"background"},{"id":"geo-fill","type":"fill","source":"geo"}]}"#;

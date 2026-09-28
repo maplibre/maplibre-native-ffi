@@ -110,6 +110,3 @@ impl Drop for AcquiredFrameHandle {
         });
     }
 }
-
-#[cfg(test)]
-mod tests;
