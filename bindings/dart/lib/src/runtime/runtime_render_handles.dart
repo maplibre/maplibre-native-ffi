@@ -52,14 +52,13 @@ final class RenderSessionAttachment {
 final class RenderSessionHandle with _GeneratedRenderSessionOperations {
   RenderSessionHandle._(this._map, NativeRenderSession handle)
     : _state = NativeHandleState(handle, 'RenderSessionHandle');
+  // Keeps the parent map reachable while the session lives.
+  // ignore: unused_field
   final MapHandle _map;
   @override
   final NativeHandleState<NativeRenderSession> _state;
   @override
   NativeRenderSession get _handle => _state.handle;
-  @override
-  Future<CommandCompletion> _startCommand(NativeCompletionStart start) =>
-      _map._startCommand(start);
   bool _viewsInvalid = false;
   @override
   void _invalidateBorrowedViews() {

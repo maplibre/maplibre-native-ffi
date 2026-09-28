@@ -4035,8 +4035,6 @@ mixin _GeneratedMapOperations implements Finalizable {
 
   NativeHandleState<NativeMap> get _state;
 
-  Future<CommandCompletion> _startCommand(NativeCompletionStart start);
-
   _NativeCallbackPorts get _callbackPorts;
 
   NativeCallbackReleases get _callbackReleases;
@@ -6777,8 +6775,6 @@ mixin _GeneratedRenderSessionOperations implements Finalizable {
   NativeRenderSession get _handle;
 
   NativeHandleState<NativeRenderSession> get _state;
-
-  Future<CommandCompletion> _startCommand(NativeCompletionStart start);
 
   void _invalidateBorrowedViews();
 

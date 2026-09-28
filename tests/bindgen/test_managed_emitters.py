@@ -145,13 +145,18 @@ mln_status mln_map_readScale(mln_map map, const mln_completion *completion);
                 set(emitter.coverage(owned)["generated"]) - {"mln_map_close"}, set()
             )
 
-    def test_dart_command_requires_owner_receipt_runtime(self):
+    def test_dart_commands_on_any_owner_share_the_receipt_helper(self):
         api = self.parse("""
-typedef unsigned long long mln_map_projection;
-BIND("execution=command;result=void;shape=none;ownership=value")
-mln_status mln_map_projection_change(mln_map_projection projection, const mln_completion *completion);
+typedef unsigned long long mln_measurement BIND("kind=handle;release=mln_measurement_close;dispose=mln_measurement_close;parent=none");
+BIND("execution=immediate")
+void mln_measurement_close(mln_measurement owner);
+BIND("receiver=measurement;execution=command;result=void;shape=none;ownership=value")
+mln_status mln_measurement_change(mln_measurement measurement, const mln_completion *completion);
 """)
-        self.assertEqual(dart.coverage(api)["generated"], [])
+        self.assertIn("mln_measurement_change", dart.coverage(api)["generated"])
+        source = dart.generate(api)
+        self.assertIn("Future<CommandCompletion> change() => _startCommand(", source)
+        self.assertNotIn("_startCommand(NativeCompletionStart", source)
 
     def test_reserved_method_identifiers_are_rejected(self):
         source = """

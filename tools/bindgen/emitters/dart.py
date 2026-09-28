@@ -154,13 +154,6 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
     if owner == "Globals":
         receiver = None
     execution = plan.execution
-    # Command receipts are implemented by these hand-written owners only.
-    if execution == "command" and receiver not in {
-        "mln_map",
-        "mln_runtime",
-        "mln_render_session",
-    }:
-        raise Unsupported("receiver has no command receipt runtime")
     if execution not in {
         "command",
         "query",
@@ -697,16 +690,6 @@ def generate(api: Api | BoundApi) -> str:
         )
         if any("_state." in body for body in bodies):
             chunks.append(f"  NativeHandleState<{handle}> get _state;\n")
-        if any("_startCommand(" in body for body in bodies):
-            chunks.append(
-                "  Future<CommandCompletion> _startCommand(NativeCompletionStart start"
-                + (
-                    ", {void Function()? onRejected}"
-                    if any("registration.reject" in body for body in bodies)
-                    else ""
-                )
-                + ");\n"
-            )
         if any("_callbackPorts" in body for body in bodies):
             chunks.append("  _NativeCallbackPorts get _callbackPorts;\n")
         if any("_callbackReleases" in body for body in bodies):

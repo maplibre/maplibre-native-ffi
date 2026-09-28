@@ -157,24 +157,6 @@ final class RuntimeHandle with _GeneratedRuntimeOperations {
     NativeOwnedArena? arena,
   }) => _callbackReleases.register(userData, release, arena: arena);
 
-  Future<CommandCompletion> _startCommand(
-    NativeCompletionStart start, {
-    void Function()? onRejected,
-  }) => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: start,
-    onRejected: onRejected,
-    acceptErrorStatus: true,
-    decode: (result) => CommandCompletion(
-      disposition: CommandDisposition.fromRawValue(result.disposition),
-      generation: uint64FromNative(result.generation),
-      status: MaplibreStatus.fromNativeStatusCode(result.status),
-      diagnostic: copyCompletionDiagnostic(result.diagnostic),
-    ),
-  );
-
   @override
   NativeRuntime get _handle => _state.handle;
   BigInt get identity => uint64FromNative(_state.handleId);
@@ -220,6 +202,25 @@ List<RuntimeEvent> decodeRuntimeEventBatchForTesting(
   RuntimeHandle runtime,
 ) => _readRuntimeEventBatchView(batch).events;
 
+/// Starts a command and decodes its receipt, including failed dispositions.
+Future<CommandCompletion> _startCommand(
+  NativeCompletionStart start, {
+  void Function()? onRejected,
+}) => startNativeCompletion(
+  copyKind:
+      raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+  elementSize: 0,
+  start: start,
+  onRejected: onRejected,
+  acceptErrorStatus: true,
+  decode: (result) => CommandCompletion(
+    disposition: CommandDisposition.fromRawValue(result.disposition),
+    generation: uint64FromNative(result.generation),
+    status: MaplibreStatus.fromNativeStatusCode(result.status),
+    diagnostic: copyCompletionDiagnostic(result.diagnostic),
+  ),
+);
+
 final class CommandCompletion {
   const CommandCompletion({
     required this.disposition,
@@ -255,9 +256,6 @@ final class MapHandle with _GeneratedMapOperations {
   NativeCallbackReleases get _callbackReleases => _runtime._callbackReleases;
   @override
   final _callbackPorts = _NativeCallbackPorts();
-  @override
-  Future<CommandCompletion> _startCommand(NativeCompletionStart start) =>
-      _runtime._startCommand(start);
   bool get isClosed => _state.isClosed;
   BigInt get identity => uint64FromNative(_state.handleId);
 }
