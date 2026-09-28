@@ -49,29 +49,13 @@ def adopt_owner(owned, expression, receiver, function, values):
     return public, result
 
 
-def registration_body(plan, values, body, status=None):
+def registration_body(plan, body):
+    """Wrap body in a registration transaction that it accepts after admission."""
     roots = (
         "_callbackPorts"
         if plan.receiver and not plan.owned_outputs
         else "_NativeCallbackPorts()"
     )
-    if status:
-        body = body.replace(
-            "      return status;",
-            "      if (status == nativeStatusOk) { registrations.accept(); }\n      return status;",
-        )
-        body = body.replace(
-            "if (status == nativeStatusOk) { created",
-            "if (status == nativeStatusOk) { registrations.accept(); created",
-        )
-    else:
-        marker = f"_check(raw.{plan.name}("
-        lines = body.splitlines()
-        for index, line in enumerate(lines):
-            if marker in line:
-                lines.insert(index + 1, "      registrations.accept();")
-                break
-        body = "\n".join(lines)
     return f"      final registrations = _NativeRegistrations({roots});\n      try {{\n{body}\n      }} finally {{ registrations.close(); }}"
 
 
@@ -372,10 +356,11 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
                 if plan.result
                 else f"\n      {call};"
             )
+            + ("\n      registrations.accept();" if plan.registrations else "")
             + (f"\n      return {result};" if result else "")
         )
         if plan.registrations:
-            body = registration_body(plan, values, body)
+            body = registration_body(plan, body)
         return (
             owner,
             f"  {public} {name}({', '.join(signature)}) => withNativeArena((arena) {{\n{body}\n  }});\n",
@@ -397,7 +382,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
             + f"\n      final status = {call};\n      if (status == nativeStatusOk) {{ {accept} try {{ created = {adoption}; }} catch (error, stack) {{ adoptionError = error; adoptionStack = stack; }} }}\n      return status;"
         )
         if plan.registrations:
-            body = registration_body(plan, values, body, "status")
+            body = registration_body(plan, body)
         return (
             owner,
             f"  {public.removesuffix('Handle')}Attachment {name}({', '.join(signature)}) {{\n    {public}? created;\n    Object? adoptionError; StackTrace? adoptionStack;\n    final completed = startNativeCompletion<void>(copyKind: raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT, elementSize: 0, start: (completion) => withNativeArena((arena) {{\n{body}\n    }}), decode: (_) {{}});\n    if (adoptionError != null) {{ completed.ignore(); Error.throwWithStackTrace(adoptionError!, adoptionStack!); }}\n    final session = created!;\n    return {public.removesuffix('Handle')}Attachment(session, completed.whenComplete(() {{ session.isClosed; }}));\n  }}\n",
@@ -407,10 +392,8 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
         setup = [
             registration_body(
                 plan,
-                values,
                 "\n".join(setup)
-                + f"\n      final status = {call};\n      return status;",
-                "status",
+                + f"\n      final status = {call};\n      if (status == nativeStatusOk) {{ registrations.accept(); }}\n      return status;",
             )
         ]
         call = None

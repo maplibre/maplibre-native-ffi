@@ -5847,9 +5847,6 @@ mixin _GeneratedMapOperations implements Finalizable {
               adoptionStack = stack;
             }
           }
-          if (status == nativeStatusOk) {
-            registrations.accept();
-          }
           return status;
         } finally {
           registrations.close();
@@ -5909,9 +5906,6 @@ mixin _GeneratedMapOperations implements Finalizable {
               adoptionError = error;
               adoptionStack = stack;
             }
-          }
-          if (status == nativeStatusOk) {
-            registrations.accept();
           }
           return status;
         } finally {
@@ -5973,9 +5967,6 @@ mixin _GeneratedMapOperations implements Finalizable {
               adoptionStack = stack;
             }
           }
-          if (status == nativeStatusOk) {
-            registrations.accept();
-          }
           return status;
         } finally {
           registrations.close();
@@ -6035,9 +6026,6 @@ mixin _GeneratedMapOperations implements Finalizable {
               adoptionError = error;
               adoptionStack = stack;
             }
-          }
-          if (status == nativeStatusOk) {
-            registrations.accept();
           }
           return status;
         } finally {
@@ -6099,9 +6087,6 @@ mixin _GeneratedMapOperations implements Finalizable {
               adoptionStack = stack;
             }
           }
-          if (status == nativeStatusOk) {
-            registrations.accept();
-          }
           return status;
         } finally {
           registrations.close();
@@ -6161,9 +6146,6 @@ mixin _GeneratedMapOperations implements Finalizable {
               adoptionError = error;
               adoptionStack = stack;
             }
-          }
-          if (status == nativeStatusOk) {
-            registrations.accept();
           }
           return status;
         } finally {
@@ -6225,9 +6207,6 @@ mixin _GeneratedMapOperations implements Finalizable {
               adoptionStack = stack;
             }
           }
-          if (status == nativeStatusOk) {
-            registrations.accept();
-          }
           return status;
         } finally {
           registrations.close();
@@ -6287,9 +6266,6 @@ mixin _GeneratedMapOperations implements Finalizable {
               adoptionError = error;
               adoptionStack = stack;
             }
-          }
-          if (status == nativeStatusOk) {
-            registrations.accept();
           }
           return status;
         } finally {
@@ -6351,9 +6327,6 @@ mixin _GeneratedMapOperations implements Finalizable {
               adoptionStack = stack;
             }
           }
-          if (status == nativeStatusOk) {
-            registrations.accept();
-          }
           return status;
         } finally {
           registrations.close();
@@ -6413,9 +6386,6 @@ mixin _GeneratedMapOperations implements Finalizable {
               adoptionError = error;
               adoptionStack = stack;
             }
-          }
-          if (status == nativeStatusOk) {
-            registrations.accept();
           }
           return status;
         } finally {
@@ -6477,9 +6447,6 @@ mixin _GeneratedMapOperations implements Finalizable {
               adoptionStack = stack;
             }
           }
-          if (status == nativeStatusOk) {
-            registrations.accept();
-          }
           return status;
         } finally {
           registrations.close();
@@ -6539,9 +6506,6 @@ mixin _GeneratedMapOperations implements Finalizable {
               adoptionError = error;
               adoptionStack = stack;
             }
-          }
-          if (status == nativeStatusOk) {
-            registrations.accept();
           }
           return status;
         } finally {
