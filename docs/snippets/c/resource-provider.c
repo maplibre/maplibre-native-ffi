@@ -63,7 +63,7 @@ void watch_for_cancellation(
   bool already_cancelled = false;
   if (
     mln_resource_request_set_cancel_callback(
-      handle, abort_pending_fetch, fetch, &already_cancelled
+      handle, abort_pending_fetch, fetch, NULL, &already_cancelled
     ) == MLN_STATUS_OK &&
     already_cancelled
   ) {

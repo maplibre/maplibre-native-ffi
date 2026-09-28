@@ -4124,7 +4124,9 @@ internal object GeneratedDirectCallbacks {
   val LogCallbackStub = staticCFunction(::generatedGeneratedLogCallbackRegistrationCallback)
   val LogCallbackReleaseStub = staticCFunction(::generatedDirectReleaseLogCallback)
   val ResourceRequestCancelCallbackStub =
-    staticCFunction(::generatedDirectResourceRequestCancelCallback)
+    staticCFunction(::generatedGeneratedResourceRequestCancelCallbackRegistrationCallback)
+  val ResourceRequestCancelCallbackReleaseStub =
+    staticCFunction(::generatedDirectReleaseResourceRequestCancelCallback)
 }
 
 @OptIn(ExperimentalForeignApi::class)
@@ -4163,9 +4165,40 @@ private fun generatedDirectReleaseLogCallback(userData: COpaquePointer?) {
 }
 
 @OptIn(ExperimentalForeignApi::class)
-private fun generatedDirectResourceRequestCancelCallback(userData: COpaquePointer?) {
+private fun generatedGeneratedResourceRequestCancelCallbackRegistrationCallback(
+  userData: COpaquePointer?
+): Unit {
   try {
-    org.maplibre.nativeffi.internal.callback.DecisionCancelRegistry.dispatch(
+    val root =
+      org.maplibre.nativeffi.internal.callback.CallbackRoots.get(userData?.rawValue?.toLong() ?: 0L)
+        ?: return Unit
+    val value = root.value as GeneratedResourceRequestCancelCallbackRegistration
+    val invoke = value.callback
+    val callbackScope =
+      org.maplibre.nativeffi.internal.callback.CallbackAdmission.scope(
+        null,
+        setOf(
+          "mln_resource_request_complete",
+          "mln_resource_request_cancelled",
+          "mln_resource_request_set_cancel_callback",
+          "mln_resource_request_release",
+        ),
+      )
+    try {
+      invoke()
+      return Unit
+    } finally {
+      callbackScope.close()
+    }
+  } catch (_: Throwable) {
+    return Unit
+  }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun generatedDirectReleaseResourceRequestCancelCallback(userData: COpaquePointer?) {
+  try {
+    org.maplibre.nativeffi.internal.callback.CallbackRoots.release(
       userData?.rawValue?.toLong() ?: 0L
     )
   } catch (_: Throwable) {}

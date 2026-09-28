@@ -239,9 +239,6 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_adapter_dart_wake_create(void* post_cobject, [NativeTypeName("int64_t")] long port, mln_wake* out_wake);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_adapter_dart_resource_cancel_register([NativeTypeName("mln_resource_request_handle")] MlnResourceRequest request, void* post_cobject, [NativeTypeName("int64_t")] long port, bool* out_cancelled);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_adapter_dart_completion_create([NativeTypeName("uint32_t")] uint copy_kind, [NativeTypeName("size_t")] nuint element_size, void* post_cobject, [NativeTypeName("int64_t")] long port, [NativeTypeName("int64_t")] long token, mln_completion* out_completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

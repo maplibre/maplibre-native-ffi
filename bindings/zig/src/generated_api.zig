@@ -9655,7 +9655,7 @@ pub fn resourceRequestSetCancelCallback(handle: ResourceRequestHandle, callback_
     var keep_registration = false;
     if (context != null) try lease.attachCallback(roots.items.items[0]);
     defer if (context != null and !keep_registration) lease.detachCallback();
-    try status.checkStatus(c.mln_resource_request_set_cancel_callback(lease.native, if (context != null) ResourceRequestCancelCallback.callTrampoline else null, context, &already_cancelled), lease.diagnostic_store);
+    try status.checkStatus(c.mln_resource_request_set_cancel_callback(lease.native, if (context != null) ResourceRequestCancelCallback.callTrampoline else null, context, if (context != null) callback.Registration(ResourceRequestCancelCallback).releaseNative else null, &already_cancelled), lease.diagnostic_store);
     if (already_cancelled) return true;
     keep_registration = true;
     roots.accept();

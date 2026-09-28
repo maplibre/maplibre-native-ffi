@@ -9960,7 +9960,7 @@ func (receiver *ResourceRequestHandle) SetCancelCallback(callback func()) (bool,
 		}
 		var alreadyRetired C.bool
 		bindingCheck(func() int32 {
-			return int32(C.mln_resource_request_set_cancel_callback(C.mln_resource_request_handle(raw), C.mln_resource_request_cancel_callback(C.binding_mln_resource_request_set_cancel_callback_registration_callback), context, &alreadyRetired))
+			return int32(C.mln_resource_request_set_cancel_callback(C.mln_resource_request_handle(raw), C.mln_resource_request_cancel_callback(C.binding_mln_resource_request_set_cancel_callback_registration_callback), context, nil, &alreadyRetired))
 		})
 		if !bool(alreadyRetired) && context != nil {
 			receiver.state.cancelTicket = cgo.Handle(uintptr(context))

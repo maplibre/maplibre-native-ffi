@@ -449,9 +449,11 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{context}: registration user_data requires a void context parameter"
                 )
-            if ("release_callback" in metadata) == ("owner_release" in metadata):
+            # TEMPORARY: owner_release may accompany release_callback while the
+            # bindings move to native release.
+            if not ("release_callback" in metadata or "owner_release" in metadata):
                 errors.append(
-                    f"{context}: registration requires exactly one callback or owner release"
+                    f"{context}: registration requires a release callback or owner release"
                 )
             if "release_callback" in metadata:
                 release = parameters.get(metadata["release_callback"])

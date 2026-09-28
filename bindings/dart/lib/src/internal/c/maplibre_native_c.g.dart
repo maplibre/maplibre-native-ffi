@@ -226,21 +226,6 @@ external int mln_adapter_dart_release_register(
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_resource_request_handle,
-    ffi.Pointer<ffi.Void>,
-    ffi.Int64,
-    ffi.Pointer<ffi.Bool>,
-  )
->()
-external int mln_adapter_dart_resource_cancel_register(
-  int request,
-  ffi.Pointer<ffi.Void> post_cobject,
-  int port,
-  ffi.Pointer<ffi.Bool> out_cancelled,
-);
-
-@ffi.Native<
   ffi.Int32 Function(ffi.Pointer<ffi.Void>, ffi.Int64, ffi.Pointer<mln_wake>)
 >()
 external int mln_adapter_dart_wake_create(
@@ -2469,6 +2454,7 @@ external void mln_resource_request_release(int handle);
     mln_resource_request_handle,
     mln_resource_request_cancel_callback,
     ffi.Pointer<ffi.Void>,
+    mln_runtime_callback_release,
     ffi.Pointer<ffi.Bool>,
   )
 >()
@@ -2476,6 +2462,7 @@ external int mln_resource_request_set_cancel_callback(
   int handle,
   mln_resource_request_cancel_callback callback,
   ffi.Pointer<ffi.Void> user_data,
+  mln_runtime_callback_release release_user_data,
   ffi.Pointer<ffi.Bool> out_cancelled,
 );
 

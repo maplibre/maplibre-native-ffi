@@ -2086,3 +2086,7 @@ public typealias ResourceTransformCallback =
   (kind: ResourceKind, url: String, outResponse: ResourceTransformResponse) -> Unit
 
 internal class GeneratedLogCallbackRegistration(val callback: LogCallback)
+
+internal class GeneratedResourceRequestCancelCallbackRegistration(
+  val callback: ResourceRequestCancelCallback
+)

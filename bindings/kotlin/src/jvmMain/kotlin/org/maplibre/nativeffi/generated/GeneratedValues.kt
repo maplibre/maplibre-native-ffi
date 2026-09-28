@@ -4800,7 +4800,14 @@ internal object GeneratedDirectCallbacks {
   val ResourceRequestCancelCallbackStub =
     mln_resource_request_cancel_callback.allocate(
       mln_resource_request_cancel_callback.Function { userData ->
-        generatedDirectResourceRequestCancelCallback(userData)
+        generatedGeneratedResourceRequestCancelCallbackRegistrationCallback(userData)
+      },
+      Arena.global(),
+    )
+  val ResourceRequestCancelCallbackReleaseStub =
+    mln_runtime_callback_release.allocate(
+      mln_runtime_callback_release.Function { userData ->
+        generatedDirectReleaseResourceRequestCancelCallback(userData)
       },
       Arena.global(),
     )
@@ -4842,8 +4849,37 @@ private fun generatedDirectReleaseLogCallback(userData: MemorySegment) {
   } catch (_: Throwable) {}
 }
 
-private fun generatedDirectResourceRequestCancelCallback(userData: MemorySegment) {
+private fun generatedGeneratedResourceRequestCancelCallbackRegistrationCallback(
+  userData: MemorySegment
+): Unit {
   try {
-    org.maplibre.nativeffi.internal.callback.DecisionCancelRegistry.dispatch(userData.address())
+    val root =
+      org.maplibre.nativeffi.internal.callback.CallbackRoots.get(userData.address()) ?: return Unit
+    val value = root.value as GeneratedResourceRequestCancelCallbackRegistration
+    val invoke = value.callback
+    val callbackScope =
+      org.maplibre.nativeffi.internal.callback.CallbackAdmission.scope(
+        null,
+        setOf(
+          "mln_resource_request_complete",
+          "mln_resource_request_cancelled",
+          "mln_resource_request_set_cancel_callback",
+          "mln_resource_request_release",
+        ),
+      )
+    try {
+      invoke()
+      return Unit
+    } finally {
+      callbackScope.close()
+    }
+  } catch (_: Throwable) {
+    return Unit
+  }
+}
+
+private fun generatedDirectReleaseResourceRequestCancelCallback(userData: MemorySegment) {
+  try {
+    org.maplibre.nativeffi.internal.callback.CallbackRoots.release(userData.address())
   } catch (_: Throwable) {}
 }

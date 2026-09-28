@@ -100,6 +100,12 @@ def operation_contract(plan: OperationPlan) -> str | None:
     return None
 
 
+def native_release(registration) -> bool:
+    # TEMPORARY: owner_release still selects the owner-rooted path while the
+    # bindings move to native release.
+    return bool(registration.release_callback) and not registration.owner_release
+
+
 @dataclass(frozen=True)
 class Emission:
     files: dict[str, str]
@@ -323,13 +329,15 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             root = "root" + pascal(registration.callback)
             args.append(
                 root
-                if registration.release_callback
+                if native_release(registration)
                 else f"{root} is null ? null : {root}.Pointer"
             )
             continue
         if parameter.name in direct_releases:
             args.append(
                 "&global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackRoot.Release"
+                if native_release(direct_releases[parameter.name])
+                else "null"
             )
             continue
         if parameter.name in direct:
@@ -338,7 +346,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             values.supported(callback_value)
             name = camel(parameter.name)
             parameters.append(f"{values.public_type(callback_value)} {name}")
-            if registration.release_callback:
+            if native_release(registration):
                 scoped = True
                 prologue.append(
                     f"        var root{pascal(parameter.name)} = {name} is null ? null : scope.Register({name});"
@@ -780,7 +788,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
                 else "        scope.Accept();"
             )
         for registration in plan.direct_registrations:
-            if not registration.release_callback:
+            if not native_release(registration):
                 condition = (
                     f"!{camel(registration.accepted_unless)}"
                     if registration.accepted_unless
@@ -1177,7 +1185,7 @@ def emit(api: Api | BoundApi) -> Emission:
         for parameter in plan.inputs
         if any(
             parameter.name == registration.callback
-            and not registration.release_callback
+            and not native_release(registration)
             for registration in plan.direct_registrations
         )
     }

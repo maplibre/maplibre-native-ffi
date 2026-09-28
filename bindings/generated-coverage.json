@@ -351,7 +351,7 @@
     "src/c_api/callback_capture_generated.inc",
     "src/c_api/callback_port_generated.inc"
   ],
-  "function_count": 302,
+  "function_count": 301,
   "languages": {
     "dart": {
       "generated": [
@@ -2530,7 +2530,6 @@
     "mln_adapter_dart_port_release",
     "mln_adapter_dart_release",
     "mln_adapter_dart_release_register",
-    "mln_adapter_dart_resource_cancel_register",
     "mln_adapter_dart_wake_create",
     "mln_adapter_http_header_transform_callback",
     "mln_adapter_http_header_validate",

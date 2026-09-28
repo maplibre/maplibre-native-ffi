@@ -1027,14 +1027,18 @@ MLN_API mln_status mln_resource_request_cancelled(
  *
  * This function may be called from any thread while the provider still owns the
  * handle. A request accepts one registration: a later call fails and leaves the
- * first registration in place. The registration stays in place until the
- * request is released, and the callback and user_data must stay valid until
- * mln_resource_request_release() returns.
+ * first registration in place.
+ *
+ * MLN_STATUS_OK with out_cancelled false transfers callback, user_data, and
+ * release_user_data to the C API. The callback runs at most once. The C API
+ * invokes release_user_data exactly once, after the callback can no longer run:
+ * when the callback returns, or when the request is released without the
+ * callback having run. release_user_data may be null.
  *
  * A request that is already cancelled and not completed stores nothing and
- * reports true through out_cancelled, so the caller handles the cancellation
- * itself and the callback never runs. Any other request reports false. This
- * function never invokes the callback.
+ * reports true through out_cancelled. The caller keeps user_data and handles
+ * the cancellation itself, and neither callback runs. Any other request reports
+ * false. This function never invokes either callback.
  *
  * mln_resource_request_release() waits for a cancel callback running on another
  * thread to return, so the callback and user_data are unused once release
@@ -1048,12 +1052,14 @@ MLN_API mln_status mln_resource_request_cancelled(
  */
 MLN_BINDING(
   "execution=immediate;registration=callback;user_data=user_data;"
-  "owner_release=mln_resource_request_release;accepted_unless=out_cancelled"
+  "release_callback=release_user_data;accepted_unless=out_cancelled;"
+  "owner_release=mln_resource_request_release"
 )
 MLN_API mln_status mln_resource_request_set_cancel_callback(
   mln_resource_request_handle handle,
   mln_resource_request_cancel_callback callback,
   void* user_data MLN_BINDING("kind=context;ownership=borrowed"),
+  mln_runtime_callback_release release_user_data,
   bool* out_cancelled MLN_BINDING("direction=out")
 ) MLN_NOEXCEPT;
 

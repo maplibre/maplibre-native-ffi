@@ -4023,7 +4023,13 @@ internal object GeneratedDirectCallbacks {
   val ResourceRequestCancelCallbackStub =
     object : MaplibreNativeC.mln_resource_request_cancel_callback() {
         override fun call(userData: Pointer?): Unit =
-          generatedDirectResourceRequestCancelCallback(userData)
+          generatedGeneratedResourceRequestCancelCallbackRegistrationCallback(userData)
+      }
+      .apply { retainReference<Pointer>() }
+  val ResourceRequestCancelCallbackReleaseStub =
+    object : MaplibreNativeC.mln_runtime_callback_release() {
+        override fun call(userData: Pointer?): Unit =
+          generatedDirectReleaseResourceRequestCancelCallback(userData)
       }
       .apply { retainReference<Pointer>() }
 }
@@ -4065,10 +4071,38 @@ private fun generatedDirectReleaseLogCallback(userData: Pointer?) {
   } catch (_: Throwable) {}
 }
 
-private fun generatedDirectResourceRequestCancelCallback(userData: Pointer?) {
+private fun generatedGeneratedResourceRequestCancelCallbackRegistrationCallback(
+  userData: Pointer?
+): Unit {
   try {
-    org.maplibre.nativeffi.internal.callback.DecisionCancelRegistry.dispatch(
-      userData?.address() ?: 0L
-    )
+    val root =
+      org.maplibre.nativeffi.internal.callback.CallbackRoots.get(userData?.address() ?: 0L)
+        ?: return Unit
+    val value = root.value as GeneratedResourceRequestCancelCallbackRegistration
+    val invoke = value.callback
+    val callbackScope =
+      org.maplibre.nativeffi.internal.callback.CallbackAdmission.scope(
+        null,
+        setOf(
+          "mln_resource_request_complete",
+          "mln_resource_request_cancelled",
+          "mln_resource_request_set_cancel_callback",
+          "mln_resource_request_release",
+        ),
+      )
+    try {
+      invoke()
+      return Unit
+    } finally {
+      callbackScope.close()
+    }
+  } catch (_: Throwable) {
+    return Unit
+  }
+}
+
+private fun generatedDirectReleaseResourceRequestCancelCallback(userData: Pointer?) {
+  try {
+    org.maplibre.nativeffi.internal.callback.CallbackRoots.release(userData?.address() ?: 0L)
   } catch (_: Throwable) {}
 }

@@ -231,6 +231,10 @@ def direct_operation(plan, values):
             raise ModelError([f"{plan.name}: unsupported owner callback result"])
         output = plan.outputs[0]
         args[output.name] = "&alreadyRetired"
+        # TEMPORARY: the owner roots the callback until release, so native
+        # release is not requested yet.
+        if registration.release_callback:
+            args[registration.release_callback] = "nil"
         setup.append("raw, done := receiver.bindingAcquire(false); defer done()")
         setup.append("receiver.state.mu.Lock(); defer receiver.state.mu.Unlock()")
         setup.append(

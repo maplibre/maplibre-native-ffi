@@ -84,44 +84,23 @@ internal actual constructor() {
     }
   }
 
-  public actual fun resourceRequestSetCancelCallback(
-    callback: ResourceRequestCancelCallback
-  ): Boolean {
+  public actual fun resourceRequestSetCancelCallback(callback: ResourceRequestCancelCallback) {
     try {
-      val owner = bindingResourceRequestHandleHandle().toLong()
       org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(
         bindingResourceRequestHandleHandle().toLong(),
         "mln_resource_request_set_cancel_callback",
       )
-      return bindingRegisterResourceRequestHandleCancel({
-        val scope =
-          org.maplibre.nativeffi.internal.callback.CallbackAdmission.scope(
-            owner,
-            setOf(
-              "mln_resource_request_complete",
-              "mln_resource_request_cancelled",
-              "mln_resource_request_set_cancel_callback",
-              "mln_resource_request_release",
-            ),
+      org.maplibre.nativeffi.internal.callback.CallbackRegistrationScope().use { registrations ->
+        val token =
+          registrations.register(GeneratedResourceRequestCancelCallbackRegistration(callback))
+        BindingStatus.check(
+          mln_resource_request_set_cancel_callback(
+            GeneratedDirectCallbacks.ResourceRequestCancelCallbackStub,
+            token.toCPointer<ByteVar>(),
+            GeneratedDirectCallbacks.ResourceRequestCancelCallbackReleaseStub,
           )
-        try {
-          callback()
-        } finally {
-          scope.close()
-        }
-      }) { raw, token ->
-        memScoped {
-          val arena = this
-          val out = alloc<BooleanVar>()
-          val status =
-            mln_resource_request_set_cancel_callback(
-              raw,
-              GeneratedDirectCallbacks.ResourceRequestCancelCallbackStub,
-              token.toCPointer<ByteVar>(),
-              out.ptr,
-            )
-          org.maplibre.nativeffi.internal.callback.DecisionCancelSetResult(status, out.value)
-        }
+        )
+        registrations.accept(org.maplibre.nativeffi.internal.callback.CallbackOwner.global)
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)

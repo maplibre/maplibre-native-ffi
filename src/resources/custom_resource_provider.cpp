@@ -37,8 +37,8 @@ struct ResourceRequestObject {
   bool completed = false;
   bool retired = false;
   mln_resource_request_cancel_callback cancel_callback = nullptr;
+  mln_runtime_callback_release cancel_release = nullptr;
   void* cancel_user_data = nullptr;
-  std::shared_ptr<void> cancel_context_owner;
   bool cancel_callback_registered = false;
   bool cancel_callback_running = false;
   // Set when the callback released its own request: the callback wrapper
@@ -216,6 +216,7 @@ auto response_from_abi(const mln_resource_response& provider_response)
 // completed. Callers hold no lock; the callback may call back into this handle.
 void run_cancel_callback(ResourceRequestObject& object) noexcept {
   mln_resource_request_cancel_callback callback = nullptr;
+  mln_runtime_callback_release release = nullptr;
   void* user_data = nullptr;
   {
     const std::scoped_lock lock(object.mutex);
@@ -223,6 +224,7 @@ void run_cancel_callback(ResourceRequestObject& object) noexcept {
       return;
     }
     callback = std::exchange(object.cancel_callback, nullptr);
+    release = std::exchange(object.cancel_release, nullptr);
     user_data = std::exchange(object.cancel_user_data, nullptr);
     object.cancel_callback_running = true;
     object.cancel_callback_thread = std::this_thread::get_id();
@@ -231,6 +233,14 @@ void run_cancel_callback(ResourceRequestObject& object) noexcept {
     callback(user_data);
   } catch (...) {
     // Host callbacks must not unwind through MapLibre's cancel path.
+  }
+  // The callback runs at most once, so its context retires as it returns.
+  if (release != nullptr) {
+    try {
+      release(user_data);
+    } catch (...) {
+      // Host callbacks must not unwind through MapLibre's cancel path.
+    }
   }
   auto remove_from_table = false;
   {
@@ -256,11 +266,15 @@ void retire_request(mln_resource_request_handle handle) noexcept {
   if (object == nullptr) {
     return;
   }
+  // A registration whose callback never ran retires with the request.
+  mln_runtime_callback_release release = nullptr;
+  void* user_data = nullptr;
   {
     auto lock = std::unique_lock{object->mutex};
     object->retired = true;
     object->cancel_callback = nullptr;
-    object->cancel_user_data = nullptr;
+    release = std::exchange(object->cancel_release, nullptr);
+    user_data = std::exchange(object->cancel_user_data, nullptr);
     if (object->cancel_callback_running) {
       if (object->cancel_callback_thread == std::this_thread::get_id()) {
         object->remove_after_cancel_callback = true;
@@ -274,6 +288,13 @@ void retire_request(mln_resource_request_handle handle) noexcept {
     }
   }
   object->state_changed.notify_all();
+  if (release != nullptr) {
+    try {
+      release(user_data);
+    } catch (...) {
+      // Host callbacks must not unwind through the release path.
+    }
+  }
   handle_table<ResourceRequestObject>().remove(handle);
 }
 
@@ -528,7 +549,7 @@ auto resource_request_cancelled(
 auto set_resource_request_cancel_callback(
   mln_resource_request_handle handle,
   mln_resource_request_cancel_callback callback, void* user_data,
-  bool* out_cancelled, std::shared_ptr<void> context_owner
+  mln_runtime_callback_release release_user_data, bool* out_cancelled
 ) -> mln_status {
   if (callback == nullptr) {
     set_thread_error("callback must not be null");
@@ -555,8 +576,8 @@ auto set_resource_request_cancel_callback(
   *out_cancelled = live->cancelled && !live->completed;
   if (!*out_cancelled) {
     live->cancel_callback = callback;
+    live->cancel_release = release_user_data;
     live->cancel_user_data = user_data;
-    live->cancel_context_owner = std::move(context_owner);
   }
   return MLN_STATUS_OK;
 }

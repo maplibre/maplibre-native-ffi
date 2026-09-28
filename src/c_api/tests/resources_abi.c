@@ -336,7 +336,7 @@ static void custom_provider_request_handles_reject_raw_null_handles(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_resource_request_set_cancel_callback(
-      MLN_HANDLE_NULL, ignore_cancel, NULL, &cancelled
+      MLN_HANDLE_NULL, ignore_cancel, NULL, NULL, &cancelled
     )
   );
 }
@@ -1409,6 +1409,8 @@ static void runtime_teardown_waits_for_in_flight_provider_callback(void) {
 typedef struct cancel_probe {
   atomic_bool provider_entered;
   atomic_int cancel_count;
+  atomic_int release_count;
+  atomic_bool released_before_cancel;
   atomic_bool release_inside_callback;
   atomic_bool complete_inline;
   atomic_bool skip_register;
@@ -1419,10 +1421,18 @@ typedef struct cancel_probe {
 
 static void count_cancel(void* user_data) {
   cancel_probe* probe = user_data;
+  if (atomic_load(&probe->release_count) != 0) {
+    atomic_store(&probe->released_before_cancel, true);
+  }
   atomic_fetch_add(&probe->cancel_count, 1);
   if (atomic_load(&probe->release_inside_callback)) {
     mln_resource_request_release(atomic_load(&probe->handle));
   }
+}
+
+static void count_cancel_release(void* user_data) {
+  cancel_probe* probe = user_data;
+  atomic_fetch_add(&probe->release_count, 1);
 }
 
 static uint32_t cancel_probe_resource_provider(
@@ -1435,9 +1445,10 @@ static uint32_t cancel_probe_resource_provider(
   if (!atomic_load(&probe->skip_register)) {
     bool cancelled = true;
     atomic_store(
-      &probe->register_status, mln_resource_request_set_cancel_callback(
-                                 handle, count_cancel, probe, &cancelled
-                               )
+      &probe->register_status,
+      mln_resource_request_set_cancel_callback(
+        handle, count_cancel, probe, count_cancel_release, &cancelled
+      )
     );
     atomic_store(&probe->register_reported_cancelled, cancelled);
   }
@@ -1504,6 +1515,15 @@ static void cancel_callback_runs_when_map_discards_request(void) {
     wait_for_cancel_count(&probe, 1, teardown_probe_wait_attempts)
   );
   const mln_resource_request_handle handle = atomic_load(&probe.handle);
+  // The context retires as the callback returns, before the request does.
+  for (size_t attempt = 0;
+       atomic_load(&probe.release_count) == 0 &&
+       attempt < teardown_probe_wait_attempts;
+       attempt += 1) {
+    mln_test_sleep_millisecond();
+  }
+  TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.release_count));
+  TEST_ASSERT_FALSE(atomic_load(&probe.released_before_cancel));
 
   bool cancelled = false;
   TEST_ASSERT_EQUAL_INT(
@@ -1518,7 +1538,7 @@ static void cancel_callback_runs_when_map_discards_request(void) {
   cancelled = false;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_STATE, mln_resource_request_set_cancel_callback(
-                                handle, count_cancel, &probe, &cancelled
+                                handle, count_cancel, &probe, NULL, &cancelled
                               )
   );
   TEST_ASSERT_FALSE(cancelled);
@@ -1527,10 +1547,11 @@ static void cancel_callback_runs_when_map_discards_request(void) {
   mln_resource_request_release(handle);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_resource_request_set_cancel_callback(
-                                   handle, count_cancel, &probe, &cancelled
+                                   handle, count_cancel, &probe, NULL, &cancelled
                                  )
   );
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
+  TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.release_count));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -1560,14 +1581,17 @@ static void late_cancel_callback_registration_reports_cancelled(void) {
   cancelled = false;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_resource_request_set_cancel_callback(
-                     handle, count_cancel, &probe, &cancelled
+                     handle, count_cancel, &probe, count_cancel_release,
+                     &cancelled
                    )
   );
   TEST_ASSERT_TRUE(cancelled);
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.cancel_count));
 
+  // A registration the C API did not keep leaves user_data with the caller.
   mln_resource_request_release(handle);
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.cancel_count));
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.release_count));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -1590,7 +1614,7 @@ static void cancel_callback_may_release_the_request(void) {
   bool cancelled = false;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_resource_request_set_cancel_callback(
-                                   handle, count_cancel, &probe, &cancelled
+                                   handle, count_cancel, &probe, NULL, &cancelled
                                  )
   );
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
@@ -1616,9 +1640,12 @@ static void cancel_callback_skips_a_completed_request(void) {
     MLN_STATUS_OK, mln_resource_request_cancelled(handle, &cancelled)
   );
   TEST_ASSERT_FALSE(cancelled);
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.release_count));
 
+  // A registration whose callback never ran retires with the request.
   mln_resource_request_release(handle);
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.cancel_count));
+  TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.release_count));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -1677,7 +1704,7 @@ static uint32_t blocking_cancel_resource_provider(
   bool cancelled = true;
   atomic_store(
     &probe->base.register_status, mln_resource_request_set_cancel_callback(
-                                    handle, block_in_cancel, probe, &cancelled
+                                    handle, block_in_cancel, probe, NULL, &cancelled
                                   )
   );
   atomic_store(&probe->base.register_reported_cancelled, cancelled);

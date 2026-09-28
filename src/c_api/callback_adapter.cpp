@@ -643,26 +643,6 @@ extern "C" MLN_API auto mln_adapter_completion_create(
   });
 }
 
-extern "C" MLN_API auto mln_adapter_dart_resource_cancel_register(
-  mln_resource_request_handle request, void* post_cobject, std::int64_t port,
-  bool* out_cancelled
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (!post_cobject || !port) return MLN_STATUS_INVALID_ARGUMENT;
-    auto context = std::shared_ptr<DartWake>{
-      new DartWake{reinterpret_cast<DartWake::Post>(post_cobject), port},
-      [](DartWake* wake) {
-        wake->notify(1);
-        delete wake;
-      }
-    };
-    return mln::core::set_resource_request_cancel_callback(
-      request, [](void* value) { static_cast<DartWake*>(value)->notify(0); },
-      context.get(), out_cancelled, context
-    );
-  });
-}
-
 extern "C" MLN_API auto mln_adapter_dart_completion_create(
   std::uint32_t copy_kind, std::size_t element_size, void* post_cobject,
   std::int64_t port, std::int64_t token, mln_completion* out_completion

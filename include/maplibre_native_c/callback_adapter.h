@@ -421,19 +421,6 @@ MLN_API mln_status mln_adapter_dart_wake_create(
 ) MLN_NOEXCEPT;
 
 /**
- * Registers request cancellation through a Dart port.
- *
- * Zero reports cancellation; one retires the port after request release.
- * The request owns the native context through callback quiescence.
- */
-MLN_BINDING("execution=immediate")
-MLN_API mln_status mln_adapter_dart_resource_cancel_register(
-  mln_resource_request_handle request,
-  void* post_cobject MLN_BINDING("kind=native_pointer;lifetime=process"),
-  int64_t port, bool* out_cancelled MLN_BINDING("direction=out")
-) MLN_NOEXCEPT;
-
-/**
  * Captures a completion and posts its token and copied result to a Dart port.
  *
  * The VM releases an undelivered result through its native-pointer message

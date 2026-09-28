@@ -136,6 +136,7 @@ public sealed unsafe partial class ResourceRequestHandle : IDisposable
                 read.Handle,
                 callback is null ? null : &InvokeResourceRequestCancelCallback,
                 rootCallback is null ? null : rootCallback.Pointer,
+                null,
                 &outCancelled
             )
         );
