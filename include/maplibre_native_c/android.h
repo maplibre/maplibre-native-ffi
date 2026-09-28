@@ -39,8 +39,12 @@ extern "C" {
  * - MLN_STATUS_NATIVE_ERROR when Android verifier or AssetManager
  *   initialization fails.
  */
-MLN_API mln_status
-mln_android_init(void* jni_env, void* jni_class, void* context) MLN_NOEXCEPT;
+MLN_BINDING("execution=immediate")
+MLN_API mln_status mln_android_init(
+  void* jni_env MLN_BINDING("kind=native_pointer;ownership=borrowed"),
+  void* jni_class MLN_BINDING("kind=native_pointer;ownership=borrowed"),
+  void* context MLN_BINDING("kind=native_pointer;ownership=borrowed")
+) MLN_NOEXCEPT;
 
 #ifdef __cplusplus
 }

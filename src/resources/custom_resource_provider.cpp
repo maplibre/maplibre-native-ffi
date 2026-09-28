@@ -38,6 +38,7 @@ struct ResourceRequestObject {
   bool retired = false;
   mln_resource_request_cancel_callback cancel_callback = nullptr;
   void* cancel_user_data = nullptr;
+  std::shared_ptr<void> cancel_context_owner;
   bool cancel_callback_registered = false;
   bool cancel_callback_running = false;
   // Set when the callback released its own request: the callback wrapper
@@ -527,7 +528,7 @@ auto resource_request_cancelled(
 auto set_resource_request_cancel_callback(
   mln_resource_request_handle handle,
   mln_resource_request_cancel_callback callback, void* user_data,
-  bool* out_cancelled
+  bool* out_cancelled, std::shared_ptr<void> context_owner
 ) -> mln_status {
   if (callback == nullptr) {
     set_thread_error("callback must not be null");
@@ -555,6 +556,7 @@ auto set_resource_request_cancel_callback(
   if (!*out_cancelled) {
     live->cancel_callback = callback;
     live->cancel_user_data = user_data;
+    live->cancel_context_owner = std::move(context_owner);
   }
   return MLN_STATUS_OK;
 }

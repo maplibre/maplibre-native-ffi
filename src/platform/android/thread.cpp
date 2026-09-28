@@ -7,6 +7,7 @@
 #include <mln/util/event.hpp>
 #include <mln/util/logging.hpp>
 #include <mln/util/platform.hpp>
+
 #include <sys/prctl.h>
 #include <sys/resource.h>
 

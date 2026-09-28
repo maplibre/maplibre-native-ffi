@@ -1,8 +1,8 @@
 diff --git a/src/mln/util/logging.cpp b/src/mln/util/logging.cpp
-index a210ac4ad416..86ac0bad7671 100644
+index a210ac4a..4745a5f1 100644
 --- a/src/mln/util/logging.cpp
 +++ b/src/mln/util/logging.cpp
-@@ -10,26 +10,24 @@
+@@ -10,26 +10,23 @@
  #include <exception>
  #include <sstream>
  #include <mutex>
@@ -14,7 +14,7 @@ index a210ac4ad416..86ac0bad7671 100644
  
 -std::unique_ptr<Log::Observer> currentObserver;
  constexpr auto SeverityCount = underlying_type(EventSeverity::SeverityCount);
- std::atomic<bool> useThread[SeverityCount] = {true, true, true, false};
+-std::atomic<bool> useThread[SeverityCount] = {true, true, true, false};
 -std::mutex mutex;
  
  } // namespace
@@ -32,10 +32,11 @@ index a210ac4ad416..86ac0bad7671 100644
              scheduler->schedule([=]() { Log::record(severity, event, code, msg, threadName); });
          } else {
              Log::record(severity, event, code, msg, {});
-@@ -43,8 +41,12 @@ public:
+@@ -43,8 +40,13 @@ public:
  #endif
      }
  
++    std::atomic<bool> useThread[SeverityCount] = {true, true, true, false};
 +    std::unique_ptr<Observer> observer;
 +    std::mutex mutex;
 +
@@ -46,7 +47,7 @@ index a210ac4ad416..86ac0bad7671 100644
  };
  
  Log::Log()
-@@ -53,8 +55,17 @@ Log::Log()
+@@ -53,13 +55,17 @@ Log::Log()
  Log::~Log() = default;
  
  Log* Log::get() noexcept {
@@ -57,16 +58,17 @@ index a210ac4ad416..86ac0bad7671 100644
 +    // destruction, and joining it then deadlocks. The worker never drained its
 +    // queue on termination, so nothing is lost.
 +    static auto* const instance = new Log();
-+    // Releasing the observer at exit keeps host cleanup that ran from its
-+    // destructor; the logger and its thread stay alive.
-+    static const struct ObserverRelease {
-+        ~ObserverRelease() { removeObserver(); }
-+    } observerRelease;
 +    return instance;
  }
  
  void Log::useLogThread(bool enable, std::optional<EventSeverity> severity) {
-@@ -69,15 +80,15 @@ void Log::useLogThread(bool enable, std::optional<EventSeverity> severity) {
+     if (severity) {
+-        useThread[underlying_type(*severity)] = enable;
++        get()->impl->useThread[underlying_type(*severity)] = enable;
+     } else {
+         useLogThread(enable, EventSeverity::Debug);
+         useLogThread(enable, EventSeverity::Info);
+@@ -69,15 +75,15 @@ void Log::useLogThread(bool enable, std::optional<EventSeverity> severity) {
  }
  
  void Log::setObserver(std::unique_ptr<Observer> observer) {
@@ -88,7 +90,7 @@ index a210ac4ad416..86ac0bad7671 100644
  }
  
  void Log::record(EventSeverity severity, Event event, const std::string& msg) noexcept {
-@@ -93,8 +104,9 @@ void Log::record(EventSeverity severity,
+@@ -93,8 +99,9 @@ void Log::record(EventSeverity severity,
                   int64_t code,
                   const std::string& msg,
                   const std::optional<std::string>& threadName) {

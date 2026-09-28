@@ -22,12 +22,12 @@ typedef enum mln_log_severity : uint32_t {
 } mln_log_severity;
 
 /** Bitmask values for log severities dispatched asynchronously. */
-typedef enum mln_log_severity_mask : uint32_t {
+typedef enum MLN_BINDING("kind=bitmask") mln_log_severity_mask : uint32_t {
   MLN_LOG_SEVERITY_MASK_INFO = 1U << MLN_LOG_SEVERITY_INFO,
   MLN_LOG_SEVERITY_MASK_WARNING = 1U << MLN_LOG_SEVERITY_WARNING,
   MLN_LOG_SEVERITY_MASK_ERROR = 1U << MLN_LOG_SEVERITY_ERROR,
-  MLN_LOG_SEVERITY_MASK_DEFAULT =
-    MLN_LOG_SEVERITY_MASK_INFO | MLN_LOG_SEVERITY_MASK_WARNING,
+  MLN_LOG_SEVERITY_MASK_DEFAULT = MLN_LOG_SEVERITY_MASK_INFO |
+                                  MLN_LOG_SEVERITY_MASK_WARNING,
   MLN_LOG_SEVERITY_MASK_ALL = MLN_LOG_SEVERITY_MASK_INFO |
                               MLN_LOG_SEVERITY_MASK_WARNING |
                               MLN_LOG_SEVERITY_MASK_ERROR,
@@ -62,16 +62,30 @@ typedef enum mln_log_event : uint32_t {
  * handle it.
  */
 typedef uint32_t (*mln_log_callback)(
-  void* user_data, uint32_t severity, uint32_t event, int64_t code,
+  void* user_data MLN_BINDING("kind=context;lifetime=owner"),
+  uint32_t severity MLN_BINDING("enum=mln_log_severity"),
+  uint32_t event MLN_BINDING("enum=mln_log_event"), int64_t code,
   const char* message
-);
+    MLN_BINDING("length=nul;encoding=utf8;ownership=borrowed;lifetime=call")
+) MLN_BINDING("thread=native;failure=0;reentry=forbid");
+
+/** Releases user_data from a log callback registration. */
+typedef void (*mln_log_callback_release)(
+  void* user_data MLN_BINDING("kind=context;lifetime=owner")
+) MLN_BINDING("thread=native;failure=contain;reentry=forbid");
 
 /**
  * Installs a process-global MapLibre Native log callback.
  *
- * Passing null clears the current callback. The callback and user_data are
- * stored by reference and must remain valid until the callback is replaced or
- * cleared.
+ * Passing a null callback clears the current registration. When that call also
+ * passes a non-null release_user_data, the C API invokes it on the passed
+ * user_data before returning.
+ *
+ * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
+ * releasing user_data to the C API. The C API invokes release_user_data after
+ * the final callback returns, when the registration is replaced or cleared.
+ * With a null release_user_data, the caller keeps that responsibility and must
+ * keep user_data valid until the registration is replaced or cleared.
  *
  * The callback is a low-level native callback:
  *
@@ -80,13 +94,22 @@ typedef uint32_t (*mln_log_callback)(
  * - MapLibre may invoke it while holding internal logging locks.
  * - The callback must be thread-safe, return quickly, and must not call this C
  *   API or MapLibre Native APIs.
+ * - release_user_data may run on the caller that replaces or clears the
+ *   registration. It must not call this C API or MapLibre Native APIs.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status
-mln_log_set_callback(mln_log_callback callback, void* user_data) MLN_NOEXCEPT;
+MLN_BINDING(
+  "execution=immediate;registration=callback;user_data=user_data;"
+  "release_callback=release_user_data"
+)
+MLN_API mln_status mln_log_set_callback(
+  mln_log_callback callback,
+  void* user_data MLN_BINDING("kind=context;ownership=borrowed"),
+  mln_log_callback_release release_user_data
+) MLN_NOEXCEPT;
 
 /**
  * Clears the process-global log callback.
@@ -95,6 +118,7 @@ mln_log_set_callback(mln_log_callback callback, void* user_data) MLN_NOEXCEPT;
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
+MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_log_clear_callback(void) MLN_NOEXCEPT;
 
 /**
@@ -109,7 +133,10 @@ MLN_API mln_status mln_log_clear_callback(void) MLN_NOEXCEPT;
  * - MLN_STATUS_INVALID_ARGUMENT when mask contains unknown bits.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_log_set_async_severity_mask(uint32_t mask) MLN_NOEXCEPT;
+MLN_BINDING("execution=immediate")
+MLN_API mln_status mln_log_set_async_severity_mask(
+  uint32_t mask MLN_BINDING("enum=mln_log_severity_mask")
+) MLN_NOEXCEPT;
 
 #ifdef __cplusplus
 }

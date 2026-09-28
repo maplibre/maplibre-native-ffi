@@ -28,12 +28,12 @@ static bool wait_for_style_loaded(
 ) {
   out_message[0] = '\0';
   for (unsigned int attempt = 0; attempt < 600; attempt += 1) {
-    if (mln_runtime_pump(runtime, 10, -1) != MLN_STATUS_OK) {
+    if (mln_test_runtime_barrier(runtime) != MLN_STATUS_OK) {
       return false;
     }
     while (true) {
-      mln_runtime_event_batch batch = mln_runtime_event_batch_default();
-      if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+      mln_test_event_batch batch = mln_test_event_batch_default();
+      if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
         return false;
       }
       if (batch.event_count == 0) {
@@ -62,6 +62,7 @@ static bool wait_for_style_loaded(
         }
       }
     }
+    mln_test_sleep_millisecond();
   }
   snprintf(
     out_message, capacity,
@@ -85,7 +86,7 @@ static void style_loads_over_http_from_the_runner_origin(void) {
 
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_set_style_url(map, url));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
 
   char failure[512];
   const bool loaded =
@@ -97,36 +98,20 @@ static void style_loads_over_http_from_the_runner_origin(void) {
     return;
   }
 
-  // Checks which document loaded: a response from anywhere else carries a
-  // different layer.
-  mln_style_id_list layers = MLN_HANDLE_NULL;
+  // Checks which document loaded: a response from anywhere else lacks this
+  // layer.
+  mln_test_completion completion =
+    mln_test_completion_default(sizeof(mln_style_layer_result));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_list_style_layer_ids(map, &layers)
+    MLN_STATUS_OK,
+    mln_map_get_style_layer_info(
+      map, mln_test_buffer_view(fixture_layer_id, strlen(fixture_layer_id)),
+      &completion.descriptor
+    )
   );
-  size_t count = 0;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_style_id_list_count(layers, &count));
-
-  bool found = false;
-  char seen[256];
-  seen[0] = '\0';
-  for (size_t index = 0; index < count; index += 1) {
-    mln_buffer_view id = {0};
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_style_id_list_get(layers, index, &id)
-    );
-    if (
-      id.size == strlen(fixture_layer_id) &&
-      memcmp(id.data, fixture_layer_id, id.size) == 0
-    ) {
-      found = true;
-    }
-    const size_t used = strlen(seen);
-    (void)snprintf(
-      seen + used, sizeof(seen) - used, "%s%.*s", used == 0 ? "" : ", ",
-      (int)id.size, id.data
-    );
-  }
-  mln_style_id_list_destroy(layers);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  const bool found = mln_test_completion_value_count(&completion) == 1;
+  mln_test_completion_destroy(&completion);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -136,8 +121,8 @@ static void style_loads_over_http_from_the_runner_origin(void) {
     (void)snprintf(
       message, sizeof(message),
       "the loaded style has no %s layer, so it did not come from the runner's "
-      "document; layers: [%s]",
-      fixture_layer_id, seen
+      "document",
+      fixture_layer_id
     );
     TEST_FAIL_MESSAGE(message);
   }

@@ -11,17 +11,11 @@ APIs. This lets the local file source load percent-encoded `file:///C:/...`
 resources whose paths contain spaces or non-ASCII characters. Upstream:
 [maplibre-native#4572](https://github.com/maplibre/maplibre-native/pull/4572).
 
-`0003-run-loop-budget.patch` adds `RunLoop::runOnce(Duration budget)`, which
-stops dequeuing tasks once the budget has elapsed. At least one task runs, the
-remaining tasks stay queued, and the loop wakes itself so the next pass picks
-them up. The C API uses it to bound one pump's drain. Upstream:
-[maplibre-native#4577](https://github.com/maplibre/maplibre-native/pull/4577).
-
-`0004-opengl-valid-api-calls.patch` allocates storage before copying a uniform
-buffer and isolates allocation errors from earlier OpenGL calls. This prevents
-strict implementations and the API 26 Android emulator from turning stale errors
-into false allocation failures. Upstream:
-[maplibre-native#4578](https://github.com/maplibre/maplibre-native/pull/4578).
+`0005-unwrapped-unprojection.patch` adds wrap-mode overloads to map and
+standalone projection coordinate conversion. The C API uses them to expose
+continuous longitudes while the existing overloads keep wrapped behavior.
+Upstream:
+[maplibre-native#4573](https://github.com/maplibre/maplibre-native/pull/4573).
 
 `0006-process-lifetime-logging.patch` gives the global logger, its observer,
 mutex, severity settings, and scheduler process lifetime. This prevents static

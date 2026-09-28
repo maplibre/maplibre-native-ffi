@@ -32,7 +32,9 @@ class AsyncTaskState : public platform::emscripten::RunLoopWake::Runnable,
     }
   }
 
-  auto dueTime() const -> mln::TimePoint override { return mln::Clock::now(); }
+  auto dueTime() const -> mln::TimePoint override {
+    return mln::TimePoint::min();
+  }
 
   auto countsForWaitForEmpty() const -> bool override { return true; }
 
