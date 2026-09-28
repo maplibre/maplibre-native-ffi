@@ -205,6 +205,7 @@ class Values:
                         prototype.value,
                         kind="buffer",
                         native="mln_buffer_view",
+                        buffer_form="view",
                         encoding=item_buffer.encoding,
                     ),
                 ),

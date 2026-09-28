@@ -232,7 +232,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
         for p in plan.inputs
         if p.value.kind == "array"
         or p.value.kind == "buffer"
-        and p.value.native != "mln_buffer_view"
+        and p.value.buffer_form != "view"
         and p.value.length not in {None, "1", "nul"}
     }
     signature, optional, setup, args, returns = (
@@ -302,7 +302,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
             args.append(local + ".cast()" if output.kind == "native_pointer" else local)
             expression = f"{local}." + (
                 "ref"
-                if output.kind == "record" or output.native == "mln_buffer_view"
+                if output.kind == "record" or output.buffer_form == "view"
                 else "value"
             )
             if plan.view:
@@ -333,11 +333,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
         if value.lifetime not in {"call", "value"}:
             raise Unsupported("input requires retained native storage")
         values.check(value)
-        if (
-            value.kind == "buffer"
-            and value.nullable
-            and value.native != "mln_buffer_view"
-        ):
+        if value.kind == "buffer" and value.nullable and value.buffer_form != "view":
             raise Unsupported(
                 "nullable counted pointer needs nullable count conversion"
             )
@@ -349,7 +345,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
         bare = replace(value, nullable=False, optional=None)
         if (
             value.kind == "buffer"
-            and value.native != "mln_buffer_view"
+            and value.buffer_form != "view"
             and value.length not in {None, "1", "nul"}
         ):
             view = (
@@ -502,8 +498,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
         bare = replace(element, nullable=False)
         kind = (
             copy_kind(element.native)
-            if element.kind in {"record", "handle"}
-            or element.native == "mln_buffer_view"
+            if element.kind in {"record", "handle"} or element.buffer_form == "view"
             else "MLN_ADAPTER_COMPLETION_COPY_FLAT"
         )
         size = f"sizeOf<{values.ffi(element)}>()"
@@ -521,7 +516,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
         else:
             expression = pointer + (
                 ".ref"
-                if element.kind == "record" or element.native == "mln_buffer_view"
+                if element.kind == "record" or element.buffer_form == "view"
                 else ".value"
             )
             decode = values.copy(

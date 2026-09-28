@@ -71,7 +71,7 @@ def signature(plan, values):
         if (
             parameter.value.kind == "buffer"
             and parameter.value.nullable
-            and parameter.value.native != "mln_buffer_view"
+            and parameter.value.buffer_form != "view"
         ):
             raise Unsupported(
                 "nullable input buffer requires independent presence storage"
@@ -183,7 +183,7 @@ def native_input(value, local, values, platform):
         )
     expression = values.cast_native(value, local, platform)
     if platform == "nativeMain" and (
-        value.kind == "record" or value.native == "mln_buffer_view"
+        value.kind == "record" or value.buffer_form == "view"
     ):
         expression += ".pointed.readValue()"
     return expression
@@ -410,7 +410,7 @@ def immediate(plan, values, platform):
     if plan.outputs:
         output = result
         if output.kind == "record" or (
-            output.kind == "buffer" and output.native == "mln_buffer_view"
+            output.kind == "buffer" and output.buffer_form == "view"
         ):
             native = output.native
             allocate = (

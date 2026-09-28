@@ -205,7 +205,7 @@ def _capture(plan, source: str, target: str, parent: str, depth: int) -> list[st
             )
         return []
     if plan.kind == "buffer":
-        if plan.native == "mln_buffer_view":
+        if plan.buffer_form == "view":
             return [f"{indent}{target} = buffer(arena, {source});"]
         if plan.length == "nul":
             return [f"{indent}{target} = string(arena, {source});"]

@@ -146,6 +146,9 @@ class ValuePlan:
     registration: RegistrationDescriptorPlan | None = None
     response: CallbackResponsePlan | None = None
     projection: ValuePlan | None = None
+    # For kind="buffer": "view" for the mln_buffer_view struct, "pointer" for a
+    # character or byte pointer with a separate length or NUL terminator.
+    buffer_form: str | None = None
 
 
 @dataclass(frozen=True)
@@ -478,7 +481,7 @@ class Binder:
             ):
                 raise ModelError([f"{context}: buffer view requires data and size"])
             common["encoding"] = metadata.get("encoding", "bytes")
-            return ValuePlan(kind="buffer", **common)
+            return ValuePlan(kind="buffer", buffer_form="view", **common)
         if resolved.kind == "pointer":
             pointee = resolved.pointee
             if pointee is None:
@@ -514,18 +517,18 @@ class Binder:
             if metadata.get("length") == "nul":
                 if pointee.kind not in {"char_s", "char_u", "schar", "uchar"}:
                     raise ModelError([f"{context}: nul length requires character data"])
-                return ValuePlan(kind="buffer", **common)
+                return ValuePlan(kind="buffer", buffer_form="pointer", **common)
             if "length" in metadata:
                 if metadata.get("encoding") in {"utf8", "json", "bytes"} and (
                     pointee.kind in {"char_s", "char_u", "schar", "uchar"}
                     or pointee.canonical.removeprefix("const ")
                     in {"char", "signed char", "unsigned char"}
                 ):
-                    return ValuePlan(kind="buffer", **common)
+                    return ValuePlan(kind="buffer", buffer_form="pointer", **common)
                 if child_name == "void":
                     if metadata.get("encoding") not in {"utf8", "json", "bytes"}:
                         raise ModelError([f"{context}: erased bytes require encoding"])
-                    return ValuePlan(kind="buffer", **common)
+                    return ValuePlan(kind="buffer", buffer_form="pointer", **common)
                 element = self.value(pointee, child_metadata, context + " element")
                 return ValuePlan(kind="array", element=element, **common)
             raise ModelError([f"{context}: pointer requires length or native kind"])

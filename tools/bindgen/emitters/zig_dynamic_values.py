@@ -28,7 +28,7 @@ def encode(values, value, source, depth=0):
     if value.kind in {"buffer", "array", "reference"} and optional:
         fallback = (
             "std.mem.zeroes(c.mln_buffer_view)"
-            if value.native == "mln_buffer_view"
+            if value.buffer_form == "view"
             else "null"
         )
         return f"if ({source}) |{item}| {encode(values, replace(value, nullable=False, optional=None), item, depth + 1)} else {fallback}"
@@ -37,7 +37,7 @@ def encode(values, value, source, depth=0):
             return f"try cString(allocator, {source})"
         return (
             f"view({source})"
-            if value.native == "mln_buffer_view"
+            if value.buffer_form == "view"
             else f"@ptrCast({source}.ptr)"
         )
     if value.kind == "reference":
@@ -67,14 +67,14 @@ def decode(values, value, source, context="raw"):
     if value.kind in {"buffer", "array", "reference"} and optional:
         absent = (
             (f"{source}.data == null" if value.nullable else f"{source}.size == 0")
-            if value.native == "mln_buffer_view"
+            if value.buffer_form == "view"
             else f"{source} == null"
         )
         return f"if ({absent}) null else {decode(values, replace(value, nullable=False, optional=None), source, context)}"
     if value.kind == "buffer":
         if value.length == "nul":
             return f"try allocator.dupe(u8, std.mem.span({source} orelse return error.NativeError))"
-        if value.native != "mln_buffer_view":
+        if value.buffer_form != "view":
             count = (
                 value.length
                 if value.length.isdigit()

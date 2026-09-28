@@ -159,9 +159,7 @@ class Values:
                 raise Unsupported("enum underlying scalar is unsupported")
             self.used[value.native] = value
             return
-        if value.kind == "buffer" and (
-            value.native == "mln_buffer_view" or value.length
-        ):
+        if value.kind == "buffer" and (value.buffer_form == "view" or value.length):
             return
         if value.kind == "array" and value.element:
             if value.item_buffer:
@@ -484,11 +482,7 @@ class Values:
                     else f"org.maplibre.nativeffi.internal.javacpp.JavaCppSupport.addressPointer({raw})"
                 )
             return raw + (".toULong()" if platform == "nativeMain" else "")
-        if (
-            value.kind == "buffer"
-            and value.nullable
-            and value.native == "mln_buffer_view"
-        ):
+        if value.kind == "buffer" and value.nullable and value.buffer_form == "view":
             return f"GeneratedValues.optional{'String' if value.encoding == 'utf8' else 'Bytes'}View(arena, {expression})"
         if value.kind == "array":
             return f"GeneratedValues.write{name(value.element.native)}Array(arena, {expression})"
@@ -528,11 +522,7 @@ class Values:
                 + (", registrations" if self.needs_registration(value) else "")
                 + ")"
             )
-        if (
-            value.kind == "buffer"
-            and value.native != "mln_buffer_view"
-            and value.nullable
-        ):
+        if value.kind == "buffer" and value.buffer_form != "view" and value.nullable:
             present = self.cast_native(
                 replace(value, nullable=False), expression + "!!", platform
             )
@@ -540,7 +530,7 @@ class Values:
             return f"if ({expression} == null) {null} else {present}"
         if value.kind == "buffer" and value.length == "nul":
             return f"GeneratedValues.cString(arena, {expression})"
-        if value.kind == "buffer" and value.native != "mln_buffer_view":
+        if value.kind == "buffer" and value.buffer_form != "view":
             data = (
                 f"{expression}.encodeToByteArray()"
                 if value.encoding == "utf8"
@@ -805,7 +795,7 @@ class Values:
             and (field.value.scalar_carrier or field.value.ctype.spelling) == "size_t"
         ):
             expression = f"({expression}).convert()"
-        if field.value.kind == "record" or field.value.native == "mln_buffer_view":
+        if field.value.kind == "record" or field.value.buffer_form == "view":
             target = self.field(record, member, base, platform)
             return (
                 f"{target}.copyFrom({expression})"

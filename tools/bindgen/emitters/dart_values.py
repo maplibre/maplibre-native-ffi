@@ -259,7 +259,7 @@ class Values:
             return scalar[1]
         if value.kind == "scalar":
             return self.scalar(value)[1]
-        if value.kind == "record" or value.native == "mln_buffer_view":
+        if value.kind == "record" or value.buffer_form == "view":
             return f"raw.{value.native}"
         if value.kind in {"array", "reference"}:
             return self.ffi(value.element)
@@ -287,7 +287,7 @@ class Values:
             child = value.element
             suffix = (
                 "ref"
-                if child.kind == "record" or child.native == "mln_buffer_view"
+                if child.kind == "record" or child.buffer_form == "view"
                 else "value"
             )
             local = expression + ("!" if value.nullable and "." in expression else "")
@@ -313,7 +313,7 @@ class Values:
             bare = replace(value, nullable=False, optional=None)
             if (
                 value.kind == "buffer"
-                and value.native != "mln_buffer_view"
+                and value.buffer_form != "view"
                 and value.nullable
             ):
                 local = expression + ("!" if "." in expression else "")
@@ -363,7 +363,7 @@ class Values:
                 + ").ref"
             )
         if value.kind == "buffer":
-            if value.native == "mln_buffer_view":
+            if value.buffer_form == "view":
                 return (
                     f"nativeStringView({expression}, arena).value"
                     if value.encoding == "utf8"
@@ -397,7 +397,7 @@ class Values:
         elif value.kind == "record":
             result = f"_read{public_name(value.native)}({expression})"
         elif value.kind == "buffer":
-            if value.native == "mln_buffer_view":
+            if value.buffer_form == "view":
                 result = f"_copyBufferView({expression})"
                 if value.encoding == "utf8":
                     result = f"utf8.decode({result})"
@@ -438,8 +438,7 @@ class Values:
         elif value.kind == "reference":
             suffix = (
                 "ref"
-                if value.element.kind == "record"
-                or value.element.native == "mln_buffer_view"
+                if value.element.kind == "record" or value.element.buffer_form == "view"
                 else "value"
             )
             result = self.copy(value.element, f"{expression}.{suffix}")
@@ -1027,7 +1026,7 @@ class Values:
                     native_field = f"result.ref.{field.name}"
                     if (
                         field.value.kind == "buffer"
-                        and field.value.native != "mln_buffer_view"
+                        and field.value.buffer_form != "view"
                         and field.value.length not in {None, "nul", "1"}
                     ):
                         view = (

@@ -59,12 +59,12 @@ def encode(values, value, source):
         value.nullable or value.optional == "empty"
     ):
         converted = encode(values, replace(value, nullable=False, optional=None), "$0")
-        fallback = " ?? mln_buffer_view()" if value.native == "mln_buffer_view" else ""
+        fallback = " ?? mln_buffer_view()" if value.buffer_form == "view" else ""
         return f"{'try ' if encode_throws(value) else ''}{source}.map {{ {converted} }}{fallback}"
     if value.kind == "buffer":
         if value.length == "nul":
             return f"try arena.cString({source})"
-        if value.native != "mln_buffer_view":
+        if value.buffer_form != "view":
             pointee = (
                 "CChar"
                 if value.ctype.pointee.spelling.removeprefix("const ") == "char"
@@ -118,7 +118,7 @@ def decode(values, value, source, context="raw"):
                 if value.optional == "empty"
                 else f"{source}.data == nil"
             )
-            if value.native == "mln_buffer_view"
+            if value.buffer_form == "view"
             else f"{source} == nil"
         )
         return f"{absent} ? nil : {converted}"
@@ -126,7 +126,7 @@ def decode(values, value, source, context="raw"):
         if value.length == "nul":
             return f"try NativeString.copyCString({source})"
         copier = "copyUTF8" if value.encoding == "utf8" else "copyData"
-        if value.native != "mln_buffer_view":
+        if value.buffer_form != "view":
             count = (
                 value.length
                 if value.length.isdigit()

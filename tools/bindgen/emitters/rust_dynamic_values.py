@@ -37,7 +37,7 @@ def encode(values, value, source):
         raw = encode(values, replace(value, nullable=False, optional=None), "item")
         null = (
             "maplibre_native_ffi_sys::mln_buffer_view { data: std::ptr::null(), size: 0 }"
-            if value.native == "mln_buffer_view"
+            if value.buffer_form == "view"
             else "std::ptr::null()"
         )
         return f"match {source}.as_ref() {{ Some(item) => {raw}, None => {null} }}"
@@ -47,7 +47,7 @@ def encode(values, value, source):
         data = f"{source}.as_bytes()" if value.encoding == "utf8" else source
         return (
             f"maplibre_native_ffi_sys::mln_buffer_view {{ data: {data}.as_ptr().cast(), size: {data}.len() }}"
-            if value.native == "mln_buffer_view"
+            if value.buffer_form == "view"
             else f"{data}.as_ptr().cast()"
         )
     if value.kind == "reference":
@@ -76,12 +76,12 @@ def decode(values, value, source, context="raw"):
         )
         absent = (
             (f"{source}.data.is_null()" if value.nullable else f"{source}.size == 0")
-            if value.native == "mln_buffer_view"
+            if value.buffer_form == "view"
             else f"{source}.is_null()"
         )
         return f"if {absent} {{ None }} else {{ Some({copied}) }}"
     if value.kind == "buffer":
-        if value.native != "mln_buffer_view" and value.length != "nul":
+        if value.buffer_form != "view" and value.length != "nul":
             count = (
                 value.length
                 if value.length.isdigit()
