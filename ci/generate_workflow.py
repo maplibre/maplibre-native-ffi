@@ -149,9 +149,11 @@ def hygiene_job() -> dict:
         "mise run ci:generate-workflow --check",
         "mise run ci:generate-devcontainer-tools --check",
         "mise run ci:test",
+        "mise run bindings:test-generator",
         "mise run --force //bindings/dart:ffigen",
         "mise run --force //bindings/dotnet:generate",
         "mise run --force //bindings/kotlin:generate",
+        "mise run bindings:check",
         "dprint output-resolved-config > /dev/null",
         "mise run fix",
     ]

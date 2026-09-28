@@ -31,9 +31,11 @@ jobs:
       - run: mise run ci:generate-workflow --check
       - run: mise run ci:generate-devcontainer-tools --check
       - run: mise run ci:test
+      - run: mise run bindings:test-generator
       - run: mise run --force //bindings/dart:ffigen
       - run: mise run --force //bindings/dotnet:generate
       - run: mise run --force //bindings/kotlin:generate
+      - run: mise run bindings:check
       - run: dprint output-resolved-config > /dev/null
       - run: mise run fix
       - name: Check generated and formatted files
@@ -128,7 +130,7 @@ jobs:
         run: mise run //bindings/python:test linux-gnu-x64-egl
       - env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/dart:build linux-gnu-x64-egl
+        run: mise run //bindings/dart:test linux-gnu-x64-egl
       - name: Save Zig packages
         if: steps.setup.outputs.zig-cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -214,7 +216,7 @@ jobs:
         run: mise run //bindings/python:test linux-gnu-x64-vulkan
       - env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/dart:build linux-gnu-x64-vulkan
+        run: mise run //bindings/dart:test linux-gnu-x64-vulkan
       - name: Save Zig packages
         if: steps.setup.outputs.zig-cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

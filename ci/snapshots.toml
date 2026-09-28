@@ -22,6 +22,7 @@ shared = [
   ".gitmodules",
   "patches/**",
   "scripts/**",
+  "tools/bindgen/**",
   "Cargo.toml",
   "Cargo.lock",
   "LICENSE",
@@ -80,6 +81,9 @@ shared = [
 
   # Not inputs to any published artifact.
   "!examples/**",
+  "!tests/bindgen/**",
+  "!tests/graphics/**",
+  "!plans/**",
   "!dprint.jsonc",
   "!hk.pkl",
   "!vite.config.ts",
