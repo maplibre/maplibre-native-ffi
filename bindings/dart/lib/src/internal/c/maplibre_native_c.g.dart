@@ -15,6 +15,139 @@ library;
 
 import 'dart:ffi' as ffi;
 
+@ffi.Native<ffi.Int32 Function(mln_acquired_frame)>()
+external int mln_acquired_frame_dispose(int frame);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_acquired_frame,
+    ffi.Pointer<mln_metal_owned_texture_frame>,
+  )
+>()
+external int mln_acquired_frame_get_metal_texture(
+  int frame,
+  ffi.Pointer<mln_metal_owned_texture_frame> out_frame,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_acquired_frame,
+    ffi.Pointer<mln_opengl_owned_texture_frame>,
+  )
+>()
+external int mln_acquired_frame_get_opengl_texture(
+  int frame,
+  ffi.Pointer<mln_opengl_owned_texture_frame> out_frame,
+);
+
+@ffi.Native<ffi.Int32 Function(mln_acquired_frame, ffi.Pointer<mln_gpu_sync>)>()
+external int mln_acquired_frame_get_producer_sync(
+  int frame,
+  ffi.Pointer<mln_gpu_sync> out_sync,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_acquired_frame, ffi.Pointer<mln_render_frame_result>)
+>()
+external int mln_acquired_frame_get_result(
+  int frame,
+  ffi.Pointer<mln_render_frame_result> out_result,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_acquired_frame,
+    ffi.Pointer<mln_vulkan_owned_texture_frame>,
+  )
+>()
+external int mln_acquired_frame_get_vulkan_texture(
+  int frame,
+  ffi.Pointer<mln_vulkan_owned_texture_frame> out_frame,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_acquired_frame,
+    ffi.Pointer<mln_webgpu_owned_texture_frame>,
+  )
+>()
+external int mln_acquired_frame_get_webgpu_texture(
+  int frame,
+  ffi.Pointer<mln_webgpu_owned_texture_frame> out_frame,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(ffi.Pointer<mln_acquired_frame>, ffi.Pointer<mln_gpu_sync>)
+>()
+external int mln_acquired_frame_release(
+  ffi.Pointer<mln_acquired_frame> frame,
+  ffi.Pointer<mln_gpu_sync> consumer_completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_acquired_frame, ffi.Pointer<ffi.Pointer<ffi.Void>>)
+>()
+external int mln_adapter_acquired_frame_view_begin(
+  int frame,
+  ffi.Pointer<ffi.Pointer<ffi.Void>> out_scope,
+);
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
+external void mln_adapter_acquired_frame_view_end(ffi.Pointer<ffi.Void> scope);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<ffi.Void>, ffi.Uint64)>()
+external int mln_adapter_arena_adopt_handle(
+  ffi.Pointer<ffi.Void> arena,
+  int handle,
+);
+
+@ffi.Native<
+  ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>, ffi.Size, ffi.Size)
+>()
+external ffi.Pointer<ffi.Void> mln_adapter_arena_allocate(
+  ffi.Pointer<ffi.Void> arena,
+  int size,
+  int alignment,
+);
+
+@ffi.Native<ffi.Pointer<ffi.Void> Function()>()
+external ffi.Pointer<ffi.Void> mln_adapter_arena_create();
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
+external void mln_adapter_arena_destroy(ffi.Pointer<ffi.Void> arena);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    ffi.Uint32,
+    ffi.Size,
+    mln_adapter_completion_listener,
+    ffi.Pointer<ffi.Void>,
+    ffi.Pointer<mln_completion>,
+  )
+>()
+external int mln_adapter_completion_create(
+  int copy_kind,
+  int element_size,
+  mln_adapter_completion_listener listener,
+  ffi.Pointer<ffi.Void> user_data,
+  ffi.Pointer<mln_completion> out_completion,
+);
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<mln_adapter_completion_record>)>()
+external void mln_adapter_completion_record_adopt(
+  ffi.Pointer<mln_adapter_completion_record> record,
+);
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<mln_adapter_completion_record>)>()
+external void mln_adapter_completion_record_destroy(
+  ffi.Pointer<mln_adapter_completion_record> record,
+);
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<mln_completion>)>()
+external void mln_adapter_completion_reject(
+  ffi.Pointer<mln_completion> completion,
+);
+
 @ffi.Native<
   ffi.Void Function(
     mln_custom_geometry_source_tile_callback,
@@ -41,18 +174,79 @@ external void mln_adapter_custom_mvt_vector_callbacks_retire(
   ffi.Pointer<ffi.Void> user_data,
 );
 
-@ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
-external void mln_adapter_handle_leak_report(ffi.Pointer<ffi.Void> token);
-
-@ffi.Native<ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Char>, ffi.Uint64)>()
-external ffi.Pointer<ffi.Void> mln_adapter_handle_leak_token_create(
-  ffi.Pointer<ffi.Char> type_name,
-  int handle,
+@ffi.Native<
+  ffi.Int32 Function(
+    ffi.Uint32,
+    ffi.Size,
+    ffi.Pointer<ffi.Void>,
+    ffi.Int64,
+    ffi.Int64,
+    ffi.Pointer<mln_completion>,
+  )
+>()
+external int mln_adapter_dart_completion_create(
+  int copy_kind,
+  int element_size,
+  ffi.Pointer<ffi.Void> post_cobject,
+  int port,
+  int token,
+  ffi.Pointer<mln_completion> out_completion,
 );
 
+@ffi.Native<ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>, ffi.Int64)>()
+external ffi.Pointer<ffi.Void> mln_adapter_dart_port_create(
+  ffi.Pointer<ffi.Void> post_cobject,
+  int port,
+);
+
+@ffi.Native<ffi.Pointer<ffi.Void> Function(ffi.Uint32)>()
+external ffi.Pointer<ffi.Void> mln_adapter_dart_port_function(int id);
+
 @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
-external void mln_adapter_handle_leak_token_destroy(
-  ffi.Pointer<ffi.Void> token,
+external void mln_adapter_dart_port_release(ffi.Pointer<ffi.Void> context);
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
+external void mln_adapter_dart_release(ffi.Pointer<ffi.Void> context);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    ffi.Pointer<ffi.Void>,
+    ffi.Int64,
+    ffi.Pointer<ffi.Void>,
+    ffi.Pointer<ffi.Void>,
+    ffi.Pointer<ffi.Uint64>,
+  )
+>()
+external int mln_adapter_dart_release_register(
+  ffi.Pointer<ffi.Void> post_cobject,
+  int port,
+  ffi.Pointer<ffi.Void> context,
+  ffi.Pointer<ffi.Void> arena,
+  ffi.Pointer<ffi.Uint64> out_registration,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_resource_request_handle,
+    ffi.Pointer<ffi.Void>,
+    ffi.Int64,
+    ffi.Pointer<ffi.Bool>,
+  )
+>()
+external int mln_adapter_dart_resource_cancel_register(
+  int request,
+  ffi.Pointer<ffi.Void> post_cobject,
+  int port,
+  ffi.Pointer<ffi.Bool> out_cancelled,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(ffi.Pointer<ffi.Void>, ffi.Int64, ffi.Pointer<mln_wake>)
+>()
+external int mln_adapter_dart_wake_create(
+  ffi.Pointer<ffi.Void> post_cobject,
+  int port,
+  ffi.Pointer<mln_wake> out_wake,
 );
 
 @ffi.Native<
@@ -93,6 +287,28 @@ external int mln_adapter_log_callback(
   ffi.Pointer<ffi.Char> message,
 );
 
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_adapter_log_queue,
+    ffi.Pointer<ffi.Pointer<mln_adapter_log_record>>,
+  )
+>()
+external int mln_adapter_log_queue_acquire(
+  int queue,
+  ffi.Pointer<ffi.Pointer<mln_adapter_log_record>> out_record,
+);
+
+@ffi.Native<ffi.Void Function(mln_adapter_log_queue)>()
+external void mln_adapter_log_queue_close(int queue);
+
+@ffi.Native<
+  ffi.Int32 Function(ffi.Pointer<mln_wake>, ffi.Pointer<mln_adapter_log_queue>)
+>()
+external int mln_adapter_log_queue_create(
+  ffi.Pointer<mln_wake> wake,
+  ffi.Pointer<mln_adapter_log_queue> out_queue,
+);
+
 @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
 external void mln_adapter_log_record_destroy(ffi.Pointer<ffi.Void> record);
 
@@ -100,6 +316,15 @@ external void mln_adapter_log_record_destroy(ffi.Pointer<ffi.Void> record);
 external int mln_adapter_log_set_callback(
   ffi.Pointer<mln_adapter_log_callback_state> state,
 );
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
+external void mln_adapter_owner_finalize(ffi.Pointer<ffi.Void> token);
+
+@ffi.Native<ffi.Pointer<ffi.Void> Function(ffi.Uint64)>()
+external ffi.Pointer<ffi.Void> mln_adapter_owner_token_create(int handle);
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
+external void mln_adapter_owner_token_destroy(ffi.Pointer<ffi.Void> token);
 
 @ffi.Native<
   ffi.Uint32 Function(
@@ -112,13 +337,6 @@ external int mln_adapter_queued_resource_provider_callback(
   ffi.Pointer<ffi.Void> user_data,
   ffi.Pointer<mln_resource_request> request,
   int handle,
-);
-
-@ffi.Native<
-  ffi.Void Function(ffi.Pointer<mln_adapter_queued_resource_provider>)
->()
-external void mln_adapter_queued_resource_provider_retire(
-  ffi.Pointer<mln_adapter_queued_resource_provider> provider,
 );
 
 @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
@@ -137,6 +355,31 @@ external int mln_adapter_resource_provider_rules_callback(
   ffi.Pointer<ffi.Void> user_data,
   ffi.Pointer<mln_resource_request> request,
   int handle,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_adapter_resource_request_queue,
+    ffi.Pointer<ffi.Pointer<mln_adapter_queued_resource_request>>,
+  )
+>()
+external int mln_adapter_resource_request_queue_acquire(
+  int queue,
+  ffi.Pointer<ffi.Pointer<mln_adapter_queued_resource_request>> out_request,
+);
+
+@ffi.Native<ffi.Void Function(mln_adapter_resource_request_queue)>()
+external void mln_adapter_resource_request_queue_close(int queue);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    ffi.Pointer<mln_wake>,
+    ffi.Pointer<mln_adapter_resource_request_queue>,
+  )
+>()
+external int mln_adapter_resource_request_queue_create(
+  ffi.Pointer<mln_wake> wake,
+  ffi.Pointer<mln_adapter_resource_request_queue> out_queue,
 );
 
 @ffi.Native<
@@ -182,11 +425,17 @@ external int mln_buffer_get(int buffer, ffi.Pointer<mln_buffer_view> out_view);
 @ffi.Native<ffi.Uint32 Function()>()
 external int mln_c_version();
 
+@ffi.Native<mln_camera_delta Function()>()
+external mln_camera_delta mln_camera_delta_default();
+
 @ffi.Native<mln_camera_fit_options Function()>()
 external mln_camera_fit_options mln_camera_fit_options_default();
 
 @ffi.Native<mln_camera_options Function()>()
 external mln_camera_options mln_camera_options_default();
+
+@ffi.Native<mln_camera_update Function()>()
+external mln_camera_update mln_camera_update_default();
 
 @ffi.Native<mln_custom_geometry_source_options Function()>()
 external mln_custom_geometry_source_options
@@ -195,6 +444,20 @@ mln_custom_geometry_source_options_default();
 @ffi.Native<mln_custom_mvt_vector_source_options Function()>()
 external mln_custom_mvt_vector_source_options
 mln_custom_mvt_vector_source_options_default();
+
+@ffi.Native<
+  ffi.Int32 Function(mln_event_batch, ffi.Pointer<mln_runtime_event_batch_view>)
+>()
+external int mln_event_batch_get(
+  int batch,
+  ffi.Pointer<mln_runtime_event_batch_view> out_view,
+);
+
+@ffi.Native<ffi.Void Function(mln_event_batch)>()
+external void mln_event_batch_release(int batch);
+
+@ffi.Native<mln_frame_demand Function()>()
+external mln_frame_demand mln_frame_demand_default();
 
 @ffi.Native<mln_free_camera_options Function()>()
 external mln_free_camera_options mln_free_camera_options_default();
@@ -217,6 +480,9 @@ external void mln_geojson_source_data_destroy(int data);
 
 @ffi.Native<mln_geojson_source_options Function()>()
 external mln_geojson_source_options mln_geojson_source_options_default();
+
+@ffi.Native<mln_gpu_sync Function()>()
+external mln_gpu_sync mln_gpu_sync_default();
 
 @ffi.Native<
   ffi.Int32 Function(
@@ -249,20 +515,34 @@ external int mln_log_clear_callback();
 @ffi.Native<ffi.Int32 Function(ffi.Uint32)>()
 external int mln_log_set_async_severity_mask(int mask);
 
-@ffi.Native<ffi.Int32 Function(mln_log_callback, ffi.Pointer<ffi.Void>)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_log_callback,
+    ffi.Pointer<ffi.Void>,
+    mln_log_callback_release,
+  )
+>()
 external int mln_log_set_callback(
   mln_log_callback callback,
   ffi.Pointer<ffi.Void> user_data,
+  mln_log_callback_release release_user_data,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view, mln_buffer_view)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+  )
 >()
 external int mln_map_add_color_relief_layer(
   int map,
   mln_buffer_view layer_id,
   mln_buffer_view source_id,
   mln_buffer_view before_layer_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -270,12 +550,14 @@ external int mln_map_add_color_relief_layer(
     mln_map,
     mln_buffer_view,
     ffi.Pointer<mln_custom_geometry_source_options>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_custom_geometry_source(
   int map,
   mln_buffer_view source_id,
   ffi.Pointer<mln_custom_geometry_source_options> options,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -283,21 +565,29 @@ external int mln_map_add_custom_geometry_source(
     mln_map,
     mln_buffer_view,
     ffi.Pointer<mln_custom_mvt_vector_source_options>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_custom_mvt_vector_source(
   int map,
   mln_buffer_view source_id,
   ffi.Pointer<mln_custom_mvt_vector_source_options> options,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, mln_geojson_source_data)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_geojson_source_data,
+    ffi.Pointer<mln_completion>,
+  )
 >()
 external int mln_map_add_geojson_source_data(
   int map,
   mln_buffer_view source_id,
   int data,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -306,6 +596,7 @@ external int mln_map_add_geojson_source_data(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_geojson_source_options>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_geojson_source_url(
@@ -313,16 +604,24 @@ external int mln_map_add_geojson_source_url(
   mln_buffer_view source_id,
   mln_buffer_view url,
   ffi.Pointer<mln_geojson_source_options> options,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view, mln_buffer_view)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+  )
 >()
 external int mln_map_add_hillshade_layer(
   int map,
   mln_buffer_view layer_id,
   mln_buffer_view source_id,
   mln_buffer_view before_layer_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -332,6 +631,7 @@ external int mln_map_add_hillshade_layer(
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
     ffi.Pointer<mln_premultiplied_rgba8_image>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_image_source_image(
@@ -340,6 +640,7 @@ external int mln_map_add_image_source_image(
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
   ffi.Pointer<mln_premultiplied_rgba8_image> image,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -349,6 +650,7 @@ external int mln_map_add_image_source_image(
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
     mln_buffer_view,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_image_source_url(
@@ -357,13 +659,22 @@ external int mln_map_add_image_source_url(
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
   mln_buffer_view url,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_add_location_indicator_layer(
   int map,
   mln_buffer_view layer_id,
   mln_buffer_view before_layer_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -373,6 +684,7 @@ external int mln_map_add_location_indicator_layer(
     ffi.Pointer<mln_buffer_view>,
     ffi.Size,
     ffi.Pointer<mln_style_tile_source_options>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_raster_dem_source_tiles(
@@ -381,6 +693,7 @@ external int mln_map_add_raster_dem_source_tiles(
   ffi.Pointer<mln_buffer_view> tiles,
   int tile_count,
   ffi.Pointer<mln_style_tile_source_options> options,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -389,6 +702,7 @@ external int mln_map_add_raster_dem_source_tiles(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_style_tile_source_options>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_raster_dem_source_url(
@@ -396,6 +710,7 @@ external int mln_map_add_raster_dem_source_url(
   mln_buffer_view source_id,
   mln_buffer_view url,
   ffi.Pointer<mln_style_tile_source_options> options,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -405,6 +720,7 @@ external int mln_map_add_raster_dem_source_url(
     ffi.Pointer<mln_buffer_view>,
     ffi.Size,
     ffi.Pointer<mln_style_tile_source_options>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_raster_source_tiles(
@@ -413,6 +729,7 @@ external int mln_map_add_raster_source_tiles(
   ffi.Pointer<mln_buffer_view> tiles,
   int tile_count,
   ffi.Pointer<mln_style_tile_source_options> options,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -421,6 +738,7 @@ external int mln_map_add_raster_source_tiles(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_style_tile_source_options>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_raster_source_url(
@@ -428,20 +746,37 @@ external int mln_map_add_raster_source_url(
   mln_buffer_view source_id,
   mln_buffer_view url,
   ffi.Pointer<mln_style_tile_source_options> options,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_add_style_layer_json(
   int map,
   mln_buffer_view layer_json,
   mln_buffer_view before_layer_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_add_style_source_json(
   int map,
   mln_buffer_view source_id,
   mln_buffer_view source_json,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -451,6 +786,7 @@ external int mln_map_add_style_source_json(
     ffi.Pointer<mln_buffer_view>,
     ffi.Size,
     ffi.Pointer<mln_style_tile_source_options>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_vector_source_tiles(
@@ -459,6 +795,7 @@ external int mln_map_add_vector_source_tiles(
   ffi.Pointer<mln_buffer_view> tiles,
   int tile_count,
   ffi.Pointer<mln_style_tile_source_options> options,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -467,6 +804,7 @@ external int mln_map_add_vector_source_tiles(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_style_tile_source_options>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_vector_source_url(
@@ -474,6 +812,20 @@ external int mln_map_add_vector_source_url(
   mln_buffer_view source_id,
   mln_buffer_view url,
   ffi.Pointer<mln_style_tile_source_options> options,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_camera_delta>,
+    ffi.Pointer<mln_completion>,
+  )
+>()
+external int mln_map_apply_camera_delta(
+  int map,
+  ffi.Pointer<mln_camera_delta> delta,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -481,14 +833,14 @@ external int mln_map_add_vector_source_url(
     mln_map,
     mln_buffer_view,
     ffi.Pointer<mln_camera_fit_options>,
-    ffi.Pointer<mln_camera_options>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_camera_for_geometry(
   int map,
   mln_buffer_view geometry,
   ffi.Pointer<mln_camera_fit_options> fit_options,
-  ffi.Pointer<mln_camera_options> out_camera,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -496,14 +848,14 @@ external int mln_map_camera_for_geometry(
     mln_map,
     mln_lat_lng_bounds,
     ffi.Pointer<mln_camera_fit_options>,
-    ffi.Pointer<mln_camera_options>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_camera_for_lat_lng_bounds(
   int map,
   mln_lat_lng_bounds bounds,
   ffi.Pointer<mln_camera_fit_options> fit_options,
-  ffi.Pointer<mln_camera_options> out_camera,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -512,7 +864,7 @@ external int mln_map_camera_for_lat_lng_bounds(
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
     ffi.Pointer<mln_camera_fit_options>,
-    ffi.Pointer<mln_camera_options>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_camera_for_lat_lngs(
@@ -520,293 +872,145 @@ external int mln_map_camera_for_lat_lngs(
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
   ffi.Pointer<mln_camera_fit_options> fit_options,
-  ffi.Pointer<mln_camera_options> out_camera,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map)>()
-external int mln_map_cancel_transitions(int map);
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_camera_query(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+);
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_buffer_view,
-    ffi.Pointer<ffi.Char>,
-    ffi.Size,
-    ffi.Pointer<ffi.Size>,
+    ffi.Pointer<mln_camera_options>,
+    ffi.Pointer<ffi.Uint64>,
   )
+>()
+external int mln_map_camera_snapshot_get(
+  int map,
+  ffi.Pointer<mln_camera_options> out_camera,
+  ffi.Pointer<ffi.Uint64> out_generation,
+);
+
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_cancel_transitions(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_copy_layer_source_id(
   int map,
   mln_buffer_view layer_id,
-  ffi.Pointer<ffi.Char> out_source_id,
-  int source_id_capacity,
-  ffi.Pointer<ffi.Size> out_source_id_size,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    ffi.Pointer<ffi.Char>,
-    ffi.Size,
-    ffi.Pointer<ffi.Size>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_copy_layer_source_layer(
   int map,
   mln_buffer_view layer_id,
-  ffi.Pointer<ffi.Char> out_source_layer,
-  int source_layer_capacity,
-  ffi.Pointer<ffi.Size> out_source_layer_size,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    ffi.Pointer<ffi.Uint8>,
-    ffi.Size,
-    ffi.Pointer<ffi.Size>,
-  )
->()
-external int mln_map_copy_loaded_style_json(
-  int map,
-  ffi.Pointer<ffi.Uint8> out_json,
-  int json_capacity,
-  ffi.Pointer<ffi.Size> out_json_size,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    ffi.Pointer<ffi.Uint8>,
-    ffi.Size,
-    ffi.Pointer<ffi.Size>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_copy_style_image_premultiplied_rgba8(
   int map,
   mln_buffer_view image_id,
-  ffi.Pointer<ffi.Uint8> out_pixels,
-  int pixel_capacity,
-  ffi.Pointer<ffi.Size> out_byte_length,
-  ffi.Pointer<ffi.Bool> out_found,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    ffi.Pointer<mln_image_stretch>,
-    ffi.Size,
-    ffi.Pointer<ffi.Size>,
-    ffi.Pointer<mln_image_stretch>,
-    ffi.Size,
-    ffi.Pointer<ffi.Size>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_copy_style_image_stretches(
   int map,
   mln_buffer_view image_id,
-  ffi.Pointer<mln_image_stretch> out_stretch_x,
-  int stretch_x_capacity,
-  ffi.Pointer<ffi.Size> out_stretch_x_count,
-  ffi.Pointer<mln_image_stretch> out_stretch_y,
-  int stretch_y_capacity,
-  ffi.Pointer<ffi.Size> out_stretch_y_count,
-  ffi.Pointer<ffi.Bool> out_found,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    ffi.Pointer<ffi.Char>,
-    ffi.Size,
-    ffi.Pointer<ffi.Size>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_copy_style_source_attribution(
   int map,
   mln_buffer_view source_id,
-  ffi.Pointer<ffi.Char> out_attribution,
-  int attribution_capacity,
-  ffi.Pointer<ffi.Size> out_attribution_size,
-  ffi.Pointer<ffi.Bool> out_found,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    ffi.Pointer<ffi.Char>,
-    ffi.Size,
-    ffi.Pointer<ffi.Size>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_copy_style_source_url(
   int map,
   mln_buffer_view source_id,
-  ffi.Pointer<ffi.Char> out_url,
-  int url_capacity,
-  ffi.Pointer<ffi.Size> out_url_size,
-  ffi.Pointer<ffi.Bool> out_found,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    ffi.Pointer<ffi.Char>,
-    ffi.Size,
-    ffi.Pointer<ffi.Size>,
-  )
->()
-external int mln_map_copy_style_url(
-  int map,
-  ffi.Pointer<ffi.Char> out_url,
-  int url_capacity,
-  ffi.Pointer<ffi.Size> out_url_size,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     ffi.Pointer<mln_map_options>,
-    ffi.Pointer<mln_map>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_create(
   int runtime,
   ffi.Pointer<mln_map_options> options,
-  ffi.Pointer<mln_map> out_map,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_map)>()
-external int mln_map_destroy(int map);
+external int mln_map_dispose(int map);
 
-@ffi.Native<ffi.Int32 Function(mln_map)>()
-external int mln_map_dump_debug_logs(int map);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    ffi.Pointer<mln_camera_options>,
-    ffi.Pointer<mln_animation_options>,
-  )
->()
-external int mln_map_ease_to(
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_dump_debug_logs(
   int map,
-  ffi.Pointer<mln_camera_options> camera,
-  ffi.Pointer<mln_animation_options> animation,
+  ffi.Pointer<mln_completion> completion,
 );
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    ffi.Pointer<mln_camera_options>,
-    ffi.Pointer<mln_animation_options>,
-  )
->()
-external int mln_map_fly_to(
-  int map,
-  ffi.Pointer<mln_camera_options> camera,
-  ffi.Pointer<mln_animation_options> animation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_bound_options>)>()
-external int mln_map_get_bounds(
-  int map,
-  ffi.Pointer<mln_bound_options> out_options,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_camera_options>)>()
-external int mln_map_get_camera(
-  int map,
-  ffi.Pointer<mln_camera_options> out_camera,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Uint32>)>()
-external int mln_map_get_debug_options(
-  int map,
-  ffi.Pointer<ffi.Uint32> out_options,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Uint64>)>()
-external int mln_map_get_event_mask(int map, ffi.Pointer<ffi.Uint64> out_mask);
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_feature_state_selector>,
-    ffi.Pointer<mln_buffer>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_get_feature_state(
   int map,
   ffi.Pointer<mln_feature_state_selector> selector,
-  ffi.Pointer<mln_buffer> out_state,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_free_camera_options>)>()
-external int mln_map_get_free_camera_options(
-  int map,
-  ffi.Pointer<mln_free_camera_options> out_options,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_buffer>)>()
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
 external int mln_map_get_global_state(
   int map,
-  ffi.Pointer<mln_buffer> out_state,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    ffi.Pointer<mln_lat_lng>,
-    ffi.Size,
-    ffi.Pointer<ffi.Size>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_get_image_source_coordinates(
   int map,
   mln_buffer_view source_id,
-  ffi.Pointer<mln_lat_lng> out_coordinates,
-  int coordinate_capacity,
-  ffi.Pointer<ffi.Size> out_coordinate_count,
-  ffi.Pointer<ffi.Bool> out_found,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_buffer>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_get_layer_filter(
   int map,
   mln_buffer_view layer_id,
-  ffi.Pointer<mln_buffer> out_filter,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Double>)
->()
-external int mln_map_get_layer_max_zoom(
-  int map,
-  mln_buffer_view layer_id,
-  ffi.Pointer<ffi.Double> out_max_zoom,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Double>)
->()
-external int mln_map_get_layer_min_zoom(
-  int map,
-  mln_buffer_view layer_id,
-  ffi.Pointer<ffi.Double> out_min_zoom,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -814,252 +1018,163 @@ external int mln_map_get_layer_min_zoom(
     mln_map,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<mln_buffer>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_get_layer_property(
   int map,
   mln_buffer_view layer_id,
   mln_buffer_view property_name,
-  ffi.Pointer<mln_buffer> out_value,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Uint32>)
->()
-external int mln_map_get_layer_visibility(
-  int map,
-  mln_buffer_view layer_id,
-  ffi.Pointer<ffi.Uint32> out_visibility,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_projection_mode>)>()
-external int mln_map_get_projection_mode(
-  int map,
-  ffi.Pointer<mln_projection_mode> out_mode,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Bool>)>()
-external int mln_map_get_rendering_stats_view_enabled(
-  int map,
-  ffi.Pointer<ffi.Bool> out_enabled,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    ffi.Pointer<ffi.Uint32>,
-    ffi.Pointer<ffi.Uint32>,
-    ffi.Pointer<ffi.Double>,
-  )
->()
-external int mln_map_get_size(
-  int map,
-  ffi.Pointer<ffi.Uint32> out_width,
-  ffi.Pointer<ffi.Uint32> out_height,
-  ffi.Pointer<ffi.Double> out_scale_factor,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    ffi.Pointer<mln_style_image_info>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_get_style_image_info(
   int map,
   mln_buffer_view image_id,
-  ffi.Pointer<mln_style_image_info> out_info,
-  ffi.Pointer<ffi.Bool> out_found,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    ffi.Pointer<mln_buffer>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+>()
+external int mln_map_get_style_layer_info(
+  int map,
+  mln_buffer_view layer_id,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_get_style_layer_json(
   int map,
   mln_buffer_view layer_id,
-  ffi.Pointer<mln_buffer> out_layer,
-  ffi.Pointer<ffi.Bool> out_found,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    ffi.Pointer<mln_buffer_view>,
-    ffi.Pointer<ffi.Bool>,
-  )
->()
-external int mln_map_get_style_layer_type(
-  int map,
-  mln_buffer_view layer_id,
-  ffi.Pointer<mln_buffer_view> out_layer_type,
-  ffi.Pointer<ffi.Bool> out_found,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_buffer>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_get_style_light_property(
   int map,
   mln_buffer_view property_name,
-  ffi.Pointer<mln_buffer> out_value,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    ffi.Pointer<mln_style_source_info>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_get_style_source_info(
   int map,
   mln_buffer_view source_id,
-  ffi.Pointer<mln_style_source_info> out_info,
-  ffi.Pointer<ffi.Bool> out_found,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    ffi.Pointer<mln_style_string_list>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_get_style_source_tile_urls(
   int map,
   mln_buffer_view source_id,
-  ffi.Pointer<mln_style_string_list> out_tile_urls,
-  ffi.Pointer<ffi.Bool> out_found,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_get_style_transition_options(
+  int map,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     mln_buffer_view,
-    ffi.Pointer<ffi.Uint32>,
-    ffi.Pointer<ffi.Bool>,
+    mln_lat_lng_bounds,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_map_get_style_source_type(
-  int map,
-  mln_buffer_view source_id,
-  ffi.Pointer<ffi.Uint32> out_source_type,
-  ffi.Pointer<ffi.Bool> out_found,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, ffi.Pointer<mln_style_transition_options>)
->()
-external int mln_map_get_style_transition_options(
-  int map,
-  ffi.Pointer<mln_style_transition_options> out_options,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_map_tile_options>)>()
-external int mln_map_get_tile_options(
-  int map,
-  ffi.Pointer<mln_map_tile_options> out_options,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, ffi.Pointer<mln_map_viewport_options>)
->()
-external int mln_map_get_viewport_options(
-  int map,
-  ffi.Pointer<mln_map_viewport_options> out_options,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_lat_lng_bounds)>()
 external int mln_map_invalidate_custom_geometry_source_region(
   int map,
   mln_buffer_view source_id,
   mln_lat_lng_bounds bounds,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, mln_canonical_tile_id)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_canonical_tile_id,
+    ffi.Pointer<mln_completion>,
+  )
 >()
 external int mln_map_invalidate_custom_geometry_source_tile(
   int map,
   mln_buffer_view source_id,
   mln_canonical_tile_id tile_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, mln_canonical_tile_id)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_canonical_tile_id,
+    ffi.Pointer<mln_completion>,
+  )
 >()
 external int mln_map_invalidate_custom_mvt_vector_source_tile(
   int map,
   mln_buffer_view source_id,
   mln_canonical_tile_id tile_id,
+  ffi.Pointer<mln_completion> completion,
 );
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Bool>)>()
-external int mln_map_is_fully_loaded(int map, ffi.Pointer<ffi.Bool> out_loaded);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Bool>)>()
-external int mln_map_is_gesture_in_progress(
-  int map,
-  ffi.Pointer<ffi.Bool> out_in_progress,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_camera_options>)>()
-external int mln_map_jump_to(int map, ffi.Pointer<mln_camera_options> camera);
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_camera_options>,
-    ffi.Pointer<mln_lat_lng_bounds>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_lat_lng_bounds_for_camera(
   int map,
   ffi.Pointer<mln_camera_options> camera,
-  ffi.Pointer<mln_lat_lng_bounds> out_bounds,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_camera_options>,
-    ffi.Pointer<mln_lat_lng_bounds>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_lat_lng_bounds_for_camera_unwrapped(
   int map,
   ffi.Pointer<mln_camera_options> camera,
-  ffi.Pointer<mln_lat_lng_bounds> out_bounds,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_screen_point, ffi.Pointer<mln_lat_lng>)
+  ffi.Int32 Function(mln_map, mln_screen_point, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_lat_lng_for_pixel(
   int map,
   mln_screen_point point,
-  ffi.Pointer<mln_lat_lng> out_coordinate,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_screen_point, ffi.Pointer<mln_lat_lng>)
+  ffi.Int32 Function(mln_map, mln_screen_point, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_lat_lng_for_pixel_unwrapped(
   int map,
   mln_screen_point point,
-  ffi.Pointer<mln_lat_lng> out_coordinate,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1067,14 +1182,14 @@ external int mln_map_lat_lng_for_pixel_unwrapped(
     mln_map,
     ffi.Pointer<mln_screen_point>,
     ffi.Size,
-    ffi.Pointer<mln_lat_lng>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_lat_lngs_for_pixels(
   int map,
   ffi.Pointer<mln_screen_point> points,
   int point_count,
-  ffi.Pointer<mln_lat_lng> out_coordinates,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1082,88 +1197,74 @@ external int mln_map_lat_lngs_for_pixels(
     mln_map,
     ffi.Pointer<mln_screen_point>,
     ffi.Size,
-    ffi.Pointer<mln_lat_lng>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_lat_lngs_for_pixels_unwrapped(
   int map,
   ffi.Pointer<mln_screen_point> points,
   int point_count,
-  ffi.Pointer<mln_lat_lng> out_coordinates,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_style_id_list>)>()
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
 external int mln_map_list_style_layer_ids(
   int map,
-  ffi.Pointer<mln_style_id_list> out_layer_ids,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_style_layer_list>)>()
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
 external int mln_map_list_style_layers(
   int map,
-  ffi.Pointer<mln_style_layer_list> out_layers,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_style_id_list>)>()
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
 external int mln_map_list_style_source_ids(
   int map,
-  ffi.Pointer<mln_style_id_list> out_source_ids,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Double, ffi.Pointer<ffi.Double>)>()
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_loaded_style_json(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_map, ffi.Double, ffi.Pointer<mln_completion>)
+>()
 external int mln_map_meters_per_pixel_at_latitude(
   int map,
   double latitude,
-  ffi.Pointer<ffi.Double> out_meters_per_pixel,
+  ffi.Pointer<mln_completion> completion,
 );
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Double, ffi.Double)>()
-external int mln_map_move_by(int map, double delta_x, double delta_y);
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    ffi.Double,
-    ffi.Double,
-    ffi.Pointer<mln_animation_options>,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_map_move_by_animated(
-  int map,
-  double delta_x,
-  double delta_y,
-  ffi.Pointer<mln_animation_options> animation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
 external int mln_map_move_style_layer(
   int map,
   mln_buffer_view layer_id,
   mln_buffer_view before_layer_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_map_options Function()>()
 external mln_map_options mln_map_options_default();
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Double)>()
-external int mln_map_pitch_by(int map, double pitch);
-
 @ffi.Native<
-  ffi.Int32 Function(mln_map, ffi.Double, ffi.Pointer<mln_animation_options>)
->()
-external int mln_map_pitch_by_animated(
-  int map,
-  double pitch,
-  ffi.Pointer<mln_animation_options> animation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_lat_lng, ffi.Pointer<mln_screen_point>)
+  ffi.Int32 Function(mln_map, mln_lat_lng, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_pixel_for_lat_lng(
   int map,
   mln_lat_lng coordinate,
-  ffi.Pointer<mln_screen_point> out_point,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1171,24 +1272,24 @@ external int mln_map_pixel_for_lat_lng(
     mln_map,
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
-    ffi.Pointer<mln_screen_point>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_pixels_for_lat_lngs(
   int map,
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
-  ffi.Pointer<mln_screen_point> out_points,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_map_projection>)>()
-external int mln_map_projection_create(
-  int map,
-  ffi.Pointer<mln_map_projection> out_projection,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_map_projection)>()
-external int mln_map_projection_destroy(int projection);
+external int mln_map_projection_close(int projection);
+
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_projection_create(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+);
 
 @ffi.Native<
   ffi.Int32 Function(mln_map_projection, ffi.Pointer<mln_camera_options>)
@@ -1278,97 +1379,81 @@ external int mln_map_projection_set_visible_geometry(
   mln_edge_insets padding,
 );
 
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_release(int map, ffi.Pointer<mln_completion> completion);
+
 @ffi.Native<
-  ffi.Int32 Function(mln_map, ffi.Pointer<mln_feature_state_selector>)
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_feature_state_selector>,
+    ffi.Pointer<mln_completion>,
+  )
 >()
 external int mln_map_remove_feature_state(
   int map,
   ffi.Pointer<mln_feature_state_selector> selector,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Bool>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_remove_style_image(
   int map,
   mln_buffer_view image_id,
-  ffi.Pointer<ffi.Bool> out_removed,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Bool>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_remove_style_layer(
   int map,
   mln_buffer_view layer_id,
-  ffi.Pointer<ffi.Bool> out_removed,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Bool>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_remove_style_source(
   int map,
   mln_buffer_view source_id,
-  ffi.Pointer<ffi.Bool> out_removed,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map)>()
-external int mln_map_request_repaint(int map);
-
-@ffi.Native<ffi.Int32 Function(mln_map)>()
-external int mln_map_request_still_image(int map);
-
-@ffi.Native<ffi.Int32 Function(mln_map, mln_screen_point, mln_screen_point)>()
-external int mln_map_rotate_by(
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_request_repaint(
   int map,
-  mln_screen_point first,
-  mln_screen_point second,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_request_still_image(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_map, mln_logical_extent, ffi.Pointer<mln_completion>)
+>()
+external int mln_map_resize(
+  int map,
+  mln_logical_extent extent,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_screen_point,
-    mln_screen_point,
-    ffi.Pointer<mln_animation_options>,
+    ffi.Pointer<mln_bound_options>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_map_rotate_by_animated(
-  int map,
-  mln_screen_point first,
-  mln_screen_point second,
-  ffi.Pointer<mln_animation_options> animation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, ffi.Double, ffi.Pointer<mln_screen_point>)
->()
-external int mln_map_scale_by(
-  int map,
-  double scale,
-  ffi.Pointer<mln_screen_point> anchor,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    ffi.Double,
-    ffi.Pointer<mln_screen_point>,
-    ffi.Pointer<mln_animation_options>,
-  )
->()
-external int mln_map_scale_by_animated(
-  int map,
-  double scale,
-  ffi.Pointer<mln_screen_point> anchor,
-  ffi.Pointer<mln_animation_options> animation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_bound_options>)>()
 external int mln_map_set_bounds(
   int map,
   ffi.Pointer<mln_bound_options> options,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1377,6 +1462,7 @@ external int mln_map_set_bounds(
     mln_buffer_view,
     mln_canonical_tile_id,
     mln_buffer_view,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_custom_geometry_source_tile_data(
@@ -1384,6 +1470,7 @@ external int mln_map_set_custom_geometry_source_tile_data(
   mln_buffer_view source_id,
   mln_canonical_tile_id tile_id,
   mln_buffer_view data,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1392,6 +1479,7 @@ external int mln_map_set_custom_geometry_source_tile_data(
     mln_buffer_view,
     mln_canonical_tile_id,
     mln_buffer_view,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_custom_mvt_vector_source_tile_data(
@@ -1399,6 +1487,7 @@ external int mln_map_set_custom_mvt_vector_source_tile_data(
   mln_buffer_view source_id,
   mln_canonical_tile_id tile_id,
   mln_buffer_view data,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1407,6 +1496,7 @@ external int mln_map_set_custom_mvt_vector_source_tile_data(
     mln_buffer_view,
     mln_canonical_tile_id,
     mln_buffer_view,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_custom_mvt_vector_source_tile_error(
@@ -1414,64 +1504,113 @@ external int mln_map_set_custom_mvt_vector_source_tile_error(
   mln_buffer_view source_id,
   mln_canonical_tile_id tile_id,
   mln_buffer_view message,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Uint32)>()
-external int mln_map_set_debug_options(int map, int options);
+@ffi.Native<
+  ffi.Int32 Function(mln_map, ffi.Uint32, ffi.Pointer<mln_completion>)
+>()
+external int mln_map_set_debug_options(
+  int map,
+  int options,
+  ffi.Pointer<mln_completion> completion,
+);
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Uint64)>()
-external int mln_map_set_event_mask(int map, int mask);
+@ffi.Native<
+  ffi.Int32 Function(mln_map, ffi.Uint64, ffi.Pointer<mln_completion>)
+>()
+external int mln_map_set_event_mask(
+  int map,
+  int mask,
+  ffi.Pointer<mln_completion> completion,
+);
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_feature_state_selector>,
     mln_buffer_view,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_feature_state(
   int map,
   ffi.Pointer<mln_feature_state_selector> selector,
   mln_buffer_view state,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_free_camera_options>)>()
-external int mln_map_set_free_camera_options(
-  int map,
-  ffi.Pointer<mln_free_camera_options> options,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, mln_geojson_source_data)
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_free_camera_options>,
+    ffi.Pointer<mln_completion>,
+  )
+>()
+external int mln_map_set_free_camera_options(
+  int map,
+  ffi.Pointer<mln_free_camera_options> options,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_geojson_source_data,
+    ffi.Pointer<mln_completion>,
+  )
 >()
 external int mln_map_set_geojson_source_data(
   int map,
   mln_buffer_view source_id,
   int data,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Bool)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Bool,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_set_geojson_source_synchronous_tiling(
   int map,
   mln_buffer_view source_id,
   bool enabled,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_set_geojson_source_url(
   int map,
   mln_buffer_view source_id,
   mln_buffer_view url,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Bool)>()
-external int mln_map_set_gesture_in_progress(int map, bool in_progress);
-
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_set_global_state_property(
   int map,
   mln_buffer_view property_name,
   mln_buffer_view value,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1480,6 +1619,7 @@ external int mln_map_set_global_state_property(
     mln_buffer_view,
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_image_source_coordinates(
@@ -1487,6 +1627,7 @@ external int mln_map_set_image_source_coordinates(
   mln_buffer_view source_id,
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1494,117 +1635,223 @@ external int mln_map_set_image_source_coordinates(
     mln_map,
     mln_buffer_view,
     ffi.Pointer<mln_premultiplied_rgba8_image>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_image_source_image(
   int map,
   mln_buffer_view source_id,
   ffi.Pointer<mln_premultiplied_rgba8_image> image,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_set_image_source_url(
   int map,
   mln_buffer_view source_id,
   mln_buffer_view url,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_buffer_view>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_buffer_view>,
+    ffi.Pointer<mln_completion>,
+  )
 >()
 external int mln_map_set_layer_filter(
   int map,
   mln_buffer_view layer_id,
   ffi.Pointer<mln_buffer_view> filter,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Double)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Double,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_set_layer_max_zoom(
   int map,
   mln_buffer_view layer_id,
   double max_zoom,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Double)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Double,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_set_layer_min_zoom(
   int map,
   mln_buffer_view layer_id,
   double min_zoom,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view, mln_buffer_view)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+  )
 >()
 external int mln_map_set_layer_property(
   int map,
   mln_buffer_view layer_id,
   mln_buffer_view property_name,
   mln_buffer_view value,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_set_layer_source_id(
   int map,
   mln_buffer_view layer_id,
   mln_buffer_view source_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_set_layer_source_layer(
   int map,
   mln_buffer_view layer_id,
   mln_buffer_view source_layer,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Uint32)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Uint32,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_set_layer_visibility(
   int map,
   mln_buffer_view layer_id,
   int visibility,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Double)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Double,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_set_location_indicator_accuracy_radius(
   int map,
   mln_buffer_view layer_id,
   double radius,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Double)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Double,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_set_location_indicator_bearing(
   int map,
   mln_buffer_view layer_id,
   double bearing,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Uint32, mln_buffer_view)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Uint32,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+  )
 >()
 external int mln_map_set_location_indicator_image_name(
   int map,
   mln_buffer_view layer_id,
   int image_kind,
   mln_buffer_view image_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, mln_lat_lng, ffi.Double)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_lat_lng,
+    ffi.Double,
+    ffi.Pointer<mln_completion>,
+  )
 >()
 external int mln_map_set_location_indicator_location(
   int map,
   mln_buffer_view layer_id,
   mln_lat_lng coordinate,
   double altitude,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_projection_mode>)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_projection_mode>,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_set_projection_mode(
   int map,
   ffi.Pointer<mln_projection_mode> mode,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Bool)>()
-external int mln_map_set_rendering_stats_view_enabled(int map, bool enabled);
+@ffi.Native<
+  ffi.Int32 Function(mln_map, ffi.Bool, ffi.Pointer<mln_completion>)
+>()
+external int mln_map_set_rendering_stats_view_enabled(
+  int map,
+  bool enabled,
+  ffi.Pointer<mln_completion> completion,
+);
 
 @ffi.Native<
   ffi.Int32 Function(
@@ -1612,6 +1859,7 @@ external int mln_map_set_rendering_stats_view_enabled(int map, bool enabled);
     mln_buffer_view,
     ffi.Pointer<mln_premultiplied_rgba8_image>,
     ffi.Pointer<mln_style_image_options>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_style_image(
@@ -1619,82 +1867,133 @@ external int mln_map_set_style_image(
   mln_buffer_view image_id,
   ffi.Pointer<mln_premultiplied_rgba8_image> image,
   ffi.Pointer<mln_style_image_options> options,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view)>()
-external int mln_map_set_style_json(int map, mln_buffer_view json);
+@ffi.Native<
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+>()
+external int mln_map_set_style_json(
+  int map,
+  mln_buffer_view json,
+  ffi.Pointer<mln_completion> completion,
+);
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view)>()
-external int mln_map_set_style_light_json(int map, mln_buffer_view light_json);
+@ffi.Native<
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+>()
+external int mln_map_set_style_light_json(
+  int map,
+  mln_buffer_view light_json,
+  ffi.Pointer<mln_completion> completion,
+);
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_set_style_light_property(
   int map,
   mln_buffer_view property_name,
   mln_buffer_view value,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Bool)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Bool,
+    ffi.Pointer<mln_completion>,
+  )
+>()
 external int mln_map_set_style_source_volatile(
   int map,
   mln_buffer_view source_id,
   bool is_volatile,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, ffi.Pointer<mln_style_transition_options>)
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_style_transition_options>,
+    ffi.Pointer<mln_completion>,
+  )
 >()
 external int mln_map_set_style_transition_options(
   int map,
   ffi.Pointer<mln_style_transition_options> options,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Char>)>()
-external int mln_map_set_style_url(int map, ffi.Pointer<ffi.Char> url);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_map_tile_options>)>()
-external int mln_map_set_tile_options(
-  int map,
-  ffi.Pointer<mln_map_tile_options> options,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, ffi.Pointer<mln_map_viewport_options>)
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<mln_completion>,
+  )
+>()
+external int mln_map_set_style_url(
+  int map,
+  ffi.Pointer<ffi.Char> url,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_map_tile_options>,
+    ffi.Pointer<mln_completion>,
+  )
+>()
+external int mln_map_set_tile_options(
+  int map,
+  ffi.Pointer<mln_map_tile_options> options,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_map_viewport_options>,
+    ffi.Pointer<mln_completion>,
+  )
 >()
 external int mln_map_set_viewport_options(
   int map,
   ffi.Pointer<mln_map_viewport_options> options,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Bool>)
->()
-external int mln_map_style_image_exists(
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_map_snapshot>)>()
+external int mln_map_snapshot_get(
   int map,
-  mln_buffer_view image_id,
-  ffi.Pointer<ffi.Bool> out_exists,
+  ffi.Pointer<mln_map_snapshot> out_snapshot,
 );
 
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Bool>)
->()
-external int mln_map_style_layer_exists(
-  int map,
-  mln_buffer_view layer_id,
-  ffi.Pointer<ffi.Bool> out_exists,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Bool>)
->()
-external int mln_map_style_source_exists(
-  int map,
-  mln_buffer_view source_id,
-  ffi.Pointer<ffi.Bool> out_exists,
-);
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_style_url(int map, ffi.Pointer<mln_completion> completion);
 
 @ffi.Native<mln_map_tile_options Function()>()
 external mln_map_tile_options mln_map_tile_options_default();
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_camera_update>,
+    ffi.Pointer<mln_completion>,
+  )
+>()
+external int mln_map_update_camera(
+  int map,
+  ffi.Pointer<mln_camera_update> update,
+  ffi.Pointer<mln_completion> completion,
+);
 
 @ffi.Native<mln_map_viewport_options Function()>()
 external mln_map_viewport_options mln_map_viewport_options_default();
@@ -1703,13 +2002,17 @@ external mln_map_viewport_options mln_map_viewport_options_default();
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_metal_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_metal_borrowed_texture_attach(
   int map,
   ffi.Pointer<mln_metal_borrowed_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_metal_borrowed_texture_descriptor Function()>()
@@ -1720,35 +2023,30 @@ mln_metal_borrowed_texture_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_metal_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_metal_borrowed_texture_set_target(
   int session,
   ffi.Pointer<mln_metal_borrowed_texture_descriptor> descriptor,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_metal_owned_texture_frame>,
-  )
->()
-external int mln_metal_owned_texture_acquire_frame(
-  int session,
-  ffi.Pointer<mln_metal_owned_texture_frame> out_frame,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_metal_owned_texture_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_metal_owned_texture_attach(
   int map,
   ffi.Pointer<mln_metal_owned_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_metal_owned_texture_descriptor Function()>()
@@ -1757,26 +2055,19 @@ mln_metal_owned_texture_descriptor_default();
 
 @ffi.Native<
   ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_metal_owned_texture_frame>,
-  )
->()
-external int mln_metal_owned_texture_release_frame(
-  int session,
-  ffi.Pointer<mln_metal_owned_texture_frame> frame,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_metal_surface_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_metal_surface_attach(
   int map,
   ffi.Pointer<mln_metal_surface_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_metal_surface_descriptor Function()>()
@@ -1786,11 +2077,13 @@ external mln_metal_surface_descriptor mln_metal_surface_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_metal_surface_descriptor>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_metal_surface_set_target(
   int session,
   ffi.Pointer<mln_metal_surface_descriptor> descriptor,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<ffi.Int32 Function(ffi.Pointer<ffi.Uint32>)>()
@@ -1800,54 +2093,20 @@ external int mln_network_status_get(ffi.Pointer<ffi.Uint32> out_status);
 external int mln_network_status_set(int status);
 
 @ffi.Native<
-  ffi.Int32 Function(mln_offline_region_list, ffi.Pointer<ffi.Size>)
->()
-external int mln_offline_region_list_count(
-  int list,
-  ffi.Pointer<ffi.Size> out_count,
-);
-
-@ffi.Native<ffi.Void Function(mln_offline_region_list)>()
-external void mln_offline_region_list_destroy(int list);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_offline_region_list,
-    ffi.Size,
-    ffi.Pointer<mln_offline_region_info>,
-  )
->()
-external int mln_offline_region_list_get(
-  int list,
-  int index,
-  ffi.Pointer<mln_offline_region_info> out_info,
-);
-
-@ffi.Native<ffi.Void Function(mln_offline_region_snapshot)>()
-external void mln_offline_region_snapshot_destroy(int snapshot);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_offline_region_snapshot,
-    ffi.Pointer<mln_offline_region_info>,
-  )
->()
-external int mln_offline_region_snapshot_get(
-  int snapshot,
-  ffi.Pointer<mln_offline_region_info> out_info,
-);
-
-@ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_opengl_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_opengl_borrowed_texture_attach(
   int map,
   ffi.Pointer<mln_opengl_borrowed_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_opengl_borrowed_texture_descriptor Function()>()
@@ -1858,51 +2117,35 @@ mln_opengl_borrowed_texture_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_opengl_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_opengl_borrowed_texture_set_target(
   int session,
   ffi.Pointer<mln_opengl_borrowed_texture_descriptor> descriptor,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_opengl_owned_texture_frame>,
-  )
->()
-external int mln_opengl_owned_texture_acquire_frame(
-  int session,
-  ffi.Pointer<mln_opengl_owned_texture_frame> out_frame,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_opengl_owned_texture_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_opengl_owned_texture_attach(
   int map,
   ffi.Pointer<mln_opengl_owned_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_opengl_owned_texture_descriptor Function()>()
 external mln_opengl_owned_texture_descriptor
 mln_opengl_owned_texture_descriptor_default();
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_opengl_owned_texture_frame>,
-  )
->()
-external int mln_opengl_owned_texture_release_frame(
-  int session,
-  ffi.Pointer<mln_opengl_owned_texture_frame> frame,
-);
 
 @ffi.Native<ffi.Uint32 Function()>()
 external int mln_opengl_supported_context_provider_mask();
@@ -1911,13 +2154,17 @@ external int mln_opengl_supported_context_provider_mask();
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_opengl_surface_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_opengl_surface_attach(
   int map,
   ffi.Pointer<mln_opengl_surface_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_opengl_surface_descriptor Function()>()
@@ -1927,11 +2174,13 @@ external mln_opengl_surface_descriptor mln_opengl_surface_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_opengl_surface_descriptor>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_opengl_surface_set_target(
   int session,
   ffi.Pointer<mln_opengl_surface_descriptor> descriptor,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_plugin_register_function_v1 Function()>()
@@ -1951,44 +2200,115 @@ external int mln_projected_meters_for_lat_lng(
 @ffi.Native<mln_projection_mode Function()>()
 external mln_projection_mode mln_projection_mode_default();
 
-@ffi.Native<mln_queried_feature Function()>()
-external mln_queried_feature mln_queried_feature_default();
-
-@ffi.Native<
-  ffi.Int32 Function(mln_queried_feature_list, ffi.Pointer<ffi.Size>)
->()
-external int mln_queried_feature_list_count(
-  int list,
+@ffi.Native<ffi.Int32 Function(mln_render_frame_batch, ffi.Pointer<ffi.Size>)>()
+external int mln_render_frame_batch_count(
+  int batch,
   ffi.Pointer<ffi.Size> out_count,
 );
 
-@ffi.Native<ffi.Void Function(mln_queried_feature_list)>()
-external void mln_queried_feature_list_destroy(int list);
-
 @ffi.Native<
   ffi.Int32 Function(
-    mln_queried_feature_list,
+    mln_render_frame_batch,
     ffi.Size,
-    ffi.Pointer<mln_queried_feature>,
+    ffi.Pointer<mln_render_frame_result>,
   )
 >()
-external int mln_queried_feature_list_get(
-  int list,
+external int mln_render_frame_batch_get(
+  int batch,
   int index,
-  ffi.Pointer<mln_queried_feature> out_feature,
+  ffi.Pointer<mln_render_frame_result> out_result,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_render_session)>()
-external int mln_render_session_clear_data(int session);
+@ffi.Native<ffi.Void Function(mln_render_frame_batch)>()
+external void mln_render_frame_batch_release(int batch);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_render_abandon_result>)
+>()
+external int mln_render_session_abandon(
+  int session,
+  ffi.Pointer<mln_render_abandon_result> out_result,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_acquired_frame>)
+>()
+external int mln_render_session_acquire_frame(
+  int session,
+  ffi.Pointer<mln_acquired_frame> out_frame,
+);
+
+@ffi.Native<mln_render_session_attach_options Function()>()
+external mln_render_session_attach_options
+mln_render_session_attach_options_default();
+
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
+>()
+external int mln_render_session_barrier(
+  int session,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
+>()
+external int mln_render_session_clear_data(
+  int session,
+  ffi.Pointer<mln_completion> completion,
+);
 
 @ffi.Native<ffi.Int32 Function(mln_render_session)>()
 external int mln_render_session_destroy(int session);
 
-@ffi.Native<ffi.Int32 Function(mln_render_session)>()
-external int mln_render_session_detach(int session);
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
+>()
+external int mln_render_session_detach(
+  int session,
+  ffi.Pointer<mln_completion> completion,
+);
 
 @ffi.Native<ffi.Int32 Function(mln_render_session)>()
-external int mln_render_session_dump_debug_logs(int session);
+external int mln_render_session_dispose(int session);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_render_frame_batch>)
+>()
+external int mln_render_session_drain_frame_results(
+  int session,
+  ffi.Pointer<mln_render_frame_batch> out_batch,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
+>()
+external int mln_render_session_dump_debug_logs(
+  int session,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_render_session_capabilities>,
+  )
+>()
+external int mln_render_session_get_capabilities(
+  int session,
+  ffi.Pointer<mln_render_session_capabilities> out_capabilities,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_render_session_snapshot>,
+  )
+>()
+external int mln_render_session_get_snapshot(
+  int session,
+  ffi.Pointer<mln_render_session_snapshot> out_snapshot,
+);
 
 @ffi.Native<
   ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_map_projection>)
@@ -2006,7 +2326,7 @@ external int mln_render_session_projection_create(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_buffer_view>,
-    ffi.Pointer<mln_buffer>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_render_session_query_feature_extensions(
@@ -2016,7 +2336,7 @@ external int mln_render_session_query_feature_extensions(
   mln_buffer_view extension,
   mln_buffer_view extension_field,
   ffi.Pointer<mln_buffer_view> arguments,
-  ffi.Pointer<mln_buffer> out_result,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2024,14 +2344,14 @@ external int mln_render_session_query_feature_extensions(
     mln_render_session,
     ffi.Pointer<mln_rendered_query_geometry>,
     ffi.Pointer<mln_rendered_feature_query_options>,
-    ffi.Pointer<mln_queried_feature_list>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_render_session_query_rendered_features(
   int session,
   ffi.Pointer<mln_rendered_query_geometry> geometry,
   ffi.Pointer<mln_rendered_feature_query_options> options,
-  ffi.Pointer<mln_queried_feature_list> out_result,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2039,40 +2359,52 @@ external int mln_render_session_query_rendered_features(
     mln_render_session,
     mln_buffer_view,
     ffi.Pointer<mln_source_feature_query_options>,
-    ffi.Pointer<mln_queried_feature_list>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_render_session_query_source_features(
   int session,
   mln_buffer_view source_id,
   ffi.Pointer<mln_source_feature_query_options> options,
-  ffi.Pointer<mln_queried_feature_list> out_result,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_render_session)>()
-external int mln_render_session_reduce_memory_use(int session);
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
+>()
+external int mln_render_session_reduce_memory_use(
+  int session,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_frame_demand>)
+>()
+external int mln_render_session_request_frame(
+  int session,
+  ffi.Pointer<mln_frame_demand> demand,
+);
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_render_session,
-    ffi.Pointer<ffi.Uint32>,
-    ffi.Pointer<ffi.Bool>,
+    ffi.Pointer<mln_render_target_extent>,
+    ffi.Pointer<mln_completion>,
   )
->()
-external int mln_render_session_render_update(
-  int session,
-  ffi.Pointer<ffi.Uint32> out_result,
-  ffi.Pointer<ffi.Bool> out_needs_repaint,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Uint32, ffi.Uint32, ffi.Double)
 >()
 external int mln_render_session_resize(
   int session,
-  int width,
-  int height,
-  double scale_factor,
+  ffi.Pointer<mln_render_target_extent> extent,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Size, ffi.Pointer<ffi.Size>)
+>()
+external int mln_render_session_service_driver_work(
+  int session,
+  int max_work,
+  ffi.Pointer<ffi.Size> out_serviced,
 );
 
 @ffi.Native<
@@ -2163,14 +2495,29 @@ external int mln_resource_transform_response_set_url(
   int url_size,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_runtime)>()
-external int mln_runtime_clear_http_header_transform(int runtime);
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
+external int mln_runtime_barrier(
+  int runtime,
+  ffi.Pointer<mln_completion> completion,
+);
 
-@ffi.Native<ffi.Int32 Function(mln_runtime)>()
-external int mln_runtime_clear_resource_provider(int runtime);
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
+external int mln_runtime_clear_http_header_transform(
+  int runtime,
+  ffi.Pointer<mln_completion> completion,
+);
 
-@ffi.Native<ffi.Int32 Function(mln_runtime)>()
-external int mln_runtime_clear_resource_transform(int runtime);
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
+external int mln_runtime_clear_resource_provider(
+  int runtime,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
+external int mln_runtime_clear_resource_transform(
+  int runtime,
+  ffi.Pointer<mln_completion> completion,
+);
 
 @ffi.Native<
   ffi.Int32 Function(ffi.Pointer<mln_runtime_options>, ffi.Pointer<mln_runtime>)
@@ -2181,34 +2528,18 @@ external int mln_runtime_create(
 );
 
 @ffi.Native<ffi.Int32 Function(mln_runtime)>()
-external int mln_runtime_destroy(int runtime);
+external int mln_runtime_dispose(int runtime);
 
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    ffi.Size,
-    ffi.Pointer<mln_runtime_event_batch>,
-  )
->()
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_event_batch>)>()
 external int mln_runtime_drain_events(
   int runtime,
-  int max_events,
-  ffi.Pointer<mln_runtime_event_batch> out_batch,
+  ffi.Pointer<mln_event_batch> out_batch,
 );
-
-@ffi.Native<mln_runtime_event_batch Function()>()
-external mln_runtime_event_batch mln_runtime_event_batch_default();
 
 @ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<ffi.Uint64>)>()
 external int mln_runtime_get_event_mask(
   int runtime,
   ffi.Pointer<ffi.Uint64> out_mask,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_runtime, mln_offline_operation_id)>()
-external int mln_runtime_offline_operation_discard(
-  int runtime,
-  int operation_id,
 );
 
 @ffi.Native<
@@ -2217,108 +2548,67 @@ external int mln_runtime_offline_operation_discard(
     ffi.Pointer<mln_offline_region_definition>,
     ffi.Pointer<ffi.Uint8>,
     ffi.Size,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_region_create_start(
+external int mln_runtime_offline_region_create(
   int runtime,
   ffi.Pointer<mln_offline_region_definition> definition,
   ffi.Pointer<ffi.Uint8> metadata,
   int metadata_size,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    mln_offline_operation_id,
-    ffi.Pointer<mln_offline_region_snapshot>,
-  )
->()
-external int mln_runtime_offline_region_create_take_result(
-  int runtime,
-  int operation_id,
-  ffi.Pointer<mln_offline_region_snapshot> out_region,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     mln_offline_region_id,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_region_delete_start(
+external int mln_runtime_offline_region_delete(
   int runtime,
   int region_id,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     mln_offline_region_id,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_region_get_start(
+external int mln_runtime_offline_region_get(
   int runtime,
   int region_id,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     mln_offline_region_id,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_region_get_status_start(
+external int mln_runtime_offline_region_get_status(
   int runtime,
   int region_id,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    mln_offline_operation_id,
-    ffi.Pointer<mln_offline_region_status>,
-  )
->()
-external int mln_runtime_offline_region_get_status_take_result(
-  int runtime,
-  int operation_id,
-  ffi.Pointer<mln_offline_region_status> out_status,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    mln_offline_operation_id,
-    ffi.Pointer<mln_offline_region_snapshot>,
-    ffi.Pointer<ffi.Bool>,
-  )
->()
-external int mln_runtime_offline_region_get_take_result(
-  int runtime,
-  int operation_id,
-  ffi.Pointer<mln_offline_region_snapshot> out_region,
-  ffi.Pointer<ffi.Bool> out_found,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     mln_offline_region_id,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_region_invalidate_start(
+external int mln_runtime_offline_region_invalidate(
   int runtime,
   int region_id,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2326,14 +2616,14 @@ external int mln_runtime_offline_region_invalidate_start(
     mln_runtime,
     mln_offline_region_id,
     ffi.Uint32,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_region_set_download_state_start(
+external int mln_runtime_offline_region_set_download_state(
   int runtime,
   int region_id,
   int state,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2341,14 +2631,14 @@ external int mln_runtime_offline_region_set_download_state_start(
     mln_runtime,
     mln_offline_region_id,
     ffi.Bool,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_region_set_observed_start(
+external int mln_runtime_offline_region_set_observed(
   int runtime,
   int region_id,
   bool observed,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2357,213 +2647,114 @@ external int mln_runtime_offline_region_set_observed_start(
     mln_offline_region_id,
     ffi.Pointer<ffi.Uint8>,
     ffi.Size,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_region_update_metadata_start(
+external int mln_runtime_offline_region_update_metadata(
   int runtime,
   int region_id,
   ffi.Pointer<ffi.Uint8> metadata,
   int metadata_size,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    mln_offline_operation_id,
-    ffi.Pointer<mln_offline_region_snapshot>,
-  )
->()
-external int mln_runtime_offline_region_update_metadata_take_result(
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
+external int mln_runtime_offline_regions_list(
   int runtime,
-  int operation_id,
-  ffi.Pointer<mln_offline_region_snapshot> out_region,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_offline_operation_id>)
->()
-external int mln_runtime_offline_regions_list_start(
-  int runtime,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    mln_offline_operation_id,
-    ffi.Pointer<mln_offline_region_list>,
-  )
->()
-external int mln_runtime_offline_regions_list_take_result(
-  int runtime,
-  int operation_id,
-  ffi.Pointer<mln_offline_region_list> out_regions,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     ffi.Pointer<ffi.Char>,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_regions_merge_database_start(
+external int mln_runtime_offline_regions_merge_database(
   int runtime,
   ffi.Pointer<ffi.Char> side_database_path,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    mln_offline_operation_id,
-    ffi.Pointer<mln_offline_region_list>,
-  )
->()
-external int mln_runtime_offline_regions_merge_database_take_result(
-  int runtime,
-  int operation_id,
-  ffi.Pointer<mln_offline_region_list> out_regions,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_runtime_options Function()>()
 external mln_runtime_options mln_runtime_options_default();
 
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Int64, ffi.Int64)>()
-external int mln_runtime_pump(int runtime, int timeout_ms, int budget_ms);
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
+external int mln_runtime_release(
+  int runtime,
+  ffi.Pointer<mln_completion> completion,
+);
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    ffi.Uint32,
-    ffi.Pointer<mln_offline_operation_id>,
-  )
+  ffi.Int32 Function(mln_runtime, ffi.Uint32, ffi.Pointer<mln_completion>)
 >()
-external int mln_runtime_run_ambient_cache_operation_start(
+external int mln_runtime_run_ambient_cache_operation(
   int runtime,
   int operation,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Uint64)>()
 external int mln_runtime_set_event_mask(int runtime, int mask);
 
 @ffi.Native<
-  ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_http_header_transform>)
+  ffi.Int32 Function(
+    mln_runtime,
+    ffi.Pointer<mln_http_header_transform>,
+    ffi.Pointer<mln_completion>,
+  )
 >()
 external int mln_runtime_set_http_header_transform(
   int runtime,
   ffi.Pointer<mln_http_header_transform> transform,
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_runtime, ffi.Uint64, ffi.Pointer<mln_completion>)
+>()
+external int mln_runtime_set_maximum_ambient_cache_size(
+  int runtime,
+  int size,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
-    ffi.Uint64,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_resource_provider>,
+    ffi.Pointer<mln_completion>,
   )
->()
-external int mln_runtime_set_maximum_ambient_cache_size_start(
-  int runtime,
-  int size,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_resource_provider>)
 >()
 external int mln_runtime_set_resource_provider(
   int runtime,
   ffi.Pointer<mln_resource_provider> provider,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_resource_transform>)
+  ffi.Int32 Function(
+    mln_runtime,
+    ffi.Pointer<mln_resource_transform>,
+    ffi.Pointer<mln_completion>,
+  )
 >()
 external int mln_runtime_set_resource_transform(
   int runtime,
   ffi.Pointer<mln_resource_transform> transform,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_wake_source>)>()
-external int mln_runtime_wake_source_acquire(
-  int runtime,
-  ffi.Pointer<mln_wake_source> out_source,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_source_feature_query_options Function()>()
 external mln_source_feature_query_options
 mln_source_feature_query_options_default();
 
-@ffi.Native<ffi.Int32 Function(mln_style_id_list, ffi.Pointer<ffi.Size>)>()
-external int mln_style_id_list_count(int list, ffi.Pointer<ffi.Size> out_count);
-
-@ffi.Native<ffi.Void Function(mln_style_id_list)>()
-external void mln_style_id_list_destroy(int list);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_style_id_list, ffi.Size, ffi.Pointer<mln_buffer_view>)
->()
-external int mln_style_id_list_get(
-  int list,
-  int index,
-  ffi.Pointer<mln_buffer_view> out_id,
-);
-
 @ffi.Native<mln_style_image_info Function()>()
 external mln_style_image_info mln_style_image_info_default();
 
 @ffi.Native<mln_style_image_options Function()>()
 external mln_style_image_options mln_style_image_options_default();
-
-@ffi.Native<mln_style_layer_info Function()>()
-external mln_style_layer_info mln_style_layer_info_default();
-
-@ffi.Native<ffi.Int32 Function(mln_style_layer_list, ffi.Pointer<ffi.Size>)>()
-external int mln_style_layer_list_count(
-  int list,
-  ffi.Pointer<ffi.Size> out_count,
-);
-
-@ffi.Native<ffi.Void Function(mln_style_layer_list)>()
-external void mln_style_layer_list_destroy(int list);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_style_layer_list,
-    ffi.Size,
-    ffi.Pointer<mln_style_layer_info>,
-  )
->()
-external int mln_style_layer_list_get(
-  int list,
-  int index,
-  ffi.Pointer<mln_style_layer_info> out_layer,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_style_string_list, ffi.Pointer<ffi.Size>)>()
-external int mln_style_string_list_count(
-  int list,
-  ffi.Pointer<ffi.Size> out_count,
-);
-
-@ffi.Native<ffi.Void Function(mln_style_string_list)>()
-external void mln_style_string_list_destroy(int list);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_style_string_list,
-    ffi.Size,
-    ffi.Pointer<mln_buffer_view>,
-  )
->()
-external int mln_style_string_list_get(
-  int list,
-  int index,
-  ffi.Pointer<mln_buffer_view> out_value,
-);
 
 @ffi.Native<mln_style_tile_source_options Function()>()
 external mln_style_tile_source_options mln_style_tile_source_options_default();
@@ -2578,37 +2769,31 @@ external int mln_supported_render_backend_mask();
 external mln_texture_image_info mln_texture_image_info_default();
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<ffi.Uint8>,
-    ffi.Size,
-    ffi.Pointer<mln_texture_image_info>,
-  )
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
 >()
 external int mln_texture_read_premultiplied_rgba8(
   int session,
-  ffi.Pointer<ffi.Uint8> out_data,
-  int out_data_capacity,
-  ffi.Pointer<mln_texture_image_info> out_info,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<ffi.Pointer<ffi.Char> Function()>()
 external ffi.Pointer<ffi.Char> mln_thread_last_error_message();
 
-@ffi.Native<ffi.Uint64 Function()>()
-external int mln_thread_token();
-
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_vulkan_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_vulkan_borrowed_texture_attach(
   int map,
   ffi.Pointer<mln_vulkan_borrowed_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_vulkan_borrowed_texture_descriptor Function()>()
@@ -2619,35 +2804,30 @@ mln_vulkan_borrowed_texture_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_vulkan_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_vulkan_borrowed_texture_set_target(
   int session,
   ffi.Pointer<mln_vulkan_borrowed_texture_descriptor> descriptor,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_vulkan_owned_texture_frame>,
-  )
->()
-external int mln_vulkan_owned_texture_acquire_frame(
-  int session,
-  ffi.Pointer<mln_vulkan_owned_texture_frame> out_frame,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_vulkan_owned_texture_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_vulkan_owned_texture_attach(
   int map,
   ffi.Pointer<mln_vulkan_owned_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_vulkan_owned_texture_descriptor Function()>()
@@ -2656,26 +2836,19 @@ mln_vulkan_owned_texture_descriptor_default();
 
 @ffi.Native<
   ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_vulkan_owned_texture_frame>,
-  )
->()
-external int mln_vulkan_owned_texture_release_frame(
-  int session,
-  ffi.Pointer<mln_vulkan_owned_texture_frame> frame,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_vulkan_surface_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_vulkan_surface_attach(
   int map,
   ffi.Pointer<mln_vulkan_surface_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_vulkan_surface_descriptor Function()>()
@@ -2685,30 +2858,30 @@ external mln_vulkan_surface_descriptor mln_vulkan_surface_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_vulkan_surface_descriptor>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_vulkan_surface_set_target(
   int session,
   ffi.Pointer<mln_vulkan_surface_descriptor> descriptor,
+  ffi.Pointer<mln_completion> completion,
 );
-
-@ffi.Native<ffi.Void Function(mln_wake_source)>()
-external void mln_wake_source_destroy(int source);
-
-@ffi.Native<ffi.Int32 Function(mln_wake_source)>()
-external int mln_wake_source_signal(int source);
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_webgpu_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_webgpu_borrowed_texture_attach(
   int map,
   ffi.Pointer<mln_webgpu_borrowed_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_webgpu_borrowed_texture_descriptor Function()>()
@@ -2719,35 +2892,30 @@ mln_webgpu_borrowed_texture_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_webgpu_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_webgpu_borrowed_texture_set_target(
   int session,
   ffi.Pointer<mln_webgpu_borrowed_texture_descriptor> descriptor,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_webgpu_owned_texture_frame>,
-  )
->()
-external int mln_webgpu_owned_texture_acquire_frame(
-  int session,
-  ffi.Pointer<mln_webgpu_owned_texture_frame> out_frame,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_webgpu_owned_texture_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_webgpu_owned_texture_attach(
   int map,
   ffi.Pointer<mln_webgpu_owned_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_webgpu_owned_texture_descriptor Function()>()
@@ -2756,26 +2924,19 @@ mln_webgpu_owned_texture_descriptor_default();
 
 @ffi.Native<
   ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_webgpu_owned_texture_frame>,
-  )
->()
-external int mln_webgpu_owned_texture_release_frame(
-  int session,
-  ffi.Pointer<mln_webgpu_owned_texture_frame> frame,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_webgpu_surface_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_webgpu_surface_attach(
   int map,
   ffi.Pointer<mln_webgpu_surface_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_webgpu_surface_descriptor Function()>()
@@ -2785,11 +2946,13 @@ external mln_webgpu_surface_descriptor mln_webgpu_surface_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_webgpu_surface_descriptor>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_webgpu_surface_set_target(
   int session,
   ffi.Pointer<mln_webgpu_surface_descriptor> descriptor,
+  ffi.Pointer<mln_completion> completion,
 );
 
 const int MLN_ADAPTER_RESOURCE_KIND_ANY = 4294967295;
@@ -2798,26 +2961,64 @@ const int MLN_HANDLE_NULL = 0;
 
 const int MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL = 0;
 
-final class UnnamedUnion extends ffi.Union {
-  external mln_offline_tile_pyramid_region_definition tile_pyramid;
+typedef mln_acquired_frame = ffi.Uint64;
+typedef Dartmln_acquired_frame = int;
 
-  external mln_offline_geometry_region_definition geometry;
+sealed class mln_adapter_completion_copy_kind {
+  static const MLN_ADAPTER_COMPLETION_COPY_FLAT = 0;
+  static const MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW = -991567862;
+  static const MLN_ADAPTER_COMPLETION_COPY_CAMERA_OPTIONS = 1729514601;
+  static const MLN_ADAPTER_COMPLETION_COPY_CAMERA_QUERY_RESULT = 1485572681;
+  static const MLN_ADAPTER_COMPLETION_COPY_LAT_LNG = -1656772627;
+  static const MLN_ADAPTER_COMPLETION_COPY_LAT_LNG_BOUNDS = -894451485;
+  static const MLN_ADAPTER_COMPLETION_COPY_MAP = 438078448;
+  static const MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION = -739888830;
+  static const MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO = -355321303;
+  static const MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_STATUS = 1567541687;
+  static const MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE = -1245999201;
+  static const MLN_ADAPTER_COMPLETION_COPY_SCREEN_POINT = 990046368;
+  static const MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_RESULT = -1982991506;
+  static const MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES_RESULT =
+      167536911;
+  static const MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY = -1349558423;
+  static const MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_RESULT = 2005255953;
+  static const MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_RESULT = 514529690;
+  static const MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS_RESULT =
+      -656734775;
+  static const MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS = 221419390;
+  static const MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK_RESULT =
+      -1419448007;
 }
 
-final class UnnamedUnion$1 extends ffi.Union {
-  external mln_wgl_context_descriptor wgl;
+typedef mln_adapter_completion_listener =
+    ffi.Pointer<ffi.NativeFunction<mln_adapter_completion_listenerFunction>>;
+typedef mln_adapter_completion_listenerFunction =
+    ffi.Void Function(
+      ffi.Pointer<ffi.Void> user_data,
+      ffi.Pointer<mln_adapter_completion_record> record,
+    );
+typedef Dartmln_adapter_completion_listenerFunction =
+    void Function(
+      ffi.Pointer<ffi.Void> user_data,
+      ffi.Pointer<mln_adapter_completion_record> record,
+    );
 
-  external mln_egl_context_descriptor egl;
+final class mln_adapter_completion_record extends ffi.Struct {
+  external ffi.Pointer<ffi.Void> owner;
 
-  external mln_webgl_context_descriptor webgl;
+  external mln_completion_result result;
 }
 
-final class UnnamedUnion$2 extends ffi.Union {
-  external mln_screen_point point;
-
-  external mln_screen_box box;
-
-  external mln_screen_line_string line_string;
+sealed class mln_adapter_dart_port_callback {
+  static const MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE =
+      -650071029;
+  static const MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE =
+      433183623;
+  static const MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE =
+      658252347;
+  static const MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE =
+      1073125309;
+  static const MLN_ADAPTER_DART_PORT_WAKE_CALLBACK = -1901719650;
 }
 
 final class mln_adapter_http_header extends ffi.Struct {
@@ -2879,25 +3080,34 @@ final class mln_adapter_http_header_transform_rules extends ffi.Struct {
 }
 
 final class mln_adapter_log_callback_state extends ffi.Struct {
-  external mln_adapter_log_record_listener listener;
+  @mln_adapter_log_queue()
+  external int queue;
 
   @ffi.Uint32()
   external int consume;
 
+  external mln_log_callback_release release_user_data;
+
+  external ffi.Pointer<ffi.Void> release_context;
+
   static ffi.Pointer<mln_adapter_log_callback_state> $allocate(
     ffi.Allocator $allocator, {
-    required mln_adapter_log_record_listener listener,
+    required int queue,
     required int consume,
+    required mln_log_callback_release release_user_data,
+    required ffi.Pointer<ffi.Void> release_context,
   }) => $allocator<mln_adapter_log_callback_state>()
-    ..ref.listener = listener
-    ..ref.consume = consume;
+    ..ref.queue = queue
+    ..ref.consume = consume
+    ..ref.release_user_data = release_user_data
+    ..ref.release_context = release_context;
 }
+
+typedef mln_adapter_log_queue = ffi.Uint64;
+typedef Dartmln_adapter_log_queue = int;
 
 final class mln_adapter_log_record extends ffi.Struct {
   external ffi.Pointer<ffi.Void> owner;
-
-  @ffi.Bool()
-  external bool retire_callback;
 
   @ffi.Uint32()
   external int severity;
@@ -2913,26 +3123,17 @@ final class mln_adapter_log_record extends ffi.Struct {
   static ffi.Pointer<mln_adapter_log_record> $allocate(
     ffi.Allocator $allocator, {
     required ffi.Pointer<ffi.Void> owner,
-    required bool retire_callback,
     required int severity,
     required int event,
     required int code,
     required ffi.Pointer<ffi.Char> message,
   }) => $allocator<mln_adapter_log_record>()
     ..ref.owner = owner
-    ..ref.retire_callback = retire_callback
     ..ref.severity = severity
     ..ref.event = event
     ..ref.code = code
     ..ref.message = message;
 }
-
-typedef mln_adapter_log_record_listener =
-    ffi.Pointer<ffi.NativeFunction<mln_adapter_log_record_listenerFunction>>;
-typedef mln_adapter_log_record_listenerFunction =
-    ffi.Void Function(ffi.Pointer<ffi.Void> record);
-typedef Dartmln_adapter_log_record_listenerFunction =
-    void Function(ffi.Pointer<ffi.Void> record);
 
 final class mln_adapter_queued_resource_provider extends ffi.Struct {
   external ffi.Pointer<mln_adapter_queued_resource_provider_route> routes;
@@ -2940,17 +3141,18 @@ final class mln_adapter_queued_resource_provider extends ffi.Struct {
   @ffi.Size()
   external int route_count;
 
-  external mln_adapter_queued_resource_request_listener listener;
+  @mln_adapter_resource_request_queue()
+  external int queue;
 
   static ffi.Pointer<mln_adapter_queued_resource_provider> $allocate(
     ffi.Allocator $allocator, {
     required ffi.Pointer<mln_adapter_queued_resource_provider_route> routes,
     required int route_count,
-    required mln_adapter_queued_resource_request_listener listener,
+    required int queue,
   }) => $allocator<mln_adapter_queued_resource_provider>()
     ..ref.routes = routes
     ..ref.route_count = route_count
-    ..ref.listener = listener;
+    ..ref.queue = queue;
 }
 
 final class mln_adapter_queued_resource_provider_route extends ffi.Struct {
@@ -3069,15 +3271,6 @@ final class mln_adapter_queued_resource_request extends ffi.Struct {
     ..ref.prior_data_size = prior_data_size;
 }
 
-typedef mln_adapter_queued_resource_request_listener =
-    ffi.Pointer<
-      ffi.NativeFunction<mln_adapter_queued_resource_request_listenerFunction>
-    >;
-typedef mln_adapter_queued_resource_request_listenerFunction =
-    ffi.Void Function(ffi.Pointer<ffi.Void> request);
-typedef Dartmln_adapter_queued_resource_request_listenerFunction =
-    void Function(ffi.Pointer<ffi.Void> request);
-
 final class mln_adapter_resource_provider_rule extends ffi.Struct {
   @ffi.Uint32()
   external int kind;
@@ -3104,6 +3297,9 @@ final class mln_adapter_resource_provider_rules extends ffi.Struct {
     ..ref.rules = rules
     ..ref.count = count;
 }
+
+typedef mln_adapter_resource_request_queue = ffi.Uint64;
+typedef Dartmln_adapter_resource_request_queue = int;
 
 final class mln_adapter_resource_rewrite_rule extends ffi.Struct {
   @ffi.Uint32()
@@ -3144,81 +3340,30 @@ final class mln_adapter_resource_rewrite_rules extends ffi.Struct {
     ..ref.count = count;
 }
 
-enum mln_adapter_resource_route_flags {
-  MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE(0),
-  MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB(1),
-  MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL(2);
-
-  final int value;
-  const mln_adapter_resource_route_flags(this.value);
-
-  static mln_adapter_resource_route_flags fromValue(int value) =>
-      switch (value) {
-        0 => MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE,
-        1 => MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB,
-        2 => MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL,
-        _ => throw ArgumentError(
-          'Unknown value for mln_adapter_resource_route_flags: $value',
-        ),
-      };
+sealed class mln_adapter_resource_route_flags {
+  static const MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE = 0;
+  static const MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB = 1;
+  static const MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL = 2;
 }
 
-enum mln_adapter_url_match_flags {
-  MLN_ADAPTER_URL_MATCH_FLAGS_NONE(0),
-  MLN_ADAPTER_URL_MATCH_GLOB(1);
-
-  final int value;
-  const mln_adapter_url_match_flags(this.value);
-
-  static mln_adapter_url_match_flags fromValue(int value) => switch (value) {
-    0 => MLN_ADAPTER_URL_MATCH_FLAGS_NONE,
-    1 => MLN_ADAPTER_URL_MATCH_GLOB,
-    _ => throw ArgumentError(
-      'Unknown value for mln_adapter_url_match_flags: $value',
-    ),
-  };
+sealed class mln_adapter_url_match_flags {
+  static const MLN_ADAPTER_URL_MATCH_FLAGS_NONE = 0;
+  static const MLN_ADAPTER_URL_MATCH_GLOB = 1;
 }
 
-enum mln_ambient_cache_operation {
-  MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE(1),
-  MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE(2),
-  MLN_AMBIENT_CACHE_OPERATION_INVALIDATE(3),
-  MLN_AMBIENT_CACHE_OPERATION_CLEAR(4);
-
-  final int value;
-  const mln_ambient_cache_operation(this.value);
-
-  static mln_ambient_cache_operation fromValue(int value) => switch (value) {
-    1 => MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE,
-    2 => MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE,
-    3 => MLN_AMBIENT_CACHE_OPERATION_INVALIDATE,
-    4 => MLN_AMBIENT_CACHE_OPERATION_CLEAR,
-    _ => throw ArgumentError(
-      'Unknown value for mln_ambient_cache_operation: $value',
-    ),
-  };
+sealed class mln_ambient_cache_operation {
+  static const MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE = 1;
+  static const MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE = 2;
+  static const MLN_AMBIENT_CACHE_OPERATION_INVALIDATE = 3;
+  static const MLN_AMBIENT_CACHE_OPERATION_CLEAR = 4;
 }
 
-enum mln_animation_option_field {
-  MLN_ANIMATION_OPTION_DURATION(1),
-  MLN_ANIMATION_OPTION_VELOCITY(2),
-  MLN_ANIMATION_OPTION_MIN_ZOOM(4),
-  MLN_ANIMATION_OPTION_EASING(8),
-  MLN_ANIMATION_OPTION_TRANSITION_ID(16);
-
-  final int value;
-  const mln_animation_option_field(this.value);
-
-  static mln_animation_option_field fromValue(int value) => switch (value) {
-    1 => MLN_ANIMATION_OPTION_DURATION,
-    2 => MLN_ANIMATION_OPTION_VELOCITY,
-    4 => MLN_ANIMATION_OPTION_MIN_ZOOM,
-    8 => MLN_ANIMATION_OPTION_EASING,
-    16 => MLN_ANIMATION_OPTION_TRANSITION_ID,
-    _ => throw ArgumentError(
-      'Unknown value for mln_animation_option_field: $value',
-    ),
-  };
+sealed class mln_animation_option_field {
+  static const MLN_ANIMATION_OPTION_DURATION = 1;
+  static const MLN_ANIMATION_OPTION_VELOCITY = 2;
+  static const MLN_ANIMATION_OPTION_MIN_ZOOM = 4;
+  static const MLN_ANIMATION_OPTION_EASING = 8;
+  static const MLN_ANIMATION_OPTION_TRANSITION_ID = 16;
 }
 
 final class mln_animation_options extends ffi.Struct {
@@ -3243,28 +3388,13 @@ final class mln_animation_options extends ffi.Struct {
   external int transition_id;
 }
 
-enum mln_bound_option_field {
-  MLN_BOUND_OPTION_BOUNDS(1),
-  MLN_BOUND_OPTION_MIN_ZOOM(2),
-  MLN_BOUND_OPTION_MAX_ZOOM(4),
-  MLN_BOUND_OPTION_MIN_PITCH(8),
-  MLN_BOUND_OPTION_MAX_PITCH(16),
-  MLN_BOUND_OPTION_UNBOUNDED(32);
-
-  final int value;
-  const mln_bound_option_field(this.value);
-
-  static mln_bound_option_field fromValue(int value) => switch (value) {
-    1 => MLN_BOUND_OPTION_BOUNDS,
-    2 => MLN_BOUND_OPTION_MIN_ZOOM,
-    4 => MLN_BOUND_OPTION_MAX_ZOOM,
-    8 => MLN_BOUND_OPTION_MIN_PITCH,
-    16 => MLN_BOUND_OPTION_MAX_PITCH,
-    32 => MLN_BOUND_OPTION_UNBOUNDED,
-    _ => throw ArgumentError(
-      'Unknown value for mln_bound_option_field: $value',
-    ),
-  };
+sealed class mln_bound_option_field {
+  static const MLN_BOUND_OPTION_BOUNDS = 1;
+  static const MLN_BOUND_OPTION_MIN_ZOOM = 2;
+  static const MLN_BOUND_OPTION_MAX_ZOOM = 4;
+  static const MLN_BOUND_OPTION_MIN_PITCH = 8;
+  static const MLN_BOUND_OPTION_MAX_PITCH = 16;
+  static const MLN_BOUND_OPTION_UNBOUNDED = 32;
 }
 
 final class mln_bound_options extends ffi.Struct {
@@ -3307,38 +3437,42 @@ final class mln_buffer_view extends ffi.Struct {
     ..ref.size = size;
 }
 
-enum mln_camera_change_mode {
-  MLN_CAMERA_CHANGE_MODE_IMMEDIATE(0),
-  MLN_CAMERA_CHANGE_MODE_ANIMATED(1);
-
-  final int value;
-  const mln_camera_change_mode(this.value);
-
-  static mln_camera_change_mode fromValue(int value) => switch (value) {
-    0 => MLN_CAMERA_CHANGE_MODE_IMMEDIATE,
-    1 => MLN_CAMERA_CHANGE_MODE_ANIMATED,
-    _ => throw ArgumentError(
-      'Unknown value for mln_camera_change_mode: $value',
-    ),
-  };
+sealed class mln_camera_change_mode {
+  static const MLN_CAMERA_CHANGE_MODE_IMMEDIATE = 0;
+  static const MLN_CAMERA_CHANGE_MODE_ANIMATED = 1;
 }
 
-enum mln_camera_fit_option_field {
-  MLN_CAMERA_FIT_OPTION_PADDING(1),
-  MLN_CAMERA_FIT_OPTION_BEARING(2),
-  MLN_CAMERA_FIT_OPTION_PITCH(4);
+final class mln_camera_delta extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
 
-  final int value;
-  const mln_camera_fit_option_field(this.value);
+  @ffi.Uint32()
+  external int kind;
 
-  static mln_camera_fit_option_field fromValue(int value) => switch (value) {
-    1 => MLN_CAMERA_FIT_OPTION_PADDING,
-    2 => MLN_CAMERA_FIT_OPTION_BEARING,
-    4 => MLN_CAMERA_FIT_OPTION_PITCH,
-    _ => throw ArgumentError(
-      'Unknown value for mln_camera_fit_option_field: $value',
-    ),
-  };
+  external mln_screen_point offset;
+
+  @ffi.Double()
+  external double amount;
+
+  @ffi.Bool()
+  external bool has_anchor;
+
+  external mln_screen_point anchor;
+
+  external mln_animation_options animation;
+}
+
+sealed class mln_camera_delta_kind {
+  static const MLN_CAMERA_DELTA_MOVE = 0;
+  static const MLN_CAMERA_DELTA_SCALE = 1;
+  static const MLN_CAMERA_DELTA_BEARING = 2;
+  static const MLN_CAMERA_DELTA_PITCH = 3;
+}
+
+sealed class mln_camera_fit_option_field {
+  static const MLN_CAMERA_FIT_OPTION_PADDING = 1;
+  static const MLN_CAMERA_FIT_OPTION_BEARING = 2;
+  static const MLN_CAMERA_FIT_OPTION_PITCH = 4;
 }
 
 final class mln_camera_fit_options extends ffi.Struct {
@@ -3357,34 +3491,16 @@ final class mln_camera_fit_options extends ffi.Struct {
   external double pitch;
 }
 
-enum mln_camera_option_field {
-  MLN_CAMERA_OPTION_CENTER(1),
-  MLN_CAMERA_OPTION_ZOOM(2),
-  MLN_CAMERA_OPTION_BEARING(4),
-  MLN_CAMERA_OPTION_PITCH(8),
-  MLN_CAMERA_OPTION_CENTER_ALTITUDE(16),
-  MLN_CAMERA_OPTION_PADDING(32),
-  MLN_CAMERA_OPTION_ANCHOR(64),
-  MLN_CAMERA_OPTION_ROLL(128),
-  MLN_CAMERA_OPTION_FOV(256);
-
-  final int value;
-  const mln_camera_option_field(this.value);
-
-  static mln_camera_option_field fromValue(int value) => switch (value) {
-    1 => MLN_CAMERA_OPTION_CENTER,
-    2 => MLN_CAMERA_OPTION_ZOOM,
-    4 => MLN_CAMERA_OPTION_BEARING,
-    8 => MLN_CAMERA_OPTION_PITCH,
-    16 => MLN_CAMERA_OPTION_CENTER_ALTITUDE,
-    32 => MLN_CAMERA_OPTION_PADDING,
-    64 => MLN_CAMERA_OPTION_ANCHOR,
-    128 => MLN_CAMERA_OPTION_ROLL,
-    256 => MLN_CAMERA_OPTION_FOV,
-    _ => throw ArgumentError(
-      'Unknown value for mln_camera_option_field: $value',
-    ),
-  };
+sealed class mln_camera_option_field {
+  static const MLN_CAMERA_OPTION_CENTER = 1;
+  static const MLN_CAMERA_OPTION_ZOOM = 2;
+  static const MLN_CAMERA_OPTION_BEARING = 4;
+  static const MLN_CAMERA_OPTION_PITCH = 8;
+  static const MLN_CAMERA_OPTION_CENTER_ALTITUDE = 16;
+  static const MLN_CAMERA_OPTION_PADDING = 32;
+  static const MLN_CAMERA_OPTION_ANCHOR = 64;
+  static const MLN_CAMERA_OPTION_ROLL = 128;
+  static const MLN_CAMERA_OPTION_FOV = 256;
 }
 
 final class mln_camera_options extends ffi.Struct {
@@ -3423,6 +3539,43 @@ final class mln_camera_options extends ffi.Struct {
   external double field_of_view;
 }
 
+final class mln_camera_query_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  @ffi.Uint64()
+  external int generation;
+
+  external mln_camera_options camera;
+}
+
+final class mln_camera_update extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int mode;
+
+  external mln_camera_options camera;
+
+  external mln_animation_options animation;
+
+  @ffi.Uint32()
+  external int gesture_phase;
+
+  @ffi.Uint32()
+  external int reserved;
+}
+
+sealed class mln_camera_update_mode {
+  static const MLN_CAMERA_UPDATE_MODE_JUMP = 0;
+  static const MLN_CAMERA_UPDATE_MODE_EASE = 1;
+  static const MLN_CAMERA_UPDATE_MODE_FLY = 2;
+}
+
 final class mln_canonical_tile_id extends ffi.Struct {
   @ffi.Uint32()
   external int z;
@@ -3444,49 +3597,94 @@ final class mln_canonical_tile_id extends ffi.Struct {
     ..ref.y = y;
 }
 
-enum mln_constrain_mode {
-  MLN_CONSTRAIN_MODE_NONE(0),
-  MLN_CONSTRAIN_MODE_HEIGHT_ONLY(1),
-  MLN_CONSTRAIN_MODE_WIDTH_AND_HEIGHT(2),
-  MLN_CONSTRAIN_MODE_SCREEN(3);
-
-  final int value;
-  const mln_constrain_mode(this.value);
-
-  static mln_constrain_mode fromValue(int value) => switch (value) {
-    0 => MLN_CONSTRAIN_MODE_NONE,
-    1 => MLN_CONSTRAIN_MODE_HEIGHT_ONLY,
-    2 => MLN_CONSTRAIN_MODE_WIDTH_AND_HEIGHT,
-    3 => MLN_CONSTRAIN_MODE_SCREEN,
-    _ => throw ArgumentError('Unknown value for mln_constrain_mode: $value'),
-  };
+sealed class mln_command_disposition {
+  static const MLN_COMMAND_DISPOSITION_COMMITTED = 0;
+  static const MLN_COMMAND_DISPOSITION_SUPERSEDED = 1;
+  static const MLN_COMMAND_DISPOSITION_FAILED = 2;
+  static const MLN_COMMAND_DISPOSITION_CANCELLED = 3;
 }
 
-enum mln_custom_geometry_source_option_field {
-  MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM(1),
-  MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM(2),
-  MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE(4),
-  MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE(8),
-  MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER(16),
-  MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP(32),
-  MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP(64);
+final class mln_completion extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
 
-  final int value;
-  const mln_custom_geometry_source_option_field(this.value);
+  external mln_completion_callback callback;
 
-  static mln_custom_geometry_source_option_field fromValue(int value) =>
-      switch (value) {
-        1 => MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM,
-        2 => MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM,
-        4 => MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE,
-        8 => MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE,
-        16 => MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER,
-        32 => MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP,
-        64 => MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP,
-        _ => throw ArgumentError(
-          'Unknown value for mln_custom_geometry_source_option_field: $value',
-        ),
-      };
+  external ffi.Pointer<ffi.Void> user_data;
+
+  external mln_completion_release release_user_data;
+
+  static ffi.Pointer<mln_completion> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required mln_completion_callback callback,
+    required ffi.Pointer<ffi.Void> user_data,
+    required mln_completion_release release_user_data,
+  }) => $allocator<mln_completion>()
+    ..ref.size = size
+    ..ref.callback = callback
+    ..ref.user_data = user_data
+    ..ref.release_user_data = release_user_data;
+}
+
+typedef mln_completion_callback =
+    ffi.Pointer<ffi.NativeFunction<mln_completion_callbackFunction>>;
+typedef mln_completion_callbackFunction =
+    ffi.Void Function(
+      ffi.Pointer<ffi.Void> user_data,
+      ffi.Pointer<mln_completion_result> result,
+    );
+typedef Dartmln_completion_callbackFunction =
+    void Function(
+      ffi.Pointer<ffi.Void> user_data,
+      ffi.Pointer<mln_completion_result> result,
+    );
+typedef mln_completion_release =
+    ffi.Pointer<ffi.NativeFunction<mln_completion_releaseFunction>>;
+typedef mln_completion_releaseFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
+typedef Dartmln_completion_releaseFunction =
+    void Function(ffi.Pointer<ffi.Void> user_data);
+
+final class mln_completion_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Int32()
+  external int status;
+
+  @ffi.Uint32()
+  external int disposition;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  @ffi.Uint64()
+  external int generation;
+
+  external mln_buffer_view diagnostic;
+
+  external ffi.Pointer<ffi.Void> value;
+
+  @ffi.Size()
+  external int value_count;
+}
+
+sealed class mln_constrain_mode {
+  static const MLN_CONSTRAIN_MODE_NONE = 0;
+  static const MLN_CONSTRAIN_MODE_HEIGHT_ONLY = 1;
+  static const MLN_CONSTRAIN_MODE_WIDTH_AND_HEIGHT = 2;
+  static const MLN_CONSTRAIN_MODE_SCREEN = 3;
+}
+
+sealed class mln_custom_geometry_source_option_field {
+  static const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM = 1;
+  static const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM = 2;
+  static const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE = 4;
+  static const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE = 8;
+  static const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER = 16;
+  static const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP = 32;
+  static const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP = 64;
 }
 
 final class mln_custom_geometry_source_options extends ffi.Struct {
@@ -3579,21 +3777,9 @@ typedef Dartmln_custom_geometry_source_tile_callbackFunction =
       mln_canonical_tile_id tile_id,
     );
 
-enum mln_custom_mvt_vector_source_option_field {
-  MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM(1),
-  MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM(2);
-
-  final int value;
-  const mln_custom_mvt_vector_source_option_field(this.value);
-
-  static mln_custom_mvt_vector_source_option_field fromValue(int value) =>
-      switch (value) {
-        1 => MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM,
-        2 => MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM,
-        _ => throw ArgumentError(
-          'Unknown value for mln_custom_mvt_vector_source_option_field: $value',
-        ),
-      };
+sealed class mln_custom_mvt_vector_source_option_field {
+  static const MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM = 1;
+  static const MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM = 2;
 }
 
 final class mln_custom_mvt_vector_source_options extends ffi.Struct {
@@ -3698,11 +3884,7 @@ final class mln_egl_context_descriptor extends ffi.Struct {
   external ffi.Pointer<ffi.Void> share_context;
 
   @ffi.Uint32()
-  external int client_apiAsInt;
-
-  mln_opengl_client_api get client_api =>
-      mln_opengl_client_api.fromValue(client_apiAsInt);
-  set client_api(mln_opengl_client_api value) => client_apiAsInt = value.value;
+  external int client_api;
 
   external ffi.Pointer<ffi.Void> get_proc_address;
 
@@ -3712,7 +3894,7 @@ final class mln_egl_context_descriptor extends ffi.Struct {
     required ffi.Pointer<ffi.Void> display,
     required ffi.Pointer<ffi.Void> config,
     required ffi.Pointer<ffi.Void> share_context,
-    required mln_opengl_client_api client_api,
+    required int client_api,
     required ffi.Pointer<ffi.Void> get_proc_address,
   }) => $allocator<mln_egl_context_descriptor>()
     ..ref.size = size
@@ -3722,6 +3904,9 @@ final class mln_egl_context_descriptor extends ffi.Struct {
     ..ref.client_api = client_api
     ..ref.get_proc_address = get_proc_address;
 }
+
+typedef mln_event_batch = ffi.Uint64;
+typedef Dartmln_event_batch = int;
 
 final class mln_feature_state_selector extends ffi.Struct {
   @ffi.Uint32()
@@ -3739,39 +3924,51 @@ final class mln_feature_state_selector extends ffi.Struct {
   external mln_buffer_view state_key;
 }
 
-enum mln_feature_state_selector_field {
-  MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID(1),
-  MLN_FEATURE_STATE_SELECTOR_FEATURE_ID(2),
-  MLN_FEATURE_STATE_SELECTOR_STATE_KEY(4);
-
-  final int value;
-  const mln_feature_state_selector_field(this.value);
-
-  static mln_feature_state_selector_field fromValue(int value) =>
-      switch (value) {
-        1 => MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID,
-        2 => MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
-        4 => MLN_FEATURE_STATE_SELECTOR_STATE_KEY,
-        _ => throw ArgumentError(
-          'Unknown value for mln_feature_state_selector_field: $value',
-        ),
-      };
+sealed class mln_feature_state_selector_field {
+  static const MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID = 1;
+  static const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID = 2;
+  static const MLN_FEATURE_STATE_SELECTOR_STATE_KEY = 4;
 }
 
-enum mln_free_camera_option_field {
-  MLN_FREE_CAMERA_OPTION_POSITION(1),
-  MLN_FREE_CAMERA_OPTION_ORIENTATION(2);
+final class mln_frame_demand extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
 
-  final int value;
-  const mln_free_camera_option_field(this.value);
+  @ffi.Uint32()
+  external int flags;
 
-  static mln_free_camera_option_field fromValue(int value) => switch (value) {
-    1 => MLN_FREE_CAMERA_OPTION_POSITION,
-    2 => MLN_FREE_CAMERA_OPTION_ORIENTATION,
-    _ => throw ArgumentError(
-      'Unknown value for mln_free_camera_option_field: $value',
-    ),
-  };
+  @ffi.Uint64()
+  external int token;
+
+  @ffi.Uint64()
+  external int coalescing_boundary;
+
+  @ffi.Uint64()
+  external int timeout_ns;
+
+  static ffi.Pointer<mln_frame_demand> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int flags,
+    required int token,
+    required int coalescing_boundary,
+    required int timeout_ns,
+  }) => $allocator<mln_frame_demand>()
+    ..ref.size = size
+    ..ref.flags = flags
+    ..ref.token = token
+    ..ref.coalescing_boundary = coalescing_boundary
+    ..ref.timeout_ns = timeout_ns;
+}
+
+sealed class mln_frame_demand_flag {
+  static const MLN_FRAME_DEMAND_IF_NEEDED = 1;
+  static const MLN_FRAME_DEMAND_PRESENT = 2;
+}
+
+sealed class mln_free_camera_option_field {
+  static const MLN_FREE_CAMERA_OPTION_POSITION = 1;
+  static const MLN_FREE_CAMERA_OPTION_ORIENTATION = 2;
 }
 
 final class mln_free_camera_options extends ffi.Struct {
@@ -3789,41 +3986,19 @@ final class mln_free_camera_options extends ffi.Struct {
 typedef mln_geojson_source_data = ffi.Uint64;
 typedef Dartmln_geojson_source_data = int;
 
-enum mln_geojson_source_option_field {
-  MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM(1),
-  MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM(2),
-  MLN_GEOJSON_SOURCE_OPTION_TOLERANCE(4),
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM(8),
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES(16),
-  MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE(32),
-  MLN_GEOJSON_SOURCE_OPTION_BUFFER(64),
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS(128),
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS(256),
-  MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS(512),
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER(1024),
-  MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING(2048);
-
-  final int value;
-  const mln_geojson_source_option_field(this.value);
-
-  static mln_geojson_source_option_field fromValue(int value) =>
-      switch (value) {
-        1 => MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM,
-        2 => MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM,
-        4 => MLN_GEOJSON_SOURCE_OPTION_TOLERANCE,
-        8 => MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM,
-        16 => MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES,
-        32 => MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE,
-        64 => MLN_GEOJSON_SOURCE_OPTION_BUFFER,
-        128 => MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS,
-        256 => MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS,
-        512 => MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS,
-        1024 => MLN_GEOJSON_SOURCE_OPTION_CLUSTER,
-        2048 => MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING,
-        _ => throw ArgumentError(
-          'Unknown value for mln_geojson_source_option_field: $value',
-        ),
-      };
+sealed class mln_geojson_source_option_field {
+  static const MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM = 1;
+  static const MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM = 2;
+  static const MLN_GEOJSON_SOURCE_OPTION_TOLERANCE = 4;
+  static const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM = 8;
+  static const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES = 16;
+  static const MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE = 32;
+  static const MLN_GEOJSON_SOURCE_OPTION_BUFFER = 64;
+  static const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 128;
+  static const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 256;
+  static const MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 512;
+  static const MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 1024;
+  static const MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 2048;
 }
 
 final class mln_geojson_source_options extends ffi.Struct {
@@ -3869,6 +4044,48 @@ final class mln_geojson_source_options extends ffi.Struct {
   external bool synchronous_tiling;
 }
 
+sealed class mln_gesture_phase {
+  static const MLN_GESTURE_PHASE_NONE = 0;
+  static const MLN_GESTURE_PHASE_BEGIN = 1;
+  static const MLN_GESTURE_PHASE_UPDATE = 2;
+  static const MLN_GESTURE_PHASE_END = 3;
+  static const MLN_GESTURE_PHASE_CANCEL = 4;
+}
+
+final class mln_gpu_sync extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int kind;
+
+  @ffi.Uint64()
+  external int object;
+
+  @ffi.Uint64()
+  external int value;
+
+  static ffi.Pointer<mln_gpu_sync> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int kind,
+    required int object,
+    required int value,
+  }) => $allocator<mln_gpu_sync>()
+    ..ref.size = size
+    ..ref.kind = kind
+    ..ref.object = object
+    ..ref.value = value;
+}
+
+sealed class mln_gpu_sync_kind {
+  static const MLN_GPU_SYNC_CPU_COMPLETE = 0;
+  static const MLN_GPU_SYNC_METAL_SHARED_EVENT = 1;
+  static const MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 2;
+  static const MLN_GPU_SYNC_OPENGL_FENCE = 3;
+  static const MLN_GPU_SYNC_WEBGPU_TOKEN = 4;
+}
+
 final class mln_http_header_transform extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -3877,15 +4094,19 @@ final class mln_http_header_transform extends ffi.Struct {
 
   external ffi.Pointer<ffi.Void> user_data;
 
+  external mln_runtime_callback_release release_user_data;
+
   static ffi.Pointer<mln_http_header_transform> $allocate(
     ffi.Allocator $allocator, {
     required int size,
     required mln_http_header_transform_callback callback,
     required ffi.Pointer<ffi.Void> user_data,
+    required mln_runtime_callback_release release_user_data,
   }) => $allocator<mln_http_header_transform>()
     ..ref.size = size
     ..ref.callback = callback
-    ..ref.user_data = user_data;
+    ..ref.user_data = user_data
+    ..ref.release_user_data = release_user_data;
 }
 
 typedef mln_http_header_transform_callback =
@@ -3984,23 +4205,10 @@ final class mln_lat_lng_bounds extends ffi.Struct {
   external mln_lat_lng northeast;
 }
 
-enum mln_location_indicator_image_kind {
-  MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP(0),
-  MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING(1),
-  MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW(2);
-
-  final int value;
-  const mln_location_indicator_image_kind(this.value);
-
-  static mln_location_indicator_image_kind fromValue(int value) =>
-      switch (value) {
-        0 => MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP,
-        1 => MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING,
-        2 => MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW,
-        _ => throw ArgumentError(
-          'Unknown value for mln_location_indicator_image_kind: $value',
-        ),
-      };
+sealed class mln_location_indicator_image_kind {
+  static const MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP = 0;
+  static const MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING = 1;
+  static const MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW = 2;
 }
 
 typedef mln_log_callback =
@@ -4021,134 +4229,48 @@ typedef Dartmln_log_callbackFunction =
       int code,
       ffi.Pointer<ffi.Char> message,
     );
+typedef mln_log_callback_release =
+    ffi.Pointer<ffi.NativeFunction<mln_log_callback_releaseFunction>>;
+typedef mln_log_callback_releaseFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
+typedef Dartmln_log_callback_releaseFunction =
+    void Function(ffi.Pointer<ffi.Void> user_data);
 
-enum mln_log_event {
-  MLN_LOG_EVENT_GENERAL(0),
-  MLN_LOG_EVENT_SETUP(1),
-  MLN_LOG_EVENT_SHADER(2),
-  MLN_LOG_EVENT_PARSE_STYLE(3),
-  MLN_LOG_EVENT_PARSE_TILE(4),
-  MLN_LOG_EVENT_RENDER(5),
-  MLN_LOG_EVENT_STYLE(6),
-  MLN_LOG_EVENT_DATABASE(7),
-  MLN_LOG_EVENT_HTTP_REQUEST(8),
-  MLN_LOG_EVENT_SPRITE(9),
-  MLN_LOG_EVENT_IMAGE(10),
-  MLN_LOG_EVENT_GRAPHICS_BACKEND(11),
-  MLN_LOG_EVENT_JNI(12),
-  MLN_LOG_EVENT_ANDROID(13),
-  MLN_LOG_EVENT_CRASH(14),
-  MLN_LOG_EVENT_GLYPH(15),
-  MLN_LOG_EVENT_TIMING(16);
-
-  final int value;
-  const mln_log_event(this.value);
-
-  static mln_log_event fromValue(int value) => switch (value) {
-    0 => MLN_LOG_EVENT_GENERAL,
-    1 => MLN_LOG_EVENT_SETUP,
-    2 => MLN_LOG_EVENT_SHADER,
-    3 => MLN_LOG_EVENT_PARSE_STYLE,
-    4 => MLN_LOG_EVENT_PARSE_TILE,
-    5 => MLN_LOG_EVENT_RENDER,
-    6 => MLN_LOG_EVENT_STYLE,
-    7 => MLN_LOG_EVENT_DATABASE,
-    8 => MLN_LOG_EVENT_HTTP_REQUEST,
-    9 => MLN_LOG_EVENT_SPRITE,
-    10 => MLN_LOG_EVENT_IMAGE,
-    11 => MLN_LOG_EVENT_GRAPHICS_BACKEND,
-    12 => MLN_LOG_EVENT_JNI,
-    13 => MLN_LOG_EVENT_ANDROID,
-    14 => MLN_LOG_EVENT_CRASH,
-    15 => MLN_LOG_EVENT_GLYPH,
-    16 => MLN_LOG_EVENT_TIMING,
-    _ => throw ArgumentError('Unknown value for mln_log_event: $value'),
-  };
+sealed class mln_log_event {
+  static const MLN_LOG_EVENT_GENERAL = 0;
+  static const MLN_LOG_EVENT_SETUP = 1;
+  static const MLN_LOG_EVENT_SHADER = 2;
+  static const MLN_LOG_EVENT_PARSE_STYLE = 3;
+  static const MLN_LOG_EVENT_PARSE_TILE = 4;
+  static const MLN_LOG_EVENT_RENDER = 5;
+  static const MLN_LOG_EVENT_STYLE = 6;
+  static const MLN_LOG_EVENT_DATABASE = 7;
+  static const MLN_LOG_EVENT_HTTP_REQUEST = 8;
+  static const MLN_LOG_EVENT_SPRITE = 9;
+  static const MLN_LOG_EVENT_IMAGE = 10;
+  static const MLN_LOG_EVENT_GRAPHICS_BACKEND = 11;
+  static const MLN_LOG_EVENT_JNI = 12;
+  static const MLN_LOG_EVENT_ANDROID = 13;
+  static const MLN_LOG_EVENT_CRASH = 14;
+  static const MLN_LOG_EVENT_GLYPH = 15;
+  static const MLN_LOG_EVENT_TIMING = 16;
 }
 
-enum mln_log_severity {
-  MLN_LOG_SEVERITY_INFO(1),
-  MLN_LOG_SEVERITY_WARNING(2),
-  MLN_LOG_SEVERITY_ERROR(3);
-
-  final int value;
-  const mln_log_severity(this.value);
-
-  static mln_log_severity fromValue(int value) => switch (value) {
-    1 => MLN_LOG_SEVERITY_INFO,
-    2 => MLN_LOG_SEVERITY_WARNING,
-    3 => MLN_LOG_SEVERITY_ERROR,
-    _ => throw ArgumentError('Unknown value for mln_log_severity: $value'),
-  };
+sealed class mln_log_severity {
+  static const MLN_LOG_SEVERITY_INFO = 1;
+  static const MLN_LOG_SEVERITY_WARNING = 2;
+  static const MLN_LOG_SEVERITY_ERROR = 3;
 }
 
-enum mln_log_severity_mask {
-  MLN_LOG_SEVERITY_MASK_INFO(2),
-  MLN_LOG_SEVERITY_MASK_WARNING(4),
-  MLN_LOG_SEVERITY_MASK_ERROR(8),
-  MLN_LOG_SEVERITY_MASK_DEFAULT(6),
-  MLN_LOG_SEVERITY_MASK_ALL(14);
-
-  final int value;
-  const mln_log_severity_mask(this.value);
-
-  static mln_log_severity_mask fromValue(int value) => switch (value) {
-    2 => MLN_LOG_SEVERITY_MASK_INFO,
-    4 => MLN_LOG_SEVERITY_MASK_WARNING,
-    8 => MLN_LOG_SEVERITY_MASK_ERROR,
-    6 => MLN_LOG_SEVERITY_MASK_DEFAULT,
-    14 => MLN_LOG_SEVERITY_MASK_ALL,
-    _ => throw ArgumentError('Unknown value for mln_log_severity_mask: $value'),
-  };
+sealed class mln_log_severity_mask {
+  static const MLN_LOG_SEVERITY_MASK_INFO = 2;
+  static const MLN_LOG_SEVERITY_MASK_WARNING = 4;
+  static const MLN_LOG_SEVERITY_MASK_ERROR = 8;
+  static const MLN_LOG_SEVERITY_MASK_DEFAULT = 6;
+  static const MLN_LOG_SEVERITY_MASK_ALL = 14;
 }
 
-typedef mln_map = ffi.Uint64;
-typedef Dartmln_map = int;
-
-enum mln_map_debug_option {
-  MLN_MAP_DEBUG_TILE_BORDERS(2),
-  MLN_MAP_DEBUG_PARSE_STATUS(4),
-  MLN_MAP_DEBUG_TIMESTAMPS(8),
-  MLN_MAP_DEBUG_COLLISION(16),
-  MLN_MAP_DEBUG_OVERDRAW(32),
-  MLN_MAP_DEBUG_STENCIL_CLIP(64),
-  MLN_MAP_DEBUG_DEPTH_BUFFER(128);
-
-  final int value;
-  const mln_map_debug_option(this.value);
-
-  static mln_map_debug_option fromValue(int value) => switch (value) {
-    2 => MLN_MAP_DEBUG_TILE_BORDERS,
-    4 => MLN_MAP_DEBUG_PARSE_STATUS,
-    8 => MLN_MAP_DEBUG_TIMESTAMPS,
-    16 => MLN_MAP_DEBUG_COLLISION,
-    32 => MLN_MAP_DEBUG_OVERDRAW,
-    64 => MLN_MAP_DEBUG_STENCIL_CLIP,
-    128 => MLN_MAP_DEBUG_DEPTH_BUFFER,
-    _ => throw ArgumentError('Unknown value for mln_map_debug_option: $value'),
-  };
-}
-
-enum mln_map_mode {
-  MLN_MAP_MODE_CONTINUOUS(0),
-  MLN_MAP_MODE_STATIC(1),
-  MLN_MAP_MODE_TILE(2);
-
-  final int value;
-  const mln_map_mode(this.value);
-
-  static mln_map_mode fromValue(int value) => switch (value) {
-    0 => MLN_MAP_MODE_CONTINUOUS,
-    1 => MLN_MAP_MODE_STATIC,
-    2 => MLN_MAP_MODE_TILE,
-    _ => throw ArgumentError('Unknown value for mln_map_mode: $value'),
-  };
-}
-
-final class mln_map_options extends ffi.Struct {
-  @ffi.Uint32()
-  external int size;
-
+final class mln_logical_extent extends ffi.Struct {
   @ffi.Uint32()
   external int width;
 
@@ -4158,6 +4280,42 @@ final class mln_map_options extends ffi.Struct {
   @ffi.Double()
   external double scale_factor;
 
+  static ffi.Pointer<mln_logical_extent> $allocate(
+    ffi.Allocator $allocator, {
+    required int width,
+    required int height,
+    required double scale_factor,
+  }) => $allocator<mln_logical_extent>()
+    ..ref.width = width
+    ..ref.height = height
+    ..ref.scale_factor = scale_factor;
+}
+
+typedef mln_map = ffi.Uint64;
+typedef Dartmln_map = int;
+
+sealed class mln_map_debug_option {
+  static const MLN_MAP_DEBUG_TILE_BORDERS = 2;
+  static const MLN_MAP_DEBUG_PARSE_STATUS = 4;
+  static const MLN_MAP_DEBUG_TIMESTAMPS = 8;
+  static const MLN_MAP_DEBUG_COLLISION = 16;
+  static const MLN_MAP_DEBUG_OVERDRAW = 32;
+  static const MLN_MAP_DEBUG_STENCIL_CLIP = 64;
+  static const MLN_MAP_DEBUG_DEPTH_BUFFER = 128;
+}
+
+sealed class mln_map_mode {
+  static const MLN_MAP_MODE_CONTINUOUS = 0;
+  static const MLN_MAP_MODE_STATIC = 1;
+  static const MLN_MAP_MODE_TILE = 2;
+}
+
+final class mln_map_options extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  external mln_logical_extent initial_extent;
+
   @ffi.Uint32()
   external int map_mode;
 
@@ -4166,51 +4324,61 @@ final class mln_map_options extends ffi.Struct {
 
   @ffi.Uint64()
   external int event_mask;
-
-  static ffi.Pointer<mln_map_options> $allocate(
-    ffi.Allocator $allocator, {
-    required int size,
-    required int width,
-    required int height,
-    required double scale_factor,
-    required int map_mode,
-    required bool fast_pfor_enabled,
-    required int event_mask,
-  }) => $allocator<mln_map_options>()
-    ..ref.size = size
-    ..ref.width = width
-    ..ref.height = height
-    ..ref.scale_factor = scale_factor
-    ..ref.map_mode = map_mode
-    ..ref.fast_pfor_enabled = fast_pfor_enabled
-    ..ref.event_mask = event_mask;
 }
 
 typedef mln_map_projection = ffi.Uint64;
 typedef Dartmln_map_projection = int;
 
-enum mln_map_tile_option_field {
-  MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA(1),
-  MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS(2),
-  MLN_MAP_TILE_OPTION_LOD_SCALE(4),
-  MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD(8),
-  MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT(16),
-  MLN_MAP_TILE_OPTION_LOD_MODE(32);
+final class mln_map_snapshot extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
 
-  final int value;
-  const mln_map_tile_option_field(this.value);
+  @ffi.Uint32()
+  external int debug_options;
 
-  static mln_map_tile_option_field fromValue(int value) => switch (value) {
-    1 => MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA,
-    2 => MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS,
-    4 => MLN_MAP_TILE_OPTION_LOD_SCALE,
-    8 => MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD,
-    16 => MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT,
-    32 => MLN_MAP_TILE_OPTION_LOD_MODE,
-    _ => throw ArgumentError(
-      'Unknown value for mln_map_tile_option_field: $value',
-    ),
-  };
+  @ffi.Uint64()
+  external int generation;
+
+  external mln_camera_options camera;
+
+  external mln_logical_extent logical_extent;
+
+  external mln_projection_mode projection_mode;
+
+  external mln_map_viewport_options viewport;
+
+  @ffi.Bool()
+  external bool fully_loaded;
+
+  @ffi.Bool()
+  external bool rendering_stats_view_enabled;
+
+  @ffi.Bool()
+  external bool repaint_demand;
+
+  @ffi.Bool()
+  external bool gesture_in_progress;
+
+  @ffi.Uint64()
+  external int event_mask;
+
+  @ffi.Uint64()
+  external int latest_render_update_generation;
+
+  external mln_map_tile_options tile;
+
+  external mln_bound_options bounds;
+
+  external mln_free_camera_options free_camera;
+}
+
+sealed class mln_map_tile_option_field {
+  static const MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA = 1;
+  static const MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS = 2;
+  static const MLN_MAP_TILE_OPTION_LOD_SCALE = 4;
+  static const MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD = 8;
+  static const MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT = 16;
+  static const MLN_MAP_TILE_OPTION_LOD_MODE = 32;
 }
 
 final class mln_map_tile_options extends ffi.Struct {
@@ -4259,24 +4427,11 @@ final class mln_map_tile_options extends ffi.Struct {
     ..ref.lod_mode = lod_mode;
 }
 
-enum mln_map_viewport_option_field {
-  MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION(1),
-  MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE(2),
-  MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE(4),
-  MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET(8);
-
-  final int value;
-  const mln_map_viewport_option_field(this.value);
-
-  static mln_map_viewport_option_field fromValue(int value) => switch (value) {
-    1 => MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION,
-    2 => MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE,
-    4 => MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE,
-    8 => MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET,
-    _ => throw ArgumentError(
-      'Unknown value for mln_map_viewport_option_field: $value',
-    ),
-  };
+sealed class mln_map_viewport_option_field {
+  static const MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION = 1;
+  static const MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE = 2;
+  static const MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE = 4;
+  static const MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET = 8;
 }
 
 final class mln_map_viewport_options extends ffi.Struct {
@@ -4397,36 +4552,16 @@ final class mln_metal_surface_descriptor extends ffi.Struct {
   external ffi.Pointer<ffi.Void> layer;
 }
 
-enum mln_network_status {
-  MLN_NETWORK_STATUS_ONLINE(1),
-  MLN_NETWORK_STATUS_OFFLINE(2);
-
-  final int value;
-  const mln_network_status(this.value);
-
-  static mln_network_status fromValue(int value) => switch (value) {
-    1 => MLN_NETWORK_STATUS_ONLINE,
-    2 => MLN_NETWORK_STATUS_OFFLINE,
-    _ => throw ArgumentError('Unknown value for mln_network_status: $value'),
-  };
+sealed class mln_network_status {
+  static const MLN_NETWORK_STATUS_ONLINE = 1;
+  static const MLN_NETWORK_STATUS_OFFLINE = 2;
 }
 
-enum mln_north_orientation {
-  MLN_NORTH_ORIENTATION_UP(0),
-  MLN_NORTH_ORIENTATION_RIGHT(1),
-  MLN_NORTH_ORIENTATION_DOWN(2),
-  MLN_NORTH_ORIENTATION_LEFT(3);
-
-  final int value;
-  const mln_north_orientation(this.value);
-
-  static mln_north_orientation fromValue(int value) => switch (value) {
-    0 => MLN_NORTH_ORIENTATION_UP,
-    1 => MLN_NORTH_ORIENTATION_RIGHT,
-    2 => MLN_NORTH_ORIENTATION_DOWN,
-    3 => MLN_NORTH_ORIENTATION_LEFT,
-    _ => throw ArgumentError('Unknown value for mln_north_orientation: $value'),
-  };
+sealed class mln_north_orientation {
+  static const MLN_NORTH_ORIENTATION_UP = 0;
+  static const MLN_NORTH_ORIENTATION_RIGHT = 1;
+  static const MLN_NORTH_ORIENTATION_DOWN = 2;
+  static const MLN_NORTH_ORIENTATION_LEFT = 3;
 }
 
 final class mln_offline_geometry_region_definition extends ffi.Struct {
@@ -4450,68 +4585,6 @@ final class mln_offline_geometry_region_definition extends ffi.Struct {
   external bool include_ideographs;
 }
 
-typedef mln_offline_operation_id = ffi.Uint64;
-typedef Dartmln_offline_operation_id = int;
-
-enum mln_offline_operation_kind {
-  MLN_OFFLINE_OPERATION_AMBIENT_CACHE(1),
-  MLN_OFFLINE_OPERATION_REGION_CREATE(2),
-  MLN_OFFLINE_OPERATION_REGION_GET(3),
-  MLN_OFFLINE_OPERATION_REGIONS_LIST(4),
-  MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE(5),
-  MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA(6),
-  MLN_OFFLINE_OPERATION_REGION_GET_STATUS(7),
-  MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED(8),
-  MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE(9),
-  MLN_OFFLINE_OPERATION_REGION_INVALIDATE(10),
-  MLN_OFFLINE_OPERATION_REGION_DELETE(11),
-  MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE(12);
-
-  final int value;
-  const mln_offline_operation_kind(this.value);
-
-  static mln_offline_operation_kind fromValue(int value) => switch (value) {
-    1 => MLN_OFFLINE_OPERATION_AMBIENT_CACHE,
-    2 => MLN_OFFLINE_OPERATION_REGION_CREATE,
-    3 => MLN_OFFLINE_OPERATION_REGION_GET,
-    4 => MLN_OFFLINE_OPERATION_REGIONS_LIST,
-    5 => MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE,
-    6 => MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA,
-    7 => MLN_OFFLINE_OPERATION_REGION_GET_STATUS,
-    8 => MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED,
-    9 => MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE,
-    10 => MLN_OFFLINE_OPERATION_REGION_INVALIDATE,
-    11 => MLN_OFFLINE_OPERATION_REGION_DELETE,
-    12 => MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE,
-    _ => throw ArgumentError(
-      'Unknown value for mln_offline_operation_kind: $value',
-    ),
-  };
-}
-
-enum mln_offline_operation_result_kind {
-  MLN_OFFLINE_OPERATION_RESULT_NONE(0),
-  MLN_OFFLINE_OPERATION_RESULT_REGION(1),
-  MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION(2),
-  MLN_OFFLINE_OPERATION_RESULT_REGION_LIST(3),
-  MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS(4);
-
-  final int value;
-  const mln_offline_operation_result_kind(this.value);
-
-  static mln_offline_operation_result_kind fromValue(int value) =>
-      switch (value) {
-        0 => MLN_OFFLINE_OPERATION_RESULT_NONE,
-        1 => MLN_OFFLINE_OPERATION_RESULT_REGION,
-        2 => MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION,
-        3 => MLN_OFFLINE_OPERATION_RESULT_REGION_LIST,
-        4 => MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS,
-        _ => throw ArgumentError(
-          'Unknown value for mln_offline_operation_result_kind: $value',
-        ),
-      };
-}
-
 final class mln_offline_region_definition extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -4519,41 +4592,23 @@ final class mln_offline_region_definition extends ffi.Struct {
   @ffi.Uint32()
   external int type;
 
-  external UnnamedUnion data;
+  external mln_offline_region_definition_data data;
 }
 
-enum mln_offline_region_definition_type {
-  MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID(1),
-  MLN_OFFLINE_REGION_DEFINITION_GEOMETRY(2);
+final class mln_offline_region_definition_data extends ffi.Union {
+  external mln_offline_tile_pyramid_region_definition tile_pyramid;
 
-  final int value;
-  const mln_offline_region_definition_type(this.value);
-
-  static mln_offline_region_definition_type fromValue(int value) =>
-      switch (value) {
-        1 => MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
-        2 => MLN_OFFLINE_REGION_DEFINITION_GEOMETRY,
-        _ => throw ArgumentError(
-          'Unknown value for mln_offline_region_definition_type: $value',
-        ),
-      };
+  external mln_offline_geometry_region_definition geometry;
 }
 
-enum mln_offline_region_download_state {
-  MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE(0),
-  MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE(1);
+sealed class mln_offline_region_definition_type {
+  static const MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID = 1;
+  static const MLN_OFFLINE_REGION_DEFINITION_GEOMETRY = 2;
+}
 
-  final int value;
-  const mln_offline_region_download_state(this.value);
-
-  static mln_offline_region_download_state fromValue(int value) =>
-      switch (value) {
-        0 => MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
-        1 => MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,
-        _ => throw ArgumentError(
-          'Unknown value for mln_offline_region_download_state: $value',
-        ),
-      };
+sealed class mln_offline_region_download_state {
+  static const MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE = 0;
+  static const MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1;
 }
 
 typedef mln_offline_region_id = ffi.Int64;
@@ -4573,11 +4628,6 @@ final class mln_offline_region_info extends ffi.Struct {
   @ffi.Size()
   external int metadata_size;
 }
-
-typedef mln_offline_region_list = ffi.Uint64;
-typedef Dartmln_offline_region_list = int;
-typedef mln_offline_region_snapshot = ffi.Uint64;
-typedef Dartmln_offline_region_snapshot = int;
 
 final class mln_offline_region_status extends ffi.Struct {
   @ffi.Uint32()
@@ -4678,20 +4728,10 @@ final class mln_opengl_borrowed_texture_descriptor extends ffi.Struct {
   external int target;
 }
 
-enum mln_opengl_client_api {
-  MLN_OPENGL_CLIENT_API_UNSPECIFIED(0),
-  MLN_OPENGL_CLIENT_API_GL(1),
-  MLN_OPENGL_CLIENT_API_GLES(2);
-
-  final int value;
-  const mln_opengl_client_api(this.value);
-
-  static mln_opengl_client_api fromValue(int value) => switch (value) {
-    0 => MLN_OPENGL_CLIENT_API_UNSPECIFIED,
-    1 => MLN_OPENGL_CLIENT_API_GL,
-    2 => MLN_OPENGL_CLIENT_API_GLES,
-    _ => throw ArgumentError('Unknown value for mln_opengl_client_api: $value'),
-  };
+sealed class mln_opengl_client_api {
+  static const MLN_OPENGL_CLIENT_API_UNSPECIFIED = 0;
+  static const MLN_OPENGL_CLIENT_API_GL = 1;
+  static const MLN_OPENGL_CLIENT_API_GLES = 2;
 }
 
 final class mln_opengl_context_descriptor extends ffi.Struct {
@@ -4699,77 +4739,38 @@ final class mln_opengl_context_descriptor extends ffi.Struct {
   external int size;
 
   @ffi.Uint32()
-  external int platformAsInt;
-
-  mln_opengl_context_platform get platform =>
-      mln_opengl_context_platform.fromValue(platformAsInt);
-  set platform(mln_opengl_context_platform value) =>
-      platformAsInt = value.value;
+  external int platform;
 
   @ffi.Uint32()
-  external int ownershipAsInt;
+  external int ownership;
 
-  mln_opengl_context_ownership get ownership =>
-      mln_opengl_context_ownership.fromValue(ownershipAsInt);
-  set ownership(mln_opengl_context_ownership value) =>
-      ownershipAsInt = value.value;
-
-  external UnnamedUnion$1 data;
+  external mln_opengl_context_descriptor_data data;
 }
 
-enum mln_opengl_context_ownership {
-  MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED(0),
-  MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED(1);
+final class mln_opengl_context_descriptor_data extends ffi.Union {
+  external mln_wgl_context_descriptor wgl;
 
-  final int value;
-  const mln_opengl_context_ownership(this.value);
+  external mln_egl_context_descriptor egl;
 
-  static mln_opengl_context_ownership fromValue(int value) => switch (value) {
-    0 => MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
-    1 => MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED,
-    _ => throw ArgumentError(
-      'Unknown value for mln_opengl_context_ownership: $value',
-    ),
-  };
+  external mln_webgl_context_descriptor webgl;
 }
 
-enum mln_opengl_context_platform {
-  MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED(0),
-  MLN_OPENGL_CONTEXT_PLATFORM_WGL(1),
-  MLN_OPENGL_CONTEXT_PLATFORM_EGL(2),
-  MLN_OPENGL_CONTEXT_PLATFORM_WEBGL(3);
-
-  final int value;
-  const mln_opengl_context_platform(this.value);
-
-  static mln_opengl_context_platform fromValue(int value) => switch (value) {
-    0 => MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED,
-    1 => MLN_OPENGL_CONTEXT_PLATFORM_WGL,
-    2 => MLN_OPENGL_CONTEXT_PLATFORM_EGL,
-    3 => MLN_OPENGL_CONTEXT_PLATFORM_WEBGL,
-    _ => throw ArgumentError(
-      'Unknown value for mln_opengl_context_platform: $value',
-    ),
-  };
+sealed class mln_opengl_context_ownership {
+  static const MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED = 0;
+  static const MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED = 1;
 }
 
-enum mln_opengl_context_provider_flag {
-  MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL(1),
-  MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL(2),
-  MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL(4);
+sealed class mln_opengl_context_platform {
+  static const MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED = 0;
+  static const MLN_OPENGL_CONTEXT_PLATFORM_WGL = 1;
+  static const MLN_OPENGL_CONTEXT_PLATFORM_EGL = 2;
+  static const MLN_OPENGL_CONTEXT_PLATFORM_WEBGL = 3;
+}
 
-  final int value;
-  const mln_opengl_context_provider_flag(this.value);
-
-  static mln_opengl_context_provider_flag fromValue(int value) =>
-      switch (value) {
-        1 => MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL,
-        2 => MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL,
-        4 => MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL,
-        _ => throw ArgumentError(
-          'Unknown value for mln_opengl_context_provider_flag: $value',
-        ),
-      };
+sealed class mln_opengl_context_provider_flag {
+  static const MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL = 1;
+  static const MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL = 2;
+  static const MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL = 4;
 }
 
 final class mln_opengl_owned_texture_descriptor extends ffi.Struct {
@@ -4879,20 +4880,10 @@ final class mln_plugin_attribute_binding_v1 extends ffi.Struct {
     ..ref.byte_offset = byte_offset;
 }
 
-enum mln_plugin_backend {
-  MLN_PLUGIN_BACKEND_OPENGL(1),
-  MLN_PLUGIN_BACKEND_VULKAN(2),
-  MLN_PLUGIN_BACKEND_METAL(4);
-
-  final int value;
-  const mln_plugin_backend(this.value);
-
-  static mln_plugin_backend fromValue(int value) => switch (value) {
-    1 => MLN_PLUGIN_BACKEND_OPENGL,
-    2 => MLN_PLUGIN_BACKEND_VULKAN,
-    4 => MLN_PLUGIN_BACKEND_METAL,
-    _ => throw ArgumentError('Unknown value for mln_plugin_backend: $value'),
-  };
+sealed class mln_plugin_backend {
+  static const MLN_PLUGIN_BACKEND_OPENGL = 1;
+  static const MLN_PLUGIN_BACKEND_VULKAN = 2;
+  static const MLN_PLUGIN_BACKEND_METAL = 4;
 }
 
 final class mln_plugin_bucket_v1 extends ffi.Struct {
@@ -4983,7 +4974,7 @@ typedef mln_plugin_create_layout_fnFunction =
       ffi.Pointer<ffi.Pointer<ffi.Void>> layout_instance,
     );
 typedef Dartmln_plugin_create_layout_fnFunction =
-    mln_plugin_status Function(
+    int Function(
       ffi.Pointer<mln_plugin_layout_context_v1> context,
       ffi.Pointer<ffi.Pointer<ffi.Void>> layout_instance,
     );
@@ -5043,12 +5034,7 @@ final class mln_plugin_feature_v1 extends ffi.Struct {
   external int struct_size;
 
   @ffi.UnsignedInt()
-  external int geometry_typeAsInt;
-
-  mln_plugin_geometry_type get geometry_type =>
-      mln_plugin_geometry_type.fromValue(geometry_typeAsInt);
-  set geometry_type(mln_plugin_geometry_type value) =>
-      geometry_typeAsInt = value.value;
+  external int geometry_type;
 
   @ffi.Uint64()
   external int feature_index;
@@ -5066,7 +5052,7 @@ final class mln_plugin_feature_v1 extends ffi.Struct {
   static ffi.Pointer<mln_plugin_feature_v1> $allocate(
     ffi.Allocator $allocator, {
     required int struct_size,
-    required mln_plugin_geometry_type geometry_type,
+    required int geometry_type,
     required int feature_index,
     required ffi.Pointer<mln_plugin_tile_point_v1> points,
     required int point_count,
@@ -5121,7 +5107,7 @@ typedef mln_plugin_finish_layout_fnFunction =
       ffi.Pointer<mln_plugin_bucket_v1> bucket,
     );
 typedef Dartmln_plugin_finish_layout_fnFunction =
-    mln_plugin_status Function(
+    int Function(
       ffi.Pointer<ffi.Void> layout_instance,
       ffi.Pointer<mln_plugin_bucket_v1> bucket,
     );
@@ -5142,22 +5128,10 @@ final class mln_plugin_float2 extends ffi.Struct {
     ..ref.y = y;
 }
 
-enum mln_plugin_geometry_type {
-  MLN_PLUGIN_GEOMETRY_POINT(1),
-  MLN_PLUGIN_GEOMETRY_LINESTRING(2),
-  MLN_PLUGIN_GEOMETRY_POLYGON(4);
-
-  final int value;
-  const mln_plugin_geometry_type(this.value);
-
-  static mln_plugin_geometry_type fromValue(int value) => switch (value) {
-    1 => MLN_PLUGIN_GEOMETRY_POINT,
-    2 => MLN_PLUGIN_GEOMETRY_LINESTRING,
-    4 => MLN_PLUGIN_GEOMETRY_POLYGON,
-    _ => throw ArgumentError(
-      'Unknown value for mln_plugin_geometry_type: $value',
-    ),
-  };
+sealed class mln_plugin_geometry_type {
+  static const MLN_PLUGIN_GEOMETRY_POINT = 1;
+  static const MLN_PLUGIN_GEOMETRY_LINESTRING = 2;
+  static const MLN_PLUGIN_GEOMETRY_POLYGON = 4;
 }
 
 final class mln_plugin_layer_type_v1 extends ffi.Struct {
@@ -5232,7 +5206,7 @@ typedef mln_plugin_layout_feature_fnFunction =
       ffi.Pointer<mln_plugin_feature_v1> feature,
     );
 typedef Dartmln_plugin_layout_feature_fnFunction =
-    mln_plugin_status Function(
+    int Function(
       ffi.Pointer<ffi.Void> layout_instance,
       ffi.Pointer<mln_plugin_feature_v1> feature,
     );
@@ -5244,10 +5218,7 @@ final class mln_plugin_property_descriptor_v1 extends ffi.Struct {
   external mln_plugin_string name;
 
   @ffi.UnsignedInt()
-  external int typeAsInt;
-
-  mln_plugin_value_type get type => mln_plugin_value_type.fromValue(typeAsInt);
-  set type(mln_plugin_value_type value) => typeAsInt = value.value;
+  external int type;
 
   external mln_plugin_value default_value;
 
@@ -5275,25 +5246,11 @@ final class mln_plugin_property_descriptor_v1 extends ffi.Struct {
   external int enum_value_count;
 }
 
-enum mln_plugin_property_encoding_v1 {
-  MLN_PLUGIN_PROPERTY_ENCODING_FLOAT(1),
-  MLN_PLUGIN_PROPERTY_ENCODING_FLOAT2(2),
-  MLN_PLUGIN_PROPERTY_ENCODING_COLOR(3),
-  MLN_PLUGIN_PROPERTY_ENCODING_ENUM_FLOAT(4);
-
-  final int value;
-  const mln_plugin_property_encoding_v1(this.value);
-
-  static mln_plugin_property_encoding_v1 fromValue(int value) =>
-      switch (value) {
-        1 => MLN_PLUGIN_PROPERTY_ENCODING_FLOAT,
-        2 => MLN_PLUGIN_PROPERTY_ENCODING_FLOAT2,
-        3 => MLN_PLUGIN_PROPERTY_ENCODING_COLOR,
-        4 => MLN_PLUGIN_PROPERTY_ENCODING_ENUM_FLOAT,
-        _ => throw ArgumentError(
-          'Unknown value for mln_plugin_property_encoding_v1: $value',
-        ),
-      };
+sealed class mln_plugin_property_encoding_v1 {
+  static const MLN_PLUGIN_PROPERTY_ENCODING_FLOAT = 1;
+  static const MLN_PLUGIN_PROPERTY_ENCODING_FLOAT2 = 2;
+  static const MLN_PLUGIN_PROPERTY_ENCODING_COLOR = 3;
+  static const MLN_PLUGIN_PROPERTY_ENCODING_ENUM_FLOAT = 4;
 }
 
 final class mln_plugin_property_statistics_v1 extends ffi.Struct {
@@ -5387,7 +5344,7 @@ typedef mln_plugin_register_function_v1Function =
       ffi.Size error_message_capacity,
     );
 typedef Dartmln_plugin_register_function_v1Function =
-    mln_plugin_status Function(
+    int Function(
       ffi.Pointer<mln_plugin_descriptor_v1> descriptor,
       ffi.Pointer<ffi.Char> error_message,
       int error_message_capacity,
@@ -5437,11 +5394,7 @@ final class mln_plugin_shader_attribute_v1 extends ffi.Struct {
   external mln_plugin_string name;
 
   @ffi.UnsignedInt()
-  external int typeAsInt;
-
-  mln_plugin_vertex_attribute_type get type =>
-      mln_plugin_vertex_attribute_type.fromValue(typeAsInt);
-  set type(mln_plugin_vertex_attribute_type value) => typeAsInt = value.value;
+  external int type;
 }
 
 final class mln_plugin_shader_descriptor_v1 extends ffi.Struct {
@@ -5478,12 +5431,7 @@ final class mln_plugin_shader_property_binding_v1 extends ffi.Struct {
   external mln_plugin_string property_name;
 
   @ffi.UnsignedInt()
-  external int encodingAsInt;
-
-  mln_plugin_property_encoding_v1 get encoding =>
-      mln_plugin_property_encoding_v1.fromValue(encodingAsInt);
-  set encoding(mln_plugin_property_encoding_v1 value) =>
-      encodingAsInt = value.value;
+  external int encoding;
 
   @ffi.Uint32()
   external int uniform_id;
@@ -5509,10 +5457,7 @@ final class mln_plugin_shader_source_v1 extends ffi.Struct {
   external int struct_size;
 
   @ffi.UnsignedInt()
-  external int backendAsInt;
-
-  mln_plugin_backend get backend => mln_plugin_backend.fromValue(backendAsInt);
-  set backend(mln_plugin_backend value) => backendAsInt = value.value;
+  external int backend;
 
   external mln_plugin_string vertex_source;
 
@@ -5523,28 +5468,14 @@ final class mln_plugin_shader_source_v1 extends ffi.Struct {
   external mln_plugin_string fragment_entry_point;
 }
 
-enum mln_plugin_status {
-  MLN_PLUGIN_STATUS_OK(0),
-  MLN_PLUGIN_STATUS_ALREADY_REGISTERED(1),
-  MLN_PLUGIN_STATUS_INVALID_ARGUMENT(2),
-  MLN_PLUGIN_STATUS_UNSUPPORTED_ABI(3),
-  MLN_PLUGIN_STATUS_CONFLICT(4),
-  MLN_PLUGIN_STATUS_NOT_FOUND(5),
-  MLN_PLUGIN_STATUS_CALLBACK_ERROR(6);
-
-  final int value;
-  const mln_plugin_status(this.value);
-
-  static mln_plugin_status fromValue(int value) => switch (value) {
-    0 => MLN_PLUGIN_STATUS_OK,
-    1 => MLN_PLUGIN_STATUS_ALREADY_REGISTERED,
-    2 => MLN_PLUGIN_STATUS_INVALID_ARGUMENT,
-    3 => MLN_PLUGIN_STATUS_UNSUPPORTED_ABI,
-    4 => MLN_PLUGIN_STATUS_CONFLICT,
-    5 => MLN_PLUGIN_STATUS_NOT_FOUND,
-    6 => MLN_PLUGIN_STATUS_CALLBACK_ERROR,
-    _ => throw ArgumentError('Unknown value for mln_plugin_status: $value'),
-  };
+sealed class mln_plugin_status {
+  static const MLN_PLUGIN_STATUS_OK = 0;
+  static const MLN_PLUGIN_STATUS_ALREADY_REGISTERED = 1;
+  static const MLN_PLUGIN_STATUS_INVALID_ARGUMENT = 2;
+  static const MLN_PLUGIN_STATUS_UNSUPPORTED_ABI = 3;
+  static const MLN_PLUGIN_STATUS_CONFLICT = 4;
+  static const MLN_PLUGIN_STATUS_NOT_FOUND = 5;
+  static const MLN_PLUGIN_STATUS_CALLBACK_ERROR = 6;
 }
 
 final class mln_plugin_string extends ffi.Struct {
@@ -5594,11 +5525,7 @@ final class mln_plugin_uniform_block_descriptor_v1 extends ffi.Struct {
   external int stage_mask;
 
   @ffi.UnsignedInt()
-  external int scopeAsInt;
-
-  mln_plugin_uniform_scope_v1 get scope =>
-      mln_plugin_uniform_scope_v1.fromValue(scopeAsInt);
-  set scope(mln_plugin_uniform_scope_v1 value) => scopeAsInt = value.value;
+  external int scope;
 }
 
 final class mln_plugin_uniform_context_v1 extends ffi.Struct {
@@ -5630,22 +5557,10 @@ final class mln_plugin_uniform_context_v1 extends ffi.Struct {
   external double pixel_ratio;
 }
 
-enum mln_plugin_uniform_scope_v1 {
-  MLN_PLUGIN_UNIFORM_DRAWABLE(0),
-  MLN_PLUGIN_UNIFORM_LAYER(1),
-  MLN_PLUGIN_UNIFORM_DRAWABLE_ARRAY(2);
-
-  final int value;
-  const mln_plugin_uniform_scope_v1(this.value);
-
-  static mln_plugin_uniform_scope_v1 fromValue(int value) => switch (value) {
-    0 => MLN_PLUGIN_UNIFORM_DRAWABLE,
-    1 => MLN_PLUGIN_UNIFORM_LAYER,
-    2 => MLN_PLUGIN_UNIFORM_DRAWABLE_ARRAY,
-    _ => throw ArgumentError(
-      'Unknown value for mln_plugin_uniform_scope_v1: $value',
-    ),
-  };
+sealed class mln_plugin_uniform_scope_v1 {
+  static const MLN_PLUGIN_UNIFORM_DRAWABLE = 0;
+  static const MLN_PLUGIN_UNIFORM_LAYER = 1;
+  static const MLN_PLUGIN_UNIFORM_DRAWABLE_ARRAY = 2;
 }
 
 typedef mln_plugin_update_uniform_block_fn =
@@ -5658,7 +5573,7 @@ typedef mln_plugin_update_uniform_block_fnFunction =
       ffi.Size output_size,
     );
 typedef Dartmln_plugin_update_uniform_block_fnFunction =
-    mln_plugin_status Function(
+    int Function(
       ffi.Pointer<mln_plugin_uniform_context_v1> context,
       int uniform_id,
       ffi.Pointer<ffi.Uint8> output,
@@ -5670,10 +5585,7 @@ final class mln_plugin_value extends ffi.Struct {
   external int struct_size;
 
   @ffi.UnsignedInt()
-  external int typeAsInt;
-
-  mln_plugin_value_type get type => mln_plugin_value_type.fromValue(typeAsInt);
-  set type(mln_plugin_value_type value) => typeAsInt = value.value;
+  external int type;
 
   external mln_plugin_value_data data;
 }
@@ -5689,53 +5601,23 @@ final class mln_plugin_value_data extends ffi.Union {
   external mln_plugin_string string_value;
 }
 
-enum mln_plugin_value_type {
-  MLN_PLUGIN_VALUE_FLOAT(1),
-  MLN_PLUGIN_VALUE_FLOAT2(2),
-  MLN_PLUGIN_VALUE_COLOR(3),
-  MLN_PLUGIN_VALUE_STRING(4);
-
-  final int value;
-  const mln_plugin_value_type(this.value);
-
-  static mln_plugin_value_type fromValue(int value) => switch (value) {
-    1 => MLN_PLUGIN_VALUE_FLOAT,
-    2 => MLN_PLUGIN_VALUE_FLOAT2,
-    3 => MLN_PLUGIN_VALUE_COLOR,
-    4 => MLN_PLUGIN_VALUE_STRING,
-    _ => throw ArgumentError('Unknown value for mln_plugin_value_type: $value'),
-  };
+sealed class mln_plugin_value_type {
+  static const MLN_PLUGIN_VALUE_FLOAT = 1;
+  static const MLN_PLUGIN_VALUE_FLOAT2 = 2;
+  static const MLN_PLUGIN_VALUE_COLOR = 3;
+  static const MLN_PLUGIN_VALUE_STRING = 4;
 }
 
-enum mln_plugin_vertex_attribute_type {
-  MLN_PLUGIN_VERTEX_INT16(1),
-  MLN_PLUGIN_VERTEX_INT16_X2(2),
-  MLN_PLUGIN_VERTEX_UINT16(3),
-  MLN_PLUGIN_VERTEX_UINT16_X2(4),
-  MLN_PLUGIN_VERTEX_FLOAT(5),
-  MLN_PLUGIN_VERTEX_FLOAT_X2(6),
-  MLN_PLUGIN_VERTEX_FLOAT_X3(7),
-  MLN_PLUGIN_VERTEX_FLOAT_X4(8),
-  MLN_PLUGIN_VERTEX_UINT8_X4_NORMALIZED(9);
-
-  final int value;
-  const mln_plugin_vertex_attribute_type(this.value);
-
-  static mln_plugin_vertex_attribute_type fromValue(int value) =>
-      switch (value) {
-        1 => MLN_PLUGIN_VERTEX_INT16,
-        2 => MLN_PLUGIN_VERTEX_INT16_X2,
-        3 => MLN_PLUGIN_VERTEX_UINT16,
-        4 => MLN_PLUGIN_VERTEX_UINT16_X2,
-        5 => MLN_PLUGIN_VERTEX_FLOAT,
-        6 => MLN_PLUGIN_VERTEX_FLOAT_X2,
-        7 => MLN_PLUGIN_VERTEX_FLOAT_X3,
-        8 => MLN_PLUGIN_VERTEX_FLOAT_X4,
-        9 => MLN_PLUGIN_VERTEX_UINT8_X4_NORMALIZED,
-        _ => throw ArgumentError(
-          'Unknown value for mln_plugin_vertex_attribute_type: $value',
-        ),
-      };
+sealed class mln_plugin_vertex_attribute_type {
+  static const MLN_PLUGIN_VERTEX_INT16 = 1;
+  static const MLN_PLUGIN_VERTEX_INT16_X2 = 2;
+  static const MLN_PLUGIN_VERTEX_UINT16 = 3;
+  static const MLN_PLUGIN_VERTEX_UINT16_X2 = 4;
+  static const MLN_PLUGIN_VERTEX_FLOAT = 5;
+  static const MLN_PLUGIN_VERTEX_FLOAT_X2 = 6;
+  static const MLN_PLUGIN_VERTEX_FLOAT_X3 = 7;
+  static const MLN_PLUGIN_VERTEX_FLOAT_X4 = 8;
+  static const MLN_PLUGIN_VERTEX_UINT8_X4_NORMALIZED = 9;
 }
 
 final class mln_plugin_vertex_stream_v1 extends ffi.Struct {
@@ -5855,22 +5737,10 @@ final class mln_projection_mode extends ffi.Struct {
     ..ref.y_skew = y_skew;
 }
 
-enum mln_projection_mode_field {
-  MLN_PROJECTION_MODE_AXONOMETRIC(1),
-  MLN_PROJECTION_MODE_X_SKEW(2),
-  MLN_PROJECTION_MODE_Y_SKEW(4);
-
-  final int value;
-  const mln_projection_mode_field(this.value);
-
-  static mln_projection_mode_field fromValue(int value) => switch (value) {
-    1 => MLN_PROJECTION_MODE_AXONOMETRIC,
-    2 => MLN_PROJECTION_MODE_X_SKEW,
-    4 => MLN_PROJECTION_MODE_Y_SKEW,
-    _ => throw ArgumentError(
-      'Unknown value for mln_projection_mode_field: $value',
-    ),
-  };
+sealed class mln_projection_mode_field {
+  static const MLN_PROJECTION_MODE_AXONOMETRIC = 1;
+  static const MLN_PROJECTION_MODE_X_SKEW = 2;
+  static const MLN_PROJECTION_MODE_Y_SKEW = 4;
 }
 
 final class mln_quaternion extends ffi.Struct {
@@ -5915,81 +5785,221 @@ final class mln_queried_feature extends ffi.Struct {
   external mln_buffer_view state;
 }
 
-enum mln_queried_feature_field {
-  MLN_QUERIED_FEATURE_SOURCE_ID(1),
-  MLN_QUERIED_FEATURE_SOURCE_LAYER_ID(2),
-  MLN_QUERIED_FEATURE_STATE(4);
-
-  final int value;
-  const mln_queried_feature_field(this.value);
-
-  static mln_queried_feature_field fromValue(int value) => switch (value) {
-    1 => MLN_QUERIED_FEATURE_SOURCE_ID,
-    2 => MLN_QUERIED_FEATURE_SOURCE_LAYER_ID,
-    4 => MLN_QUERIED_FEATURE_STATE,
-    _ => throw ArgumentError(
-      'Unknown value for mln_queried_feature_field: $value',
-    ),
-  };
+sealed class mln_queried_feature_field {
+  static const MLN_QUERIED_FEATURE_SOURCE_ID = 1;
+  static const MLN_QUERIED_FEATURE_SOURCE_LAYER_ID = 2;
+  static const MLN_QUERIED_FEATURE_STATE = 4;
 }
 
-typedef mln_queried_feature_list = ffi.Uint64;
-typedef Dartmln_queried_feature_list = int;
-
-enum mln_render_backend_flag {
-  MLN_RENDER_BACKEND_FLAG_METAL(1),
-  MLN_RENDER_BACKEND_FLAG_VULKAN(2),
-  MLN_RENDER_BACKEND_FLAG_OPENGL(4),
-  MLN_RENDER_BACKEND_FLAG_WEBGPU(8);
-
-  final int value;
-  const mln_render_backend_flag(this.value);
-
-  static mln_render_backend_flag fromValue(int value) => switch (value) {
-    1 => MLN_RENDER_BACKEND_FLAG_METAL,
-    2 => MLN_RENDER_BACKEND_FLAG_VULKAN,
-    4 => MLN_RENDER_BACKEND_FLAG_OPENGL,
-    8 => MLN_RENDER_BACKEND_FLAG_WEBGPU,
-    _ => throw ArgumentError(
-      'Unknown value for mln_render_backend_flag: $value',
-    ),
-  };
+sealed class mln_render_abandon_disposition {
+  static const MLN_RENDER_ABANDON_DISPOSITION_CLEAN = 0;
+  static const MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED = 1;
 }
 
-enum mln_render_mode {
-  MLN_RENDER_MODE_PARTIAL(0),
-  MLN_RENDER_MODE_FULL(1);
+final class mln_render_abandon_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
 
-  final int value;
-  const mln_render_mode(this.value);
+  @ffi.Uint32()
+  external int disposition;
 
-  static mln_render_mode fromValue(int value) => switch (value) {
-    0 => MLN_RENDER_MODE_PARTIAL,
-    1 => MLN_RENDER_MODE_FULL,
-    _ => throw ArgumentError('Unknown value for mln_render_mode: $value'),
-  };
+  @ffi.Uint32()
+  external int quarantined_resource_count;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  static ffi.Pointer<mln_render_abandon_result> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int disposition,
+    required int quarantined_resource_count,
+    required int reserved,
+  }) => $allocator<mln_render_abandon_result>()
+    ..ref.size = size
+    ..ref.disposition = disposition
+    ..ref.quarantined_resource_count = quarantined_resource_count
+    ..ref.reserved = reserved;
 }
 
-enum mln_render_result {
-  MLN_RENDER_RESULT_RENDERED(0),
-  MLN_RENDER_RESULT_NO_UPDATE(1),
-  MLN_RENDER_RESULT_SIZE_PENDING(2),
-  MLN_RENDER_RESULT_TARGET_NOT_READY(3);
+sealed class mln_render_backend_flag {
+  static const MLN_RENDER_BACKEND_FLAG_METAL = 1;
+  static const MLN_RENDER_BACKEND_FLAG_VULKAN = 2;
+  static const MLN_RENDER_BACKEND_FLAG_OPENGL = 4;
+  static const MLN_RENDER_BACKEND_FLAG_WEBGPU = 8;
+}
 
-  final int value;
-  const mln_render_result(this.value);
+sealed class mln_render_driver_kind {
+  static const MLN_RENDER_DRIVER_CORE_WORKER = 1;
+  static const MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD = 2;
+}
 
-  static mln_render_result fromValue(int value) => switch (value) {
-    0 => MLN_RENDER_RESULT_RENDERED,
-    1 => MLN_RENDER_RESULT_NO_UPDATE,
-    2 => MLN_RENDER_RESULT_SIZE_PENDING,
-    3 => MLN_RENDER_RESULT_TARGET_NOT_READY,
-    _ => throw ArgumentError('Unknown value for mln_render_result: $value'),
-  };
+typedef mln_render_frame_batch = ffi.Uint64;
+typedef Dartmln_render_frame_batch = int;
+
+final class mln_render_frame_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int disposition;
+
+  @ffi.Uint64()
+  external int token;
+
+  @ffi.Uint64()
+  external int map_update_generation;
+
+  @ffi.Uint64()
+  external int extent_generation;
+
+  @ffi.Uint64()
+  external int frame_generation;
+
+  @ffi.Bool()
+  external bool needs_repaint;
+
+  static ffi.Pointer<mln_render_frame_result> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int disposition,
+    required int token,
+    required int map_update_generation,
+    required int extent_generation,
+    required int frame_generation,
+    required bool needs_repaint,
+  }) => $allocator<mln_render_frame_result>()
+    ..ref.size = size
+    ..ref.disposition = disposition
+    ..ref.token = token
+    ..ref.map_update_generation = map_update_generation
+    ..ref.extent_generation = extent_generation
+    ..ref.frame_generation = frame_generation
+    ..ref.needs_repaint = needs_repaint;
+}
+
+sealed class mln_render_mode {
+  static const MLN_RENDER_MODE_PARTIAL = 0;
+  static const MLN_RENDER_MODE_FULL = 1;
+}
+
+sealed class mln_render_result {
+  static const MLN_RENDER_RESULT_RENDERED = 0;
+  static const MLN_RENDER_RESULT_NO_UPDATE = 1;
+  static const MLN_RENDER_RESULT_SIZE_PENDING = 2;
+  static const MLN_RENDER_RESULT_TARGET_NOT_READY = 3;
+  static const MLN_RENDER_RESULT_SUPERSEDED = 4;
+  static const MLN_RENDER_RESULT_DEADLINE_MISSED = 5;
 }
 
 typedef mln_render_session = ffi.Uint64;
 typedef Dartmln_render_session = int;
+
+final class mln_render_session_attach_options extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int driver;
+
+  @ffi.Uint32()
+  external int requested_texture_ring_depth;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  external mln_wake frame_wake;
+
+  external mln_wake driver_work_wake;
+}
+
+final class mln_render_session_capabilities extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int driver;
+
+  @ffi.Uint32()
+  external int texture_ring_depth;
+
+  @ffi.Uint32()
+  external int flags;
+
+  static ffi.Pointer<mln_render_session_capabilities> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int driver,
+    required int texture_ring_depth,
+    required int flags,
+  }) => $allocator<mln_render_session_capabilities>()
+    ..ref.size = size
+    ..ref.driver = driver
+    ..ref.texture_ring_depth = texture_ring_depth
+    ..ref.flags = flags;
+}
+
+sealed class mln_render_session_capability_flag {
+  static const MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION = 1;
+  static const MLN_RENDER_SESSION_CAPABILITY_READBACK = 2;
+  static const MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC = 4;
+  static const MLN_RENDER_SESSION_CAPABILITY_PRESENTATION = 8;
+}
+
+final class mln_render_session_snapshot extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int state;
+
+  @ffi.Uint32()
+  external int driver;
+
+  @ffi.Uint32()
+  external int latest_result;
+
+  external mln_render_target_extent extent;
+
+  @ffi.Uint64()
+  external int generation;
+
+  @ffi.Uint64()
+  external int map_update_generation;
+
+  @ffi.Uint64()
+  external int rendered_update_generation;
+
+  @ffi.Uint64()
+  external int extent_generation;
+
+  @ffi.Uint64()
+  external int frame_generation;
+
+  @ffi.Uint64()
+  external int latest_demand_token;
+
+  @ffi.Uint32()
+  external int pending_demand_count;
+
+  @ffi.Uint32()
+  external int acquired_frame_count;
+
+  @ffi.Bool()
+  external bool target_ready;
+
+  @ffi.Bool()
+  external bool pending_changes;
+}
+
+sealed class mln_render_session_state {
+  static const MLN_RENDER_SESSION_STATE_ATTACHING = 1;
+  static const MLN_RENDER_SESSION_STATE_ATTACHED = 2;
+  static const MLN_RENDER_SESSION_STATE_DETACHING = 3;
+  static const MLN_RENDER_SESSION_STATE_DETACHED = 4;
+  static const MLN_RENDER_SESSION_STATE_TARGET_LOST = 5;
+  static const MLN_RENDER_SESSION_STATE_ABANDONED = 6;
+}
 
 final class mln_render_target_extent extends ffi.Struct {
   @ffi.Uint32()
@@ -6017,19 +6027,8 @@ final class mln_render_target_extent extends ffi.Struct {
     ..ref.scale_factor = scale_factor;
 }
 
-enum mln_rendered_feature_query_option_field {
-  MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS(1);
-
-  final int value;
-  const mln_rendered_feature_query_option_field(this.value);
-
-  static mln_rendered_feature_query_option_field fromValue(int value) =>
-      switch (value) {
-        1 => MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS,
-        _ => throw ArgumentError(
-          'Unknown value for mln_rendered_feature_query_option_field: $value',
-        ),
-      };
+sealed class mln_rendered_feature_query_option_field {
+  static const MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS = 1;
 }
 
 final class mln_rendered_feature_query_options extends ffi.Struct {
@@ -6068,26 +6067,21 @@ final class mln_rendered_query_geometry extends ffi.Struct {
   @ffi.Uint32()
   external int type;
 
-  external UnnamedUnion$2 data;
+  external mln_rendered_query_geometry_data data;
 }
 
-enum mln_rendered_query_geometry_type {
-  MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT(1),
-  MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX(2),
-  MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING(3);
+final class mln_rendered_query_geometry_data extends ffi.Union {
+  external mln_screen_point point;
 
-  final int value;
-  const mln_rendered_query_geometry_type(this.value);
+  external mln_screen_box box;
 
-  static mln_rendered_query_geometry_type fromValue(int value) =>
-      switch (value) {
-        1 => MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT,
-        2 => MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
-        3 => MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING,
-        _ => throw ArgumentError(
-          'Unknown value for mln_rendered_query_geometry_type: $value',
-        ),
-      };
+  external mln_screen_line_string line_string;
+}
+
+sealed class mln_rendered_query_geometry_type {
+  static const MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT = 1;
+  static const MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX = 2;
+  static const MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING = 3;
 }
 
 final class mln_rendering_stats extends ffi.Struct {
@@ -6121,86 +6115,35 @@ final class mln_rendering_stats extends ffi.Struct {
     ..ref.total_draw_call_count = total_draw_call_count;
 }
 
-enum mln_resource_error_reason {
-  MLN_RESOURCE_ERROR_REASON_NONE(0),
-  MLN_RESOURCE_ERROR_REASON_NOT_FOUND(1),
-  MLN_RESOURCE_ERROR_REASON_SERVER(2),
-  MLN_RESOURCE_ERROR_REASON_CONNECTION(3),
-  MLN_RESOURCE_ERROR_REASON_RATE_LIMIT(4),
-  MLN_RESOURCE_ERROR_REASON_OTHER(5);
-
-  final int value;
-  const mln_resource_error_reason(this.value);
-
-  static mln_resource_error_reason fromValue(int value) => switch (value) {
-    0 => MLN_RESOURCE_ERROR_REASON_NONE,
-    1 => MLN_RESOURCE_ERROR_REASON_NOT_FOUND,
-    2 => MLN_RESOURCE_ERROR_REASON_SERVER,
-    3 => MLN_RESOURCE_ERROR_REASON_CONNECTION,
-    4 => MLN_RESOURCE_ERROR_REASON_RATE_LIMIT,
-    5 => MLN_RESOURCE_ERROR_REASON_OTHER,
-    _ => throw ArgumentError(
-      'Unknown value for mln_resource_error_reason: $value',
-    ),
-  };
+sealed class mln_resource_error_reason {
+  static const MLN_RESOURCE_ERROR_REASON_NONE = 0;
+  static const MLN_RESOURCE_ERROR_REASON_NOT_FOUND = 1;
+  static const MLN_RESOURCE_ERROR_REASON_SERVER = 2;
+  static const MLN_RESOURCE_ERROR_REASON_CONNECTION = 3;
+  static const MLN_RESOURCE_ERROR_REASON_RATE_LIMIT = 4;
+  static const MLN_RESOURCE_ERROR_REASON_OTHER = 5;
 }
 
-enum mln_resource_kind {
-  MLN_RESOURCE_KIND_UNKNOWN(0),
-  MLN_RESOURCE_KIND_STYLE(1),
-  MLN_RESOURCE_KIND_SOURCE(2),
-  MLN_RESOURCE_KIND_TILE(3),
-  MLN_RESOURCE_KIND_GLYPHS(4),
-  MLN_RESOURCE_KIND_SPRITE_IMAGE(5),
-  MLN_RESOURCE_KIND_SPRITE_JSON(6),
-  MLN_RESOURCE_KIND_IMAGE(7);
-
-  final int value;
-  const mln_resource_kind(this.value);
-
-  static mln_resource_kind fromValue(int value) => switch (value) {
-    0 => MLN_RESOURCE_KIND_UNKNOWN,
-    1 => MLN_RESOURCE_KIND_STYLE,
-    2 => MLN_RESOURCE_KIND_SOURCE,
-    3 => MLN_RESOURCE_KIND_TILE,
-    4 => MLN_RESOURCE_KIND_GLYPHS,
-    5 => MLN_RESOURCE_KIND_SPRITE_IMAGE,
-    6 => MLN_RESOURCE_KIND_SPRITE_JSON,
-    7 => MLN_RESOURCE_KIND_IMAGE,
-    _ => throw ArgumentError('Unknown value for mln_resource_kind: $value'),
-  };
+sealed class mln_resource_kind {
+  static const MLN_RESOURCE_KIND_UNKNOWN = 0;
+  static const MLN_RESOURCE_KIND_STYLE = 1;
+  static const MLN_RESOURCE_KIND_SOURCE = 2;
+  static const MLN_RESOURCE_KIND_TILE = 3;
+  static const MLN_RESOURCE_KIND_GLYPHS = 4;
+  static const MLN_RESOURCE_KIND_SPRITE_IMAGE = 5;
+  static const MLN_RESOURCE_KIND_SPRITE_JSON = 6;
+  static const MLN_RESOURCE_KIND_IMAGE = 7;
 }
 
-enum mln_resource_loading_method {
-  MLN_RESOURCE_LOADING_METHOD_ALL(0),
-  MLN_RESOURCE_LOADING_METHOD_CACHE_ONLY(1),
-  MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY(2);
-
-  final int value;
-  const mln_resource_loading_method(this.value);
-
-  static mln_resource_loading_method fromValue(int value) => switch (value) {
-    0 => MLN_RESOURCE_LOADING_METHOD_ALL,
-    1 => MLN_RESOURCE_LOADING_METHOD_CACHE_ONLY,
-    2 => MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY,
-    _ => throw ArgumentError(
-      'Unknown value for mln_resource_loading_method: $value',
-    ),
-  };
+sealed class mln_resource_loading_method {
+  static const MLN_RESOURCE_LOADING_METHOD_ALL = 0;
+  static const MLN_RESOURCE_LOADING_METHOD_CACHE_ONLY = 1;
+  static const MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY = 2;
 }
 
-enum mln_resource_priority {
-  MLN_RESOURCE_PRIORITY_REGULAR(0),
-  MLN_RESOURCE_PRIORITY_LOW(1);
-
-  final int value;
-  const mln_resource_priority(this.value);
-
-  static mln_resource_priority fromValue(int value) => switch (value) {
-    0 => MLN_RESOURCE_PRIORITY_REGULAR,
-    1 => MLN_RESOURCE_PRIORITY_LOW,
-    _ => throw ArgumentError('Unknown value for mln_resource_priority: $value'),
-  };
+sealed class mln_resource_priority {
+  static const MLN_RESOURCE_PRIORITY_REGULAR = 0;
+  static const MLN_RESOURCE_PRIORITY_LOW = 1;
 }
 
 final class mln_resource_provider extends ffi.Struct {
@@ -6211,15 +6154,19 @@ final class mln_resource_provider extends ffi.Struct {
 
   external ffi.Pointer<ffi.Void> user_data;
 
+  external mln_runtime_callback_release release_user_data;
+
   static ffi.Pointer<mln_resource_provider> $allocate(
     ffi.Allocator $allocator, {
     required int size,
     required mln_resource_provider_callback callback,
     required ffi.Pointer<ffi.Void> user_data,
+    required mln_runtime_callback_release release_user_data,
   }) => $allocator<mln_resource_provider>()
     ..ref.size = size
     ..ref.callback = callback
-    ..ref.user_data = user_data;
+    ..ref.user_data = user_data
+    ..ref.release_user_data = release_user_data;
 }
 
 typedef mln_resource_provider_callback =
@@ -6237,20 +6184,9 @@ typedef Dartmln_resource_provider_callbackFunction =
       Dartmln_resource_request_handle handle,
     );
 
-enum mln_resource_provider_decision {
-  MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH(0),
-  MLN_RESOURCE_PROVIDER_DECISION_HANDLE(1);
-
-  final int value;
-  const mln_resource_provider_decision(this.value);
-
-  static mln_resource_provider_decision fromValue(int value) => switch (value) {
-    0 => MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH,
-    1 => MLN_RESOURCE_PROVIDER_DECISION_HANDLE,
-    _ => throw ArgumentError(
-      'Unknown value for mln_resource_provider_decision: $value',
-    ),
-  };
+sealed class mln_resource_provider_decision {
+  static const MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH = 0;
+  static const MLN_RESOURCE_PROVIDER_DECISION_HANDLE = 1;
 }
 
 final class mln_resource_request extends ffi.Struct {
@@ -6429,40 +6365,16 @@ final class mln_resource_response extends ffi.Struct {
     ..ref.retry_after_unix_ms = retry_after_unix_ms;
 }
 
-enum mln_resource_response_status {
-  MLN_RESOURCE_RESPONSE_STATUS_OK(0),
-  MLN_RESOURCE_RESPONSE_STATUS_ERROR(1),
-  MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT(2),
-  MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED(3);
-
-  final int value;
-  const mln_resource_response_status(this.value);
-
-  static mln_resource_response_status fromValue(int value) => switch (value) {
-    0 => MLN_RESOURCE_RESPONSE_STATUS_OK,
-    1 => MLN_RESOURCE_RESPONSE_STATUS_ERROR,
-    2 => MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT,
-    3 => MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED,
-    _ => throw ArgumentError(
-      'Unknown value for mln_resource_response_status: $value',
-    ),
-  };
+sealed class mln_resource_response_status {
+  static const MLN_RESOURCE_RESPONSE_STATUS_OK = 0;
+  static const MLN_RESOURCE_RESPONSE_STATUS_ERROR = 1;
+  static const MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT = 2;
+  static const MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED = 3;
 }
 
-enum mln_resource_storage_policy {
-  MLN_RESOURCE_STORAGE_POLICY_PERMANENT(0),
-  MLN_RESOURCE_STORAGE_POLICY_VOLATILE(1);
-
-  final int value;
-  const mln_resource_storage_policy(this.value);
-
-  static mln_resource_storage_policy fromValue(int value) => switch (value) {
-    0 => MLN_RESOURCE_STORAGE_POLICY_PERMANENT,
-    1 => MLN_RESOURCE_STORAGE_POLICY_VOLATILE,
-    _ => throw ArgumentError(
-      'Unknown value for mln_resource_storage_policy: $value',
-    ),
-  };
+sealed class mln_resource_storage_policy {
+  static const MLN_RESOURCE_STORAGE_POLICY_PERMANENT = 0;
+  static const MLN_RESOURCE_STORAGE_POLICY_VOLATILE = 1;
 }
 
 final class mln_resource_transform extends ffi.Struct {
@@ -6473,15 +6385,19 @@ final class mln_resource_transform extends ffi.Struct {
 
   external ffi.Pointer<ffi.Void> user_data;
 
+  external mln_runtime_callback_release release_user_data;
+
   static ffi.Pointer<mln_resource_transform> $allocate(
     ffi.Allocator $allocator, {
     required int size,
     required mln_resource_transform_callback callback,
     required ffi.Pointer<ffi.Void> user_data,
+    required mln_runtime_callback_release release_user_data,
   }) => $allocator<mln_resource_transform>()
     ..ref.size = size
     ..ref.callback = callback
-    ..ref.user_data = user_data;
+    ..ref.user_data = user_data
+    ..ref.release_user_data = release_user_data;
 }
 
 typedef mln_resource_transform_callback =
@@ -6520,22 +6436,19 @@ final class mln_resource_transform_response extends ffi.Struct {
     ..ref.context = context;
 }
 
-enum mln_resource_usage {
-  MLN_RESOURCE_USAGE_ONLINE(0),
-  MLN_RESOURCE_USAGE_OFFLINE(1);
-
-  final int value;
-  const mln_resource_usage(this.value);
-
-  static mln_resource_usage fromValue(int value) => switch (value) {
-    0 => MLN_RESOURCE_USAGE_ONLINE,
-    1 => MLN_RESOURCE_USAGE_OFFLINE,
-    _ => throw ArgumentError('Unknown value for mln_resource_usage: $value'),
-  };
+sealed class mln_resource_usage {
+  static const MLN_RESOURCE_USAGE_ONLINE = 0;
+  static const MLN_RESOURCE_USAGE_OFFLINE = 1;
 }
 
 typedef mln_runtime = ffi.Uint64;
 typedef Dartmln_runtime = int;
+typedef mln_runtime_callback_release =
+    ffi.Pointer<ffi.NativeFunction<mln_runtime_callback_releaseFunction>>;
+typedef mln_runtime_callback_releaseFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
+typedef Dartmln_runtime_callback_releaseFunction =
+    void Function(ffi.Pointer<ffi.Void> user_data);
 
 final class mln_runtime_event extends ffi.Struct {
   @ffi.Uint32()
@@ -6553,7 +6466,7 @@ final class mln_runtime_event extends ffi.Struct {
   @ffi.Uint32()
   external int payload_type;
 
-  @ffi.Uint32()
+  @ffi.Uint64()
   external int message_offset;
 
   @ffi.Uint32()
@@ -6562,7 +6475,7 @@ final class mln_runtime_event extends ffi.Struct {
   external mln_runtime_event_payload payload;
 }
 
-final class mln_runtime_event_batch extends ffi.Struct {
+final class mln_runtime_event_batch_view extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
@@ -6579,10 +6492,7 @@ final class mln_runtime_event_batch extends ffi.Struct {
   @ffi.Size()
   external int messages_size;
 
-  @ffi.Size()
-  external int remaining_count;
-
-  static ffi.Pointer<mln_runtime_event_batch> $allocate(
+  static ffi.Pointer<mln_runtime_event_batch_view> $allocate(
     ffi.Allocator $allocator, {
     required int size,
     required int event_size,
@@ -6590,15 +6500,13 @@ final class mln_runtime_event_batch extends ffi.Struct {
     required int event_count,
     required ffi.Pointer<ffi.Char> messages,
     required int messages_size,
-    required int remaining_count,
-  }) => $allocator<mln_runtime_event_batch>()
+  }) => $allocator<mln_runtime_event_batch_view>()
     ..ref.size = size
     ..ref.event_size = event_size
     ..ref.events = events
     ..ref.event_count = event_count
     ..ref.messages = messages
-    ..ref.messages_size = messages_size
-    ..ref.remaining_count = remaining_count;
+    ..ref.messages_size = messages_size;
 }
 
 final class mln_runtime_event_camera_transition_finished extends ffi.Struct {
@@ -6613,101 +6521,34 @@ final class mln_runtime_event_camera_transition_finished extends ffi.Struct {
         ..ref.transition_id = transition_id;
 }
 
-enum mln_runtime_event_mask {
-  MLN_RUNTIME_EVENT_MASK_NONE(0),
-  MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE(2),
-  MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING(4),
-  MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE(8),
-  MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED(16),
-  MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED(32),
-  MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED(64),
-  MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED(128),
-  MLN_RUNTIME_EVENT_MASK_MAP_IDLE(256),
-  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE(512),
-  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR(1024),
-  MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED(2048),
-  MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED(4096),
-  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED(8192),
-  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED(16384),
-  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED(32768),
-  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED(65536),
-  MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING(131072),
-  MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION(262144),
-  MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED(8388608),
-  MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED(524288),
-  MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR(1048576),
-  MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED(2097152),
-  MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED(4194304),
-  MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS(8912894),
-  MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS(7864320),
-  MLN_RUNTIME_EVENT_MASK_ALL(16777214);
-
-  final int value;
-  const mln_runtime_event_mask(this.value);
-
-  static mln_runtime_event_mask fromValue(int value) => switch (value) {
-    0 => MLN_RUNTIME_EVENT_MASK_NONE,
-    2 => MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE,
-    4 => MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING,
-    8 => MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE,
-    16 => MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED,
-    32 => MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED,
-    64 => MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED,
-    128 => MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED,
-    256 => MLN_RUNTIME_EVENT_MASK_MAP_IDLE,
-    512 => MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE,
-    1024 => MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR,
-    2048 => MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED,
-    4096 => MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED,
-    8192 => MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED,
-    16384 => MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED,
-    32768 => MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED,
-    65536 => MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED,
-    131072 => MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING,
-    262144 => MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION,
-    8388608 => MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED,
-    524288 => MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED,
-    1048576 => MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR,
-    2097152 => MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
-    4194304 => MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED,
-    8912894 => MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS,
-    7864320 => MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS,
-    16777214 => MLN_RUNTIME_EVENT_MASK_ALL,
-    _ => throw ArgumentError(
-      'Unknown value for mln_runtime_event_mask: $value',
-    ),
-  };
-}
-
-final class mln_runtime_event_offline_operation_completed extends ffi.Struct {
-  @mln_offline_operation_id()
-  external int operation_id;
-
-  @ffi.Uint32()
-  external int operation_kind;
-
-  @ffi.Uint32()
-  external int result_kind;
-
-  @ffi.Int32()
-  external int result_status;
-
-  @ffi.Bool()
-  external bool found;
-
-  static ffi.Pointer<mln_runtime_event_offline_operation_completed> $allocate(
-    ffi.Allocator $allocator, {
-    required int operation_id,
-    required int operation_kind,
-    required int result_kind,
-    required int result_status,
-    required bool found,
-  }) => $allocator<mln_runtime_event_offline_operation_completed>()
-    ..ref.operation_id = operation_id
-    ..ref.operation_kind = operation_kind
-    ..ref.result_kind = result_kind
-    ..ref.result_status = result_status
-    ..ref.found = found;
+sealed class mln_runtime_event_mask {
+  static const MLN_RUNTIME_EVENT_MASK_NONE = 0;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE = 2;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING = 4;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE = 8;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED = 16;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED = 32;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED = 64;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED = 128;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_IDLE = 256;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE = 512;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR = 1024;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED = 2048;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED = 4096;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED = 8192;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED = 16384;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED = 32768;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED = 65536;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING = 131072;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION = 262144;
+  static const MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED = 4194304;
+  static const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED = 524288;
+  static const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR = 1048576;
+  static const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED =
+      2097152;
+  static const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 4718590;
+  static const MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS = 3670016;
+  static const MLN_RUNTIME_EVENT_MASK_ALL = 8388606;
 }
 
 final class mln_runtime_event_offline_region_response_error extends ffi.Struct {
@@ -6766,41 +6607,19 @@ final class mln_runtime_event_payload extends ffi.Union {
   external mln_runtime_event_offline_region_tile_count_limit
   offline_region_tile_count_limit;
 
-  external mln_runtime_event_offline_operation_completed
-  offline_operation_completed;
-
   external mln_runtime_event_camera_transition_finished
   camera_transition_finished;
 }
 
-enum mln_runtime_event_payload_type {
-  MLN_RUNTIME_EVENT_PAYLOAD_NONE(0),
-  MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME(1),
-  MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP(2),
-  MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION(4),
-  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS(5),
-  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR(6),
-  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT(7),
-  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED(8),
-  MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED(9);
-
-  final int value;
-  const mln_runtime_event_payload_type(this.value);
-
-  static mln_runtime_event_payload_type fromValue(int value) => switch (value) {
-    0 => MLN_RUNTIME_EVENT_PAYLOAD_NONE,
-    1 => MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME,
-    2 => MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP,
-    4 => MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
-    5 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS,
-    6 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR,
-    7 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT,
-    8 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED,
-    9 => MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
-    _ => throw ArgumentError(
-      'Unknown value for mln_runtime_event_payload_type: $value',
-    ),
-  };
+sealed class mln_runtime_event_payload_type {
+  static const MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0;
+  static const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME = 1;
+  static const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP = 2;
+  static const MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = 4;
+  static const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 5;
+  static const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6;
+  static const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7;
+  static const MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 9;
 }
 
 final class mln_runtime_event_render_frame extends ffi.Struct {
@@ -6826,20 +6645,9 @@ final class mln_runtime_event_render_map extends ffi.Struct {
   }) => $allocator<mln_runtime_event_render_map>()..ref.mode = mode;
 }
 
-enum mln_runtime_event_source_type {
-  MLN_RUNTIME_EVENT_SOURCE_RUNTIME(0),
-  MLN_RUNTIME_EVENT_SOURCE_MAP(1);
-
-  final int value;
-  const mln_runtime_event_source_type(this.value);
-
-  static mln_runtime_event_source_type fromValue(int value) => switch (value) {
-    0 => MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-    1 => MLN_RUNTIME_EVENT_SOURCE_MAP,
-    _ => throw ArgumentError(
-      'Unknown value for mln_runtime_event_source_type: $value',
-    ),
-  };
+sealed class mln_runtime_event_source_type {
+  static const MLN_RUNTIME_EVENT_SOURCE_RUNTIME = 0;
+  static const MLN_RUNTIME_EVENT_SOURCE_MAP = 1;
 }
 
 final class mln_runtime_event_tile_action extends ffi.Struct {
@@ -6849,62 +6657,29 @@ final class mln_runtime_event_tile_action extends ffi.Struct {
   external mln_tile_id tile_id;
 }
 
-enum mln_runtime_event_type {
-  MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE(1),
-  MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING(2),
-  MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE(3),
-  MLN_RUNTIME_EVENT_MAP_STYLE_LOADED(4),
-  MLN_RUNTIME_EVENT_MAP_LOADING_STARTED(5),
-  MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED(6),
-  MLN_RUNTIME_EVENT_MAP_LOADING_FAILED(7),
-  MLN_RUNTIME_EVENT_MAP_IDLE(8),
-  MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE(9),
-  MLN_RUNTIME_EVENT_MAP_RENDER_ERROR(10),
-  MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED(11),
-  MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED(12),
-  MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED(13),
-  MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED(14),
-  MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED(15),
-  MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED(16),
-  MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING(17),
-  MLN_RUNTIME_EVENT_MAP_TILE_ACTION(18),
-  MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED(19),
-  MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR(20),
-  MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED(21),
-  MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED(22),
-  MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED(23);
-
-  final int value;
-  const mln_runtime_event_type(this.value);
-
-  static mln_runtime_event_type fromValue(int value) => switch (value) {
-    1 => MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE,
-    2 => MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING,
-    3 => MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE,
-    4 => MLN_RUNTIME_EVENT_MAP_STYLE_LOADED,
-    5 => MLN_RUNTIME_EVENT_MAP_LOADING_STARTED,
-    6 => MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED,
-    7 => MLN_RUNTIME_EVENT_MAP_LOADING_FAILED,
-    8 => MLN_RUNTIME_EVENT_MAP_IDLE,
-    9 => MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE,
-    10 => MLN_RUNTIME_EVENT_MAP_RENDER_ERROR,
-    11 => MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED,
-    12 => MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED,
-    13 => MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED,
-    14 => MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED,
-    15 => MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED,
-    16 => MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED,
-    17 => MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING,
-    18 => MLN_RUNTIME_EVENT_MAP_TILE_ACTION,
-    19 => MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED,
-    20 => MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
-    21 => MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
-    22 => MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED,
-    23 => MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
-    _ => throw ArgumentError(
-      'Unknown value for mln_runtime_event_type: $value',
-    ),
-  };
+sealed class mln_runtime_event_type {
+  static const MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1;
+  static const MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING = 2;
+  static const MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE = 3;
+  static const MLN_RUNTIME_EVENT_MAP_STYLE_LOADED = 4;
+  static const MLN_RUNTIME_EVENT_MAP_LOADING_STARTED = 5;
+  static const MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED = 6;
+  static const MLN_RUNTIME_EVENT_MAP_LOADING_FAILED = 7;
+  static const MLN_RUNTIME_EVENT_MAP_IDLE = 8;
+  static const MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE = 9;
+  static const MLN_RUNTIME_EVENT_MAP_RENDER_ERROR = 10;
+  static const MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED = 11;
+  static const MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED = 12;
+  static const MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED = 13;
+  static const MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED = 14;
+  static const MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED = 15;
+  static const MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED = 16;
+  static const MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING = 17;
+  static const MLN_RUNTIME_EVENT_MAP_TILE_ACTION = 18;
+  static const MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 19;
+  static const MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20;
+  static const MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21;
+  static const MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = 22;
 }
 
 final class mln_runtime_options extends ffi.Struct {
@@ -6921,19 +6696,7 @@ final class mln_runtime_options extends ffi.Struct {
   @ffi.Uint64()
   external int event_mask;
 
-  static ffi.Pointer<mln_runtime_options> $allocate(
-    ffi.Allocator $allocator, {
-    required int size,
-    required int flags,
-    required ffi.Pointer<ffi.Char> asset_path,
-    required ffi.Pointer<ffi.Char> cache_path,
-    required int event_mask,
-  }) => $allocator<mln_runtime_options>()
-    ..ref.size = size
-    ..ref.flags = flags
-    ..ref.asset_path = asset_path
-    ..ref.cache_path = cache_path
-    ..ref.event_mask = event_mask;
+  external mln_wake event_wake;
 }
 
 final class mln_screen_box extends ffi.Struct {
@@ -6973,19 +6736,8 @@ final class mln_screen_point extends ffi.Struct {
     ..ref.y = y;
 }
 
-enum mln_source_feature_query_option_field {
-  MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS(1);
-
-  final int value;
-  const mln_source_feature_query_option_field(this.value);
-
-  static mln_source_feature_query_option_field fromValue(int value) =>
-      switch (value) {
-        1 => MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS,
-        _ => throw ArgumentError(
-          'Unknown value for mln_source_feature_query_option_field: $value',
-        ),
-      };
+sealed class mln_source_feature_query_option_field {
+  static const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS = 1;
 }
 
 final class mln_source_feature_query_options extends ffi.Struct {
@@ -7024,10 +6776,12 @@ sealed class mln_status {
   static const MLN_STATUS_WRONG_THREAD = -3;
   static const MLN_STATUS_UNSUPPORTED = -4;
   static const MLN_STATUS_NATIVE_ERROR = -5;
+  static const MLN_STATUS_CANCELLED = -6;
+  static const MLN_STATUS_BUSY = -7;
+  static const MLN_STATUS_TARGET_LOST = -8;
+  static const MLN_STATUS_NOT_READY = -9;
+  static const MLN_STATUS_NOT_FOUND = -10;
 }
-
-typedef mln_style_id_list = ffi.Uint64;
-typedef Dartmln_style_id_list = int;
 
 final class mln_style_image_info extends ffi.Struct {
   @ffi.Uint32()
@@ -7075,30 +6829,14 @@ final class mln_style_image_info extends ffi.Struct {
   external bool has_text_fit_height;
 }
 
-enum mln_style_image_option_field {
-  MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO(1),
-  MLN_STYLE_IMAGE_OPTION_SDF(2),
-  MLN_STYLE_IMAGE_OPTION_STRETCH_X(4),
-  MLN_STYLE_IMAGE_OPTION_STRETCH_Y(8),
-  MLN_STYLE_IMAGE_OPTION_CONTENT(16),
-  MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH(32),
-  MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT(64);
-
-  final int value;
-  const mln_style_image_option_field(this.value);
-
-  static mln_style_image_option_field fromValue(int value) => switch (value) {
-    1 => MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO,
-    2 => MLN_STYLE_IMAGE_OPTION_SDF,
-    4 => MLN_STYLE_IMAGE_OPTION_STRETCH_X,
-    8 => MLN_STYLE_IMAGE_OPTION_STRETCH_Y,
-    16 => MLN_STYLE_IMAGE_OPTION_CONTENT,
-    32 => MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH,
-    64 => MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT,
-    _ => throw ArgumentError(
-      'Unknown value for mln_style_image_option_field: $value',
-    ),
-  };
+sealed class mln_style_image_option_field {
+  static const MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO = 1;
+  static const MLN_STYLE_IMAGE_OPTION_SDF = 2;
+  static const MLN_STYLE_IMAGE_OPTION_STRETCH_X = 4;
+  static const MLN_STYLE_IMAGE_OPTION_STRETCH_Y = 8;
+  static const MLN_STYLE_IMAGE_OPTION_CONTENT = 16;
+  static const MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH = 32;
+  static const MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT = 64;
 }
 
 final class mln_style_image_options extends ffi.Struct {
@@ -7133,25 +6871,69 @@ final class mln_style_image_options extends ffi.Struct {
   external bool sdf;
 }
 
-enum mln_style_image_text_fit {
-  MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK(0),
-  MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY(1),
-  MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL(2);
+final class mln_style_image_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
 
-  final int value;
-  const mln_style_image_text_fit(this.value);
+  @ffi.Uint32()
+  external int reserved;
 
-  static mln_style_image_text_fit fromValue(int value) => switch (value) {
-    0 => MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
-    1 => MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY,
-    2 => MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL,
-    _ => throw ArgumentError(
-      'Unknown value for mln_style_image_text_fit: $value',
-    ),
-  };
+  external mln_style_image_info info;
+
+  external mln_buffer_view pixels;
+
+  external ffi.Pointer<mln_image_stretch> stretch_x;
+
+  @ffi.Size()
+  external int stretch_x_count;
+
+  external ffi.Pointer<mln_image_stretch> stretch_y;
+
+  @ffi.Size()
+  external int stretch_y_count;
 }
 
-final class mln_style_layer_info extends ffi.Struct {
+final class mln_style_image_stretches_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  external ffi.Pointer<mln_image_stretch> stretch_x;
+
+  @ffi.Size()
+  external int stretch_x_count;
+
+  external ffi.Pointer<mln_image_stretch> stretch_y;
+
+  @ffi.Size()
+  external int stretch_y_count;
+
+  static ffi.Pointer<mln_style_image_stretches_result> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int reserved,
+    required ffi.Pointer<mln_image_stretch> stretch_x,
+    required int stretch_x_count,
+    required ffi.Pointer<mln_image_stretch> stretch_y,
+    required int stretch_y_count,
+  }) => $allocator<mln_style_image_stretches_result>()
+    ..ref.size = size
+    ..ref.reserved = reserved
+    ..ref.stretch_x = stretch_x
+    ..ref.stretch_x_count = stretch_x_count
+    ..ref.stretch_y = stretch_y
+    ..ref.stretch_y_count = stretch_y_count;
+}
+
+sealed class mln_style_image_text_fit {
+  static const MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK = 0;
+  static const MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY = 1;
+  static const MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL = 2;
+}
+
+final class mln_style_layer_entry extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
@@ -7164,39 +6946,47 @@ final class mln_style_layer_info extends ffi.Struct {
   external mln_buffer_view source_layer;
 }
 
-typedef mln_style_layer_list = ffi.Uint64;
-typedef Dartmln_style_layer_list = int;
+final class mln_style_layer_info extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
 
-enum mln_style_layer_visibility {
-  MLN_STYLE_LAYER_VISIBILITY_VISIBLE(0),
-  MLN_STYLE_LAYER_VISIBILITY_NONE(1);
+  @ffi.Uint32()
+  external int reserved;
 
-  final int value;
-  const mln_style_layer_visibility(this.value);
+  external mln_buffer_view type;
 
-  static mln_style_layer_visibility fromValue(int value) => switch (value) {
-    0 => MLN_STYLE_LAYER_VISIBILITY_VISIBLE,
-    1 => MLN_STYLE_LAYER_VISIBILITY_NONE,
-    _ => throw ArgumentError(
-      'Unknown value for mln_style_layer_visibility: $value',
-    ),
-  };
+  @ffi.Double()
+  external double min_zoom;
+
+  @ffi.Double()
+  external double max_zoom;
+
+  @ffi.Uint32()
+  external int visibility;
 }
 
-enum mln_style_raster_dem_encoding {
-  MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX(0),
-  MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM(1);
+final class mln_style_layer_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
 
-  final int value;
-  const mln_style_raster_dem_encoding(this.value);
+  @ffi.Uint32()
+  external int reserved;
 
-  static mln_style_raster_dem_encoding fromValue(int value) => switch (value) {
-    0 => MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX,
-    1 => MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM,
-    _ => throw ArgumentError(
-      'Unknown value for mln_style_raster_dem_encoding: $value',
-    ),
-  };
+  external mln_style_layer_info info;
+
+  external mln_buffer_view source_id;
+
+  external mln_buffer_view source_layer;
+}
+
+sealed class mln_style_layer_visibility {
+  static const MLN_STYLE_LAYER_VISIBILITY_VISIBLE = 0;
+  static const MLN_STYLE_LAYER_VISIBILITY_NONE = 1;
+}
+
+sealed class mln_style_raster_dem_encoding {
+  static const MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX = 0;
+  static const MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM = 1;
 }
 
 final class mln_style_source_info extends ffi.Struct {
@@ -7248,104 +7038,112 @@ final class mln_style_source_info extends ffi.Struct {
   external int raster_encoding;
 }
 
-enum mln_style_source_info_field {
-  MLN_STYLE_SOURCE_INFO_URL(1),
-  MLN_STYLE_SOURCE_INFO_TILEJSON(2),
-  MLN_STYLE_SOURCE_INFO_BOUNDS(4),
-  MLN_STYLE_SOURCE_INFO_TILE_SIZE(8),
-  MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING(16),
-  MLN_STYLE_SOURCE_INFO_RASTER_ENCODING(32);
-
-  final int value;
-  const mln_style_source_info_field(this.value);
-
-  static mln_style_source_info_field fromValue(int value) => switch (value) {
-    1 => MLN_STYLE_SOURCE_INFO_URL,
-    2 => MLN_STYLE_SOURCE_INFO_TILEJSON,
-    4 => MLN_STYLE_SOURCE_INFO_BOUNDS,
-    8 => MLN_STYLE_SOURCE_INFO_TILE_SIZE,
-    16 => MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING,
-    32 => MLN_STYLE_SOURCE_INFO_RASTER_ENCODING,
-    _ => throw ArgumentError(
-      'Unknown value for mln_style_source_info_field: $value',
-    ),
-  };
+sealed class mln_style_source_info_field {
+  static const MLN_STYLE_SOURCE_INFO_URL = 1;
+  static const MLN_STYLE_SOURCE_INFO_TILEJSON = 2;
+  static const MLN_STYLE_SOURCE_INFO_BOUNDS = 4;
+  static const MLN_STYLE_SOURCE_INFO_TILE_SIZE = 8;
+  static const MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 16;
+  static const MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 32;
 }
 
-enum mln_style_source_type {
-  MLN_STYLE_SOURCE_TYPE_UNKNOWN(0),
-  MLN_STYLE_SOURCE_TYPE_VECTOR(1),
-  MLN_STYLE_SOURCE_TYPE_RASTER(2),
-  MLN_STYLE_SOURCE_TYPE_RASTER_DEM(3),
-  MLN_STYLE_SOURCE_TYPE_GEOJSON(4),
-  MLN_STYLE_SOURCE_TYPE_IMAGE(5),
-  MLN_STYLE_SOURCE_TYPE_VIDEO(6),
-  MLN_STYLE_SOURCE_TYPE_ANNOTATIONS(7),
-  MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR(8),
-  MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR(9);
+final class mln_style_source_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
 
-  final int value;
-  const mln_style_source_type(this.value);
+  @ffi.Uint32()
+  external int reserved;
 
-  static mln_style_source_type fromValue(int value) => switch (value) {
-    0 => MLN_STYLE_SOURCE_TYPE_UNKNOWN,
-    1 => MLN_STYLE_SOURCE_TYPE_VECTOR,
-    2 => MLN_STYLE_SOURCE_TYPE_RASTER,
-    3 => MLN_STYLE_SOURCE_TYPE_RASTER_DEM,
-    4 => MLN_STYLE_SOURCE_TYPE_GEOJSON,
-    5 => MLN_STYLE_SOURCE_TYPE_IMAGE,
-    6 => MLN_STYLE_SOURCE_TYPE_VIDEO,
-    7 => MLN_STYLE_SOURCE_TYPE_ANNOTATIONS,
-    8 => MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR,
-    9 => MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR,
-    _ => throw ArgumentError('Unknown value for mln_style_source_type: $value'),
-  };
+  external mln_style_source_info info;
+
+  external mln_buffer_view attribution;
+
+  external mln_buffer_view url;
+
+  external ffi.Pointer<mln_buffer_view> tile_urls;
+
+  @ffi.Size()
+  external int tile_url_count;
 }
 
-typedef mln_style_string_list = ffi.Uint64;
-typedef Dartmln_style_string_list = int;
+final class mln_style_source_tile_info extends ffi.Struct {
+  @ffi.Size()
+  external int tile_count;
 
-enum mln_style_tile_scheme {
-  MLN_STYLE_TILE_SCHEME_XYZ(0),
-  MLN_STYLE_TILE_SCHEME_TMS(1);
+  @ffi.Double()
+  external double min_zoom;
 
-  final int value;
-  const mln_style_tile_scheme(this.value);
+  @ffi.Double()
+  external double max_zoom;
 
-  static mln_style_tile_scheme fromValue(int value) => switch (value) {
-    0 => MLN_STYLE_TILE_SCHEME_XYZ,
-    1 => MLN_STYLE_TILE_SCHEME_TMS,
-    _ => throw ArgumentError('Unknown value for mln_style_tile_scheme: $value'),
-  };
+  @ffi.Uint32()
+  external int scheme;
+
+  static ffi.Pointer<mln_style_source_tile_info> $allocate(
+    ffi.Allocator $allocator, {
+    required int tile_count,
+    required double min_zoom,
+    required double max_zoom,
+    required int scheme,
+  }) => $allocator<mln_style_source_tile_info>()
+    ..ref.tile_count = tile_count
+    ..ref.min_zoom = min_zoom
+    ..ref.max_zoom = max_zoom
+    ..ref.scheme = scheme;
 }
 
-enum mln_style_tile_source_option_field {
-  MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM(1),
-  MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM(2),
-  MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION(4),
-  MLN_STYLE_TILE_SOURCE_OPTION_SCHEME(8),
-  MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS(16),
-  MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE(32),
-  MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING(64),
-  MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING(128);
+final class mln_style_source_tile_urls_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
 
-  final int value;
-  const mln_style_tile_source_option_field(this.value);
+  @ffi.Uint32()
+  external int reserved;
 
-  static mln_style_tile_source_option_field fromValue(int value) =>
-      switch (value) {
-        1 => MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM,
-        2 => MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM,
-        4 => MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION,
-        8 => MLN_STYLE_TILE_SOURCE_OPTION_SCHEME,
-        16 => MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS,
-        32 => MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE,
-        64 => MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING,
-        128 => MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING,
-        _ => throw ArgumentError(
-          'Unknown value for mln_style_tile_source_option_field: $value',
-        ),
-      };
+  external ffi.Pointer<mln_buffer_view> tile_urls;
+
+  @ffi.Size()
+  external int tile_url_count;
+
+  static ffi.Pointer<mln_style_source_tile_urls_result> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int reserved,
+    required ffi.Pointer<mln_buffer_view> tile_urls,
+    required int tile_url_count,
+  }) => $allocator<mln_style_source_tile_urls_result>()
+    ..ref.size = size
+    ..ref.reserved = reserved
+    ..ref.tile_urls = tile_urls
+    ..ref.tile_url_count = tile_url_count;
+}
+
+sealed class mln_style_source_type {
+  static const MLN_STYLE_SOURCE_TYPE_UNKNOWN = 0;
+  static const MLN_STYLE_SOURCE_TYPE_VECTOR = 1;
+  static const MLN_STYLE_SOURCE_TYPE_RASTER = 2;
+  static const MLN_STYLE_SOURCE_TYPE_RASTER_DEM = 3;
+  static const MLN_STYLE_SOURCE_TYPE_GEOJSON = 4;
+  static const MLN_STYLE_SOURCE_TYPE_IMAGE = 5;
+  static const MLN_STYLE_SOURCE_TYPE_VIDEO = 6;
+  static const MLN_STYLE_SOURCE_TYPE_ANNOTATIONS = 7;
+  static const MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR = 8;
+  static const MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR = 9;
+}
+
+sealed class mln_style_tile_scheme {
+  static const MLN_STYLE_TILE_SCHEME_XYZ = 0;
+  static const MLN_STYLE_TILE_SCHEME_TMS = 1;
+}
+
+sealed class mln_style_tile_source_option_field {
+  static const MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM = 1;
+  static const MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM = 2;
+  static const MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION = 4;
+  static const MLN_STYLE_TILE_SOURCE_OPTION_SCHEME = 8;
+  static const MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS = 16;
+  static const MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE = 32;
+  static const MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING = 64;
+  static const MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING = 128;
 }
 
 final class mln_style_tile_source_options extends ffi.Struct {
@@ -7378,23 +7176,10 @@ final class mln_style_tile_source_options extends ffi.Struct {
   external int raster_encoding;
 }
 
-enum mln_style_transition_option_field {
-  MLN_STYLE_TRANSITION_OPTION_DURATION(1),
-  MLN_STYLE_TRANSITION_OPTION_DELAY(2),
-  MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS(4);
-
-  final int value;
-  const mln_style_transition_option_field(this.value);
-
-  static mln_style_transition_option_field fromValue(int value) =>
-      switch (value) {
-        1 => MLN_STYLE_TRANSITION_OPTION_DURATION,
-        2 => MLN_STYLE_TRANSITION_OPTION_DELAY,
-        4 => MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS,
-        _ => throw ArgumentError(
-          'Unknown value for mln_style_transition_option_field: $value',
-        ),
-      };
+sealed class mln_style_transition_option_field {
+  static const MLN_STYLE_TRANSITION_OPTION_DURATION = 1;
+  static const MLN_STYLE_TRANSITION_OPTION_DELAY = 2;
+  static const MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS = 4;
 }
 
 final class mln_style_transition_options extends ffi.Struct {
@@ -7428,20 +7213,9 @@ final class mln_style_transition_options extends ffi.Struct {
     ..ref.enable_placement_transitions = enable_placement_transitions;
 }
 
-enum mln_style_vector_tile_encoding {
-  MLN_STYLE_VECTOR_TILE_ENCODING_MVT(0),
-  MLN_STYLE_VECTOR_TILE_ENCODING_MLT(1);
-
-  final int value;
-  const mln_style_vector_tile_encoding(this.value);
-
-  static mln_style_vector_tile_encoding fromValue(int value) => switch (value) {
-    0 => MLN_STYLE_VECTOR_TILE_ENCODING_MVT,
-    1 => MLN_STYLE_VECTOR_TILE_ENCODING_MLT,
-    _ => throw ArgumentError(
-      'Unknown value for mln_style_vector_tile_encoding: $value',
-    ),
-  };
+sealed class mln_style_vector_tile_encoding {
+  static const MLN_STYLE_VECTOR_TILE_ENCODING_MVT = 0;
+  static const MLN_STYLE_VECTOR_TILE_ENCODING_MLT = 1;
 }
 
 final class mln_texture_image_info extends ffi.Struct {
@@ -7475,6 +7249,18 @@ final class mln_texture_image_info extends ffi.Struct {
     ..ref.byte_length = byte_length;
 }
 
+final class mln_texture_readback_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  external mln_buffer_view data;
+
+  external mln_texture_image_info info;
+}
+
 final class mln_tile_id extends ffi.Struct {
   @ffi.Uint32()
   external int overscaled_z;
@@ -7506,46 +7292,21 @@ final class mln_tile_id extends ffi.Struct {
     ..ref.canonical_y = canonical_y;
 }
 
-enum mln_tile_lod_mode {
-  MLN_TILE_LOD_MODE_DEFAULT(0),
-  MLN_TILE_LOD_MODE_DISTANCE(1);
-
-  final int value;
-  const mln_tile_lod_mode(this.value);
-
-  static mln_tile_lod_mode fromValue(int value) => switch (value) {
-    0 => MLN_TILE_LOD_MODE_DEFAULT,
-    1 => MLN_TILE_LOD_MODE_DISTANCE,
-    _ => throw ArgumentError('Unknown value for mln_tile_lod_mode: $value'),
-  };
+sealed class mln_tile_lod_mode {
+  static const MLN_TILE_LOD_MODE_DEFAULT = 0;
+  static const MLN_TILE_LOD_MODE_DISTANCE = 1;
 }
 
-enum mln_tile_operation {
-  MLN_TILE_OPERATION_REQUESTED_FROM_CACHE(0),
-  MLN_TILE_OPERATION_REQUESTED_FROM_NETWORK(1),
-  MLN_TILE_OPERATION_LOAD_FROM_NETWORK(2),
-  MLN_TILE_OPERATION_LOAD_FROM_CACHE(3),
-  MLN_TILE_OPERATION_START_PARSE(4),
-  MLN_TILE_OPERATION_END_PARSE(5),
-  MLN_TILE_OPERATION_ERROR(6),
-  MLN_TILE_OPERATION_CANCELLED(7),
-  MLN_TILE_OPERATION_NULL(8);
-
-  final int value;
-  const mln_tile_operation(this.value);
-
-  static mln_tile_operation fromValue(int value) => switch (value) {
-    0 => MLN_TILE_OPERATION_REQUESTED_FROM_CACHE,
-    1 => MLN_TILE_OPERATION_REQUESTED_FROM_NETWORK,
-    2 => MLN_TILE_OPERATION_LOAD_FROM_NETWORK,
-    3 => MLN_TILE_OPERATION_LOAD_FROM_CACHE,
-    4 => MLN_TILE_OPERATION_START_PARSE,
-    5 => MLN_TILE_OPERATION_END_PARSE,
-    6 => MLN_TILE_OPERATION_ERROR,
-    7 => MLN_TILE_OPERATION_CANCELLED,
-    8 => MLN_TILE_OPERATION_NULL,
-    _ => throw ArgumentError('Unknown value for mln_tile_operation: $value'),
-  };
+sealed class mln_tile_operation {
+  static const MLN_TILE_OPERATION_REQUESTED_FROM_CACHE = 0;
+  static const MLN_TILE_OPERATION_REQUESTED_FROM_NETWORK = 1;
+  static const MLN_TILE_OPERATION_LOAD_FROM_NETWORK = 2;
+  static const MLN_TILE_OPERATION_LOAD_FROM_CACHE = 3;
+  static const MLN_TILE_OPERATION_START_PARSE = 4;
+  static const MLN_TILE_OPERATION_END_PARSE = 5;
+  static const MLN_TILE_OPERATION_ERROR = 6;
+  static const MLN_TILE_OPERATION_CANCELLED = 7;
+  static const MLN_TILE_OPERATION_NULL = 8;
 }
 
 final class mln_unit_bezier extends ffi.Struct {
@@ -7595,18 +7356,9 @@ final class mln_vec3 extends ffi.Struct {
     ..ref.z = z;
 }
 
-enum mln_viewport_mode {
-  MLN_VIEWPORT_MODE_DEFAULT(0),
-  MLN_VIEWPORT_MODE_FLIPPED_Y(1);
-
-  final int value;
-  const mln_viewport_mode(this.value);
-
-  static mln_viewport_mode fromValue(int value) => switch (value) {
-    0 => MLN_VIEWPORT_MODE_DEFAULT,
-    1 => MLN_VIEWPORT_MODE_FLIPPED_Y,
-    _ => throw ArgumentError('Unknown value for mln_viewport_mode: $value'),
-  };
+sealed class mln_viewport_mode {
+  static const MLN_VIEWPORT_MODE_DEFAULT = 0;
+  static const MLN_VIEWPORT_MODE_FLIPPED_Y = 1;
 }
 
 final class mln_vulkan_borrowed_texture_descriptor extends ffi.Struct {
@@ -7763,23 +7515,58 @@ final class mln_vulkan_surface_descriptor extends ffi.Struct {
   external int surface;
 }
 
-typedef mln_wake_source = ffi.Uint64;
-typedef Dartmln_wake_source = int;
+final class mln_wake extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  external mln_wake_callback callback;
+
+  external ffi.Pointer<ffi.Void> user_data;
+
+  external mln_wake_release release_user_data;
+
+  static ffi.Pointer<mln_wake> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required mln_wake_callback callback,
+    required ffi.Pointer<ffi.Void> user_data,
+    required mln_wake_release release_user_data,
+  }) => $allocator<mln_wake>()
+    ..ref.size = size
+    ..ref.callback = callback
+    ..ref.user_data = user_data
+    ..ref.release_user_data = release_user_data;
+}
+
+typedef mln_wake_callback =
+    ffi.Pointer<ffi.NativeFunction<mln_wake_callbackFunction>>;
+typedef mln_wake_callbackFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
+typedef Dartmln_wake_callbackFunction =
+    void Function(ffi.Pointer<ffi.Void> user_data);
+typedef mln_wake_release =
+    ffi.Pointer<ffi.NativeFunction<mln_wake_releaseFunction>>;
+typedef mln_wake_releaseFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
+typedef Dartmln_wake_releaseFunction =
+    void Function(ffi.Pointer<ffi.Void> user_data);
 
 final class mln_webgl_context_descriptor extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
+  @ffi.Uint32()
+  external int kind;
+
   @ffi.Int32()
   external int context;
 
-  static ffi.Pointer<mln_webgl_context_descriptor> $allocate(
-    ffi.Allocator $allocator, {
-    required int size,
-    required int context,
-  }) => $allocator<mln_webgl_context_descriptor>()
-    ..ref.size = size
-    ..ref.context = context;
+  external mln_buffer_view canvas_selector;
+}
+
+sealed class mln_webgl_context_kind {
+  static const MLN_WEBGL_CONTEXT_EXISTING = 0;
+  static const MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS = 1;
 }
 
 final class mln_webgpu_borrowed_texture_descriptor extends ffi.Struct {

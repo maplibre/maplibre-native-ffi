@@ -58,13 +58,8 @@ void main(List<String> args) {
     enums: Enums(
       include: Declarations.includeAll,
       silenceWarning: true,
-      // Status stays an integer: a Dart enum makes ffigen wrap every
-      // status-returning function in a converting call, which hides the
-      // `@Native` declaration and puts the function's address out of reach.
-      style: (declaration, suggested) =>
-          declaration.originalName == 'mln_status'
-          ? EnumStyle.intConstants
-          : (suggested ?? EnumStyle.dartEnum),
+      // Integer constants preserve unknown enum values and direct native entry points.
+      style: (declaration, suggested) => EnumStyle.intConstants,
     ),
     functions: Functions.includeAll,
     globals: Globals.includeAll,

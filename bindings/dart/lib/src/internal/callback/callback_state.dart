@@ -7,9 +7,6 @@ abstract base class RetainedCallbackState {
   var _closeScheduled = false;
   var _closed = false;
 
-  /// Whether retirement has started, exposed for internal lifecycle tests.
-  bool get retiredForTesting => _retired;
-
   /// Whether all callback resources have closed, exposed for lifecycle tests.
   bool get closedForTesting => _closed;
 
@@ -39,6 +36,23 @@ abstract base class RetainedCallbackState {
     }
     _retired = true;
     _scheduleCloseIfReady();
+  }
+
+  /// Retires and releases callback resources before this call returns.
+  ///
+  /// The caller must first detach the native callback so that no new upcall can
+  /// start. An active upcall keeps the ordinary deferred close behavior.
+  void closeSynchronously() {
+    if (_closed) {
+      return;
+    }
+    _retired = true;
+    if (_activeUpcalls != 0) {
+      _scheduleCloseIfReady();
+      return;
+    }
+    _closed = true;
+    closeResources();
   }
 
   void _scheduleCloseIfReady() {

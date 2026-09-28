@@ -1,6 +1,7 @@
 /// Low-level Dart bindings for the MapLibre Native C API.
 library;
 
+export 'src/generated_values.dart';
 export 'src/camera/camera.dart';
 export 'src/error/maplibre_exception.dart';
 export 'src/geo/geo.dart';
@@ -14,11 +15,8 @@ export 'src/render/render.dart';
 export 'src/resource/resource.dart';
 export 'src/runtime/runtime.dart'
     hide
-        CustomGeometryCallbackLifecycleProbe,
-        customGeometryCallbackProbeForTesting,
-        CustomMvtVectorCallbackLifecycleProbe,
-        customMvtVectorCallbackProbeForTesting,
+        logCallbackStateForTesting,
         decodeRuntimeEventBatchForTesting,
-        mapAttachRefIdForTesting,
+        mapHandleIdForTesting,
         runtimeHandleIdForTesting;
 export 'src/style/style.dart';

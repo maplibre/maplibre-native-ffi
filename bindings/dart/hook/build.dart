@@ -23,7 +23,7 @@ const String _snapshotTag = 'unstable-native-snapshot';
 const String _releaseBaseUrl =
     'https://github.com/maplibre/maplibre-native-ffi/releases/download';
 
-void main(List<String> arguments) async {
+Future<void> main(List<String> arguments) async {
   await build(arguments, (input, output) async {
     if (!input.config.buildCodeAssets) {
       return;
@@ -39,7 +39,7 @@ void main(List<String> arguments) async {
         package: input.packageName,
         name: nativeAssetName,
         linkMode: DynamicLoadingBundled(),
-        file: library.absolute.uri,
+        file: await _bundleLibrary(library, input),
       ),
     );
 
@@ -56,11 +56,20 @@ void main(List<String> arguments) async {
           package: input.packageName,
           name: 'native/${sibling.uri.pathSegments.last}',
           linkMode: DynamicLoadingBundled(),
-          file: sibling.absolute.uri,
+          file: await _bundleLibrary(sibling, input),
         ),
       );
     }
   });
+}
+
+// Flutter treats declared assets as generated outputs and deletes stale ones.
+// Keep those outputs separate from shared installs and downloaded artifacts.
+Future<Uri> _bundleLibrary(File library, BuildInput input) async {
+  final destination = input.outputDirectory.resolve(
+    library.uri.pathSegments.last,
+  );
+  return (await library.copy(destination.toFilePath())).uri;
 }
 
 /// Rejects an install prefix that does not match what this build asked for.

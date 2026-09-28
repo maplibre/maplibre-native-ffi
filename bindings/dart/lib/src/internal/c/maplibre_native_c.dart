@@ -18,15 +18,6 @@ final class MaplibreNativeCApi {
   /// Checks the native ABI version before any public handle is created.
   factory MaplibreNativeCApi.open() => MaplibreNativeCApi._();
 
-  /// Copies the current thread-local native diagnostic message.
-  String threadLastErrorMessage() {
-    final pointer = generated.mln_thread_last_error_message();
-    if (pointer == nullptr) {
-      return '';
-    }
-    return pointer.cast<Utf8>().toDartString();
-  }
-
   /// Native adapter callback for queued log records.
   Pointer<NativeFunction<generated.mln_log_callbackFunction>>
   adapterLogCallback() => Native.addressOf(generated.mln_adapter_log_callback);
@@ -59,6 +50,18 @@ final class MaplibreNativeCApi {
   /// Destroys a copied adapter resource request record.
   void adapterResourceProviderRequestDestroy(Pointer<Void> request) =>
       generated.mln_adapter_resource_provider_request_destroy(request);
+}
+
+/// Copies the current thread-local native diagnostic message.
+///
+/// Native code sets it on every non-OK synchronous return, and leaves it empty
+/// when the call reported no diagnostic.
+String threadLastErrorMessage() {
+  final pointer = generated.mln_thread_last_error_message();
+  if (pointer == nullptr) {
+    return '';
+  }
+  return pointer.cast<Utf8>().toDartString();
 }
 
 bool _abiVersionChecked = false;
