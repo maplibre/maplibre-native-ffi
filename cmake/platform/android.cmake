@@ -2,14 +2,13 @@ function(mln_ffi_configure_platform_dependencies target)
   target_link_libraries(${target} INTERFACE android atomic log z)
   mln_ffi_bundle_clang_cxx_runtime(${target} "${CMAKE_ANDROID_NDK}/NOTICE")
   string(REGEX REPLACE "^android-" "" android_api_level "${ANDROID_PLATFORM}")
-  # The emulator this repository boots runs x86_64 with SwiftShader drivers for
-  # both render backends, so every x86_64 configuration can execute its suite.
+  # Both emulator architectures run the suite through the Android task runner.
   if(ANDROID_ABI STREQUAL "x86_64")
     set(android_test_supported TRUE)
     set(android_target_platform android-x64)
     set(android_target_triple x86_64-linux-android)
   elseif(ANDROID_ABI STREQUAL "arm64-v8a")
-    set(android_test_supported FALSE)
+    set(android_test_supported TRUE)
     set(android_target_platform android-arm64)
     set(android_target_triple aarch64-linux-android)
   elseif(ANDROID_ABI STREQUAL "armeabi-v7a")

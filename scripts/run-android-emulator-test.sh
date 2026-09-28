@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# Runs native test executables in the Android emulator, booting it when needed.
+# Runs native test executables on ANDROID_SERIAL or boots the default emulator.
 # Every executable runs and reports its own exit status; the first failure
 # stops the batch.
 set -euo pipefail
 
-if [[ $# -lt 3 ]]; then
-  echo "usage: $0 <timeout-seconds> <native-library> [--api <api>] [test-argument ...] -- <test-executable ...>" >&2
+if [[ $# -lt 4 ]]; then
+  echo "usage: $0 <timeout-seconds> <abi> <native-library> [--api <api>] [test-argument ...] -- <test-executable ...>" >&2
   exit 2
 fi
 
 timeout_seconds=$1
-native_library=$2
-shift 2
+abi=$2
+native_library=$3
+shift 3
 emulator_api=
 if [[ ${1:-} == --api ]]; then
   emulator_api=${2:?--api requires an Android API level}
@@ -31,14 +32,14 @@ if (($# == 0)); then
 fi
 test_executables=("$@")
 
-serial=emulator-5554
+serial=${ANDROID_SERIAL:-emulator-5554}
 remote_dir=/data/local/tmp/maplibre-native-ffi
 fixture_dir=${MLN_FFI_TEST_FIXTURE_DIR:-}
 adb="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}/platform-tools/adb"
 
 for local_file in "$native_library" "${test_executables[@]}"; do
   if [[ ! -f "$local_file" ]]; then
-    echo "Android emulator test input does not exist: $local_file" >&2
+    echo "Android test input does not exist: $local_file" >&2
     exit 2
   fi
 done
@@ -51,16 +52,26 @@ if [[ -n "$emulator_api" && ! "$emulator_api" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 if [[ -n "$fixture_dir" && ! -d "$fixture_dir" ]]; then
-  echo "Android emulator fixture directory does not exist: $fixture_dir" >&2
+  echo "Android fixture directory does not exist: $fixture_dir" >&2
   exit 2
 fi
 
-# platform-tools arrives with the first boot, so a missing adb means boot, not
-# failure.
-if [[ -n "$emulator_api" ]] || [[ ! -x "$adb" ]] ||
+# An explicit serial selects a connected device; only the default emulator can
+# be booted automatically.
+if [[ -n "${ANDROID_SERIAL:-}" ]]; then
+  device_abi=$("$adb" -s "$serial" shell getprop ro.product.cpu.abi | tr -d '\r')
+  device_api=$("$adb" -s "$serial" shell getprop ro.build.version.sdk | tr -d '\r')
+  if [[ "$device_abi" != "$abi" ]] ||
+    [[ -n "$emulator_api" && "$device_api" != "$emulator_api" ]]; then
+    echo "Android device $serial has ABI $device_abi and API $device_api; expected $abi ${emulator_api:+at API $emulator_api}." >&2
+    exit 2
+  fi
+elif [[ -n "$emulator_api" ]] || [[ ! -x "$adb" ]] ||
   ! "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
-  tr -d '\r' | grep -qx 1; then
-  emulator_args=(x86_64)
+  tr -d '\r' | grep -qx 1 ||
+  ! "$adb" -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null |
+  tr -d '\r' | grep -qx "$abi"; then
+  emulator_args=("$abi")
   if [[ -n "$emulator_api" ]]; then
     emulator_args+=(--api "$emulator_api")
   fi
@@ -80,7 +91,7 @@ if [[ -n "$fixture_dir" ]]; then
 fi
 
 for test_executable in "${test_executables[@]}"; do
-  echo "Running $(basename "$test_executable") in the Android emulator."
+  echo "Running $(basename "$test_executable") on Android device $serial."
   "$adb" -s "$serial" push "$test_executable" "$remote_dir/test-executable" >/dev/null
 
   # Android has no /tmp, which is where a runtime library falls back to when
@@ -106,7 +117,7 @@ for test_executable in "${test_executables[@]}"; do
     exit "$transport_status"
   fi
   if [[ ! "$test_status" =~ ^[0-9]+$ ]]; then
-    echo "Android emulator test returned no exit status." >&2
+    echo "Android test returned no exit status." >&2
     exit 1
   fi
   if ((test_status != 0)); then

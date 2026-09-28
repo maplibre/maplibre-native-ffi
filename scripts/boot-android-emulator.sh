@@ -32,9 +32,13 @@ adb="$sdk_root/platform-tools/adb"
 if [[ -x "$adb" ]]; then
   running_avd=$("$adb" -s "$serial" emu avd name 2>/dev/null | sed -n '1s/\r$//p') ||
     running_avd=
-  if [[ "$running_avd" == "$avd_name" ]] &&
+  if [[ -n "$running_avd" ]] &&
     "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
-    tr -d '\r' | grep -qx 1; then
+    tr -d '\r' | grep -qx 1 &&
+    "$adb" -s "$serial" shell getprop ro.build.version.sdk 2>/dev/null |
+    tr -d '\r' | grep -qx "$api" &&
+    "$adb" -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null |
+    tr -d '\r' | grep -qx "$image_arch"; then
     echo "Android emulator is ready at $serial."
     exit 0
   fi
