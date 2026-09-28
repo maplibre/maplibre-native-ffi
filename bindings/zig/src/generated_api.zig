@@ -9622,8 +9622,7 @@ pub const ResourceRequestCancelCallback = struct {
     fn callTrampoline(native_arg_0: CallbackArg(c.mln_resource_request_cancel_callback, 0)) callconv(.c) CallbackResult(c.mln_resource_request_cancel_callback) {
         return struct {
             fn invoke(callback_arg_0: CallbackArg(c.mln_resource_request_cancel_callback, 0)) status.Error!CallbackResult(c.mln_resource_request_cancel_callback) {
-                const state = callback.Token(ResourceRequestCancelCallback).get(callback_arg_0) orelse return;
-                defer callback.Registration(ResourceRequestCancelCallback).releaseErased(state);
+                const state = callback.Registration(ResourceRequestCancelCallback).get(callback_arg_0);
                 const host = state.value.call orelse {
                     return;
                 };
@@ -9649,15 +9648,11 @@ pub fn resourceRequestSetCancelCallback(handle: ResourceRequestHandle, callback_
     if (binding_arg_1) |value| {
         var retained = value;
         retained.owner = binding_arg_0.raw;
-        if (retained.call != null) context = try callback.Token(ResourceRequestCancelCallback).create(&roots, retained);
+        if (retained.call != null) context = try roots.retain(ResourceRequestCancelCallback, retained);
     }
-    var already_cancelled: bool = false;
-    var keep_registration = false;
-    if (context != null) try lease.attachCallback(roots.items.items[0]);
-    defer if (context != null and !keep_registration) lease.detachCallback();
-    try status.checkStatus(c.mln_resource_request_set_cancel_callback(lease.native, if (context != null) ResourceRequestCancelCallback.callTrampoline else null, context, if (context != null) callback.Registration(ResourceRequestCancelCallback).releaseNative else null, &already_cancelled), lease.diagnostic_store);
-    if (already_cancelled) return true;
-    keep_registration = true;
+    var rejected: bool = false;
+    try status.checkStatus(c.mln_resource_request_set_cancel_callback(lease.native, if (context != null) ResourceRequestCancelCallback.callTrampoline else null, context, if (context != null) callback.Registration(ResourceRequestCancelCallback).releaseNative else null, &rejected), lease.diagnostic_store);
+    if (rejected) return true;
     roots.accept();
     return false;
 }

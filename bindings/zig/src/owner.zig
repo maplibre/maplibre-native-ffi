@@ -28,7 +28,6 @@ const State = struct {
     completed: bool = false,
     completing: bool = false,
     release_requested: bool = false,
-    callback_root: ?callback.Roots.Entry = null,
     finalizer: callback.Finalizer = .{},
     raw: u64,
     dispose: *const fn (u64) status.Error!void,
@@ -38,7 +37,6 @@ const State = struct {
     }
     fn release(self: *State) void {
         if (self.references.fetchSub(1, .acq_rel) != 1) return;
-        if (self.callback_root) |root| root.releaseNative();
         if (self.parent) |parent| parent.release();
         allocator.destroy(self);
     }
@@ -124,17 +122,6 @@ pub fn Handle(comptime name: []const u8, comptime dispose: *const fn (u64) statu
             native: u64,
             diagnostic_store: ?*diagnostics.DiagnosticStore,
             reserved: bool = false,
-            pub fn attachCallback(self: Lease, root: callback.Roots.Entry) status.Error!void {
-                lock();
-                defer unlock();
-                if (self.state.callback_root != null) return error.InvalidState;
-                self.state.callback_root = root;
-            }
-            pub fn detachCallback(self: Lease) void {
-                lock();
-                defer unlock();
-                self.state.callback_root = null;
-            }
             pub fn finishComplete(self: Lease, accepted: bool) void {
                 lock();
                 self.state.completing = false;

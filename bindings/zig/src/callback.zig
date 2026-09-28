@@ -154,39 +154,6 @@ pub fn finalize(task: *Finalizer) void {
     std.Io.Threaded.mutexUnlock(&finalizer_mutex);
 }
 
-pub fn Token(comptime T: type) type {
-    return struct {
-        var mutex: std.Io.Mutex = .init;
-        var next: usize = 1;
-        var entries: std.AutoHashMapUnmanaged(usize, *Registration(T)) = .empty;
-        pub fn create(roots: *Roots, value: T) status.Error!?*anyopaque {
-            const state = try roots.retain(T, value);
-            std.Io.Threaded.mutexLock(&mutex);
-            defer std.Io.Threaded.mutexUnlock(&mutex);
-            const token = next;
-            next = std.math.add(usize, next, 1) catch return error.OutOfMemory;
-            try entries.put(std.heap.smp_allocator, token, state);
-            state.token = token;
-            roots.items.items[roots.items.items.len - 1].native_release = remove;
-            return @ptrFromInt(token);
-        }
-        pub fn get(token: ?*anyopaque) ?*Registration(T) {
-            std.Io.Threaded.mutexLock(&mutex);
-            defer std.Io.Threaded.mutexUnlock(&mutex);
-            const state = entries.get(@intFromPtr(token)) orelse return null;
-            _ = state.refs.fetchAdd(1, .monotonic);
-            return state;
-        }
-        fn remove(context: *anyopaque) void {
-            const state: *Registration(T) = @ptrCast(@alignCast(context));
-            std.Io.Threaded.mutexLock(&mutex);
-            _ = entries.remove(state.token);
-            std.Io.Threaded.mutexUnlock(&mutex);
-            Registration(T).releaseNativeErased(context);
-        }
-    };
-}
-
 test "callback policies intersect nested scopes and restore outer admission" {
     var outer: Scope = .{};
     outer.enter(&.{ "complete", "release" }, 7);
@@ -203,7 +170,7 @@ test "callback policies intersect nested scopes and restore outer admission" {
     try check("complete", 7);
 }
 
-test "inline native release and token retirement preserve caller and dispatch roots" {
+test "inline native release preserves the caller root until acceptance" {
     const Probe = struct {
         context: ?*anyopaque,
         release_context: ?*const fn (?*anyopaque) void,
@@ -222,17 +189,4 @@ test "inline native release and token retirement preserve caller and dispatch ro
         roots.deinit();
     }
     try std.testing.expectEqual(@as(usize, 1), count);
-    {
-        var roots: Roots = .{};
-        const token = try Token(Probe).create(&roots, .{ .context = &count, .release_context = Probe.released });
-        const entry = roots.items.items[0];
-        roots.accept();
-        roots.deinit();
-        const dispatch = Token(Probe).get(token).?;
-        entry.releaseNative();
-        try std.testing.expect(Token(Probe).get(token) == null);
-        try std.testing.expectEqual(@as(usize, 1), count);
-        Registration(Probe).releaseErased(dispatch);
-    }
-    try std.testing.expectEqual(@as(usize, 2), count);
 }

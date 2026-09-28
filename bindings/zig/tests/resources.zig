@@ -1281,12 +1281,14 @@ test "resource provider observes cancellation before late completion" {
     try testing.expect(message.value.len > 0);
 }
 
-// Cancellation registrations remain rooted until the request retires.
+// Native code releases an accepted cancellation registration once, after its
+// callback returns or when the request retires without it having run.
 const CancelProbeState = struct {
     handle_lock: std.atomic.Mutex = .unlocked,
     handle: ?maplibre.ResourceRequestHandle = null,
     registered: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     cancels: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
+    releases: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
     register_when_handled: bool = false,
     complete_when_handled: bool = false,
     release_inside_callback: bool = false,
@@ -1324,6 +1326,15 @@ fn recordCancel(context: ?*anyopaque) maplibre.Error!void {
     _ = state.cancels.fetchAdd(1, .seq_cst);
 }
 
+fn recordCancelRelease(context: ?*anyopaque) void {
+    const state: *CancelProbeState = @ptrCast(@alignCast(context.?));
+    _ = state.releases.fetchAdd(1, .seq_cst);
+}
+
+fn cancelProbeCallback(state: *CancelProbeState) maplibre.ResourceRequestCancelCallback {
+    return .{ .call = recordCancel, .context = state, .release_context = recordCancelRelease };
+}
+
 fn cancelProbeProvider(
     context: ?*anyopaque,
     request: maplibre.ResourceRequest,
@@ -1334,7 +1345,7 @@ fn cancelProbeProvider(
     const state: *CancelProbeState = @ptrCast(@alignCast(context.?));
     state.storeHandle(handle);
     if (state.register_when_handled) {
-        _ = maplibre.resourceRequestSetCancelCallback(support.handle(handle), .{ .call = recordCancel, .context = state }) catch {
+        _ = maplibre.resourceRequestSetCancelCallback(support.handle(handle), cancelProbeCallback(state)) catch {
             maplibre.resourceRequestRelease(support.handle(handle)) catch {};
             return .pass_through;
         };
@@ -1397,11 +1408,16 @@ test "cancel callback runs once when the map discards a handled request" {
     var probe = try startCancelProbeRequest(&runtime, &state);
     defer maplibre.resourceRequestRelease(support.handle(probe.handle)) catch {};
 
-    try testing.expectError(error.InvalidState, maplibre.resourceRequestSetCancelCallback(support.handle(probe.handle), .{ .call = recordCancel, .context = &state }));
+    // A rejected registration never reaches its release_context.
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestSetCancelCallback(support.handle(probe.handle), cancelProbeCallback(&state)));
     try testing.expectEqual(@as(usize, 0), state.cancels.load(.seq_cst));
+    try testing.expectEqual(@as(usize, 0), state.releases.load(.seq_cst));
 
     try support.closeMap(&probe.map);
     try testing.expect(try cancelCountReaches(&state.cancels, 1, 5000));
+    // Native code releases the registration once the callback returns, before
+    // the provider releases the request.
+    try testing.expect(try cancelCountReaches(&state.releases, 1, 5000));
     try testing.expect(try maplibre.resourceRequestCancelled(support.handle(probe.handle)));
     try testing.expectError(error.InvalidState, maplibre.resourceRequestComplete(testing.allocator, support.handle(probe.handle), .{ .bytes = support.style_json }));
 
@@ -1413,6 +1429,7 @@ test "cancel callback runs once when the map discards a handled request" {
     maplibre.resourceRequestRelease(support.handle(probe.handle)) catch {};
     try testing.expectError(error.InvalidState, maplibre.resourceRequestSetCancelCallback(support.handle(probe.handle), .{ .call = recordCancel, .context = &state }));
     try testing.expectEqual(@as(usize, 1), state.cancels.load(.seq_cst));
+    try testing.expectEqual(@as(usize, 1), state.releases.load(.seq_cst));
 }
 
 test "cancel callback can release its own resource request" {
@@ -1429,6 +1446,7 @@ test "cancel callback can release its own resource request" {
     try testing.expectError(error.InvalidState, maplibre.resourceRequestCancelled(support.handle(probe.handle)));
     try testing.expectError(error.InvalidState, maplibre.resourceRequestSetCancelCallback(support.handle(probe.handle), .{ .call = recordCancel, .context = &state }));
     try testing.expectEqual(@as(usize, 1), state.cancels.load(.seq_cst));
+    try testing.expect(try cancelCountReaches(&state.releases, 1, 5000));
     // A second release of the handle the callback already released is a no-op.
     maplibre.resourceRequestRelease(support.handle(probe.handle)) catch {};
 }
@@ -1441,10 +1459,14 @@ test "late cancel registration reports cancellation without retaining a callback
     defer maplibre.resourceRequestRelease(probe.handle) catch {};
     try support.closeMap(&probe.map);
     try waitForRequestCancellation(probe.handle);
-    try testing.expect(try maplibre.resourceRequestSetCancelCallback(probe.handle, .{ .call = recordCancel, .context = &state }));
+    // The caller keeps a context the request did not store, so neither
+    // callback runs, now or when the request is released.
+    try testing.expect(try maplibre.resourceRequestSetCancelCallback(probe.handle, cancelProbeCallback(&state)));
     try testing.expectEqual(@as(usize, 0), state.cancels.load(.seq_cst));
     try testing.expectError(error.InvalidState, maplibre.resourceRequestSetCancelCallback(probe.handle, .{ .call = recordCancel, .context = &state }));
     try testing.expectEqual(@as(usize, 0), state.cancels.load(.seq_cst));
+    try maplibre.resourceRequestRelease(probe.handle);
+    try testing.expectEqual(@as(usize, 0), state.releases.load(.seq_cst));
 }
 
 test "cancel callback stays silent for a completed resource request" {
@@ -1461,6 +1483,10 @@ test "cancel callback stays silent for a completed resource request" {
     try support.waitForBarrier(&runtime);
     try testing.expect(!(try cancelCountReaches(&state.cancels, 1, 200)));
     try testing.expectEqual(@as(usize, 0), state.cancels.load(.seq_cst));
+    // The registration whose callback never ran retires with the request.
+    try testing.expectEqual(@as(usize, 0), state.releases.load(.seq_cst));
+    try maplibre.resourceRequestRelease(support.handle(probe.handle));
+    try testing.expectEqual(@as(usize, 1), state.releases.load(.seq_cst));
 }
 
 test "offline region download control emits copied status events" {

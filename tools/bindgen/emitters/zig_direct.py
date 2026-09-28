@@ -1,5 +1,6 @@
-"""Direct callback registration with native release or generational callback tokens."""
+"""Direct callback registration whose native release frees the binding root."""
 
+from ..model import ModelError
 from ..semantic import FieldPlan, RegistrationPlan, ValuePlan
 from .zig import camel, identifier, pascal
 from .zig_callbacks import parts
@@ -7,6 +8,8 @@ from .zig_callbacks import parts
 
 def operation(plan, values):
     registration = plan.direct_registrations[0]
+    if not registration.release_callback:
+        raise ModelError([f"{plan.name}: direct callback requires a native release"])
     parameter = next(p for p in plan.inputs if p.name == registration.callback)
     callback_plan = values.bound.callbacks[parameter.value.native]
     for item in callback_plan.parameters:
@@ -29,19 +32,13 @@ def operation(plan, values):
         ),
     )
     fields, _, _, trampolines = parts(values, descriptor)
-    token = registration.owner_release is not None
-    if token:
+    policy = callback_plan.reentry_policy
+    # A callback restricted to its registration owner records that owner.
+    owned = bool(policy and policy.registration_owner)
+    if owned:
+        if not plan.receiver:
+            raise ModelError([f"{plan.name}: registration owner requires a receiver"])
         fields.append("    owner: u64 = 0,")
-        trampolines = [
-            line.replace(
-                f"callback.Registration({name}).get(callback_arg_0)",
-                f"callback.Token({name}).get(callback_arg_0) orelse return",
-            ).replace(
-                "const host =",
-                f"defer callback.Registration({name}).releaseErased(state); const host =",
-            )
-            for line in trampolines
-        ]
     declaration = (
         f"pub const {name} = struct {{\n"
         + "\n".join([*fields, *trampolines])
@@ -71,9 +68,9 @@ def operation(plan, values):
             "var context: ?*anyopaque = null;",
         ]
     )
-    if token:
+    if owned:
         setup.append(
-            f"if ({public_callback}) |value| {{ var retained = value; retained.owner = {receiver_name}.raw; if (retained.call != null) context = try callback.Token({name}).create(&roots, retained); }}"
+            f"if ({public_callback}) |value| {{ var retained = value; retained.owner = {receiver_name}.raw; if (retained.call != null) context = try roots.retain({name}, retained); }}"
         )
     else:
         setup.append(
@@ -93,26 +90,21 @@ def operation(plan, values):
                 f"if (context != null) callback.Registration({name}).releaseNative else null"
             )
         elif p.name == registration.accepted_unless:
-            setup.append("var already_cancelled: bool = false;")
-            args.append("&already_cancelled")
-    if token:
-        setup.extend(
-            [
-                "var keep_registration = false;",
-                "if (context != null) try lease.attachCallback(roots.items.items[0]);",
-                "defer if (context != null and !keep_registration) lease.detachCallback();",
-            ]
-        )
+            setup.append("var rejected: bool = false;")
+            args.append("&rejected")
+        else:
+            raise ModelError([f"{plan.name}: unsupported direct callback parameter"])
     setup.append(
         f"try status.checkStatus(c.{plan.name}({', '.join(args)}), {'lease.diagnostic_store' if receiver_name else 'null'});"
     )
-    if token:
-        setup.append("if (already_cancelled) return true;")
-        setup.append("keep_registration = true;")
+    if registration.accepted_unless:
+        # A rejected registration stores nothing, so the caller keeps its
+        # context and the roots release without its release_context.
+        setup.append("if (rejected) return true;")
     setup.append("roots.accept();")
-    if token:
+    if registration.accepted_unless:
         setup.append("return false;")
-    return_type = "bool" if token else "void"
+    return_type = "bool" if registration.accepted_unless else "void"
     return (
         declaration
         + f"pub fn {camel(plan.name.removeprefix('mln_'))}({', '.join(signature)}) status.Error!{return_type} {{\n    "
