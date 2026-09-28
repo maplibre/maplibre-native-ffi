@@ -11,10 +11,8 @@ for platform setup, pinned tools, local commands, tests, and examples.
 
 Read [concepts](https://maplibre.org/maplibre-native-ffi/concepts/) before
 changing behavior. Read the
-[C API Conventions](https://maplibre.org/maplibre-native-ffi/development/c-conventions/)
-before changing public C interfaces or C ABI behavior. Read the
-[Binding specification](https://maplibre.org/maplibre-native-ffi/development/binding-specification/)
-before changing language bindings or generated binding reference docs.
+[binding generation guide](https://maplibre.org/maplibre-native-ffi/development/binding-generation/)
+before changing C interfaces, their contracts, or language bindings.
 
 Keep pull requests focused on one reviewable change. The reviewer should be able
 to connect the use case, public behavior, implementation, and validation without

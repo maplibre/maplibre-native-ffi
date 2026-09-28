@@ -10,7 +10,7 @@ static mln_buffer_view view(const char* text) {
   return (mln_buffer_view){.data = text, .size = strlen(text)};
 }
 
-mln_status add_vehicle_source(mln_map map) {
+mln_status add_vehicle_source(mln_map map, const mln_completion* completion) {
   // #region add
   mln_geojson_source_data empty = MLN_HANDLE_NULL;
   mln_status status = mln_geojson_source_data_create(
@@ -18,7 +18,8 @@ mln_status add_vehicle_source(mln_map map) {
   );
   if (status != MLN_STATUS_OK) return status;
 
-  status = mln_map_add_geojson_source_data(map, view("vehicles"), empty);
+  status =
+    mln_map_add_geojson_source_data(map, view("vehicles"), empty, completion);
   mln_geojson_source_data_destroy(empty);
   return status;
   // #endregion add
@@ -26,7 +27,7 @@ mln_status add_vehicle_source(mln_map map) {
 
 mln_status publish_vehicles(
   mln_map map, const mln_lat_lng* positions, size_t count, char* json,
-  size_t json_capacity
+  size_t json_capacity, const mln_completion* completion
 ) {
   if (count > MAX_VEHICLES) count = MAX_VEHICLES;
 
@@ -65,17 +66,21 @@ mln_status publish_vehicles(
   // #endregion prepare
 
   // #region publish
-  // The install is cheap and runs on the map owner thread.
-  status = mln_map_set_geojson_source_data(map, view("vehicles"), prepared);
+  // The install is a cheap command submitted to the map owner.
+  status = mln_map_set_geojson_source_data(
+    map, view("vehicles"), prepared, completion
+  );
   mln_geojson_source_data_destroy(prepared);
   return status;
   // #endregion publish
 }
 
-mln_status track_position_closely(mln_map map, bool tracking) {
+mln_status track_position_closely(
+  mln_map map, bool tracking, const mln_completion* completion
+) {
   // #region synchronous-tiling
   return mln_map_set_geojson_source_synchronous_tiling(
-    map, view("vehicles"), tracking
+    map, view("vehicles"), tracking, completion
   );
   // #endregion synchronous-tiling
 }

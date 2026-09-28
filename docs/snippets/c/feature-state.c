@@ -19,7 +19,10 @@ static mln_feature_state_selector select_poi(const char* feature_id) {
   return selector;
 }
 
-mln_status set_selected(mln_map map, const char* feature_id, bool selected) {
+mln_status set_selected(
+  mln_map map, const char* feature_id, bool selected,
+  const mln_completion* completion
+) {
   const mln_feature_state_selector selector = select_poi(feature_id);
 
   // #region value
@@ -28,17 +31,19 @@ mln_status set_selected(mln_map map, const char* feature_id, bool selected) {
   // #endregion value
 
   // #region set
-  // The call parses or copies the bytes before returning.
-  return mln_map_set_feature_state(map, &selector, state);
+  // The start call parses or copies the bytes before returning.
+  return mln_map_set_feature_state(map, &selector, state, completion);
   // #endregion set
 }
 
-mln_status clear_selected(mln_map map, const char* feature_id) {
+mln_status clear_selected(
+  mln_map map, const char* feature_id, const mln_completion* completion
+) {
   // #region remove
   mln_feature_state_selector selector = select_poi(feature_id);
   selector.fields |= MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
   selector.state_key = view("selected");
 
-  return mln_map_remove_feature_state(map, &selector);
+  return mln_map_remove_feature_state(map, &selector, completion);
   // #endregion remove
 }

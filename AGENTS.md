@@ -172,17 +172,15 @@ sentence-level style, page structure, and project terminology.
 
 Read these docs before changing related code:
 
-- [Binding Specification](docs/src/content/docs/development/binding-specification.md)
-  for binding requirements and language binding changes.
+- [Binding generation](docs/src/content/docs/development/binding-generation.md)
+  before changing public C declarations, ownership contracts, callbacks, or
+  language bindings.
 - [Map Example Specification](docs/src/content/docs/development/map-example-specification.md)
   for example requirements.
 - [Overview](docs/src/content/docs/development/overview.md) for project layout,
   workflow, and tooling.
 - [Concepts](docs/src/content/docs/concepts.md) for project scope, ownership,
   threading, events, rendering targets, and host integration boundaries.
-- [C API Conventions](docs/src/content/docs/development/c-conventions.md) before
-  changing public C headers, C ABI behavior, callbacks, diagnostics, or render
-  target contracts.
 
 ## External Docs
 

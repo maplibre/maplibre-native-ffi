@@ -18,34 +18,35 @@ static mln_camera_options downtown(void) {
 }
 
 // #region jump
-mln_status jump_downtown(mln_map map) {
-  const mln_camera_options camera = downtown();
-  return mln_map_jump_to(map, &camera);
+mln_status jump_downtown(mln_map map, const mln_completion* completion) {
+  mln_camera_update update = mln_camera_update_default();
+  update.mode = MLN_CAMERA_UPDATE_MODE_JUMP;
+  update.camera = downtown();
+  return mln_map_update_camera(map, &update, completion);
 }
 // #endregion jump
 
-mln_status ease_downtown(mln_map map, uint64_t transition_id) {
-  const mln_camera_options camera = downtown();
-
+mln_status ease_downtown(
+  mln_map map, uint64_t transition_id, const mln_completion* completion
+) {
   // #region ease
-  mln_animation_options animation = mln_animation_options_default();
-  animation.fields = MLN_ANIMATION_OPTION_DURATION |
-                     MLN_ANIMATION_OPTION_EASING |
-                     MLN_ANIMATION_OPTION_TRANSITION_ID;
-  animation.duration_ms = 800.0;
-  // Control points of a cubic bezier that runs from (0, 0) to (1, 1).
-  animation.easing =
+  mln_camera_update update = mln_camera_update_default();
+  update.mode = MLN_CAMERA_UPDATE_MODE_EASE;
+  update.camera = downtown();
+  update.animation.fields = MLN_ANIMATION_OPTION_DURATION |
+                            MLN_ANIMATION_OPTION_EASING |
+                            MLN_ANIMATION_OPTION_TRANSITION_ID;
+  update.animation.duration_ms = 800.0;
+  update.animation.easing =
     (mln_unit_bezier){.x1 = 0.25, .y1 = 0.1, .x2 = 0.25, .y2 = 1.0};
-  animation.transition_id = transition_id;
-  return mln_map_ease_to(map, &camera, &animation);
+  update.animation.transition_id = transition_id;
+  return mln_map_update_camera(map, &update, completion);
   // #endregion ease
 }
 
-// A map reports a finished transition only while its subscription selects this
-// type.
-mln_status select_camera_events(mln_map map) {
+mln_status select_camera_events(mln_map map, const mln_completion* completion) {
   return mln_map_set_event_mask(
-    map, MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED
+    map, MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED, completion
   );
 }
 
@@ -56,8 +57,7 @@ bool transition_finished(
   if (event->type != MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED) {
     return false;
   }
-  const mln_runtime_event_camera_transition_finished* finished =
-    &event->payload.camera_transition_finished;
-  return finished->transition_id == transition_id;
+  return event->payload.camera_transition_finished.transition_id ==
+         transition_id;
   // #endregion finished
 }
