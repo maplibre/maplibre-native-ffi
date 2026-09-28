@@ -563,6 +563,7 @@
         "mln_resource_request_cancelled",
         "mln_resource_request_complete",
         "mln_resource_request_release",
+        "mln_resource_request_set_cancel_callback",
         "mln_resource_request_wait_until_retired",
         "mln_runtime_barrier",
         "mln_runtime_clear_http_header_transform",
@@ -619,7 +620,6 @@
       "support": {
         "mln_http_header_transform_response_set": "native callback adapter mln_adapter_http_header_transform_callback for mln_http_header_transform",
         "mln_log_set_callback": "hand-written logSetCallback in runtime_logging.dart through mln_adapter_log_callback and its native log queue",
-        "mln_resource_request_set_cancel_callback": "hand-written ResourceRequestCancellation.setCancelCallback in runtime_resource_callbacks.dart through mln_adapter_dart_resource_cancel_register",
         "mln_resource_transform_response_set_url": "native callback adapter mln_adapter_resource_transform_rewrite_callback for mln_resource_transform"
       },
       "unsupported": {}

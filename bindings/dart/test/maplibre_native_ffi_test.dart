@@ -838,61 +838,72 @@ void main() {
   });
 
   // a cancel callback registered on a handled request runs once when
-  // MapLibre discards the request, may release the request from inside, and
-  // keeps an exception it throws inside the binding.
+  // MapLibre discards the request, routes an exception it throws to the
+  // registering zone, and releases its port once after it runs while the
+  // request stays open.
   test(
     'resource request cancel callbacks report a discarded request',
     () async {
       const styleUrl = 'custom://dart-provider-cancel-reported.json';
       final runtime = runtimeCreate(runtimeOptionsDefault());
       ResourceRequestHandle? token;
+      CallbackPortLifecycleProbe? probe;
       var cancels = 0;
       var cancelledInsideCallback = false;
-      Object? insideError;
+      final zoneErrors = <Object>[];
 
-      runtime.setQueuedResourceProvider(
-        QueuedResourceProvider(
-          routes: [
-            AdapterQueuedResourceProviderRoute(
-              kind: ResourceKind.style.rawValue,
-              url: styleUrl,
-            ),
-          ],
-          callback: (_, handle) {
-            token = handle;
-            handle.setCancelCallback(() {
-              cancels += 1;
-              try {
-                cancelledInsideCallback = handle.cancelled();
-              } catch (error) {
-                insideError = error;
-              }
-              handle.close();
-              throw StateError('cancel callback failed');
-            });
-          },
+      runZonedGuarded(
+        () => runtime.setQueuedResourceProvider(
+          QueuedResourceProvider(
+            routes: [
+              AdapterQueuedResourceProviderRoute(
+                kind: ResourceKind.style.rawValue,
+                url: styleUrl,
+              ),
+            ],
+            callback: (_, handle) {
+              expect(
+                handle.setCancelCallback(() {
+                  cancels += 1;
+                  cancelledInsideCallback = handle.cancelled();
+                  throw StateError('cancel callback failed');
+                }),
+                isFalse,
+              );
+              probe = singleCallbackPortProbeForTesting(handle);
+              token = handle;
+            },
+          ),
         ),
+        (error, _) => zoneErrors.add(error),
       );
 
       final map = await runtime.createMap();
       map.setStyleUrl(styleUrl);
       await _waitUntil(() => token != null);
       final liveToken = token!;
+      final liveProbe = probe!;
       expect(
         () => liveToken.setCancelCallback(() {}),
         throwsA(isA<InvalidStateException>()),
       );
+      // The rejected registration leaves the first port pending.
+      expect(liveProbe.closed, isFalse);
 
       await map.close();
       await runtime.close();
-      await _waitUntil(() => cancels > 0);
+      await _waitUntil(() => cancels > 0 && liveProbe.closed);
 
       // A second delivery would arrive on a later turn, so settle before
       // asserting the callback ran once.
       await Future<void>.delayed(const Duration(milliseconds: 50));
-      expect(insideError, isNull);
       expect(cancelledInsideCallback, isTrue);
       expect(cancels, 1);
+      expect(zoneErrors, [isA<StateError>()]);
+      expect(liveToken.isClosed, isFalse);
+      expect(singleCallbackPortProbeForTesting(liveToken), isNull);
+
+      liveToken.close();
       expect(
         () => liveToken.setCancelCallback(() {}),
         throwsA(isA<InvalidArgumentException>()),
@@ -900,10 +911,12 @@ void main() {
     },
   );
 
-  // a request the provider completed is never reported as cancelled.
+  // a request the provider completed is never reported as cancelled, and
+  // its release retires the registration once.
   test('resource request cancel callbacks end at completion', () async {
     const styleUrl = 'custom://dart-provider-cancel-completed.json';
     final runtime = runtimeCreate(runtimeOptionsDefault());
+    CallbackPortLifecycleProbe? probe;
     var cancels = 0;
 
     runtime.setQueuedResourceProvider(
@@ -915,13 +928,16 @@ void main() {
           ),
         ],
         callback: (_, handle) {
-          handle.setCancelCallback(() => cancels += 1);
+          expect(handle.setCancelCallback(() => cancels += 1), isFalse);
+          probe = singleCallbackPortProbeForTesting(handle);
           handle.complete(
             ResourceResponse(
               status: ResourceResponseStatus.ok,
               bytes: Uint8List.fromList(_emptyStyleJson.codeUnits),
             ),
           );
+          expect(probe!.closed, isFalse);
+          handle.close();
         },
       ),
     );
@@ -932,6 +948,7 @@ void main() {
       runtime,
       (candidate) => candidate.type == RuntimeEventType.mapStyleLoaded,
     );
+    await _waitUntil(() => probe!.closed);
 
     await map.close();
     await runtime.close();
@@ -939,8 +956,8 @@ void main() {
     expect(cancels, 0);
   });
 
-  // a registration on a request MapLibre already cancelled runs the
-  // callback before registration returns.
+  // a registration on a request MapLibre already cancelled reports it,
+  // stores nothing, and never runs the callback.
   test('cancel registration reports an already cancelled request', () async {
     const styleUrl = 'custom://dart-provider-cancel-late.json';
     final runtime = runtimeCreate(runtimeOptionsDefault());
@@ -971,11 +988,12 @@ void main() {
     await _waitUntil(liveToken.cancelled);
 
     expect(liveToken.setCancelCallback(() => cancels += 1), isTrue);
-    expect(cancels, 0);
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-    expect(cancels, 0);
+    // The binding releases the refused port itself, before native release.
+    expect(singleCallbackPortProbeForTesting(liveToken), isNull);
 
     liveToken.close();
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(cancels, 0);
   });
 
   test(

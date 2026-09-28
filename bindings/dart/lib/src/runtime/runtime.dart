@@ -48,9 +48,13 @@ final class CallbackPortLifecycleProbe {
   bool get closed => _port.closed;
 }
 
-/// Returns a map's single pending port, or null after native release.
-CallbackPortLifecycleProbe? singleCallbackPortProbeForTesting(MapHandle map) {
-  final pending = map._callbackPorts.pending;
+/// Returns an owner's single pending port, or null after its release.
+CallbackPortLifecycleProbe? singleCallbackPortProbeForTesting(Object owner) {
+  final pending = switch (owner) {
+    MapHandle() => owner._callbackPorts.pending,
+    ResourceRequestHandle() => owner._callbackPorts.pending,
+    _ => throw ArgumentError.value(owner, 'owner', 'has no callback ports'),
+  };
   return pending.isEmpty ? null : CallbackPortLifecycleProbe._(pending.single);
 }
 

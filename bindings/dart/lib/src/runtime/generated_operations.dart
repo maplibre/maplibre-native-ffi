@@ -7002,6 +7002,8 @@ extension type const NativeResourceRequest(int raw) implements NativeHandle {}
 final class ResourceRequestHandle implements Finalizable {
   ResourceRequestHandle._(NativeResourceRequest handle)
     : _state = NativeHandleState(handle, 'ResourceRequestHandle');
+  // Roots this owner's port registrations for as long as it lives.
+  final _callbackPorts = _NativeCallbackPorts();
   final NativeHandleState<NativeResourceRequest> _state;
   NativeResourceRequest get _handle => _state.handle;
 
@@ -7031,6 +7033,50 @@ final class ResourceRequestHandle implements Finalizable {
     }),
     threadLastErrorMessage,
   );
+  bool setCancelCallback(
+    ResourceRequestCancelCallback callback,
+  ) => withNativeArena((arena) {
+    final handle = _handle;
+    final declined = arena<Bool>();
+    final port = _callbackPorts.register({
+      (raw
+              .mln_adapter_dart_port_callback
+              .MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK &
+          0xffffffff): (message) {
+        if (!isClosed) {
+          callback();
+        }
+      },
+    });
+    var accepted = false;
+    try {
+      _check(
+        raw.mln_resource_request_set_cancel_callback(
+          handle.raw,
+          raw
+              .mln_adapter_dart_port_function(
+                (raw
+                        .mln_adapter_dart_port_callback
+                        .MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK &
+                    0xffffffff),
+              )
+              .cast(),
+          port.context,
+          Native.addressOf<
+                NativeFunction<raw.mln_runtime_callback_releaseFunction>
+              >(raw.mln_adapter_dart_port_release)
+              .cast(),
+          declined,
+        ),
+      );
+      accepted = !declined.value;
+      return declined.value;
+    } finally {
+      if (!accepted) {
+        port.reject();
+      }
+    }
+  });
   void waitUntilRetired() => withNativeArena((arena) {
     _check(raw.mln_resource_request_wait_until_retired(_state.handleId));
   });

@@ -6,6 +6,7 @@ import re
 from collections import defaultdict
 from dataclasses import replace
 
+from tools.bindgen import native_ports
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import KEYWORDS, LOCALS, conflicting_functions
 from tools.bindgen.model import Api
@@ -68,25 +69,91 @@ def registration_body(plan, body):
     return f"      final registrations = _NativeRegistrations({roots});\n      try {{\n{body}\n      }} finally {{ registrations.close(); }}"
 
 
+def lower_port_registration(plan, registration, callback, values):
+    """Lower a receiver's direct registration that a native port delivers.
+
+    The port stays rooted by the receiver until native release retires it. A
+    registration that native code does not accept releases the port at once.
+    """
+    function = plan.function
+    receiver = type_name(function.parameters[0].type) if plan.receiver else None
+    if receiver not in values.bound.public_handles:
+        raise Unsupported("port registration requires an owned receiver")
+    if (
+        plan.execution != "immediate"
+        or plan.completion
+        or type_name(function.return_type) != "mln_status"
+    ):
+        raise Unsupported("port registration requires immediate admission status")
+    inputs = {p.name: p.value for p in plan.inputs}
+    if inputs[registration.release_callback].native != "mln_runtime_callback_release":
+        raise Unsupported("port registration requires the runtime release callback")
+    controls = {
+        function.parameters[0].name,
+        registration.callback,
+        registration.user_data,
+        registration.release_callback,
+        registration.accepted_unless,
+    }
+    if any(p.name not in controls for p in function.parameters):
+        raise Unsupported("port registration requires no other parameters")
+    outputs = {p.name: p.value for p in plan.outputs}
+    declined = outputs.get(registration.accepted_unless)
+    if registration.accepted_unless and (
+        not declined or not declined.element or declined.element.native != "bool"
+    ):
+        raise Unsupported("port registration refusal requires a boolean output")
+    value = inputs[registration.callback]
+    values.check(value)
+    key = (
+        "(raw.mln_adapter_dart_port_callback."
+        f"{native_ports.constant(plan.name, registration.callback)} & 0xffffffff)"
+    )
+    decoded, offset = [], 1
+    for parameter in callback.parameters:
+        if parameter.name != callback.context:
+            expression, offset = values.port_copy(parameter.value, offset)
+            decoded.append(expression)
+    name = camel(function.name.removeprefix(receiver.removesuffix("_handle") + "_"))
+    arguments = {
+        function.parameters[0].name: "handle.raw",
+        registration.callback: f"raw.mln_adapter_dart_port_function({key}).cast()",
+        registration.user_data: "port.context",
+        registration.release_callback: "Native.addressOf<NativeFunction<raw.mln_runtime_callback_releaseFunction>>(raw.mln_adapter_dart_port_release).cast()",
+        registration.accepted_unless: "declined",
+    }
+    call = f"raw.{function.name}({', '.join(arguments[p.name] for p in function.parameters)})"
+    if declined:
+        storage = "      final declined = arena<Bool>();\n"
+        accept, result, public = (
+            "accepted = !declined.value;",
+            "\n        return declined.value;",
+            "bool",
+        )
+    else:
+        storage, accept, result, public = "", "accepted = true;", "", "void"
+    # Delivery queued before the receiver closes is dropped.
+    body = (
+        "      final handle = _handle;\n"
+        + storage
+        + f"      final port = _callbackPorts.register({{\n        {key}: (message) {{ if (!isClosed) {{ callback({', '.join(decoded)}); }} }},\n      }});\n"
+        + f"      var accepted = false;\n      try {{\n        _check({call});\n        {accept}{result}\n      }} finally {{ if (!accepted) {{ port.reject(); }} }}"
+    )
+    return (
+        receiver,
+        f"  {public} {name}({values.public(value)} callback) => withNativeArena((arena) {{\n{body}\n  }});\n",
+    )
+
+
 def lower_direct_registration(plan, values):
-    """Verify a direct registration that a hand-written Dart adapter binds."""
+    """Lower a direct registration through a native port or its hand-written adapter."""
     if len(plan.direct_registrations) != 1:
         raise Unsupported("one direct registration required")
     registration = plan.direct_registrations[0]
+    for port_plan, _, callback, _ in native_ports.direct_callbacks(values.bound):
+        if port_plan.name == plan.name:
+            return lower_port_registration(plan, registration, callback, values)
     callback = next(p.value for p in plan.inputs if p.name == registration.callback)
-    if registration.owner_release and registration.accepted_unless:
-        if not any(
-            c.decision and c.decision.cancel_registration == plan.name
-            for c in values.bound.callbacks.values()
-        ):
-            raise Unsupported(
-                "owner cancellation requires verified provider decision protocol"
-            )
-        raise HandWritten(
-            "hand-written ResourceRequestCancellation.setCancelCallback in "
-            "runtime_resource_callbacks.dart through "
-            "mln_adapter_dart_resource_cancel_register"
-        )
     adapters = [
         a for a in values.bound.callback_adapters if a.callback == callback.native
     ]

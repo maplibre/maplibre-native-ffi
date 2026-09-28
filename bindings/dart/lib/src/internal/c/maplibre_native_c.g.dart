@@ -3006,6 +3006,8 @@ sealed class mln_adapter_dart_port_callback {
   static const MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE =
       1073125309;
   static const MLN_ADAPTER_DART_PORT_WAKE_CALLBACK = -1901719650;
+  static const MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK =
+      1605404209;
 }
 
 final class mln_adapter_http_header extends ffi.Struct {

@@ -102,10 +102,11 @@ the native diagnostic path.
 
 `ResourceRequestHandle.setCancelCallback()` registers one callback per request
 that runs when MapLibre discards a request the provider left open. The binding
-queues the callback to the isolate that registered it, and a request that is
-already cancelled runs the callback before registration returns. Register,
-complete, and release such a request on that isolate. An exception the callback
-throws is contained inside the binding.
+queues the callback to the isolate and zone that registered it, and drops it
+once the handle is closed. A request that is already cancelled returns true,
+stores nothing, and never runs the callback. Register, complete, and release
+such a request on that isolate. An exception the callback throws goes to the
+registering zone's error handler.
 
 Unsigned C `uint64_t` JSON values, feature identifiers, and camera transition
 IDs use Dart `BigInt` so the complete native range is preserved. Native byte

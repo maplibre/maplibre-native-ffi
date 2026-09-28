@@ -3848,6 +3848,8 @@ final class ResourceResponse {
   ]);
 }
 
+typedef ResourceRequestCancelCallback = void Function();
+
 final class RuntimeOptions {
   const RuntimeOptions({
     this.flags = 0,
