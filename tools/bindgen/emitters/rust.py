@@ -414,7 +414,7 @@ def operation(api: Api, plan: OperationPlan, value_types) -> tuple[str, str, set
             value_plan
             and value_plan.kind == "buffer"
             and value_plan.length != "nul"
-            and native != "mln_buffer_view"
+            and value_plan.buffer_form != "view"
         ):
             from .rust_dynamic_values import encode
 
@@ -426,7 +426,7 @@ def operation(api: Api, plan: OperationPlan, value_types) -> tuple[str, str, set
                 f"let {local}_native = {encode(value_types, value_plan, local).replace('crate::', 'maplibre_core::')};"
             )
             args.append(f"{local}_native")
-        elif native == "mln_buffer_view":
+        elif value_plan and value_plan.buffer_form == "view":
             from .rust_dynamic_values import encode
 
             encoding = value_plan.encoding

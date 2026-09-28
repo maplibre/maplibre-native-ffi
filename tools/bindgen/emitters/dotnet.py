@@ -22,8 +22,9 @@ from tools.bindgen.semantic import BoundApi, OperationPlan
 from .dotnet_values import Unsupported, Values
 
 
-def operation_contract(function: Function) -> str | None:
+def operation_contract(plan: OperationPlan) -> str | None:
     """Reject contracts that the .NET operation skeleton does not implement."""
+    function = plan.function
     metadata = function.metadata
     execution = metadata.get("execution")
     if metadata.get("name"):
@@ -44,7 +45,9 @@ def operation_contract(function: Function) -> str | None:
     if (
         metadata.get("shape") == "array"
         and (metadata.get("nullable") == "true" or "optional" in metadata)
-        and metadata.get("result") == "mln_buffer_view"
+        and plan.result is not None
+        and plan.result.element is not None
+        and plan.result.element.buffer_form == "view"
     ):
         return "optional array result needs a presence rule"
     if metadata.get("optional") == "empty" and metadata.get("encoding") != "utf8":
@@ -185,7 +188,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         raise Unsupported("unconditional consumption requires a void immediate release")
     input_plans = {parameter.name: parameter.value for parameter in plan.inputs}
     values = Values(bound)
-    if reason := operation_contract(function):
+    if reason := operation_contract(plan):
         raise Unsupported(reason)
     receiver_parameter = next(
         (
@@ -462,14 +465,20 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             values.supported(value_plan)
             parameters.append(f"{values.public_type(value_plan)} {name}")
             args.append(values.encode(value_plan, name))
-        elif ctype in api.records_by_name and ctype != "mln_buffer_view":
+        elif (
+            ctype in api.records_by_name
+            and getattr(input_plans.get(parameter.name), "buffer_form", None) != "view"
+        ):
             value_plan = values.record(ctype)
             values.encoder(value_plan)
             scoped |= values.needs_scope(value_plan)
             parameters.append(f"{public_type(ctype)} {name}")
             args.append(values.encode(value_plan, name))
             records.add(ctype)
-        elif ctype == "mln_buffer_view" and parameter.metadata.get("encoding") in {
+        elif (
+            input_plans.get(parameter.name) is not None
+            and input_plans[parameter.name].buffer_form == "view"
+        ) and parameter.metadata.get("encoding") in {
             "bytes",
             "json",
             "utf8",
@@ -805,7 +814,14 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             if native == "void" and shape == "none":
                 result_type = "Task"
                 converter = "result => true"
-            elif native == "mln_buffer_view" and function.metadata.get("encoding") in {
+            elif (
+                plan.result is not None
+                and "view"
+                in {
+                    plan.result.buffer_form,
+                    plan.result.element and plan.result.element.buffer_form,
+                }
+            ) and function.metadata.get("encoding") in {
                 "utf8",
                 "json",
                 "bytes",

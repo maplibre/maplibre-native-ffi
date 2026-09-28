@@ -183,7 +183,9 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
         elif type_ in SCALARS:
             declarations.append(f"{label}: {SCALARS[type_]}")
             arguments.append(local)
-        elif type_ == "mln_buffer_view" and param.metadata.get("encoding") in (
+        elif (
+            value_plan is not None and value_plan.buffer_form == "view"
+        ) and param.metadata.get("encoding") in (
             "utf8",
             "bytes",
             "json",
@@ -315,7 +317,8 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
                 conversion = f"try NativeCompletion.value(result, as: {result}.self)"
             elif (
                 shape == "value"
-                and result_type == "mln_buffer_view"
+                and plan.result is not None
+                and plan.result.buffer_form == "view"
                 and function.metadata.get("encoding") in ("utf8", "json", "bytes")
             ):
                 text = function.metadata["encoding"] == "utf8"
@@ -329,7 +332,9 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
                 conversion = f"{'try ' if dynamic(plan.result) else ''}{result}(raw: try NativeCompletion.value(result, as: {result_type}.self))"
             elif (
                 shape == "array"
-                and result_type == "mln_buffer_view"
+                and plan.result is not None
+                and plan.result.element is not None
+                and plan.result.element.buffer_form == "view"
                 and function.metadata.get("encoding") == "utf8"
             ):
                 result = "[String]"
@@ -345,7 +350,9 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
                     function, "result needs a supported payload/ownership rule"
                 )
             if empty_optional:
-                if shape != "value" or result_type != "mln_buffer_view":
+                if shape != "value" or not (
+                    plan.result is not None and plan.result.buffer_form == "view"
+                ):
                     raise unsupported(
                         function, "empty optional requires a view payload"
                     )
