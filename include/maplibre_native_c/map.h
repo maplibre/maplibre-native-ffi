@@ -15,6 +15,7 @@
 #include <stdint.h>
 
 #include "base.h"
+#include "completion.h"
 #include "runtime.h"
 
 #ifdef __cplusplus
@@ -22,7 +23,7 @@ extern "C" {
 #endif
 
 /** Field mask values for mln_camera_options. */
-typedef enum mln_camera_option_field : uint32_t {
+typedef enum MLN_BINDING("kind=bitmask") mln_camera_option_field : uint32_t {
   MLN_CAMERA_OPTION_CENTER = 1U << 0U,
   MLN_CAMERA_OPTION_ZOOM = 1U << 1U,
   MLN_CAMERA_OPTION_BEARING = 1U << 2U,
@@ -35,7 +36,7 @@ typedef enum mln_camera_option_field : uint32_t {
 } mln_camera_option_field;
 
 /** Field mask values for mln_animation_options. */
-typedef enum mln_animation_option_field : uint32_t {
+typedef enum MLN_BINDING("kind=bitmask") mln_animation_option_field : uint32_t {
   MLN_ANIMATION_OPTION_DURATION = 1U << 0U,
   MLN_ANIMATION_OPTION_VELOCITY = 1U << 1U,
   MLN_ANIMATION_OPTION_MIN_ZOOM = 1U << 2U,
@@ -44,14 +45,16 @@ typedef enum mln_animation_option_field : uint32_t {
 } mln_animation_option_field;
 
 /** Field mask values for mln_camera_fit_options. */
-typedef enum mln_camera_fit_option_field : uint32_t {
+typedef enum MLN_BINDING(
+  "kind=bitmask"
+) mln_camera_fit_option_field : uint32_t {
   MLN_CAMERA_FIT_OPTION_PADDING = 1U << 0U,
   MLN_CAMERA_FIT_OPTION_BEARING = 1U << 1U,
   MLN_CAMERA_FIT_OPTION_PITCH = 1U << 2U,
 } mln_camera_fit_option_field;
 
 /** Field mask values for mln_bound_options. */
-typedef enum mln_bound_option_field : uint32_t {
+typedef enum MLN_BINDING("kind=bitmask") mln_bound_option_field : uint32_t {
   /**
    * Selects mln_bound_options.bounds as a geographic constraint that the
    * camera center stays inside. Mutually exclusive with
@@ -73,20 +76,22 @@ typedef enum mln_bound_option_field : uint32_t {
 } mln_bound_option_field;
 
 /** Field mask values for mln_free_camera_options. */
-typedef enum mln_free_camera_option_field : uint32_t {
+typedef enum MLN_BINDING(
+  "kind=bitmask"
+) mln_free_camera_option_field : uint32_t {
   MLN_FREE_CAMERA_OPTION_POSITION = 1U << 0U,
   MLN_FREE_CAMERA_OPTION_ORIENTATION = 1U << 1U,
 } mln_free_camera_option_field;
 
 /** Field mask values for MapLibre axonometric rendering options. */
-typedef enum mln_projection_mode_field : uint32_t {
+typedef enum MLN_BINDING("kind=bitmask") mln_projection_mode_field : uint32_t {
   MLN_PROJECTION_MODE_AXONOMETRIC = 1U << 0U,
   MLN_PROJECTION_MODE_X_SKEW = 1U << 1U,
   MLN_PROJECTION_MODE_Y_SKEW = 1U << 2U,
 } mln_projection_mode_field;
 
 /** Debug overlay mask values for mln_map_set_debug_options(). */
-typedef enum mln_map_debug_option : uint32_t {
+typedef enum MLN_BINDING("kind=bitmask") mln_map_debug_option : uint32_t {
   MLN_MAP_DEBUG_TILE_BORDERS = 1U << 1U,
   MLN_MAP_DEBUG_PARSE_STATUS = 1U << 2U,
   MLN_MAP_DEBUG_TIMESTAMPS = 1U << 3U,
@@ -119,7 +124,9 @@ typedef enum mln_viewport_mode : uint32_t {
 } mln_viewport_mode;
 
 /** Field mask values for mln_map_viewport_options. */
-typedef enum mln_map_viewport_option_field : uint32_t {
+typedef enum MLN_BINDING(
+  "kind=bitmask"
+) mln_map_viewport_option_field : uint32_t {
   MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION = 1U << 0U,
   MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE = 1U << 1U,
   MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE = 1U << 2U,
@@ -133,7 +140,7 @@ typedef enum mln_tile_lod_mode : uint32_t {
 } mln_tile_lod_mode;
 
 /** Field mask values for mln_map_tile_options. */
-typedef enum mln_map_tile_option_field : uint32_t {
+typedef enum MLN_BINDING("kind=bitmask") mln_map_tile_option_field : uint32_t {
   MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA = 1U << 0U,
   MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS = 1U << 1U,
   MLN_MAP_TILE_OPTION_LOD_SCALE = 1U << 2U,
@@ -151,35 +158,31 @@ typedef enum mln_map_mode : uint32_t {
   /** Produces one-off still images for a single tile. */
   MLN_MAP_MODE_TILE = 2,
 } mln_map_mode;
+/** Logical map extent in UI pixels and device-pixel scale. */
+typedef struct mln_logical_extent {
+  uint32_t width;
+  uint32_t height;
+  /**
+   * Device pixels per UI pixel. The renderer takes it at map creation, so
+   * mln_map_resize() accepts only the value the map was created with.
+   */
+  double scale_factor;
+} mln_logical_extent;
 
 /** Options used when creating a map. */
 typedef struct mln_map_options {
-  uint32_t size;
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /**
-   * Initial logical map width in UI pixels. Must be positive.
+   * Initial logical extent. Width and height must be positive. The scale
+   * factor must be positive and finite, and fixes the map's scale factor for
+   * its lifetime.
    *
-   * Attaching a render session replaces this with the render target extent, and
-   * mln_render_session_resize() replaces it again. Until the first attach it is
-   * the viewport that camera and projection queries such as
-   * mln_map_camera_for_lat_lng_bounds() and mln_map_pixel_for_lat_lng() are
-   * answered against.
+   * After creation, mln_map_resize() is the only function that changes the
+   * width and height.
    */
-  uint32_t width;
-  /** Initial logical map height in UI pixels. See width. */
-  uint32_t height;
-  /**
-   * UI-to-device pixel scale. Must be positive and finite.
-   *
-   * Unlike width and height, this is fixed for the lifetime of the map and
-   * selects sprites, glyphs, and raster tiles for every frame the map renders.
-   * Render targets carry their own scale factor for geometry and shaders, so
-   * create the map with the scale factor you intend to render at. A render
-   * session attached or resized with a different scale factor logs a warning
-   * and renders styled imagery chosen for the map's density.
-   */
-  double scale_factor;
+  mln_logical_extent initial_extent;
   /** One of mln_map_mode. Defaults to MLN_MAP_MODE_CONTINUOUS. */
-  uint32_t map_mode;
+  uint32_t map_mode MLN_BINDING("enum=mln_map_mode");
   /**
    * Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
    * encodings. Defaults to false.
@@ -203,8 +206,8 @@ typedef struct mln_map_options {
    * The mask applies throughout construction, including the camera events that
    * MapLibre reports while it initializes the map's size.
    */
-  uint64_t event_mask;
-} mln_map_options;
+  uint64_t event_mask MLN_BINDING("enum=mln_runtime_event_mask");
+} mln_map_options MLN_BINDING("default=mln_map_options_default");
 
 /** Screen-space point in logical map pixels. */
 typedef struct mln_screen_point {
@@ -220,29 +223,30 @@ typedef struct mln_edge_insets {
   double right;
 } mln_edge_insets;
 
-/** Camera fields used for snapshots and camera commands. */
+/** Camera fields used by snapshots and camera updates. */
 typedef struct mln_camera_options {
-  uint32_t size;
-  uint32_t fields;
-  double latitude;
-  double longitude;
-  double center_altitude;
-  mln_edge_insets padding;
-  /**
-   * Screen-space focal point for a camera command. This field is input-only.
-   *
-   * MapLibre Native applies it to camera commands and leaves it out of every
-   * camera snapshot it reports, so MLN_CAMERA_OPTION_ANCHOR is set only by the
-   * caller. mln_map_get_camera(), mln_map_projection_get_camera(), and the
-   * mln_map_camera_for_* family leave it clear.
-   */
-  mln_screen_point anchor;
-  double zoom;
-  double bearing;
-  double pitch;
-  double roll;
-  double field_of_view;
-} mln_camera_options;
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t fields
+    MLN_BINDING("kind=presence_mask;enum=mln_camera_option_field");
+  double latitude MLN_BINDING(
+    "mask=fields;bit=MLN_CAMERA_OPTION_CENTER;group_type=mln_lat_lng"
+  );
+  double longitude MLN_BINDING(
+    "mask=fields;bit=MLN_CAMERA_OPTION_CENTER;group_type=mln_lat_lng"
+  );
+  double center_altitude
+    MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_CENTER_ALTITUDE");
+  mln_edge_insets padding
+    MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_PADDING");
+  /** Optional screen-space focal point in logical map pixels. */
+  mln_screen_point anchor
+    MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_ANCHOR");
+  double zoom MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_ZOOM");
+  double bearing MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_BEARING");
+  double pitch MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_PITCH");
+  double roll MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_ROLL");
+  double field_of_view MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_FOV");
+} mln_camera_options MLN_BINDING("default=mln_camera_options_default");
 
 /** Cubic easing curve for animated camera transitions. */
 typedef struct mln_unit_bezier {
@@ -254,25 +258,27 @@ typedef struct mln_unit_bezier {
 
 /** Optional animation controls for camera transitions. */
 typedef struct mln_animation_options {
-  uint32_t size;
-  uint32_t fields;
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t fields
+    MLN_BINDING("kind=presence_mask;enum=mln_animation_option_field");
   /**
    * Duration in milliseconds. Must be finite and non-negative. Values that
    * would overflow MapLibre Native's internal duration are invalid.
    *
-   * When this field is omitted, ease, pan, zoom, rotate, and pitch transitions
-   * default to zero and apply instantly, while mln_map_fly_to() derives a
-   * duration from velocity instead.
+   * When omitted, ease transitions apply immediately. Fly transitions derive
+   * their duration from velocity.
    */
-  double duration_ms;
+  double duration_ms
+    MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_DURATION");
   /**
-   * Average flyTo velocity in screenfuls per second. Must be positive.
-   * Defaults to 1.2 when omitted. Applies to mln_map_fly_to().
+   * Average fly velocity in screenfuls per second. Must be positive and
+   * defaults to 1.2 when omitted.
    */
-  double velocity;
+  double velocity MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_VELOCITY");
   /** Peak zoom for flyTo transitions. */
-  double min_zoom;
-  mln_unit_bezier easing;
+  double min_zoom MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_MIN_ZOOM");
+  mln_unit_bezier easing
+    MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_EASING");
   /**
    * Caller-chosen identity for the transition this options struct starts.
    *
@@ -282,15 +288,11 @@ typedef struct mln_animation_options {
    * passes the value through without interpreting it, so callers pick their own
    * scheme, such as a monotonically increasing counter.
    *
-   * Each command emits that event once all its properties have completed or
-   * been superseded. Replacing one property leaves the command active while
-   * another property continues. Cancelling all transitions also ends every
-   * active command. A zero-duration ease emits its event during the call.
-   * A command this API rejects -- one carrying a non-finite enabled camera
-   * field, for example -- starts no transition and emits no such
-   * event. The event carries no completion reason, so a host that needs to tell
-   * completion from cancellation compares the resulting camera against the
-   * requested one, or tracks which commands own the requested properties.
+   * Each command emits that event once all its properties complete or are
+   * superseded. Replacing one property leaves other properties animating.
+   * Cancelling all transitions ends every active command. The event carries no
+   * completion reason, so a host that needs to distinguish outcomes compares
+   * the resulting camera against the requested one.
    *
    * The event is queued on the runtime that owns the map and is drained by
    * mln_runtime_drain_events(). It is queued immediately before that command's
@@ -301,17 +303,93 @@ typedef struct mln_animation_options {
    *
    * When this field is omitted, the transition emits no such event.
    */
-  uint64_t transition_id;
-} mln_animation_options;
+  uint64_t transition_id
+    MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_TRANSITION_ID");
+} mln_animation_options MLN_BINDING("default=mln_animation_options_default");
+
+/** Relative camera operation carried by mln_camera_delta. */
+typedef enum mln_camera_delta_kind : uint32_t {
+  MLN_CAMERA_DELTA_MOVE = 0,
+  MLN_CAMERA_DELTA_SCALE = 1,
+  MLN_CAMERA_DELTA_BEARING = 2,
+  MLN_CAMERA_DELTA_PITCH = 3,
+} mln_camera_delta_kind;
+
+/**
+ * One relative camera operation.
+ *
+ * MOVE reads offset. SCALE reads amount as a positive factor. BEARING and
+ * PITCH read amount as degrees, added to the current value: a positive PITCH
+ * amount tilts the camera further from straight down, the opposite of
+ * MapLibre Native's Map::pitchBy(). SCALE and BEARING apply anchor when
+ * has_anchor is true. Every operation reads animation.
+ */
+typedef struct mln_camera_delta {
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t kind MLN_BINDING("enum=mln_camera_delta_kind");
+  mln_screen_point offset;
+  double amount;
+  bool has_anchor MLN_BINDING("kind=presence_mask");
+  mln_screen_point anchor MLN_BINDING("mask=has_anchor");
+  mln_animation_options animation;
+} mln_camera_delta MLN_BINDING("default=mln_camera_delta_default");
+
+/** Camera transition behavior for mln_camera_update. */
+typedef enum mln_camera_update_mode : uint32_t {
+  MLN_CAMERA_UPDATE_MODE_JUMP = 0,
+  MLN_CAMERA_UPDATE_MODE_EASE = 1,
+  MLN_CAMERA_UPDATE_MODE_FLY = 2,
+} mln_camera_update_mode;
+
+/**
+ * Gesture boundary carried atomically with a camera update.
+ *
+ * The phase is applied around the camera write and is reported by
+ * mln_map_snapshot.gesture_in_progress.
+ */
+typedef enum mln_gesture_phase : uint32_t {
+  /** The update carries no gesture boundary and leaves the flag as it is. */
+  MLN_GESTURE_PHASE_NONE = 0,
+  /**
+   * Marks a gesture as in progress before the camera write. It does not
+   * cancel running transitions; use mln_map_cancel_transitions() for that.
+   */
+  MLN_GESTURE_PHASE_BEGIN = 1,
+  /** Keeps the gesture marked as in progress before the camera write. */
+  MLN_GESTURE_PHASE_UPDATE = 2,
+  /** Clears the gesture flag after the camera write. */
+  MLN_GESTURE_PHASE_END = 3,
+  /**
+   * Cancels transitions running after the camera write, then clears the
+   * gesture flag.
+   */
+  MLN_GESTURE_PHASE_CANCEL = 4,
+} mln_gesture_phase;
+
+/**
+ * One atomic absolute camera update.
+ *
+ * The command copies this struct before returning.
+ */
+typedef struct mln_camera_update {
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t mode MLN_BINDING("enum=mln_camera_update_mode");
+  mln_camera_options camera;
+  mln_animation_options animation;
+  uint32_t gesture_phase MLN_BINDING("enum=mln_gesture_phase");
+  uint32_t reserved MLN_BINDING("kind=reserved;default=0");
+} mln_camera_update MLN_BINDING("default=mln_camera_update_default");
 
 /** Optional fitting controls for camera-for-viewport queries. */
 typedef struct mln_camera_fit_options {
-  uint32_t size;
-  uint32_t fields;
-  mln_edge_insets padding;
-  double bearing;
-  double pitch;
-} mln_camera_fit_options;
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t fields
+    MLN_BINDING("kind=presence_mask;enum=mln_camera_fit_option_field");
+  mln_edge_insets padding
+    MLN_BINDING("mask=fields;bit=MLN_CAMERA_FIT_OPTION_PADDING");
+  double bearing MLN_BINDING("mask=fields;bit=MLN_CAMERA_FIT_OPTION_BEARING");
+  double pitch MLN_BINDING("mask=fields;bit=MLN_CAMERA_FIT_OPTION_PITCH");
+} mln_camera_fit_options MLN_BINDING("default=mln_camera_fit_options_default");
 
 /** Three-component vector used by free camera options. */
 typedef struct mln_vec3 {
@@ -330,11 +408,16 @@ typedef struct mln_quaternion {
 
 /** Free camera position and orientation in MapLibre Native camera space. */
 typedef struct mln_free_camera_options {
-  uint32_t size;
-  uint32_t fields;
-  mln_vec3 position;
-  mln_quaternion orientation;
-} mln_free_camera_options;
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t fields
+    MLN_BINDING("kind=presence_mask;enum=mln_free_camera_option_field");
+  mln_vec3 position
+    MLN_BINDING("mask=fields;bit=MLN_FREE_CAMERA_OPTION_POSITION");
+  mln_quaternion orientation
+    MLN_BINDING("mask=fields;bit=MLN_FREE_CAMERA_OPTION_ORIENTATION");
+} mln_free_camera_options MLN_BINDING(
+  "default=mln_free_camera_options_default"
+);
 
 /** Geographic coordinate in degrees used by map and projection APIs. */
 typedef struct mln_lat_lng {
@@ -346,7 +429,9 @@ typedef struct mln_lat_lng {
 } mln_lat_lng;
 
 /** Optional fields for mln_feature_state_selector. */
-typedef enum mln_feature_state_selector_field : uint32_t {
+typedef enum MLN_BINDING(
+  "kind=bitmask"
+) mln_feature_state_selector_field : uint32_t {
   MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID = 1U << 0U,
   MLN_FEATURE_STATE_SELECTOR_FEATURE_ID = 1U << 1U,
   MLN_FEATURE_STATE_SELECTOR_STATE_KEY = 1U << 2U,
@@ -354,17 +439,24 @@ typedef enum mln_feature_state_selector_field : uint32_t {
 
 /** Feature-state source, feature, and key selector. */
 typedef struct mln_feature_state_selector {
-  uint32_t size;
-  uint32_t fields;
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t fields
+    MLN_BINDING("kind=presence_mask;enum=mln_feature_state_selector_field");
   /** Source ID. Required and borrowed for the duration of the call. */
-  mln_buffer_view source_id;
+  mln_buffer_view source_id MLN_BINDING("encoding=utf8");
   /** Optional source layer ID. Required for vector-source disambiguation. */
-  mln_buffer_view source_layer_id;
+  mln_buffer_view source_layer_id MLN_BINDING(
+    "encoding=utf8;mask=fields;bit=MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID"
+  );
   /** Optional feature ID string. Required by set/get and optional for remove.
    */
-  mln_buffer_view feature_id;
+  mln_buffer_view feature_id MLN_BINDING(
+    "encoding=utf8;mask=fields;bit=MLN_FEATURE_STATE_SELECTOR_FEATURE_ID"
+  );
   /** Optional state key. Used only by remove and requires feature_id. */
-  mln_buffer_view state_key;
+  mln_buffer_view state_key MLN_BINDING(
+    "encoding=utf8;mask=fields;bit=MLN_FEATURE_STATE_SELECTOR_STATE_KEY"
+  );
 } mln_feature_state_selector;
 
 /** Geographic bounds in degrees. */
@@ -375,21 +467,23 @@ typedef struct mln_lat_lng_bounds {
 
 /** Optional map camera constraint fields. */
 typedef struct mln_bound_options {
-  uint32_t size;
-  uint32_t fields;
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t fields MLN_BINDING("kind=presence_mask;enum=mln_bound_option_field");
   /** Read when fields contains MLN_BOUND_OPTION_BOUNDS. */
-  mln_lat_lng_bounds bounds;
-  double min_zoom;
-  double max_zoom;
-  double min_pitch;
-  double max_pitch;
-} mln_bound_options;
+  mln_lat_lng_bounds bounds
+    MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_BOUNDS");
+  double min_zoom MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_MIN_ZOOM");
+  double max_zoom MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_MAX_ZOOM");
+  double min_pitch MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_MIN_PITCH");
+  double max_pitch MLN_BINDING("mask=fields;bit=MLN_BOUND_OPTION_MAX_PITCH");
+} mln_bound_options MLN_BINDING("default=mln_bound_options_default");
 
 /** Tile-pyramid offline region definition. */
 typedef struct mln_offline_tile_pyramid_region_definition {
-  uint32_t size;
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /** Style URL. Copied during region creation. */
-  const char* style_url;
+  const char* style_url
+    MLN_BINDING("length=nul;encoding=utf8;ownership=borrowed");
   mln_lat_lng_bounds bounds;
   double min_zoom;
   /**
@@ -403,11 +497,12 @@ typedef struct mln_offline_tile_pyramid_region_definition {
 
 /** Geometry offline region definition. */
 typedef struct mln_offline_geometry_region_definition {
-  uint32_t size;
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /** Style URL. Copied during region creation. */
-  const char* style_url;
+  const char* style_url
+    MLN_BINDING("length=nul;encoding=utf8;ownership=borrowed");
   /** UTF-8 GeoJSON Geometry bytes. Borrowed during region creation. */
-  mln_buffer_view geometry;
+  mln_buffer_view geometry MLN_BINDING("encoding=json");
   double min_zoom;
   /**
    * Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
@@ -418,84 +513,124 @@ typedef struct mln_offline_geometry_region_definition {
   bool include_ideographs;
 } mln_offline_geometry_region_definition;
 
+/** Offline region definition data. */
+typedef union mln_offline_region_definition_data {
+  mln_offline_tile_pyramid_region_definition tile_pyramid
+    MLN_BINDING("variant=MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID");
+  mln_offline_geometry_region_definition geometry
+    MLN_BINDING("variant=MLN_OFFLINE_REGION_DEFINITION_GEOMETRY");
+} mln_offline_region_definition_data;
+
 /** Tagged offline region definition. */
 typedef struct mln_offline_region_definition {
-  uint32_t size;
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /** One of mln_offline_region_definition_type. */
-  uint32_t type;
-  union {
-    mln_offline_tile_pyramid_region_definition tile_pyramid;
-    mln_offline_geometry_region_definition geometry;
-  } data;
+  uint32_t type MLN_BINDING("kind=tag;enum=mln_offline_region_definition_type");
+  mln_offline_region_definition_data data MLN_BINDING("tag=type");
 } mln_offline_region_definition;
 
-/** Region data view returned from a snapshot or list handle. */
+/**
+ * Region data delivered by an offline completion.
+ *
+ * The record and every pointer it carries, including the definition's style
+ * URL and geometry and the metadata bytes, are borrowed for the duration of the
+ * completion callback.
+ */
 typedef struct mln_offline_region_info {
-  uint32_t size;
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
   mln_offline_region_id id;
   mln_offline_region_definition definition;
-  /** Metadata bytes. Valid until the owner snapshot/list is destroyed.
-   */
-  const uint8_t* metadata;
-  size_t metadata_size;
+  /** Metadata bytes. */
+  const uint8_t* metadata
+    MLN_BINDING("length=metadata_size;ownership=borrowed;encoding=bytes");
+  size_t metadata_size MLN_BINDING("kind=count");
 } mln_offline_region_info;
 
 /**
  * Starts creating an offline region.
  *
  * Input strings, GeoJSON geometry bytes, and metadata are copied before this
- * call returns. Completion is reported through
- * MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED. On successful completion, call
- * mln_runtime_offline_region_create_take_result() to take the snapshot.
+ * call returns. A successful completion borrows one mln_offline_region_info
+ * value, valid only for the duration of the callback.
  *
  * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
+ * - MLN_STATUS_OK when the operation is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, definition is
- *   null or invalid, metadata is null with a non-zero size, or
- *   out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *   null or malformed, metadata is null with a non-zero metadata_size, or
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK and one region record.
+ * - MLN_STATUS_UNSUPPORTED when the stored definition type is unsupported.
+ * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
-MLN_API mln_status mln_runtime_offline_region_create_start(
-  mln_runtime runtime, const mln_offline_region_definition* definition,
-  const uint8_t* metadata, size_t metadata_size,
-  mln_offline_operation_id* out_operation_id
+MLN_BINDING(
+  "execution=operation;result=mln_offline_region_info;shape=value;ownership="
+  "borrowed"
+)
+MLN_API mln_status mln_runtime_offline_region_create(
+  mln_runtime runtime,
+  const mln_offline_region_definition* definition MLN_BINDING("length=1"),
+  const uint8_t* metadata
+    MLN_BINDING("length=metadata_size;encoding=bytes;ownership=borrowed"),
+  size_t metadata_size, const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
- * Starts getting an offline region snapshot by ID.
+ * Starts getting one offline region by ID.
  *
- * Completion is reported through MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
- * On successful completion, call
- * mln_runtime_offline_region_get_take_result().
+ * A successful completion borrows zero or one mln_offline_region_info value,
+ * depending on whether the region exists, valid only for the duration of the
+ * callback. Unlike the other region operations, a missing region completes
+ * MLN_STATUS_OK with no value rather than MLN_STATUS_NOT_FOUND.
  *
  * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the operation is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK and zero or one region record.
+ * - MLN_STATUS_UNSUPPORTED when the stored definition type is unsupported.
+ * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
-MLN_API mln_status mln_runtime_offline_region_get_start(
+MLN_BINDING(
+  "execution=query;result=mln_offline_region_info;shape=value;ownership="
+  "borrowed;nullable=true"
+)
+MLN_API mln_status mln_runtime_offline_region_get(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_offline_operation_id* out_operation_id
+  const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
- * Starts listing offline region snapshots in the runtime database.
+ * Starts listing the offline regions in the runtime database.
+ *
+ * A successful completion borrows value_count mln_offline_region_info values,
+ * valid only for the duration of the callback.
  *
  * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the operation is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK and one record per stored region.
+ * - MLN_STATUS_UNSUPPORTED when a stored definition type is unsupported.
+ * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
-MLN_API mln_status mln_runtime_offline_regions_list_start(
-  mln_runtime runtime, mln_offline_operation_id* out_operation_id
+MLN_BINDING(
+  "execution=query;result=mln_offline_region_info;shape=array;ownership="
+  "borrowed"
+)
+MLN_API mln_status mln_runtime_offline_regions_list(
+  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
@@ -504,356 +639,198 @@ MLN_API mln_status mln_runtime_offline_regions_list_start(
  * side_database_path must identify an existing, readable MapLibre offline
  * database whose schema version matches this library. The runtime opens the
  * database read-only and leaves its contents unchanged. Keep the file present
- * and unchanged until the operation completes.
+ * and unchanged until the completion runs.
  *
  * The merge copies only tiles and resources assigned to a region. It does not
  * accept an MBTiles database, which uses a different schema.
  *
- * This function validates that the database can be opened read-only and copies
- * side_database_path before returning. It does not inspect the schema
- * synchronously. Format, schema, and later filesystem errors appear in the
- * operation-completed event's result status and message.
+ * The call validates that the database opens read-only and copies
+ * side_database_path before it accepts the submission; it does not inspect the
+ * schema synchronously. A path that names no existing readable database file is
+ * rejected with MLN_STATUS_INVALID_ARGUMENT before acceptance. Format, schema,
+ * and later filesystem errors reach the completion as a non-OK status and
+ * diagnostic.
+ *
+ * A successful completion borrows value_count mln_offline_region_info values,
+ * one per merged region, valid only for the duration of the callback.
  *
  * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
+ * - MLN_STATUS_OK when the operation is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live,
- *   side_database_path is null, does not identify an existing readable
- *   database file, or out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *   side_database_path is null or names no readable database file, or
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK and one record per merged region.
+ * - MLN_STATUS_UNSUPPORTED when a merged definition type is unsupported.
+ * - MLN_STATUS_NATIVE_ERROR when the merge fails, including a schema mismatch.
  */
-MLN_API mln_status mln_runtime_offline_regions_merge_database_start(
-  mln_runtime runtime, const char* side_database_path,
-  mln_offline_operation_id* out_operation_id
+MLN_BINDING(
+  "execution=operation;result=mln_offline_region_info;shape=array;ownership="
+  "borrowed"
+)
+MLN_API mln_status mln_runtime_offline_regions_merge_database(
+  mln_runtime runtime,
+  const char* side_database_path
+    MLN_BINDING("encoding=utf8;lifetime=call;length=nul;ownership=borrowed"),
+  const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
  * Starts updating opaque binary metadata for an offline region.
  *
- * On successful completion, call
- * mln_runtime_offline_region_update_metadata_take_result().
+ * Metadata bytes are copied before this call returns. A successful completion
+ * borrows one mln_offline_region_info value carrying the updated region, valid
+ * only for the duration of the callback.
  *
  * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
+ * - MLN_STATUS_OK when the operation is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, metadata is
- *   null with a non-zero size, or out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *   null with a non-zero metadata_size, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK and one region record.
+ * - MLN_STATUS_NOT_FOUND when no region carries region_id.
+ * - MLN_STATUS_UNSUPPORTED when the stored definition type is unsupported.
+ * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
-MLN_API mln_status mln_runtime_offline_region_update_metadata_start(
-  mln_runtime runtime, mln_offline_region_id region_id, const uint8_t* metadata,
-  size_t metadata_size, mln_offline_operation_id* out_operation_id
+MLN_BINDING(
+  "execution=operation;result=mln_offline_region_info;shape=value;ownership="
+  "borrowed"
+)
+MLN_API mln_status mln_runtime_offline_region_update_metadata(
+  mln_runtime runtime, mln_offline_region_id region_id,
+  const uint8_t* metadata
+    MLN_BINDING("length=metadata_size;encoding=bytes;ownership=borrowed"),
+  size_t metadata_size, const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
- * Starts getting the current completed/download status for an offline region.
+ * Starts getting the current download status for an offline region.
+ *
+ * A successful completion borrows one mln_offline_region_status value, valid
+ * only for the duration of the callback.
  *
  * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the operation is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK and one status value.
+ * - MLN_STATUS_NOT_FOUND when no region carries region_id.
+ * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
-MLN_API mln_status mln_runtime_offline_region_get_status_start(
+MLN_BINDING(
+  "execution=query;result=mln_offline_region_status;shape=value;ownership="
+  "borrowed"
+)
+MLN_API mln_status mln_runtime_offline_region_get_status(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_offline_operation_id* out_operation_id
+  const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
  * Enables or disables runtime events for an offline region.
  *
- * Observer callbacks are copied into runtime events. Disabling observation also
- * discards queued events for this region.
- *
- * Completion is reported through MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
+ * Observer callbacks are copied into runtime events. Disabling observation
+ * prevents future events for this region and leaves queued events unchanged.
+ * The completion reports the terminal status and carries no value.
  *
  * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the operation is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK when observation was changed.
+ * - MLN_STATUS_NOT_FOUND when no region carries region_id.
+ * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
-MLN_API mln_status mln_runtime_offline_region_set_observed_start(
+MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_API mln_status mln_runtime_offline_region_set_observed(
   mln_runtime runtime, mln_offline_region_id region_id, bool observed,
-  mln_offline_operation_id* out_operation_id
+  const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
  * Sets an offline region's native download state.
  *
  * Register observation separately with
- * mln_runtime_offline_region_set_observed_start() to receive progress and error
- * events.
- *
- * Completion is reported through MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
+ * mln_runtime_offline_region_set_observed() to receive progress and error
+ * events. The completion reports the terminal status and carries no value.
  *
  * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
+ * - MLN_STATUS_OK when the operation is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, state is not
- *   a mln_offline_region_download_state value, or out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *   an mln_offline_region_download_state value, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK when the download state was set.
+ * - MLN_STATUS_NOT_FOUND when no region carries region_id.
+ * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
-MLN_API mln_status mln_runtime_offline_region_set_download_state_start(
-  mln_runtime runtime, mln_offline_region_id region_id, uint32_t state,
-  mln_offline_operation_id* out_operation_id
+MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_API mln_status mln_runtime_offline_region_set_download_state(
+  mln_runtime runtime, mln_offline_region_id region_id,
+  uint32_t state MLN_BINDING("enum=mln_offline_region_download_state"),
+  const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
  * Invalidates cached resources for an offline region.
  *
- * Completion is reported through MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
+ * The completion reports the terminal status and carries no value.
  *
  * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the operation is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK when the region's resources were invalidated.
+ * - MLN_STATUS_NOT_FOUND when no region carries region_id.
+ * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
-MLN_API mln_status mln_runtime_offline_region_invalidate_start(
+MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_API mln_status mln_runtime_offline_region_invalidate(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_offline_operation_id* out_operation_id
+  const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
  * Deletes an offline region.
  *
- * Completion is reported through MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
+ * The completion reports the terminal status and carries no value.
  *
  * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the operation is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_OK when the region was deleted.
+ * - MLN_STATUS_NOT_FOUND when no region carries region_id.
+ * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
-MLN_API mln_status mln_runtime_offline_region_delete_start(
+MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_API mln_status mln_runtime_offline_region_delete(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_offline_operation_id* out_operation_id
-) MLN_NOEXCEPT;
-
-/**
- * Takes the snapshot result from a completed offline region create operation.
- *
- * Must only be called after the matching
- * mln_runtime_offline_region_create_start() operation has completed
- * successfully (MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED with result
- * status MLN_STATUS_OK). The caller owns the returned snapshot handle and must
- * destroy it with mln_offline_region_snapshot_destroy().
- *
- * On success, the operation entry is consumed. On failure, it remains live so
- * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard(). Taking or discarding a result also
- * removes that operation's undrained completion event. The thread diagnostic
- * carries a failed operation's error text.
- *
- * Returns:
- * - MLN_STATUS_OK when the result was taken and out_region was set.
- * - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
- *   kind does not match a region snapshot.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or out_region
- *   is null.
- */
-MLN_API mln_status mln_runtime_offline_region_create_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot* out_region
-) MLN_NOEXCEPT;
-
-/**
- * Takes the snapshot result from a completed offline region get operation.
- *
- * Must only be called after the matching
- * mln_runtime_offline_region_get_start() operation has completed successfully.
- * The caller owns the returned snapshot handle and must destroy it with
- * mln_offline_region_snapshot_destroy().
- *
- * On success, the operation entry is consumed. On failure, it remains live so
- * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard(). Taking or discarding a result also
- * removes that operation's undrained completion event. The thread diagnostic
- * carries a failed operation's error text.
- *
- * Returns:
- * - MLN_STATUS_OK when the result was taken; out_found indicates whether a
- *   region existed for the requested ID.
- * - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
- *   kind does not match an optional region snapshot.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, out_region is
- *   null, or out_found is null.
- */
-MLN_API mln_status mln_runtime_offline_region_get_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot* out_region, bool* out_found
-) MLN_NOEXCEPT;
-
-/**
- * Takes the region list from a completed offline regions list operation.
- *
- * Must only be called after the matching
- * mln_runtime_offline_regions_list_start() operation has completed
- * successfully. The caller owns the returned list handle and must destroy it
- * with mln_offline_region_list_destroy().
- *
- * On success, the operation entry is consumed. On failure, it remains live so
- * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard(). Taking or discarding a result also
- * removes that operation's undrained completion event. The thread diagnostic
- * carries a failed operation's error text.
- *
- * Returns:
- * - MLN_STATUS_OK when the result was taken and out_regions was set.
- * - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
- *   kind does not match a region list.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_regions is null.
- */
-MLN_API mln_status mln_runtime_offline_regions_list_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_list* out_regions
-) MLN_NOEXCEPT;
-
-/**
- * Takes the region list from a completed offline database merge operation.
- *
- * Must only be called after the matching
- * mln_runtime_offline_regions_merge_database_start() operation has completed
- * successfully. The caller owns the returned list handle and must destroy it
- * with mln_offline_region_list_destroy().
- *
- * On success, the operation entry is consumed. On failure, it remains live so
- * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard(). Taking or discarding a result also
- * removes that operation's undrained completion event. The thread diagnostic
- * carries a failed operation's error text.
- *
- * Returns:
- * - MLN_STATUS_OK when the result was taken and out_regions was set.
- * - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
- *   kind does not match a region list.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_regions is null.
- */
-MLN_API mln_status mln_runtime_offline_regions_merge_database_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_list* out_regions
-) MLN_NOEXCEPT;
-
-/**
- * Takes the snapshot result from a completed offline region update-metadata
- * operation.
- *
- * Must only be called after the matching
- * mln_runtime_offline_region_update_metadata_start() operation has completed
- * successfully. The caller owns the returned snapshot handle and must destroy
- * it with mln_offline_region_snapshot_destroy().
- *
- * On success, the operation entry is consumed. On failure, it remains live so
- * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard(). Taking or discarding a result also
- * removes that operation's undrained completion event. The thread diagnostic
- * carries a failed operation's error text.
- *
- * Returns:
- * - MLN_STATUS_OK when the result was taken and out_region was set.
- * - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
- *   kind does not match a region snapshot.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or out_region
- *   is null.
- */
-MLN_API mln_status mln_runtime_offline_region_update_metadata_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot* out_region
-) MLN_NOEXCEPT;
-
-/**
- * Takes the status struct from a completed offline region get-status operation.
- *
- * Must only be called after the matching
- * mln_runtime_offline_region_get_status_start() operation has completed
- * successfully. The caller provides a pre-allocated mln_offline_region_status
- * struct which is filled by this function.
- *
- * On success, the operation entry is consumed. On failure, it remains live so
- * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard(). Taking or discarding a result also
- * removes that operation's undrained completion event. The thread diagnostic
- * carries a failed operation's error text.
- *
- * Returns:
- * - MLN_STATUS_OK when the result was taken and out_status was filled.
- * - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
- *   kind does not match a region status.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or out_status
- *   is null.
- */
-MLN_API mln_status mln_runtime_offline_region_get_status_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_status* out_status
-) MLN_NOEXCEPT;
-
-/**
- * Copies a region data view out of a snapshot handle.
- *
- * On success, out_info receives pointers into snapshot-owned storage. Those
- * pointers remain valid until the snapshot is destroyed.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when snapshot is null or not live, out_info is
- *   null, or out_info->size is too small.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_offline_region_snapshot_get(
-  mln_offline_region_snapshot snapshot, mln_offline_region_info* out_info
-) MLN_NOEXCEPT;
-
-/** Destroys an offline region snapshot handle. Null is accepted as a no-op. */
-MLN_API void mln_offline_region_snapshot_destroy(
-  mln_offline_region_snapshot snapshot
-) MLN_NOEXCEPT;
-
-/**
- * Gets the number of regions in a list handle.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when list is null or not live, or out_count is
- *   null.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_offline_region_list_count(
-  mln_offline_region_list list, size_t* out_count
-) MLN_NOEXCEPT;
-
-/**
- * Copies a region data view for one list entry.
- *
- * On success, out_info receives pointers into list-owned storage. Those
- * pointers remain valid until the list is destroyed.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when list is null or not live, index is out of
- *   range, out_info is null, or out_info->size is too small.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_offline_region_list_get(
-  mln_offline_region_list list, size_t index, mln_offline_region_info* out_info
-) MLN_NOEXCEPT;
-
-/** Destroys an offline region list handle. Null is accepted as a no-op. */
-MLN_API void mln_offline_region_list_destroy(
-  mln_offline_region_list list
+  const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
@@ -876,88 +853,179 @@ typedef struct mln_projected_meters {
  * map render transform, not the geographic coordinate model.
  */
 typedef struct mln_projection_mode {
-  uint32_t size;
-  uint32_t fields;
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t fields
+    MLN_BINDING("kind=presence_mask;enum=mln_projection_mode_field");
   /** Enables a non-perspective axonometric render transform. */
-  bool axonometric;
+  bool axonometric
+    MLN_BINDING("mask=fields;bit=MLN_PROJECTION_MODE_AXONOMETRIC");
   /** Native x-skew factor used by the axonometric transform. */
-  double x_skew;
+  double x_skew MLN_BINDING("mask=fields;bit=MLN_PROJECTION_MODE_X_SKEW");
   /** Native y-skew factor used by the axonometric transform. */
-  double y_skew;
-} mln_projection_mode;
+  double y_skew MLN_BINDING("mask=fields;bit=MLN_PROJECTION_MODE_Y_SKEW");
+} mln_projection_mode MLN_BINDING("default=mln_projection_mode_default");
 
 /** Live map viewport and render-transform controls. */
 typedef struct mln_map_viewport_options {
-  uint32_t size;
-  uint32_t fields;
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t fields
+    MLN_BINDING("kind=presence_mask;enum=mln_map_viewport_option_field");
   /** One of mln_north_orientation. */
-  uint32_t north_orientation;
+  uint32_t north_orientation MLN_BINDING(
+    "mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;enum=mln_north_"
+    "orientation"
+  );
   /** One of mln_constrain_mode. */
-  uint32_t constrain_mode;
+  uint32_t constrain_mode MLN_BINDING(
+    "mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;enum=mln_constrain_"
+    "mode"
+  );
   /** One of mln_viewport_mode. */
-  uint32_t viewport_mode;
-  mln_edge_insets frustum_offset;
-} mln_map_viewport_options;
+  uint32_t viewport_mode MLN_BINDING(
+    "mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;enum=mln_viewport_"
+    "mode"
+  );
+  mln_edge_insets frustum_offset
+    MLN_BINDING("mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET");
+} mln_map_viewport_options MLN_BINDING(
+  "default=mln_map_viewport_options_default"
+);
 
 /** Tile prefetch and LOD tuning controls. */
 typedef struct mln_map_tile_options {
-  uint32_t size;
-  uint32_t fields;
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t fields
+    MLN_BINDING("kind=presence_mask;enum=mln_map_tile_option_field");
   /** Native uint8_t prefetch zoom delta. */
-  uint32_t prefetch_zoom_delta;
-  double lod_min_radius;
-  double lod_scale;
-  double lod_pitch_threshold;
-  double lod_zoom_shift;
+  uint32_t prefetch_zoom_delta
+    MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA");
+  double lod_min_radius
+    MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS");
+  double lod_scale MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_SCALE");
+  double lod_pitch_threshold
+    MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD");
+  double lod_zoom_shift
+    MLN_BINDING("mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT");
   /** One of mln_tile_lod_mode. */
-  uint32_t lod_mode;
-} mln_map_tile_options;
+  uint32_t lod_mode MLN_BINDING(
+    "mask=fields;bit=MLN_MAP_TILE_OPTION_LOD_MODE;enum=mln_tile_lod_mode"
+  );
+} mln_map_tile_options MLN_BINDING("default=mln_map_tile_options_default");
+/**
+ * Immutable map state copied from the latest published generation.
+ *
+ * Every field is unkeyed, fixed-size map state that changes only through this
+ * map's own commands or through load progress. Each committed map command
+ * publishes a new generation and reports it through its completion, even when
+ * the command changes nothing, so a snapshot whose generation is at or past a
+ * completion observes that commit.
+ */
+typedef struct mln_map_snapshot {
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  /** Debug overlay mask of mln_map_debug_option values. */
+  uint32_t debug_options MLN_BINDING("enum=mln_map_debug_option");
+  uint64_t generation;
+  mln_camera_options camera;
+  mln_logical_extent logical_extent;
+  mln_projection_mode projection_mode;
+  mln_map_viewport_options viewport;
+  /** True once every requested style and tile resource finished loading. */
+  bool fully_loaded;
+  bool rendering_stats_view_enabled;
+  bool repaint_demand;
+  /**
+   * True while the map is inside a gesture.
+   *
+   * A camera update whose gesture_phase is MLN_GESTURE_PHASE_BEGIN or
+   * MLN_GESTURE_PHASE_UPDATE sets it; MLN_GESTURE_PHASE_END and
+   * MLN_GESTURE_PHASE_CANCEL clear it.
+   */
+  bool gesture_in_progress;
+  uint64_t event_mask MLN_BINDING("enum=mln_runtime_event_mask");
+  uint64_t latest_render_update_generation;
+  mln_map_tile_options tile;
+  mln_bound_options bounds;
+  mln_free_camera_options free_camera;
+} mln_map_snapshot;
+
+/** Camera result borrowed for an ordered camera-query completion. */
+typedef struct mln_camera_query_result {
+  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t reserved MLN_BINDING("kind=reserved;default=0");
+  uint64_t generation;
+  mln_camera_options camera;
+} mln_camera_query_result;
 
 /**
  * Returns map options initialized for this C API version.
  */
+MLN_BINDING("execution=immediate")
 MLN_API mln_map_options mln_map_options_default(void) MLN_NOEXCEPT;
 
 /**
- * Creates a map handle on the runtime owner thread.
+ * Creates a map on the runtime worker.
  *
- * On success, the runtime owner thread becomes the map owner thread.
+ * Input is copied before this function returns. The completion value points to
+ * one mln_map handle when status is MLN_STATUS_OK.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, out_map is
- *   null, *out_map is not null, or options are invalid, which includes an
- *   event_mask bit outside MLN_RUNTIME_EVENT_MASK_ALL.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
+ * - MLN_STATUS_OK when the creation is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, options is
+ *   null, undersized, or carries an invalid field, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NATIVE_ERROR when the map fails to construct on the runtime
+ *   worker.
  */
+MLN_BINDING("execution=lifecycle;result=mln_map;shape=value;ownership=owned")
 MLN_API mln_status mln_map_create(
-  mln_runtime runtime, const mln_map_options* options, mln_map* out_map
+  mln_runtime runtime, const mln_map_options* options MLN_BINDING("length=1"),
+  const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
- * Copies the map's current logical viewport size and its pixel ratio.
- *
- * The size starts at mln_map_options.width and height, and follows the
- * attach and resize rules documented there. The scale factor is
- * mln_map_options.scale_factor, fixed for the lifetime of the map and
- * independent of any render target's scale factor; compare the two before
- * attaching or resizing a render session to keep them in agreement.
- *
- * This is a state snapshot. All three out-parameters are required.
+ * Copies the latest immutable state published by the map worker.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or out_width,
- *   out_height, or out_scale_factor is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or out_snapshot
+ *   is null or undersized.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_get_size(
-  mln_map map, uint32_t* out_width, uint32_t* out_height,
-  double* out_scale_factor
+MLN_BINDING("execution=snapshot")
+MLN_API mln_status mln_map_snapshot_get(
+  mln_map map, mln_map_snapshot* out_snapshot MLN_BINDING("direction=out")
+) MLN_NOEXCEPT;
+
+/**
+ * Submits the sole post-creation logical extent update.
+ *
+ * extent.scale_factor must equal the scale factor the map was created with;
+ * only width and height may change. While a render session is attached, resize
+ * through mln_render_session_resize(), which submits this command itself; a
+ * direct map resize to a different extent leaves the session waiting for an
+ * update that the map never publishes. The completion reports terminal
+ * disposition and the snapshot generation published by a committed resize. A
+ * resize that a later one replaces before the worker runs it completes as
+ * superseded.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the resize was accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, extent has a
+ *   zero dimension or a non-finite, non-positive, or changed scale factor, or
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_NATIVE_ERROR when applying the size throws on the map worker.
+ */
+MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_API mln_status mln_map_resize(
+  mln_map map, mln_logical_extent extent,
+  const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
@@ -977,20 +1045,21 @@ MLN_API mln_status mln_map_get_size(
  *
  * Returns:
  * - MLN_STATUS_OK when the request was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live.
- * - MLN_STATUS_INVALID_STATE when map is not in MLN_MAP_MODE_CONTINUOUS.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is not live or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when map is not continuous or is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_API mln_status mln_map_request_repaint(mln_map map) MLN_NOEXCEPT;
+MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_API mln_status mln_map_request_repaint(
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+) MLN_NOEXCEPT;
 
 /**
- * Sets per-feature state on this map.
+ * Submits a copied per-feature-state command.
  *
- * selector->source_id and selector->feature_id are borrowed for the duration of
- * the call. state must contain one UTF-8 JSON object and is parsed before
- * return. The accepted command requests a map repaint.
+ * selector->source_id, selector->feature_id, and state are copied before
+ * return. state must contain one UTF-8 JSON object and is validated before
+ * return. The committed command requests a map repaint.
  *
  * Feature state belongs to the map. A render session pushes it into the
  * renderer on the next render update, including the first presented frame that
@@ -998,38 +1067,47 @@ MLN_API mln_status mln_map_request_repaint(mln_map map) MLN_NOEXCEPT;
  * the last rendered frame.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, selector is
  *   null or invalid, selector lacks MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
- *   state is empty, invalid JSON, or not an object.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *   state is empty, invalid JSON, or not an object, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
+MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_feature_state(
-  mln_map map, const mln_feature_state_selector* selector, mln_buffer_view state
+  mln_map map,
+  const mln_feature_state_selector* selector MLN_BINDING("length=1"),
+  mln_buffer_view state MLN_BINDING("encoding=json;lifetime=call"),
+  const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
- * Copies per-feature state from this map.
+ * Starts an ordered read of per-feature state from this map.
  *
- * selector->source_id and selector->feature_id are borrowed for the duration of
- * the call. On success, *out_state receives an owned buffer containing a UTF-8
- * JSON object. Destroy it with mln_buffer_destroy(). Missing feature state is
- * reported as an empty object. The copy does not require a render session or a
- * loaded source.
+ * selector->source_id and selector->feature_id are copied before return. The
+ * read observes every map command accepted before it and copies the map
+ * store, not the last rendered frame, so it does not require a render session
+ * or a loaded source. The completion borrows UTF-8 bytes holding one JSON
+ * object for the callback. Missing feature state is reported as an empty
+ * object.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the read was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, selector is
- *   null or invalid, selector lacks MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
- *   out_state is null, or *out_state is not null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
+ *   null or invalid, selector lacks MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, or
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
+MLN_BINDING(
+  "execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;"
+  "encoding=json"
+)
 MLN_API mln_status mln_map_get_feature_state(
-  mln_map map, const mln_feature_state_selector* selector, mln_buffer* out_state
+  mln_map map,
+  const mln_feature_state_selector* selector MLN_BINDING("length=1"),
+  const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
@@ -1042,177 +1120,175 @@ MLN_API mln_status mln_map_get_feature_state(
  * a map repaint.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, selector is
- *   null or invalid, or selector has MLN_FEATURE_STATE_SELECTOR_STATE_KEY
- *   without MLN_FEATURE_STATE_SELECTOR_FEATURE_ID.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *   null or invalid, selector has MLN_FEATURE_STATE_SELECTOR_STATE_KEY
+ *   without MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
+MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_remove_feature_state(
-  mln_map map, const mln_feature_state_selector* selector
+  mln_map map,
+  const mln_feature_state_selector* selector MLN_BINDING("length=1"),
+  const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
  * Requests one still image for a static or tile map.
  *
- * Pump the runtime and drain runtime events for this map until
- * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED or
- * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED is reported. Those two types are the
- * only completion reports, so select both in the map's event mask. While the
- * request is pending, process each
- * MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE event from this map. Render
- * targets use mln_render_session_render_update(). Surface targets present
- * directly. A render-update
- * call can report a result other than MLN_RENDER_RESULT_RENDERED before the
- * next update is available; keep pumping and draining in that case. After
- * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED, use the latest successful texture
- * update when the host needs image bytes or a backend texture.
+ * Keep servicing the selected render driver while this request is pending.
+ * Submit frame demands with mln_render_session_request_frame() and drain their
+ * terminal results with mln_render_session_drain_frame_results(). A
+ * caller-graphics-thread driver also requires calls to
+ * mln_render_session_service_driver_work() on its graphics thread. A rendered
+ * frame may be acquired or read back after the completion runs.
  *
  * Returns:
  * - MLN_STATUS_OK when the request was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ *   invalid.
  * - MLN_STATUS_INVALID_STATE when map is not in MLN_MAP_MODE_STATIC or
- *   MLN_MAP_MODE_TILE, or when a still-image request is already pending.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
+ *   MLN_MAP_MODE_TILE, or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_STATE when a still-image request was already pending
+ *   when this one reached the map worker.
+ * - MLN_STATUS_CANCELLED when the map closes before the image is produced.
+ * - MLN_STATUS_NATIVE_ERROR when rendering the image fails.
  */
-MLN_API mln_status mln_map_request_still_image(mln_map map) MLN_NOEXCEPT;
-
-/**
- * Destroys a map handle on its owner thread.
- *
- * The map must not have an attached render session.
- *
- * Destruction also discards this map's queued events, including queued style
- * loading failures. There is no flush and no terminal event, so the last state
- * a host mirrored from events can stay behind the map's final state. Snapshot
- * whatever state the host needs while the map is still live, and let teardown
- * proceed without awaiting an event for this map. A batch that a host already
- * drained holds copies, so it stays readable after this call.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not a live map handle.
- * - MLN_STATUS_INVALID_STATE when map still has an attached render target
- *   session.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_destroy(mln_map map) MLN_NOEXCEPT;
-
-/**
- * Loads a style URL through MapLibre Native style APIs.
- *
- * This is a map command. The return status reports synchronous acceptance or
- * failure. Later native success and failure are reported through runtime
- * events. A URL that is unreachable, malformed, or serves invalid style
- * content is still accepted synchronously; every such failure arrives later as
- * a style loading-failed event, so hosts report style URL errors from the event
- * stream rather than from this return status.
- *
- * Returns:
- * - MLN_STATUS_OK when the load request was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null, not live, or url is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when a synchronous native error is reported or an
- *   internal exception is converted to status.
- */
-MLN_API mln_status
-mln_map_set_style_url(mln_map map, const char* url) MLN_NOEXCEPT;
-
-/**
- * Loads inline style JSON through MapLibre Native style APIs.
- *
- * This is a map command. The return status reports synchronous acceptance or
- * failure. Later native success and failure are reported through runtime
- * events. Malformed JSON can fail synchronously and still enqueue a
- * loading-failed event.
- *
- * Returns:
- * - MLN_STATUS_OK when the load request was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null, not live, or json is empty or
- *   has a nonzero size with a null data pointer.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when a synchronous native error is reported or an
- *   internal exception is converted to status.
- */
-MLN_API mln_status
-mln_map_set_style_json(mln_map map, mln_buffer_view json) MLN_NOEXCEPT;
-
-/**
- * Copies the style document this map's style was last parsed from.
- *
- * This is a state snapshot of the loaded document, not a serialization of the
- * live style. The bytes are the document the style loader last parsed
- * successfully: the bytes passed to mln_map_set_style_json(), or the response
- * body fetched for mln_map_set_style_url(). Runtime mutations through the
- * style APIs, such as adding a layer or setting a paint property, do not change
- * it, and a failed parse leaves the previously parsed document in place.
- *
- * A copy of the document is byte-for-byte identical to the bytes that were
- * passed to mln_map_set_style_json(), so a host may hand it back to that
- * function unchanged.
- *
- * out_json may be null only when json_capacity is 0, which is a size probe that
- * reports the required length and succeeds. *out_json_size receives the byte
- * length before the capacity is checked, so a caller learns the size from a
- * call that could not fit the document. The bytes are not null-terminated, so
- * an exact-length buffer is sufficient.
- *
- * A reported size of 0 means no document has been parsed: no style has been
- * loaded yet, or every load so far failed to parse. A parsed document is never
- * empty.
- *
- * Returns:
- * - MLN_STATUS_OK on success, including a size probe.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_json is null
- *   with non-zero capacity, json_capacity is too small for a non-null buffer,
- *   or out_json_size is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_copy_loaded_style_json(
-  mln_map map, uint8_t* out_json, size_t json_capacity, size_t* out_json_size
+MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_API mln_status mln_map_request_still_image(
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
- * Copies the URL this map's style was last requested from.
+ * Releases a map after synchronous state preflight.
  *
- * Unlike mln_map_copy_loaded_style_json(), this is live rather than load-time
- * state: mln_map_set_style_url() records the URL when the request is made,
- * before the response arrives or the document parses, and
- * mln_map_set_style_json() clears it. The document reports what was last parsed
- * while the URL reports what was last requested, so the two can disagree while
- * a load is in flight or after one fails.
- *
- * out_url may be null only when url_capacity is 0, which is a size probe that
- * reports the required length and succeeds. *out_url_size receives the byte
- * length before the capacity is checked. The bytes are not null-terminated, so
- * an exact-length buffer is sufficient.
- *
- * A reported size of 0 means no URL bytes are available. That covers a style
- * loaded from inline JSON, a map that has loaded no style, and a URL load
- * requested with an empty string, which mln_map_set_style_url() accepts. These
- * cases are not distinguishable through this entry point.
+ * A successful call consumes the public handle before returning. The
+ * completion runs after previously accepted work is terminal, the native map
+ * can no longer call the host, and map-owned callback state has been released.
+ * Backend worker and graphics-resource cleanup may continue after completion.
+ * The completion state follows the one-shot ownership contract.
  *
  * Returns:
- * - MLN_STATUS_OK on success, including a size probe.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_url is null
- *   with non-zero capacity, url_capacity is too small for a non-null buffer, or
- *   out_url_size is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when release was accepted and the handle was consumed.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is already closing or still has an
+ *   attached render session.
+ * - MLN_STATUS_NATIVE_ERROR when teardown could not be scheduled.
  */
-MLN_API mln_status mln_map_copy_style_url(
-  mln_map map, char* out_url, size_t url_capacity, size_t* out_url_size
+MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
+MLN_API mln_status mln_map_release(
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+) MLN_NOEXCEPT;
+
+/**
+ * Consumes a map handle without observing its asynchronous retirement.
+ *
+ * For an eligible live handle, disposal admission and scheduling use storage
+ * reserved at creation and require no allocation or new thread. Native
+ * retirement releases callback state and resources on their required execution
+ * contexts. Attached sessions retain the map until they detach or retire.
+ * A successful call consumes the handle before returning. A failed
+ * call retains caller ownership.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the handle was consumed.
+ * - MLN_STATUS_INVALID_ARGUMENT when the handle is null or not live.
+ * - MLN_STATUS_INVALID_STATE when the map is already closing.
+ */
+MLN_BINDING("execution=immediate")
+MLN_API mln_status mln_map_dispose(mln_map map) MLN_NOEXCEPT;
+
+/**
+ * Queues a style URL command.
+ *
+ * The function copies url before returning acceptance. The completion reports
+ * committed or failed application. Style loading events continue to report
+ * network, decode, and parse results after a committed command.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the command was accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is not live, url is null, or
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ */
+MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_API mln_status mln_map_set_style_url(
+  mln_map map,
+  const char* url
+    MLN_BINDING("encoding=utf8;lifetime=call;length=nul;ownership=borrowed"),
+  const mln_completion* completion MLN_BINDING("length=1")
+) MLN_NOEXCEPT;
+
+/**
+ * Queues an inline style JSON command.
+ *
+ * The function copies json before returning acceptance. The completion reports
+ * committed or failed application. Style loading events continue to report
+ * later resource and parse results after a committed command.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the command was accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is not live, json is invalid, or
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ */
+MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_API mln_status mln_map_set_style_json(
+  mln_map map, mln_buffer_view json MLN_BINDING("encoding=json;lifetime=call"),
+  const mln_completion* completion MLN_BINDING("length=1")
+) MLN_NOEXCEPT;
+
+/**
+ * Starts an ordered copy of the last successfully parsed style document.
+ *
+ * The completion borrows the copied UTF-8 bytes for the callback.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the query is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NATIVE_ERROR when the copy throws on the map worker.
+ */
+MLN_BINDING(
+  "execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;"
+  "encoding=json"
+)
+MLN_API mln_status mln_map_loaded_style_json(
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+) MLN_NOEXCEPT;
+
+/**
+ * Starts an ordered copy of the last requested style URL.
+ *
+ * The completion borrows the copied UTF-8 bytes for the callback.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the query is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NATIVE_ERROR when the copy throws on the map worker.
+ */
+MLN_BINDING(
+  "execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;"
+  "encoding=utf8"
+)
+MLN_API mln_status mln_map_style_url(
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
 /**
@@ -1225,8 +1301,7 @@ MLN_API mln_status mln_map_copy_style_url(
  *
  * This call reads the bits in MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS and ignores
  * the rest, so MLN_RUNTIME_EVENT_MASK_ALL selects every map-originated type.
- * mln_map_get_event_mask() reports the value last set, so a host reads it,
- * changes one bit, and writes it back.
+ * mln_map_snapshot_get() reports the last committed mask.
  *
  * A map that has not been narrowed selects every map-originated event type this
  * library reports, which covers types a caller's header may not declare. A new
@@ -1243,47 +1318,29 @@ MLN_API mln_status mln_map_copy_style_url(
  * - MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE is the map's only
  *   invalidation report. See mln_map_request_repaint().
  * - MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED and
- *   MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED are the only reports that a
- *   still-image request finished. See mln_map_request_still_image().
+ *   MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED report observer completion
+ *   in addition to the still-image completion.
  * - MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED carries the
  *   transition identity a caller set on an animation. Camera events report no
  *   completion reason. See mln_animation_options.transition_id.
  * - MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED and
  *   MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR carry native failure text.
  *
- * mln_map_set_style_url() and mln_map_set_style_json() report a style failure
- * that MapLibre raises inside the call through their return status and a thread
- * diagnostic, whatever this mask selects.
+ * Style commands report application failures through their completions
+ * regardless of this mask.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not a live map handle, or
- *   mask holds a bit outside MLN_RUNTIME_EVENT_MASK_ALL.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_OK when the command is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is not live, mask contains an unknown
+ *   bit, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_API mln_status
-mln_map_set_event_mask(mln_map map, uint64_t mask) MLN_NOEXCEPT;
-
-/**
- * Reports which map-originated event types this map queues.
- *
- * The value is the mask last set, including bits outside
- * MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS that this map ignores. A map that has
- * not been narrowed reports MLN_RUNTIME_EVENT_MASK_ALL as this library defines
- * it.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not a live map handle, or
- *   out_mask is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status
-mln_map_get_event_mask(mln_map map, uint64_t* out_mask) MLN_NOEXCEPT;
+MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_API mln_status mln_map_set_event_mask(
+  mln_map map, uint64_t mask MLN_BINDING("enum=mln_runtime_event_mask"),
+  const mln_completion* completion MLN_BINDING("length=1")
+) MLN_NOEXCEPT;
 
 #ifdef __cplusplus
 }
