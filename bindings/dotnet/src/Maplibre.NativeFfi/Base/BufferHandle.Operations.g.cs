@@ -20,7 +20,7 @@ public sealed unsafe partial class BufferHandle : IDisposable
 {
     private readonly NativeHandleState<MlnBuffer> state;
     private readonly ulong nativeId;
-    internal ulong NativeId => nativeId;
+    public ulong Id => nativeId;
 
     internal BufferHandle(MlnBuffer handle)
     {

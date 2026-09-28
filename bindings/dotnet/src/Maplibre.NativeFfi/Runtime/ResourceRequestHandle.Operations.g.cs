@@ -20,7 +20,7 @@ public sealed unsafe partial class ResourceRequestHandle : IDisposable
 {
     private readonly NativeHandleState<MlnResourceRequest> state;
     private readonly ulong nativeId;
-    internal ulong NativeId => nativeId;
+    public ulong Id => nativeId;
 
     internal ResourceRequestHandle(MlnResourceRequest handle, bool pendingDecision = false)
     {

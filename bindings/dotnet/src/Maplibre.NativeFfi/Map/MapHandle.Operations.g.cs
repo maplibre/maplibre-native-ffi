@@ -16,12 +16,12 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
 namespace Maplibre.NativeFfi.Map;
 
-public sealed unsafe partial class MapHandle : IDisposable
+public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
 {
     private readonly NativeHandleState<MlnMap> state;
     private volatile Task teardown = Task.CompletedTask;
     private readonly ulong nativeId;
-    internal ulong NativeId => nativeId;
+    public ulong Id => nativeId;
 
     internal MapHandle(RuntimeHandle parent, MlnMap handle)
     {
@@ -1713,6 +1713,8 @@ public sealed unsafe partial class MapHandle : IDisposable
         state.Close();
         return teardown;
     }
+
+    public ValueTask DisposeAsync() => new(CloseAsync());
 
     private mln_status StartRelease(MlnMap handle)
     {

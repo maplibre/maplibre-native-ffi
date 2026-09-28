@@ -20,7 +20,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable
 {
     private readonly NativeHandleState<MlnMapProjection> state;
     private readonly ulong nativeId;
-    internal ulong NativeId => nativeId;
+    public ulong Id => nativeId;
 
     internal MapProjectionHandle(MlnMapProjection handle)
     {

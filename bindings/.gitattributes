@@ -109,6 +109,7 @@
 /dotnet/src/Maplibre.NativeFfi/Render/WebgpuSurfaceDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Render/WglContextDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/AmbientCacheOperation.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/CommandDisposition.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/EventBatchHandle.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransform.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransformResponse.Operations.g.cs linguist-generated=true

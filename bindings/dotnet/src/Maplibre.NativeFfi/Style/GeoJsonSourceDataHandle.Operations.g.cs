@@ -20,7 +20,7 @@ public sealed unsafe partial class GeoJsonSourceDataHandle : IDisposable
 {
     private readonly NativeHandleState<MlnGeoJsonSourceData> state;
     private readonly ulong nativeId;
-    internal ulong NativeId => nativeId;
+    public ulong Id => nativeId;
 
     internal GeoJsonSourceDataHandle(MlnGeoJsonSourceData handle)
     {

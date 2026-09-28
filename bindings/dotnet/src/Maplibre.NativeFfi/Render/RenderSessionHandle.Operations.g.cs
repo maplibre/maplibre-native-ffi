@@ -20,7 +20,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
 {
     private readonly NativeHandleState<MlnRenderSession> state;
     private readonly ulong nativeId;
-    internal ulong NativeId => nativeId;
+    public ulong Id => nativeId;
     public Task Completion { get; }
 
     internal RenderSessionHandle(MapHandle parent, MlnRenderSession handle, Task completion)

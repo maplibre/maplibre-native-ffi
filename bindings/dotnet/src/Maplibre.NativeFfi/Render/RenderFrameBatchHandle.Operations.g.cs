@@ -20,7 +20,7 @@ public sealed unsafe partial class RenderFrameBatchHandle : IDisposable
 {
     private readonly NativeHandleState<MlnRenderFrameBatch> state;
     private readonly ulong nativeId;
-    internal ulong NativeId => nativeId;
+    public ulong Id => nativeId;
 
     internal RenderFrameBatchHandle(MlnRenderFrameBatch handle)
     {

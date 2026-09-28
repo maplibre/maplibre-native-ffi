@@ -538,7 +538,7 @@ public sealed class MapCameraOptionsTests
 
         var single = Assert.Single(drained, one => Finishes(one, transitionId));
         Assert.Equal(RuntimeEventType.MapCameraTransitionFinished, single.Type);
-        Assert.Equal(map.NativeId, single.Source);
+        Assert.Equal(map.Id, single.Source);
         return drained;
     }
 

@@ -20,7 +20,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable
 {
     private readonly NativeHandleState<MlnAcquiredFrame> state;
     private readonly ulong nativeId;
-    internal ulong NativeId => nativeId;
+    public ulong Id => nativeId;
 
     internal AcquiredFrameHandle(RenderSessionHandle parent, MlnAcquiredFrame handle)
     {

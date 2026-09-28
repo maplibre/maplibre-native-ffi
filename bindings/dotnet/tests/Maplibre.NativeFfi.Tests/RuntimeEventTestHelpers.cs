@@ -72,7 +72,7 @@ internal static unsafe class RuntimeEventTestHelpers
                 if (
                     runtimeEvent.Type == eventType
                     && runtimeEvent.SourceType == RuntimeEventSourceType.Map
-                    && runtimeEvent.Source == map.NativeId
+                    && runtimeEvent.Source == map.Id
                 )
                 {
                     return runtimeEvent;

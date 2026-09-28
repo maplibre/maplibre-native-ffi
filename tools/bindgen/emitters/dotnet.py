@@ -61,10 +61,7 @@ def operation_contract(plan: OperationPlan) -> str | None:
         return f"method {method!r} requires identifier escaping"
     seen = set()
     for parameter in function.parameters[1:]:
-        if (
-            parameter.type.pointee
-            and type_name(parameter.type.pointee) == "mln_completion"
-        ):
+        if plan.completion and parameter.name == plan.completion.parameter:
             continue
         name = camel(parameter.name)
         if (
@@ -146,7 +143,7 @@ def namespace_for(path: str) -> str:
         "Render"
         if domain in {"render_session", "render_target", "texture", "surface"}
         else "Runtime"
-        if domain == "wake"
+        if domain in {"completion", "wake"}
         else "Map"
         if domain == "projection"
         else pascal(domain)
@@ -264,6 +261,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             (
                 "    public void Close() => CloseAsync().GetAwaiter().GetResult();\n\n"
                 f'    public Task CloseAsync()\n    {{\n        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(this, "{function.name}");\n        state.Close();\n        return teardown;\n    }}\n\n'
+                "    public ValueTask DisposeAsync() => new(CloseAsync());\n\n"
                 f"    private mln_status StartRelease({native_type} handle)\n    {{\n"
                 f"        teardown = NativeCompletion.SubmitUnit(completion => NativeMethods.{function.name}(handle, completion));\n"
                 "        return mln_status.MLN_STATUS_OK;\n    }\n"
@@ -372,7 +370,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             continue
         ctype = type_name(parameter.type)
         pointee = parameter.type.pointee
-        if pointee and type_name(pointee) == "mln_completion":
+        if plan.completion and parameter.name == plan.completion.parameter:
             args.append("completion")
         elif parameter.name in {owner.parameter for owner in plan.owned_outputs}:
             owner = next(
@@ -992,6 +990,7 @@ def emit(api: Api | BoundApi) -> Emission:
         if callback.decision
     }
     created_handles.update(native for native in owners if owners[native] in methods)
+    async_disposable: set[str] = set()
     for native in sorted(created_handles):
         handle = bound.handles[native]
         owner = owners[native]
@@ -1002,6 +1001,12 @@ def emit(api: Api | BoundApi) -> Emission:
             plan for plan in bound.operations if plan.function.name == handle.release
         )
         asynchronous_release = bool(release.completion)
+        if (
+            asynchronous_release
+            and not handle.release_inputs
+            and handle.release in supported
+        ):
+            async_disposable.add(owner)
         immediate_completion = any(
             plan.completion
             and any(output.handle.native == native for output in plan.owned_outputs)
@@ -1038,7 +1043,10 @@ def emit(api: Api | BoundApi) -> Emission:
         declarations = f"    private readonly NativeHandleState<{native_type}> state;\n"
         if asynchronous_release:
             declarations += "    private volatile Task teardown = Task.CompletedTask;\n"
-        declarations += "    private readonly ulong nativeId;\n    internal ulong NativeId => nativeId;\n"
+        # Runtime events report their source by this identity.
+        declarations += (
+            "    private readonly ulong nativeId;\n    public ulong Id => nativeId;\n"
+        )
         if immediate_completion:
             declarations += "    public Task Completion { get; }\n"
         declarations += (
@@ -1116,6 +1124,11 @@ def emit(api: Api | BoundApi) -> Emission:
                 "Maplibre": "Base",
             }.get(owner, "Map")
         )
+        interfaces = [
+            *(["IDisposable"] if owner in {owners[n] for n in created_handles} else []),
+            *(["IAsyncDisposable"] if owner in async_disposable else []),
+        ]
+        bases = f" : {', '.join(interfaces)}" if interfaces else ""
         files[f"{namespace}/{owner}.Operations.g.cs"] = (
             "// Generated from the C headers by tools/bindgen. Do not edit.\n"
             "#nullable enable\n"
@@ -1129,7 +1142,7 @@ def emit(api: Api | BoundApi) -> Emission:
             "using Maplibre.NativeFfi.Map;\n"
             "using Maplibre.NativeFfi.Style;\n" + extra_imports + "\n"
             f"namespace Maplibre.NativeFfi{'.' + namespace if owner != 'Maplibre' else ''};\n\n"
-            f"public {'static' if owner == 'Maplibre' else 'sealed'} unsafe partial class {owner}{' : IDisposable' if owner in {owner_name(native) for native in created_handles} else ''}\n{{\n"
+            f"public {'static' if owner == 'Maplibre' else 'sealed'} unsafe partial class {owner}{bases}\n{{\n"
             + "\n".join(body)
             + "}\n"
         )
@@ -1211,6 +1224,22 @@ def emit(api: Api | BoundApi) -> Emission:
             "#nullable enable\nusing Maplibre.NativeFfi.Internal.C;\n" + imports + "\n"
             f"namespace Maplibre.NativeFfi.{namespace};\n\n" + declaration
         )
+    # The completion runtime reads results through the completion record's
+    # callbacks, so the enums those results carry, such as a command
+    # disposition, are public without appearing in an operation signature.
+    completion_records = {
+        parameter.type.pointee.declaration
+        for plan in bound.operations
+        if plan.function.name in supported and plan.completion
+        for parameter in plan.function.parameters
+        if parameter.name == plan.completion.parameter and parameter.type.pointee
+    }
+    completion_values = Values(bound)
+    for record_name in sorted(completion_records & bound.values.keys()):
+        for field in bound.values[record_name].fields:
+            if field.value.kind == "callback":
+                completion_values.supported(field.value)
+    enum_names.update(completion_values.enum_names)
     for enum in api.enums:
         if enum.name not in enum_names:
             continue
@@ -1229,12 +1258,7 @@ def emit(api: Api | BoundApi) -> Emission:
                 "unsigned int": "uint",
                 "int": "int",
             }[enum.underlying_type.canonical]
-        flags = (
-            "[Flags]\n"
-            if enum.metadata.get("kind") in {"flags", "bitmask"}
-            or enum.name.endswith("_mask")
-            else ""
-        )
+        flags = "[Flags]\n" if enum.metadata.get("kind") == "bitmask" else ""
         fields = [
             f"    {pascal(value.name.removeprefix(prefix).lower())} = {value.value},"
             for value in enum.values

@@ -16,12 +16,12 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
 namespace Maplibre.NativeFfi.Runtime;
 
-public sealed unsafe partial class RuntimeHandle : IDisposable
+public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
 {
     private readonly NativeHandleState<MlnRuntime> state;
     private volatile Task teardown = Task.CompletedTask;
     private readonly ulong nativeId;
-    internal ulong NativeId => nativeId;
+    public ulong Id => nativeId;
 
     internal RuntimeHandle(MlnRuntime handle)
     {
@@ -460,6 +460,8 @@ public sealed unsafe partial class RuntimeHandle : IDisposable
         state.Close();
         return teardown;
     }
+
+    public ValueTask DisposeAsync() => new(CloseAsync());
 
     private mln_status StartRelease(MlnRuntime handle)
     {

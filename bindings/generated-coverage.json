@@ -110,6 +110,7 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Render/WebgpuSurfaceDescriptor.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Render/WglContextDescriptor.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/AmbientCacheOperation.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/CommandDisposition.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/EventBatchHandle.Operations.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransform.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransformResponse.Operations.g.cs",

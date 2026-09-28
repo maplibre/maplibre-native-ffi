@@ -20,7 +20,7 @@ public sealed unsafe partial class EventBatchHandle : IDisposable
 {
     private readonly NativeHandleState<MlnEventBatch> state;
     private readonly ulong nativeId;
-    internal ulong NativeId => nativeId;
+    public ulong Id => nativeId;
 
     internal EventBatchHandle(MlnEventBatch handle)
     {

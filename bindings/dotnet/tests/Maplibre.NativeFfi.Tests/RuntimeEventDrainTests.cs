@@ -32,7 +32,7 @@ public sealed class RuntimeEventDrainTests
                 < Array.IndexOf(types, RuntimeEventType.MapStyleLoaded),
             "the loading-started event followed the style-loaded event"
         );
-        Assert.All(batch, runtimeEvent => Assert.Equal(map.NativeId, runtimeEvent.Source));
+        Assert.All(batch, runtimeEvent => Assert.Equal(map.Id, runtimeEvent.Source));
     }
 
     [BindingSpecTest("")]

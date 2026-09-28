@@ -485,7 +485,7 @@ public sealed class StyleJsonTests
         Assert.Equal(RuntimeEventType.MapStyleLoaded, runtimeEvent.Type);
         Assert.Equal((uint)RuntimeEventType.MapStyleLoaded, (uint)runtimeEvent.Type);
         Assert.Equal(RuntimeEventSourceType.Map, runtimeEvent.SourceType);
-        Assert.Equal(map.NativeId, runtimeEvent.Source);
+        Assert.Equal(map.Id, runtimeEvent.Source);
         Assert.NotEqual(0UL, runtimeEvent.Source);
         Assert.IsType<RuntimeEvent.PayloadValue.None>(runtimeEvent.Payload);
     }
