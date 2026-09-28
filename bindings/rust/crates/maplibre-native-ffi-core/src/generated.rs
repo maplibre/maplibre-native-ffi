@@ -5609,19 +5609,7 @@ impl ResourceRequestHandle {
     ) -> crate::Result<bool> {
         let native = self.state.native_for_call()?;
         crate::callback::check("mln_resource_request_set_cancel_callback", native.0)?;
-        let callback = Box::new(move || {
-            let _policy = crate::callback::PolicyScope::enter(
-                &[
-                    "mln_resource_request_complete",
-                    "mln_resource_request_cancelled",
-                    "mln_resource_request_set_cancel_callback",
-                    "mln_resource_request_release",
-                ],
-                native.0,
-            );
-            callback();
-        });
-        Ok(self.state.register_cancel_callback(callback)?.is_some())
+        self.state.set_cancel_callback(Box::new(callback))
     }
     pub fn wait_until_retired(&self) -> crate::Result<()> {
         let native = self.state.issued_handle();
@@ -5634,6 +5622,63 @@ impl ResourceRequestHandle {
         crate::callback::check("mln_resource_request_release", self.state.issued_handle().0)?;
         self.state.close();
         Ok(())
+    }
+}
+impl crate::resource::ResourceRequestHandleState {
+    /// Registers a callback that runs at most once when MapLibre cancels the
+    /// request, returning whether the request was already cancelled.
+    ///
+    /// An accepted registration transfers the callback to the C API, which
+    /// releases it once it can no longer run. A rejected registration or an
+    /// already cancelled request drops the callback unrun before returning.
+    pub fn set_cancel_callback(
+        &self,
+        callback: Box<dyn FnOnce() + Send + 'static>,
+    ) -> crate::Result<bool> {
+        type Registration = (u64, Option<Box<dyn FnOnce() + Send + 'static>>);
+        unsafe extern "C" fn invoke(user_data: *mut std::ffi::c_void) {
+            // SAFETY: native passes the registration it owns and invokes it at
+            // most once, before its release.
+            let (owner, callback) = unsafe { &mut *user_data.cast::<Registration>() };
+            let _policy = crate::callback::PolicyScope::enter(
+                &[
+                    "mln_resource_request_complete",
+                    "mln_resource_request_cancelled",
+                    "mln_resource_request_set_cancel_callback",
+                    "mln_resource_request_release",
+                ],
+                *owner,
+            );
+            if let Some(callback) = callback.take() {
+                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(callback));
+            }
+        }
+        unsafe extern "C" fn release(user_data: *mut std::ffi::c_void) {
+            let _policy = crate::callback::PolicyScope::enter(&[], 0);
+            // SAFETY: native or the rejecting arena releases each registration once.
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
+                drop(Box::from_raw(user_data.cast::<Registration>()))
+            }));
+        }
+        let handle = self.native_for_call()?;
+        let mut arena = crate::input::InputArena::default();
+        // SAFETY: release reclaims exactly this box without unwinding.
+        let user_data =
+            unsafe { arena.registration::<Registration>((handle.0, Some(callback)), release) };
+        let mut cancelled = false;
+        crate::check(unsafe {
+            maplibre_native_ffi_sys::mln_resource_request_set_cancel_callback(
+                handle,
+                Some(invoke),
+                user_data,
+                Some(release),
+                &mut cancelled,
+            )
+        })?;
+        if !cancelled {
+            arena.accept_registrations();
+        }
+        Ok(cancelled)
     }
 }
 
@@ -9571,10 +9616,7 @@ pub unsafe fn runtime_dispose(native: maplibre_native_ffi_sys::mln_runtime) -> c
 pub const RESOURCE_REQUEST_HANDLE_FUNCTIONS: crate::resource::ResourceRequestHandleFns = unsafe {
     crate::resource::ResourceRequestHandleFns::new(
         maplibre_native_ffi_sys::mln_resource_request_complete,
-        maplibre_native_ffi_sys::mln_resource_request_cancelled,
-        maplibre_native_ffi_sys::mln_resource_request_set_cancel_callback,
         maplibre_native_ffi_sys::mln_resource_request_release,
-        maplibre_native_ffi_sys::mln_resource_request_wait_until_retired,
     )
 };
 

@@ -157,8 +157,8 @@ BIND("execution=command;result=void;shape=none;ownership=value")
 mln_status mln_host_set_provider(mln_host host, const mln_ticket_provider *provider BIND("length=1"), const mln_completion *completion);
 BIND("execution=immediate") mln_status mln_ticket_answer(mln_ticket ticket, unsigned response);
 BIND("execution=immediate") mln_status mln_ticket_cancelled(mln_ticket ticket, bool *result BIND("direction=out"));
-BIND("execution=immediate;registration=callback;user_data=context;owner_release=mln_ticket_release;accepted_unless=cancelled") mln_status mln_ticket_on_cancel(
-  mln_ticket ticket, cancel callback, void *context BIND("kind=context"), bool *cancelled BIND("direction=out"));
+BIND("execution=immediate;registration=callback;user_data=context;release_callback=release;accepted_unless=cancelled") mln_status mln_ticket_on_cancel(
+  mln_ticket ticket, cancel callback, void *context BIND("kind=context"), release_context release, bool *cancelled BIND("direction=out"));
 BIND("execution=immediate") void mln_ticket_release(mln_ticket ticket);
 BIND("execution=immediate") mln_status mln_ticket_await(mln_ticket ticket BIND("handle_access=issued"));
 """)
@@ -168,6 +168,8 @@ BIND("execution=immediate") mln_status mln_ticket_await(mln_ticket ticket BIND("
         self.assertIn('#[pyclass(name = "_TicketHandle")]', native)
         self.assertIn("module.add_class::<TicketHandle>()?;", native)
         self.assertIn("Py::new(py, TicketHandle {", native)
+        # The core registration owns the cancel callback's native release.
+        self.assertIn("self.state.on_cancel(Box::new(", native)
         self.assertIn(
             "_wrap_response(ticket, 'TicketHandle')",
             files["python/maplibre_native_ffi/_generated_values.py"],

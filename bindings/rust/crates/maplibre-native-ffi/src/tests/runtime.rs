@@ -916,20 +916,34 @@ where
     );
 }
 
+/// Counts drops of a cancel callback's captures, which happen when the
+/// registration releases the callback.
+struct ReleaseCounter(Arc<AtomicUsize>);
+
+impl Drop for ReleaseCounter {
+    fn drop(&mut self) {
+        self.0.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
 #[test]
 
 fn cancel_callback_runs_once_when_the_map_discards_the_request() {
     let runtime = crate::runtime_create(&crate::RuntimeOptions::default()).unwrap();
     let cancels = Arc::new(AtomicUsize::new(0));
     let callback_cancels = Arc::clone(&cancels);
+    let releases = Arc::new(AtomicUsize::new(0));
+    let callback_releases = Arc::clone(&releases);
     let (sender, receiver) = std::sync::mpsc::channel();
     commit_resource_provider(&runtime, move |request, handle| {
         if request.requested_url.as_deref() != Some("custom://cancel-style.json") {
             return ResourceProviderDecision::PassThrough;
         }
         let cancels = Arc::clone(&callback_cancels);
+        let release = ReleaseCounter(Arc::clone(&callback_releases));
         handle
             .set_cancel_callback(move || {
+                let _release = &release;
                 cancels.fetch_add(1, Ordering::SeqCst);
             })
             .unwrap();
@@ -943,10 +957,13 @@ fn cancel_callback_runs_once_when_the_map_discards_the_request() {
         .recv_timeout(Duration::from_secs(5))
         .expect("provider should send handled request");
     assert_eq!(cancels.load(Ordering::SeqCst), 0);
+    assert_eq!(releases.load(Ordering::SeqCst), 0);
 
     map.close_and_wait();
 
     assert!(wait_for_condition(|| cancels.load(Ordering::SeqCst) == 1));
+    // The callback's return releases it while the request stays open.
+    assert!(wait_for_condition(|| releases.load(Ordering::SeqCst) == 1));
     assert!(handle.cancelled().unwrap());
     // The cancelled request rejects a late completion and stays at one call.
     assert_eq!(
@@ -961,6 +978,7 @@ fn cancel_callback_runs_once_when_the_map_discards_the_request() {
     );
     assert_eq!(cancels.load(Ordering::SeqCst), 1);
     handle.close().unwrap();
+    assert_eq!(releases.load(Ordering::SeqCst), 1);
     runtime.close_and_wait();
 }
 
@@ -1011,24 +1029,27 @@ fn cancel_callback_skips_a_completed_request() {
     let runtime = crate::runtime_create(&crate::RuntimeOptions::default()).unwrap();
     let cancels = Arc::new(AtomicUsize::new(0));
     let callback_cancels = Arc::clone(&cancels);
+    let releases = Arc::new(AtomicUsize::new(0));
+    let callback_releases = Arc::clone(&releases);
+    let (sender, receiver) = std::sync::mpsc::channel();
     commit_resource_provider(&runtime, move |request, handle| {
         if request.requested_url.as_deref() != Some("custom://cancel-style.json") {
             return ResourceProviderDecision::PassThrough;
         }
         let cancels = Arc::clone(&callback_cancels);
+        let release = ReleaseCounter(Arc::clone(&callback_releases));
         handle
             .set_cancel_callback(move || {
+                let _release = &release;
                 cancels.fetch_add(1, Ordering::SeqCst);
             })
             .unwrap();
-        // Completing releases the handle, so no Rust view of the request
-        // survives to query its cancellation afterwards; the cancel count
-        // carries the negative instead.
         handle
             .complete(&crate::test_support::ok_response(
                 PROVIDER_STYLE_JSON.as_bytes().to_vec(),
             ))
             .unwrap();
+        sender.send(handle).unwrap();
         ResourceProviderDecision::Handle
     });
 
@@ -1042,6 +1063,14 @@ fn cancel_callback_skips_a_completed_request() {
     // MapLibre runs its cancel hook on every request teardown, so the
     // retired map proves the completed request reported no cancellation.
     crate::completion::blocking(runtime.barrier());
+    assert_eq!(cancels.load(Ordering::SeqCst), 0);
+    // A callback that never ran stays registered until the request's release.
+    let handle = receiver
+        .recv_timeout(Duration::from_secs(5))
+        .expect("provider should send handled request");
+    assert_eq!(releases.load(Ordering::SeqCst), 0);
+    handle.close().unwrap();
+    assert_eq!(releases.load(Ordering::SeqCst), 1);
     assert_eq!(cancels.load(Ordering::SeqCst), 0);
     runtime.close_and_wait();
 }
@@ -1069,13 +1098,18 @@ fn cancel_registration_reports_an_already_cancelled_request() {
 
     let cancels = Arc::new(AtomicUsize::new(0));
     let callback_cancels = Arc::clone(&cancels);
+    let releases = Arc::new(AtomicUsize::new(0));
+    let release = ReleaseCounter(Arc::clone(&releases));
     let already_cancelled = handle
         .set_cancel_callback(move || {
+            let _release = &release;
             callback_cancels.fetch_add(1, Ordering::SeqCst);
         })
         .unwrap();
     assert!(already_cancelled);
     assert_eq!(cancels.load(Ordering::SeqCst), 0);
+    // Native stored nothing, so the binding dropped the callback itself.
+    assert_eq!(releases.load(Ordering::SeqCst), 1);
 
     // The accepted registration remains consumed after reporting cancellation.
     assert_eq!(
@@ -1083,6 +1117,7 @@ fn cancel_registration_reports_an_already_cancelled_request() {
         ErrorKind::InvalidState
     );
     handle.close().unwrap();
+    assert_eq!(releases.load(Ordering::SeqCst), 1);
     runtime.close_and_wait();
 }
 

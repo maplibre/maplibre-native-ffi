@@ -138,7 +138,7 @@ def sources(values, plan):
 
         def copy_parameter(parameter, callback=callback, owner=decision_owner):
             if callback.decision and parameter.name == callback.decision.parameter:
-                return f"Py::new(py, {owner} {{ state: ManuallyDrop::new(Arc::clone(&decision_state)), cancel_root: Mutex::new(None) }})?"
+                return f"Py::new(py, {owner} {{ state: ManuallyDrop::new(Arc::clone(&decision_state)), cancel_root: Mutex::new(std::sync::Weak::new()) }})?"
             value = (
                 parameter.value.element
                 if parameter.value.kind == "reference"
@@ -176,7 +176,7 @@ def sources(values, plan):
         decision_setup = ""
         if callback.decision:
             decision = callback.decision
-            functions = f"maplibre_core::resource::ResourceRequestHandleFns::new(sys::{decision.complete}, sys::{decision.cancelled}, sys::{decision.cancel_registration}, sys::{decision.handle.release}, sys::{decision.wait_retired})"
+            functions = f"maplibre_core::resource::ResourceRequestHandleFns::new(sys::{decision.complete}, sys::{decision.handle.release})"
             decision_setup = f"let decision_state = match unsafe {{ maplibre_core::resource::ResourceRequestHandleState::new({decision.parameter}, {functions}) }} {{ Ok(state) => state, Err(_) => return sys::{decision.pass_through} }};"
             failure = "decision_state.finish_provider_decision(maplibre_core::ResourceProviderDecision::PassThrough)"
             result = f"let decision = result.extract::<u32>()?; Ok(decision_state.finish_provider_decision(if decision == sys::{decision.accept} {{ maplibre_core::ResourceProviderDecision::Handle }} else {{ maplibre_core::ResourceProviderDecision::PassThrough }}))"
@@ -228,67 +228,46 @@ def sources(values, plan):
 
 def direct_operation(plan, values):
     from ..semantic import FieldPlan, RegistrationDescriptorPlan, ValuePlan
-    from .python import OWNERS, unsupported
+    from .python import DECISIONS, OWNERS, unsupported
 
     registration = plan.direct_registrations[0]
     parameter = next(p for p in plan.inputs if p.name == registration.callback)
     callback = values.api.callbacks[parameter.value.native]
     receiver = next((p for p in plan.inputs if p.name == plan.receiver), None)
-    if registration.owner_release:
-        decision = next(
-            (
-                c.decision
-                for c in values.api.callbacks.values()
-                if c.decision
-                and c.decision.handle.release == registration.owner_release
-            ),
-            None,
-        )
+    decision = DECISIONS.get(receiver.value.native) if receiver else None
+    if decision and decision.cancel_registration == plan.name:
         if (
-            not decision
+            not registration.release_callback
+            or not registration.accepted_unless
             or len(callback.parameters) != 1
             or callback.result.native != "void"
         ):
             raise unsupported(
                 plan.function,
-                "direct owner callback needs a matching decision protocol",
+                "cancel registration needs a native release and a notification callback",
             )
         owner = OWNERS[receiver.value.native]
         name = plan.name.removeprefix(
             receiver.value.native.removesuffix("_handle") + "_"
         )
-        policy = callback.reentry_policy
-        operations = (
-            ", ".join('"' + operation + '"' for operation in policy.operations)
-            if policy
-            else ""
-        )
-        guard = (
-            f"let _policy = GeneratedCallbackPolicy::enter(&[{operations}], callback_owner);"
-            if policy
-            else ""
-        )
+        # The core registration enters the callback's reentry policy and
+        # contains panics; this root only keeps the callback visible to the
+        # owner's garbage collection.
         native = f"""    fn {name}(&self, py: Python<'_>, callback: Py<PyAny>) -> PyResult<bool> {{
         let callback_owner = maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle());
         generated_check_operation("{plan.name}", callback_owner)?;
         if !callback.bind(py).is_callable() {{ return Err(invalid_argument_error("callback must be callable")); }}
-        let root = Arc::new(Mutex::new(Some(callback)));
-        let weak = Arc::downgrade(&root);
-        let inline = self.state.register_cancel_callback(Box::new(move || {{
-            {guard}
-            if let Some(root) = weak.upgrade() {{
-                let callback = root.lock().unwrap_or_else(|p| p.into_inner()).take();
-                if let Some(callback) = callback {{
-                    Python::try_attach(|py| {{
-                        if let Err(error) = callback.bind(py).call0() {{ error.write_unraisable(py, None); }}
-                    }});
+        let root = GeneratedCallbackRootOwner::new(vec![callback]);
+        let weak = root.downgrade();
+        let cancelled = self.state.{name}(Box::new(move || {{
+            Python::try_attach(|py| {{
+                if let Some(callback) = root.get(py, 0) {{
+                    if let Err(error) = callback.bind(py).call0() {{ error.write_unraisable(py, None); }}
                 }}
-            }}
+            }});
         }})).map_err(map_error)?;
-        let cancelled = inline.is_some();
-        drop(inline);
         if !cancelled {{
-            *self.cancel_root.lock().unwrap_or_else(|p| p.into_inner()) = Some(root);
+            *self.cancel_root.lock().unwrap_or_else(|p| p.into_inner()) = weak;
         }}
         Ok(cancelled)
     }}

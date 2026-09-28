@@ -244,6 +244,17 @@ impl GeneratedInputStorage<'_> {
     }
 }
 
+fn generated_root_callback(
+    py: Python<'_>,
+    root: &GeneratedCallbackRoot,
+    index: usize,
+) -> Option<Py<PyAny>> {
+    root.lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .get(index)
+        .map(|value| value.clone_ref(py))
+}
+
 unsafe fn generated_get_callback(
     py: Python<'_>,
     user_data: *mut c_void,
@@ -251,19 +262,41 @@ unsafe fn generated_get_callback(
 ) -> Option<Py<PyAny>> {
     // SAFETY: native keeps the registration alive through each callback.
     let root = unsafe { &*user_data.cast::<Arc<GeneratedCallbackRoot>>() };
-    root.lock()
-        .unwrap_or_else(|p| p.into_inner())
-        .get(index)
-        .map(|value| value.clone_ref(py))
+    generated_root_callback(py, root, index)
+}
+
+/// Holds a registration's callback root and drops its Python callbacks with
+/// the interpreter attached when the registration retires.
+struct GeneratedCallbackRootOwner(Arc<GeneratedCallbackRoot>);
+
+impl GeneratedCallbackRootOwner {
+    fn new(callbacks: Vec<Py<PyAny>>) -> Self {
+        Self(Arc::new(Mutex::new(callbacks)))
+    }
+
+    /// Lets an owner visit the callbacks for garbage collection.
+    fn downgrade(&self) -> std::sync::Weak<GeneratedCallbackRoot> {
+        Arc::downgrade(&self.0)
+    }
+
+    fn get(&self, py: Python<'_>, index: usize) -> Option<Py<PyAny>> {
+        generated_root_callback(py, &self.0, index)
+    }
+}
+
+impl Drop for GeneratedCallbackRootOwner {
+    fn drop(&mut self) {
+        let callbacks = std::mem::take(&mut *self.0.lock().unwrap_or_else(|p| p.into_inner()));
+        let mut callbacks = Some(callbacks);
+        Python::try_attach(|_| drop(callbacks.take()));
+        drop(callbacks);
+    }
 }
 
 unsafe extern "C" fn generated_release_callbacks(user_data: *mut c_void) {
     // SAFETY: native releases the accepted descriptor exactly once at quiescence.
     let root = unsafe { Box::from_raw(user_data.cast::<Arc<GeneratedCallbackRoot>>()) };
-    let callbacks = std::mem::take(&mut *root.lock().unwrap_or_else(|p| p.into_inner()));
-    let mut callbacks = Some(callbacks);
-    Python::try_attach(|_| drop(callbacks.take()));
-    drop(callbacks);
+    drop(GeneratedCallbackRootOwner(*root));
 }
 
 struct GeneratedDetached<T>(T);

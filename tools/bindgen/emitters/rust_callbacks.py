@@ -372,18 +372,7 @@ def decision_declaration(values, value):
     name = values.name(value)
     prefix = value.native.removesuffix("_handle") + "_"
     method = lambda operation: identifier(operation.removeprefix(prefix))
-    cancel_callback = values.bound.callbacks[
-        next(
-            p.value.native
-            for p in values.bound.operations_by_name[
-                decision.cancel_registration
-            ].inputs
-            if p.value.kind == "callback"
-        )
-    ]
-    allowed = ", ".join(
-        '"' + operation + '"' for operation in cancel_callback.reentry_policy.operations
-    )
+    registration = cancel_registration(values, decision, method)
     return f'''#[derive(Debug)]
 pub struct {name} {{
     state: std::sync::Arc<crate::resource::ResourceRequestHandleState>,
@@ -407,8 +396,7 @@ impl {name} {{
     pub fn {method(decision.cancel_registration)}(&self, callback: impl FnOnce() + Send + 'static) -> crate::Result<bool> {{
         let native = self.state.native_for_call()?;
         crate::callback::check("{decision.cancel_registration}", native.0)?;
-        let callback = Box::new(move || {{ let _policy = crate::callback::PolicyScope::enter(&[{allowed}], native.0); callback(); }});
-        Ok(self.state.register_cancel_callback(callback)?.is_some())
+        self.state.{method(decision.cancel_registration)}(Box::new(callback))
     }}
     pub fn {method(decision.wait_retired)}(&self) -> crate::Result<()> {{
         let native = self.state.issued_handle();
@@ -420,4 +408,73 @@ impl {name} {{
         self.state.close(); Ok(())
     }}
 }}
-'''
+{registration}'''
+
+
+def cancel_registration(values, decision, method):
+    """Emit the one-shot cancel registration whose root native releases."""
+    plan = values.bound.operations_by_name[decision.cancel_registration]
+    if len(plan.direct_registrations) != 1:
+        raise Unsupported(f"{plan.name}: cancel registration needs one callback")
+    registration = plan.direct_registrations[0]
+    if not registration.release_callback or not registration.accepted_unless:
+        raise Unsupported(
+            f"{plan.name}: cancel registration needs a native release and report"
+        )
+    callback = values.bound.callbacks[
+        next(p.value.native for p in plan.inputs if p.name == registration.callback)
+    ]
+    if (
+        [p.name for p in callback.parameters] != [callback.context]
+        or callback.result.ctype.kind != "void"
+        or not callback.reentry_policy
+        or not callback.reentry_policy.registration_owner
+    ):
+        raise Unsupported(
+            f"{plan.name}: cancel callback must be a request notification"
+        )
+    allowed = ", ".join(
+        f'"{operation}"' for operation in callback.reentry_policy.operations
+    )
+    arguments = {
+        plan.receiver: "handle",
+        registration.callback: "Some(invoke)",
+        registration.user_data: "user_data",
+        registration.release_callback: "Some(release)",
+        registration.accepted_unless: "&mut cancelled",
+    }
+    call = ", ".join(arguments[p.name] for p in plan.function.parameters)
+    return f"""impl crate::resource::ResourceRequestHandleState {{
+    /// Registers a callback that runs at most once when MapLibre cancels the
+    /// request, returning whether the request was already cancelled.
+    ///
+    /// An accepted registration transfers the callback to the C API, which
+    /// releases it once it can no longer run. A rejected registration or an
+    /// already cancelled request drops the callback unrun before returning.
+    pub fn {method(decision.cancel_registration)}(&self, callback: Box<dyn FnOnce() + Send + 'static>) -> crate::Result<bool> {{
+        type Registration = (u64, Option<Box<dyn FnOnce() + Send + 'static>>);
+        unsafe extern "C" fn invoke(user_data: *mut std::ffi::c_void) {{
+            // SAFETY: native passes the registration it owns and invokes it at
+            // most once, before its release.
+            let (owner, callback) = unsafe {{ &mut *user_data.cast::<Registration>() }};
+            let _policy = crate::callback::PolicyScope::enter(&[{allowed}], *owner);
+            if let Some(callback) = callback.take() {{
+                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(callback));
+            }}
+        }}
+        unsafe extern "C" fn release(user_data: *mut std::ffi::c_void) {{
+            let _policy = crate::callback::PolicyScope::enter(&[], 0);
+            // SAFETY: native or the rejecting arena releases each registration once.
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {{ drop(Box::from_raw(user_data.cast::<Registration>())) }}));
+        }}
+        let handle = self.native_for_call()?;
+        let mut arena = crate::input::InputArena::default();
+        // SAFETY: release reclaims exactly this box without unwinding.
+        let user_data = unsafe {{ arena.registration::<Registration>((handle.0, Some(callback)), release) }};
+        let mut cancelled = false;
+        crate::check(unsafe {{ maplibre_native_ffi_sys::{plan.name}({call}) }})?;
+        if !cancelled {{ arena.accept_registrations(); }}
+        Ok(cancelled)
+    }}
+}}
+"""

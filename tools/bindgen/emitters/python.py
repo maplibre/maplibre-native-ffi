@@ -487,8 +487,8 @@ def operation(
         call_args = ", ".join(arguments[p.name] for p in function.parameters)
         if decision and plan.name == decision.handle.release:
             body = [line for line in setup if "let storage =" not in line] + [
+                # Native release retires the cancel registration and its root.
                 "        unsafe { generated_native_call(py, || self.state.close()) };",
-                "        self.__clear__();",
                 "        Ok(py.None())",
             ]
             rust = (
@@ -511,8 +511,6 @@ def operation(
             body[-1] = (
                 f"        let result = unsafe {{ generated_native_call(py, || self.state.complete_with(|handle| maplibre_core::check(sys::{function.name}({call_args})))) }};"
             )
-        if decision_complete:
-            body.append("        if result.is_ok() { self.__clear__(); }")
         if ctype(function.return_type) == "mln_status":
             if plan.consumes == "always":
                 body.append("        reservation.commit();")
@@ -715,7 +713,8 @@ def decision_owner(owner: str) -> str:
     return f"""
 #[pyclass(name = "_{owner}")]
 struct {owner} {{
-    cancel_root: Mutex<Option<Arc<Mutex<Option<Py<PyAny>>>>>>,
+    // The accepted cancel callback, which native owns until it retires.
+    cancel_root: Mutex<std::sync::Weak<GeneratedCallbackRoot>>,
     // Dropped by hand, with the GIL released; see the Drop impl below.
     state: ManuallyDrop<Arc<maplibre_core::resource::ResourceRequestHandleState>>,
 }}
@@ -737,17 +736,20 @@ impl {owner} {{
     #[getter]
     fn id(&self) -> u64 {{ maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle()) }}
     fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {{
-        let root = self.cancel_root.lock().unwrap_or_else(|p| p.into_inner());
-        if let Some(root) = root.as_ref() {{
-            if let Some(callback) = root.lock().unwrap_or_else(|p| p.into_inner()).as_ref() {{
+        let root = self.cancel_root.lock().unwrap_or_else(|p| p.into_inner()).upgrade();
+        if let Some(root) = root {{
+            for callback in root.lock().unwrap_or_else(|p| p.into_inner()).iter() {{
                 visit.call(callback)?;
             }}
         }}
         Ok(())
     }}
     fn __clear__(&self) {{
-        let root = self.cancel_root.lock().unwrap_or_else(|p| p.into_inner()).take();
-        drop(root);
+        let root = self.cancel_root.lock().unwrap_or_else(|p| p.into_inner()).upgrade();
+        if let Some(root) = root {{
+            let callbacks = std::mem::take(&mut *root.lock().unwrap_or_else(|p| p.into_inner()));
+            drop(callbacks);
+        }}
     }}
 }}
 """

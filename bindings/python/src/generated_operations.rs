@@ -2099,10 +2099,7 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
             handle,
             maplibre_core::resource::ResourceRequestHandleFns::new(
                 sys::mln_resource_request_complete,
-                sys::mln_resource_request_cancelled,
-                sys::mln_resource_request_set_cancel_callback,
                 sys::mln_resource_request_release,
-                sys::mln_resource_request_wait_until_retired,
             ),
         )
     } {
@@ -2130,7 +2127,7 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
                     py,
                     ResourceRequestHandle {
                         state: ManuallyDrop::new(Arc::clone(&decision_state)),
-                        cancel_root: Mutex::new(None),
+                        cancel_root: Mutex::new(std::sync::Weak::new()),
                     },
                 )?,
             ))?;
@@ -11877,9 +11874,6 @@ impl ResourceRequestHandle {
                 })
             })
         };
-        if result.is_ok() {
-            self.__clear__();
-        }
         result.map_err(map_error)?;
         Ok(py.None())
     }
@@ -11889,7 +11883,6 @@ impl ResourceRequestHandle {
             maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle()),
         )?;
         unsafe { generated_native_call(py, || self.state.close()) };
-        self.__clear__();
         Ok(py.None())
     }
     fn set_cancel_callback(&self, py: Python<'_>, callback: Py<PyAny>) -> PyResult<bool> {
@@ -11899,36 +11892,22 @@ impl ResourceRequestHandle {
         if !callback.bind(py).is_callable() {
             return Err(invalid_argument_error("callback must be callable"));
         }
-        let root = Arc::new(Mutex::new(Some(callback)));
-        let weak = Arc::downgrade(&root);
-        let inline = self
+        let root = GeneratedCallbackRootOwner::new(vec![callback]);
+        let weak = root.downgrade();
+        let cancelled = self
             .state
-            .register_cancel_callback(Box::new(move || {
-                let _policy = GeneratedCallbackPolicy::enter(
-                    &[
-                        "mln_resource_request_complete",
-                        "mln_resource_request_cancelled",
-                        "mln_resource_request_set_cancel_callback",
-                        "mln_resource_request_release",
-                    ],
-                    callback_owner,
-                );
-                if let Some(root) = weak.upgrade() {
-                    let callback = root.lock().unwrap_or_else(|p| p.into_inner()).take();
-                    if let Some(callback) = callback {
-                        Python::try_attach(|py| {
-                            if let Err(error) = callback.bind(py).call0() {
-                                error.write_unraisable(py, None);
-                            }
-                        });
+            .set_cancel_callback(Box::new(move || {
+                Python::try_attach(|py| {
+                    if let Some(callback) = root.get(py, 0) {
+                        if let Err(error) = callback.bind(py).call0() {
+                            error.write_unraisable(py, None);
+                        }
                     }
-                }
+                });
             }))
             .map_err(map_error)?;
-        let cancelled = inline.is_some();
-        drop(inline);
         if !cancelled {
-            *self.cancel_root.lock().unwrap_or_else(|p| p.into_inner()) = Some(root);
+            *self.cancel_root.lock().unwrap_or_else(|p| p.into_inner()) = weak;
         }
         Ok(cancelled)
     }
@@ -12942,7 +12921,8 @@ impl RenderSessionHandle {
 
 #[pyclass(name = "_ResourceRequestHandle")]
 struct ResourceRequestHandle {
-    cancel_root: Mutex<Option<Arc<Mutex<Option<Py<PyAny>>>>>>,
+    // The accepted cancel callback, which native owns until it retires.
+    cancel_root: Mutex<std::sync::Weak<GeneratedCallbackRoot>>,
     // Dropped by hand, with the GIL released; see the Drop impl below.
     state: ManuallyDrop<Arc<maplibre_core::resource::ResourceRequestHandleState>>,
 }
@@ -12968,9 +12948,13 @@ impl ResourceRequestHandle {
         maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle())
     }
     fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
-        let root = self.cancel_root.lock().unwrap_or_else(|p| p.into_inner());
-        if let Some(root) = root.as_ref() {
-            if let Some(callback) = root.lock().unwrap_or_else(|p| p.into_inner()).as_ref() {
+        let root = self
+            .cancel_root
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .upgrade();
+        if let Some(root) = root {
+            for callback in root.lock().unwrap_or_else(|p| p.into_inner()).iter() {
                 visit.call(callback)?;
             }
         }
@@ -12981,8 +12965,11 @@ impl ResourceRequestHandle {
             .cancel_root
             .lock()
             .unwrap_or_else(|p| p.into_inner())
-            .take();
-        drop(root);
+            .upgrade();
+        if let Some(root) = root {
+            let callbacks = std::mem::take(&mut *root.lock().unwrap_or_else(|p| p.into_inner()));
+            drop(callbacks);
+        }
     }
 }
 

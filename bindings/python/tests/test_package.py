@@ -3317,6 +3317,57 @@ def test_resource_request_cancel_callback_reports_discarded_request() -> None:
     assert handle.closed is True
 
 
+class _CancelProbe:
+    """A cancel callback whose collection shows that its registration retired."""
+
+    def __init__(self, calls: list[str]) -> None:
+        self.calls = calls
+
+    def __call__(self) -> None:
+        self.calls.append("cancelled")
+
+
+def _wait_until_collected(ref: weakref.ref[object]) -> bool:
+    deadline = time.monotonic() + 5
+    while ref() is not None and time.monotonic() < deadline:
+        time.sleep(0.01)
+    return ref() is None
+
+
+def test_resource_request_cancel_callback_retires_after_running() -> None:
+    """native releases a callback once it returns, while its request stays
+    open."""
+    handles: list[resource.ResourceRequestHandle] = []
+    calls: list[str] = []
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        if request.requested_url != "custom://retire-after-cancel-style.json":
+            return resource.ResourceProviderDecision.PASS_THROUGH
+        handles.append(handle)
+        return resource.ResourceProviderDecision.HANDLE
+
+    with mln.runtime_create() as runtime:
+        _await(runtime.set_resource_provider(mln.ResourceProvider(provider)))
+        with runtime.map_create().result(timeout=5) as map_handle:
+            map_handle.set_style_url("custom://retire-after-cancel-style.json")
+            handle = _wait_for_provider_handle(handles)
+            probe = _CancelProbe(calls)
+            probe_ref = weakref.ref(probe)
+            assert handle.set_cancel_callback(probe) is False
+            del probe
+            # The accepted registration keeps the callback until it can no
+            # longer run.
+            assert probe_ref() is not None
+
+        assert _wait_until_collected(probe_ref), "cancel callback was not released"
+        assert calls == ["cancelled"]
+        assert handle.closed is False
+        handle.close()
+
+
 def test_resource_request_cancel_callback_cycle_is_collectable():
     handles = []
 
@@ -3425,7 +3476,12 @@ def test_resource_request_registration_reports_prior_cancellation() -> None:
             msg = "host failure inside the cancel callback"
             raise RuntimeError(msg)
 
-        assert handle.set_cancel_callback(on_cancel) is True
+        probe = _CancelProbe(cancellations)
+        probe_ref = weakref.ref(probe)
+        assert handle.set_cancel_callback(probe) is True
+        del probe
+        # Native stored nothing, so the binding released the callback itself.
+        assert probe_ref() is None
         assert cancellations == []
 
         # The request keeps its one registration after reporting cancellation.
@@ -3461,7 +3517,10 @@ def test_resource_request_cancel_callback_skips_completed_request() -> None:
         with runtime.map_create().result(timeout=5) as map_handle:
             map_handle.set_style_url("custom://completed-style.json")
             handle = _wait_for_provider_handle(handles)
-            handle.set_cancel_callback(lambda: cancellations.append("cancelled"))
+            probe = _CancelProbe(cancellations)
+            probe_ref = weakref.ref(probe)
+            handle.set_cancel_callback(probe)
+            del probe
             handle.complete(
                 resource.ResourceResponse(
                     bytes=_EMPTY_STYLE_BYTES,
@@ -3471,6 +3530,12 @@ def test_resource_request_cancel_callback_skips_completed_request() -> None:
                 )
             )
             _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
+
+        # A callback that never ran stays registered until the request's
+        # release.
+        assert probe_ref() is not None
+        handle.close()
+        assert probe_ref() is None
 
     assert cancellations == []
     with pytest.raises(

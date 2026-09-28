@@ -815,7 +815,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         if callback.decision
     }
     decision_tables = [
-        f"pub const {native.removeprefix('mln_').upper()}_FUNCTIONS: crate::resource::ResourceRequestHandleFns = unsafe {{ crate::resource::ResourceRequestHandleFns::new(maplibre_native_ffi_sys::{decision.complete}, maplibre_native_ffi_sys::{decision.cancelled}, maplibre_native_ffi_sys::{decision.cancel_registration}, maplibre_native_ffi_sys::{decision.handle.release}, maplibre_native_ffi_sys::{decision.wait_retired}) }};\n"
+        f"pub const {native.removeprefix('mln_').upper()}_FUNCTIONS: crate::resource::ResourceRequestHandleFns = unsafe {{ crate::resource::ResourceRequestHandleFns::new(maplibre_native_ffi_sys::{decision.complete}, maplibre_native_ffi_sys::{decision.handle.release}) }};\n"
         for native, decision in sorted(decisions.items())
     ]
     from .rust_direct import declaration as direct_declaration
