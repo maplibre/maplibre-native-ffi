@@ -230,16 +230,16 @@ def test_multiple_runtimes_are_independent() -> None:
         # the other's queue and maps untouched.
         first_events = _drain_runtime_events(first)
         assert first_events
-        first_sources = {event.source for event in first_events}
-        assert len(first_sources) == 1
+        assert {event.source for event in first_events} == {first_map.id}
         _await(first_map.close())
         _await(first.close())
 
         assert not second_map.closed
         assert _await(second_map.camera_query()).generation > 0
-        assert {event.source for event in _drain_runtime_events(second)}.isdisjoint(
-            first_sources
-        )
+        # A closed map keeps its ID, so events drained later still identify it.
+        assert first_map.id not in {
+            event.source for event in _drain_runtime_events(second)
+        }
         _await(second_map.close())
     finally:
         second.close()
@@ -2417,8 +2417,7 @@ def test_drain_returns_a_copied_map_loading_failure() -> None:
         assert failures
         loading_failed = failures[0]
         assert loading_failed.source_type == mln.RuntimeEventSourceType.MAP
-        assert loading_failed.source != 0
-        assert loading_failed.source != 0
+        assert loading_failed.source == map_handle.id
         assert loading_failed.message
 
 
@@ -2433,7 +2432,7 @@ def test_autonomous_runtime_and_drain_return_a_copied_style_loaded_event() -> No
         )
 
         assert style_loaded.source_type == mln.RuntimeEventSourceType.MAP
-        assert style_loaded.source != 0
+        assert style_loaded.source == map_handle.id
         assert style_loaded.payload is None
 
 

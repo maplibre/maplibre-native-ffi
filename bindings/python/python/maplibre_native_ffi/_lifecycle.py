@@ -75,6 +75,15 @@ class NativeHandleMixin(WarnUnclosedMixin, ContextHandleMixin):
         """Return whether the private native handle has been closed."""
         return bool(self._native.closed)
 
+    @property
+    def id(self) -> int:
+        """Return the native handle ID that runtime events report as a source.
+
+        The ID stays readable after close, so events drained later still match
+        the handle that produced them.
+        """
+        return int(self._native.id)
+
     def close(self) -> object:
         """Release the private native handle exactly once."""
         return self._native.close()

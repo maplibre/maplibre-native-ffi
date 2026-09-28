@@ -34,6 +34,9 @@ struct NativeHandleState<T: maplibre_core::handle::NativeHandle> {
     active_reads: usize,
     callback_roots: Vec<std::sync::Weak<GeneratedCallbackRoot>>,
     id: Option<std::num::NonZeroU64>,
+    // The handle ID the native API issued, kept after close so a closed owner
+    // still matches the IDs that earlier runtime events reported.
+    issued_id: std::num::NonZeroU64,
     closing: bool,
     _typed_handle: std::marker::PhantomData<fn() -> T>,
     dispose_abandoned: Option<unsafe extern "C" fn(T) -> sys::mln_status>,
@@ -57,6 +60,7 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
             active_reads: 0,
             callback_roots: Vec::new(),
             id: Some(id),
+            issued_id: id,
             closing: false,
             _typed_handle: std::marker::PhantomData,
             dispose_abandoned: None,
@@ -115,6 +119,10 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
 
     fn is_closed(&self) -> bool {
         self.id.is_none()
+    }
+
+    fn issued_id(&self) -> u64 {
+        self.issued_id.get()
     }
 }
 

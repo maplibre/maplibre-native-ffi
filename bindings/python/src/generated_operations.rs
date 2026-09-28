@@ -12686,6 +12686,10 @@ impl AcquiredFrameHandle {
     fn closed(&self) -> bool {
         self.state().is_closed()
     }
+    #[getter]
+    fn id(&self) -> u64 {
+        self.state().issued_id()
+    }
     fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
         self.state().traverse_callbacks(&visit)
     }
@@ -12720,6 +12724,10 @@ impl BufferHandle {
     fn closed(&self) -> bool {
         self.state().is_closed()
     }
+    #[getter]
+    fn id(&self) -> u64 {
+        self.state().issued_id()
+    }
     fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
         self.state().traverse_callbacks(&visit)
     }
@@ -12748,6 +12756,10 @@ impl EventBatchHandle {
     #[getter]
     fn closed(&self) -> bool {
         self.state().is_closed()
+    }
+    #[getter]
+    fn id(&self) -> u64 {
+        self.state().issued_id()
     }
     fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
         self.state().traverse_callbacks(&visit)
@@ -12778,6 +12790,10 @@ impl GeoJsonSourceDataHandle {
     fn closed(&self) -> bool {
         self.state().is_closed()
     }
+    #[getter]
+    fn id(&self) -> u64 {
+        self.state().issued_id()
+    }
     fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
         self.state().traverse_callbacks(&visit)
     }
@@ -12806,6 +12822,10 @@ impl MapHandle {
     #[getter]
     fn closed(&self) -> bool {
         self.state().is_closed()
+    }
+    #[getter]
+    fn id(&self) -> u64 {
+        self.state().issued_id()
     }
     fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
         self.state().traverse_callbacks(&visit)
@@ -12836,6 +12856,10 @@ impl MapProjectionHandle {
     fn closed(&self) -> bool {
         self.state().is_closed()
     }
+    #[getter]
+    fn id(&self) -> u64 {
+        self.state().issued_id()
+    }
     fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
         self.state().traverse_callbacks(&visit)
     }
@@ -12865,6 +12889,10 @@ impl RenderFrameBatchHandle {
     fn closed(&self) -> bool {
         self.state().is_closed()
     }
+    #[getter]
+    fn id(&self) -> u64 {
+        self.state().issued_id()
+    }
     fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
         self.state().traverse_callbacks(&visit)
     }
@@ -12893,6 +12921,10 @@ impl RenderSessionHandle {
     #[getter]
     fn closed(&self) -> bool {
         self.state().is_closed()
+    }
+    #[getter]
+    fn id(&self) -> u64 {
+        self.state().issued_id()
     }
     fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
         self.state().traverse_callbacks(&visit)
@@ -12931,6 +12963,10 @@ impl ResourceRequestHandle {
     fn closed(&self) -> bool {
         self.state.native_for_call().is_err()
     }
+    #[getter]
+    fn id(&self) -> u64 {
+        maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle())
+    }
     fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
         let root = self.cancel_root.lock().unwrap_or_else(|p| p.into_inner());
         if let Some(root) = root.as_ref() {
@@ -12964,6 +13000,10 @@ impl RuntimeHandle {
     #[getter]
     fn closed(&self) -> bool {
         self.state().is_closed()
+    }
+    #[getter]
+    fn id(&self) -> u64 {
+        self.state().issued_id()
     }
     fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
         self.state().traverse_callbacks(&visit)

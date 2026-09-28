@@ -8,6 +8,7 @@ from ._generated_values import *
 
 class _AcquiredFrameHandle:
     closed: bool
+    id: int
     def with_metal_texture(self) -> Any: ...
     def with_opengl_texture(self) -> Any: ...
     def with_producer_sync(self) -> Any: ...
@@ -18,24 +19,29 @@ class _AcquiredFrameHandle:
 
 class _BufferHandle:
     closed: bool
+    id: int
     def close(self) -> Any: ...
     def get(self) -> Any: ...
 
 class _EventBatchHandle:
     closed: bool
+    id: int
     def get(self) -> Any: ...
     def close(self) -> Any: ...
 
 class _GeoJsonSourceDataHandle:
     closed: bool
+    id: int
     def close(self) -> Any: ...
 
 class _HttpHeaderTransformResponseScope:
     closed: bool
+    id: int
     def set(self, name: str, value: str) -> Any: ...
 
 class _MapHandle:
     closed: bool
+    id: int
     def add_color_relief_layer(
         self, layer_id: str, source_id: str, before_layer_id: str | None = None
     ) -> Future[CommandCompletion]: ...
@@ -351,6 +357,7 @@ class _MapHandle:
 
 class _MapProjectionHandle:
     closed: bool
+    id: int
     def close(self) -> Any: ...
     def get_camera(self) -> Any: ...
     def lat_lng_for_pixel(self, point: ScreenPoint) -> Any: ...
@@ -365,12 +372,14 @@ class _MapProjectionHandle:
 
 class _RenderFrameBatchHandle:
     closed: bool
+    id: int
     def count(self) -> Any: ...
     def get(self, index: int) -> Any: ...
     def close(self) -> Any: ...
 
 class _RenderSessionHandle:
     closed: bool
+    id: int
     def metal_borrowed_texture_set_target(
         self, descriptor: MetalBorrowedTextureDescriptor | None = None
     ) -> Future[None]: ...
@@ -430,6 +439,7 @@ class _RenderSessionHandle:
 
 class _ResourceRequestHandle:
     closed: bool
+    id: int
     def cancelled(self) -> Any: ...
     def complete(self, response: ResourceResponse) -> Any: ...
     def close(self) -> None: ...
@@ -438,10 +448,12 @@ class _ResourceRequestHandle:
 
 class _ResourceTransformResponseScope:
     closed: bool
+    id: int
     def set_url(self, url: str) -> Any: ...
 
 class _RuntimeHandle:
     closed: bool
+    id: int
     def map_create(self, options: MapOptions | None = None) -> Future[Any]: ...
     def barrier(self) -> Future[None]: ...
     def clear_http_header_transform(self) -> Future[None]: ...

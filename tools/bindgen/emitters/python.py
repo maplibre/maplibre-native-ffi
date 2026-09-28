@@ -47,7 +47,7 @@ def unsupported(function: Function | Record, reason: str) -> ModelError:
 
 # Members every handle owner defines. The release operation alone becomes
 # `close`; any other operation with one of these names would shadow a member.
-OWNER_MEMBERS = {"state", "closed", "close"}
+OWNER_MEMBERS = {"state", "closed", "close", "id"}
 LOCAL_NAMES = {
     "self",
     "py",
@@ -692,6 +692,8 @@ impl {owner} {{
 impl {owner} {{
     #[getter]
     fn closed(&self) -> bool {{ self.state().is_closed() }}
+    #[getter]
+    fn id(&self) -> u64 {{ self.state().issued_id() }}
     fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {{
         self.state().traverse_callbacks(&visit)
     }}
@@ -732,6 +734,8 @@ impl Drop for {owner} {{
 impl {owner} {{
     #[getter]
     fn closed(&self) -> bool {{ self.state.native_for_call().is_err() }}
+    #[getter]
+    fn id(&self) -> u64 {{ maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle()) }}
     fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {{
         let root = self.cancel_root.lock().unwrap_or_else(|p| p.into_inner());
         if let Some(root) = root.as_ref() {{
@@ -889,7 +893,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     files["python/maplibre_native_ffi/_native.pyi"] = (
         f"# {notice}\nfrom concurrent.futures import Future\nfrom typing import Any, Callable\nfrom ._completion import CommandCompletion\nfrom ._generated_values import *\n\n"
         + "\n".join(
-            f"class _{owner}:\n    closed: bool\n{''.join(methods)}"
+            f"class _{owner}:\n    closed: bool\n    id: int\n{''.join(methods)}"
             for owner, methods in sorted(stubs.items())
             if owner
         )
