@@ -31,8 +31,13 @@ final class NativeInputArena {
 
   func submit(_ body: () throws -> mln_status) rethrows -> mln_status {
     let status = try body()
-    if status == MLN_STATUS_OK { callbacks.removeAll() }
+    if status == MLN_STATUS_OK { accept() }
     return status
+  }
+
+  /// Transfers every callback this arena registered to native ownership.
+  func accept() {
+    callbacks.removeAll()
   }
 
   static func count<Value: BinaryInteger>(_ count: Int) throws -> Value {
@@ -181,6 +186,13 @@ final class GeneratedCallbackBox<Value> {
   init(_ value: Value) {
     self.value = value
   }
+}
+
+/// A callback whose reentry policy admits calls on the handle that registered
+/// it. The owner is weak so a native root does not keep its handle alive.
+struct NativeOwnedCallback<Value> {
+  weak var owner: AnyObject?
+  let value: Value
 }
 
 func releaseGeneratedCallback(_ pointer: UnsafeMutableRawPointer?) {

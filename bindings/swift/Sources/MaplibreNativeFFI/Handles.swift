@@ -76,14 +76,6 @@ class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
     }
   }
 
-  func retainCallback(_ callback: AnyObject) {
-    state.retainCallback(callback)
-  }
-
-  func retireCallback(_ callback: AnyObject) {
-    state.retireCallback(callback)
-  }
-
   func beginClaim() throws -> NativeClaim {
     try state.beginClaim()
   }

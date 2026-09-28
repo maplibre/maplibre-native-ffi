@@ -73,22 +73,24 @@ public extension ResourceRequestHandle {
       operation: "mln_resource_request_set_cancel_callback"
     )
     return try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       let access = try handle.borrow()
       defer { access.end(); withExtendedLifetime(self) {} }
-      let box = NativeOwnedCallback(owner: self, value: callback)
-      let token = NativeCallbackRegistry.shared.insert(box)
-      handle.retainCallback(box)
-      var accepted = false
-      defer { if !accepted { handle.retireCallback(box) } }
-      var cancelled = false
+      let token = arena.callback(NativeOwnedCallback(
+        owner: self,
+        value: callback
+      ))
+      var rejected = false
       try checkStatus(mln_resource_request_set_cancel_callback(
         access.handle.raw,
         invokeMlnResourceRequestSetCancelCallback,
         token,
-        &cancelled
+        releaseGeneratedCallback,
+        &rejected
       ))
-      accepted = !cancelled
-      return cancelled
+      if !rejected { arena.accept() }
+      return rejected
     }
   }
 }
@@ -96,9 +98,11 @@ public extension ResourceRequestHandle {
 private func invokeMlnResourceRequestSetCancelCallback(
   user_data: UnsafeMutableRawPointer?
 ) {
-  guard let box = NativeCallbackRegistry.shared
-    .resolve(user_data) as? NativeOwnedCallback<@Sendable () throws -> Void>,
-    let owner = box.owner else { return }
+  guard let user_data else { return }
+  let box =
+    Unmanaged<GeneratedCallbackBox<NativeOwnedCallback<@Sendable () throws
+        -> Void>>>.fromOpaque(user_data).takeUnretainedValue()
+  guard let owner = box.value.owner else { return }
   let admission = NativeCallbackGuard.enter(
     owner: owner,
     operations: [
@@ -109,7 +113,7 @@ private func invokeMlnResourceRequestSetCancelCallback(
     ]
   )
   defer { admission.end() }
-  do { try box.value() } catch { return }
+  do { try box.value.value() } catch { return }
 }
 
 public extension ResourceRequestHandle {

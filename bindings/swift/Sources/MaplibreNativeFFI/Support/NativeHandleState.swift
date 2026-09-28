@@ -10,7 +10,6 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
   private let typeName: String
   private let lock = NSLock()
   private var state: State
-  private var callbacks: [AnyObject] = []
   private var readers = 0
   private var claims = 0
   private var claimed = false
@@ -128,24 +127,13 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
 
     do {
       try destroy(liveHandle)
-      lock.withLock {
-        state = .closed
-        callbacks.removeAll()
-      }
+      lock.withLock { state = .closed }
     } catch {
       lock.withLock {
         state = .live(liveHandle)
       }
       throw error
     }
-  }
-
-  func retainCallback(_ callback: AnyObject) {
-    lock.withLock { callbacks.append(callback) }
-  }
-
-  func retireCallback(_ callback: AnyObject) {
-    lock.withLock { callbacks.removeAll { $0 === callback } }
   }
 
   func beginClaim() throws -> NativeClaim {
@@ -169,7 +157,6 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
       if !owns {
         state = .closed
         deferredClose = nil
-        callbacks.removeAll()
       }
       return owns
     }

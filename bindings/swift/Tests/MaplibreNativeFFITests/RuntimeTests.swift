@@ -197,6 +197,27 @@ private final class CancelProbe: @unchecked Sendable {
   var cancels: Int {
     lock.withLock { cancelCount }
   }
+
+  private var releaseCount = 0
+
+  /// Counts the times a cancel callback that captures the returned sentinel is
+  /// freed, which is when the binding or native code releases its registration.
+  func sentinel() -> ReleaseSentinel {
+    ReleaseSentinel { [self] in lock.withLock { releaseCount += 1 } }
+  }
+
+  var releases: Int {
+    lock.withLock { releaseCount }
+  }
+}
+
+private final class ReleaseSentinel: Sendable {
+  private let onRelease: @Sendable () -> Void
+  init(_ onRelease: @escaping @Sendable () -> Void) {
+    self.onRelease = onRelease
+  }
+
+  deinit { onRelease() }
 }
 
 /// Installs a provider that takes every request and keeps the handle, then
@@ -224,8 +245,8 @@ private func startCancelProbeRequest(
 
 /// closing a map discards its pending style request, and MapLibre
 /// runs the registered cancel callback once for the request the provider still
-/// holds. A second registration reports invalid state and leaves the first in
-/// place, and a closed request rejects a registration.
+/// holds and then releases it. A second registration reports invalid state and
+/// leaves the first in place, and a closed request rejects a registration.
 @Test func resourceRequestCancelCallbackRunsWhenTheMapDiscardsTheRequest(
 ) async throws {
   let runtime =
@@ -243,7 +264,9 @@ private func startCancelProbeRequest(
   let secondCalls = LockedBox(0)
   let secondRegistration = LockedBox<Result<Bool, Error>?>(nil)
   let configure: @Sendable (ResourceRequestHandle) -> Void = { handle in
-    try? handle.setCancelCallback { probe.recordCancel() }
+    try? handle.setCancelCallback { [sentinel = probe.sentinel()] in
+      withExtendedLifetime(sentinel) { probe.recordCancel() }
+    }
     secondRegistration.update {
       $0 = Result {
         try handle.setCancelCallback { secondCalls.update { $0 += 1 } }
@@ -258,6 +281,7 @@ private func startCancelProbeRequest(
     configure: configure
   ))
   #expect(probe.cancels == 0)
+  #expect(probe.releases == 0)
   switch secondRegistration.value {
   case let .failure(error as MaplibreError):
     #expect(error.kind == .invalidState)
@@ -277,6 +301,11 @@ private func startCancelProbeRequest(
   try await runtime.barrier()
   #expect(probe.cancels == 1)
   #expect(secondCalls.value == 0)
+  // Native code releases the registration once the callback returns, before
+  // the provider releases the request.
+  #expect(try await waitUntilTrue("the cancel registration release") {
+    probe.releases == 1
+  })
 
   let handle = try #require(probe.handle)
   #expect(try handle.cancelled())
@@ -295,6 +324,7 @@ private func startCancelProbeRequest(
     #expect(error.diagnostic.contains("closed"))
   }
   #expect(probe.cancels == 1)
+  #expect(probe.releases == 1)
 }
 
 /// the cancel callback may close its own request. Native release
@@ -355,17 +385,26 @@ private func startCancelProbeRequest(
     probe: probe
   ))
   let handle = try #require(probe.handle)
-  defer { try? handle.close() }
   try await map.close()
   #expect(try await waitUntilTrue("request cancellation") {
     try handle.cancelled()
   })
-  #expect(try handle.setCancelCallback { probe.recordCancel() })
+  let cancelled = try handle
+    .setCancelCallback { [sentinel = probe.sentinel()] in
+      withExtendedLifetime(sentinel) { probe.recordCancel() }
+    }
+  #expect(cancelled)
+  // The request stores nothing, so the binding frees the callback itself and
+  // releasing the request frees nothing more.
+  #expect(probe.releases == 1)
+  try handle.close()
+  #expect(probe.releases == 1)
   #expect(probe.cancels == 0)
 }
 
 /// MapLibre retires a request the provider answered, and that
-/// teardown leaves the cancel callback alone.
+/// teardown leaves the cancel callback alone until the provider releases the
+/// request.
 @Test func resourceRequestCancelCallbackSkipsACompletedRequest() async throws {
   let runtime =
     try Maplibre.runtimeCreate(options: RuntimeOptions(cachePath: ":memory:"))
@@ -384,7 +423,9 @@ private func startCancelProbeRequest(
     map: map,
     probe: probe
   ) { handle in
-    try? handle.setCancelCallback { probe.recordCancel() }
+    try? handle.setCancelCallback { [sentinel = probe.sentinel()] in
+      withExtendedLifetime(sentinel) { probe.recordCancel() }
+    }
     try? handle.complete(response: ResourceResponse(
       status: .ok,
       bytes: Data(providerStyleJSON.utf8)
@@ -399,10 +440,12 @@ private func startCancelProbeRequest(
   try await runtime.barrier()
 
   #expect(probe.cancels == 0)
+  #expect(probe.releases == 0)
   // Completion keeps ownership until explicit close.
   let handle = try #require(probe.handle)
   #expect(!handle.isClosed)
   try handle.close()
+  #expect(probe.releases == 1)
   try handle.waitUntilRetired()
 }
 
