@@ -436,6 +436,19 @@ run = 'PYTHONPATH="$MISE_MONOREPO_ROOT/ci${PYTHONPATH:+:$PYTHONPATH}" uv run --n
 description = "Merge, sign, and publish Kotlin Maven repositories."
 run = 'python3 ci/kotlin_release.py "$@"'
 
+[tasks."bindings:generate"]
+description = "Regenerate native declarations and public binding APIs from C headers."
+depends = [
+  "//bindings/dart:ffigen",
+  "//bindings/dotnet:generate",
+  "//bindings/kotlin:generate",
+]
+run = "uv run --no-sync python -m tools.bindgen generate"
+
+[tasks."bindings:check"]
+description = "Check header contracts and committed generated binding output."
+run = "uv run --no-sync python -m tools.bindgen generate --check --require-complete"
+
 [tasks."bindings:test-generator"]
 description = "Test compiler extraction, contract diagnostics, and language lowering."
 run = "uv run --no-sync python -m unittest discover -s tests/bindgen"
