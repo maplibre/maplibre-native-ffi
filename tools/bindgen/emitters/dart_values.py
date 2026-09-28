@@ -49,42 +49,10 @@ SCALARS = {
 }
 
 
-# Hand-written Dart owners: the generated operations mixin each uses, its public
-# class, and its native handle type. Every other public handle gets a generated
-# owner named after its C type.
-HANDWRITTEN_OWNERS = {
-    "mln_acquired_frame": ("AcquiredFrame", "AcquiredFrame", "NativeAcquiredFrame"),
-    "mln_geojson_source_data": (
-        "GeoJsonSourceData",
-        "GeoJsonSourceDataHandle",
-        "NativeGeoJsonSourceData",
-    ),
-    "mln_map": ("Map", "MapHandle", "NativeMap"),
-    "mln_map_projection": ("Projection", "MapProjectionHandle", "NativeMapProjection"),
-    "mln_render_session": (
-        "RenderSession",
-        "RenderSessionHandle",
-        "NativeRenderSession",
-    ),
-    "mln_resource_request_handle": (
-        "ResourceRequest",
-        "ResourceRequestHandle",
-        "NativeResourceRequest",
-    ),
-    "mln_runtime": ("Runtime", "RuntimeHandle", "NativeRuntime"),
-}
-
-
-def owner_names(native: str) -> tuple[str, str, str]:
-    """The operations mixin, public class, and native type for a handle."""
-    if native in HANDWRITTEN_OWNERS:
-        return HANDWRITTEN_OWNERS[native]
-    name = public_name(native)
-    return name, name + "Handle", "Native" + name
-
-
-def generated_owners(bound) -> list[str]:
-    return sorted(bound.public_handles.keys() - HANDWRITTEN_OWNERS.keys())
+def owner_names(native: str) -> tuple[str, str]:
+    """The public owner class and native handle type for a handle."""
+    name = public_name(native.removesuffix("_handle"))
+    return name + "Handle", "Native" + name
 
 
 class Unsupported(ValueError):
@@ -254,7 +222,7 @@ class Values:
     def public(self, value):
         self.check(value)
         if value.kind == "handle":
-            name = owner_names(value.native)[1]
+            name = owner_names(value.native)[0]
         elif value.kind == "native_pointer":
             name = "NativePointer"
         elif value.kind in {"scalar", "enum"}:

@@ -2,6 +2,38 @@ part of 'runtime.dart';
 
 _LogCallbackState? _logCallbackState;
 
+/// Registers or replaces the process-wide native log callback.
+///
+/// MapLibre logging threads copy each record into a native queue that this
+/// isolate drains, so [callback] runs on this isolate after the record is
+/// logged. With [consume] set, each record is consumed, so MapLibre Native's
+/// platform logger does not also handle it.
+void logSetCallback(LogCallback callback, {bool consume = false}) {
+  final state = _LogCallbackState(callback, consume: consume);
+  _callbackReleases.register(
+    state.pointer.cast(),
+    state.close,
+    arena: state.arena,
+  );
+  try {
+    _check(
+      raw.mln_log_set_callback(
+        Native.addressOf<NativeFunction<raw.mln_log_callbackFunction>>(
+          raw.mln_adapter_log_callback,
+        ),
+        state.pointer.cast(),
+        Native.addressOf<NativeFunction<raw.mln_log_callback_releaseFunction>>(
+          raw.mln_adapter_dart_release,
+        ),
+      ),
+    );
+    _logCallbackState = state;
+  } catch (_) {
+    _callbackReleases.reject(state.pointer.cast());
+    rethrow;
+  }
+}
+
 final class _LogCallbackState extends RetainedCallbackState {
   _LogCallbackState(LogCallback callback, {required bool consume})
     : _callback = callback {

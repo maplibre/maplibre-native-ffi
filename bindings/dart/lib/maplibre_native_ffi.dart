@@ -14,9 +14,5 @@ export 'src/query/query.dart';
 export 'src/render/render.dart';
 export 'src/resource/resource.dart';
 export 'src/runtime/runtime.dart'
-    hide
-        logCallbackStateForTesting,
-        decodeRuntimeEventBatchForTesting,
-        mapHandleIdForTesting,
-        runtimeHandleIdForTesting;
+    hide logCallbackStateForTesting, decodeRuntimeEventBatchForTesting;
 export 'src/style/style.dart';

@@ -25,7 +25,6 @@ part 'runtime_resource_callbacks.dart';
 part 'runtime_logging.dart';
 part 'generated_operations.dart';
 part 'runtime_offline.dart';
-part 'runtime_render_handles.dart';
 
 final MaplibreNativeCApi _c = MaplibreNativeCApi.open();
 
@@ -72,6 +71,45 @@ final class QueuedResourceProvider {
 
   /// Callback invoked on the receiver isolate for matching requests.
   final ResourceProviderCallback callback;
+}
+
+/// Queued Dart resource provider registration on a runtime.
+///
+/// The provider copies each matching request into a native queue that its
+/// isolate drains, a protocol the generated operations do not express.
+extension RuntimeQueuedResourceProvider on RuntimeHandle {
+  /// Registers or replaces a queued Dart resource provider callback.
+  ///
+  /// Requests reach [QueuedResourceProvider.callback] on the isolate that
+  /// registered the provider, one event-loop turn after MapLibre queues them.
+  Future<CommandCompletion> setQueuedResourceProvider(
+    QueuedResourceProvider provider,
+  ) {
+    final state = _ResourceProviderCallbackState(provider);
+    final userData = state.pointer.cast<Void>();
+    final releases = _resourceProviderReleases[this] ??=
+        NativeCallbackReleases();
+    releases.register(userData, state.retire, arena: state.arena);
+    return _startCommand(
+      (completion) => withNativeArena((arena) {
+        final nativeProvider = arena<raw.mln_resource_provider>();
+        nativeProvider.ref.size = sizeOf<raw.mln_resource_provider>();
+        nativeProvider.ref.callback = _c
+            .adapterQueuedResourceProviderCallback();
+        nativeProvider.ref.user_data = userData;
+        nativeProvider.ref.release_user_data =
+            Native.addressOf<
+              NativeFunction<raw.mln_runtime_callback_releaseFunction>
+            >(raw.mln_adapter_dart_release);
+        return raw.mln_runtime_set_resource_provider(
+          _handle.raw,
+          nativeProvider,
+          completion,
+        );
+      }),
+      onRejected: () => releases.reject(userData),
+    );
+  }
 }
 
 final class _NativeCallbackPorts {
@@ -147,56 +185,6 @@ void Function(dynamic) _callbackPortHandler(
   state._deliver(message);
 };
 
-/// Runtime handle with autonomous native execution.
-final class RuntimeHandle with _GeneratedRuntimeOperations {
-  RuntimeHandle._(NativeRuntime handle)
-    : _state = NativeHandleState(handle, 'RuntimeHandle');
-  @override
-  final NativeHandleState<NativeRuntime> _state;
-  @override
-  final _callbackPorts = _NativeCallbackPorts();
-
-  @override
-  NativeRuntime get _handle => _state.handle;
-  BigInt get identity => uint64FromNative(_state.handleId);
-
-  /// Whether this runtime has been closed by the Dart binding.
-  bool get isClosed => _state.isClosed;
-
-  /// Registers or replaces a queued Dart resource provider callback.
-  ///
-  /// Requests reach [QueuedResourceProvider.callback] on the isolate that registered
-  /// the provider, one event-loop turn after MapLibre queues them.
-  Future<CommandCompletion> setQueuedResourceProvider(
-    QueuedResourceProvider provider,
-  ) {
-    final state = _ResourceProviderCallbackState(provider);
-    final userData = state.pointer.cast<Void>();
-    final releases = _resourceProviderReleases[this] ??=
-        NativeCallbackReleases();
-    releases.register(userData, state.retire, arena: state.arena);
-    return _startCommand(
-      (completion) => withNativeArena((arena) {
-        final nativeProvider = arena<raw.mln_resource_provider>();
-        nativeProvider.ref.size = sizeOf<raw.mln_resource_provider>();
-        nativeProvider.ref.callback = _c
-            .adapterQueuedResourceProviderCallback();
-        nativeProvider.ref.user_data = userData;
-        nativeProvider.ref.release_user_data =
-            Native.addressOf<
-              NativeFunction<raw.mln_runtime_callback_releaseFunction>
-            >(raw.mln_adapter_dart_release);
-        return raw.mln_runtime_set_resource_provider(
-          _handle.raw,
-          nativeProvider,
-          completion,
-        );
-      }),
-      onRejected: () => releases.reject(userData),
-    );
-  }
-}
-
 /// Decodes a synthetic native batch through the production generated converter.
 List<RuntimeEvent> decodeRuntimeEventBatchForTesting(
   raw.mln_runtime_event_batch_view batch,
@@ -234,31 +222,6 @@ final class CommandCompletion {
   final BigInt generation;
   final MaplibreStatus status;
   final String diagnostic;
-}
-
-final class GeoJsonSourceDataHandle with _GeneratedGeoJsonSourceDataOperations {
-  GeoJsonSourceDataHandle._(NativeGeoJsonSourceData handle)
-    : _state = NativeHandleState(handle, 'GeoJsonSourceDataHandle');
-  @override
-  final NativeHandleState<NativeGeoJsonSourceData> _state;
-  NativeGeoJsonSourceData get _handle => _state.handle;
-  bool get isClosed => _state.isClosed;
-}
-
-final class MapHandle with _GeneratedMapOperations {
-  MapHandle._(this._runtime, NativeMap handle)
-    : _state = NativeHandleState(handle, 'MapHandle');
-  // Keeps the parent runtime reachable while the map lives.
-  // ignore: unused_field
-  final RuntimeHandle _runtime;
-  @override
-  final NativeHandleState<NativeMap> _state;
-  @override
-  NativeMap get _handle => _state.handle;
-  @override
-  final _callbackPorts = _NativeCallbackPorts();
-  bool get isClosed => _state.isClosed;
-  BigInt get identity => uint64FromNative(_state.handleId);
 }
 
 T _adoptOwned<T>(int handle, T Function() adopt, void Function(int) dispose) {

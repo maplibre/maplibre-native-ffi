@@ -16,7 +16,6 @@ from tools.bindgen.semantic import BoundApi, OperationPlan
 from .dart_values import (
     Unsupported,
     Values,
-    generated_owners,
     owner_names,
     public_name,
 )
@@ -26,14 +25,20 @@ from .dart_values import (
 HANDWRITTEN_VALUES = ("mln_adapter_queued_resource_provider_route",)
 
 
+class HandWritten(Exception):
+    """A verified operation whose adapter protocol a hand-written Dart file binds."""
+
+
 def adopt_owner(owned, expression, receiver, function, values):
     if owned.handle.native not in values.bound.public_handles:
         raise Unsupported("owned output requires a generated class")
-    _, public, native = owner_names(owned.handle.native)
+    public, native = owner_names(owned.handle.native)
     parent = ""
-    if owned.parent_parameter:
+    if owned.handle.parent in values.bound.public_handles:
+        if not owned.parent_parameter:
+            raise Unsupported("owned output requires its parent owner")
         parent = (
-            "this as " + owner_names(owned.handle.parent)[1]
+            "this"
             if receiver and function.parameters[0].name == owned.parent_parameter
             else camel(owned.parent_parameter)
         )
@@ -64,6 +69,7 @@ def registration_body(plan, body):
 
 
 def lower_direct_registration(plan, values):
+    """Verify a direct registration that a hand-written Dart adapter binds."""
     if len(plan.direct_registrations) != 1:
         raise Unsupported("one direct registration required")
     registration = plan.direct_registrations[0]
@@ -76,11 +82,10 @@ def lower_direct_registration(plan, values):
             raise Unsupported(
                 "owner cancellation requires verified provider decision protocol"
             )
-        return (
-            owner_names(
-                next(p.value.native for p in plan.inputs if p.name == plan.receiver)
-            )[0],
-            "  bool setCancelCallback(void Function() callback) => _registerResourceCancellation(this as ResourceRequestHandle, callback);\n",
+        raise HandWritten(
+            "hand-written ResourceRequestCancellation.setCancelCallback in "
+            "runtime_resource_callbacks.dart through "
+            "mln_adapter_dart_resource_cancel_register"
         )
     adapters = [
         a for a in values.bound.callback_adapters if a.callback == callback.native
@@ -91,18 +96,9 @@ def lower_direct_registration(plan, values):
         or adapters[0].context != "mln_adapter_log_callback_state"
     ):
         raise Unsupported("direct callback requires a verified native queue adapter")
-    adapter = adapters[0]
-    return (
-        "Globals",
-        f"""  void logSetCallback(LogCallback callback, {{bool consume = false}}) {{
-    final state = _LogCallbackState(callback, consume: consume);
-    _callbackReleases.register(state.pointer.cast(), state.close, arena: state.arena);
-    try {{
-      _check(raw.{plan.name}(Native.addressOf<NativeFunction<raw.{callback.native}Function>>(raw.{adapter.function}), state.pointer.cast(), Native.addressOf<NativeFunction<raw.mln_log_callback_releaseFunction>>(raw.mln_adapter_dart_release)));
-      _logCallbackState = state;
-    }} catch (_) {{ _callbackReleases.reject(state.pointer.cast()); rethrow; }}
-  }}
-""",
+    raise HandWritten(
+        f"hand-written logSetCallback in runtime_logging.dart through "
+        f"{adapters[0].function} and its native log queue"
     )
 
 
@@ -129,11 +125,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
     ):
         receiver = type_name(function.parameters[0].type.pointee)
         receiver_reference = True
-    owner = (
-        owner_names(receiver)[0]
-        if receiver in values.bound.public_handles
-        else "Globals"
-    )
+    owner = receiver if receiver in values.bound.public_handles else "Globals"
     if owner == "Globals":
         receiver = None
     execution = plan.execution
@@ -264,7 +256,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
                         "Scoped" + values.public(output),
                         "Scoped"
                         + values.public(output)
-                        + "._(this as AcquiredFrame, "
+                        + "._(this, "
                         + values.copy(output, expression)
                         + ")",
                     )
@@ -379,7 +371,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
                 "completion requires one immediate owner and void readiness"
             )
         public, adoption = returns[0]
-        owned = plan.completion.immediate_owners[0]
+        attachment = attachment_name(plan.completion.immediate_owners[0])
         accept = "registrations.accept();" if plan.registrations else ""
         body = (
             "\n".join(setup)
@@ -389,7 +381,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
             body = registration_body(plan, body)
         return (
             owner,
-            f"  {public.removesuffix('Handle')}Attachment {name}({', '.join(signature)}) {{\n    {public}? created;\n    Object? adoptionError; StackTrace? adoptionStack;\n    final completed = startNativeCompletion<void>(copyKind: raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT, elementSize: 0, start: (completion) => withNativeArena((arena) {{\n{body}\n    }}), decode: (_) {{}});\n    if (adoptionError != null) {{ completed.ignore(); Error.throwWithStackTrace(adoptionError!, adoptionStack!); }}\n    final session = created!;\n    return {public.removesuffix('Handle')}Attachment(session, completed.whenComplete(() {{ session.isClosed; }}));\n  }}\n",
+            f"  {attachment} {name}({', '.join(signature)}) {{\n    {public}? created;\n    Object? adoptionError; StackTrace? adoptionStack;\n    final completed = startNativeCompletion<void>(copyKind: raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT, elementSize: 0, start: (completion) => withNativeArena((arena) {{\n{body}\n    }}), decode: (_) {{}});\n    if (adoptionError != null) {{ completed.ignore(); Error.throwWithStackTrace(adoptionError!, adoptionStack!); }}\n    final owner = created!;\n    return {attachment}(owner, completed.whenComplete(() {{ owner.isClosed; }}));\n  }}\n",
         )
 
     if plan.registrations:
@@ -482,8 +474,12 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
     )
 
 
+def attachment_name(owned):
+    return owner_names(owned.handle.native)[0].removesuffix("Handle") + "Attachment"
+
+
 def lower(api: Api | BoundApi):
-    methods, generated, unsupported = defaultdict(list), [], {}
+    methods, generated, unsupported, handwritten = defaultdict(list), [], {}, {}
     bound = compile_api(api)
     values = Values(bound)
     unsupported.update(
@@ -501,12 +497,14 @@ def lower(api: Api | BoundApi):
             values.used.update(local_values.used)
             methods[owner].append(body)
             generated.append(plan.name)
+        except HandWritten as reason:
+            handwritten[plan.name] = str(reason)
         except Unsupported as error:
             unsupported[plan.name] = f"{plan.function.location}: {error}"
     for native in HANDWRITTEN_VALUES:
         if native in bound.values:
             values.check(bound.values[native])
-    return methods, generated, unsupported, values
+    return methods, generated, unsupported, values, handwritten
 
 
 def render_scoped_views(bound, generated, values):
@@ -534,21 +532,21 @@ def render_scoped_views(bound, generated, values):
                 f"  {'ScopedNativePointer' if native_pointer else typ} get {name} {{ _scope.checkActive(); return {result}; }}"
             )
         chunks.append(
-            f"final class Scoped{public} {{\n  Scoped{public}._(AcquiredFrame owner, this._value) : _scope = _GeneratedNativeViewScope(owner, raw.{plan.view.owner.view_begin}, raw.{plan.view.owner.view_end});\n  final {public} _value;\n  final _GeneratedNativeViewScope _scope;\n  T withView<T>(T Function(Scoped{public}) use) => _scope.use(() => use(this));\n"
+            f"final class Scoped{public} {{\n  Scoped{public}._({owner_names(plan.view.owner.native)[0]} owner, this._value) : _scope = _GeneratedNativeViewScope(() => owner._handle, raw.{plan.view.owner.view_begin}, raw.{plan.view.owner.view_end});\n  final {public} _value;\n  final _GeneratedNativeViewScope _scope;\n  T withView<T>(T Function(Scoped{public}) use) => _scope.use(() => use(this));\n"
             + "\n".join(getters)
             + "\n}\n"
         )
     if chunks:
         chunks.append("""final class _GeneratedNativeViewScope {
-  _GeneratedNativeViewScope(this.owner, this.begin, this.end);
-  final AcquiredFrame owner;
+  _GeneratedNativeViewScope(this.handle, this.begin, this.end);
+  final NativeHandle Function() handle;
   final int Function(int, Pointer<Pointer<Void>>) begin;
   final void Function(Pointer<Void>) end;
   int _active = 0;
   void checkActive() { if (_active == 0) { throwInvalidState('borrowed native value requires an active withView callback'); } }
   T use<T>(T Function() callback) => withNativeArena((arena) {
     final token = arena<Pointer<Void>>();
-    _check(begin(owner._handle.raw, token));
+    _check(begin(handle().raw, token));
     _active++;
     try {
       final result = callback();
@@ -592,8 +590,63 @@ def registration_runtime(values):
     )
 
 
+def render_owner(native, handle, bodies, bound):
+    public, native_type = owner_names(native)
+    parameters, fields = [], []
+    if handle.parent in bound.public_handles:
+        parameters.append("this._parent")
+        fields.append(
+            "  // Keeps the parent owner reachable while this owner lives.\n"
+            f"  // ignore: unused_field\n  final {owner_names(handle.parent)[0]} _parent;"
+        )
+    if any("_callbackPorts" in body for body in bodies):
+        fields.append(
+            "  // Roots this owner's port registrations for as long as it lives.\n"
+            "  final _callbackPorts = _NativeCallbackPorts();"
+        )
+    fields.append(f"  final NativeHandleState<{native_type}> _state;")
+    fields.append(f"  {native_type} get _handle => _state.handle;")
+    parameters.append(f"{native_type} handle")
+    return (
+        f"/// Issued `{native}` handle id.\n"
+        f"extension type const {native_type}(int raw) implements NativeHandle {{}}\n\n"
+        f"/// Owner of one native `{native}` handle.\n"
+        f"final class {public} implements Finalizable {{\n"
+        f"  {public}._({', '.join(parameters)}) : _state = NativeHandleState(handle, '{public}');\n"
+        + "\n".join(fields)
+        + "\n\n  /// Whether this binding object has released its native handle.\n"
+        "  bool get isClosed => _state.isClosed;\n\n"
+        "  /// The issued native handle id.\n"
+        "  BigInt get identity => uint64FromNative(_state.handleId);\n\n"
+        + "".join(bodies)
+        + "}\n"
+    )
+
+
+def render_attachments(bound, generated):
+    """Pair each owner an attachment creates at once with its completion."""
+    chunks = {}
+    for plan in bound.operations:
+        if plan.name not in generated or not plan.completion:
+            continue
+        for owned in plan.completion.immediate_owners:
+            name = attachment_name(owned)
+            field = camel(owned.parameter.removeprefix("out_"))
+            chunks[name] = (
+                f"/// A new {field} and the completion of the attachment that created it.\n"
+                f"final class {name} {{\n"
+                f"  const {name}(this.{field}, this.completed);\n\n"
+                f"  /// The {field}, usable at once while attachment completes.\n"
+                f"  final {owner_names(owned.handle.native)[0]} {field};\n\n"
+                "  /// Completes after native attachment finishes.\n"
+                "  final Future<void> completed;\n}\n"
+            )
+    return [chunks[name] for name in sorted(chunks)]
+
+
 def generate(api: Api | BoundApi) -> str:
-    methods, generated, _, values = lower(api)
+    methods, generated, _, values, _ = lower(api)
+    bound = values.bound
     _, conversions = values.render()
     parts = re.split(
         r"(?m)(?=^(?:Pointer<raw\.\w+>|_NativeRegistration<raw\.\w+>|\w+) _(?:write|read|prepare)\w+\()",
@@ -653,46 +706,18 @@ def generate(api: Api | BoundApi) -> str:
         )
         else "",
     ]
-    native_types = {
-        owner_names(native)[0]: owner_names(native)[2]
-        for native in values.bound.public_handles
-    }
-    generated_mixins = {
-        owner_names(native)[0] for native in generated_owners(values.bound)
-    }
-    for owner, bodies in sorted(methods.items()):
-        if owner == "Globals":
-            chunks.extend(bodies)
-            continue
-        handle = native_types[owner]
-        chunks.append(
-            f"mixin _Generated{owner}Operations implements Finalizable {{\n"
-            + (
-                f"  {handle} get _handle;\n"
-                if any("_handle" in body for body in bodies)
-                else ""
-            )
-        )
-        if any("_state." in body for body in bodies):
-            chunks.append(f"  NativeHandleState<{handle}> get _state;\n")
-        if any("_callbackPorts" in body for body in bodies):
-            chunks.append("  _NativeCallbackPorts get _callbackPorts;\n")
-        chunks.extend(bodies)
-        chunks.append("}\n")
-        if owner in generated_mixins:
-            public = owner + "Handle"
-            chunks.append(
-                f"/// {owner} handle id.\nextension type const {handle}(int raw) implements NativeHandle {{}}\n\n"
-                f"final class {public} with _Generated{owner}Operations {{\n  {public}._({handle} handle) : _state = NativeHandleState(handle, '{public}');\n  @override final NativeHandleState<{handle}> _state;\n  @override {handle} get _handle => _state.handle;\n  bool get isClosed => _state.isClosed;\n}}\n"
-            )
-    chunks.append(render_scoped_views(compile_api(api), generated, values))
+    chunks.extend(methods.get("Globals", []))
+    for native, handle in sorted(bound.public_handles.items()):
+        chunks.append(render_owner(native, handle, methods.get(native, []), bound))
+    chunks.extend(render_attachments(bound, generated))
+    chunks.append(render_scoped_views(bound, generated, values))
     return "\n".join(chunks)
 
 
 def coverage(api: Api | BoundApi):
-    _, generated, unsupported, values = lower(api)
-    support = {}
-    bound = compile_api(api)
+    _, generated, unsupported, values, handwritten = lower(api)
+    support = dict(handwritten)
+    bound = values.bound
     for value in values.used.values():
         if value.registration:
             for adapter in values.registration_adapters(value):
@@ -706,7 +731,7 @@ def coverage(api: Api | BoundApi):
 
 
 def generate_values(api: Api | BoundApi) -> str:
-    _, _, _, values = lower(api)
+    _, _, _, values, _ = lower(api)
     declarations, _ = values.render()
     return (
         "// Generated from the C headers by tools/bindgen. Do not edit.\nimport 'dart:typed_data';\nimport 'render/native_pointer.dart';\n\n"

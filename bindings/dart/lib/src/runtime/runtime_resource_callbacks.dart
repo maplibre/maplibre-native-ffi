@@ -147,40 +147,41 @@ void _failQueuedRequest(Pointer<Void> rawRequest, String errorMessage) {
 /// Dart callback run when MapLibre cancels a provider resource request.
 typedef ResourceRequestCancelCallback = void Function();
 
-/// Cancel registrations made on this isolate, keyed by request handle id.
+/// Cancel callback registration on a provider resource request.
 ///
-bool _registerResourceCancellation(
-  ResourceRequestHandle owner,
-  void Function() callback,
-) {
-  final handle = owner._handle.raw;
-  if (owner._cancelRegistration != null) {
-    throwInvalidState('request already has a cancel registration');
-  }
-  final state = _ResourceRequestCancelState(owner, callback);
-  owner._cancelRegistration = state;
-  try {
-    final cancelled = withNativeArena((arena) {
-      final output = arena<Bool>();
-      _check(
-        raw.mln_adapter_dart_resource_cancel_register(
-          handle,
-          NativeApi.postCObject.cast(),
-          state.port.sendPort.nativePort,
-          output,
-        ),
-      );
-      return output.value;
-    });
-    if (cancelled) {
-      owner._cancelRegistration = null;
+/// Native code reports cancellation through a Dart port, a protocol the
+/// generated operations do not express.
+extension ResourceRequestCancellation on ResourceRequestHandle {
+  /// Registers [callback] to run on this isolate when MapLibre cancels the
+  /// request.
+  ///
+  /// Returns true, and never runs [callback], when the request is already
+  /// cancelled. A request accepts one registration.
+  bool setCancelCallback(ResourceRequestCancelCallback callback) {
+    final state = _ResourceRequestCancelState(this, callback);
+    try {
+      final cancelled = withNativeArena((arena) {
+        final output = arena<Bool>();
+        _check(
+          raw.mln_adapter_dart_resource_cancel_register(
+            _handle.raw,
+            NativeApi.postCObject.cast(),
+            state.port.sendPort.nativePort,
+            output,
+          ),
+        );
+        return output.value;
+      });
+      if (cancelled) {
+        state.close();
+      } else {
+        _state.retain(state);
+      }
+      return cancelled;
+    } catch (_) {
       state.close();
+      rethrow;
     }
-    return cancelled;
-  } catch (_) {
-    owner._cancelRegistration = null;
-    state.close();
-    rethrow;
   }
 }
 

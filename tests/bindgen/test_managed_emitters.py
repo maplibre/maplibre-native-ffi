@@ -158,6 +158,26 @@ mln_status mln_measurement_change(mln_measurement measurement, const mln_complet
         self.assertIn("Future<CommandCompletion> change() => _startCommand(", source)
         self.assertNotIn("_startCommand(NativeCompletionStart", source)
 
+    def test_dart_owners_come_from_handle_plans(self):
+        api = self.parse("""
+typedef unsigned long long mln_measurement BIND("kind=handle;release=mln_measurement_close;dispose=mln_measurement_close;parent=none");
+typedef unsigned long long mln_sample_handle BIND("kind=handle;release=mln_sample_close;dispose=mln_sample_close;parent=mln_measurement");
+BIND("execution=immediate")
+void mln_measurement_close(mln_measurement owner);
+BIND("execution=immediate")
+void mln_sample_close(mln_sample_handle sample);
+BIND("receiver=measurement;execution=immediate")
+mln_status mln_measurement_take_sample(mln_measurement measurement, mln_sample_handle *out_sample BIND("direction=out;ownership=owned"));
+""")
+        self.assertEqual(dart.coverage(api)["unsupported"], {})
+        source = dart.generate(api)
+        # The owner name drops the handle suffix, and the child keeps its parent.
+        self.assertIn("final class SampleHandle implements Finalizable", source)
+        self.assertIn("SampleHandle._(this._parent, NativeSample handle)", source)
+        self.assertIn("final MeasurementHandle _parent;", source)
+        self.assertIn("SampleHandle._(this, NativeSample(outSample.value))", source)
+        self.assertEqual(source.count("BigInt get identity"), 2)
+
     def test_reserved_method_identifiers_are_rejected(self):
         source = """
 BIND("execution=query;result=double;shape=value;ownership=borrowed")

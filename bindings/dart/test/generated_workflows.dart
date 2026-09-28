@@ -29,7 +29,7 @@ extension RenderTestWorkflows on RenderSessionHandle {
     }
   }
 
-  AcquiredFrame? tryAcquireFrame() {
+  AcquiredFrameHandle? tryAcquireFrame() {
     try {
       return acquireFrame();
     } on NotReadyException {

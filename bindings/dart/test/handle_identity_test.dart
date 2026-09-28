@@ -65,7 +65,7 @@ void main() {
     () async {
       final runtime = runtimeCreate(runtimeOptionsDefault());
       final first = await runtime.createMap();
-      final released = mapHandleIdForTesting(first);
+      final released = first.identity.toSigned(64).toInt();
       await first.close();
 
       // The released slot is the one the next map takes, so the replayed id
@@ -88,7 +88,7 @@ void main() {
       );
 
       // The live map is unaffected by the replay.
-      _mapSnapshotById(mapHandleIdForTesting(second));
+      _mapSnapshotById(second.identity.toSigned(64).toInt());
     },
   );
 
@@ -105,7 +105,7 @@ void main() {
       // The generated bindings spell both as `int`, so this call needs the raw
       // id; the C API rejects it on its kind tag.
       expect(
-        () => _runtimeBarrierById(mapHandleIdForTesting(map)),
+        () => _runtimeBarrierById(map.identity.toSigned(64).toInt()),
         throwsA(
           isA<InvalidArgumentException>()
               .having((e) => e.diagnostic, 'diagnostic', contains('map'))
