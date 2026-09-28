@@ -1,8 +1,5 @@
-using System.Runtime.InteropServices;
-using System.Text;
 using Maplibre.NativeFfi.Camera;
 using Maplibre.NativeFfi.Error;
-using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Render;
 using Maplibre.NativeFfi.Runtime;
@@ -12,90 +9,54 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class RenderedProjectionTests
 {
-    public static bool SupportsMetal =>
-        Maplibre.SupportedRenderBackends().HasFlag(RenderBackend.Metal);
-
-    [DllImport("/System/Library/Frameworks/Metal.framework/Metal")]
-    private static extern nint MTLCreateSystemDefaultDevice();
-
-    [DllImport("/usr/lib/libobjc.A.dylib")]
-    private static extern void objc_release(nint value);
-
-    [Fact(SkipUnless = nameof(SupportsMetal), Skip = "This test attaches a Metal render target.")]
-    public void ProjectionCapturesRenderedCameraAndOutlivesSession()
+    [Fact]
+    public async Task ProjectionCapturesRenderedCameraAndOutlivesSession()
     {
-        var device = MTLCreateSystemDefaultDevice();
-        Assert.NotEqual(0, device);
+        using var fixture = OwnedTextureFixture.Create();
+        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        using var map = TestHandles.CreateMap(
+            runtime,
+            MapOptions.Default with
+            {
+                InitialExtent = MapOptions.Default.InitialExtent with { Width = 32, Height = 16 },
+            }
+        );
+        using var session = fixture.Attach(map, new RenderTargetExtent(32, 16, 1));
+        await session.Completion;
         try
         {
-            using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-            using var map = MapHandle.Create(runtime, new MapOptions { Width = 128, Height = 64 });
-            using var session = RenderSessionHandle.AttachMetalOwnedTexture(
-                map,
-                new MetalOwnedTextureDescriptor
+            Assert.Throws<InvalidStateException>(() => session.ProjectionCreate());
+            await map.SetStyleJsonAsync("{\"version\":8,\"sources\":{},\"layers\":[]}"u8.ToArray());
+            await map.UpdateCameraAsync(
+                CameraUpdate.Default with
                 {
-                    Extent = new RenderTargetExtent(128, 64, 1),
-                    Context = new MetalContextDescriptor
-                    {
-                        Device = NativePointer.FromBorrowedAddress(device),
-                    },
+                    Camera = new CameraOptions { Zoom = 3 },
                 }
             );
-            Assert.Throws<InvalidStateException>(() => session.CreateProjection());
-            map.SetStyleJson(
-                Encoding.UTF8.GetBytes("{\"version\":8,\"sources\":{},\"layers\":[]}")
+            session.RequestFrame(new FrameDemand { Token = 1 });
+            await session.BarrierAsync();
+            Assert.Equal(
+                RenderResult.Rendered,
+                Assert.Single(session.DrainFrameCopies()).Disposition
             );
-            runtime.Pump(TimeSpan.Zero);
-            var coordinate = new LatLng(37.78, -122.41);
-            map.JumpTo(
-                new CameraOptions
+            await map.UpdateCameraAsync(
+                CameraUpdate.Default with
                 {
-                    Center = new LatLng(37.7749, -122.4194),
-                    Zoom = 12,
-                    Bearing = 23,
-                    Pitch = 40,
+                    Camera = new CameraOptions { Zoom = 6 },
                 }
             );
-            runtime.Pump(TimeSpan.Zero);
-            var expected = map.PixelForLatLng(coordinate);
-            Assert.Equal(RenderResult.Rendered, session.RenderUpdate().Result);
-            map.JumpTo(new CameraOptions { Center = new LatLng(37.80, -122.45) });
-            runtime.Pump(TimeSpan.Zero);
-            using var projection = session.CreateProjection();
-            AssertPoint(expected, projection.PixelForLatLng(coordinate));
-            Assert.True(Math.Abs(map.PixelForLatLng(coordinate).X - expected.X) > 1);
-            using (var frame = session.AcquireMetalOwnedTextureFrame())
-            using (var captured = session.CreateProjection())
-                AssertPoint(expected, captured.PixelForLatLng(coordinate));
-            session.Resize(96, 48, 2);
-            Assert.Throws<InvalidStateException>(() => session.CreateProjection());
-            runtime.Pump(TimeSpan.Zero);
-            Assert.Equal(RenderResult.Rendered, session.RenderUpdate().Result);
-            using (var resized = session.CreateProjection())
-                AssertPoint(map.PixelForLatLng(coordinate), resized.PixelForLatLng(coordinate));
+            using var projection = session.ProjectionCreate();
+            Assert.Equal(3, projection.GetCamera().Zoom);
+            await session.ResizeAsync(new RenderTargetExtent(16, 16, 1));
+            Assert.Throws<InvalidStateException>(() => session.ProjectionCreate());
+            await session.DetachAsync();
             session.Close();
-            map.Close();
-            runtime.Close();
-            Exception? failure = null;
-            var worker = new Thread(() =>
-            {
-                failure = Record.Exception(() =>
-                    AssertPoint(expected, projection.PixelForLatLng(coordinate))
-                );
-            });
-            worker.Start();
-            worker.Join();
-            Assert.Null(failure);
+            await Task.Run(() => Assert.Equal(3, projection.GetCamera().Zoom));
         }
         finally
         {
-            objc_release(device);
+            if (!session.IsClosed)
+                await session.DetachAsync();
         }
-    }
-
-    private static void AssertPoint(ScreenPoint expected, ScreenPoint actual)
-    {
-        Assert.Equal(expected.X, actual.X, 6);
-        Assert.Equal(expected.Y, actual.Y, 6);
     }
 }

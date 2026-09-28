@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
+using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Resource;
+using Maplibre.NativeFfi.Runtime;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
@@ -11,7 +12,7 @@ public sealed unsafe class ResourceResponseTests
     public void ResourceResponseClonesBytesAtBoundary()
     {
         var source = new byte[] { 1, 2, 3 };
-        var response = new ResourceResponse(ResourceResponseStatus.Ok) { Bytes = source };
+        var response = new ResourceResponse { Status = ResourceResponseStatus.Ok, Bytes = source };
         source[0] = 9;
         var copied = response.Bytes;
         copied[1] = 9;
@@ -22,24 +23,22 @@ public sealed unsafe class ResourceResponseTests
     [Fact]
     public void NativeResourceResponseCopiesOwnedFields()
     {
-        var modified = DateTimeOffset.FromUnixTimeMilliseconds(1234);
-        var expires = DateTimeOffset.FromUnixTimeMilliseconds(5678);
-        var retryAfter = DateTimeOffset.FromUnixTimeMilliseconds(9000);
-        using var native = NativeResourceResponse.From(
-            new ResourceResponse(ResourceResponseStatus.Error)
+        using var scope = new NativeCallScope();
+        var value = GeneratedValues.NativeResourceResponse(
+            new ResourceResponse
             {
+                Status = ResourceResponseStatus.Error,
                 ErrorReason = ResourceErrorReason.NotFound,
                 Bytes = [1, 2, 3],
                 ErrorMessage = "missing",
                 MustRevalidate = true,
-                Modified = modified,
-                Expires = expires,
+                ModifiedUnixMs = 1234,
+                ExpiresUnixMs = 5678,
                 Etag = "abc",
-                RetryAfter = retryAfter,
-            }
+                RetryAfterUnixMs = 9000,
+            },
+            scope
         );
-
-        var value = native.Value;
         Assert.Equal((uint)ResourceResponseStatus.Error, value.status);
         Assert.Equal((uint)ResourceErrorReason.NotFound, value.error_reason);
         Assert.Equal(3u, value.byte_count);

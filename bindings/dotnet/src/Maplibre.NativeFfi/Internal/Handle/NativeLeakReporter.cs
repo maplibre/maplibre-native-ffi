@@ -5,7 +5,6 @@ namespace Maplibre.NativeFfi.Internal.Pointer;
 internal enum NativeLeakReportKind
 {
     LeakedHandle,
-    DisposeFailed,
 }
 
 /// <param name="Handle">

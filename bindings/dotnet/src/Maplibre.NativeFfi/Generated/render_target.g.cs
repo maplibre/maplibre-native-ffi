@@ -16,6 +16,81 @@ namespace Maplibre.NativeFfi.Internal.C
         public double scale_factor;
     }
 
+    [NativeTypeName("uint32_t")]
+    internal enum mln_render_driver_kind : uint
+    {
+        MLN_RENDER_DRIVER_CORE_WORKER = 1U,
+        MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD = 2U,
+    }
+
+    [NativeTypeName("uint32_t")]
+    internal enum mln_render_session_capability_flag : uint
+    {
+        MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION = 1U << 0,
+        MLN_RENDER_SESSION_CAPABILITY_READBACK = 1U << 1,
+        MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC = 1U << 2,
+        MLN_RENDER_SESSION_CAPABILITY_PRESENTATION = 1U << 3,
+    }
+
+    internal partial struct mln_render_session_attach_options
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("uint32_t")]
+        public uint driver;
+
+        [NativeTypeName("uint32_t")]
+        public uint requested_texture_ring_depth;
+
+        [NativeTypeName("uint32_t")]
+        public uint reserved;
+
+        public mln_wake frame_wake;
+
+        public mln_wake driver_work_wake;
+    }
+
+    internal partial struct mln_render_session_capabilities
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("uint32_t")]
+        public uint driver;
+
+        [NativeTypeName("uint32_t")]
+        public uint texture_ring_depth;
+
+        [NativeTypeName("uint32_t")]
+        public uint flags;
+    }
+
+    [NativeTypeName("uint32_t")]
+    internal enum mln_gpu_sync_kind : uint
+    {
+        MLN_GPU_SYNC_CPU_COMPLETE = 0U,
+        MLN_GPU_SYNC_METAL_SHARED_EVENT = 1U,
+        MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 2U,
+        MLN_GPU_SYNC_OPENGL_FENCE = 3U,
+        MLN_GPU_SYNC_WEBGPU_TOKEN = 4U,
+    }
+
+    internal partial struct mln_gpu_sync
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("uint32_t")]
+        public uint kind;
+
+        [NativeTypeName("uint64_t")]
+        public ulong @object;
+
+        [NativeTypeName("uint64_t")]
+        public ulong value;
+    }
+
     internal unsafe partial struct mln_metal_context_descriptor
     {
         [NativeTypeName("uint32_t")]
@@ -117,13 +192,38 @@ namespace Maplibre.NativeFfi.Internal.C
         public void* get_proc_address;
     }
 
+    [NativeTypeName("uint32_t")]
+    internal enum mln_webgl_context_kind : uint
+    {
+        MLN_WEBGL_CONTEXT_EXISTING = 0U,
+        MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS = 1U,
+    }
+
     internal partial struct mln_webgl_context_descriptor
     {
         [NativeTypeName("uint32_t")]
         public uint size;
 
+        [NativeTypeName("uint32_t")]
+        public uint kind;
+
         [NativeTypeName("int32_t")]
         public int context;
+
+        public mln_buffer_view canvas_selector;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    internal partial struct mln_opengl_context_descriptor_data
+    {
+        [FieldOffset(0)]
+        public mln_wgl_context_descriptor wgl;
+
+        [FieldOffset(0)]
+        public mln_egl_context_descriptor egl;
+
+        [FieldOffset(0)]
+        public mln_webgl_context_descriptor webgl;
     }
 
     internal partial struct mln_opengl_context_descriptor
@@ -135,25 +235,17 @@ namespace Maplibre.NativeFfi.Internal.C
 
         public mln_opengl_context_ownership ownership;
 
-        [NativeTypeName("__AnonymousRecord_render_target_L191_C3")]
-        public _data_e__Union data;
-
-        [StructLayout(LayoutKind.Explicit)]
-        internal partial struct _data_e__Union
-        {
-            [FieldOffset(0)]
-            public mln_wgl_context_descriptor wgl;
-
-            [FieldOffset(0)]
-            public mln_egl_context_descriptor egl;
-
-            [FieldOffset(0)]
-            public mln_webgl_context_descriptor webgl;
-        }
+        public mln_opengl_context_descriptor_data data;
     }
 
     internal static unsafe partial class NativeMethods
     {
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_gpu_sync mln_gpu_sync_default();
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_render_session_attach_options mln_render_session_attach_options_default();
+
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_render_target_extent_physical_size([NativeTypeName("const mln_render_target_extent *")] mln_render_target_extent* extent, [NativeTypeName("uint32_t *")] uint* out_width, [NativeTypeName("uint32_t *")] uint* out_height);
 

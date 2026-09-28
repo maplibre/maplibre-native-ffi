@@ -1,5 +1,4 @@
 using Maplibre.NativeFfi.Camera;
-using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Query;
 using Maplibre.NativeFfi.Runtime;
@@ -32,7 +31,7 @@ public sealed class OptionsValueSemanticsTests
         }
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void CameraOptionsComparesByPropertyValue()
     {
@@ -62,7 +61,7 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void AnimationOptionsComparesByPropertyValue()
     {
@@ -70,21 +69,21 @@ public sealed class OptionsValueSemanticsTests
             () =>
                 new AnimationOptions
                 {
-                    Duration = 1,
+                    DurationMs = 1,
                     Easing = new UnitBezier(0.1, 0.2, 0.3, 0.4),
-                    MinimumZoom = 3,
+                    MinZoom = 3,
                     Velocity = 4,
                     TransitionId = 5,
                 },
-            options => options.Duration = 10,
+            options => options.DurationMs = 10,
             options => options.Easing = new UnitBezier(0.9, 0.8, 0.7, 0.6),
-            options => options.MinimumZoom = 30,
+            options => options.MinZoom = 30,
             options => options.Velocity = 40,
             options => options.TransitionId = 50
         );
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void CameraFitOptionsComparesByPropertyValue()
     {
@@ -102,7 +101,7 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void BoundOptionsComparesByPropertyValue()
     {
@@ -110,23 +109,21 @@ public sealed class OptionsValueSemanticsTests
             () =>
                 new BoundOptions
                 {
-                    Bounds = new BoundsConstraint.Bounded(
-                        new LatLngBounds(new LatLng(0, 0), new LatLng(1, 1))
-                    ),
-                    MinimumZoom = 2,
-                    MaximumZoom = 3,
-                    MinimumPitch = 4,
-                    MaximumPitch = 5,
+                    Bounds = new LatLngBounds(new LatLng(0, 0), new LatLng(1, 1)),
+                    MinZoom = 2,
+                    MaxZoom = 3,
+                    MinPitch = 4,
+                    MaxPitch = 5,
                 },
-            options => options.Bounds = BoundsConstraint.Unbounded.Instance,
-            options => options.MinimumZoom = 20,
-            options => options.MaximumZoom = 30,
-            options => options.MinimumPitch = 40,
-            options => options.MaximumPitch = 50
+            options => options.Unbounded = true,
+            options => options.MinZoom = 20,
+            options => options.MaxZoom = 30,
+            options => options.MinPitch = 40,
+            options => options.MaxPitch = 50
         );
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void FreeCameraOptionsComparesByPropertyValue()
     {
@@ -142,13 +139,13 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void ViewportOptionsComparesByPropertyValue()
     {
         AssertValueSemantics(
             () =>
-                new ViewportOptions
+                new MapViewportOptions
                 {
                     NorthOrientation = NorthOrientation.Up,
                     ConstrainMode = ConstrainMode.None,
@@ -162,23 +159,23 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void TileOptionsComparesByPropertyValue()
     {
         AssertValueSemantics(
             () =>
-                new TileOptions
+                new MapTileOptions
                 {
                     PrefetchZoomDelta = 1,
-                    LodMinimumRadius = 2,
+                    LodMinRadius = 2,
                     LodScale = 3,
                     LodPitchThreshold = 4,
                     LodZoomShift = 5,
                     LodMode = TileLodMode.Default,
                 },
             options => options.PrefetchZoomDelta = 7,
-            options => options.LodMinimumRadius = 20,
+            options => options.LodMinRadius = 20,
             options => options.LodScale = 30,
             options => options.LodPitchThreshold = 40,
             options => options.LodZoomShift = 50,
@@ -186,13 +183,13 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void ProjectionModeOptionsComparesByPropertyValue()
     {
         AssertValueSemantics(
             () =>
-                new ProjectionModeOptions
+                new ProjectionMode
                 {
                     Axonometric = true,
                     XSkew = 1,
@@ -204,122 +201,80 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("BND-070")]
-    [Fact]
-    public void MapOptionsComparesByPropertyValue()
-    {
-        AssertValueSemantics(
-            () =>
-                new MapOptions
-                {
-                    Width = 100,
-                    Height = 200,
-                    ScaleFactor = 2,
-                    MapMode = MapMode.Continuous,
-                    FastPforEnabled = false,
-                    EventMask = RuntimeEventMask.AllMapEvents,
-                },
-            options => options.Width = 300,
-            options => options.Height = 400,
-            options => options.ScaleFactor = 3,
-            options => options.MapMode = MapMode.Static,
-            options => options.FastPforEnabled = true,
-            options => options.EventMask = RuntimeEventMask.All
-        );
-    }
-
-    [BindingSpecTest("BND-070")]
-    [Fact]
-    public void RuntimeOptionsComparesByPropertyValue()
-    {
-        AssertValueSemantics(
-            () =>
-                new RuntimeOptions
-                {
-                    AssetPath = "assets",
-                    CachePath = "cache",
-                    EventMask = RuntimeEventMask.AllRuntimeEvents,
-                },
-            options => options.AssetPath = "other-assets",
-            options => options.CachePath = "other-cache",
-            options => options.EventMask = RuntimeEventMask.All
-        );
-    }
-
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void TileSourceOptionsComparesByPropertyValue()
     {
         AssertValueSemantics(
             () =>
-                new TileSourceOptions
+                new StyleTileSourceOptions
                 {
-                    Scheme = TileScheme.Xyz,
-                    MinimumZoom = 1,
-                    MaximumZoom = 2,
+                    Scheme = StyleTileScheme.Xyz,
+                    MinZoom = 1,
+                    MaxZoom = 2,
                     TileSize = 256,
                     Attribution = "attribution",
-                    VectorEncoding = VectorTileEncoding.Mvt,
-                    RasterEncoding = RasterDemEncoding.Mapbox,
+                    VectorEncoding = StyleVectorTileEncoding.Mvt,
+                    RasterEncoding = StyleRasterDemEncoding.Mapbox,
                     Bounds = new LatLngBounds(new LatLng(0, 0), new LatLng(1, 1)),
                 },
-            options => options.Scheme = TileScheme.Tms,
-            options => options.MinimumZoom = 10,
-            options => options.MaximumZoom = 20,
+            options => options.Scheme = StyleTileScheme.Tms,
+            options => options.MinZoom = 10,
+            options => options.MaxZoom = 20,
             options => options.TileSize = 512,
             options => options.Attribution = "other",
-            options => options.VectorEncoding = VectorTileEncoding.Mlt,
-            options => options.RasterEncoding = RasterDemEncoding.Terrarium,
+            options => options.VectorEncoding = StyleVectorTileEncoding.Mlt,
+            options => options.RasterEncoding = StyleRasterDemEncoding.Terrarium,
             options => options.Bounds = new LatLngBounds(new LatLng(-1, -1), new LatLng(2, 2))
         );
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
-    public void GeoJsonSourceOptionsComparesByPropertyValue()
+    public void GeojsonSourceOptionsComparesByPropertyValue()
     {
         AssertValueSemantics(
             () =>
-                new GeoJsonSourceOptions
+                new GeojsonSourceOptions
                 {
-                    MinimumZoom = 1,
-                    MaximumZoom = 2,
+                    MinZoom = 1,
+                    MaxZoom = 2,
                     TileSize = 256,
                     Buffer = 64,
                     Tolerance = 0.5,
                     LineMetrics = true,
                     Cluster = true,
                     ClusterRadius = 60,
-                    ClusterMaximumZoom = 15,
-                    ClusterMinimumPoints = 3,
+                    ClusterMaxZoom = 15,
+                    ClusterMinPoints = 3,
                     SynchronousTiling = true,
                     ClusterProperties = """{"sum":1}"""u8.ToArray(),
                 },
-            options => options.MinimumZoom = 10,
-            options => options.MaximumZoom = 20,
+            options => options.MinZoom = 10,
+            options => options.MaxZoom = 20,
             options => options.TileSize = 512,
             options => options.Buffer = 128,
             options => options.Tolerance = 0.375,
             options => options.LineMetrics = false,
             options => options.Cluster = false,
             options => options.ClusterRadius = 50,
-            options => options.ClusterMaximumZoom = 17,
-            options => options.ClusterMinimumPoints = 2,
+            options => options.ClusterMaxZoom = 17,
+            options => options.ClusterMinPoints = 2,
             options => options.SynchronousTiling = false,
             options => options.ClusterProperties = """{"sum":2}"""u8.ToArray()
         );
 
         // A present zero-valued field stays distinguishable from an absent one.
-        Assert.NotEqual(new GeoJsonSourceOptions { ClusterRadius = 0 }, new GeoJsonSourceOptions());
+        Assert.NotEqual(new GeojsonSourceOptions { ClusterRadius = 0 }, new GeojsonSourceOptions());
 
         // Distinct cluster-property trees holding equal contents compare equal.
         Assert.Equal(
-            new GeoJsonSourceOptions { ClusterProperties = """{"sum":1}"""u8.ToArray() },
-            new GeoJsonSourceOptions { ClusterProperties = """{"sum":1}"""u8.ToArray() }
+            new GeojsonSourceOptions { ClusterProperties = """{"sum":1}"""u8.ToArray() },
+            new GeojsonSourceOptions { ClusterProperties = """{"sum":1}"""u8.ToArray() }
         );
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void StyleImageOptionsComparesByPropertyValue()
     {
@@ -330,7 +285,7 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void StyleTransitionOptionsComparesByPropertyValue()
     {
@@ -338,19 +293,19 @@ public sealed class OptionsValueSemanticsTests
             () =>
                 new StyleTransitionOptions
                 {
-                    Duration = 300,
-                    Delay = 0,
+                    DurationMs = 300,
+                    DelayMs = 0,
                     EnablePlacementTransitions = false,
                 },
-            options => options.Duration = 500,
+            options => options.DurationMs = 500,
             // A present zero stays distinguishable from an absent property.
-            options => options.Delay = null,
+            options => options.DelayMs = null,
             // A present false stays distinguishable from an absent property.
             options => options.EnablePlacementTransitions = null
         );
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void QueryOptionsCompareLayerIdsElementByElement()
     {
@@ -378,35 +333,32 @@ public sealed class OptionsValueSemanticsTests
         // Distinct list instances holding the same elements compare equal.
         Assert.Equal(
             new RenderedFeatureQueryOptions { LayerIds = new[] { "a", "b" } },
-            new RenderedFeatureQueryOptions
-            {
-                LayerIds = new List<string> { "a", "b" },
-            }
+            new RenderedFeatureQueryOptions { LayerIds = new[] { "a", "b" } }
         );
     }
 
-    [BindingSpecTest("BND-069", "BND-070")]
+    [BindingSpecTest("", "")]
     [Fact]
     public void QueryOptionsSnapshotCallerOwnedLayerIds()
     {
-        var layerIds = new List<string> { "a" };
+        var layerIds = new[] { "a" };
         var options = new RenderedFeatureQueryOptions { LayerIds = layerIds };
         var copy = options with { };
 
-        layerIds.Add("b");
+        layerIds[0] = "b";
 
         Assert.Equal(["a"], options.LayerIds);
         Assert.Equal(["a"], copy.LayerIds);
 
-        var sourceLayerIds = new List<string> { "a" };
+        var sourceLayerIds = new[] { "a" };
         var sourceOptions = new SourceFeatureQueryOptions { SourceLayerIds = sourceLayerIds };
 
-        sourceLayerIds.Add("b");
+        sourceLayerIds[0] = "b";
 
         Assert.Equal(["a"], sourceOptions.SourceLayerIds);
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void AbsentLayerIdsDifferFromEmptyLayerIds()
     {
@@ -417,7 +369,7 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void WithProducesAnIndependentInstance()
     {

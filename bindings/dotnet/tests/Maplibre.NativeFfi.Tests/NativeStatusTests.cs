@@ -8,7 +8,7 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class NativeStatusTests
 {
-    [BindingSpecTest("BND-020")]
+    [BindingSpecTest("")]
     [Theory]
     [InlineData(
         (int)mln_status.MLN_STATUS_INVALID_ARGUMENT,
@@ -35,6 +35,22 @@ public sealed class NativeStatusTests
         MaplibreStatus.NativeError,
         typeof(NativeErrorException)
     )]
+    [InlineData((int)mln_status.MLN_STATUS_BUSY, MaplibreStatus.Busy, typeof(MaplibreException))]
+    [InlineData(
+        (int)mln_status.MLN_STATUS_TARGET_LOST,
+        MaplibreStatus.TargetLost,
+        typeof(MaplibreException)
+    )]
+    [InlineData(
+        (int)mln_status.MLN_STATUS_NOT_READY,
+        MaplibreStatus.NotReady,
+        typeof(MaplibreException)
+    )]
+    [InlineData(
+        (int)mln_status.MLN_STATUS_NOT_FOUND,
+        MaplibreStatus.NotFound,
+        typeof(MaplibreException)
+    )]
     public void NativeStatusesMapToPublicExceptionCategories(
         int rawStatus,
         MaplibreStatus expectedStatus,
@@ -53,7 +69,7 @@ public sealed class NativeStatusTests
         Assert.Equal("mapped diagnostic", maplibreError.Diagnostic);
     }
 
-    [BindingSpecTest("BND-020", "BND-022")]
+    [BindingSpecTest("", "")]
     [Fact]
     public void NativeInvalidStatusMapsToExceptionWithCopiedDiagnostic()
     {
@@ -68,7 +84,7 @@ public sealed class NativeStatusTests
         Assert.Contains("network status", error.Diagnostic, StringComparison.OrdinalIgnoreCase);
     }
 
-    [BindingSpecTest("BND-021")]
+    [BindingSpecTest("")]
     [Fact]
     public void UnknownNativeStatusPreservesRawStatus()
     {
@@ -81,7 +97,7 @@ public sealed class NativeStatusTests
         Assert.Equal("future status", error.Diagnostic);
     }
 
-    [BindingSpecTest("BND-022")]
+    [BindingSpecTest("")]
     [Fact]
     public void DiagnosticIsCopiedBeforeLaterFailureChangesThreadLocalMessage()
     {

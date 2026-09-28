@@ -1,6 +1,7 @@
-using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Internal.C;
+using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Struct;
+using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Query;
 using Xunit;
 
@@ -8,95 +9,98 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed unsafe class QueryStructTests
 {
-    [BindingSpecTest("BND-060")]
+    [BindingSpecTest("")]
     [Fact]
     public void RenderedQueryGeometryMaterializesPublicShapes()
     {
-        using var point = NativeRenderedQueryGeometry.From(
-            new RenderedQueryGeometry.Point(new ScreenPoint(1, 2))
+        using var scope = new NativeCallScope();
+        var point = GeneratedValues.NativeRenderedQueryGeometry(
+            new RenderedQueryGeometry.Point(new ScreenPoint(1, 2)),
+            scope
         );
         Assert.Equal(
             (uint)mln_rendered_query_geometry_type.MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT,
-            point.Value.type
+            point.type
         );
-        Assert.Equal(1, point.Value.data.point.x);
-        Assert.Equal(2, point.Value.data.point.y);
+        Assert.Equal(1, point.data.point.x);
+        Assert.Equal(2, point.data.point.y);
 
-        using var box = NativeRenderedQueryGeometry.From(
+        var box = GeneratedValues.NativeRenderedQueryGeometry(
             new RenderedQueryGeometry.Box(
                 new ScreenBox(new ScreenPoint(3, 4), new ScreenPoint(5, 6))
-            )
+            ),
+            scope
         );
         Assert.Equal(
             (uint)mln_rendered_query_geometry_type.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
-            box.Value.type
+            box.type
         );
-        Assert.Equal(3, box.Value.data.box.min.x);
-        Assert.Equal(6, box.Value.data.box.max.y);
+        Assert.Equal(3, box.data.box.min.x);
+        Assert.Equal(6, box.data.box.max.y);
 
-        using var line = NativeRenderedQueryGeometry.From(
-            new RenderedQueryGeometry.LineString([new ScreenPoint(7, 8), new ScreenPoint(9, 10)])
+        var line = GeneratedValues.NativeRenderedQueryGeometry(
+            new RenderedQueryGeometry.LineString(
+                new ScreenLineString([new ScreenPoint(7, 8), new ScreenPoint(9, 10)])
+            ),
+            scope
         );
         Assert.Equal(
             (uint)mln_rendered_query_geometry_type.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING,
-            line.Value.type
+            line.type
         );
-        Assert.Equal(2u, line.Value.data.line_string.point_count);
-        Assert.Equal(9, line.Value.data.line_string.points[1].x);
+        Assert.Equal(2u, line.data.line_string.point_count);
+        Assert.Equal(9, line.data.line_string.points[1].x);
     }
 
-    [BindingSpecTest("BND-060", "BND-061")]
+    [BindingSpecTest("", "")]
     [Fact]
     public void QueryOptionsMaterializeOptionalFieldsAndFilters()
     {
-        using var rendered = NativeRenderedFeatureQueryOptions.From(
+        using var scope = new NativeCallScope();
+        var rendered = GeneratedValues.NativeRenderedFeatureQueryOptions(
             new RenderedFeatureQueryOptions
             {
                 LayerIds = ["roads", "labels"],
                 Filter = "true"u8.ToArray(),
-            }
+            },
+            scope
         );
         Assert.Equal(
             (uint)
                 mln_rendered_feature_query_option_field.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS,
-            rendered.Value.fields
+            rendered.fields
         );
-        Assert.Equal(2u, rendered.Value.layer_id_count);
+        Assert.Equal(2u, rendered.layer_id_count);
         Assert.Equal(
             "roads",
-            RuntimeStructs.CopyUtf8(
-                rendered.Value.layer_ids[0].data,
-                rendered.Value.layer_ids[0].size
-            )
+            RuntimeStructs.CopyUtf8(rendered.layer_ids[0].data, rendered.layer_ids[0].size)
         );
-        Assert.Equal(
-            "true",
-            RuntimeStructs.CopyUtf8(rendered.Value.filter->data, rendered.Value.filter->size)
-        );
+        Assert.Equal("true", RuntimeStructs.CopyUtf8(rendered.filter->data, rendered.filter->size));
 
-        using var source = NativeSourceFeatureQueryOptions.From(
+        var source = GeneratedValues.NativeSourceFeatureQueryOptions(
             new SourceFeatureQueryOptions
             {
                 SourceLayerIds = ["landuse"],
                 Filter = "\"visible\""u8.ToArray(),
-            }
+            },
+            scope
         );
         Assert.Equal(
             (uint)
                 mln_source_feature_query_option_field.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS,
-            source.Value.fields
+            source.fields
         );
-        Assert.Equal(1u, source.Value.source_layer_id_count);
+        Assert.Equal(1u, source.source_layer_id_count);
         Assert.Equal(
             "landuse",
             RuntimeStructs.CopyUtf8(
-                source.Value.source_layer_ids[0].data,
-                source.Value.source_layer_ids[0].size
+                source.source_layer_ids[0].data,
+                source.source_layer_ids[0].size
             )
         );
         Assert.Equal(
             "\"visible\"",
-            RuntimeStructs.CopyUtf8(source.Value.filter->data, source.Value.filter->size)
+            RuntimeStructs.CopyUtf8(source.filter->data, source.filter->size)
         );
     }
 }

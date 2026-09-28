@@ -1,8 +1,8 @@
-using Maplibre.NativeFfi.Geo;
-using Maplibre.NativeFfi.Offline;
+using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Query;
 using Maplibre.NativeFfi.Render;
 using Maplibre.NativeFfi.Runtime;
+using Maplibre.NativeFfi.Style;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
@@ -14,30 +14,50 @@ public sealed class BufferValueEqualityTests
 {
     private static readonly TextureImageInfo Info = new(2, 1, 8, 8);
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void ImagesComparePixelContents()
     {
-        var left = new PremultipliedRgba8Image([1, 2, 3, 4, 5, 6, 7, 8], Info);
-        var right = new PremultipliedRgba8Image([1, 2, 3, 4, 5, 6, 7, 8], Info);
+        var left = new PremultipliedRgba8Image(
+            Info.Width,
+            Info.Height,
+            Info.Stride,
+            [1, 2, 3, 4, 5, 6, 7, 8]
+        );
+        var right = new PremultipliedRgba8Image(
+            Info.Width,
+            Info.Height,
+            Info.Stride,
+            [1, 2, 3, 4, 5, 6, 7, 8]
+        );
 
         Assert.Equal(left, right);
         Assert.Equal(left.GetHashCode(), right.GetHashCode());
-        Assert.NotEqual(left, new PremultipliedRgba8Image([1, 2, 3, 4, 5, 6, 7, 9], Info));
-        Assert.NotEqual(left, new PremultipliedRgba8Image([1, 2, 3, 4], new(1, 1, 4, 4)));
+        Assert.NotEqual(
+            left,
+            new PremultipliedRgba8Image(
+                Info.Width,
+                Info.Height,
+                Info.Stride,
+                [1, 2, 3, 4, 5, 6, 7, 9]
+            )
+        );
+        Assert.NotEqual(left, new PremultipliedRgba8Image(1, 1, 4, [1, 2, 3, 4]));
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void OfflineRegionInfoComparesMetadataContents()
     {
         var definition = new OfflineRegionDefinition.TilePyramid(
-            "https://example.invalid/style.json",
-            new LatLngBounds(new LatLng(0, 0), new LatLng(1, 1)),
-            0,
-            10,
-            1,
-            false
+            new OfflineTilePyramidRegionDefinition(
+                "https://example.invalid/style.json",
+                new LatLngBounds(new LatLng(0, 0), new LatLng(1, 1)),
+                0,
+                10,
+                1,
+                false
+            )
         );
 
         var left = new OfflineRegionInfo(7, definition, [1, 2, 3]);
@@ -49,58 +69,74 @@ public sealed class BufferValueEqualityTests
         Assert.NotEqual(left, new OfflineRegionInfo(8, definition, [1, 2, 3]));
     }
 
-    [BindingSpecTest("BND-069", "BND-070")]
+    [BindingSpecTest("", "")]
     [Fact]
     public void OfflineGeometryRegionOwnsAndComparesGeometryContents()
     {
         var geometry = new byte[] { 1, 2, 3 };
-        var left = new OfflineRegionDefinition.GeometryRegion(
-            "https://example.invalid/style.json",
-            geometry,
-            0,
-            10,
-            1,
-            false
+        var left = new OfflineRegionDefinition.Geometry(
+            new OfflineGeometryRegionDefinition(
+                "https://example.invalid/style.json",
+                geometry,
+                0,
+                10,
+                1,
+                false
+            )
         );
-        var right = new OfflineRegionDefinition.GeometryRegion(
-            "https://example.invalid/style.json",
-            [1, 2, 3],
-            0,
-            10,
-            1,
-            false
+        var right = new OfflineRegionDefinition.Geometry(
+            new OfflineGeometryRegionDefinition(
+                "https://example.invalid/style.json",
+                [1, 2, 3],
+                0,
+                10,
+                1,
+                false
+            )
         );
 
         geometry[0] = 9;
-        var returned = left.Geometry;
+        var returned = left.Value.Geometry;
         returned[1] = 9;
 
         Assert.Equal(left, right);
         Assert.Equal(left.GetHashCode(), right.GetHashCode());
-        Assert.Equal(new byte[] { 1, 2, 3 }, left.Geometry);
+        Assert.Equal(new byte[] { 1, 2, 3 }, left.Value.Geometry);
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void UnknownEventPayloadComparesPayloadContents()
     {
-        var left = new RuntimeEventPayload.Unknown(3, [9, 8, 7]);
-        var right = new RuntimeEventPayload.Unknown(3, [9, 8, 7]);
+        var left = new RuntimeEvent.PayloadValue.Unknown(3, [9, 8, 7]);
+        var right = new RuntimeEvent.PayloadValue.Unknown(3, [9, 8, 7]);
 
         Assert.Equal(left, right);
         Assert.Equal(left.GetHashCode(), right.GetHashCode());
-        Assert.NotEqual(left, new RuntimeEventPayload.Unknown(3, [9, 8, 6]));
-        Assert.NotEqual(left, new RuntimeEventPayload.Unknown(4, [9, 8, 7]));
+        Assert.NotEqual(left, new RuntimeEvent.PayloadValue.Unknown(3, [9, 8, 6]));
+        Assert.NotEqual(left, new RuntimeEvent.PayloadValue.Unknown(4, [9, 8, 7]));
     }
 
-    [BindingSpecTest("BND-069", "BND-071")]
+    [BindingSpecTest("", "")]
     [Fact]
     public void QueriedFeatureOwnsAndComparesFeatureAndStateContents()
     {
         var feature = new byte[] { 1, 2, 3 };
         var state = new byte[] { 4, 5 };
-        var left = new QueriedFeature(feature, "source", "layer", state);
-        var right = new QueriedFeature([1, 2, 3], "source", "layer", [4, 5]);
+        var left = new QueriedFeature
+        {
+            Feature = feature,
+            SourceId = "source",
+            SourceLayerId = "layer",
+            State = state,
+        };
+        var right = new QueriedFeature
+        {
+            Feature = [1, 2, 3],
+            SourceId = "source",
+            SourceLayerId = "layer",
+            State = [4, 5],
+        };
 
         feature[0] = 9;
         state[0] = 9;
@@ -113,22 +149,66 @@ public sealed class BufferValueEqualityTests
         Assert.Equal(left.GetHashCode(), right.GetHashCode());
         Assert.Equal(new byte[] { 1, 2, 3 }, left.Feature);
         Assert.Equal(new byte[] { 4, 5 }, left.State);
-        Assert.NotEqual(left, new QueriedFeature([1, 2, 4], "source", "layer", [4, 5]));
-        Assert.NotEqual(left, new QueriedFeature([1, 2, 3], "source", "layer", [4, 6]));
-        Assert.NotEqual(left, new QueriedFeature([1, 2, 3], "source", "layer", null));
-        Assert.NotEqual(left, new QueriedFeature([1, 2, 3], null, "layer", [4, 5]));
+        Assert.NotEqual(
+            left,
+            new QueriedFeature
+            {
+                Feature = [1, 2, 4],
+                SourceId = "source",
+                SourceLayerId = "layer",
+                State = [4, 5],
+            }
+        );
+        Assert.NotEqual(
+            left,
+            new QueriedFeature
+            {
+                Feature = [1, 2, 3],
+                SourceId = "source",
+                SourceLayerId = "layer",
+                State = [4, 6],
+            }
+        );
+        Assert.NotEqual(
+            left,
+            new QueriedFeature
+            {
+                Feature = [1, 2, 3],
+                SourceId = "source",
+                SourceLayerId = "layer",
+                State = null,
+            }
+        );
+        Assert.NotEqual(
+            left,
+            new QueriedFeature
+            {
+                Feature = [1, 2, 3],
+                SourceId = null,
+                SourceLayerId = "layer",
+                State = [4, 5],
+            }
+        );
     }
 
-    [BindingSpecTest("BND-070")]
+    [BindingSpecTest("")]
     [Fact]
     public void MutatingTheCallerBufferDoesNotChangeEquality()
     {
-        // BND-069: the copied buffer is what participates in equality.
+        // the copied buffer is what participates in equality.
         var pixels = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
-        var image = new PremultipliedRgba8Image(pixels, Info);
+        var image = new PremultipliedRgba8Image(Info.Width, Info.Height, Info.Stride, pixels);
 
         pixels[0] = 99;
 
-        Assert.Equal(new PremultipliedRgba8Image([1, 2, 3, 4, 5, 6, 7, 8], Info), image);
+        Assert.Equal(
+            new PremultipliedRgba8Image(
+                Info.Width,
+                Info.Height,
+                Info.Stride,
+                [1, 2, 3, 4, 5, 6, 7, 8]
+            ),
+            image
+        );
     }
 }

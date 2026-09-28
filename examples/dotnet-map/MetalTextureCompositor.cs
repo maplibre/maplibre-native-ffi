@@ -33,7 +33,7 @@ internal sealed class MetalTextureCompositor : ITextureCompositor
         _ = viewport;
     }
 
-    public bool Draw(MetalOwnedTextureFrame frame)
+    public bool Draw(MetalOwnedTextureFrameView frame)
     {
         if (frame.Width == 0 || frame.Height == 0 || frame.Texture.IsNull)
         {

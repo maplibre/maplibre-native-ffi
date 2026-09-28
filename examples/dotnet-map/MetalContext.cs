@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Maplibre.NativeFfi;
+using Maplibre.NativeFfi.Base;
 using Maplibre.NativeFfi.Render;
 using Silk.NET.GLFW;
 
@@ -26,7 +27,7 @@ internal sealed unsafe class MetalContext : IGraphicsContext
         this.layer = layer;
     }
 
-    public RenderBackend Backend => RenderBackend.Metal;
+    public RenderBackendFlag Backend => RenderBackendFlag.Metal;
 
     public nint WindowHandle => window.NativeHandle;
 

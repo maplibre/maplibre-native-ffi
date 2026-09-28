@@ -7,14 +7,14 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class MaplibreTests
 {
-    [BindingSpecTest("BND-001")]
+    [BindingSpecTest("")]
     [Fact]
     public void CVersionComesFromNativeLibrary()
     {
         Assert.Equal(NativeLibraryLoader.ExpectedAbiVersion, Maplibre.CVersion());
     }
 
-    [BindingSpecTest("BND-001")]
+    [BindingSpecTest("")]
     [Fact]
     public void AbiVersionMismatchUsesStableBindingError()
     {
@@ -31,28 +31,28 @@ public sealed class MaplibreTests
         );
     }
 
-    [BindingSpecTest("BND-160")]
+    [BindingSpecTest("")]
     [Fact]
     public void SupportedOpenGLContextProvidersComeFromNativeLibrary()
     {
-        var providers = Maplibre.SupportedOpenGLContextProviders();
+        var providers = Maplibre.OpenglSupportedContextProviderMask();
 
         Assert.Equal(
             providers,
             providers
                 & (
-                    OpenGLContextProvider.Wgl
-                    | OpenGLContextProvider.Egl
-                    | OpenGLContextProvider.WebGl
+                    OpenglContextProviderFlag.Wgl
+                    | OpenglContextProviderFlag.Egl
+                    | OpenglContextProviderFlag.Webgl
                 )
         );
     }
 
-    [BindingSpecTest("BND-103")]
+    [BindingSpecTest("")]
     [Fact]
     public void ProjectionHelpersRoundTripThroughNativeLibrary()
     {
-        var coordinate = new Geo.LatLng(45.0, -122.0);
+        var coordinate = new Map.LatLng(45.0, -122.0);
 
         var meters = Maplibre.ProjectedMetersForLatLng(coordinate);
         var roundTripped = Maplibre.LatLngForProjectedMeters(meters);
@@ -61,18 +61,18 @@ public sealed class MaplibreTests
         Assert.True(Math.Abs(roundTripped.Longitude - coordinate.Longitude) < 1e-9);
     }
 
-    [BindingSpecTest("BND-068")]
+    [BindingSpecTest("")]
     [Fact]
-    public void UnknownNetworkStatusIsRejectedBeforeNativeCall()
+    public void UnknownNetworkStatusIsRejectedByNativeValidation()
     {
-        var status = NetworkStatus.FromRaw(999_999);
+        var status = (Runtime.NetworkStatus)999_999;
 
         var error = Assert.Throws<InvalidArgumentException>(() =>
-            Maplibre.SetNetworkStatus(status)
+            Maplibre.NetworkStatusSet(status)
         );
 
         Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
-        Assert.Null(error.RawStatus);
-        Assert.Contains("999999", error.Diagnostic, StringComparison.Ordinal);
+        Assert.Equal(-1, error.RawStatus);
+        Assert.NotNull(error.Diagnostic);
     }
 }

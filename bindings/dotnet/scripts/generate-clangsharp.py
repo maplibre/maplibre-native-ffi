@@ -17,22 +17,8 @@ MANIFEST = BINDING_DIR / ".config" / "dotnet-tools.json"
 HEADER_DIR = ROOT / "include" / "maplibre_native_c"
 OUTPUT_DIR = BINDING_DIR / "src" / "Maplibre.NativeFfi" / "Generated"
 
-HEADERS = (
-    "android",
-    "base",
-    "diagnostics",
-    "logging",
-    "runtime",
-    "map",
-    "camera",
-    "projection",
-    "query",
-    "render_target",
-    "render_session",
-    "style",
-    "surface",
-    "texture",
-    "plugin",
+HEADERS = tuple(
+    path.stem for path in sorted(HEADER_DIR.glob("*.h")) if path.stem != "binding"
 )
 
 # The generator loads libclang from the ClangSharp package built for the host,
@@ -112,6 +98,11 @@ def generate(
     header: str, output: pathlib.Path, include: pathlib.Path, env: dict[str, str]
 ) -> None:
     source = HEADER_DIR / f"{header}.h"
+    handles = json.loads(
+        (
+            BINDING_DIR / "src/Maplibre.NativeFfi/Internal/C/handle-remaps.json"
+        ).read_text()
+    )
     subprocess.run(
         (
             "dotnet",
@@ -120,6 +111,8 @@ def generate(
             "ClangSharpPInvokeGenerator",
             "--",
             "@scripts/generate-clangsharp.rsp",
+            "--remap",
+            *(f"{native}={managed}" for native, managed in handles.items()),
             "-f",
             str(source),
             "-t",

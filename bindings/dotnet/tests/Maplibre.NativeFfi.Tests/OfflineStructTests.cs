@@ -1,78 +1,85 @@
 using System.Runtime.InteropServices;
-using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Offline;
+using Maplibre.NativeFfi.Map;
+using Maplibre.NativeFfi.Runtime;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
 
 public sealed unsafe class OfflineStructTests
 {
-    [BindingSpecTest("BND-060", "BND-061")]
+    [BindingSpecTest("", "")]
     [Fact]
     public void OfflineRegionDefinitionsMaterializeNativeShape()
     {
-        using var tile = NativeOfflineRegionDefinition.From(
+        using var scope = new NativeCallScope();
+        var tile = GeneratedValues.NativeOfflineRegionDefinition(
             new OfflineRegionDefinition.TilePyramid(
-                "maplibre://style",
-                new LatLngBounds(new LatLng(1, 2), new LatLng(3, 4)),
-                5,
-                6,
-                2,
-                true
-            )
+                new OfflineTilePyramidRegionDefinition(
+                    "maplibre://style",
+                    new LatLngBounds(new LatLng(1, 2), new LatLng(3, 4)),
+                    5,
+                    6,
+                    2,
+                    true
+                )
+            ),
+            scope
         );
 
         Assert.Equal(
             (uint)mln_offline_region_definition_type.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
-            tile.Value.type
+            tile.type
         );
         Assert.Equal(
             "maplibre://style",
-            Marshal.PtrToStringUTF8((nint)tile.Value.data.tile_pyramid.style_url)
+            Marshal.PtrToStringUTF8((nint)tile.data.tile_pyramid.style_url)
         );
-        Assert.Equal(1, tile.Value.data.tile_pyramid.bounds.southwest.latitude);
-        Assert.Equal(6, tile.Value.data.tile_pyramid.max_zoom);
-        Assert.Equal(1, tile.Value.data.tile_pyramid.include_ideographs);
+        Assert.Equal(1, tile.data.tile_pyramid.bounds.southwest.latitude);
+        Assert.Equal(6, tile.data.tile_pyramid.max_zoom);
+        Assert.Equal(1, tile.data.tile_pyramid.include_ideographs);
 
-        using var geometry = NativeOfflineRegionDefinition.From(
-            new OfflineRegionDefinition.GeometryRegion(
-                "maplibre://geometry",
-                """{"type":"Point","coordinates":[8,7]}"""u8.ToArray(),
-                9,
-                10,
-                3,
-                false
-            )
+        var geometry = GeneratedValues.NativeOfflineRegionDefinition(
+            new OfflineRegionDefinition.Geometry(
+                new OfflineGeometryRegionDefinition(
+                    "maplibre://geometry",
+                    """{"type":"Point","coordinates":[8,7]}"""u8.ToArray(),
+                    9,
+                    10,
+                    3,
+                    false
+                )
+            ),
+            scope
         );
 
         Assert.Equal(
             (uint)mln_offline_region_definition_type.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY,
-            geometry.Value.type
+            geometry.type
         );
         Assert.Equal(
             "maplibre://geometry",
-            Marshal.PtrToStringUTF8((nint)geometry.Value.data.geometry.style_url)
+            Marshal.PtrToStringUTF8((nint)geometry.data.geometry.style_url)
         );
         Assert.Equal(
             """{"type":"Point","coordinates":[8,7]}""",
             RuntimeStructs.CopyUtf8(
-                geometry.Value.data.geometry.geometry.data,
-                geometry.Value.data.geometry.geometry.size
+                geometry.data.geometry.geometry.data,
+                geometry.data.geometry.geometry.size
             )
         );
-        Assert.Equal(0, geometry.Value.data.geometry.include_ideographs);
+        Assert.Equal(0, geometry.data.geometry.include_ideographs);
     }
 
-    [BindingSpecTest("BND-063")]
+    [BindingSpecTest("")]
     [Fact]
     public void OfflineRegionInfoCopiesDefinitionAndMetadata()
     {
         using var styleUrl = NativeUtf8String.FromNullableString("maplibre://snapshot", "styleUrl");
         var metadata = stackalloc byte[] { 1, 2, 3 };
-        var info = OfflineStructs.ReadInfo(
+        var info = GeneratedValues.CopyOfflineRegionInfo(
             new mln_offline_region_info
             {
                 size = (uint)sizeof(mln_offline_region_info),
@@ -88,7 +95,7 @@ public sealed unsafe class OfflineStructTests
                         {
                             size = (uint)sizeof(mln_offline_tile_pyramid_region_definition),
                             style_url = styleUrl.Pointer,
-                            bounds = MapStructs.ToNative(
+                            bounds = GeneratedValues.NativeLatLngBounds(
                                 new LatLngBounds(new LatLng(1, 2), new LatLng(3, 4))
                             ),
                             min_zoom = 5,
@@ -106,11 +113,11 @@ public sealed unsafe class OfflineStructTests
         Assert.Equal(42, info.Id);
         Assert.Equal([1, 2, 3], info.Metadata);
         var definition = Assert.IsType<OfflineRegionDefinition.TilePyramid>(info.Definition);
-        Assert.Equal("maplibre://snapshot", definition.StyleUrl);
-        Assert.Equal(new LatLng(3, 4), definition.Bounds.Northeast);
+        Assert.Equal("maplibre://snapshot", definition.Value.StyleUrl);
+        Assert.Equal(new LatLng(3, 4), definition.Value.Bounds.Northeast);
     }
 
-    [BindingSpecTest("BND-069")]
+    [BindingSpecTest("")]
     [Fact]
     public void OfflineRegionInfoSnapshotsMetadataAndReturnsCopies()
     {
@@ -118,12 +125,14 @@ public sealed unsafe class OfflineStructTests
         var info = new OfflineRegionInfo(
             42,
             new OfflineRegionDefinition.TilePyramid(
-                "maplibre://snapshot",
-                new LatLngBounds(new LatLng(1, 2), new LatLng(3, 4)),
-                5,
-                6,
-                2,
-                true
+                new OfflineTilePyramidRegionDefinition(
+                    "maplibre://snapshot",
+                    new LatLngBounds(new LatLng(1, 2), new LatLng(3, 4)),
+                    5,
+                    6,
+                    2,
+                    true
+                )
             ),
             source
         );
@@ -136,65 +145,24 @@ public sealed unsafe class OfflineStructTests
     }
 
     [Fact]
-    public void UnknownOfflineRegionDefinitionTypeThrows()
+    public void UnknownOfflineRegionDefinitionRetainsItsTag()
     {
-        var error = Assert.Throws<InvalidOperationException>(() =>
-            OfflineStructs.ReadDefinition(
-                new mln_offline_region_definition
-                {
-                    size = (uint)sizeof(mln_offline_region_definition),
-                    type = 999,
-                }
-            )
+        var copied = GeneratedValues.CopyOfflineRegionDefinition(
+            new mln_offline_region_definition
+            {
+                size = (uint)sizeof(mln_offline_region_definition),
+                type = 999,
+            }
         );
-
-        Assert.Contains(
-            "mln_offline_region_definition_type",
-            error.Message,
-            StringComparison.Ordinal
-        );
-        Assert.Contains("999", error.Message, StringComparison.Ordinal);
+        var unknown = Assert.IsType<OfflineRegionDefinition.Unknown>(copied);
+        Assert.Equal(999u, unknown.Tag);
     }
 
-    [BindingSpecTest("BND-066")]
-    [Fact]
-    public void OfflineRegionListIsDestroyedWhenCopyingItemFails()
-    {
-        var destroyCalls = 0;
-        using var methods = OfflineStructs.UseOfflineListMethodsForTest(
-            (_, count) =>
-            {
-                *count = 1;
-                return mln_status.MLN_STATUS_OK;
-            },
-            (_, _, info) =>
-            {
-                *info = new mln_offline_region_info
-                {
-                    size = (uint)sizeof(mln_offline_region_info),
-                    definition = new mln_offline_region_definition
-                    {
-                        size = (uint)sizeof(mln_offline_region_definition),
-                        type = 999,
-                    },
-                };
-                return mln_status.MLN_STATUS_OK;
-            },
-            _ => destroyCalls++
-        );
-
-        Assert.Throws<InvalidOperationException>(() =>
-            OfflineStructs.ReadList(SyntheticHandles.OfflineRegionList(1234))
-        );
-
-        Assert.Equal(1, destroyCalls);
-    }
-
-    [BindingSpecTest("BND-060")]
+    [BindingSpecTest("")]
     [Fact]
     public void OfflineRegionStatusCopiesNativeFields()
     {
-        var status = OfflineStructs.ReadStatus(
+        var status = GeneratedValues.CopyOfflineRegionStatus(
             new mln_offline_region_status
             {
                 download_state = (uint)

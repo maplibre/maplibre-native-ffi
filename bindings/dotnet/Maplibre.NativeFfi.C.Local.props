@@ -5,13 +5,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Copies every shared library from the install beside the app, matching
-         how NuGet runtime assets enter the native-library lookup. Not just the
-         C API one: the OpenGL presets install ANGLE beside it. -->
+    <!-- Copies every shared library from the selected install beside the app,
+         matching how NuGet runtime assets enter the native-library lookup.
+         Copy unconditionally because different presets reuse the same output
+         path and their dylibs can have unrelated timestamps. Not just the C
+         API one: the OpenGL presets install ANGLE beside it. -->
     <Content Include="$(MaplibreNativeCRuntimeDir)/*.so;$(MaplibreNativeCRuntimeDir)/*.so.*;$(MaplibreNativeCRuntimeDir)/*.dylib;$(MaplibreNativeCRuntimeDir)/*.dll">
       <Link>%(Filename)%(Extension)</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
 </Project>

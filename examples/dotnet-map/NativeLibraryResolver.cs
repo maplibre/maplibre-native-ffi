@@ -101,6 +101,15 @@ internal static class NativeLibraryResolver
 
     private static IEnumerable<string> CandidateLibraryDirectories()
     {
+        foreach (
+            var directory in SplitLibraryDirectories(
+                Environment.GetEnvironmentVariable("MAPLIBRE_NATIVE_FFI_LIBRARY_DIRS")
+            )
+        )
+        {
+            yield return directory;
+        }
+
         // The MapLibre install's runtime, including the ANGLE libEGL the OpenGL presets ship.
         yield return AppContext.BaseDirectory;
 
@@ -111,5 +120,23 @@ internal static class NativeLibraryResolver
             RuntimeInformation.RuntimeIdentifier,
             "native"
         );
+    }
+
+    private static IEnumerable<string> SplitLibraryDirectories(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            yield break;
+        }
+
+        foreach (
+            var directory in value.Split(
+                Path.PathSeparator,
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+            )
+        )
+        {
+            yield return directory;
+        }
     }
 }

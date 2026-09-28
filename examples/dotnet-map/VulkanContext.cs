@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Maplibre.NativeFfi;
+using Maplibre.NativeFfi.Base;
 using Maplibre.NativeFfi.Render;
 using Silk.NET.Core.Native;
 using Silk.NET.GLFW;
@@ -37,7 +38,7 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
         this.vk = vk;
     }
 
-    public RenderBackend Backend => RenderBackend.Vulkan;
+    public RenderBackendFlag Backend => RenderBackendFlag.Vulkan;
 
     public nint WindowHandle => window.NativeHandle;
 
@@ -153,7 +154,7 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
             Instance = NativePointer.FromBorrowedAddress(instance.Handle),
             PhysicalDevice = NativePointer.FromBorrowedAddress(physicalDevice.Handle),
             Device = NativePointer.FromBorrowedAddress(device.Handle),
-            Queue = NativePointer.FromBorrowedAddress(graphicsQueue.Handle),
+            GraphicsQueue = NativePointer.FromBorrowedAddress(graphicsQueue.Handle),
             GraphicsQueueFamilyIndex = graphicsQueueFamilyIndex,
             GetInstanceProcAddr = NativePointer.FromBorrowedAddress(
                 (nint)vk.GetInstanceProcAddr(instance, "vkGetInstanceProcAddr")
@@ -163,7 +164,7 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
             ),
         };
 
-    public VulkanHandle SurfaceHandle() => new(surface.Handle);
+    public ulong SurfaceHandle() => surface.Handle;
 
     public Viewport ReadViewport() => window.ReadViewport();
 

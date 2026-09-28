@@ -1,5 +1,6 @@
 using Maplibre.NativeFfi;
-using Maplibre.NativeFfi.Log;
+using Maplibre.NativeFfi.Base;
+using Maplibre.NativeFfi.Logging;
 using Maplibre.NativeFfi.Render;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
@@ -22,7 +23,7 @@ internal static class Program
         try
         {
             Maplibre.LoadNativeLibrary();
-            var backends = Maplibre.SupportedRenderBackends();
+            var backends = Maplibre.SupportedRenderBackendMask();
             Console.WriteLine($"native render backends: {backends}");
             if (!SupportsUsableBackend(backends))
             {
@@ -32,16 +33,16 @@ internal static class Program
                 return 1;
             }
 
-            Maplibre.SetAsyncLogSeverities(LogSeverityMask.All);
-            Maplibre.SetLogCallback(PrintNativeLog);
+            Maplibre.LogSetAsyncSeverityMask(LogSeverityMask.All);
+            Maplibre.LogSetCallback(PrintNativeLog);
             try
             {
                 Shell.Run(parseResult.Mode.Value, backends);
             }
             finally
             {
-                Maplibre.ClearLogCallback();
-                Maplibre.RestoreDefaultAsyncLogSeverities();
+                Maplibre.LogClearCallback();
+                Maplibre.LogSetAsyncSeverityMask(LogSeverityMask.Default);
             }
 
             return 0;
@@ -87,19 +88,22 @@ internal static class Program
         writer.WriteLine("  native-surface    native surface render target");
     }
 
-    private static bool SupportsUsableBackend(RenderBackend backends)
+    private static bool SupportsUsableBackend(RenderBackendFlag backends)
     {
-        return backends.HasFlag(RenderBackend.Metal)
-            || backends.HasFlag(RenderBackend.OpenGL)
-            || backends.HasFlag(RenderBackend.Vulkan);
+        return backends.HasFlag(RenderBackendFlag.Metal)
+            || backends.HasFlag(RenderBackendFlag.Opengl)
+            || backends.HasFlag(RenderBackendFlag.Vulkan);
     }
 
-    private static bool PrintNativeLog(LogRecord record)
+    private static uint PrintNativeLog(
+        LogSeverity severity,
+        LogEvent logEvent,
+        long code,
+        string message
+    )
     {
-        Console.Error.WriteLine(
-            $"MapLibre {record.Severity} {record.Event} {record.Code}: {record.Message}"
-        );
-        return true;
+        Console.Error.WriteLine($"MapLibre {severity} {logEvent} {code}: {message}");
+        return 1;
     }
 
     private sealed record ParseResult(RenderTargetMode? Mode, bool ShowedHelp);

@@ -13,6 +13,10 @@
   <ItemGroup>
     <ProjectReference Include="../Maplibre.NativeFfi/Maplibre.NativeFfi.csproj" />
     <None Include="_._" Pack="true" PackagePath="lib/$(TargetFramework)/" />
-    <None Include="$(NativeAssetsDir)/**" Pack="true" PackagePath="runtimes/%(RecursiveDir)%(Filename)%(Extension)" />
+    <None
+      Include="$(NativeAssetsDir)/**"
+      Pack="true"
+      PackagePath="runtimes/%(RecursiveDir)%(Filename)%(Extension)"
+    />
   </ItemGroup>
 </Project>

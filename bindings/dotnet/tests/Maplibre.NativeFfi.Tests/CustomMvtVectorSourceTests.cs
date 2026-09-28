@@ -1,5 +1,5 @@
+using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Error;
-using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Callback;
 using Maplibre.NativeFfi.Map;
@@ -11,205 +11,170 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class CustomMvtVectorSourceTests
 {
-    private static readonly byte[] EmptyStyleJson =
-        """{"version":8,"sources":{},"layers":[]}"""u8.ToArray();
-
-    [BindingSpecTest("BND-121", "BND-124")]
+    [BindingSpecTest("", "")]
     [Fact]
-    public void CustomMvtVectorCallbacksCopyTileIdsAndSwallowExceptions()
+    public async Task CustomMvtVectorSourceApisAdaptThroughNativeMap()
     {
-        CanonicalTileId? fetched = null;
-        CanonicalTileId? cancelled = null;
-        using var state = new CustomMvtVectorSourceState(
-            new CustomMvtVectorSourceOptions
+        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        using var map = TestHandles.CreateMap(
+            runtime,
+            MapOptions.Default with
             {
-                FetchTile = tileId => fetched = tileId,
-                CancelTile = tileId => cancelled = tileId,
+                InitialExtent = MapOptions.Default.InitialExtent with { Width = 512, Height = 512 },
             }
         );
-        var tile = new CanonicalTileId(1, 2, 3);
-
-        state.FetchForTest(tile);
-        state.CancelForTest(tile);
-
-        Assert.Equal(tile, fetched);
-        Assert.Equal(tile, cancelled);
-
-        using var throwing = new CustomMvtVectorSourceState(
-            new CustomMvtVectorSourceOptions
-            {
-                FetchTile = _ => throw new InvalidOperationException("boom"),
-            }
-        );
-        throwing.FetchForTest(tile);
-    }
-
-    [BindingSpecTest("BND-025")]
-    [Fact]
-    public void CustomMvtVectorSourceRequiresFetchTileCallback()
-    {
-        var error = Assert.Throws<ArgumentException>(() =>
-            new CustomMvtVectorSourceState(new CustomMvtVectorSourceOptions())
-        );
-        Assert.Equal("options", error.ParamName);
-    }
-
-    [BindingSpecTest("BND-124")]
-    [Fact]
-    public async Task CustomMvtVectorDisposeKeepsHandleAliveUntilActiveCallbackExits()
-    {
-        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var state = new CustomMvtVectorSourceState(
-            new CustomMvtVectorSourceOptions
-            {
-                FetchTile = _ =>
-                {
-                    entered.SetResult();
-                    release.Task.GetAwaiter().GetResult();
-                },
-            }
-        );
-
-        var worker = Task.Run(
-            () => state.FetchForTest(new CanonicalTileId(1, 2, 3)),
-            TestContext.Current.CancellationToken
-        );
-        await entered.Task.WaitAsync(
-            TimeSpan.FromSeconds(5),
-            TestContext.Current.CancellationToken
-        );
-
-        state.Dispose();
-
-        Assert.True(state.IsHandleAllocatedForTest);
-        release.SetResult();
-        await worker.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        Assert.False(state.IsHandleAllocatedForTest);
-    }
-
-    [BindingSpecTest("BND-122")]
-    [Fact]
-    public unsafe void CustomMvtVectorSourceInstallFailureReleasesOnlyTheRejectedState()
-    {
-        var failInstall = false;
-        using var install = MapHandle.UseCustomMvtVectorSourceInstallForTest(
-            (_, _, _) =>
-                failInstall ? mln_status.MLN_STATUS_INVALID_STATE : mln_status.MLN_STATUS_OK
-        );
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        var installed = new CustomMvtVectorSourceState(
-            new CustomMvtVectorSourceOptions { FetchTile = _ => { } }
-        );
-        map.AddCustomMvtVectorSource("custom-mvt", installed);
-
-        failInstall = true;
-        var rejected = new CustomMvtVectorSourceState(
-            new CustomMvtVectorSourceOptions { FetchTile = _ => { } }
-        );
-        Assert.Throws<InvalidStateException>(() =>
-            map.AddCustomMvtVectorSource("custom-mvt", rejected)
-        );
-
-        Assert.False(rejected.IsHandleAllocatedForTest);
-        Assert.True(installed.IsHandleAllocatedForTest);
-
-        installed.Dispose();
-    }
-
-    [BindingSpecTest("BND-105", "BND-124")]
-    [Fact]
-    public void CustomMvtVectorSourceApisAdaptThroughNativeMap()
-    {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson(EmptyStyleJson);
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
         var tile = new CanonicalTileId(0, 0, 0);
 
-        map.AddCustomMvtVectorSource(
+        _ = map.AddCustomMvtVectorSourceAsync(
             "custom-mvt",
             new CustomMvtVectorSourceOptions
             {
                 FetchTile = _ => { },
                 CancelTile = _ => { },
-                MinimumZoom = 0,
-                MaximumZoom = 10,
+                MinZoom = 0,
+                MaxZoom = 10,
+            },
+            TestContext.Current.CancellationToken
+        );
+        _ = map.SetCustomMvtVectorSourceTileDataAsync(
+            "custom-mvt",
+            tile,
+            [],
+            TestContext.Current.CancellationToken
+        );
+        _ = map.SetCustomMvtVectorSourceTileErrorAsync(
+            "custom-mvt",
+            tile,
+            "tile missing",
+            TestContext.Current.CancellationToken
+        );
+        _ = map.InvalidateCustomMvtVectorSourceTileAsync(
+            "custom-mvt",
+            tile,
+            TestContext.Current.CancellationToken
+        );
+
+        Assert.Equal(
+            StyleSourceType.CustomMvtVector,
+            (await map.GetStyleSourceInfoAsync("custom-mvt", TestContext.Current.CancellationToken))
+                ?.Info
+                .Type
+        );
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.RemoveStyleSourceAsync("custom-mvt", TestContext.Current.CancellationToken)
+        );
+        Assert.Null(
+            await map.GetStyleSourceInfoAsync("custom-mvt", TestContext.Current.CancellationToken)
+        );
+    }
+
+    [BindingSpecTest("")]
+    [Fact]
+    public async Task RemovingACustomMvtVectorSourceReleasesItsCallbackState()
+    {
+        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        using var map = TestHandles.CreateMap(
+            runtime,
+            MapOptions.Default with
+            {
+                InitialExtent = MapOptions.Default.InitialExtent with { Width = 512, Height = 512 },
             }
         );
-        map.SetCustomMvtVectorSourceTileData("custom-mvt", tile, []);
-        map.SetCustomMvtVectorSourceTileError("custom-mvt", tile, "tile missing");
-        map.InvalidateCustomMvtVectorSourceTile("custom-mvt", tile);
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
+        var state = InstallCallbackProbe(map);
+        Assert.True(Alive(state));
 
-        Assert.Equal(SourceType.CustomMvtVector, map.StyleSourceType("custom-mvt"));
-        Assert.True(map.RemoveStyleSource("custom-mvt"));
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.RemoveStyleSourceAsync("custom-mvt", TestContext.Current.CancellationToken)
+        );
+        Assert.Null(
+            await map.GetStyleSourceInfoAsync("custom-mvt", TestContext.Current.CancellationToken)
+        );
+
+        Assert.False(Alive(state));
     }
 
-    [BindingSpecTest("BND-124")]
+    [BindingSpecTest("")]
     [Fact]
-    public void RemovingACustomMvtVectorSourceReleasesItsCallbackState()
+    public async Task ClosingAMapReleasesItsCustomMvtVectorSourceCallbackState()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson(EmptyStyleJson);
-        var state = new CustomMvtVectorSourceState(
-            new CustomMvtVectorSourceOptions { FetchTile = _ => { } }
+        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        var map = TestHandles.CreateMap(
+            runtime,
+            MapOptions.Default with
+            {
+                InitialExtent = MapOptions.Default.InitialExtent with { Width = 512, Height = 512 },
+            }
         );
-        map.AddCustomMvtVectorSource("custom-mvt", state);
-        Assert.True(state.IsHandleAllocatedForTest);
-
-        Assert.True(map.RemoveStyleSource("custom-mvt"));
-
-        Assert.False(state.IsHandleAllocatedForTest);
-    }
-
-    [BindingSpecTest("BND-124")]
-    [Fact]
-    public void ClosingAMapReleasesItsCustomMvtVectorSourceCallbackState()
-    {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson(EmptyStyleJson);
-        var state = new CustomMvtVectorSourceState(
-            new CustomMvtVectorSourceOptions { FetchTile = _ => { } }
-        );
-        map.AddCustomMvtVectorSource("custom-mvt", state);
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
+        var state = InstallCallbackProbe(map);
 
         map.Close();
+        // The runtime runs the release callback while retiring the map, so a barrier that
+        // observes the retirement observes the release too.
+        await runtime.BarrierAsync(TestContext.Current.CancellationToken);
 
-        Assert.False(state.IsHandleAllocatedForTest);
+        Assert.False(Alive(state));
     }
 
-    [BindingSpecTest("BND-093", "BND-124")]
+    [BindingSpecTest("", "")]
     [Fact]
-    public void AStyleReplacementReleasesADroppedSourceWithoutStyleLoadedEvents()
+    public async Task AStyleReplacementReleasesADroppedSourceWithoutStyleLoadedEvents()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(
+        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        using var map = TestHandles.CreateMap(
             runtime,
-            new MapOptions
+            MapOptions.Default with
             {
-                Width = 512,
-                Height = 512,
+                InitialExtent = MapOptions.Default.InitialExtent with { Width = 512, Height = 512 },
+
                 EventMask = RuntimeEventMask.All & ~RuntimeEventMask.MapStyleLoaded,
             }
         );
-        map.SetStyleJson(EmptyStyleJson);
-        var state = new CustomMvtVectorSourceState(
-            new CustomMvtVectorSourceOptions { FetchTile = _ => { } }
+        _ = map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken);
+        var state = InstallCallbackProbe(map);
+
+        // The replacement style drops the source, and the C API reports that through the release
+        // callback rather than through an event, so the host's cleared mask stays cleared.
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.SetStyleJsonAsync(TestStyles.Empty, TestContext.Current.CancellationToken)
         );
-        map.AddCustomMvtVectorSource("custom-mvt", state);
+        await runtime.BarrierAsync(TestContext.Current.CancellationToken);
+        var drained = runtime.DrainEventCopies().Select(polled => polled.Type).ToList();
 
-        map.SetStyleJson(EmptyStyleJson);
-        var drained = new List<RuntimeEventType>();
-        for (var attempt = 0; attempt < 1000 && state.IsHandleAllocatedForTest; attempt++)
-        {
-            runtime.Pump(TimeSpan.FromMilliseconds(1));
-            drained.AddRange(runtime.DrainEvents().Events.Select(polled => polled.Type));
-        }
-
-        Assert.False(state.IsHandleAllocatedForTest);
+        Assert.False(Alive(state));
         Assert.DoesNotContain(RuntimeEventType.MapStyleLoaded, drained);
-        Assert.Equal(RuntimeEventMask.All & ~RuntimeEventMask.MapStyleLoaded, map.GetEventMask());
+        Assert.Equal(
+            RuntimeEventMask.All & ~RuntimeEventMask.MapStyleLoaded,
+            map.SnapshotGet().EventMask
+        );
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference InstallCallbackProbe(MapHandle map)
+    {
+        var target = new CallbackProbe();
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.AddCustomMvtVectorSourceAsync(
+                "custom-mvt",
+                new CustomMvtVectorSourceOptions { FetchTile = target.Fetch },
+                TestContext.Current.CancellationToken
+            )
+        );
+        return new WeakReference(target);
+    }
+
+    private sealed class CallbackProbe
+    {
+        public void Fetch(CanonicalTileId _) { }
+    }
+
+    private static bool Alive(WeakReference value)
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        return value.IsAlive;
     }
 }

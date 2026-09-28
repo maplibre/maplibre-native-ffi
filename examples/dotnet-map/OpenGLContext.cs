@@ -1,4 +1,5 @@
 using Maplibre.NativeFfi;
+using Maplibre.NativeFfi.Base;
 using Maplibre.NativeFfi.Render;
 using Silk.NET.GLFW;
 using DesktopGL = Silk.NET.OpenGL.GL;
@@ -23,7 +24,7 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
         this.glesGl = glesGl;
     }
 
-    public RenderBackend Backend => RenderBackend.OpenGL;
+    public RenderBackendFlag Backend => RenderBackendFlag.Opengl;
 
     public nint WindowHandle => window.NativeHandle;
 
@@ -37,13 +38,13 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
 
     public static OpenGLContext Create(string title, int width, int height)
     {
-        var providers = Maplibre.SupportedOpenGLContextProviders();
-        if (providers.HasFlag(OpenGLContextProvider.Egl))
+        var providers = Maplibre.OpenglSupportedContextProviderMask();
+        if (providers.HasFlag(OpenglContextProviderFlag.Egl))
         {
             return CreateEgl(title, width, height);
         }
 
-        if (providers.HasFlag(OpenGLContextProvider.Wgl))
+        if (providers.HasFlag(OpenglContextProviderFlag.Wgl))
         {
             return CreateWgl(title, width, height);
         }
@@ -53,29 +54,42 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
         );
     }
 
-    public OpenGLContextDescriptor Descriptor(bool requirePbufferConfig)
+    public OpenglContextDescriptor Descriptor(bool requirePbufferConfig)
     {
         if (gles)
         {
-            return new EglContextDescriptor
-            {
-                Display = NativePointer.FromBorrowedAddress(GlfwNativeAccess.GetEglDisplay()),
-                Config = NativePointer.FromBorrowedAddress(EglConfig(requirePbufferConfig)),
-                ShareContext = NativePointer.FromBorrowedAddress(
-                    GlfwNativeAccess.GetEglContext(window.Handle)
-                ),
-                GetProcAddress = NativeCallbacks.GlfwGetProcAddress,
-            };
+            return new OpenglContextDescriptor(
+                OpenglContextOwnership.Shared,
+                new OpenglContextDescriptor.DataValue.Egl(
+                    new EglContextDescriptor
+                    {
+                        Display = NativePointer.FromBorrowedAddress(
+                            GlfwNativeAccess.GetEglDisplay()
+                        ),
+                        Config = NativePointer.FromBorrowedAddress(EglConfig(requirePbufferConfig)),
+                        ClientApi = OpenglClientApi.Gles,
+                        ShareContext = NativePointer.FromBorrowedAddress(
+                            GlfwNativeAccess.GetEglContext(window.Handle)
+                        ),
+                        GetProcAddress = NativeCallbacks.GlfwGetProcAddress,
+                    }
+                )
+            );
         }
 
-        return new WglContextDescriptor
-        {
-            DeviceContext = NativePointer.FromBorrowedAddress(deviceContext),
-            ShareContext = NativePointer.FromBorrowedAddress(
-                GlfwNativeAccess.GetWglContext(window.Handle)
-            ),
-            GetProcAddress = NativeCallbacks.GlfwGetProcAddress,
-        };
+        return new OpenglContextDescriptor(
+            OpenglContextOwnership.Shared,
+            new OpenglContextDescriptor.DataValue.Wgl(
+                new WglContextDescriptor
+                {
+                    DeviceContext = NativePointer.FromBorrowedAddress(deviceContext),
+                    ShareContext = NativePointer.FromBorrowedAddress(
+                        GlfwNativeAccess.GetWglContext(window.Handle)
+                    ),
+                    GetProcAddress = NativeCallbacks.GlfwGetProcAddress,
+                }
+            )
+        );
     }
 
     public NativePointer SurfacePointer() =>
@@ -436,6 +450,18 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
 
     public uint GetError() => gles ? (uint)glesGl!.GetError() : (uint)desktopGl!.GetError();
 
+    public void FinishGpuWork()
+    {
+        if (gles)
+        {
+            glesGl!.Finish();
+        }
+        else
+        {
+            desktopGl!.Finish();
+        }
+    }
+
     public void Dispose()
     {
         if (closed)
@@ -466,7 +492,7 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
 
     private static OpenGLContext CreateEgl(string title, int width, int height)
     {
-        if (!Maplibre.SupportedOpenGLContextProviders().HasFlag(OpenGLContextProvider.Egl))
+        if (!Maplibre.OpenglSupportedContextProviderMask().HasFlag(OpenglContextProviderFlag.Egl))
         {
             throw new InvalidOperationException("Native library does not support EGL.");
         }
@@ -515,7 +541,7 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
 
     private static OpenGLContext CreateWgl(string title, int width, int height)
     {
-        if (!Maplibre.SupportedOpenGLContextProviders().HasFlag(OpenGLContextProvider.Wgl))
+        if (!Maplibre.OpenglSupportedContextProviderMask().HasFlag(OpenglContextProviderFlag.Wgl))
         {
             throw new InvalidOperationException("Native library does not support WGL.");
         }

@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
+using Maplibre.NativeFfi.Internal.Callback;
 using Maplibre.NativeFfi.Internal.Pointer;
 using Xunit;
 
@@ -14,7 +15,76 @@ public sealed unsafe class NativeHandleStateTests
     private static mln_status destroyStatus;
     private static int destroyCount;
 
-    [BindingSpecTest("BND-040")]
+    [BindingSpecTest("")]
+    [Fact]
+    public void BorrowedCopyPreventsConcurrentCloseAndReleasesOnException()
+    {
+        var destroyed = 0;
+        var state = new NativeHandleState<MlnRuntime>(
+            SyntheticHandles.Runtime(1234),
+            _ =>
+            {
+                Interlocked.Increment(ref destroyed);
+                return mln_status.MLN_STATUS_OK;
+            },
+            "RuntimeHandle"
+        );
+        Assert.Throws<FormatException>(
+            (Action)(
+                () =>
+                {
+                    using var read = state.Borrow();
+                    Assert.Equal(SyntheticHandles.Runtime(1234).Value, read.Handle.Value);
+                    Task.Run(() => Assert.Throws<InvalidStateException>(state.Close))
+                        .GetAwaiter()
+                        .GetResult();
+                    Assert.Equal(0, destroyed);
+                    throw new FormatException("Copy failed.");
+                }
+            )
+        );
+        state.Close();
+        Assert.Equal(1, destroyed);
+        Assert.Throws<InvalidStateException>(() =>
+        {
+            using var read = state.Borrow();
+        });
+    }
+
+    [BindingSpecTest("", "")]
+    [Fact]
+    public void OwnerCallbackCapturesDoNotRootAbandonedOwnersAndStaleTokensDoNotDispatch()
+    {
+        var released = 0;
+        var abandoned = AbandonRegisteredOwner(() => Interlocked.Increment(ref released));
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        Assert.False(abandoned.Owner.IsAlive);
+        Assert.Equal(1, released);
+        Assert.Null(NativeOwnerCallbackRoot.Value((void*)abandoned.Token));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (WeakReference Owner, nint Token) AbandonRegisteredOwner(Action released)
+    {
+        mln_status Release(MlnResourceRequest _)
+        {
+            released();
+            return mln_status.MLN_STATUS_OK;
+        }
+        var state = new NativeHandleState<MlnResourceRequest>(
+            SyntheticHandles.ResourceRequest(1),
+            Release,
+            "Request",
+            Release
+        );
+        using var registration = state.PrepareCallback((Action)(() => GC.KeepAlive(state)));
+        registration.Accept();
+        return (new WeakReference(state), (nint)registration.Pointer);
+    }
+
+    [BindingSpecTest("")]
     [Fact]
     public void CloseIsIdempotentAfterSuccess()
     {
@@ -34,7 +104,7 @@ public sealed unsafe class NativeHandleStateTests
         Assert.Equal(1, destroyCount);
     }
 
-    [BindingSpecTest("BND-041")]
+    [BindingSpecTest("")]
     [Fact]
     public void FailedCloseKeepsHandleLiveForRetry()
     {
@@ -60,110 +130,59 @@ public sealed unsafe class NativeHandleStateTests
         Assert.Equal(2, destroyCount);
     }
 
-    [BindingSpecTest("BND-046")]
+    [BindingSpecTest("")]
     [Fact]
     public void PointerFailsWhileCloseIsInProgress()
     {
-        using var destroyStarted = new ManualResetEventSlim(false);
-        using var allowDestroy = new ManualResetEventSlim(false);
-        var destroyCount = 0;
+        using var destroy = new BlockingDestroy();
         var state = new NativeHandleState<MlnRuntime>(
             SyntheticHandles.Runtime(1234),
-            DestroyAfterRelease,
+            destroy.Destroy,
             "RuntimeHandle"
         );
 
         var close = Task.Run(state.Close);
-        Assert.True(destroyStarted.Wait(TimeSpan.FromSeconds(5)));
+        destroy.WaitUntilStarted();
 
         var error = Assert.Throws<InvalidStateException>(() => _ = state.Handle);
 
         Assert.Equal(MaplibreStatus.InvalidState, error.Status);
         Assert.Contains("closing", error.Message, StringComparison.OrdinalIgnoreCase);
 
-        allowDestroy.Set();
+        destroy.Allow();
         close.GetAwaiter().GetResult();
 
         Assert.True(state.IsClosed);
-        Assert.Equal(1, destroyCount);
-
-        mln_status DestroyAfterRelease(MlnRuntime handle)
-        {
-            Assert.False(handle.IsNull);
-            destroyCount++;
-            destroyStarted.Set();
-            Assert.True(allowDestroy.Wait(TimeSpan.FromSeconds(5)));
-            return mln_status.MLN_STATUS_OK;
-        }
+        Assert.Equal(1, destroy.Count);
     }
 
-    [BindingSpecTest("BND-046")]
+    [BindingSpecTest("")]
     [Fact]
-    public void ConcurrentCloseWaitsForInProgressReleaseWithoutDestroyingTwice()
+    public void ConcurrentCloseFailsWithoutBlockingOrDestroyingTwice()
     {
-        using var destroyStarted = new ManualResetEventSlim(false);
-        using var allowDestroy = new ManualResetEventSlim(false);
-        var destroyCount = 0;
+        using var destroy = new BlockingDestroy();
         var state = new NativeHandleState<MlnRuntime>(
             SyntheticHandles.Runtime(1234),
-            DestroyAfterRelease,
+            destroy.Destroy,
             "RuntimeHandle"
         );
 
         var firstClose = Task.Run(state.Close);
-        Assert.True(destroyStarted.Wait(TimeSpan.FromSeconds(5)));
+        destroy.WaitUntilStarted();
 
-        var secondClose = Task.Run(state.Close);
-        Assert.False(secondClose.Wait(TimeSpan.FromMilliseconds(50)));
-        Assert.Equal(1, destroyCount);
+        var secondClose = Task.Run(() => Assert.Throws<InvalidStateException>(state.Close));
+        secondClose.GetAwaiter().GetResult();
+        Assert.Equal(1, destroy.Count);
 
-        allowDestroy.Set();
+        destroy.Allow();
         firstClose.GetAwaiter().GetResult();
         secondClose.GetAwaiter().GetResult();
 
         Assert.True(state.IsClosed);
-        Assert.Equal(1, destroyCount);
-
-        mln_status DestroyAfterRelease(MlnRuntime handle)
-        {
-            Assert.False(handle.IsNull);
-            destroyCount++;
-            destroyStarted.Set();
-            Assert.True(allowDestroy.Wait(TimeSpan.FromSeconds(5)));
-            return mln_status.MLN_STATUS_OK;
-        }
+        Assert.Equal(1, destroy.Count);
     }
 
-    [BindingSpecTest("BND-048")]
-    [Fact]
-    public void TryCloseSuppressesFailureWithoutClosingHandle()
-    {
-        using var _ = Gate.EnterScope();
-        destroyStatus = mln_status.MLN_STATUS_INVALID_STATE;
-        destroyCount = 0;
-        var reports = new List<NativeLeakReport>();
-        using var capture = NativeLeakReporter.CaptureForTest(reports.Add);
-        var state = new NativeHandleState<MlnRuntime>(
-            SyntheticHandles.Runtime(1234),
-            Destroy,
-            "RuntimeHandle"
-        );
-
-        Assert.False(state.TryClose());
-
-        Assert.False(state.IsClosed);
-        Assert.Equal(1, destroyCount);
-        var report = Assert.Single(reports);
-        Assert.Equal(NativeLeakReportKind.DisposeFailed, report.Kind);
-        Assert.Equal("RuntimeHandle", report.TypeName);
-        Assert.Equal(SyntheticHandles.Runtime(1234).Value, report.Handle);
-        Assert.Equal(mln_status.MLN_STATUS_INVALID_STATE, report.Status);
-
-        destroyStatus = mln_status.MLN_STATUS_OK;
-        state.Close();
-    }
-
-    [BindingSpecTest("BND-044")]
+    [BindingSpecTest("")]
     [Fact]
     public void FinalizerReportsLeakedLiveHandleWithoutDestroyingIt()
     {
@@ -196,55 +215,7 @@ public sealed unsafe class NativeHandleStateTests
         );
     }
 
-    [BindingSpecTest("BND-197")]
-    [Fact]
-    public void CloseWaitsForAUseInFlightOnAnotherThread()
-    {
-        using var _ = Gate.EnterScope();
-        destroyStatus = mln_status.MLN_STATUS_OK;
-        destroyCount = 0;
-        var state = new NativeHandleState<MlnRuntime>(
-            SyntheticHandles.Runtime(1234),
-            Destroy,
-            "RuntimeHandle"
-        );
-
-        using var entered = new ManualResetEventSlim(false);
-        using var releaseUse = new ManualResetEventSlim(false);
-        using var closeReturned = new ManualResetEventSlim(false);
-        var destroysSeenByUse = -1;
-
-        var useThread = new Thread(() =>
-            state.WithLive(_ =>
-            {
-                entered.Set();
-                Assert.True(releaseUse.Wait(TimeSpan.FromSeconds(5)));
-                destroysSeenByUse = Volatile.Read(ref destroyCount);
-            })
-        );
-        useThread.Start();
-        Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
-
-        var closeThread = new Thread(() =>
-        {
-            state.Close();
-            closeReturned.Set();
-        });
-        closeThread.Start();
-
-        Assert.False(closeReturned.Wait(TimeSpan.FromMilliseconds(200)));
-        Assert.Equal(0, Volatile.Read(ref destroyCount));
-
-        releaseUse.Set();
-        Assert.True(closeReturned.Wait(TimeSpan.FromSeconds(5)));
-        Assert.True(useThread.Join(TimeSpan.FromSeconds(5)));
-
-        Assert.Equal(1, destroyCount);
-        Assert.Equal(0, destroysSeenByUse);
-        Assert.True(state.IsClosed);
-    }
-
-    [BindingSpecTest("BND-197")]
+    [BindingSpecTest("")]
     [Fact]
     public void AUseStartingAfterCloseBeginsIsRefused()
     {
@@ -259,7 +230,36 @@ public sealed unsafe class NativeHandleStateTests
 
         state.Close();
 
-        Assert.Throws<InvalidStateException>(() => state.WithLive(_ => { }));
+        Assert.Throws<InvalidStateException>(() => state.Handle);
+    }
+
+    /// <summary>A destroy that blocks until the test releases it, so a close stays in progress.</summary>
+    private sealed class BlockingDestroy : IDisposable
+    {
+        private readonly ManualResetEventSlim started = new(false);
+        private readonly ManualResetEventSlim allowed = new(false);
+        private int count;
+
+        internal int Count => Volatile.Read(ref count);
+
+        internal mln_status Destroy(MlnRuntime handle)
+        {
+            Assert.False(handle.IsNull);
+            Interlocked.Increment(ref count);
+            started.Set();
+            Assert.True(allowed.Wait(TimeSpan.FromSeconds(5)));
+            return mln_status.MLN_STATUS_OK;
+        }
+
+        internal void WaitUntilStarted() => Assert.True(started.Wait(TimeSpan.FromSeconds(5)));
+
+        internal void Allow() => allowed.Set();
+
+        public void Dispose()
+        {
+            started.Dispose();
+            allowed.Dispose();
+        }
     }
 
     private static mln_status Destroy(MlnRuntime handle)

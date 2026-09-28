@@ -56,7 +56,7 @@ internal sealed class OpenGLTextureCompositor : ITextureCompositor
         this.viewport = viewport;
     }
 
-    public bool Draw(OpenGLOwnedTextureFrame frame)
+    public bool Draw(OpenglOwnedTextureFrameView frame)
     {
         if (frame.Width == 0 || frame.Height == 0)
         {
