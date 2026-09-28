@@ -169,12 +169,28 @@ def operation(plan, values):
                 )
         arguments[p.name] = "&" + local
         outputs.append((p, value, local))
+
+    def parent_of(owned):
+        # An adopted child retains the Go owner passed as its parent input.
+        if owned is None or owned.parent_parameter is None:
+            return "nil"
+        if owned.parent_parameter == receiver_name:
+            return "receiver"
+        return "input" + str(
+            next(
+                index
+                for index, p in enumerate(plan.inputs)
+                if p.name == owned.parent_parameter
+            )
+        )
+
+    owned_outputs = {owned.parameter: owned for owned in plan.owned_outputs}
     output_types = []
     conversions = []
     for p, value, local in outputs:
         output_types.append(values.type(value))
         if value.kind == "handle":
-            parent = "receiver" if value.handle.parent and receiver else "nil"
+            parent = parent_of(owned_outputs.get(p.name))
             conversions.append(
                 f"adopt{values.owner(value.native)}(uint64({local}), {parent})"
             )
@@ -193,7 +209,7 @@ def operation(plan, values):
             values.require(result)
             completion_type = values.type(result)
             if result.kind == "handle":
-                parent = "receiver" if result.handle.parent and receiver else "nil"
+                parent = parent_of(plan.completion.result_owner)
                 convert = f"adopt{values.owner(result.native)}(uint64(raw), {parent})"
                 body = f"raw, err := completionValue[C.{result.native}](result); if err != nil {{ return nil, err }}; return {convert}, nil"
             elif result.kind == "array":

@@ -132,3 +132,24 @@ func TestRoundtrip(t *testing.T) {
                     check=False,
                 )
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_owned_output_retains_its_parent_input_rather_than_the_receiver(self):
+        with TemporaryDirectory() as directory:
+            include = Path(directory)
+            (include / "api.h").write_text("""
+#define BIND(x) __attribute__((annotate("mln:" x)))
+typedef int mln_status;
+typedef unsigned long long mln_forest BIND("kind=handle;release=mln_forest_close;dispose=mln_forest_close;parent=none");
+typedef unsigned long long mln_seed BIND("kind=handle;release=mln_seed_close;dispose=mln_seed_close;parent=none");
+typedef unsigned long long mln_tree BIND("kind=handle;release=mln_tree_close;dispose=mln_tree_close;parent=mln_forest");
+BIND("execution=immediate") void mln_forest_close(mln_forest forest);
+BIND("execution=immediate") void mln_seed_close(mln_seed seed);
+BIND("execution=immediate") void mln_tree_close(mln_tree tree);
+BIND("execution=immediate")
+mln_status mln_seed_plant(mln_seed seed, mln_forest forest, mln_tree *out_tree BIND("direction=out;ownership=owned"));
+""")
+            api = parse_headers(include)
+            validate(api)
+            source = go.generate(api)["generated_api.go"]
+        self.assertIn("func (receiver *SeedHandle) Plant(forest *ForestHandle)", source)
+        self.assertIn("adoptTreeHandle(uint64(outputOutTree), input1)", source)
