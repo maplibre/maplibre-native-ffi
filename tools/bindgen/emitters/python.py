@@ -763,8 +763,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         {
             name: public_name(name)
             + ("" if public_name(name).endswith("Handle") else "Handle")
-            for name, handle in bound.handles.items()
-            if handle.release not in bound.source.runtime_exports
+            for name in bound.public_handles
         }
     )
     DECISIONS.clear()
