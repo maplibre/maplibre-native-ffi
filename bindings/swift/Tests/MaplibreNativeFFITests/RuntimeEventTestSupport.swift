@@ -190,6 +190,13 @@ func withSynthesizedEventBatch<Result>(
 }
 
 extension RuntimeHandle {
+  /// Closes and waits for native teardown without an async context, so a test
+  /// leaves no native thread running past its own end.
+  func closeBlockingForTests() throws {
+    guard let teardown = try startClose() else { return }
+    try mapNativeFailure { try teardown.valueBlocking() }
+  }
+
   func drainEventCopies() throws -> [RuntimeEvent] {
     do {
       let batch = try drainEvents()
@@ -198,6 +205,14 @@ extension RuntimeHandle {
     } catch let error as MaplibreError where error.kind == .notReady {
       return []
     }
+  }
+}
+
+extension MapHandle {
+  /// Closes and waits for native teardown without an async context.
+  func closeBlockingForTests() throws {
+    guard let teardown = try startClose() else { return }
+    try mapNativeFailure { try teardown.valueBlocking() }
   }
 }
 

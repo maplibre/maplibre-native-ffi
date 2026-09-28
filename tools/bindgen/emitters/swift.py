@@ -92,9 +92,7 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
 
         return consumed(plan, owner, value_types)
     completion = bool(
-        params
-        and params[-1].type.pointee
-        and native(params[-1].type.pointee) == "mln_completion"
+        plan.completion and params and params[-1].name == plan.completion.parameter
     )
     if completion:
         params.pop()
@@ -248,7 +246,7 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
                 function, "multiple immediate completion owners require a result record"
             )
         owned = plan.completion.immediate_owners[0]
-        public = name(owned.handle.native.removeprefix("mln_")) + "Handle"
+        public = owner_name(owned.handle.native)
         result = public.removesuffix("Handle") + "Attachment"
         member = camel(owned.parameter.removeprefix("out_"))
         value_types.attachments[result] = (
