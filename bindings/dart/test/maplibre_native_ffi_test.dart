@@ -523,9 +523,7 @@ void main() {
           AdapterQueuedResourceProviderRoute(
             kind: ResourceKind.style.rawValue,
             url: aliasUrl,
-            flags: raw
-                .mln_adapter_resource_route_flags
-                .MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL,
+            flags: AdapterResourceRouteFlags.useRequestedUrl,
           ),
         ],
         callback: (request, handle) {
@@ -568,9 +566,7 @@ void main() {
           AdapterQueuedResourceProviderRoute(
             kind: raw.MLN_ADAPTER_RESOURCE_KIND_ANY,
             url: '$origin**',
-            flags: raw
-                .mln_adapter_resource_route_flags
-                .MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB,
+            flags: AdapterResourceRouteFlags.matchGlob,
           ),
         ],
         callback: (request, handle) {
@@ -656,9 +652,7 @@ void main() {
         AdapterQueuedResourceProviderRoute(
           kind: ResourceKind.style.rawValue,
           url: aliasUrl,
-          flags: raw
-              .mln_adapter_resource_route_flags
-              .MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL,
+          flags: AdapterResourceRouteFlags.useRequestedUrl,
         ),
       );
       expect(byRequested.resolvedUrl, normalizedUrl);
@@ -1683,7 +1677,7 @@ void main() {
               AdapterHttpHeaderTransformRule(
                 kind: 0xffffffff,
                 url: 'https://example.com/**',
-                flags: 1,
+                flags: AdapterUrlMatchFlags.glob,
                 headers: [AdapterHttpHeader(name: 'X-Test', value: 'café')],
               ),
             ],

@@ -166,7 +166,7 @@ typedef enum MLN_BINDING(
  */
 typedef struct mln_adapter_resource_rewrite_rule {
   uint32_t kind;
-  uint32_t flags;
+  uint32_t flags MLN_BINDING("enum=mln_adapter_url_match_flags");
   const char* url MLN_BINDING(
     "length=nul;encoding=utf8;ownership=borrowed;"
     "lifetime=owner;nullable=true"
@@ -215,7 +215,7 @@ typedef struct mln_adapter_http_header {
  */
 typedef struct mln_adapter_http_header_transform_rule {
   uint32_t kind;
-  uint32_t flags;
+  uint32_t flags MLN_BINDING("enum=mln_adapter_url_match_flags");
   const char* url MLN_BINDING(
     "length=nul;encoding=utf8;ownership=borrowed;"
     "lifetime=owner;nullable=true"
@@ -247,7 +247,7 @@ typedef struct mln_adapter_http_header_transform_rules {
  */
 typedef struct mln_adapter_resource_provider_rule {
   uint32_t kind;
-  uint32_t flags;
+  uint32_t flags MLN_BINDING("enum=mln_adapter_url_match_flags");
   const char* requested_url MLN_BINDING(
     "length=nul;encoding=utf8;ownership=borrowed;"
     "lifetime=owner;nullable=true"
@@ -299,7 +299,7 @@ typedef enum MLN_BINDING(
  */
 typedef struct mln_adapter_queued_resource_provider_route {
   uint32_t kind;
-  uint32_t flags;
+  uint32_t flags MLN_BINDING("enum=mln_adapter_resource_route_flags");
   const char* url MLN_BINDING(
     "length=nul;encoding=utf8;ownership=borrowed;"
     "lifetime=owner;nullable=true"

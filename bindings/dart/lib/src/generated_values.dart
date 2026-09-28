@@ -4012,6 +4012,24 @@ final class OfflineRegionInfo {
   ]);
 }
 
+final class AdapterUrlMatchFlags {
+  const AdapterUrlMatchFlags.fromRawValue(this.rawValue);
+  final int rawValue;
+  static const flagsNone = AdapterUrlMatchFlags.fromRawValue(0);
+  static const glob = AdapterUrlMatchFlags.fromRawValue(1);
+  AdapterUrlMatchFlags operator |(AdapterUrlMatchFlags other) =>
+      AdapterUrlMatchFlags.fromRawValue(rawValue | other.rawValue);
+  AdapterUrlMatchFlags operator &(AdapterUrlMatchFlags other) =>
+      AdapterUrlMatchFlags.fromRawValue(rawValue & other.rawValue);
+  bool contains(AdapterUrlMatchFlags other) =>
+      (rawValue & other.rawValue) == other.rawValue;
+  @override
+  bool operator ==(Object other) =>
+      other is AdapterUrlMatchFlags && other.rawValue == rawValue;
+  @override
+  int get hashCode => rawValue.hashCode;
+}
+
 final class AdapterHttpHeader {
   const AdapterHttpHeader({this.name, this.value});
   final String? name;
@@ -4030,12 +4048,12 @@ final class AdapterHttpHeader {
 final class AdapterHttpHeaderTransformRule {
   AdapterHttpHeaderTransformRule({
     this.kind = 0,
-    this.flags = 0,
+    this.flags = const AdapterUrlMatchFlags.fromRawValue(0),
     this.url,
     required List<AdapterHttpHeader> headers,
   }) : headers = List.unmodifiable(headers);
   final int kind;
-  final int flags;
+  final AdapterUrlMatchFlags flags;
   final String? url;
   final List<AdapterHttpHeader> headers;
 
@@ -4087,14 +4105,33 @@ final class HttpHeaderTransformHttpHeaderTransformRules
   final AdapterHttpHeaderTransformRules value;
 }
 
+final class AdapterResourceRouteFlags {
+  const AdapterResourceRouteFlags.fromRawValue(this.rawValue);
+  final int rawValue;
+  static const flagsNone = AdapterResourceRouteFlags.fromRawValue(0);
+  static const matchGlob = AdapterResourceRouteFlags.fromRawValue(1);
+  static const useRequestedUrl = AdapterResourceRouteFlags.fromRawValue(2);
+  AdapterResourceRouteFlags operator |(AdapterResourceRouteFlags other) =>
+      AdapterResourceRouteFlags.fromRawValue(rawValue | other.rawValue);
+  AdapterResourceRouteFlags operator &(AdapterResourceRouteFlags other) =>
+      AdapterResourceRouteFlags.fromRawValue(rawValue & other.rawValue);
+  bool contains(AdapterResourceRouteFlags other) =>
+      (rawValue & other.rawValue) == other.rawValue;
+  @override
+  bool operator ==(Object other) =>
+      other is AdapterResourceRouteFlags && other.rawValue == rawValue;
+  @override
+  int get hashCode => rawValue.hashCode;
+}
+
 final class AdapterQueuedResourceProviderRoute {
   const AdapterQueuedResourceProviderRoute({
     this.kind = 0,
-    this.flags = 0,
+    this.flags = const AdapterResourceRouteFlags.fromRawValue(0),
     this.url,
   });
   final int kind;
-  final int flags;
+  final AdapterResourceRouteFlags flags;
   final String? url;
 
   @override
@@ -4114,12 +4151,12 @@ final class AdapterQueuedResourceProviderRoute {
 final class AdapterResourceProviderRule {
   const AdapterResourceProviderRule({
     this.kind = 0,
-    this.flags = 0,
+    this.flags = const AdapterUrlMatchFlags.fromRawValue(0),
     this.requestedUrl,
     required this.response,
   });
   final int kind;
-  final int flags;
+  final AdapterUrlMatchFlags flags;
   final String? requestedUrl;
   final ResourceResponse response;
 
@@ -4173,12 +4210,12 @@ final class ResourceProviderResourceProviderRules extends ResourceProvider {
 final class AdapterResourceRewriteRule {
   const AdapterResourceRewriteRule({
     this.kind = 0,
-    this.flags = 0,
+    this.flags = const AdapterUrlMatchFlags.fromRawValue(0),
     this.url,
     this.replacementUrl,
   });
   final int kind;
-  final int flags;
+  final AdapterUrlMatchFlags flags;
   final String? url;
   final String? replacementUrl;
 

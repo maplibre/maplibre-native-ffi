@@ -2949,7 +2949,7 @@ _writeAdapterHttpHeaderTransformRule(
 ) {
   final result = arena<raw.mln_adapter_http_header_transform_rule>();
   result.ref.kind = _generatedInteger(value.kind, 0, 4294967295);
-  result.ref.flags = _generatedInteger(value.flags, 0, 4294967295);
+  result.ref.flags = value.flags.rawValue;
   result.ref.url = value.url == null
       ? nullptr
       : nativeUtf8CString(value.url!, arena).pointer.cast<Char>();
@@ -3039,7 +3039,7 @@ _writeAdapterQueuedResourceProviderRoute(
 ) {
   final result = arena<raw.mln_adapter_queued_resource_provider_route>();
   result.ref.kind = _generatedInteger(value.kind, 0, 4294967295);
-  result.ref.flags = _generatedInteger(value.flags, 0, 4294967295);
+  result.ref.flags = value.flags.rawValue;
   result.ref.url = value.url == null
       ? nullptr
       : nativeUtf8CString(value.url!, arena).pointer.cast<Char>();
@@ -3053,7 +3053,7 @@ _writeAdapterResourceProviderRule(
 ) {
   final result = arena<raw.mln_adapter_resource_provider_rule>();
   result.ref.kind = _generatedInteger(value.kind, 0, 4294967295);
-  result.ref.flags = _generatedInteger(value.flags, 0, 4294967295);
+  result.ref.flags = value.flags.rawValue;
   result.ref.requested_url = value.requestedUrl == null
       ? nullptr
       : nativeUtf8CString(value.requestedUrl!, arena).pointer.cast<Char>();
@@ -3130,7 +3130,7 @@ Pointer<raw.mln_adapter_resource_rewrite_rule> _writeAdapterResourceRewriteRule(
 ) {
   final result = arena<raw.mln_adapter_resource_rewrite_rule>();
   result.ref.kind = _generatedInteger(value.kind, 0, 4294967295);
-  result.ref.flags = _generatedInteger(value.flags, 0, 4294967295);
+  result.ref.flags = value.flags.rawValue;
   result.ref.url = value.url == null
       ? nullptr
       : nativeUtf8CString(value.url!, arena).pointer.cast<Char>();
