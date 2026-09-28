@@ -9,7 +9,6 @@ import org.maplibre.nativeffi.internal.async.adoptOwned
 import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC
 import org.maplibre.nativeffi.internal.callback.*
-import org.maplibre.nativeffi.internal.lifecycle.OwnerAdoption
 import org.maplibre.nativeffi.internal.loader.CompletionBridge
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.status.Status as BindingStatus
@@ -23,7 +22,9 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
 
   internal abstract fun bindingRetireRuntime(call: (Long) -> Deferred<Unit>): Deferred<Unit>
 
-  public actual fun mapCreate(options: MapOptions): Deferred<org.maplibre.nativeffi.map.MapHandle> {
+  public actual fun mapCreate(
+    options: MapOptions
+  ): Deferred<org.maplibre.nativeffi.generated.MapHandle> {
     try {
       NativeAccess.ensureLoaded()
       org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(
@@ -32,13 +33,13 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       )
       return CompletionBridge.submitOwned(
         { result ->
-          OwnerAdoption.map(
+          MapHandle(
             NativeAccess.completionValue(result, ValueLayout.JAVA_LONG.byteSize())
               .get(ValueLayout.JAVA_LONG, 0),
-            this@GeneratedRuntimeOperations as org.maplibre.nativeffi.runtime.RuntimeHandle,
+            this@GeneratedRuntimeOperations as org.maplibre.nativeffi.generated.RuntimeHandle,
           )
         },
-        { it.disposeAbandoned() },
+        { it.dispose() },
         { result ->
           GeneratedOwnerDisposal.map(
             NativeAccess.completionValue(result, ValueLayout.JAVA_LONG.byteSize())

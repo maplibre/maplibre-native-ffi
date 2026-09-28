@@ -8,7 +8,6 @@ import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.async.adoptOwned
 import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.callback.*
-import org.maplibre.nativeffi.internal.lifecycle.OwnerAdoption
 import org.maplibre.nativeffi.internal.status.Status as BindingStatus
 import org.maplibre.nativeffi.runtime.CommandCompletion
 import platform.posix.size_t
@@ -21,8 +20,6 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
   internal abstract fun bindingRenderSessionHandle(): ULong
 
   internal abstract fun bindingCloseRenderSession(call: (ULong) -> Int)
-
-  internal abstract fun invalidateBindingViews()
 
   public actual fun metalBorrowedTextureSetTarget(
     descriptor: MetalBorrowedTextureDescriptor
@@ -123,7 +120,6 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         val output = arena.alloc<mln_render_abandon_result>()
         output.size = sizeOf<mln_render_abandon_result>().toUInt()
         BindingStatus.check(mln_render_session_abandon(bindingRenderSessionHandle(), output.ptr))
-        invalidateBindingViews()
         GeneratedValues.readRenderAbandonResult(output)
       }
     } finally {
@@ -131,7 +127,7 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
     }
   }
 
-  public actual fun acquireFrame(): org.maplibre.nativeffi.render.AcquiredFrameHandle {
+  public actual fun acquireFrame(): org.maplibre.nativeffi.generated.AcquiredFrameHandle {
     try {
       org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(
         bindingRenderSessionHandle().toLong(),
@@ -147,10 +143,10 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
           output.value,
           { GeneratedOwnerDisposal.acquiredFrame(it.toLong()) },
           {
-            OwnerAdoption.acquiredFrame(
+            AcquiredFrameHandle(
               it,
               this@GeneratedRenderSessionOperations
-                as org.maplibre.nativeffi.render.RenderSessionHandle,
+                as org.maplibre.nativeffi.generated.RenderSessionHandle,
             )
           },
         )
@@ -331,7 +327,7 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
     }
   }
 
-  public actual fun projectionCreate(): org.maplibre.nativeffi.map.MapProjectionHandle {
+  public actual fun projectionCreate(): org.maplibre.nativeffi.generated.MapProjectionHandle {
     try {
       org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(
         bindingRenderSessionHandle().toLong(),
@@ -346,7 +342,7 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         adoptOwned(
           output.value,
           { GeneratedOwnerDisposal.mapProjection(it.toLong()) },
-          { OwnerAdoption.mapProjection(it) },
+          { MapProjectionHandle(it) },
         )
       }
     } finally {

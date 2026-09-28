@@ -6,10 +6,10 @@ import java.lang.foreign.Linker
 import java.lang.foreign.MemorySegment
 import java.lang.foreign.SymbolLookup
 import java.lang.foreign.ValueLayout.ADDRESS
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MetalContextDescriptor
 import org.maplibre.nativeffi.generated.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.RenderTargetExtent
-import org.maplibre.nativeffi.map.MapHandle
 
 internal fun attachJvmMetal(
   map: MapHandle,

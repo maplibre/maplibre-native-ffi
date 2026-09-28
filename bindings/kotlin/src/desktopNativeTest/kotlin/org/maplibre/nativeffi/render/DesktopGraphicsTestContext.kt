@@ -6,6 +6,7 @@ import kotlinx.cinterop.pointed
 import kotlinx.cinterop.rawValue
 import org.maplibre.nativeffi.generated.EglContextDescriptor
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.OpenglClientApi
 import org.maplibre.nativeffi.generated.OpenglContextDescriptor
 import org.maplibre.nativeffi.generated.OpenglContextDescriptorData
@@ -18,7 +19,6 @@ import org.maplibre.nativeffi.generated.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_create
 import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_destroy
 import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_make_current
-import org.maplibre.nativeffi.map.MapHandle
 
 internal fun attachDesktopOwnedTexture(
   map: MapHandle,

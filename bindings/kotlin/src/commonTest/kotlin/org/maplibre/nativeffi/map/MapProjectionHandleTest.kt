@@ -73,8 +73,8 @@ class MapProjectionHandleTest {
     assertEquals(0.0, offThreadRoundTrip.latitude, 0.000001)
     assertEquals(0.0, offThreadRoundTrip.longitude, 0.000001)
 
-    map.close().await()
-    runtime.close().await()
+    map.release().await()
+    runtime.release().await()
     // The projection owns its snapshot independently of both source handles.
     assertNotNull(projection.getCamera().zoom)
     projection.close()
@@ -124,8 +124,8 @@ class MapProjectionHandleTest {
         projection.close()
       }
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -145,8 +145,8 @@ class MapProjectionHandleTest {
         )
         .await()
     val projection = map.projectionCreate().await()
-    map.close().await()
-    runtime.close().await()
+    map.release().await()
+    runtime.release().await()
     val failure = AtomicReference<Throwable?>(null)
 
     // A projection stays usable, and closable, on a thread that never touched the map.

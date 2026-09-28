@@ -11,12 +11,12 @@ import org.maplibre.nativeffi.generated.CameraUpdateMode
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.GesturePhase
 import org.maplibre.nativeffi.generated.LatLng
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.RuntimeEventMask
 import org.maplibre.nativeffi.generated.RuntimeEventType
+import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.generated.ScreenPoint
-import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.runtime.RuntimeHandle
 
 /** Runtime and map state driven by the core-owned runtime worker. */
 internal class MapState
@@ -99,9 +99,9 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
   override fun close() {
     runBlocking {
       try {
-        map.close().await()
+        map.release().await()
       } finally {
-        runtime.close().await()
+        runtime.release().await()
       }
     }
   }
@@ -143,7 +143,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
               .await()
           }
         } catch (error: Throwable) {
-          runBlocking { runtime.close().await() }
+          runBlocking { runtime.release().await() }
           throw error
         }
       try {
@@ -153,8 +153,8 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
         return state
       } catch (error: Throwable) {
         runBlocking {
-          map.close().await()
-          runtime.close().await()
+          map.release().await()
+          runtime.release().await()
         }
         throw error
       }

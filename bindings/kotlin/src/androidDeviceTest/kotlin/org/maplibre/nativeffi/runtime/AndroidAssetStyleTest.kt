@@ -8,10 +8,11 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.RuntimeEventSourceType
 import org.maplibre.nativeffi.generated.RuntimeEventType
-import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.sleepMillis
 
 class AndroidAssetStyleTest {

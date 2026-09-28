@@ -32,7 +32,7 @@ class ManagedEmitterTests(unittest.TestCase):
     def kotlin_map(self, source, platform="jvmMain"):
         api = self.parse(source, map_handle=True)
         return kotlin.generate(api)[
-            f"src/{platform}/kotlin/org/maplibre/nativeffi/map/GeneratedMapOperations.kt"
+            f"src/{platform}/kotlin/org/maplibre/nativeffi/generated/GeneratedMapOperations.kt"
         ]
 
     def test_dotnet_new_owner_uses_shared_release_and_copy_reservation(self):

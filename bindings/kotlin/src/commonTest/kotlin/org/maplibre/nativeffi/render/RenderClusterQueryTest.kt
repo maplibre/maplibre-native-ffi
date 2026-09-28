@@ -9,6 +9,7 @@ import org.maplibre.nativeffi.generated.CameraUpdate
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.GeojsonSourceOptions
 import org.maplibre.nativeffi.generated.LatLng
+import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.generated.ScreenBox
 import org.maplibre.nativeffi.generated.ScreenPoint

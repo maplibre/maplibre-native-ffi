@@ -9,10 +9,10 @@ import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderer
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceSession
 import org.maplibre.nativeffi.examples.composemap.surface.ProducerBackend
 import org.maplibre.nativeffi.examples.composemap.surface.SurfaceExtent
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.RenderResult
+import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.ScreenPoint
-import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.render.RenderSessionHandle
 
 /**
  * The native-surface render loop.

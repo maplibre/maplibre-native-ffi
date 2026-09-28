@@ -73,25 +73,16 @@ def native_identifier(native):
     return "`" + native + "`" if identifier(native).startswith("`") else native
 
 
-from . import kotlin_callbacks
-
-# Handles whose Kotlin owners are hand-written because they carry runtime
-# behavior beyond close-once. Every other public handle gets a generated owner.
-HANDWRITTEN_OWNERS = {
-    "mln_acquired_frame": "org.maplibre.nativeffi.render.AcquiredFrameHandle",
-    "mln_geojson_source_data": "org.maplibre.nativeffi.style.GeoJsonSourceDataHandle",
-    "mln_map": "org.maplibre.nativeffi.map.MapHandle",
-    "mln_map_projection": "org.maplibre.nativeffi.map.MapProjectionHandle",
-    "mln_render_session": "org.maplibre.nativeffi.render.RenderSessionHandle",
-    "mln_resource_request_handle": "org.maplibre.nativeffi.resource.ResourceRequestHandle",
-    "mln_runtime": "org.maplibre.nativeffi.runtime.RuntimeHandle",
-}
+def owner_name(native):
+    """Name a handle's generated owner class; a `_handle` suffix is not repeated."""
+    return name(native.removesuffix("_handle")) + "Handle"
 
 
 def owner_class(native):
-    return HANDWRITTEN_OWNERS.get(
-        native, f"org.maplibre.nativeffi.generated.{name(native)}Handle"
-    )
+    return "org.maplibre.nativeffi.generated." + owner_name(native)
+
+
+from . import kotlin_callbacks
 
 
 class Values:
@@ -430,7 +421,7 @@ class Values:
                     result.append(
                         f"public class {public}(\n"
                         + ",\n".join(args)
-                        + "\n) {\n  internal var bindingScope: org.maplibre.nativeffi.render.FrameScope? = null\n"
+                        + "\n) {\n  internal var bindingScope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null\n"
                         + "\n".join(getters)
                         + "\n}"
                     )
@@ -1070,7 +1061,7 @@ class Values:
                 read.append(f"      {member} = {decoded}")
             write += ["    return result", "  }"]
             scope_parameter = (
-                ", scope: org.maplibre.nativeffi.render.FrameScope? = null"
+                ", scope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null"
                 if value.native in self.views
                 else ""
             )
@@ -1177,10 +1168,4 @@ class Values:
 
 
 def generated_owners(bound) -> list[str]:
-    return sorted(bound.public_handles.keys() - HANDWRITTEN_OWNERS.keys())
-
-
-def release_is_asynchronous(bound, handle) -> bool:
-    return any(
-        plan.name == handle.release and plan.completion for plan in bound.operations
-    )
+    return sorted(bound.public_handles)

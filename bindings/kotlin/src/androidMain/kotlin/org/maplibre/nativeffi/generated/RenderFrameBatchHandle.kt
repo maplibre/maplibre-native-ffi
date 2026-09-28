@@ -1,20 +1,20 @@
 // Generated from handle ownership plans. Do not edit.
 package org.maplibre.nativeffi.generated
 
-import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
-import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
-
-public actual class RenderFrameBatchHandle internal constructor(private val handle: Long) :
-  GeneratedRenderFrameBatchOperations(), AutoCloseable {
+public actual class RenderFrameBatchHandle
+internal constructor(
+  private val handle: Long,
+  dispose: (Long) -> Unit = GeneratedOwnerDisposal::renderFrameBatch,
+) : GeneratedRenderFrameBatchOperations(), AutoCloseable {
   private val core =
-    HandleStateCore(
+    org.maplibre.nativeffi.internal.lifecycle.HandleStateCore(
       "RenderFrameBatchHandle",
       handle,
-      dispose = GeneratedOwnerDisposal::renderFrameBatch,
+      dispose = dispose,
     )
 
   init {
-    HandleLeakCleaner.register(this, core.leakReport)
+    org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner.register(this, core.leakReport)
   }
 
   internal override fun bindingRenderFrameBatchHandle(): Long {
@@ -30,9 +30,6 @@ public actual class RenderFrameBatchHandle internal constructor(private val hand
     get() = core.isReleased()
 
   public actual override fun close() {
-    core.closeOnce({
-      GeneratedOwnerDisposal.renderFrameBatch(handle)
-      0
-    })
+    release()
   }
 }

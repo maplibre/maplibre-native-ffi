@@ -11,11 +11,12 @@ import org.maplibre.nativeffi.generated.CameraUpdate
 import org.maplibre.nativeffi.generated.CameraUpdateMode
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.GesturePhase
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.MapOptions
 import org.maplibre.nativeffi.generated.RuntimeEventPayload
 import org.maplibre.nativeffi.generated.RuntimeEventType
-import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.runtime.awaitCommitted
 import org.maplibre.nativeffi.runtime.runSuspendTest
 import org.maplibre.nativeffi.runtime.use
@@ -106,7 +107,7 @@ class CameraTransitionTest {
       // A static map with no render session never renders the image, so the request is still
       // outstanding when the map retires.
       val pending = map.requestStillImage()
-      map.close().await()
+      map.release().await()
 
       val failure =
         kotlin.test.assertFailsWith<org.maplibre.nativeffi.error.MaplibreException> {

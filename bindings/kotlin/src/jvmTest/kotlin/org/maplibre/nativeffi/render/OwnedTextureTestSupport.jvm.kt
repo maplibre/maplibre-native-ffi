@@ -5,8 +5,10 @@ import org.lwjgl.egl.EGL
 import org.lwjgl.egl.EGL14
 import org.lwjgl.egl.EGL15
 import org.lwjgl.system.MemoryStack
+import org.maplibre.nativeffi.generated.AcquiredFrameHandle
 import org.maplibre.nativeffi.generated.EglContextDescriptor
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.OpenglClientApi
 import org.maplibre.nativeffi.generated.OpenglContextDescriptor
 import org.maplibre.nativeffi.generated.OpenglContextDescriptorData
@@ -16,7 +18,6 @@ import org.maplibre.nativeffi.generated.OpenglOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.RenderBackendFlag
 import org.maplibre.nativeffi.generated.RenderSessionAttachment
 import org.maplibre.nativeffi.generated.RenderTargetExtent
-import org.maplibre.nativeffi.map.MapHandle
 
 private const val EGL_PLATFORM_SURFACELESS_MESA = 0x31DD
 
@@ -45,6 +46,7 @@ internal actual object OwnedTextureTestSupport {
 }
 
 private class JvmEglOwnedTextureSession(
+  private val map: MapHandle,
   private val display: Long,
   private val config: Long,
   private val surface: Long,
@@ -60,18 +62,16 @@ private class JvmEglOwnedTextureSession(
         clientApi = OpenglClientApi.GLES,
         getProcAddress = NativePointer.NULL_POINTER,
       )
-    return session
-      .map()
-      .openglOwnedTextureAttach(
-        OpenglOwnedTextureDescriptor(
-          RenderTargetExtent(width.toUInt(), height.toUInt(), 1.0),
-          OpenglContextDescriptor(
-            OpenglContextOwnership.SHARED,
-            OpenglContextDescriptorData.Egl(descriptor),
-          ),
+    return map.openglOwnedTextureAttach(
+      OpenglOwnedTextureDescriptor(
+        RenderTargetExtent(width.toUInt(), height.toUInt(), 1.0),
+        OpenglContextDescriptor(
+          OpenglContextOwnership.SHARED,
+          OpenglContextDescriptorData.Egl(descriptor),
         ),
-        OWNED_TEXTURE_ATTACH_OPTIONS,
-      )
+      ),
+      OWNED_TEXTURE_ATTACH_OPTIONS,
+    )
   }
 
   override fun frameSize(frame: AcquiredFrameHandle): OwnedTextureFrameSize {
@@ -162,7 +162,7 @@ private fun createEglSession(
         ),
         OWNED_TEXTURE_ATTACH_OPTIONS.copy(requestedTextureRingDepth = textureRingDepth),
       )
-    return JvmEglOwnedTextureSession(display, config, surface, context, attachment)
+    return JvmEglOwnedTextureSession(map, display, config, surface, context, attachment)
   } catch (error: Throwable) {
     releaseEgl(display, surface, context)
     throw error

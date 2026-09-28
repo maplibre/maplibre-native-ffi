@@ -3,7 +3,6 @@ package org.maplibre.nativeffi.render
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -18,6 +17,7 @@ import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LogicalExtent
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.MetalContextDescriptor
 import org.maplibre.nativeffi.generated.MetalSurfaceDescriptor
@@ -25,8 +25,7 @@ import org.maplibre.nativeffi.generated.RenderBackendFlag
 import org.maplibre.nativeffi.generated.RenderResult
 import org.maplibre.nativeffi.generated.RenderSessionCapabilityFlag
 import org.maplibre.nativeffi.generated.RenderTargetExtent
-import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.runtime.runSuspendTest
 import platform.CoreGraphics.CGSizeMake
 import platform.Metal.MTLCreateSystemDefaultDevice
@@ -75,7 +74,6 @@ class MetalRenderTargetTest {
         val session = attachment.session
         try {
           attachment.ready.await()
-          assertSame(borrowedMap, session.map())
           borrowedMap.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray()).await()
           runtime.barrier().await()
           assertEquals(RenderResult.RENDERED, session.awaitRenderedFrame().disposition)
@@ -93,7 +91,7 @@ class MetalRenderTargetTest {
         // The session never retained the texture the host attached with.
         assertEquals(borrowedTextureAddress, borrowedDescriptor.texture.address)
       } finally {
-        borrowedMap.close().await()
+        borrowedMap.release().await()
         runtime.barrier().await()
       }
 
@@ -113,7 +111,6 @@ class MetalRenderTargetTest {
         val session = attachment.session
         try {
           attachment.ready.await()
-          assertSame(surfaceMap, session.map())
           surfaceMap.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray()).await()
           runtime.barrier().await()
           assertEquals(RenderResult.RENDERED, session.awaitRenderedFrame().disposition)
@@ -128,11 +125,11 @@ class MetalRenderTargetTest {
           runtime.barrier().await()
         }
       } finally {
-        surfaceMap.close().await()
+        surfaceMap.release().await()
         runtime.barrier().await()
       }
     } finally {
-      runtime.close().await()
+      runtime.release().await()
     }
   }
 
@@ -175,11 +172,11 @@ class MetalRenderTargetTest {
           runtime.barrier().await()
         }
       } finally {
-        map.close().await()
+        map.release().await()
         runtime.barrier().await()
       }
     } finally {
-      runtime.close().await()
+      runtime.release().await()
     }
   }
 
@@ -235,7 +232,6 @@ class MetalRenderTargetTest {
           session.metalBorrowedTextureSetTarget(replacement).await()
           borrowedMap.resize(LogicalExtent(16u, 8u, 1.0)).await()
           runtime.barrier().await()
-          assertSame(borrowedMap, session.map())
           assertEquals(RenderResult.RENDERED, session.awaitRenderedFrame().disposition)
           // The session paints the texture it was handed, not the one it had.
           assertTrue(
@@ -251,7 +247,7 @@ class MetalRenderTargetTest {
           runtime.barrier().await()
         }
       } finally {
-        borrowedMap.close().await()
+        borrowedMap.release().await()
         runtime.barrier().await()
       }
 
@@ -289,18 +285,17 @@ class MetalRenderTargetTest {
             .await()
           surfaceMap.resize(LogicalExtent(16u, 8u, 1.0)).await()
           runtime.barrier().await()
-          assertSame(surfaceMap, session.map())
           assertEquals(RenderResult.RENDERED, session.awaitRenderedFrame().disposition)
         } finally {
           session.abandonAndClose()
           runtime.barrier().await()
         }
       } finally {
-        surfaceMap.close().await()
+        surfaceMap.release().await()
         runtime.barrier().await()
       }
     } finally {
-      runtime.close().await()
+      runtime.release().await()
     }
   }
 
@@ -346,7 +341,7 @@ class MetalRenderTargetTest {
           runtime.barrier().await()
         }
       } finally {
-        borrowedMap.close().await()
+        borrowedMap.release().await()
         runtime.barrier().await()
       }
 
@@ -366,11 +361,11 @@ class MetalRenderTargetTest {
           runtime.barrier().await()
         }
       } finally {
-        surfaceMap.close().await()
+        surfaceMap.release().await()
         runtime.barrier().await()
       }
     } finally {
-      runtime.close().await()
+      runtime.release().await()
     }
   }
 

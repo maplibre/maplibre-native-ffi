@@ -10,6 +10,7 @@ import org.maplibre.nativeffi.error.UnsupportedFeatureException
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LatLng
 import org.maplibre.nativeffi.generated.MapOptions
+import org.maplibre.nativeffi.generated.MapProjectionHandle
 import org.maplibre.nativeffi.generated.MetalContextDescriptor
 import org.maplibre.nativeffi.generated.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.OpenglContextDescriptor
@@ -40,8 +41,8 @@ class DescriptorValidationTest {
       assertInvalidCoordinateDiagnostic { GeneratedApi.projectedMetersForLatLng(invalidCoordinate) }
     } finally {
       projection?.close()
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -100,8 +101,8 @@ class DescriptorValidationTest {
         )
       }
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 

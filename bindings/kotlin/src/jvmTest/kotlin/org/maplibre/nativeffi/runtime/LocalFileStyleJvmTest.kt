@@ -5,9 +5,10 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.RuntimeEventSourceType
 import org.maplibre.nativeffi.generated.RuntimeEventType
-import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.generated.RuntimeHandle
 
 class LocalFileStyleJvmTest {
   @Test
@@ -34,7 +35,7 @@ class LocalFileStyleJvmTest {
           map.setStyleUrl(styleFile.toUri().toASCIIString()).await()
           assertTrue(waitForStyleLoaded(runtime, map))
         } finally {
-          map.close()
+          map.release()
         }
       }
     } finally {

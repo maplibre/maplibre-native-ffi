@@ -1,14 +1,14 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
 import org.lwjgl.vulkan.VK10
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.RenderResult
+import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.VulkanContextDescriptor
 import org.maplibre.nativeffi.generated.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.VulkanSurfaceDescriptor
-import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.render.NativePointer
-import org.maplibre.nativeffi.render.RenderSessionHandle
 
 internal object VulkanRenderTarget {
   fun attach(
@@ -83,7 +83,7 @@ internal object VulkanRenderTarget {
           )
           .let { attachment -> RenderTarget.finishAttachment(attachment.session, attachment.ready) }
       compositor = VulkanTextureCompositor(context, viewport)
-      return BorrowedTexture(context, session, compositor, image)
+      return BorrowedTexture(context, map, session, compositor, image)
     } catch (error: RuntimeException) {
       RenderTarget.closeSuppressed(error, compositor)
       RenderTarget.closeSuppressed(error, session)
@@ -188,6 +188,7 @@ internal object VulkanRenderTarget {
 
   private class BorrowedTexture(
     private val context: VulkanContext,
+    private val map: MapHandle,
     private val session: RenderSessionHandle,
     private val compositor: VulkanTextureCompositor,
     private var image: VulkanBorrowedImage,
@@ -216,7 +217,7 @@ internal object VulkanRenderTarget {
       image = replacement
       // A handover replaces only the graphics resource, so the map still needs the new
       // extent.
-      RenderTarget.resizeMap(session.map(), viewport)
+      RenderTarget.resizeMap(map, viewport)
     }
 
     override fun renderUpdate(): Boolean {

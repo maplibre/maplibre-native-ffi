@@ -1,16 +1,20 @@
 // Generated from handle ownership plans. Do not edit.
 package org.maplibre.nativeffi.generated
 
-import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
-import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
-
-public actual class EventBatchHandle internal constructor(private val handle: Long) :
-  GeneratedEventBatchOperations(), AutoCloseable {
+public actual class EventBatchHandle
+internal constructor(
+  private val handle: Long,
+  dispose: (Long) -> Unit = GeneratedOwnerDisposal::eventBatch,
+) : GeneratedEventBatchOperations(), AutoCloseable {
   private val core =
-    HandleStateCore("EventBatchHandle", handle, dispose = GeneratedOwnerDisposal::eventBatch)
+    org.maplibre.nativeffi.internal.lifecycle.HandleStateCore(
+      "EventBatchHandle",
+      handle,
+      dispose = dispose,
+    )
 
   init {
-    HandleLeakCleaner.register(this, core.leakReport)
+    org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner.register(this, core.leakReport)
   }
 
   internal override fun bindingEventBatchHandle(): Long {
@@ -30,9 +34,6 @@ public actual class EventBatchHandle internal constructor(private val handle: Lo
     get() = core.isReleased()
 
   public actual override fun close() {
-    core.closeOnce({
-      GeneratedOwnerDisposal.eventBatch(handle)
-      0
-    })
+    release()
   }
 }

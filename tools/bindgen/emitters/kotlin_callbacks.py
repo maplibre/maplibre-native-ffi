@@ -2,7 +2,7 @@
 
 from types import SimpleNamespace
 
-from .kotlin_values import Unsupported, identifier, name
+from .kotlin_values import Unsupported, identifier, name, owner_class
 
 ROOTS = "org.maplibre.nativeffi.internal.callback.CallbackRoots"
 SCOPE = "org.maplibre.nativeffi.internal.callback.CallbackRegistrationScope"
@@ -266,17 +266,10 @@ def callback_thunk(value, field, values, platform):
             continue
         local = identifier(parameter.name)
         if decision and parameter.name == decision.parameter:
-            carrier = (
-                local
-                if platform == "androidMain"
-                else f"org.maplibre.nativeffi.internal.lifecycle.NativeResourceRequest({local})"
-                if platform == "jvmMain"
-                else f"org.maplibre.nativeffi.internal.lifecycle.resourceRequestHandle({local})"
-            )
             lines.append(
-                f"      val requestOwner = org.maplibre.nativeffi.resource.ResourceRequestHandle({carrier})"
+                f"      val decisionOwner = {owner_class(decision.handle.native)}({local})"
             )
-            arguments.append("requestOwner")
+            arguments.append("decisionOwner")
         elif parameter.value.kind == "record" and platform == "nativeMain":
             arguments.append(
                 f"{local}.useContents {{ {values.cast_public(parameter.value, 'this', platform)} }}"
@@ -292,7 +285,7 @@ def callback_thunk(value, field, values, platform):
     invocation = f"invoke({', '.join(arguments)})"
     if decision:
         lines += [
-            f"      return try {{ requestOwner.finishBindingDecision({invocation}.rawValue.toUInt()) }} catch (_: Throwable) {{ requestOwner.finishBindingException() }} finally {{ org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(requestOwner) }}"
+            f"      return try {{ decisionOwner.finishBindingDecision({invocation}.rawValue.toUInt()) }} catch (_: Throwable) {{ decisionOwner.finishBindingException() }} finally {{ org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(decisionOwner) }}"
             + (".toInt()" if platform != "nativeMain" else "")
         ]
     elif callback.result.native == "void":
@@ -547,10 +540,8 @@ def operation(plan, values, platform):
         if decision:
             arguments[0] = "raw"
             hook = (
-                "bindingCompleteResourceRequestHandle"
-                if plan.name == decision.complete
-                else "bindingReadResourceRequestHandle"
-            )
+                "bindingComplete" if plan.name == decision.complete else "bindingRead"
+            ) + name(decision.handle.native)
             start = f"{hook} {{ raw -> {arena}"
             if returns == "Boolean":
                 output = (
@@ -649,7 +640,7 @@ def direct_conversions(values, platform):
             parameter = callback.parameters[0]
             function = "generatedDirect" + public
             thunks.append(
-                f"private fun {function}({identifier(parameter.name)}: {native_type(parameter.value, values, platform)}) {{ try {{ org.maplibre.nativeffi.internal.callback.ResourceRequestCancelRegistry.dispatch({token_expression(parameter.name, platform)}) }} catch (_: Throwable) {{}} }}"
+                f"private fun {function}({identifier(parameter.name)}: {native_type(parameter.value, values, platform)}) {{ try {{ org.maplibre.nativeffi.internal.callback.DecisionCancelRegistry.dispatch({token_expression(parameter.name, platform)}) }} catch (_: Throwable) {{}} }}"
             )
             stubs.append(
                 f"  val {public}Stub = {stub(callback_value.native, function, values, platform)}"
@@ -670,7 +661,7 @@ def direct_conversions(values, platform):
 
 
 def direct_operation(plan, values, platform):
-    from .kotlin_ir import admission
+    from .kotlin_ir import admission, receiver_value
 
     if len(plan.direct_registrations) != 1:
         raise Unsupported(
@@ -761,7 +752,8 @@ def direct_operation(plan, values, platform):
     )
     invoke = f"{{ val scope = {ADMISSION}.scope(owner, {allowed}); try {{ callback() }} finally {{ scope.close() }} }}"
     call = f"{prefix}{plan.name}(raw, GeneratedDirectCallbacks.{public}Stub, {token}, {output_pointer})"
-    return f"  public actual fun {method}({params}): Boolean {{ {loaded}val owner = bindingResourceRequestHandleHandle().toLong(); {admission(plan)}; return bindingRegisterResourceRequestHandleCancel({invoke}) {{ raw, token -> {arena} val out = {output}; val status = {call}; org.maplibre.nativeffi.internal.callback.ResourceRequestCancelSetResult(status, {read}) }} }} }}\n"
+    family = name(receiver_value(plan).native)
+    return f"  public actual fun {method}({params}): Boolean {{ {loaded}val owner = binding{family}Handle().toLong(); {admission(plan)}; return bindingRegister{family}Cancel({invoke}) {{ raw, token -> {arena} val out = {output}; val status = {call}; org.maplibre.nativeffi.internal.callback.DecisionCancelSetResult(status, {read}) }} }} }}\n"
 
 
 def android_bridge(values):

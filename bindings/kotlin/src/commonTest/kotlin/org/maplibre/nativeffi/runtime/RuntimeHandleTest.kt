@@ -13,6 +13,7 @@ import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.generated.AmbientCacheOperation
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.NetworkStatus
 import org.maplibre.nativeffi.generated.OfflineGeometryRegionDefinition
 import org.maplibre.nativeffi.generated.OfflineRegionDefinition
@@ -22,6 +23,7 @@ import org.maplibre.nativeffi.generated.ResourceErrorReason
 import org.maplibre.nativeffi.generated.ResourceKind
 import org.maplibre.nativeffi.generated.ResourceProvider
 import org.maplibre.nativeffi.generated.ResourceProviderDecision
+import org.maplibre.nativeffi.generated.ResourceRequestHandle
 import org.maplibre.nativeffi.generated.ResourceResponse
 import org.maplibre.nativeffi.generated.ResourceResponseStatus
 import org.maplibre.nativeffi.generated.ResourceTransform
@@ -29,8 +31,7 @@ import org.maplibre.nativeffi.generated.RuntimeEvent
 import org.maplibre.nativeffi.generated.RuntimeEventPayload
 import org.maplibre.nativeffi.generated.RuntimeEventSourceType
 import org.maplibre.nativeffi.generated.RuntimeEventType
-import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.resource.ResourceRequestHandle
+import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.sleepMillis
 
 @OptIn(ExperimentalAtomicApi::class)
@@ -41,9 +42,9 @@ class RuntimeHandleTest {
 
     assertFalse(runtime.isClosed)
     runtime.barrier().await()
-    val tornDown = runtime.close()
+    val tornDown = runtime.release()
     // A second close reports the same teardown instead of starting another one.
-    assertEquals(tornDown, runtime.close())
+    assertEquals(tornDown, runtime.release())
 
     assertTrue(runtime.isClosed)
     assertFailsWith<InvalidStateException> { runtime.barrier().await() }
@@ -63,10 +64,10 @@ class RuntimeHandleTest {
         )
         .await()
     map.setStyleUrl("custom://never-served.json").await()
-    map.close()
+    map.release()
 
     // The report arrives only after the released map's teardown finishes too.
-    runtime.close().await()
+    runtime.release().await()
 
     assertTrue(runtime.isClosed)
     assertTrue(map.isClosed)
@@ -83,7 +84,7 @@ class RuntimeHandleTest {
   fun ambientCacheOperationRemainsUsableAfterRuntimeClose(): Unit = runSuspendTest {
     val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
     val completion = runtime.runAmbientCacheOperation(AmbientCacheOperation.INVALIDATE)
-    runtime.close()
+    runtime.release()
     assertTrue(runtime.isClosed)
     completion.await()
   }
@@ -94,7 +95,7 @@ class RuntimeHandleTest {
       GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:"))
     runtime.setMaximumAmbientCacheSize(8uL shl 20).await()
 
-    runtime.close()
+    runtime.release()
   }
 
   @Test
@@ -174,7 +175,7 @@ class RuntimeHandleTest {
         assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED))
         assertEquals("https://demotiles.maplibre.org/style.json", resolvedUrl.load())
       } finally {
-        map.close()
+        map.release()
       }
     }
   }
@@ -230,7 +231,7 @@ class RuntimeHandleTest {
         callbackError.load()?.let { throw AssertionError("resource provider callback failed", it) }
         assertEquals(1, calls.load())
       } finally {
-        map.close()
+        map.release()
       }
     }
   }
@@ -276,7 +277,7 @@ class RuntimeHandleTest {
         }
         assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED))
       } finally {
-        map.close()
+        map.release()
       }
     }
   }
@@ -324,7 +325,7 @@ class RuntimeHandleTest {
         runtime.drainEvents().use { it.get().events }
         assertEquals(copiedMessage, event.message)
       } finally {
-        map.close()
+        map.release()
       }
     }
   }
@@ -359,7 +360,7 @@ class RuntimeHandleTest {
       map.setStyleUrl("custom://cancelled-style.json").await()
       val handle = waitForHandledRequest(runtime, handledRequest)
 
-      map.close()
+      map.release()
 
       assertTrue(waitForRequestCancellation(runtime, handle))
       assertFailsWith<InvalidStateException> {
@@ -387,7 +388,7 @@ class RuntimeHandleTest {
         handle.resourceRequestSetCancelCallback { rejectedCancels.addAndFetch(1) }
       }
 
-      map.close().await()
+      map.release().await()
 
       assertTrue(waitForCondition { cancels.load() == 1 })
       assertTrue(handle.resourceRequestCancelled())
@@ -417,7 +418,7 @@ class RuntimeHandleTest {
         closes.addAndFetch(1)
       }
 
-      map.close().await()
+      map.release().await()
 
       assertTrue(waitForCondition { closes.load() == 1 })
       assertFailsWith<InvalidStateException> { handle.resourceRequestCancelled() }
@@ -433,7 +434,7 @@ class RuntimeHandleTest {
       val map = createSmallMap(runtime)
       map.setStyleUrl("custom://late-cancel-callback-style.json").await()
       val handle = waitForHandledRequest(runtime, handledRequest)
-      map.close().await()
+      map.release().await()
       assertTrue(waitForRequestCancellation(runtime, handle))
 
       val cancels = AtomicInt(0)
@@ -462,7 +463,7 @@ class RuntimeHandleTest {
       assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED))
 
       // MapLibre runs its cancel hook on every request teardown, including a completed one.
-      map.close().await()
+      map.release().await()
 
       repeat(CANCEL_SETTLE_ROUNDS) {
         runtime.barrier().await()
@@ -525,7 +526,7 @@ class RuntimeHandleTest {
         // Clearing an already cleared provider stays a successful no-op.
         runtime.clearResourceProvider().await()
       } finally {
-        map.close()
+        map.release()
       }
     }
   }
@@ -577,7 +578,7 @@ class RuntimeHandleTest {
           waitForMapLoadingFailure(runtime, map, "unsupported://after-clear-style.json")
           assertEquals(callsBeforeClear, calls.load())
         } finally {
-          map.close().await()
+          map.release().await()
         }
       }
     } finally {
@@ -623,7 +624,7 @@ class RuntimeHandleTest {
           handle.resourceRequestComplete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
         }
       } finally {
-        map.close()
+        map.release()
       }
     }
   }
@@ -638,7 +639,7 @@ class RuntimeHandleTest {
             ResourceProvider(
               callback = provider@{ request, _ ->
                   if (request.requestedUrl == "custom://close-during-provider.json") {
-                    closeError.store(assertFailsWith<InvalidStateException> { runtime.close() })
+                    closeError.store(assertFailsWith<InvalidStateException> { runtime.release() })
                   }
                   ResourceProviderDecision.PASS_THROUGH
                 }
@@ -660,7 +661,7 @@ class RuntimeHandleTest {
           assertTrue(waitForCondition { closeError.load() != null })
           assertFalse(runtime.isClosed)
         } finally {
-          map.close()
+          map.release()
         }
       }
     }
@@ -675,7 +676,7 @@ class RuntimeHandleTest {
             ResourceTransform(
               callback = transform@{ kind, url, response ->
                   if (url == "http://example.invalid/close-during-transform.json") {
-                    closeError.store(assertFailsWith<InvalidStateException> { runtime.close() })
+                    closeError.store(assertFailsWith<InvalidStateException> { runtime.release() })
                   }
                   GeneratedApi.resourceTransformResponseSetUrl(
                     response,
@@ -700,7 +701,7 @@ class RuntimeHandleTest {
           assertTrue(waitForCondition { closeError.load() != null })
           assertFalse(runtime.isClosed)
         } finally {
-          map.close()
+          map.release()
         }
       }
     }

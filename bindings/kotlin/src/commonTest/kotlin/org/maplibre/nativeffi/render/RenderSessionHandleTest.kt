@@ -7,7 +7,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.error.InvalidArgumentException
@@ -96,7 +95,7 @@ class RenderSessionHandleTest {
   fun staticRenderWaitingForStyleKeepsThePreviousProjection(): Unit = runSuspendTest {
     withOwnedTextureSession(mapMode = MapMode.STATIC) { runtime, map, owned ->
       val session = owned.session
-      val pending = AtomicReference<org.maplibre.nativeffi.resource.ResourceRequestHandle?>(null)
+      val pending = AtomicReference<org.maplibre.nativeffi.generated.ResourceRequestHandle?>(null)
       session.completeOnDriver(
         runtime.setResourceProvider(
           ResourceProvider(
@@ -157,7 +156,7 @@ class RenderSessionHandleTest {
 
   @Test
   fun renderedProjectionFollowsRenderedUpdatesAndOutlivesTheSession(): Unit = runSuspendTest {
-    var retained: org.maplibre.nativeffi.map.MapProjectionHandle? = null
+    var retained: org.maplibre.nativeffi.generated.MapProjectionHandle? = null
     try {
       withOwnedTextureSession { runtime, map, owned ->
         val session = owned.session
@@ -197,7 +196,6 @@ class RenderSessionHandleTest {
   fun ownedTextureSessionRendersReadsBackAcquiresAFrameAndDetaches(): Unit = runSuspendTest {
     withOwnedTextureSession { runtime, map, owned ->
       val session = owned.session
-      assertSame(map, session.map())
       assertEquals(RenderDriverKind.CALLER_GRAPHICS_THREAD, session.getCapabilities().driver)
       assertTrue(RenderSessionCapabilityFlag.READBACK in session.getCapabilities().flags)
       assertEquals(RenderSessionState.ATTACHED, session.getSnapshot().state)
@@ -235,7 +233,7 @@ class RenderSessionHandleTest {
       assertEquals(rendered.frameGeneration, frame.getResult().frameGeneration)
       assertEquals(OwnedTextureFrameSize(32, 16), owned.frameSize(frame))
       frame.release()
-      assertTrue(frame.isReleased)
+      assertTrue(frame.isClosed)
 
       // the scale factor is fixed at attachment, so only width and height may change.
       assertFailsWith<InvalidArgumentException> {
@@ -336,7 +334,7 @@ class RenderSessionHandleTest {
       assertTrue(failure is MaplibreException, "expected a target-lost failure: $failure")
       assertEquals(MaplibreStatus.TARGET_LOST, failure.status)
       frame.release()
-      assertTrue(frame.isReleased)
+      assertTrue(frame.isClosed)
       assertEquals(RenderSessionState.ABANDONED, session.getSnapshot().state)
     }
   }

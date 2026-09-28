@@ -2,8 +2,10 @@ package org.maplibre.nativeffi.render
 
 import android.opengl.EGL14
 import android.opengl.EGLConfig
+import org.maplibre.nativeffi.generated.AcquiredFrameHandle
 import org.maplibre.nativeffi.generated.EglContextDescriptor
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.OpenglClientApi
 import org.maplibre.nativeffi.generated.OpenglContextDescriptor
 import org.maplibre.nativeffi.generated.OpenglContextDescriptorData
@@ -12,7 +14,6 @@ import org.maplibre.nativeffi.generated.OpenglOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.RenderBackendFlag
 import org.maplibre.nativeffi.generated.RenderSessionAttachment
 import org.maplibre.nativeffi.generated.RenderTargetExtent
-import org.maplibre.nativeffi.map.MapHandle
 
 private const val EGL_OPENGL_ES3_BIT = 0x00000040
 
@@ -32,6 +33,7 @@ internal actual object OwnedTextureTestSupport {
 }
 
 private class AndroidEglOwnedTextureSession(
+  private val map: MapHandle,
   private val display: android.opengl.EGLDisplay,
   private val config: EGLConfig,
   private val surface: android.opengl.EGLSurface,
@@ -47,18 +49,16 @@ private class AndroidEglOwnedTextureSession(
         clientApi = OpenglClientApi.GLES,
         getProcAddress = NativePointer.NULL_POINTER,
       )
-    return session
-      .map()
-      .openglOwnedTextureAttach(
-        OpenglOwnedTextureDescriptor(
-          RenderTargetExtent(width.toUInt(), height.toUInt(), 1.0),
-          OpenglContextDescriptor(
-            OpenglContextOwnership.SHARED,
-            OpenglContextDescriptorData.Egl(descriptor),
-          ),
+    return map.openglOwnedTextureAttach(
+      OpenglOwnedTextureDescriptor(
+        RenderTargetExtent(width.toUInt(), height.toUInt(), 1.0),
+        OpenglContextDescriptor(
+          OpenglContextOwnership.SHARED,
+          OpenglContextDescriptorData.Egl(descriptor),
         ),
-        OWNED_TEXTURE_ATTACH_OPTIONS,
-      )
+      ),
+      OWNED_TEXTURE_ATTACH_OPTIONS,
+    )
   }
 
   override fun frameSize(frame: AcquiredFrameHandle): OwnedTextureFrameSize {
@@ -121,7 +121,7 @@ private fun createEglSession(
         ),
         OWNED_TEXTURE_ATTACH_OPTIONS.copy(requestedTextureRingDepth = textureRingDepth),
       )
-    return AndroidEglOwnedTextureSession(display, config, surface, context, attachment)
+    return AndroidEglOwnedTextureSession(map, display, config, surface, context, attachment)
   } catch (error: Throwable) {
     releaseEgl(display, surface, context)
     throw error

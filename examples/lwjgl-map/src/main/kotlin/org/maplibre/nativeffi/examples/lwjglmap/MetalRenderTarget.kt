@@ -1,13 +1,13 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.MetalContextDescriptor
 import org.maplibre.nativeffi.generated.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.MetalSurfaceDescriptor
 import org.maplibre.nativeffi.generated.RenderResult
-import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.render.NativePointer
-import org.maplibre.nativeffi.render.RenderSessionHandle
 
 internal object MetalRenderTarget {
   fun attach(
@@ -81,7 +81,7 @@ internal object MetalRenderTarget {
           )
           .let { attachment -> RenderTarget.finishAttachment(attachment.session, attachment.ready) }
       compositor = MetalTextureCompositor(context)
-      return BorrowedTexture(context, session, compositor, texture)
+      return BorrowedTexture(context, map, session, compositor, texture)
     } catch (error: RuntimeException) {
       RenderTarget.closeSuppressed(error, compositor)
       RenderTarget.closeSuppressed(error, session)
@@ -172,6 +172,7 @@ internal object MetalRenderTarget {
 
   private class BorrowedTexture(
     private val context: MetalContext,
+    private val map: MapHandle,
     private val session: RenderSessionHandle,
     private val compositor: MetalTextureCompositor,
     private var texture: MetalBorrowedTexture,
@@ -201,7 +202,7 @@ internal object MetalRenderTarget {
       texture = replacement
       // A handover replaces only the graphics resource, so the map still needs the new
       // extent.
-      RenderTarget.resizeMap(session.map(), viewport)
+      RenderTarget.resizeMap(map, viewport)
     }
 
     override fun renderUpdate(): Boolean {

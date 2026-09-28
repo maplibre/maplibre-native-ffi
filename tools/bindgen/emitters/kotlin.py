@@ -5,7 +5,7 @@ from tools.bindgen.managed_contracts import conflicting_functions
 from tools.bindgen.model import Api
 from tools.bindgen.semantic import BoundApi
 
-from . import kotlin_callbacks, kotlin_ir
+from . import kotlin_callbacks, kotlin_ir, kotlin_owners
 from .kotlin_values import Unsupported, Values, generated_owners
 from .kotlin_values import name as value_name
 
@@ -96,9 +96,8 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         outputs[
             f"src/{platform}/kotlin/org/maplibre/nativeffi/generated/GeneratedOwnerDisposal.kt"
         ] = source
-    from .kotlin_owners import generate_owners
-
-    outputs.update(generate_owners(bound))
+    plans = [bound.operations_by_name[function.name] for function in functions]
+    outputs.update(kotlin_owners.generate_owners(bound, plans))
     for platform in ("commonMain", "jvmMain", "androidMain", "nativeMain"):
         imports = [
             "kotlinx.coroutines.Deferred",
@@ -112,8 +111,6 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
             "org.maplibre.nativeffi.generated." + value_name(v.native)
             for v in values.used.values()
         ]
-        if platform != "commonMain":
-            imports += ["org.maplibre.nativeffi.internal.lifecycle.OwnerAdoption"]
         if platform == "jvmMain":
             imports += [
                 "java.lang.foreign.Arena",
@@ -149,14 +146,12 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
             groups.setdefault(receiver, []).append(function)
         # Every generated owner extends its operations class, even when no
         # operation names it as a receiver.
-        for owner in ("mln_map", *generated_owners(bound)):
-            if owner in bound.handles:
-                groups.setdefault(owner, [])
+        for owner in generated_owners(bound):
+            groups.setdefault(owner, [])
         for receiver, members in groups.items():
             family = value_name(receiver) if receiver else "Api"
             class_name = "Generated" + family + ("Operations" if receiver else "")
-            package = "map" if receiver == "mln_map" else "generated"
-            source = f"// Generated from the C headers by tools/bindgen. Do not edit.\npackage org.maplibre.nativeffi.{package}\n\n"
+            source = "// Generated from the C headers by tools/bindgen. Do not edit.\npackage org.maplibre.nativeffi.generated\n\n"
             source += "\n".join(f"import {n}" for n in sorted(imports)) + "\n\n"
             if platform == "nativeMain":
                 source += "@OptIn(ExperimentalForeignApi::class)\n"
@@ -184,46 +179,26 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                     )
                     if callback_owner:
                         source += "  internal val bindingCallbacks = org.maplibre.nativeffi.internal.callback.CallbackOwner()\n"
-                    source += f"  internal abstract fun binding{family}Handle(): {'ULong' if platform == 'nativeMain' else 'Long'}\n"
-                    if any(
-                        kotlin_ir.needs_read(bound.operations_by_name[f.name])
-                        for f in members
-                    ):
-                        raw = "ULong" if platform == "nativeMain" else "Long"
+                    raw = "ULong" if platform == "nativeMain" else "Long"
+                    needs = kotlin_owners.hooks(
+                        bound,
+                        receiver,
+                        [bound.operations_by_name[f.name] for f in members],
+                    )
+                    source += (
+                        f"  internal abstract fun binding{family}Handle(): {raw}\n"
+                    )
+                    if needs.read:
                         source += f"  internal abstract fun <T> bindingRead{family}(block: ({raw}) -> T): T\n"
-                    if any(
-                        callback.decision
-                        and callback.decision.handle.native == receiver
-                        for callback in bound.callbacks.values()
-                    ):
-                        raw = "ULong" if platform == "nativeMain" else "Long"
+                    if needs.decision:
                         source += f"  internal abstract fun bindingComplete{family}(call: ({raw}) -> Int)\n"
-                        source += f"  internal abstract fun <T> bindingRead{family}(block: ({raw}) -> T): T\n"
-                        source += f"  internal abstract fun bindingRegister{family}Cancel(callback: () -> Unit, call: ({raw}, Long) -> org.maplibre.nativeffi.internal.callback.ResourceRequestCancelSetResult): Boolean\n"
-                    if any(
-                        bound.operations_by_name[f.name].receiver_access == "issued"
-                        for f in members
-                    ):
-                        source += f"  internal abstract fun bindingIssued{family}Handle(): {'ULong' if platform == 'nativeMain' else 'Long'}\n"
-                    if any(
-                        bound.operations_by_name[f.name].consumes
-                        and not bound.operations_by_name[f.name].completion
-                        for f in members
-                    ):
-                        source += f"  internal abstract fun bindingClose{family}(call: ({'ULong' if platform == 'nativeMain' else 'Long'}) -> Int)\n"
-                    if any(
-                        bound.operations_by_name[f.name].consumes
-                        and bound.operations_by_name[f.name].completion
-                        for f in members
-                    ):
-                        source += f"  internal abstract fun bindingRetire{family}(call: ({'ULong' if platform == 'nativeMain' else 'Long'}) -> Deferred<Unit>): Deferred<Unit>\n"
-
-                if platform != "commonMain" and any(
-                    bound.handles.get(receiver)
-                    and bound.handles[receiver].abandon == f.name
-                    for f in members
-                ):
-                    source += "  internal abstract fun invalidateBindingViews()\n"
+                        source += f"  internal abstract fun bindingRegister{family}Cancel(callback: () -> Unit, call: ({raw}, Long) -> org.maplibre.nativeffi.internal.callback.DecisionCancelSetResult): Boolean\n"
+                    if needs.issued:
+                        source += f"  internal abstract fun bindingIssued{family}Handle(): {raw}\n"
+                    if needs.close:
+                        source += f"  internal abstract fun bindingClose{family}(call: ({raw}) -> Int)\n"
+                    if needs.retire:
+                        source += f"  internal abstract fun bindingRetire{family}(call: ({raw}) -> Deferred<Unit>): Deferred<Unit>\n"
             else:
                 source += (
                     "public expect object GeneratedApi {\n"
@@ -239,7 +214,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                 )
             source += "\n".join(bodies) + "}\n"
             outputs[
-                f"src/{platform}/kotlin/org/maplibre/nativeffi/{package}/{class_name}.kt"
+                f"src/{platform}/kotlin/org/maplibre/nativeffi/generated/{class_name}.kt"
             ] = source
     outputs[
         "src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedValues.kt"

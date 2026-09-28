@@ -960,7 +960,7 @@ public class MetalOwnedTextureFrame(
   device: org.maplibre.nativeffi.render.NativePointer,
   pixelFormat: ULong = 0uL,
 ) {
-  internal var bindingScope: org.maplibre.nativeffi.render.FrameScope? = null
+  internal var bindingScope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null
   private val storedGeneration: ULong = generation
   public val generation: ULong
     get() {
@@ -1030,7 +1030,7 @@ public class OpenglOwnedTextureFrame(
   format: UInt = 0u,
   type: UInt = 0u,
 ) {
-  internal var bindingScope: org.maplibre.nativeffi.render.FrameScope? = null
+  internal var bindingScope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null
   private val storedGeneration: ULong = generation
   public val generation: ULong
     get() {
@@ -1107,7 +1107,7 @@ public class GpuSync(
   `object`: ULong = 0uL,
   value: ULong = 0uL,
 ) {
-  internal var bindingScope: org.maplibre.nativeffi.render.FrameScope? = null
+  internal var bindingScope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null
   private val storedKind: GpuSyncKind = kind
   public val kind: GpuSyncKind
     get() {
@@ -1151,7 +1151,7 @@ public class VulkanOwnedTextureFrame(
   format: UInt = 0u,
   layout: UInt = 0u,
 ) {
-  internal var bindingScope: org.maplibre.nativeffi.render.FrameScope? = null
+  internal var bindingScope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null
   private val storedGeneration: ULong = generation
   public val generation: ULong
     get() {
@@ -1234,7 +1234,7 @@ public class WebgpuOwnedTextureFrame(
   device: org.maplibre.nativeffi.render.NativePointer,
   format: UInt = 0u,
 ) {
-  internal var bindingScope: org.maplibre.nativeffi.render.FrameScope? = null
+  internal var bindingScope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null
   private val storedGeneration: ULong = generation
   public val generation: ULong
     get() {
@@ -2010,7 +2010,7 @@ public data class ResourceRequestRange(
 )
 
 public data class RenderSessionAttachment(
-  public val session: org.maplibre.nativeffi.render.RenderSessionHandle,
+  public val session: org.maplibre.nativeffi.generated.RenderSessionHandle,
   public val ready: kotlinx.coroutines.Deferred<Unit>,
 )
 
@@ -2077,7 +2077,7 @@ public data class ResourceProvider(public val callback: ResourceProviderCallback
 
 public typealias ResourceProviderCallback =
   (
-    request: ResourceRequest, handle: org.maplibre.nativeffi.resource.ResourceRequestHandle,
+    request: ResourceRequest, handle: org.maplibre.nativeffi.generated.ResourceRequestHandle,
   ) -> ResourceProviderDecision
 
 public data class ResourceTransform(public val callback: ResourceTransformCallback)

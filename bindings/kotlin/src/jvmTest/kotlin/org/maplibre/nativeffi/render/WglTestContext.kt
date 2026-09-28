@@ -4,13 +4,13 @@ import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.glfw.GLFWNativeWGL.glfwGetWGLContext
 import org.lwjgl.glfw.GLFWNativeWin32.glfwGetWin32Window
 import org.lwjgl.system.windows.User32
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.OpenglContextDescriptor
 import org.maplibre.nativeffi.generated.OpenglContextDescriptorData
 import org.maplibre.nativeffi.generated.OpenglContextOwnership
 import org.maplibre.nativeffi.generated.OpenglOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.RenderTargetExtent
 import org.maplibre.nativeffi.generated.WglContextDescriptor
-import org.maplibre.nativeffi.map.MapHandle
 
 internal fun attachJvmWgl(
   map: MapHandle,

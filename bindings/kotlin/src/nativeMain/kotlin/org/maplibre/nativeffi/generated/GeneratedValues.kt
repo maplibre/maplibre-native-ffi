@@ -31,7 +31,7 @@ internal object GeneratedValues {
 
   fun readMetalOwnedTextureFrame(
     source: mln_metal_owned_texture_frame,
-    scope: org.maplibre.nativeffi.render.FrameScope? = null,
+    scope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null,
   ): MetalOwnedTextureFrame =
     MetalOwnedTextureFrame(
         generation = source.generation,
@@ -87,7 +87,7 @@ internal object GeneratedValues {
 
   fun readOpenglOwnedTextureFrame(
     source: mln_opengl_owned_texture_frame,
-    scope: org.maplibre.nativeffi.render.FrameScope? = null,
+    scope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null,
   ): OpenglOwnedTextureFrame =
     OpenglOwnedTextureFrame(
         generation = source.generation,
@@ -114,7 +114,7 @@ internal object GeneratedValues {
 
   fun readGpuSync(
     source: mln_gpu_sync,
-    scope: org.maplibre.nativeffi.render.FrameScope? = null,
+    scope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null,
   ): GpuSync =
     GpuSync(kind = GpuSyncKind(source.kind), `object` = source.`object`, value = source.value)
       .also { it.bindingScope = scope }
@@ -171,7 +171,7 @@ internal object GeneratedValues {
 
   fun readVulkanOwnedTextureFrame(
     source: mln_vulkan_owned_texture_frame,
-    scope: org.maplibre.nativeffi.render.FrameScope? = null,
+    scope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null,
   ): VulkanOwnedTextureFrame =
     VulkanOwnedTextureFrame(
         generation = source.generation,
@@ -219,7 +219,7 @@ internal object GeneratedValues {
 
   fun readWebgpuOwnedTextureFrame(
     source: mln_webgpu_owned_texture_frame,
-    scope: org.maplibre.nativeffi.render.FrameScope? = null,
+    scope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null,
   ): WebgpuOwnedTextureFrame =
     WebgpuOwnedTextureFrame(
         generation = source.generation,
@@ -4048,20 +4048,17 @@ private fun generatedResourceProviderCallback(
         ),
       )
     try {
-      val requestOwner =
-        org.maplibre.nativeffi.resource.ResourceRequestHandle(
-          org.maplibre.nativeffi.internal.lifecycle.resourceRequestHandle(handle)
-        )
+      val decisionOwner = org.maplibre.nativeffi.generated.ResourceRequestHandle(handle)
       return try {
-        requestOwner.finishBindingDecision(
-          invoke(GeneratedValues.readResourceRequest(request!!.pointed), requestOwner)
+        decisionOwner.finishBindingDecision(
+          invoke(GeneratedValues.readResourceRequest(request!!.pointed), decisionOwner)
             .rawValue
             .toUInt()
         )
       } catch (_: Throwable) {
-        requestOwner.finishBindingException()
+        decisionOwner.finishBindingException()
       } finally {
-        org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(requestOwner)
+        org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(decisionOwner)
       }
     } finally {
       callbackScope.close()
@@ -4168,7 +4165,7 @@ private fun generatedDirectReleaseLogCallback(userData: COpaquePointer?) {
 @OptIn(ExperimentalForeignApi::class)
 private fun generatedDirectResourceRequestCancelCallback(userData: COpaquePointer?) {
   try {
-    org.maplibre.nativeffi.internal.callback.ResourceRequestCancelRegistry.dispatch(
+    org.maplibre.nativeffi.internal.callback.DecisionCancelRegistry.dispatch(
       userData?.rawValue?.toLong() ?: 0L
     )
   } catch (_: Throwable) {}

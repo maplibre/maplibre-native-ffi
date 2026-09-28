@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.render
 
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.generated.QueriedFeature
+import org.maplibre.nativeffi.generated.RenderSessionHandle
 
 internal const val QUERY_STYLE_JSON =
   """

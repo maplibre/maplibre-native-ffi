@@ -36,7 +36,7 @@ public expect object GeneratedApi {
   public fun geojsonSourceDataCreate(
     data: ByteArray,
     options: GeojsonSourceOptions? = null,
-  ): org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
+  ): org.maplibre.nativeffi.generated.GeojsonSourceDataHandle
 
   public fun geojsonSourceOptionsDefault(): GeojsonSourceOptions
 
@@ -104,7 +104,7 @@ public expect object GeneratedApi {
 
   public fun resourceTransformResponseSetUrl(response: ResourceTransformResponse, url: String): Unit
 
-  public fun runtimeCreate(options: RuntimeOptions): org.maplibre.nativeffi.runtime.RuntimeHandle
+  public fun runtimeCreate(options: RuntimeOptions): org.maplibre.nativeffi.generated.RuntimeHandle
 
   public fun runtimeOptionsDefault(): RuntimeOptions
 

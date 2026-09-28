@@ -50,9 +50,6 @@ internal class HandleStateCore(
 
   fun isReleased(): Boolean = releaseState.load() == STATE_CLOSED
 
-  /** The C API handle id this wrapper owns. */
-  fun handleId(): Long = handleId
-
   /**
    * Acquires the exclusive close lease before an asynchronous native close starts.
    *

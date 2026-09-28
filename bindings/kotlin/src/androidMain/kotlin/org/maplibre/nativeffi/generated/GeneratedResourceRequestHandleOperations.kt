@@ -15,13 +15,13 @@ internal actual constructor() {
 
   internal abstract fun bindingResourceRequestHandleHandle(): Long
 
-  internal abstract fun bindingCompleteResourceRequestHandle(call: (Long) -> Int)
-
   internal abstract fun <T> bindingReadResourceRequestHandle(block: (Long) -> T): T
+
+  internal abstract fun bindingCompleteResourceRequestHandle(call: (Long) -> Int)
 
   internal abstract fun bindingRegisterResourceRequestHandleCancel(
     callback: () -> Unit,
-    call: (Long, Long) -> org.maplibre.nativeffi.internal.callback.ResourceRequestCancelSetResult,
+    call: (Long, Long) -> org.maplibre.nativeffi.internal.callback.DecisionCancelSetResult,
   ): Boolean
 
   internal abstract fun bindingIssuedResourceRequestHandleHandle(): Long
@@ -123,10 +123,7 @@ internal actual constructor() {
               org.maplibre.nativeffi.internal.javacpp.JavaCppSupport.addressPointer(token),
               out,
             )
-          org.maplibre.nativeffi.internal.callback.ResourceRequestCancelSetResult(
-            status,
-            out.get(0),
-          )
+          org.maplibre.nativeffi.internal.callback.DecisionCancelSetResult(status, out.get(0))
         }
       }
     } finally {

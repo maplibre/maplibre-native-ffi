@@ -13,11 +13,11 @@ import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.GesturePhase
 import org.maplibre.nativeffi.generated.LatLng
 import org.maplibre.nativeffi.generated.LogicalExtent
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.RuntimeEventMask
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.ScreenPoint
-import org.maplibre.nativeffi.map.MapHandle
 
 /** Runtime and map state driven by the core-owned runtime worker. */
 internal class MapState(initialViewport: Viewport, private val startLoop: () -> Unit) :
@@ -57,8 +57,8 @@ internal class MapState(initialViewport: Viewport, private val startLoop: () -> 
       map.updateCamera(CameraUpdate(camera = initialCamera))
     } catch (error: Throwable) {
       runBlocking {
-        if (::ownedMap.isInitialized) ownedMap.close().await()
-        runtime.close().await()
+        if (::ownedMap.isInitialized) ownedMap.release().await()
+        runtime.release().await()
       }
       throw error
     }
@@ -156,9 +156,9 @@ internal class MapState(initialViewport: Viewport, private val startLoop: () -> 
     closed = true
     runBlocking {
       try {
-        map.close().await()
+        map.release().await()
       } finally {
-        runtime.close().await()
+        runtime.release().await()
       }
     }
   }

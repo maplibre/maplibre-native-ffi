@@ -32,9 +32,9 @@ class RuntimeHandleNativeTest : org.maplibre.nativeffi.NativeTestBase() {
             )
         )
         .await()
-    map.close().await()
+    map.release().await()
     assertTrue(map.isClosed)
-    runtime.close().await()
+    runtime.release().await()
     assertTrue(runtime.isClosed)
   }
 }

@@ -6,6 +6,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.PremultipliedRgba8Image
 import org.maplibre.nativeffi.generated.StyleImageOptions

@@ -51,10 +51,10 @@ class GeneratedResourceCallbackTest {
         withTimeout(5_000) { completed.await() }
         runtime.barrier().await()
       } finally {
-        map.close().await()
+        map.release().await()
       }
     } finally {
-      runtime.close().await()
+      runtime.release().await()
     }
   }
 }

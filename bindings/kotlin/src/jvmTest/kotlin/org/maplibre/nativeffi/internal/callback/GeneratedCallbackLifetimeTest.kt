@@ -6,7 +6,7 @@ import kotlin.test.assertNull
 import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.ResourceTransform
-import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.generated.RuntimeHandle
 
 class GeneratedCallbackLifetimeTest {
   @Test

@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
 import org.maplibre.nativeffi.generated.EglContextDescriptor
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.OpenglBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.OpenglClientApi
 import org.maplibre.nativeffi.generated.OpenglContextDescriptor
@@ -9,10 +10,9 @@ import org.maplibre.nativeffi.generated.OpenglContextOwnership
 import org.maplibre.nativeffi.generated.OpenglOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.OpenglSurfaceDescriptor
 import org.maplibre.nativeffi.generated.RenderResult
+import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.WglContextDescriptor
-import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.render.NativePointer
-import org.maplibre.nativeffi.render.RenderSessionHandle
 
 internal object OpenGLRenderTarget {
   fun attach(
@@ -87,7 +87,7 @@ internal object OpenGLRenderTarget {
           )
           .let { attachment -> RenderTarget.finishAttachment(attachment.session, attachment.ready) }
       compositor = OpenGLTextureCompositor(context, viewport)
-      return BorrowedTexture(context, session, compositor, texture)
+      return BorrowedTexture(context, map, session, compositor, texture)
     } catch (error: RuntimeException) {
       RenderTarget.closeSuppressed(error, compositor)
       RenderTarget.closeSuppressed(error, session)
@@ -202,6 +202,7 @@ internal object OpenGLRenderTarget {
 
   private class BorrowedTexture(
     private val context: OpenGLContext,
+    private val map: MapHandle,
     private val session: RenderSessionHandle,
     private val compositor: OpenGLTextureCompositor,
     private var texture: OpenGLBorrowedTexture,
@@ -230,7 +231,7 @@ internal object OpenGLRenderTarget {
       texture = replacement
       // A handover replaces only the graphics resource, so the map still needs the new
       // extent.
-      RenderTarget.resizeMap(session.map(), viewport)
+      RenderTarget.resizeMap(map, viewport)
     }
 
     override fun renderUpdate(): Boolean {

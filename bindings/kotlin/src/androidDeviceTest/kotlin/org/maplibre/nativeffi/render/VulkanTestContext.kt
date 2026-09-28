@@ -1,9 +1,9 @@
 package org.maplibre.nativeffi.render
 
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.RenderTargetExtent
 import org.maplibre.nativeffi.generated.VulkanContextDescriptor
 import org.maplibre.nativeffi.generated.VulkanOwnedTextureDescriptor
-import org.maplibre.nativeffi.map.MapHandle
 
 internal object TestVulkanDriver {
   init {

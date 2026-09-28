@@ -6,7 +6,7 @@ import org.maplibre.nativeffi.generated.*
 import org.maplibre.nativeffi.internal.callback.*
 
 public expect abstract class GeneratedRuntimeOperations internal constructor() {
-  public fun mapCreate(options: MapOptions): Deferred<org.maplibre.nativeffi.map.MapHandle>
+  public fun mapCreate(options: MapOptions): Deferred<org.maplibre.nativeffi.generated.MapHandle>
 
   public fun barrier(): Deferred<Unit>
 

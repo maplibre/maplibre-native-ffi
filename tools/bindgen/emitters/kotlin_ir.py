@@ -6,13 +6,7 @@ from dataclasses import replace
 
 from ..managed_contracts import LOCALS
 from . import kotlin_callbacks
-from .kotlin_values import (
-    Unsupported,
-    generated_owners,
-    identifier,
-    name,
-    release_is_asynchronous,
-)
+from .kotlin_values import Unsupported, identifier, name, owner_name
 
 
 def parameter_name(native):
@@ -98,17 +92,19 @@ def signature(plan, values):
     else:
         result_type = "CommandCompletion" if plan.execution == "command" else "Unit"
     return (
-        identifier(
-            plan.name.removeprefix(
-                receiver_type.native + "_"
-                if receiver and plan.name.startswith(receiver_type.native + "_")
-                else "mln_"
-            )
-        ),
+        method_name(plan),
         params,
         inputs,
         result,
         result_type,
+    )
+
+
+def method_name(plan):
+    """Name an operation's method after its receiver prefix, or its whole name."""
+    prefix = receiver_value(plan).native + "_" if plan.receiver else "mln_"
+    return identifier(
+        plan.name.removeprefix(prefix if plan.name.startswith(prefix) else "mln_")
     )
 
 
@@ -504,8 +500,6 @@ def immediate(plan, values, platform):
         )
     else:
         setup.append(call)
-    if any(handle.abandon == plan.name for handle in values.bound.handles.values()):
-        setup.append("invalidateBindingViews()")
     setup.append(decoded)
     arena = (
         "Arena.ofConfined().use { arena -> "
@@ -595,11 +589,8 @@ def owned_operation(plan, values, platform):
     )
 
     def adopt(raw):
-        if handle.native in generated_owners(values.bound):
-            return family + "Handle(" + raw + ")"
         return (
-            "OwnerAdoption."
-            + factory
+            owner_name(handle.native)
             + "("
             + raw
             + (", " + parent if parent else "")
@@ -628,12 +619,8 @@ def owned_operation(plan, values, platform):
     if plan.completion and not immediate_owner:
         args.append("completion")
         raw = owned_raw(platform)
-        # A late owner whose release is asynchronous must not block on it.
-        drop = (
-            "it.disposeAbandoned()"
-            if release_is_asynchronous(values.bound, handle)
-            else "it.close()"
-        )
+        # A late owner the host never saw takes the any-thread disposal path.
+        drop = "it." + disposal_method(handle) + "()"
         expression = (
             "CompletionBridge.submitOwned({ result -> "
             + adopt(raw)
@@ -686,7 +673,7 @@ def owned_operation(plan, values, platform):
         )
         if registered:
             final = returns + "(owner, ready)" if attachment else "owner"
-            disposer = identifier(handle.dispose.removeprefix(handle.native + "_"))
+            disposer = disposal_method(handle)
             wrapped = (
                 "run { val owner = "
                 + wrapped
@@ -713,6 +700,10 @@ def owned_operation(plan, values, platform):
     if platform == "nativeMain" and not plan.receiver:
         ensure = "org.maplibre.nativeffi.Maplibre.loadNativeLibrary(); " + ensure
     return f"  public actual fun {method}({params}): {returns} {{ {ensure}return {expression} }}\n"
+
+
+def disposal_method(handle):
+    return identifier(handle.dispose.removeprefix(handle.native + "_"))
 
 
 def view_operation(plan, values, platform):
@@ -777,4 +768,4 @@ def view_operation(plan, values, platform):
         + ")"
     )
     end = prefix + plan.view.owner.view_end + "(" + token_value + ")"
-    return f"  public actual fun <T> {method}(block: ({result_type}) -> T): T = {arena}\n    {admission(plan)}\n    val scope = org.maplibre.nativeffi.render.FrameScope()\n    val token = {token}\n    BindingStatus.check({begin})\n    try {{\n      val output = {allocate}\n      {size}\n      BindingStatus.check({prefix}{plan.name}({receiver_handle(plan)}, {pointer}))\n      block(GeneratedValues.read{name(native)}(output, scope))\n    }} finally {{ scope.close(); {end} }}\n  }}\n"
+    return f"  public actual fun <T> {method}(block: ({result_type}) -> T): T = {arena}\n    {admission(plan)}\n    val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()\n    val token = {token}\n    BindingStatus.check({begin})\n    try {{\n      val output = {allocate}\n      {size}\n      BindingStatus.check({prefix}{plan.name}({receiver_handle(plan)}, {pointer}))\n      block(GeneratedValues.read{name(native)}(output, scope))\n    }} finally {{ scope.close(); {end} }}\n  }}\n"

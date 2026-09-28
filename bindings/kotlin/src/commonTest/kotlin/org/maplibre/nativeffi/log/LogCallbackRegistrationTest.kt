@@ -6,7 +6,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.generated.GeneratedApi
-import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.generated.MapHandle
+import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.runtime.runSuspendTest
 import org.maplibre.nativeffi.runtime.use
 import org.maplibre.nativeffi.sleepMillis
@@ -34,7 +35,7 @@ class LogCallbackRegistrationTest {
               first.fetchAndAdd(1)
               1u
             })
-            map.emitParserWarning()
+            map.emitParserWarning(runtime)
             awaitRecord(first, "the first callback never received a record")
 
             GeneratedApi.logSetCallback({ _, _, _, _ ->
@@ -42,7 +43,7 @@ class LogCallbackRegistrationTest {
               1u
             })
             val seenByFirst = first.load()
-            map.emitParserWarning()
+            map.emitParserWarning(runtime)
             awaitRecord(second, "the replacement callback never received a record")
             assertEquals(
               seenByFirst,
@@ -52,7 +53,7 @@ class LogCallbackRegistrationTest {
 
             GeneratedApi.logClearCallback()
             val seenBySecond = second.load()
-            map.emitParserWarning()
+            map.emitParserWarning(runtime)
             assertEquals(seenBySecond, second.load(), "records arrived after the callback cleared")
           } finally {
             GeneratedApi.logClearCallback()
@@ -62,10 +63,10 @@ class LogCallbackRegistrationTest {
   }
 
   /** Loads a style whose center is the wrong JSON type, which logs a native parser warning. */
-  private suspend fun MapHandle.emitParserWarning() {
+  private suspend fun MapHandle.emitParserWarning(runtime: RuntimeHandle) {
     setStyleJson("""{"version":8,"center":false,"sources":{},"layers":[]}""".encodeToByteArray())
       .await()
-    runtime().barrier().await()
+    runtime.barrier().await()
   }
 
   /** Waits for one record, since MapLibre logs the parse on a worker of its own. */

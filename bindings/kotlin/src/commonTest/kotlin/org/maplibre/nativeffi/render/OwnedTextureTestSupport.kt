@@ -1,9 +1,11 @@
 package org.maplibre.nativeffi.render
 
 import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.generated.AcquiredFrameHandle
 import org.maplibre.nativeffi.generated.FrameDemand
 import org.maplibre.nativeffi.generated.FrameDemandFlag
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderFrameResult
@@ -11,9 +13,9 @@ import org.maplibre.nativeffi.generated.RenderResult
 import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
 import org.maplibre.nativeffi.generated.RenderSessionAttachment
 import org.maplibre.nativeffi.generated.RenderSessionCapabilityFlag
+import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.RenderSessionState
-import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.sleepMillis
 
 /** Backend texture size read from an acquired frame. */
@@ -187,8 +189,8 @@ internal suspend fun withOwnedTextureSession(
   } catch (error: Throwable) {
     failures += error
   }
-  failures.addIfFailed { map.close().await() }
-  failures.addIfFailed { runtime.close().await() }
+  failures.addIfFailed { map.release().await() }
+  failures.addIfFailed { runtime.release().await() }
   failures.firstOrNull()?.let { throw it }
 }
 
@@ -233,7 +235,7 @@ internal fun attachOwnedTextureFixture(
     override val attachment = attachment
 
     override fun attachAnotherOwnedTexture(width: Int, height: Int) =
-      attach(session.map(), width, height, OWNED_TEXTURE_ATTACH_OPTIONS)
+      attach(map, width, height, OWNED_TEXTURE_ATTACH_OPTIONS)
 
     override fun frameSize(frame: AcquiredFrameHandle) = frameSize(frame)
 

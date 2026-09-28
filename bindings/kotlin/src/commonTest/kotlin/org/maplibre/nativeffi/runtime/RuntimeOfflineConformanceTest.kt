@@ -16,6 +16,7 @@ import org.maplibre.nativeffi.generated.OfflineTilePyramidRegionDefinition
 import org.maplibre.nativeffi.generated.RuntimeEvent
 import org.maplibre.nativeffi.generated.RuntimeEventPayload
 import org.maplibre.nativeffi.generated.RuntimeEventSourceType
+import org.maplibre.nativeffi.generated.RuntimeHandle
 
 class RuntimeOfflineConformanceTest {
   private val drained = mutableListOf<RuntimeEvent>()
@@ -68,7 +69,7 @@ class RuntimeOfflineConformanceTest {
       runtime.offlineRegionDelete(created.id).await()
       assertNull(runtime.offlineRegionGet(created.id).await())
     } finally {
-      runtime.close().await()
+      runtime.release().await()
     }
   }
 

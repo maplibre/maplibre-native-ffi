@@ -7,7 +7,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.error.InvalidArgumentException
@@ -257,19 +256,18 @@ class MapHandleTest {
         .await()
 
     assertFalse(map.isClosed)
-    assertSame(runtime, map.runtime())
-    assertFailsWith<InvalidStateException> { runtime.close().await() }
+    assertFailsWith<InvalidStateException> { runtime.release().await() }
 
     map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
     map.setStyleUrl("https://example.com/style.json").await()
-    map.close().await()
-    map.close().await()
+    map.release().await()
+    map.release().await()
 
     assertTrue(map.isClosed)
     assertFailsWith<InvalidStateException> {
       map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
     }
-    runtime.close().await()
+    runtime.release().await()
     assertTrue(runtime.isClosed)
   }
 
@@ -305,8 +303,8 @@ class MapHandleTest {
     assertFailsWith<InvalidArgumentException> { map.resize(LogicalExtent(320u, 200u, 1.0)).await() }
     assertEquals(LogicalExtent(320u, 200u, 2.0), map.snapshotGet().logicalExtent)
 
-    map.close().await()
-    runtime.close().await()
+    map.release().await()
+    runtime.release().await()
   }
 
   @Test
@@ -334,8 +332,8 @@ class MapHandleTest {
       assertNull(map.getStyleSourceInfo("places").await())
       assertCommandFailed(map.removeStyleSource("places").await(), MaplibreStatus.NOT_FOUND)
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -368,8 +366,8 @@ class MapHandleTest {
         MaplibreStatus.NOT_FOUND,
       )
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -429,8 +427,8 @@ class MapHandleTest {
       assertNull(retainedInfo.info.rasterEncoding)
       map.removeStyleSource("inline").awaitCommitted()
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
 
     assertEquals(tileUrls, retainedInfo.tileUrls)
@@ -566,8 +564,8 @@ class MapHandleTest {
       )
       assertNull(map.getStyleSourceInfo("invalid-cluster-properties").await())
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -622,8 +620,8 @@ class MapHandleTest {
       map.removeStyleSource("custom-places").awaitCommitted()
       assertNull(map.getStyleSourceInfo("custom-places").await())
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -672,8 +670,8 @@ class MapHandleTest {
       map.removeStyleSource("custom-mvt").awaitCommitted()
       assertNull(map.getStyleSourceInfo("custom-mvt").await())
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -714,8 +712,8 @@ class MapHandleTest {
       assertNull(map.getStyleSourceInfo("custom-1").await())
       assertNull(map.getStyleSourceInfo("custom-mvt-1").await())
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -766,8 +764,8 @@ class MapHandleTest {
       map.removeFeatureState(selector).awaitCommitted()
       assertEquals("{}", map.getFeatureState(selector).await().decodeToString())
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -834,8 +832,8 @@ class MapHandleTest {
         map.listStyleSourceIds().await().containsAll(listOf("roads", "satellite", "terrain"))
       )
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -890,8 +888,8 @@ class MapHandleTest {
       assertNull(map.getStyleLayerInfo("background").await())
       assertCommandFailed(map.removeStyleLayer("background").await(), MaplibreStatus.NOT_FOUND)
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -912,8 +910,8 @@ class MapHandleTest {
         projection.close()
       }
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -959,8 +957,8 @@ class MapHandleTest {
         map.listStyleLayers().await(),
       )
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -1001,8 +999,8 @@ class MapHandleTest {
       assertNull(map.copyStyleImagePremultipliedRgba8("dot").await())
       assertCommandFailed(map.removeStyleImage("dot").await(), MaplibreStatus.NOT_FOUND)
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -1043,8 +1041,8 @@ class MapHandleTest {
         map.getStyleSourceInfo("inline-overlay").await()?.info?.type,
       )
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -1306,8 +1304,8 @@ class MapHandleTest {
         projection.close()
       }
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -1350,8 +1348,8 @@ class MapHandleTest {
       assertEquals(emptyList(), map.latLngsForPixels(emptyList()).await())
       assertEquals(emptyList(), map.latLngsForPixelsUnwrapped(emptyList()).await())
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 
@@ -1392,8 +1390,8 @@ class MapHandleTest {
         1e-10,
       )
     } finally {
-      map.close().await()
-      runtime.close().await()
+      map.release().await()
+      runtime.release().await()
     }
   }
 

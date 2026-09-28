@@ -37,7 +37,7 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
           bindingAcquiredFrameHandle().toLong(),
           "mln_acquired_frame_get_metal_texture",
         )
-        val scope = org.maplibre.nativeffi.render.FrameScope()
+        val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()
         val token = PointerPointer<Pointer>(1L)
         BindingStatus.check(
           MaplibreNativeC.mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token)
@@ -69,7 +69,7 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
           bindingAcquiredFrameHandle().toLong(),
           "mln_acquired_frame_get_opengl_texture",
         )
-        val scope = org.maplibre.nativeffi.render.FrameScope()
+        val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()
         val token = PointerPointer<Pointer>(1L)
         BindingStatus.check(
           MaplibreNativeC.mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token)
@@ -101,7 +101,7 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
           bindingAcquiredFrameHandle().toLong(),
           "mln_acquired_frame_get_producer_sync",
         )
-        val scope = org.maplibre.nativeffi.render.FrameScope()
+        val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()
         val token = PointerPointer<Pointer>(1L)
         BindingStatus.check(
           MaplibreNativeC.mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token)
@@ -153,7 +153,7 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
           bindingAcquiredFrameHandle().toLong(),
           "mln_acquired_frame_get_vulkan_texture",
         )
-        val scope = org.maplibre.nativeffi.render.FrameScope()
+        val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()
         val token = PointerPointer<Pointer>(1L)
         BindingStatus.check(
           MaplibreNativeC.mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token)
@@ -185,7 +185,7 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
           bindingAcquiredFrameHandle().toLong(),
           "mln_acquired_frame_get_webgpu_texture",
         )
-        val scope = org.maplibre.nativeffi.render.FrameScope()
+        val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()
         val token = PointerPointer<Pointer>(1L)
         BindingStatus.check(
           MaplibreNativeC.mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token)

@@ -9,7 +9,6 @@ import org.maplibre.nativeffi.internal.async.adoptOwned
 import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC
 import org.maplibre.nativeffi.internal.callback.*
-import org.maplibre.nativeffi.internal.lifecycle.OwnerAdoption
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.status.Status as BindingStatus
 
@@ -165,7 +164,7 @@ public actual object GeneratedApi {
   public actual fun geojsonSourceDataCreate(
     data: ByteArray,
     options: GeojsonSourceOptions?,
-  ): org.maplibre.nativeffi.style.GeoJsonSourceDataHandle {
+  ): org.maplibre.nativeffi.generated.GeojsonSourceDataHandle {
     NativeAccess.ensureLoaded()
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(
       null,
@@ -184,7 +183,7 @@ public actual object GeneratedApi {
       adoptOwned(
         output.get(ValueLayout.JAVA_LONG, 0),
         { GeneratedOwnerDisposal.geojsonSourceData(it) },
-        { OwnerAdoption.geojsonSourceData(it) },
+        { GeojsonSourceDataHandle(it) },
       )
     }
   }
@@ -609,7 +608,7 @@ public actual object GeneratedApi {
 
   public actual fun runtimeCreate(
     options: RuntimeOptions
-  ): org.maplibre.nativeffi.runtime.RuntimeHandle {
+  ): org.maplibre.nativeffi.generated.RuntimeHandle {
     NativeAccess.ensureLoaded()
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(null, "mln_runtime_create")
     return run {
@@ -628,7 +627,7 @@ public actual object GeneratedApi {
               adoptOwned(
                 output.get(ValueLayout.JAVA_LONG, 0),
                 { GeneratedOwnerDisposal.runtime(it) },
-                { OwnerAdoption.runtime(it) },
+                { RuntimeHandle(it) },
               )
             try {
               registrations.accept(owner.bindingCallbacks)

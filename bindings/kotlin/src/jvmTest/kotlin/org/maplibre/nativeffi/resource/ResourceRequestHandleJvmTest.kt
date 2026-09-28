@@ -13,9 +13,10 @@ import kotlin.test.assertTrue
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.generated.ResourceProviderDecision
+import org.maplibre.nativeffi.generated.ResourceRequestHandle
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC
-import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelRegistry
-import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelSetResult
+import org.maplibre.nativeffi.internal.callback.DecisionCancelRegistry
+import org.maplibre.nativeffi.internal.callback.DecisionCancelSetResult
 import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 
@@ -24,9 +25,8 @@ class ResourceRequestHandleJvmTest {
   fun rejectedCompletionPreservesOwnerAndAllowsRetry() {
     NativeAccess.ensureLoaded()
     var releases = 0
-    val handle =
-      ResourceRequestHandle(SyntheticHandles.resourceRequest(), releaser = { releases++ })
-    handle.finishProviderDecision(ResourceProviderDecision.HANDLE)
+    val handle = ResourceRequestHandle(SyntheticHandles.resourceRequest(), dispose = { releases++ })
+    handle.finishBindingDecision(ResourceProviderDecision.HANDLE.rawValue)
     val failure =
       assertFailsWith<InvalidArgumentException> {
         handle.bindingCompleteResourceRequestHandle {
@@ -50,9 +50,9 @@ class ResourceRequestHandleJvmTest {
     val handle =
       ResourceRequestHandle(
         SyntheticHandles.resourceRequest(),
-        releaser = { releases.incrementAndGet() },
+        dispose = { releases.incrementAndGet() },
       )
-    handle.finishProviderDecision(ResourceProviderDecision.HANDLE)
+    handle.finishBindingDecision(ResourceProviderDecision.HANDLE.rawValue)
     val worker = thread {
       handle.bindingCompleteResourceRequestHandle {
         entered.countDown()
@@ -86,29 +86,28 @@ class ResourceRequestHandleJvmTest {
 
   private fun registerUnreachable(released: CountDownLatch) {
     val handle =
-      ResourceRequestHandle(SyntheticHandles.resourceRequest(), releaser = { released.countDown() })
+      ResourceRequestHandle(SyntheticHandles.resourceRequest(), dispose = { released.countDown() })
     handle.bindingRegisterResourceRequestHandleCancel({ handle.close() }) { _, _ ->
-      ResourceRequestCancelSetResult(0, false)
+      DecisionCancelSetResult(0, false)
     }
-    handle.finishProviderDecision(ResourceProviderDecision.HANDLE)
+    handle.finishBindingDecision(ResourceProviderDecision.HANDLE.rawValue)
   }
 
   @Test
   fun providerPassThroughDisarmsCancellationWithoutReleasingTwice() {
     val token = AtomicLong(0)
     var releases = 0
-    val handle =
-      ResourceRequestHandle(SyntheticHandles.resourceRequest(), releaser = { releases++ })
+    val handle = ResourceRequestHandle(SyntheticHandles.resourceRequest(), dispose = { releases++ })
     handle.bindingRegisterResourceRequestHandleCancel({}) { _, registered ->
       token.set(registered)
-      ResourceRequestCancelSetResult(0, false)
+      DecisionCancelSetResult(0, false)
     }
-    assertTrue(ResourceRequestCancelRegistry.isRegisteredForTesting(token.get()))
+    assertTrue(DecisionCancelRegistry.isRegisteredForTesting(token.get()))
     assertEquals(
-      ResourceProviderDecision.PASS_THROUGH.rawValue.toInt(),
-      handle.finishProviderDecision(ResourceProviderDecision.PASS_THROUGH),
+      ResourceProviderDecision.PASS_THROUGH.rawValue,
+      handle.finishBindingDecision(ResourceProviderDecision.PASS_THROUGH.rawValue),
     )
-    assertFalse(ResourceRequestCancelRegistry.isRegisteredForTesting(token.get()))
+    assertFalse(DecisionCancelRegistry.isRegisteredForTesting(token.get()))
     handle.close()
     assertEquals(0, releases)
   }

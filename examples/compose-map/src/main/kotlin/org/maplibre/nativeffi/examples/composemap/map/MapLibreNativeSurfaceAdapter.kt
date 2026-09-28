@@ -14,6 +14,7 @@ import org.maplibre.nativeffi.examples.composemap.surface.VulkanImageTarget
 import org.maplibre.nativeffi.examples.composemap.surface.WglContextHandles
 import org.maplibre.nativeffi.generated.EglContextDescriptor
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.OpenglBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.OpenglContextDescriptor
@@ -21,13 +22,12 @@ import org.maplibre.nativeffi.generated.RenderBackendFlag
 import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
 import org.maplibre.nativeffi.generated.RenderSessionAttachment
+import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.RenderTargetExtent
 import org.maplibre.nativeffi.generated.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.VulkanContextDescriptor
 import org.maplibre.nativeffi.generated.WglContextDescriptor
-import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.render.NativePointer
-import org.maplibre.nativeffi.render.RenderSessionHandle
 
 internal object MapLibreNativeSurfaceAdapter {
   val backend: ProducerBackend =

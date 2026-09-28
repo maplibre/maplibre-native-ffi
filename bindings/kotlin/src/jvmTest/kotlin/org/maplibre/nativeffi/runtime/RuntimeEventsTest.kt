@@ -9,11 +9,11 @@ import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.generated.*
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapOptions
 import org.maplibre.nativeffi.generated.RuntimeEventMask
 import org.maplibre.nativeffi.generated.RuntimeEventSourceType
 import org.maplibre.nativeffi.generated.RuntimeEventType
-import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.runOnBackgroundThread
 
 class RuntimeEventsTest {
@@ -63,7 +63,7 @@ class RuntimeEventsTest {
         val types = drainUntil(runtime) { RuntimeEventType.MAP_STYLE_LOADED in it }
         assertTrue(RuntimeEventType.MAP_LOADING_STARTED !in types, "cleared type was delivered")
       } finally {
-        map.close()
+        map.release()
       }
     }
   }
@@ -165,7 +165,7 @@ class RuntimeEventsTest {
           "a cleared style-loaded event reached the host",
         )
       } finally {
-        map.close()
+        map.release()
       }
     }
   }
@@ -191,7 +191,7 @@ class RuntimeEventsTest {
       // Closing the map quiesces and releases the source it still owns.
       map.addCustomGeometrySource("surviving", customGeometrySourceOptions()).await()
       runtime.barrier().await()
-      map.close()
+      map.release()
       runtime.barrier().await()
       assertLiveSources(0)
     }
@@ -207,7 +207,7 @@ class RuntimeEventsTest {
 
       // A closed map rejects the registration on the calling thread, so the registry keeps
       // neither the rejected state nor a displaced entry.
-      map.close().await()
+      map.release().await()
       rejectRegistration(map)
       assertLiveSources(0)
     }
@@ -290,7 +290,7 @@ class RuntimeEventsTest {
       try {
         body(runtime, map)
       } finally {
-        map.close()
+        map.release()
       }
     }
   }

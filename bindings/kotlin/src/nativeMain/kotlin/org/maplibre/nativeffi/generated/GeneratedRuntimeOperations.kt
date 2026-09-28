@@ -8,7 +8,6 @@ import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.async.adoptOwned
 import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.callback.*
-import org.maplibre.nativeffi.internal.lifecycle.OwnerAdoption
 import org.maplibre.nativeffi.internal.status.Status as BindingStatus
 
 @OptIn(ExperimentalForeignApi::class)
@@ -21,7 +20,9 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
 
   internal abstract fun bindingRetireRuntime(call: (ULong) -> Deferred<Unit>): Deferred<Unit>
 
-  public actual fun mapCreate(options: MapOptions): Deferred<org.maplibre.nativeffi.map.MapHandle> {
+  public actual fun mapCreate(
+    options: MapOptions
+  ): Deferred<org.maplibre.nativeffi.generated.MapHandle> {
     try {
       org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(
         bindingRuntimeHandle().toLong(),
@@ -29,12 +30,12 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       )
       return CompletionBridge.submitOwned(
         { result ->
-          OwnerAdoption.map(
+          MapHandle(
             result.pointed.value!!.reinterpret<ULongVar>().pointed.value,
-            this@GeneratedRuntimeOperations as org.maplibre.nativeffi.runtime.RuntimeHandle,
+            this@GeneratedRuntimeOperations as org.maplibre.nativeffi.generated.RuntimeHandle,
           )
         },
-        { it.disposeAbandoned() },
+        { it.dispose() },
         { result ->
           GeneratedOwnerDisposal.map(
             result.pointed.value!!.reinterpret<ULongVar>().pointed.value.toLong()

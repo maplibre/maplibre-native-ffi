@@ -1,6 +1,6 @@
 package org.maplibre.nativeffi.render
 
-import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.generated.MapHandle
 
 /**
  * Kotlin/Native Android targets only compile. The Android device suite attaches an owned texture

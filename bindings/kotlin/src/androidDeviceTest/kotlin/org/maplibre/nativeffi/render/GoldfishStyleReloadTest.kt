@@ -2,9 +2,10 @@ package org.maplibre.nativeffi.render
 
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
-import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.generated.RenderSessionHandle
+import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class GoldfishStyleReloadTest {

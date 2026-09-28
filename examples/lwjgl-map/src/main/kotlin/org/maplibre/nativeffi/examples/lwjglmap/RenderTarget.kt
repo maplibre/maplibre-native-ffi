@@ -5,12 +5,12 @@ import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.generated.FrameDemandFlag
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LogicalExtent
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderFrameResult
 import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
+import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.RenderTargetExtent
-import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.render.RenderSessionHandle
 
 /**
  * The render loop explicitly services caller-driver work on its graphics thread. Native code owns

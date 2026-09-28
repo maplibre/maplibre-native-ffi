@@ -1,8 +1,8 @@
 package org.maplibre.nativeffi.render
 
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.RenderBackendFlag
-import org.maplibre.nativeffi.map.MapHandle
 
 internal actual object OwnedTextureTestSupport {
   actual fun attach(

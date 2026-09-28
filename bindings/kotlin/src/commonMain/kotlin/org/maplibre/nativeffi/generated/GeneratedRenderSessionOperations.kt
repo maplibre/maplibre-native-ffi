@@ -21,7 +21,7 @@ public expect abstract class GeneratedRenderSessionOperations internal construct
 
   public fun abandon(): RenderAbandonResult
 
-  public fun acquireFrame(): org.maplibre.nativeffi.render.AcquiredFrameHandle
+  public fun acquireFrame(): org.maplibre.nativeffi.generated.AcquiredFrameHandle
 
   public fun barrier(): Deferred<Unit>
 
@@ -41,7 +41,7 @@ public expect abstract class GeneratedRenderSessionOperations internal construct
 
   public fun getSnapshot(): RenderSessionSnapshot
 
-  public fun projectionCreate(): org.maplibre.nativeffi.map.MapProjectionHandle
+  public fun projectionCreate(): org.maplibre.nativeffi.generated.MapProjectionHandle
 
   public fun queryFeatureExtensions(
     sourceId: String,

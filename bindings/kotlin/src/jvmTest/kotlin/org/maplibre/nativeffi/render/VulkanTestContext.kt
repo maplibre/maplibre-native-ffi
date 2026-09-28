@@ -17,10 +17,10 @@ import org.lwjgl.vulkan.VkInstanceCreateInfo
 import org.lwjgl.vulkan.VkPhysicalDevice
 import org.lwjgl.vulkan.VkPhysicalDeviceFeatures
 import org.lwjgl.vulkan.VkQueueFamilyProperties
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.RenderTargetExtent
 import org.maplibre.nativeffi.generated.VulkanContextDescriptor
 import org.maplibre.nativeffi.generated.VulkanOwnedTextureDescriptor
-import org.maplibre.nativeffi.map.MapHandle
 
 internal fun attachJvmVulkan(
   map: MapHandle,

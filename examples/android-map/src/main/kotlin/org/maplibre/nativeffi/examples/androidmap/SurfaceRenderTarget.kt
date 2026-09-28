@@ -5,14 +5,14 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LogicalExtent
+import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.OpenglSurfaceDescriptor
 import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderFrameResult
 import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
 import org.maplibre.nativeffi.generated.RenderSessionAttachment
+import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.VulkanSurfaceDescriptor
-import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.render.RenderSessionHandle
 
 /** A caller-driver native surface serviced on the UI graphics thread. */
 internal class SurfaceRenderTarget private constructor(private val session: RenderSessionHandle) :

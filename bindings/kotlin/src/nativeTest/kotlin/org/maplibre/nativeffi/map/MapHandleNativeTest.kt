@@ -28,8 +28,8 @@ class MapHandleNativeTest : org.maplibre.nativeffi.NativeTestBase() {
     assertTrue(command.generation > 0uL)
     runtime.barrier().await()
     assertEquals(2.0, map.cameraQuery().await().camera.zoom)
-    map.close().await()
-    runtime.close().await()
+    map.release().await()
+    runtime.release().await()
     assertTrue(map.isClosed)
     assertTrue(runtime.isClosed)
   }
