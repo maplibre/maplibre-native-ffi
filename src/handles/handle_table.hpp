@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -23,16 +24,14 @@ enum class HandleKind : std::uint8_t {
   Map = 2,
   MapProjection = 3,
   RenderSession = 4,
-  OfflineRegionSnapshot = 5,
-  OfflineRegionList = 6,
   Buffer = 7,
-  StyleIdList = 8,
-  WakeSource = 11,
   ResourceRequest = 12,
-  StyleStringList = 13,
-  GeoJsonSourceData = 14,
-  QueriedFeatureList = 15,
-  StyleLayerList = 16,
+  EventBatch = 16,
+  AdapterResourceRequestQueue = 18,
+  AdapterLogQueue = 19,
+  AcquiredFrame = 20,
+  RenderFrameBatch = 21,
+  GeoJsonSourceData = 22,
 };
 
 inline constexpr auto handle_generation_bits = std::uint32_t{36};
@@ -139,6 +138,13 @@ class HandleTable {
     if (slots_.size() > handle_max_index) {
       throw HandleTableExhausted{"handle table is full"};
     }
+    // Reserve recycling capacity before publishing ownership. Retiring any
+    // existing handle can then return its slot without allocating.
+    if (free_indices_.capacity() < slots_.size() + 1) {
+      free_indices_.reserve(
+        std::max(slots_.size() + 1, free_indices_.capacity() * 2)
+      );
+    }
     const auto index = static_cast<std::uint64_t>(slots_.size());
     slots_.push_back(Slot{.generation = 1, .object = std::move(object)});
     return encode_handle(Traits::kind, index, 1);
@@ -185,6 +191,14 @@ class HandleTable {
     requires(Traits::leasable)
   {
     const std::scoped_lock lock(mutex_);
+    return lease_locked(handle);
+  }
+
+  // The same lease for a caller that already holds mutex().
+  [[nodiscard]] auto lease_locked(std::uint64_t handle) const
+    -> std::shared_ptr<Object>
+    requires(Traits::leasable)
+  {
     const auto* slot = find_slot(handle);
     if (slot == nullptr) {
       set_handle_fault_error(Traits::kind, handle, fault_for(handle));

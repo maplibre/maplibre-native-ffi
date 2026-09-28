@@ -8,11 +8,15 @@
 
 namespace mln::c_api {
 
-template <typename Function>
+template <bool WithAutoreleasePool = true, typename Function>
 auto status_boundary(Function function) noexcept -> mln_status {
   mln::core::clear_thread_error();
   try {
-    return with_autorelease_pool(function);
+    if constexpr (WithAutoreleasePool) {
+      return with_autorelease_pool(function);
+    } else {
+      return function();
+    }
   } catch (const std::exception& exception) {
     mln::core::set_thread_error(exception);
     return MLN_STATUS_NATIVE_ERROR;

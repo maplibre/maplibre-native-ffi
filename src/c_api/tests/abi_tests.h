@@ -10,6 +10,7 @@
 // be declared here and called from `main.c`.
 
 void run_browser_http_abi_tests(void);
+void run_browser_run_loop_abi_tests(void);
 void run_callback_adapter_abi_tests(void);
 void run_core_abi_tests(void);
 void run_custom_geometry_source_abi_tests(void);
@@ -24,9 +25,11 @@ void run_render_target_lifecycle_abi_tests(void);
 void run_render_thread_abi_tests(void);
 void run_query_abi_tests(void);
 void run_mlt_decode_abi_tests(void);
+void run_completion_abi_tests(void);
+void run_projection_abi_tests(void);
 void run_resources_abi_tests(void);
 void run_runtime_events_abi_tests(void);
-void run_runtime_wake_abi_tests(void);
+void run_runtime_lifecycle_abi_tests(void);
 void run_style_values_abi_tests(void);
 
 #endif
