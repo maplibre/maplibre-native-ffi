@@ -2,29 +2,23 @@ package org.maplibre.nativeffi.examples.composemap
 
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.examples.composemap.app.ComposeMapApp
 import org.maplibre.nativeffi.examples.composemap.map.MapLibreSurfaceRenderer
+import org.maplibre.nativeffi.generated.GeneratedApi
 
 internal object Main {
   @JvmStatic
   fun main(args: Array<String>) {
     val renderer = MapLibreSurfaceRenderer()
-    Maplibre.setAsyncLogSeverities(emptySet())
-    Maplibre.setLogCallback { record ->
-      System.err.printf(
-        "MapLibre %s %s %d: %s%n",
-        record.severity,
-        record.event,
-        record.code,
-        record.message,
-      )
-      true
+    GeneratedApi.logSetAsyncSeverityMask(org.maplibre.nativeffi.generated.LogSeverityMask(0u))
+    GeneratedApi.logSetCallback { severity, event, code, message ->
+      System.err.printf("MapLibre %s %s %d: %s%n", severity, event, code, message)
+      1u
     }
     System.getProperty("org.maplibre.nativeffi.library.path")?.let {
       println("MapLibre native library: $it")
     }
-    println("native render backends: ${Maplibre.supportedRenderBackends().joinToString()}")
+    println("native render backends: ${GeneratedApi.supportedRenderBackendMask()}")
     println("render target: compose-borrowed-texture")
     println(
       "render target status: renders into a host-owned texture, then samples it into the Compose/Skiko surface"
@@ -38,7 +32,7 @@ internal object Main {
         }
       }
     } finally {
-      Maplibre.clearLogCallback()
+      GeneratedApi.logClearCallback()
     }
   }
 

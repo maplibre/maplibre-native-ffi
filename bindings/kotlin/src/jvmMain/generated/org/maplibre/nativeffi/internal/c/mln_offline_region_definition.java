@@ -17,10 +17,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  * struct mln_offline_region_definition {
  *     uint32_t size;
  *     uint32_t type;
- *     union {
- *         mln_offline_tile_pyramid_region_definition tile_pyramid;
- *         mln_offline_geometry_region_definition geometry;
- *     } data;
+ *     mln_offline_region_definition_data data;
  * }
  * }
  */
@@ -33,7 +30,7 @@ public class mln_offline_region_definition {
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
         MapLibreNativeC.C_INT.withName("size"),
         MapLibreNativeC.C_INT.withName("type"),
-        mln_offline_region_definition.data.layout().withName("data")
+        mln_offline_region_definition_data.layout().withName("data")
     ).withName("mln_offline_region_definition");
 
     /**
@@ -131,174 +128,12 @@ public class mln_offline_region_definition {
         struct.set(type$LAYOUT, type$OFFSET, fieldValue);
     }
 
-    /**
-     * {@snippet lang=c :
-     * union {
-     *     mln_offline_tile_pyramid_region_definition tile_pyramid;
-     *     mln_offline_geometry_region_definition geometry;
-     * }
-     * }
-     */
-    public static class data {
-
-        data() {
-            // Should not be called directly
-        }
-
-        private static final GroupLayout $LAYOUT = MemoryLayout.unionLayout(
-            mln_offline_tile_pyramid_region_definition.layout().withName("tile_pyramid"),
-            mln_offline_geometry_region_definition.layout().withName("geometry")
-        ).withName("$anon$426:3");
-
-        /**
-         * The layout of this union
-         */
-        public static final GroupLayout layout() {
-            return $LAYOUT;
-        }
-
-        private static final GroupLayout tile_pyramid$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("tile_pyramid"));
-
-        /**
-         * Layout for field:
-         * {@snippet lang=c :
-         * mln_offline_tile_pyramid_region_definition tile_pyramid
-         * }
-         */
-        public static final GroupLayout tile_pyramid$layout() {
-            return tile_pyramid$LAYOUT;
-        }
-
-        private static final long tile_pyramid$OFFSET = $LAYOUT.byteOffset(groupElement("tile_pyramid"));
-
-        /**
-         * Offset for field:
-         * {@snippet lang=c :
-         * mln_offline_tile_pyramid_region_definition tile_pyramid
-         * }
-         */
-        public static final long tile_pyramid$offset() {
-            return tile_pyramid$OFFSET;
-        }
-
-        /**
-         * Getter for field:
-         * {@snippet lang=c :
-         * mln_offline_tile_pyramid_region_definition tile_pyramid
-         * }
-         */
-        public static MemorySegment tile_pyramid(MemorySegment union) {
-            return union.asSlice(tile_pyramid$OFFSET, tile_pyramid$LAYOUT.byteSize());
-        }
-
-        /**
-         * Setter for field:
-         * {@snippet lang=c :
-         * mln_offline_tile_pyramid_region_definition tile_pyramid
-         * }
-         */
-        public static void tile_pyramid(MemorySegment union, MemorySegment fieldValue) {
-            MemorySegment.copy(fieldValue, 0L, union, tile_pyramid$OFFSET, tile_pyramid$LAYOUT.byteSize());
-        }
-
-        private static final GroupLayout geometry$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("geometry"));
-
-        /**
-         * Layout for field:
-         * {@snippet lang=c :
-         * mln_offline_geometry_region_definition geometry
-         * }
-         */
-        public static final GroupLayout geometry$layout() {
-            return geometry$LAYOUT;
-        }
-
-        private static final long geometry$OFFSET = $LAYOUT.byteOffset(groupElement("geometry"));
-
-        /**
-         * Offset for field:
-         * {@snippet lang=c :
-         * mln_offline_geometry_region_definition geometry
-         * }
-         */
-        public static final long geometry$offset() {
-            return geometry$OFFSET;
-        }
-
-        /**
-         * Getter for field:
-         * {@snippet lang=c :
-         * mln_offline_geometry_region_definition geometry
-         * }
-         */
-        public static MemorySegment geometry(MemorySegment union) {
-            return union.asSlice(geometry$OFFSET, geometry$LAYOUT.byteSize());
-        }
-
-        /**
-         * Setter for field:
-         * {@snippet lang=c :
-         * mln_offline_geometry_region_definition geometry
-         * }
-         */
-        public static void geometry(MemorySegment union, MemorySegment fieldValue) {
-            MemorySegment.copy(fieldValue, 0L, union, geometry$OFFSET, geometry$LAYOUT.byteSize());
-        }
-
-        /**
-         * Obtains a slice of {@code arrayParam} which selects the array element at {@code index}.
-         * The returned segment has address {@code arrayParam.address() + index * layout().byteSize()}
-         */
-        public static MemorySegment asSlice(MemorySegment array, long index) {
-            return array.asSlice(layout().byteSize() * index);
-        }
-
-        /**
-         * The size (in bytes) of this union
-         */
-        public static long sizeof() { return layout().byteSize(); }
-
-        /**
-         * Allocate a segment of size {@code layout().byteSize()} using {@code allocator}
-         */
-        public static MemorySegment allocate(SegmentAllocator allocator) {
-            return allocator.allocate(layout());
-        }
-
-        /**
-         * Allocate an array of size {@code elementCount} using {@code allocator}.
-         * The returned segment has size {@code elementCount * layout().byteSize()}.
-         */
-        public static MemorySegment allocateArray(long elementCount, SegmentAllocator allocator) {
-            return allocator.allocate(MemoryLayout.sequenceLayout(elementCount, layout()));
-        }
-
-        /**
-         * Reinterprets {@code addr} using target {@code arena} and {@code cleanupAction} (if any).
-         * The returned segment has size {@code layout().byteSize()}
-         */
-        public static MemorySegment reinterpret(MemorySegment addr, Arena arena, Consumer<MemorySegment> cleanup) {
-            return reinterpret(addr, 1, arena, cleanup);
-        }
-
-        /**
-         * Reinterprets {@code addr} using target {@code arena} and {@code cleanupAction} (if any).
-         * The returned segment has size {@code elementCount * layout().byteSize()}
-         */
-        public static MemorySegment reinterpret(MemorySegment addr, long elementCount, Arena arena, Consumer<MemorySegment> cleanup) {
-            return addr.reinterpret(layout().byteSize() * elementCount, arena, cleanup);
-        }
-    }
-
     private static final GroupLayout data$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("data"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * union {
-     *     mln_offline_tile_pyramid_region_definition tile_pyramid;
-     *     mln_offline_geometry_region_definition geometry;
-     * } data
+     * mln_offline_region_definition_data data
      * }
      */
     public static final GroupLayout data$layout() {
@@ -310,10 +145,7 @@ public class mln_offline_region_definition {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * union {
-     *     mln_offline_tile_pyramid_region_definition tile_pyramid;
-     *     mln_offline_geometry_region_definition geometry;
-     * } data
+     * mln_offline_region_definition_data data
      * }
      */
     public static final long data$offset() {
@@ -323,10 +155,7 @@ public class mln_offline_region_definition {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * union {
-     *     mln_offline_tile_pyramid_region_definition tile_pyramid;
-     *     mln_offline_geometry_region_definition geometry;
-     * } data
+     * mln_offline_region_definition_data data
      * }
      */
     public static MemorySegment data(MemorySegment struct) {
@@ -336,10 +165,7 @@ public class mln_offline_region_definition {
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * union {
-     *     mln_offline_tile_pyramid_region_definition tile_pyramid;
-     *     mln_offline_geometry_region_definition geometry;
-     * } data
+     * mln_offline_region_definition_data data
      * }
      */
     public static void data(MemorySegment struct, MemorySegment fieldValue) {

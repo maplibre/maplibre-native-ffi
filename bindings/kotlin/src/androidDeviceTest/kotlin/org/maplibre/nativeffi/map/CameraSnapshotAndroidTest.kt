@@ -4,43 +4,48 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import org.maplibre.nativeffi.camera.CameraOptions
-import org.maplibre.nativeffi.camera.EdgeInsets
-import org.maplibre.nativeffi.geo.LatLng
-import org.maplibre.nativeffi.runtime.RuntimeHandle
-import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.generated.CameraOptions
+import org.maplibre.nativeffi.generated.CameraUpdate
+import org.maplibre.nativeffi.generated.EdgeInsets
+import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.LatLng
+import org.maplibre.nativeffi.runtime.awaitCommitted
+import org.maplibre.nativeffi.runtime.runSuspendTest
+import org.maplibre.nativeffi.runtime.use
 
 class CameraSnapshotAndroidTest {
   @Test
-  fun cameraSnapshotsCopyEveryReportedField() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 640
-            height = 480
-          },
+  fun cameraSnapshotsCopyEveryReportedField(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 640u, height = 480u)
+            )
         )
+        .await()
         .use { map ->
           val camera =
-            CameraOptions().apply {
-              center = LatLng(12.0, 34.0)
-              centerAltitude = 123.0
-              padding = EdgeInsets(5.0, 10.0, 15.0, 20.0)
-              zoom = 4.0
-              bearing = 25.0
-              pitch = 30.0
-              roll = 7.0
-              fieldOfView = 40.0
-            }
-          map.jumpTo(camera)
-          val snapshot = map.camera
+            CameraOptions(
+              center = LatLng(12.0, 34.0),
+              centerAltitude = 123.0,
+              padding = EdgeInsets(5.0, 10.0, 15.0, 20.0),
+              zoom = 4.0,
+              bearing = 25.0,
+              pitch = 30.0,
+              roll = 7.0,
+              fieldOfView = 40.0,
+            )
+          map.updateCamera(CameraUpdate(camera = camera)).awaitCommitted()
+          val snapshot = map.cameraSnapshotGet().camera
           assertCamera(camera, snapshot)
-          map.createProjection().use { projection ->
-            assertCamera(camera, projection.camera)
-            map.jumpTo(CameraOptions().apply { zoom = 6.0 })
+          map.projectionCreate().await().use { projection ->
+            assertCamera(camera, projection.getCamera())
+            map.updateCamera(CameraUpdate(camera = CameraOptions(zoom = 6.0))).awaitCommitted()
             assertCamera(camera, snapshot)
-            assertCamera(camera, projection.camera)
+            assertCamera(camera, projection.getCamera())
           }
         }
     }

@@ -4,132 +4,115 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.UnsupportedFeatureException
-import org.maplibre.nativeffi.geo.LatLng
-import org.maplibre.nativeffi.render.MetalContextDescriptor
-import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
-import org.maplibre.nativeffi.render.NativeBuffer
+import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.LatLng
+import org.maplibre.nativeffi.generated.MapOptions
+import org.maplibre.nativeffi.generated.MetalContextDescriptor
+import org.maplibre.nativeffi.generated.MetalOwnedTextureDescriptor
+import org.maplibre.nativeffi.generated.OpenglContextDescriptor
+import org.maplibre.nativeffi.generated.OpenglContextDescriptorData
+import org.maplibre.nativeffi.generated.OpenglContextOwnership
+import org.maplibre.nativeffi.generated.OpenglOwnedTextureDescriptor
+import org.maplibre.nativeffi.generated.RenderBackendFlag
+import org.maplibre.nativeffi.generated.RenderDriverKind
+import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
+import org.maplibre.nativeffi.generated.RenderTargetExtent
+import org.maplibre.nativeffi.generated.VulkanContextDescriptor
+import org.maplibre.nativeffi.generated.VulkanOwnedTextureDescriptor
+import org.maplibre.nativeffi.generated.WglContextDescriptor
 import org.maplibre.nativeffi.render.NativePointer
-import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
-import org.maplibre.nativeffi.render.RenderBackend
-import org.maplibre.nativeffi.render.RenderTargetExtent
-import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
-import org.maplibre.nativeffi.render.VulkanContextDescriptor
-import org.maplibre.nativeffi.render.VulkanHandle
-import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
-import org.maplibre.nativeffi.render.WglContextDescriptor
-import org.maplibre.nativeffi.runtime.RuntimeHandle
-import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class DescriptorValidationTest {
   @Test
-  fun signedCarriersRejectNegativeUnsignedValues() {
-    assertFailsWith<InvalidArgumentException> {
-      MapOptions().apply {
-        width = -1
-        height = 1
-      }
-    }
-    assertFailsWith<InvalidArgumentException> { TileOptions().prefetchZoomDelta = -1 }
-    assertFailsWith<InvalidArgumentException> { NativeBuffer.allocate(-1) }
-    val nullPointer = NativePointer.NULL_POINTER
-    assertFailsWith<InvalidArgumentException> { RenderTargetExtent(-1, 1, 1.0) }
-    assertFailsWith<InvalidArgumentException> { RenderTargetExtent(1, 1, 1.0).width = -1 }
-    assertFailsWith<InvalidArgumentException> {
-      vulkanContext(nullPointer, graphicsQueueFamilyIndex = -1)
-    }
-    assertFailsWith<InvalidArgumentException> {
-      vulkanContext(nullPointer).graphicsQueueFamilyIndex = -1
-    }
-    assertFailsWith<InvalidArgumentException> {
-      vulkanBorrowedTextureDescriptor(nullPointer, format = -1)
-    }
-    assertFailsWith<InvalidArgumentException> {
-      vulkanBorrowedTextureDescriptor(nullPointer).format = -1
-    }
-  }
-
-  @Test
-  fun mapAndProjectionInputsPropagateNativeCoordinateValidation() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map = MapHandle.create(runtime, mapOptions())
+  fun mapAndProjectionInputsPropagateNativeCoordinateValidation(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    val map = runtime.mapCreate(mapOptions()).await()
     var projection: MapProjectionHandle? = null
     try {
       val invalidCoordinate = LatLng(Double.NaN, 0.0)
-      assertInvalidCoordinateDiagnostic { map.pixelForLatLng(invalidCoordinate) }
-      assertInvalidCoordinateDiagnostic { map.metersPerPixelAtLatitude(91.0) }
-      projection = map.createProjection()
-      assertInvalidCoordinateDiagnostic { projection.pixelForLatLng(invalidCoordinate) }
-      assertInvalidCoordinateDiagnostic { projection.metersPerPixelAtLatitude(91.0) }
-      assertInvalidCoordinateDiagnostic { Maplibre.projectedMetersForLatLng(invalidCoordinate) }
+      val createdProjection = map.projectionCreate().await()
+      projection = createdProjection
+      assertInvalidCoordinateDiagnostic { createdProjection.pixelForLatLng(invalidCoordinate) }
+      assertInvalidCoordinateDiagnostic { GeneratedApi.projectedMetersForLatLng(invalidCoordinate) }
     } finally {
       projection?.close()
-      map.close()
-      runtime.close()
+      map.close().await()
+      runtime.close().await()
     }
   }
 
   @Test
-  fun unsupportedRenderBackendsRejectAttachBeforeSessionCreation() {
-    val supported = Maplibre.supportedRenderBackends()
-    assertTrue(supported.isNotEmpty())
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map = MapHandle.create(runtime, mapOptions())
+  fun unsupportedRenderBackendFlagsRejectAttachBeforeSessionCreation(): Unit = runSuspendTest {
+    val supported = GeneratedApi.supportedRenderBackendMask()
+    assertTrue(supported.rawValue != 0u)
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    val map = runtime.mapCreate(mapOptions()).await()
     try {
       val pointer = NativePointer.ofAddress(0x10L)
-      val extent = RenderTargetExtent(256, 256, 1.0)
-      if (RenderBackend.METAL !in supported) {
+      val extent = RenderTargetExtent(256u, 256u, 1.0)
+      if (RenderBackendFlag.METAL !in supported) {
         assertEquals(
           MaplibreStatus.UNSUPPORTED,
           assertFailsWith<UnsupportedFeatureException> {
-              map.attachMetalOwnedTexture(
-                MetalOwnedTextureDescriptor(extent, MetalContextDescriptor(pointer))
+              map.metalOwnedTextureAttach(
+                MetalOwnedTextureDescriptor(extent, MetalContextDescriptor(pointer)),
+                RenderSessionAttachOptions(RenderDriverKind.CALLER_GRAPHICS_THREAD),
               )
             }
             .status,
         )
       }
-      if (RenderBackend.VULKAN !in supported) {
+      if (RenderBackendFlag.VULKAN !in supported) {
         assertEquals(
           MaplibreStatus.UNSUPPORTED,
           assertFailsWith<UnsupportedFeatureException> {
-              map.attachVulkanOwnedTexture(
-                VulkanOwnedTextureDescriptor(extent, context = vulkanContext(pointer))
+              map.vulkanOwnedTextureAttach(
+                VulkanOwnedTextureDescriptor(extent, context = vulkanContext(pointer)),
+                RenderSessionAttachOptions(RenderDriverKind.CALLER_GRAPHICS_THREAD),
               )
             }
             .status,
         )
       }
-      if (RenderBackend.OPENGL !in supported) {
+      if (RenderBackendFlag.OPENGL !in supported) {
         assertEquals(
           MaplibreStatus.UNSUPPORTED,
           assertFailsWith<UnsupportedFeatureException> {
-              map.attachOpenGLOwnedTexture(
-                OpenGLOwnedTextureDescriptor(
+              map.openglOwnedTextureAttach(
+                OpenglOwnedTextureDescriptor(
                   extent,
-                  context = WglContextDescriptor(pointer, pointer, pointer),
-                )
+                  context =
+                    OpenglContextDescriptor(
+                      OpenglContextOwnership.SHARED,
+                      OpenglContextDescriptorData.Wgl(
+                        WglContextDescriptor(pointer, pointer, pointer)
+                      ),
+                    ),
+                ),
+                RenderSessionAttachOptions(RenderDriverKind.CALLER_GRAPHICS_THREAD),
               )
             }
             .status,
         )
       }
     } finally {
-      map.close()
-      runtime.close()
+      map.close().await()
+      runtime.close().await()
     }
   }
 
   private fun mapOptions(): MapOptions =
-    MapOptions().apply {
-      width = 128
-      height = 128
-    }
+    GeneratedApi.mapOptionsDefault()
+      .copy(
+        initialExtent =
+          GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 128u, height = 128u)
+      )
 
-  private fun assertInvalidCoordinateDiagnostic(block: () -> Unit) {
+  private suspend fun assertInvalidCoordinateDiagnostic(block: suspend () -> Unit) {
     val error = assertFailsWith<InvalidArgumentException> { block() }
     assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
     assertTrue(error.diagnostic.contains("latitude must be finite"))
@@ -137,7 +120,7 @@ class DescriptorValidationTest {
 
   private fun vulkanContext(
     pointer: NativePointer,
-    graphicsQueueFamilyIndex: Int = 0,
+    graphicsQueueFamilyIndex: UInt = 0u,
   ): VulkanContextDescriptor =
     VulkanContextDescriptor(
       pointer,
@@ -147,20 +130,5 @@ class DescriptorValidationTest {
       graphicsQueueFamilyIndex,
       pointer,
       pointer,
-    )
-
-  private fun vulkanBorrowedTextureDescriptor(
-    pointer: NativePointer,
-    format: Int = 0,
-  ): VulkanBorrowedTextureDescriptor =
-    VulkanBorrowedTextureDescriptor(
-      RenderTargetExtent(1, 1, 1.0),
-      1,
-      1,
-      vulkanContext(pointer),
-      VulkanHandle.ofBits(pointer.address),
-      VulkanHandle.ofBits(pointer.address),
-      format,
-      0,
     )
 }

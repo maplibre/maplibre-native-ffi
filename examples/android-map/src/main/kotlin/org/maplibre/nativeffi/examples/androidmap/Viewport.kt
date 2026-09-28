@@ -3,7 +3,7 @@ package org.maplibre.nativeffi.examples.androidmap
 import android.util.Log
 import kotlin.math.ceil
 import kotlin.math.max
-import org.maplibre.nativeffi.render.RenderTargetExtent
+import org.maplibre.nativeffi.generated.RenderTargetExtent
 
 internal data class Viewport(
   val logicalWidth: Int,
@@ -14,7 +14,7 @@ internal data class Viewport(
   val isEmpty: Boolean,
 ) {
   val extent: RenderTargetExtent
-    get() = RenderTargetExtent(logicalWidth, logicalHeight, scaleFactor)
+    get() = RenderTargetExtent(logicalWidth.toUInt(), logicalHeight.toUInt(), scaleFactor)
 
   fun log(label: String) {
     Log.i(

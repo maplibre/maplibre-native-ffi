@@ -5,61 +5,54 @@ package org.maplibre.nativeffi.render
 import kotlinx.cinterop.ObjCObject
 import kotlinx.cinterop.objcPtr
 import kotlinx.cinterop.toLong
-import org.maplibre.nativeffi.Maplibre
+import org.maplibre.nativeffi.generated.MetalContextDescriptor
+import org.maplibre.nativeffi.generated.MetalOwnedTextureDescriptor
+import org.maplibre.nativeffi.generated.RenderSessionAttachment
+import org.maplibre.nativeffi.generated.RenderTargetExtent
 import org.maplibre.nativeffi.map.MapHandle
 import platform.Metal.MTLCreateSystemDefaultDevice
 
-internal actual object OwnedTextureTestSupport {
-  actual fun attach(map: MapHandle, width: Int, height: Int): OwnedTextureTestSession? {
-    if (RenderBackend.METAL !in Maplibre.supportedRenderBackends()) return null
-    val device =
-      MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
-    val session =
-      map.attachMetalOwnedTexture(
-        MetalOwnedTextureDescriptor(
-          extent = RenderTargetExtent(width, height, 1.0),
-          context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
-        )
-      )
-    return AppleOwnedTextureSession(device.address(), session)
-  }
+internal fun attachAppleMetal(
+  map: MapHandle,
+  width: Int,
+  height: Int,
+  textureRingDepth: UInt,
+): OwnedTextureTestSession {
+  val device = MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
+  val attachment =
+    map.metalOwnedTextureAttach(
+      MetalOwnedTextureDescriptor(
+        extent = RenderTargetExtent(width.toUInt(), height.toUInt(), 1.0),
+        context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
+      ),
+      OWNED_TEXTURE_ATTACH_OPTIONS.copy(requestedTextureRingDepth = textureRingDepth),
+    )
+  return AppleOwnedTextureSession(device, attachment)
 }
 
 private class AppleOwnedTextureSession(
-  private val deviceAddress: Long,
-  override val session: RenderSessionHandle,
+  private val device: platform.Metal.MTLDeviceProtocol,
+  override val attachment: RenderSessionAttachment,
 ) : OwnedTextureTestSession {
-  override fun attachAnotherOwnedTexture(width: Int, height: Int): RenderSessionHandle =
+  override fun attachAnotherOwnedTexture(width: Int, height: Int): RenderSessionAttachment =
     session
       .map()
-      .attachMetalOwnedTexture(
+      .metalOwnedTextureAttach(
         MetalOwnedTextureDescriptor(
-          extent = RenderTargetExtent(width, height, 1.0),
-          context = MetalContextDescriptor(NativePointer.ofAddress(deviceAddress)),
-        )
+          extent = RenderTargetExtent(width.toUInt(), height.toUInt(), 1.0),
+          context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
+        ),
+        OWNED_TEXTURE_ATTACH_OPTIONS,
       )
 
-  override fun acquireFrame(): OwnedTextureTestFrame {
-    val handle = session.acquireMetalOwnedTextureFrame()
-    val frame = handle.frame()
-    return object : OwnedTextureTestFrame {
-      override val width: Int
-        get() = frame.width()
-
-      override val height: Int
-        get() = frame.height()
-
-      override val isClosed: Boolean
-        get() = handle.isClosed
-
-      override fun close() {
-        handle.close()
-      }
+  override fun frameSize(frame: AcquiredFrameHandle): OwnedTextureFrameSize {
+    return frame.withGetMetalTexture { texture ->
+      OwnedTextureFrameSize(texture.width.toInt(), texture.height.toInt())
     }
   }
 
   override fun close() {
-    session.close()
+    session.abandonAndClose()
   }
 }
 

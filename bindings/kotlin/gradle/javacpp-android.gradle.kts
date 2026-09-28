@@ -40,6 +40,7 @@ val javaCppConfigSources =
   listOf(
     "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/MaplibreNativeCConfig.java",
     "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/AndroidNativeBridge.java",
+    "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/GeneratedCallbackBridge.java",
   )
 val checkedInCHeaders = rootProject.layout.projectDirectory.dir("include")
 // plugin_bridge.h includes upstream's mln/plugin/plugin_api.h from the submodule.
@@ -92,6 +93,7 @@ val generateJavaCppBindings =
       "-nogenerate",
       "org.maplibre.nativeffi.internal.javacpp.MaplibreNativeCConfig",
       "org.maplibre.nativeffi.internal.javacpp.AndroidNativeBridge",
+      "org.maplibre.nativeffi.internal.javacpp.GeneratedCallbackBridge",
     )
     inputs.files(javaCppConfigSources.map(::file))
     inputs.dir(checkedInCHeaders).withPropertyName("maplibreNativeCHeaders")
@@ -206,6 +208,7 @@ androidTargets.forEach { target ->
         "-Wl,--exclude-libs,ALL",
         "org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC",
         "org.maplibre.nativeffi.internal.javacpp.AndroidNativeBridge",
+        "org.maplibre.nativeffi.internal.javacpp.GeneratedCallbackBridge",
       )
       inputs.files(javaCppConfigSources.map(::file))
       inputs.dir(javaCppAndroidIncludes)

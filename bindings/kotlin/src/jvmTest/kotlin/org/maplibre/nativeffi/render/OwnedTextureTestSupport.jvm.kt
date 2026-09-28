@@ -5,17 +5,42 @@ import org.lwjgl.egl.EGL
 import org.lwjgl.egl.EGL14
 import org.lwjgl.egl.EGL15
 import org.lwjgl.system.MemoryStack
-import org.maplibre.nativeffi.Maplibre
+import org.maplibre.nativeffi.generated.EglContextDescriptor
+import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.OpenglClientApi
+import org.maplibre.nativeffi.generated.OpenglContextDescriptor
+import org.maplibre.nativeffi.generated.OpenglContextDescriptorData
+import org.maplibre.nativeffi.generated.OpenglContextOwnership
+import org.maplibre.nativeffi.generated.OpenglContextProviderFlag
+import org.maplibre.nativeffi.generated.OpenglOwnedTextureDescriptor
+import org.maplibre.nativeffi.generated.RenderBackendFlag
+import org.maplibre.nativeffi.generated.RenderSessionAttachment
+import org.maplibre.nativeffi.generated.RenderTargetExtent
 import org.maplibre.nativeffi.map.MapHandle
 
 private const val EGL_PLATFORM_SURFACELESS_MESA = 0x31DD
 
 internal actual object OwnedTextureTestSupport {
-  actual fun attach(map: MapHandle, width: Int, height: Int): OwnedTextureTestSession? {
-    if (RenderBackend.OPENGL !in Maplibre.supportedRenderBackends()) return null
-    if (OpenGLContextProvider.EGL !in Maplibre.supportedOpenGLContextProviders()) return null
+  actual fun attach(
+    map: MapHandle,
+    width: Int,
+    height: Int,
+    textureRingDepth: UInt,
+  ): OwnedTextureTestSession {
+    val backends = GeneratedApi.supportedRenderBackendMask()
+    if (RenderBackendFlag.METAL in backends)
+      return attachJvmMetal(map, width, height, textureRingDepth)
+    if (RenderBackendFlag.VULKAN in backends)
+      return attachJvmVulkan(map, width, height, textureRingDepth)
+    check(RenderBackendFlag.OPENGL in backends) { "No supported rendering backend: $backends" }
+    val providers = GeneratedApi.openglSupportedContextProviderMask()
+    if (OpenglContextProviderFlag.WGL in providers)
+      return attachJvmWgl(map, width, height, textureRingDepth)
+    check(OpenglContextProviderFlag.EGL in providers) { "No supported OpenGL provider: $providers" }
     ensureEglFunctionProvider()
-    return MemoryStack.stackPush().use { stack -> createEglSession(map, width, height, stack) }
+    return MemoryStack.stackPush().use { stack ->
+      createEglSession(map, width, height, textureRingDepth, stack)
+    }
   }
 }
 
@@ -24,45 +49,40 @@ private class JvmEglOwnedTextureSession(
   private val config: Long,
   private val surface: Long,
   private val context: Long,
-  override val session: RenderSessionHandle,
+  override val attachment: RenderSessionAttachment,
 ) : OwnedTextureTestSession {
-  override fun attachAnotherOwnedTexture(width: Int, height: Int): RenderSessionHandle {
+  override fun attachAnotherOwnedTexture(width: Int, height: Int): RenderSessionAttachment {
     val descriptor =
       EglContextDescriptor(
         NativePointer.ofAddress(display),
         NativePointer.ofAddress(config),
         NativePointer.ofAddress(context),
-        NativePointer.NULL_POINTER,
+        clientApi = OpenglClientApi.GLES,
+        getProcAddress = NativePointer.NULL_POINTER,
       )
     return session
       .map()
-      .attachOpenGLOwnedTexture(
-        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor)
+      .openglOwnedTextureAttach(
+        OpenglOwnedTextureDescriptor(
+          RenderTargetExtent(width.toUInt(), height.toUInt(), 1.0),
+          OpenglContextDescriptor(
+            OpenglContextOwnership.SHARED,
+            OpenglContextDescriptorData.Egl(descriptor),
+          ),
+        ),
+        OWNED_TEXTURE_ATTACH_OPTIONS,
       )
   }
 
-  override fun acquireFrame(): OwnedTextureTestFrame {
-    val handle = session.acquireOpenGLOwnedTextureFrame()
-    val frame = handle.frame()
-    return object : OwnedTextureTestFrame {
-      override val width: Int
-        get() = frame.width()
-
-      override val height: Int
-        get() = frame.height()
-
-      override val isClosed: Boolean
-        get() = handle.isClosed
-
-      override fun close() {
-        handle.close()
-      }
+  override fun frameSize(frame: AcquiredFrameHandle): OwnedTextureFrameSize {
+    return frame.withGetOpenglTexture { texture ->
+      OwnedTextureFrameSize(texture.width.toInt(), texture.height.toInt())
     }
   }
 
   override fun close() {
     try {
-      session.close()
+      session.abandonAndClose()
     } finally {
       releaseEgl(display, surface, context)
     }
@@ -73,13 +93,11 @@ private fun createEglSession(
   map: MapHandle,
   width: Int,
   height: Int,
+  textureRingDepth: UInt,
   stack: MemoryStack,
-): OwnedTextureTestSession? {
-  val display = initializedDisplay(stack)
-  if (display == null) {
-    check(!isLinuxHost()) { "EGL pbuffer fixture failed on Linux" }
-    return null
-  }
+): OwnedTextureTestSession {
+  val display =
+    checkNotNull(initializedDisplay(stack)) { "EGL pbuffer fixture initialization failed" }
 
   var surface = EGL14.EGL_NO_SURFACE
   var context = EGL14.EGL_NO_CONTEXT
@@ -130,13 +148,21 @@ private fun createEglSession(
         NativePointer.ofAddress(display),
         NativePointer.ofAddress(config),
         NativePointer.ofAddress(context),
-        NativePointer.NULL_POINTER,
+        clientApi = OpenglClientApi.GLES,
+        getProcAddress = NativePointer.NULL_POINTER,
       )
-    val session =
-      map.attachOpenGLOwnedTexture(
-        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor)
+    val attachment =
+      map.openglOwnedTextureAttach(
+        OpenglOwnedTextureDescriptor(
+          RenderTargetExtent(width.toUInt(), height.toUInt(), 1.0),
+          OpenglContextDescriptor(
+            OpenglContextOwnership.SHARED,
+            OpenglContextDescriptorData.Egl(descriptor),
+          ),
+        ),
+        OWNED_TEXTURE_ATTACH_OPTIONS.copy(requestedTextureRingDepth = textureRingDepth),
       )
-    return JvmEglOwnedTextureSession(display, config, surface, context, session)
+    return JvmEglOwnedTextureSession(display, config, surface, context, attachment)
   } catch (error: Throwable) {
     releaseEgl(display, surface, context)
     throw error
@@ -196,6 +222,3 @@ private fun ensureEglFunctionProvider() {
     EGL.create()
   }
 }
-
-private fun isLinuxHost(): Boolean =
-  System.getProperty("os.name").orEmpty().lowercase().contains("linux")

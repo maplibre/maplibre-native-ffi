@@ -58,7 +58,7 @@ import org.lwjgl.vulkan.VkInstanceCreateInfo
 import org.lwjgl.vulkan.VkPhysicalDevice
 import org.lwjgl.vulkan.VkQueue
 import org.lwjgl.vulkan.VkQueueFamilyProperties
-import org.maplibre.nativeffi.render.RenderBackend
+import org.maplibre.nativeffi.generated.RenderBackendFlag
 
 internal class VulkanContext private constructor(private val window: Long) : GraphicsContext {
   private var instance: VkInstance? = null
@@ -70,7 +70,7 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
 
   override fun window(): Long = window
 
-  override fun backend(): RenderBackend = RenderBackend.VULKAN
+  override fun backend(): RenderBackendFlag = RenderBackendFlag.VULKAN
 
   fun instanceAddress(): Long = instance().address()
 

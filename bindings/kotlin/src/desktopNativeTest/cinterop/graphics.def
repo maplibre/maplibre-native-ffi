@@ -1,0 +1,4 @@
+headers = GraphicsSupport.h
+headerFilter = GraphicsSupport.h
+package = org.maplibre.nativeffi.internal.graphics
+language = C

@@ -5,10 +5,30 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.generated.ResourceProviderDecision
+import org.maplibre.nativeffi.runtime.runSuspendTest
 
 class ResourceRequestHandleCoreTest {
   @Test
-  fun providerOwnedHandleReleasesAfterCloseExactlyOnce() {
+  fun inlineCloseForcesOwnershipThroughPassThroughOrException(): Unit = runSuspendTest {
+    for (exception in listOf(false, true)) {
+      var releases = 0
+      val core = ResourceRequestHandleCore { releases++ }
+      core.close()
+      core.close()
+      assertEquals(0, releases)
+      val decision =
+        if (exception) core.finishProviderException()
+        else core.finishProviderDecision(ResourceProviderDecision.PASS_THROUGH)
+      assertEquals(ResourceProviderDecision.HANDLE, decision)
+      core.close()
+      core.releaseIfOwned()
+      assertEquals(1, releases)
+    }
+  }
+
+  @Test
+  fun providerOwnedHandleReleasesAfterCloseExactlyOnce(): Unit = runSuspendTest {
     var releases = 0
     val core = ResourceRequestHandleCore { releases++ }
 
@@ -24,7 +44,7 @@ class ResourceRequestHandleCoreTest {
   }
 
   @Test
-  fun passThroughDecisionLetsNativeOwnRelease() {
+  fun passThroughDecisionLetsNativeOwnRelease(): Unit = runSuspendTest {
     var releases = 0
     val core = ResourceRequestHandleCore { releases++ }
 
@@ -39,7 +59,7 @@ class ResourceRequestHandleCoreTest {
   }
 
   @Test
-  fun completionBeforeProviderDecisionForcesProviderOwnership() {
+  fun completionBeforeProviderDecisionForcesProviderOwnership(): Unit = runSuspendTest {
     var releases = 0
     val core = ResourceRequestHandleCore { releases++ }
 
@@ -49,11 +69,14 @@ class ResourceRequestHandleCoreTest {
       core.finishProviderDecision(ResourceProviderDecision.PASS_THROUGH),
     )
 
+    assertEquals(0, releases)
+    core.withLiveHandle {}
+    core.close()
     assertEquals(1, releases)
   }
 
   @Test
-  fun failedCompletionBeforeNativeCallLeavesHandleRetryable() {
+  fun failedCompletionBeforeNativeCallLeavesHandleRetryable(): Unit = runSuspendTest {
     var completions = 0
     val core = ResourceRequestHandleCore {}
 
@@ -70,7 +93,7 @@ class ResourceRequestHandleCoreTest {
   }
 
   @Test
-  fun completedHandleRejectsFurtherCompletion() {
+  fun completedHandleRejectsFurtherCompletion(): Unit = runSuspendTest {
     var nativeCalls = 0
     val core = ResourceRequestHandleCore {}
 
@@ -85,43 +108,45 @@ class ResourceRequestHandleCoreTest {
   }
 
   @Test
-  fun closeDuringLiveOperationDefersProviderOwnedReleaseUntilOperationExits() {
-    var releases = 0
-    val core = ResourceRequestHandleCore { releases++ }
+  fun closeDuringLiveOperationDefersProviderOwnedReleaseUntilOperationExits(): Unit =
+    runSuspendTest {
+      var releases = 0
+      val core = ResourceRequestHandleCore { releases++ }
 
-    assertEquals(
-      ResourceProviderDecision.HANDLE,
-      core.finishProviderDecision(ResourceProviderDecision.HANDLE),
-    )
-    val operation = core.beginComplete()
-    core.close()
+      assertEquals(
+        ResourceProviderDecision.HANDLE,
+        core.finishProviderDecision(ResourceProviderDecision.HANDLE),
+      )
+      val operation = core.beginComplete()
+      core.close()
 
-    assertEquals(0, releases)
+      assertEquals(0, releases)
 
-    operation.markCompleted()
-    operation.close()
+      operation.markCompleted()
+      operation.close()
 
-    assertEquals(1, releases)
-  }
-
-  @Test
-  fun providerOwnedHandleClosedBeforeDecisionReleasesAfterDecisionExactlyOnce() {
-    var releases = 0
-    val core = ResourceRequestHandleCore { releases++ }
-
-    core.close()
-    assertEquals(
-      ResourceProviderDecision.HANDLE,
-      core.finishProviderDecision(ResourceProviderDecision.HANDLE),
-    )
-    core.close()
-    core.releaseIfOwned()
-
-    assertEquals(1, releases)
-  }
+      assertEquals(1, releases)
+    }
 
   @Test
-  fun retainedPassThroughHandleCannotStartLaterOperations() {
+  fun providerOwnedHandleClosedBeforeDecisionReleasesAfterDecisionExactlyOnce(): Unit =
+    runSuspendTest {
+      var releases = 0
+      val core = ResourceRequestHandleCore { releases++ }
+
+      core.close()
+      assertEquals(
+        ResourceProviderDecision.HANDLE,
+        core.finishProviderDecision(ResourceProviderDecision.HANDLE),
+      )
+      core.close()
+      core.releaseIfOwned()
+
+      assertEquals(1, releases)
+    }
+
+  @Test
+  fun retainedPassThroughHandleCannotStartLaterOperations(): Unit = runSuspendTest {
     var releases = 0
     val core = ResourceRequestHandleCore { releases++ }
 
@@ -138,7 +163,7 @@ class ResourceRequestHandleCoreTest {
   }
 
   @Test
-  fun closeRejectsCompletionAndCancellationBeforeNativeCalls() {
+  fun closeRejectsCompletionAndCancellationBeforeNativeCalls(): Unit = runSuspendTest {
     var releases = 0
     var nativeCalls = 0
     val core = ResourceRequestHandleCore { releases++ }

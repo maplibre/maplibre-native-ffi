@@ -31,9 +31,9 @@ import org.lwjgl.opengles.GLES20
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.system.windows.User32
-import org.maplibre.nativeffi.Maplibre
-import org.maplibre.nativeffi.render.OpenGLContextProvider
-import org.maplibre.nativeffi.render.RenderBackend
+import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.OpenglContextProviderFlag
+import org.maplibre.nativeffi.generated.RenderBackendFlag
 
 internal class OpenGLContext private constructor(val isGles: Boolean, private val window: Long) :
   GraphicsContext {
@@ -46,7 +46,7 @@ internal class OpenGLContext private constructor(val isGles: Boolean, private va
 
   override fun window(): Long = window
 
-  override fun backend(): RenderBackend = RenderBackend.OPENGL
+  override fun backend(): RenderBackendFlag = RenderBackendFlag.OPENGL
 
   fun hdcAddress(): Long = hdc
 
@@ -104,10 +104,10 @@ internal class OpenGLContext private constructor(val isGles: Boolean, private va
 
   internal companion object {
     fun create(title: String, width: Int, height: Int): OpenGLContext {
-      val providers = Maplibre.supportedOpenGLContextProviders()
+      val providers = GeneratedApi.openglSupportedContextProviderMask()
       return when {
-        OpenGLContextProvider.EGL in providers -> createEgl(title, width, height)
-        OpenGLContextProvider.WGL in providers -> createWgl(title, width, height)
+        OpenglContextProviderFlag.EGL in providers -> createEgl(title, width, height)
+        OpenglContextProviderFlag.WGL in providers -> createWgl(title, width, height)
         else ->
           error(
             "The loaded MapLibre native library does not support an OpenGL context provider usable by lwjgl-map"
@@ -116,7 +116,7 @@ internal class OpenGLContext private constructor(val isGles: Boolean, private va
     }
 
     private fun createEgl(title: String, width: Int, height: Int): OpenGLContext {
-      check(OpenGLContextProvider.EGL in Maplibre.supportedOpenGLContextProviders()) {
+      check(OpenglContextProviderFlag.EGL in GeneratedApi.openglSupportedContextProviderMask()) {
         "Native library does not support EGL"
       }
       check(glfwInit()) { "GLFW initialization failed" }
@@ -160,7 +160,7 @@ internal class OpenGLContext private constructor(val isGles: Boolean, private va
     }
 
     private fun createWgl(title: String, width: Int, height: Int): OpenGLContext {
-      check(OpenGLContextProvider.WGL in Maplibre.supportedOpenGLContextProviders()) {
+      check(OpenglContextProviderFlag.WGL in GeneratedApi.openglSupportedContextProviderMask()) {
         "Native library does not support WGL"
       }
       check(glfwInit()) { "GLFW initialization failed" }

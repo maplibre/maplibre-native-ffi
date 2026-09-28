@@ -4,9 +4,8 @@ import android.app.Activity
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
-import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.MaplibreAndroid
-import org.maplibre.nativeffi.log.LogRecord
+import org.maplibre.nativeffi.generated.GeneratedApi
 
 class MainActivity : Activity() {
   private lateinit var mapView: AndroidMapView
@@ -32,17 +31,14 @@ class MainActivity : Activity() {
 
   override fun onDestroy() {
     mapView.close()
-    Maplibre.clearLogCallback()
+    GeneratedApi.logClearCallback()
     super.onDestroy()
   }
 
   private fun installMaplibreLogging() {
-    Maplibre.setLogCallback { record: LogRecord ->
-      Log.i(
-        "MapLibre",
-        "severity=${record.severity} event=${record.event} code=${record.code}: ${record.message}",
-      )
-      true
+    GeneratedApi.logSetCallback { severity, event, code, message ->
+      Log.i("MapLibre", "severity=${severity} event=${event} code=${code}: ${message}")
+      1u
     }
   }
 

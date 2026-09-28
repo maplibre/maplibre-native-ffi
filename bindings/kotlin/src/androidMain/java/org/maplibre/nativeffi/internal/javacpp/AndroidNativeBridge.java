@@ -16,23 +16,15 @@ public final class AndroidNativeBridge {
 
   @Name("mln_android_map_get_camera")
   public static native @Cast("mln_status") int mapGetCamera(
-      @Cast("mln_map") long map, double[] out);
+      @Cast("mln_map") long map, double[] out, @Cast("uint64_t*") long[] generation);
 
   @Name("mln_android_projection_get_camera")
   public static native @Cast("mln_status") int projectionGetCamera(
       @Cast("mln_map_projection") long projection, double[] out);
 
-  @Name("mln_android_map_pixel_for_lat_lng")
-  public static native @Cast("mln_status") int mapPixelForLatLng(
-      @Cast("mln_map") long map, double latitude, double longitude, double[] out);
-
   @Name("mln_android_projection_pixel_for_lat_lng")
   public static native @Cast("mln_status") int projectionPixelForLatLng(
       @Cast("mln_map_projection") long projection, double latitude, double longitude, double[] out);
-
-  @Name("mln_android_map_lat_lng_for_pixel")
-  public static native @Cast("mln_status") int mapLatLngForPixel(
-      @Cast("mln_map") long map, double x, double y, boolean unwrapped, double[] out);
 
   @Name("mln_android_projection_lat_lng_for_pixel")
   public static native @Cast("mln_status") int projectionLatLngForPixel(
@@ -54,7 +46,8 @@ public final class AndroidNativeBridge {
       @Cast("const mln_buffer_view*") Pointer imageId,
       @Cast("const mln_premultiplied_rgba8_image*") Pointer image,
       @Cast("const uint8_t*") byte[] pixels,
-      @Cast("const mln_style_image_options*") Pointer options);
+      @Cast("const mln_style_image_options*") Pointer options,
+      @Cast("const mln_completion*") Pointer completion);
 
   @Name("mln_android_add_image_source_image")
   public static native @Cast("mln_status") int addImageSourceImage(
@@ -63,12 +56,14 @@ public final class AndroidNativeBridge {
       @Cast("const mln_lat_lng*") Pointer coordinates,
       @Cast("size_t") long coordinateCount,
       @Cast("const mln_premultiplied_rgba8_image*") Pointer image,
-      @Cast("const uint8_t*") byte[] pixels);
+      @Cast("const uint8_t*") byte[] pixels,
+      @Cast("const mln_completion*") Pointer completion);
 
   @Name("mln_android_set_image_source_image")
   public static native @Cast("mln_status") int setImageSourceImage(
       @Cast("mln_map") long map,
       @Cast("const mln_buffer_view*") Pointer sourceId,
       @Cast("const mln_premultiplied_rgba8_image*") Pointer image,
-      @Cast("const uint8_t*") byte[] pixels);
+      @Cast("const uint8_t*") byte[] pixels,
+      @Cast("const mln_completion*") Pointer completion);
 }

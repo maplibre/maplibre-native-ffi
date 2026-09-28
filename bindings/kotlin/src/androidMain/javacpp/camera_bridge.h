@@ -1,6 +1,6 @@
 #pragma once
 
-#include <maplibre_native_c/map.h>
+#include <maplibre_native_c/camera.h>
 #include <maplibre_native_c/projection.h>
 
 // The private Android bridge keeps temporary structs on the native stack.
@@ -26,9 +26,11 @@ inline void mln_android_copy_camera(
   out[14] = camera.field_of_view;
 }
 
-inline mln_status mln_android_map_get_camera(mln_map map, double* out) {
+inline mln_status mln_android_map_get_camera(
+  mln_map map, double* out, uint64_t* generation
+) {
   auto camera = mln_camera_options_default();
-  const auto status = mln_map_get_camera(map, &camera);
+  const auto status = mln_map_camera_snapshot_get(map, &camera, generation);
   if (status == MLN_STATUS_OK) mln_android_copy_camera(camera, out);
   return status;
 }
@@ -42,19 +44,6 @@ inline mln_status mln_android_projection_get_camera(
   return status;
 }
 
-inline mln_status mln_android_map_pixel_for_lat_lng(
-  mln_map map, double latitude, double longitude, double* out
-) {
-  mln_screen_point point{};
-  const auto status =
-    mln_map_pixel_for_lat_lng(map, {latitude, longitude}, &point);
-  if (status == MLN_STATUS_OK) {
-    out[0] = point.x;
-    out[1] = point.y;
-  }
-  return status;
-}
-
 inline mln_status mln_android_projection_pixel_for_lat_lng(
   mln_map_projection projection, double latitude, double longitude, double* out
 ) {
@@ -65,20 +54,6 @@ inline mln_status mln_android_projection_pixel_for_lat_lng(
   if (status == MLN_STATUS_OK) {
     out[0] = point.x;
     out[1] = point.y;
-  }
-  return status;
-}
-
-inline mln_status mln_android_map_lat_lng_for_pixel(
-  mln_map map, double x, double y, bool unwrapped, double* out
-) {
-  mln_lat_lng coordinate{};
-  const auto status =
-    unwrapped ? mln_map_lat_lng_for_pixel_unwrapped(map, {x, y}, &coordinate)
-              : mln_map_lat_lng_for_pixel(map, {x, y}, &coordinate);
-  if (status == MLN_STATUS_OK) {
-    out[0] = coordinate.latitude;
-    out[1] = coordinate.longitude;
   }
   return status;
 }

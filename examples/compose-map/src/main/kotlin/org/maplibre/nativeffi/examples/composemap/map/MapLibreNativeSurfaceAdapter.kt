@@ -1,6 +1,6 @@
 package org.maplibre.nativeffi.examples.composemap.map
 
-import org.maplibre.nativeffi.Maplibre
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.examples.composemap.surface.EglContextHandles
 import org.maplibre.nativeffi.examples.composemap.surface.MetalTextureTarget
 import org.maplibre.nativeffi.examples.composemap.surface.NativeHandle
@@ -12,26 +12,29 @@ import org.maplibre.nativeffi.examples.composemap.surface.SurfaceExtent
 import org.maplibre.nativeffi.examples.composemap.surface.VulkanContextHandles
 import org.maplibre.nativeffi.examples.composemap.surface.VulkanImageTarget
 import org.maplibre.nativeffi.examples.composemap.surface.WglContextHandles
+import org.maplibre.nativeffi.generated.EglContextDescriptor
+import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.MetalBorrowedTextureDescriptor
+import org.maplibre.nativeffi.generated.OpenglBorrowedTextureDescriptor
+import org.maplibre.nativeffi.generated.OpenglContextDescriptor
+import org.maplibre.nativeffi.generated.RenderBackendFlag
+import org.maplibre.nativeffi.generated.RenderDriverKind
+import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
+import org.maplibre.nativeffi.generated.RenderSessionAttachment
+import org.maplibre.nativeffi.generated.RenderTargetExtent
+import org.maplibre.nativeffi.generated.VulkanBorrowedTextureDescriptor
+import org.maplibre.nativeffi.generated.VulkanContextDescriptor
+import org.maplibre.nativeffi.generated.WglContextDescriptor
 import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.render.EglContextDescriptor
-import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.NativePointer
-import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
-import org.maplibre.nativeffi.render.OpenGLContextDescriptor
-import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.render.RenderSessionHandle
-import org.maplibre.nativeffi.render.RenderTargetExtent
-import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
-import org.maplibre.nativeffi.render.VulkanContextDescriptor
-import org.maplibre.nativeffi.render.VulkanHandle
-import org.maplibre.nativeffi.render.WglContextDescriptor
 
 internal object MapLibreNativeSurfaceAdapter {
   val backend: ProducerBackend =
-    Maplibre.supportedRenderBackends().mapNotNull { it.toProducerBackend() }.singleOrNull()
-      ?: error(
-        "Expected exactly one MapLibre render backend, found ${Maplibre.supportedRenderBackends()}"
-      )
+    listOf(RenderBackendFlag.METAL, RenderBackendFlag.VULKAN, RenderBackendFlag.OPENGL)
+      .filter { it in GeneratedApi.supportedRenderBackendMask() }
+      .mapNotNull { it.toProducerBackend() }
+      .singleOrNull() ?: error("Expected exactly one supported MapLibre render backend")
 
   fun borrowedTarget(target: NativeSurfaceTarget, extent: SurfaceExtent): BorrowedTarget =
     when (target) {
@@ -44,31 +47,31 @@ internal object MapLibreNativeSurfaceAdapter {
     val descriptor =
       MetalBorrowedTextureDescriptor(
         extent.toRenderTargetExtent(),
-        extent.physicalWidth,
-        extent.physicalHeight,
+        extent.physicalWidth.toUInt(),
+        extent.physicalHeight.toUInt(),
         target.texture.toPointer(),
       )
     return BorrowedTarget(
       sessionKey = SessionKey.Metal(target.device, target.pixelFormat),
       targetKey = TargetKey(target.generation, extent),
-      attach = { map -> map.attachMetalBorrowedTexture(descriptor) },
-      setTarget = { session -> session.setMetalBorrowedTextureTarget(descriptor) },
+      attach = { map -> map.metalBorrowedTextureAttach(descriptor, callerDriverOptions) },
+      setTarget = { session -> session.metalBorrowedTextureSetTarget(descriptor) },
     )
   }
 
   private fun vulkanTarget(target: VulkanImageTarget, extent: SurfaceExtent): BorrowedTarget {
     val descriptor =
       VulkanBorrowedTextureDescriptor(
-          extent.toRenderTargetExtent(),
-          extent.physicalWidth,
-          extent.physicalHeight,
-          target.context.toDescriptor(),
-          target.image.toVulkanHandle(),
-          target.imageView.toVulkanHandle(),
-          target.format,
-          target.initialLayout,
-        )
-        .apply { finalLayout = target.finalLayout }
+        extent.toRenderTargetExtent(),
+        extent.physicalWidth.toUInt(),
+        extent.physicalHeight.toUInt(),
+        target.context.toDescriptor(),
+        target.image.toVulkanHandle(),
+        target.imageView.toVulkanHandle(),
+        target.format.toUInt(),
+        target.initialLayout.toUInt(),
+        target.finalLayout.toUInt(),
+      )
     return BorrowedTarget(
       sessionKey =
         SessionKey.Vulkan(
@@ -78,26 +81,26 @@ internal object MapLibreNativeSurfaceAdapter {
           finalLayout = target.finalLayout,
         ),
       targetKey = TargetKey(target.generation, extent),
-      attach = { map -> map.attachVulkanBorrowedTexture(descriptor) },
-      setTarget = { session -> session.setVulkanBorrowedTextureTarget(descriptor) },
+      attach = { map -> map.vulkanBorrowedTextureAttach(descriptor, callerDriverOptions) },
+      setTarget = { session -> session.vulkanBorrowedTextureSetTarget(descriptor) },
     )
   }
 
   private fun openGlTarget(target: OpenGlTextureTarget, extent: SurfaceExtent): BorrowedTarget {
     val descriptor =
-      OpenGLBorrowedTextureDescriptor(
+      OpenglBorrowedTextureDescriptor(
         extent.toRenderTargetExtent(),
-        extent.physicalWidth,
-        extent.physicalHeight,
+        extent.physicalWidth.toUInt(),
+        extent.physicalHeight.toUInt(),
         target.context.toDescriptor(),
-        target.textureName,
-        target.textureTarget,
+        target.textureName.toUInt(),
+        target.textureTarget.toUInt(),
       )
     return BorrowedTarget(
       sessionKey = SessionKey.OpenGl(target.context),
       targetKey = TargetKey(target.generation, extent),
-      attach = { map -> map.attachOpenGLBorrowedTexture(descriptor) },
-      setTarget = { session -> session.setOpenGLBorrowedTextureTarget(descriptor) },
+      attach = { map -> map.openglBorrowedTextureAttach(descriptor, callerDriverOptions) },
+      setTarget = { session -> session.openglBorrowedTextureSetTarget(descriptor) },
     )
   }
 
@@ -134,25 +137,28 @@ internal object MapLibreNativeSurfaceAdapter {
   class BorrowedTarget(
     val sessionKey: SessionKey,
     val targetKey: TargetKey,
-    val attach: (MapHandle) -> RenderSessionHandle,
-    val setTarget: (RenderSessionHandle) -> Unit,
+    val attach: (MapHandle) -> RenderSessionAttachment,
+    val setTarget: (RenderSessionHandle) -> Deferred<Unit>,
   )
+
+  private val callerDriverOptions =
+    RenderSessionAttachOptions(driver = RenderDriverKind.CALLER_GRAPHICS_THREAD)
 }
 
 private fun SurfaceExtent.toRenderTargetExtent(): RenderTargetExtent =
-  RenderTargetExtent(width, height, scaleFactor)
+  RenderTargetExtent(width.toUInt(), height.toUInt(), scaleFactor)
 
 private fun NativeHandle.toPointer(): NativePointer = NativePointer.ofAddress(address)
 
-private fun NativeHandle.toVulkanHandle(): VulkanHandle = VulkanHandle.ofBits(address)
+private fun NativeHandle.toVulkanHandle(): ULong = address.toULong()
 
-private fun RenderBackend.toProducerBackend(): ProducerBackend? =
+private fun RenderBackendFlag.toProducerBackend(): ProducerBackend? =
   when (this) {
-    RenderBackend.METAL -> ProducerBackend.METAL
-    RenderBackend.VULKAN -> ProducerBackend.VULKAN
-    RenderBackend.OPENGL -> ProducerBackend.OPENGL
+    RenderBackendFlag.METAL -> ProducerBackend.METAL
+    RenderBackendFlag.VULKAN -> ProducerBackend.VULKAN
+    RenderBackendFlag.OPENGL -> ProducerBackend.OPENGL
     // The Skia bridges this example produces for have no WebGPU consumer.
-    RenderBackend.WEBGPU -> null
+    else -> null
   }
 
 private fun VulkanContextHandles.toDescriptor(): VulkanContextDescriptor =
@@ -161,24 +167,33 @@ private fun VulkanContextHandles.toDescriptor(): VulkanContextDescriptor =
     physicalDevice.toPointer(),
     device.toPointer(),
     graphicsQueue.toPointer(),
-    graphicsQueueFamilyIndex,
+    graphicsQueueFamilyIndex.toUInt(),
     getInstanceProcAddr.toPointer(),
     getDeviceProcAddr.toPointer(),
   )
 
-private fun OpenGlContextHandles.toDescriptor(): OpenGLContextDescriptor =
-  when (this) {
-    is EglContextHandles ->
-      EglContextDescriptor(
-        display.toPointer(),
-        config.toPointer(),
-        shareContext.toPointer(),
-        getProcAddress.toPointer(),
-      )
-    is WglContextHandles ->
-      WglContextDescriptor(
-        deviceContext.toPointer(),
-        shareContext.toPointer(),
-        getProcAddress.toPointer(),
-      )
-  }
+private fun OpenGlContextHandles.toDescriptor(): OpenglContextDescriptor =
+  OpenglContextDescriptor(
+    ownership = org.maplibre.nativeffi.generated.OpenglContextOwnership.SHARED,
+    data =
+      when (this) {
+        is EglContextHandles ->
+          org.maplibre.nativeffi.generated.OpenglContextDescriptorData.Egl(
+            EglContextDescriptor(
+              display.toPointer(),
+              config.toPointer(),
+              shareContext.toPointer(),
+              org.maplibre.nativeffi.generated.OpenglClientApi.GLES,
+              getProcAddress.toPointer(),
+            )
+          )
+        is WglContextHandles ->
+          org.maplibre.nativeffi.generated.OpenglContextDescriptorData.Wgl(
+            WglContextDescriptor(
+              deviceContext.toPointer(),
+              shareContext.toPointer(),
+              getProcAddress.toPointer(),
+            )
+          )
+      },
+  )

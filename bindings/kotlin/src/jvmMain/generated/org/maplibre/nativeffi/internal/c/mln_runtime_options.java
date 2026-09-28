@@ -20,6 +20,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     const char *asset_path;
  *     const char *cache_path;
  *     uint64_t event_mask;
+ *     mln_wake event_wake;
  * }
  * }
  */
@@ -34,7 +35,8 @@ public class mln_runtime_options {
         MapLibreNativeC.C_INT.withName("flags"),
         MapLibreNativeC.C_POINTER.withName("asset_path"),
         MapLibreNativeC.C_POINTER.withName("cache_path"),
-        MapLibreNativeC.C_LONG.withName("event_mask")
+        MapLibreNativeC.C_LONG.withName("event_mask"),
+        mln_wake.layout().withName("event_wake")
     ).withName("mln_runtime_options");
 
     /**
@@ -262,6 +264,50 @@ public class mln_runtime_options {
      */
     public static void event_mask(MemorySegment struct, long fieldValue) {
         struct.set(event_mask$LAYOUT, event_mask$OFFSET, fieldValue);
+    }
+
+    private static final GroupLayout event_wake$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("event_wake"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * mln_wake event_wake
+     * }
+     */
+    public static final GroupLayout event_wake$layout() {
+        return event_wake$LAYOUT;
+    }
+
+    private static final long event_wake$OFFSET = $LAYOUT.byteOffset(groupElement("event_wake"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * mln_wake event_wake
+     * }
+     */
+    public static final long event_wake$offset() {
+        return event_wake$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * mln_wake event_wake
+     * }
+     */
+    public static MemorySegment event_wake(MemorySegment struct) {
+        return struct.asSlice(event_wake$OFFSET, event_wake$LAYOUT.byteSize());
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * mln_wake event_wake
+     * }
+     */
+    public static void event_wake(MemorySegment struct, MemorySegment fieldValue) {
+        MemorySegment.copy(fieldValue, 0L, struct, event_wake$OFFSET, event_wake$LAYOUT.byteSize());
     }
 
     /**

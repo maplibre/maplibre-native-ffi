@@ -1,27 +1,21 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
 import kotlin.system.exitProcess
-import org.maplibre.nativeffi.Maplibre
-import org.maplibre.nativeffi.render.RenderBackend
+import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.RenderBackendFlag
 
 internal object Main {
   @JvmStatic
   fun main(args: Array<String>) {
     val mode = parseArgs(args) ?: return
-    val backends = Maplibre.supportedRenderBackends()
+    val backends = GeneratedApi.supportedRenderBackendMask()
     println("native render backends: $backends")
     check(supportsUsableBackend(backends)) {
       "The loaded MapLibre native library does not support a backend usable by lwjgl-map"
     }
-    Maplibre.setLogCallback { record ->
-      System.err.printf(
-        "MapLibre %s %s %d: %s%n",
-        record.severity,
-        record.event,
-        record.code,
-        record.message,
-      )
-      true
+    GeneratedApi.logSetCallback { severity, event, code, message ->
+      System.err.printf("MapLibre %s %s %d: %s%n", severity, event, code, message)
+      1u
     }
     System.getProperty("org.maplibre.nativeffi.library.path")?.let {
       println("MapLibre native library: $it")
@@ -30,7 +24,7 @@ internal object Main {
     try {
       Shell.run(mode, backends)
     } finally {
-      Maplibre.clearLogCallback()
+      GeneratedApi.logClearCallback()
     }
   }
 
@@ -66,8 +60,8 @@ internal object Main {
     )
   }
 
-  private fun supportsUsableBackend(backends: Set<RenderBackend>): Boolean =
-    RenderBackend.METAL in backends ||
-      RenderBackend.OPENGL in backends ||
-      RenderBackend.VULKAN in backends
+  private fun supportsUsableBackend(backends: RenderBackendFlag): Boolean =
+    RenderBackendFlag.METAL in backends ||
+      RenderBackendFlag.OPENGL in backends ||
+      RenderBackendFlag.VULKAN in backends
 }

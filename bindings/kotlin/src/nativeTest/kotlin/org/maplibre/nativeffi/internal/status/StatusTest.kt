@@ -13,17 +13,15 @@ import kotlinx.cinterop.sizeOf
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.generated.NetworkStatus
 import org.maplibre.nativeffi.internal.c.mln_network_status_set
 import org.maplibre.nativeffi.internal.c.mln_resource_transform_response
 import org.maplibre.nativeffi.internal.c.mln_resource_transform_response_set_url
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.memory.toCSize
-import org.maplibre.nativeffi.runtime.NetworkStatus
 
 @OptIn(ExperimentalForeignApi::class)
 class NativeStatusDiagnosticTest : org.maplibre.nativeffi.NativeTestBase() {
-  // BND-020, BND-021, BND-022, BND-023, BND-024, BND-025, BND-026.
-
   @Test
   fun deterministicNativeStatusProducersThrowMappedExceptionTypes() {
     memScoped {
@@ -69,12 +67,12 @@ class NativeStatusDiagnosticTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(MaplibreStatus.INVALID_ARGUMENT, exception.status)
       assertTrue(diagnostic.contains("network status"))
 
-      Status.check(mln_network_status_set(NetworkStatus.ONLINE.nativeValue.toUInt()))
+      Status.check(mln_network_status_set(NetworkStatus.ONLINE.rawValue))
 
       assertEquals("", Status.currentDiagnostic())
       assertEquals(diagnostic, exception.diagnostic)
     } finally {
-      Status.check(mln_network_status_set(NetworkStatus.ONLINE.nativeValue.toUInt()))
+      Status.check(mln_network_status_set(NetworkStatus.ONLINE.rawValue))
     }
   }
 

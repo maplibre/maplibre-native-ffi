@@ -1,88 +1,81 @@
 package org.maplibre.nativeffi.resource
 
-import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelBridge
-import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelRegistration
-import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelSetResult
-import org.maplibre.nativeffi.internal.callback.ResourceRequestCancelState
+import org.maplibre.nativeffi.generated.ResourceProviderDecision
+import org.maplibre.nativeffi.internal.callback.*
 import org.maplibre.nativeffi.internal.lifecycle.NativeResourceRequest
 import org.maplibre.nativeffi.internal.lifecycle.UnreachableActions
-import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.status.Status
 
-/** Owned JVM FFM handle for a resource provider request. */
 public actual class ResourceRequestHandle
 internal constructor(
   private val handle: NativeResourceRequest,
-  private val completer: (NativeResourceRequest, ResourceResponse) -> Int =
-    NativeAccess::completeResourceRequest,
-  private val cancellationChecker: (NativeResourceRequest) -> Boolean =
-    NativeAccess::isResourceRequestCancelled,
-  private val cancelCallbackSetter:
-    (NativeResourceRequest, Long) -> ResourceRequestCancelSetResult =
-    { requestHandle, token ->
-      NativeAccess.setResourceRequestCancelCallback(
-        requestHandle,
-        ResourceRequestCancelBridge.stub,
-        ResourceRequestCancelBridge.userData(token),
-      )
-    },
-  releaser: (NativeResourceRequest) -> Unit = NativeAccess::releaseResourceRequest,
-) : AutoCloseable {
-  private val cancelRegistration = ResourceRequestCancelRegistration()
-  private val cancelState = ResourceRequestCancelState(cancelRegistration)
-  private val core =
-    ResourceRequestHandleCore(ReleaseNativeRequest(handle, releaser, cancelRegistration))
-
-  init {
-    UnreachableActions.register(this, CloseWhenUnreachableAction(core))
+  releaser: (Long) -> Unit = {
+    org.maplibre.nativeffi.generated.GeneratedOwnerDisposal.resourceRequestHandle(it.toLong())
+  },
+) : org.maplibre.nativeffi.generated.GeneratedResourceRequestHandleOperations(), AutoCloseable {
+  internal override fun bindingResourceRequestHandleHandle(): Long = core.withLiveHandle {
+    handle.raw
   }
 
-  public actual fun complete(response: ResourceResponse) {
-    NativeAccess.ensureLoaded()
+  internal override fun bindingIssuedResourceRequestHandleHandle(): Long = handle.raw
+
+  internal override fun bindingCloseResourceRequestHandle(call: (Long) -> Int) {
+    close()
+  }
+
+  internal override fun bindingCompleteResourceRequestHandle(call: (Long) -> Int) {
     val operation = core.beginComplete()
-    var reachedNative = false
     try {
-      val nativeStatus = completer(handle, response).also { reachedNative = true }
-      val nativeFailure =
-        if (nativeStatus == MaplibreStatus.OK.nativeCode) null else Status.exception(nativeStatus)
-      operation.markCompleted()
-      nativeFailure?.let { throw it }
+      val status = call(handle.raw)
+      if (status == 0) operation.markCompleted() else operation.markNotReachedNative()
+      Status.check(status)
     } catch (error: Throwable) {
-      if (reachedNative) {
-        operation.markCompleted()
-      } else {
-        operation.markNotReachedNative()
-      }
+      operation.markNotReachedNative()
       throw error
     } finally {
-      if (reachedNative) cancelState.drop()
       operation.close()
     }
   }
 
-  public actual fun isCancelled(): Boolean {
-    NativeAccess.ensureLoaded()
-    return core.withLiveHandle { cancellationChecker(handle) }
+  internal override fun <T> bindingReadResourceRequestHandle(block: (Long) -> T): T =
+    core.withLiveHandle {
+      block(handle.raw)
+    }
+
+  internal override fun bindingRegisterResourceRequestHandleCancel(
+    callback: () -> Unit,
+    call: (Long, Long) -> ResourceRequestCancelSetResult,
+  ): Boolean = core.withLiveHandle {
+    val cancelled = cancelState.register(callback) { token -> call(handle.raw, token) } != null
+    if (core.isClosed) cancelState.drop()
+    cancelled
   }
 
-  public actual fun setCancelCallback(callback: () -> Unit) {
-    NativeAccess.ensureLoaded()
-    val alreadyCancelled = core.withLiveHandle {
-      cancelState.register(callback) { token -> cancelCallbackSetter(handle, token) }
+  internal fun finishBindingDecision(raw: UInt): UInt =
+    when (raw) {
+      ResourceProviderDecision.PASS_THROUGH.rawValue ->
+        finishProviderDecision(ResourceProviderDecision.PASS_THROUGH).toUInt()
+      ResourceProviderDecision.HANDLE.rawValue ->
+        finishProviderDecision(ResourceProviderDecision.HANDLE).toUInt()
+      else -> finishProviderException().toUInt()
     }
-    // Close or completion may have marked the handle while this borrow was live and dropped an
-    // empty slot. They release native once the borrow ends, so the callback never runs: drop it.
-    if (core.isClosed) cancelState.drop()
-    // The borrow has ended, so the callback may close this handle and release it immediately.
-    alreadyCancelled?.let(ResourceRequestCancelState::runContained)
+
+  internal fun finishBindingException(): UInt = finishProviderException().toUInt()
+
+  private val cancelRegistration = ResourceRequestCancelRegistration()
+  private val cancelState = ResourceRequestCancelState(cancelRegistration)
+  private val core =
+    ResourceRequestHandleCore(ReleaseNativeRequest(handle.raw, releaser, cancelRegistration))
+
+  init {
+    val state = core
+    UnreachableActions.register(this, Runnable { state.close() })
   }
 
   public actual override fun close() {
+    CallbackAdmission.check(handle.raw.toLong(), "mln_resource_request_release")
     cancelState.drop()
     core.close()
-    // A registration that held a borrow while this close began may have filled the slot after the
-    // first drop. The borrow has drained and native release has returned, so nothing runs it now.
     cancelState.drop()
   }
 
@@ -94,53 +87,32 @@ internal constructor(
 
   private fun finishProvider(decision: ResourceProviderDecision): Int =
     if (decision == ResourceProviderDecision.PASS_THROUGH) {
-      handedBackToNative(decision.nativeValue)
+      handedBackToNative(decision.rawValue.toInt())
     } else {
-      decision.nativeValue
+      decision.rawValue.toInt()
     }
 
-  /** MapLibre retires a request the provider did not handle, so the release path never runs. */
   private fun handedBackToNative(result: Int): Int {
     cancelState.drop()
     cancelRegistration.dispose()
     return result
   }
 
-  /**
-   * Releases the native request once the wrapper becomes unreachable.
-   *
-   * Request handles carry no owner-thread affinity, so the cleanup thread may reclaim one. This
-   * holds the ownership state alone; holding the wrapper would keep it reachable and suppress every
-   * reclaim.
-   */
-  private class CloseWhenUnreachableAction(private val core: ResourceRequestHandleCore) : Runnable {
-    override fun run() {
-      core.close()
-    }
-  }
-
-  /**
-   * Releases the native request and then drops its registry token.
-   *
-   * Native release returns once a cancel callback running on another thread has returned, so no
-   * native use of the token outlives this call. This holds the token alone; the callback state
-   * would reach the host callback and whatever it captures.
-   */
   private class ReleaseNativeRequest(
-    private val handle: NativeResourceRequest,
-    private val releaser: (NativeResourceRequest) -> Unit,
-    private val cancelRegistration: ResourceRequestCancelRegistration,
+    private val raw: Long,
+    private val releaser: (Long) -> Unit,
+    private val registration: ResourceRequestCancelRegistration,
   ) : () -> Unit {
     override fun invoke() {
       try {
-        releaser(handle)
+        releaser(raw)
       } finally {
-        cancelRegistration.dispose()
+        registration.dispose()
       }
     }
   }
 
   private companion object {
-    private const val UNKNOWN_DECISION: Int = -1
+    const val UNKNOWN_DECISION = -1
   }
 }

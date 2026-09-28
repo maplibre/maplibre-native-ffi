@@ -24,12 +24,10 @@ import platform.posix.usleep
 
 @OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
 class HandleStateTest : org.maplibre.nativeffi.NativeTestBase() {
-  // BND-040, BND-041, BND-046, BND-048.
-
   @Test
   fun concurrentReleaseDuringNativeDestroyRejectsSecondCloseAndDestroysOnce() {
     val handle = SyntheticHandles.map()
-    val state = HandleState("TestHandle", handle)
+    val state = HandleState("TestHandle", handle, dispose = {})
     val phase = AtomicInt(0)
     val concurrentCloseError = AtomicReference<Throwable?>(null)
     var attempts = 0

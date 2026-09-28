@@ -20,7 +20,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     uint64_t source;
  *     int32_t code;
  *     uint32_t payload_type;
- *     uint32_t message_offset;
+ *     uint64_t message_offset;
  *     uint32_t message_size;
  *     mln_runtime_event_payload payload;
  * }
@@ -38,8 +38,9 @@ public class mln_runtime_event {
         MapLibreNativeC.C_LONG.withName("source"),
         MapLibreNativeC.C_INT.withName("code"),
         MapLibreNativeC.C_INT.withName("payload_type"),
-        MapLibreNativeC.C_INT.withName("message_offset"),
+        MapLibreNativeC.C_LONG.withName("message_offset"),
         MapLibreNativeC.C_INT.withName("message_size"),
+        MemoryLayout.paddingLayout(4),
         mln_runtime_event_payload.layout().withName("payload")
     ).withName("mln_runtime_event");
 
@@ -270,15 +271,15 @@ public class mln_runtime_event {
         struct.set(payload_type$LAYOUT, payload_type$OFFSET, fieldValue);
     }
 
-    private static final OfInt message_offset$LAYOUT = (OfInt)$LAYOUT.select(groupElement("message_offset"));
+    private static final OfLong message_offset$LAYOUT = (OfLong)$LAYOUT.select(groupElement("message_offset"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint32_t message_offset
+     * uint64_t message_offset
      * }
      */
-    public static final OfInt message_offset$layout() {
+    public static final OfLong message_offset$layout() {
         return message_offset$LAYOUT;
     }
 
@@ -287,7 +288,7 @@ public class mln_runtime_event {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint32_t message_offset
+     * uint64_t message_offset
      * }
      */
     public static final long message_offset$offset() {
@@ -297,20 +298,20 @@ public class mln_runtime_event {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint32_t message_offset
+     * uint64_t message_offset
      * }
      */
-    public static int message_offset(MemorySegment struct) {
+    public static long message_offset(MemorySegment struct) {
         return struct.get(message_offset$LAYOUT, message_offset$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint32_t message_offset
+     * uint64_t message_offset
      * }
      */
-    public static void message_offset(MemorySegment struct, int fieldValue) {
+    public static void message_offset(MemorySegment struct, long fieldValue) {
         struct.set(message_offset$LAYOUT, message_offset$OFFSET, fieldValue);
     }
 

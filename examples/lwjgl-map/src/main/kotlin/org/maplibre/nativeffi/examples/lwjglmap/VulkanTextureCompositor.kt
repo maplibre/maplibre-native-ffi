@@ -88,7 +88,8 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
           imageIndex,
         )
       if (acquire == VK_ERROR_OUT_OF_DATE_KHR) {
-        // The surface outgrew this swapchain, so nothing reaches the screen until it is replaced.
+        // The surface outgrew this swapchain, so nothing reaches the screen until it is
+        // replaced.
         swapchainStale = true
         return@use false
       }

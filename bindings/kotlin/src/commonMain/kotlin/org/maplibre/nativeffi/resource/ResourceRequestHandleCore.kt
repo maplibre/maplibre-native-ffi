@@ -4,6 +4,7 @@ import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.generated.ResourceProviderDecision
 import org.maplibre.nativeffi.internal.status.Status
 
 /** Platform-neutral ownership state for provider-owned resource request handles. */
@@ -49,7 +50,9 @@ internal class ResourceRequestHandleCore(private val releaseNative: () -> Unit) 
   fun finishProviderDecision(decision: ResourceProviderDecision): ResourceProviderDecision {
     if (!decisionFinalized.compareAndSet(0, 1)) return ResourceProviderDecision.HANDLE
     return if (
-      completion.load() != COMPLETION_OPEN || decision == ResourceProviderDecision.HANDLE
+      isClosed ||
+        completion.load() != COMPLETION_OPEN ||
+        decision == ResourceProviderDecision.HANDLE
     ) {
       nativeReference.markProviderOwned()
       tryReleaseNative()
@@ -63,7 +66,7 @@ internal class ResourceRequestHandleCore(private val releaseNative: () -> Unit) 
 
   fun finishProviderException(): ResourceProviderDecision? {
     if (!decisionFinalized.compareAndSet(0, 1)) return ResourceProviderDecision.HANDLE
-    return if (completion.load() != COMPLETION_OPEN) {
+    return if (isClosed || completion.load() != COMPLETION_OPEN) {
       nativeReference.markProviderOwned()
       tryReleaseNative()
       ResourceProviderDecision.HANDLE
@@ -135,7 +138,6 @@ internal class ResourceRequestHandleCore(private val releaseNative: () -> Unit) 
 
     fun markCompleted() {
       owner.completion.store(COMPLETION_DONE)
-      owner.markClosed()
     }
 
     override fun close() {

@@ -3,6 +3,8 @@ package org.maplibre.nativeffi.internal.lifecycle
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.status.Status
 
 /** Platform-neutral release-state bookkeeping for native handles. */
@@ -11,12 +13,13 @@ internal class HandleStateCore(
   private val typeName: String,
   private val handleId: Long,
   vararg parents: Any,
+  dispose: ((Long) -> Unit)? = null,
 ) {
   @Suppress("unused") private val parents: Array<out Any> = parents
-  val leakReport: LeakReport = LeakReport(typeName, handleId)
+  val leakReport: LeakReport = LeakReport(typeName, handleId, dispose = dispose)
   private val releaseState = AtomicInt(STATE_LIVE)
-  private val liveChildren = AtomicReference<List<String>>(emptyList())
-  private val activeUses = AtomicInt(0)
+  private val readers = AtomicInt(0)
+  private val retirement = AtomicReference<CompletableDeferred<Unit>?>(null)
 
   fun requireLive() {
     when (releaseState.load()) {
@@ -26,24 +29,22 @@ internal class HandleStateCore(
     }
   }
 
-  /**
-   * Runs [block] with release held off until it returns, for handles the host may use and release
-   * from different threads. Calling [closeOnce] from inside [block] deadlocks.
-   */
+  /** Runs [block] after checking that this wrapper still owns its native handle. */
   fun <T> withLive(block: () -> T): T {
-    addActiveUse(1)
+    while (true) {
+      val count = readers.load()
+      if (count < 0) {
+        requireLive()
+        throw Status.released(typeName)
+      }
+      check(count < Int.MAX_VALUE)
+      if (readers.compareAndSet(count, count + 1)) break
+    }
     try {
       requireLive()
       return block()
     } finally {
-      addActiveUse(-1)
-    }
-  }
-
-  private fun addActiveUse(delta: Int) {
-    while (true) {
-      val current = activeUses.load()
-      if (activeUses.compareAndSet(current, current + delta)) return
+      readers.addAndFetch(-1)
     }
   }
 
@@ -53,80 +54,103 @@ internal class HandleStateCore(
   fun handleId(): Long = handleId
 
   /**
-   * Retains this handle on behalf of a live child wrapper. [childTypeName] appears in the error a
-   * blocked parent release throws.
+   * Acquires the exclusive close lease before an asynchronous native close starts.
+   *
+   * Returns false when the handle is already closed. The caller must pair a true result with
+   * [completeClose] or [abortClose].
    */
-  fun retainChild(childTypeName: String): ChildRetention {
-    while (true) {
-      requireLive()
-      val children = liveChildren.load()
-      if (!liveChildren.compareAndSet(children, children + childTypeName)) {
-        continue
-      }
-      try {
-        requireLive()
-        return ChildRetention(this, childTypeName)
-      } catch (error: Throwable) {
-        releaseChild(childTypeName)
-        throw error
-      }
+  fun beginClose(): Boolean {
+    if (releaseState.load() == STATE_CLOSED) return false
+    if (!readers.compareAndSet(0, -1)) {
+      if (readers.load() > 0)
+        throw org.maplibre.nativeffi.error.MaplibreException(
+          org.maplibre.nativeffi.error.MaplibreStatus.BUSY,
+          org.maplibre.nativeffi.error.MaplibreStatus.BUSY.nativeCode,
+          "$typeName has an active borrowed value copy",
+        )
+      if (releaseState.load() == STATE_CLOSED) return false
+      throw Status.invalidState("$typeName is currently releasing")
     }
-  }
-
-  fun closeOnce(destroy: () -> Int, afterSuccess: () -> Unit = {}) {
     if (!releaseState.compareAndSet(STATE_LIVE, STATE_RELEASING)) {
       when (releaseState.load()) {
-        STATE_CLOSED -> return
+        STATE_CLOSED -> return false
         STATE_RELEASING -> throw Status.invalidState("$typeName is currently releasing")
         else -> throw Status.released(typeName)
       }
     }
-    val children = liveChildren.load()
-    if (children.isNotEmpty()) {
-      releaseState.store(STATE_LIVE)
-      throw Status.liveChildren(typeName, children)
-    }
-    // Uses that already passed their liveness check still hold the handle; wait them out.
-    while (activeUses.load() != 0) {
-      yieldWhileClosing()
-    }
-    try {
-      Status.check(destroy())
-    } catch (error: Throwable) {
-      releaseState.store(STATE_LIVE)
-      throw error
-    }
+    return true
+  }
+
+  fun completeClose(afterSuccess: () -> Unit = {}) {
+    check(releaseState.load() == STATE_RELEASING)
     leakReport.markReleased()
     releaseState.store(STATE_CLOSED)
     afterSuccess()
   }
 
-  private fun releaseChild(childTypeName: String) {
+  fun abortClose() {
+    check(releaseState.compareAndSet(STATE_RELEASING, STATE_LIVE))
+    readers.store(0)
+  }
+
+  /**
+   * Claims this handle's one asynchronous close and takes the close lease with it.
+   *
+   * The first caller gets [claim] back and owns the close; every later caller gets the deferred the
+   * first one published, so a repeated or concurrent close awaits the same native teardown.
+   */
+  fun claimRetirement(claim: CompletableDeferred<Unit>): Deferred<Unit> {
     while (true) {
-      val children = liveChildren.load()
-      val index = children.indexOf(childTypeName)
-      if (index < 0) {
-        return
+      retirement.load()?.let {
+        return it
       }
-      val remaining = children.toMutableList().apply { removeAt(index) }
-      if (liveChildren.compareAndSet(children, remaining)) {
-        return
+      if (retirement.compareAndSet(null, claim)) {
+        try {
+          check(beginClose()) { "$typeName retired without a claim" }
+        } catch (failure: Throwable) {
+          retirement.compareAndSet(claim, null)
+          claim.completeExceptionally(failure)
+          throw failure
+        }
+        return claim
       }
     }
   }
 
-  /** One child wrapper's retention of its parent handle. Releasing more than once is a no-op. */
-  internal class ChildRetention(
-    private val owner: HandleStateCore,
-    private val childTypeName: String,
-  ) {
-    private val released = AtomicInt(0)
+  /** Reports a rejected close to its waiters and leaves the handle available for a retry. */
+  fun rejectRetirement(claim: CompletableDeferred<Unit>, failure: Throwable) {
+    abortClose()
+    check(retirement.compareAndSet(claim, null))
+    claim.completeExceptionally(failure)
+  }
 
-    fun close() {
-      if (released.compareAndSet(0, 1)) {
-        owner.releaseChild(childTypeName)
+  fun retire(call: () -> Deferred<Unit>, afterSuccess: () -> Unit = {}): Deferred<Unit> {
+    val claim = CompletableDeferred<Unit>()
+    val existing = claimRetirement(claim)
+    if (existing !== claim) return existing
+    val completion =
+      try {
+        call()
+      } catch (failure: Throwable) {
+        rejectRetirement(claim, failure)
+        return claim
       }
+    completeClose(afterSuccess)
+    completion.invokeOnCompletion { failure ->
+      if (failure == null) claim.complete(Unit) else claim.completeExceptionally(failure)
     }
+    return claim
+  }
+
+  fun closeOnce(destroy: () -> Int, afterSuccess: () -> Unit = {}) {
+    if (!beginClose()) return
+    try {
+      Status.check(destroy())
+    } catch (error: Throwable) {
+      abortClose()
+      throw error
+    }
+    completeClose(afterSuccess)
   }
 
   @OptIn(ExperimentalAtomicApi::class)
@@ -134,6 +158,7 @@ internal class HandleStateCore(
     private val typeName: String,
     private val handleId: Long,
     private val writeLine: (String) -> Unit = { message -> println(message) },
+    private val dispose: ((Long) -> Unit)? = null,
   ) {
     private val released = AtomicInt(0)
 
@@ -142,11 +167,12 @@ internal class HandleStateCore(
     }
 
     fun report() {
-      if (released.load() == 0) {
-        writeLine(
-          "Leaked $typeName native handle 0x${handleId.toString(16)}; " +
-            "close handles explicitly."
-        )
+      if (released.compareAndSet(0, 1)) {
+        if (dispose != null) dispose(handleId)
+        else
+          writeLine(
+            "Leaked $typeName native handle 0x${handleId.toString(16)}; close it explicitly."
+          )
       }
     }
   }

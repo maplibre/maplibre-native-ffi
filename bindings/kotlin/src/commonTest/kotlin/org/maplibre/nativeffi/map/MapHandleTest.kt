@@ -1,728 +1,937 @@
 package org.maplibre.nativeffi.map
 
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.camera.AnimationOptions
-import org.maplibre.nativeffi.camera.BoundOptions
-import org.maplibre.nativeffi.camera.BoundsConstraint
-import org.maplibre.nativeffi.camera.CameraFitOptions
-import org.maplibre.nativeffi.camera.CameraOptions
-import org.maplibre.nativeffi.camera.EdgeInsets
-import org.maplibre.nativeffi.camera.UnitBezier
+import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
-import org.maplibre.nativeffi.error.WrongThreadException
-import org.maplibre.nativeffi.failureFromBackgroundThread
-import org.maplibre.nativeffi.geo.CanonicalTileId
-import org.maplibre.nativeffi.geo.LatLng
-import org.maplibre.nativeffi.geo.LatLngBounds
-import org.maplibre.nativeffi.geo.Quaternion
-import org.maplibre.nativeffi.geo.ScreenPoint
-import org.maplibre.nativeffi.geo.Vec3
-import org.maplibre.nativeffi.render.PremultipliedRgba8Image
-import org.maplibre.nativeffi.runtime.CameraChangeMode
-import org.maplibre.nativeffi.runtime.RuntimeEventPayload
-import org.maplibre.nativeffi.runtime.RuntimeEventType
-import org.maplibre.nativeffi.runtime.RuntimeHandle
-import org.maplibre.nativeffi.runtime.RuntimeOptions
-import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
-import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
-import org.maplibre.nativeffi.style.CustomMvtVectorSourceCallback
-import org.maplibre.nativeffi.style.CustomMvtVectorSourceOptions
-import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
-import org.maplibre.nativeffi.style.GeoJsonSourceOptions
-import org.maplibre.nativeffi.style.RasterDemEncoding
-import org.maplibre.nativeffi.style.SourceInfo
-import org.maplibre.nativeffi.style.SourceType
-import org.maplibre.nativeffi.style.StyleImageOptions
-import org.maplibre.nativeffi.style.StyleLayerInfo
-import org.maplibre.nativeffi.style.StyleLayerVisibility
-import org.maplibre.nativeffi.style.StyleTransitionOptions
-import org.maplibre.nativeffi.style.TileScheme
-import org.maplibre.nativeffi.style.TileSourceOptions
-import org.maplibre.nativeffi.style.VectorTileEncoding
+import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.generated.BoundOptions
+import org.maplibre.nativeffi.generated.CameraFitOptions
+import org.maplibre.nativeffi.generated.CameraOptions
+import org.maplibre.nativeffi.generated.CameraUpdate
+import org.maplibre.nativeffi.generated.CanonicalTileId
+import org.maplibre.nativeffi.generated.CommandDisposition
+import org.maplibre.nativeffi.generated.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.generated.CustomMvtVectorSourceOptions
+import org.maplibre.nativeffi.generated.EdgeInsets
+import org.maplibre.nativeffi.generated.FeatureStateSelector
+import org.maplibre.nativeffi.generated.FreeCameraOptions
+import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.GeojsonSourceOptions
+import org.maplibre.nativeffi.generated.LatLng
+import org.maplibre.nativeffi.generated.LatLngBounds
+import org.maplibre.nativeffi.generated.LogicalExtent
+import org.maplibre.nativeffi.generated.MapDebugOption
+import org.maplibre.nativeffi.generated.MapMode
+import org.maplibre.nativeffi.generated.MapTileOptions
+import org.maplibre.nativeffi.generated.MapViewportOptions
+import org.maplibre.nativeffi.generated.NorthOrientation
+import org.maplibre.nativeffi.generated.PremultipliedRgba8Image
+import org.maplibre.nativeffi.generated.ProjectionMode
+import org.maplibre.nativeffi.generated.Quaternion
+import org.maplibre.nativeffi.generated.ScreenPoint
+import org.maplibre.nativeffi.generated.StyleImageOptions
+import org.maplibre.nativeffi.generated.StyleLayerEntry
+import org.maplibre.nativeffi.generated.StyleLayerVisibility
+import org.maplibre.nativeffi.generated.StyleRasterDemEncoding
+import org.maplibre.nativeffi.generated.StyleSourceResult
+import org.maplibre.nativeffi.generated.StyleSourceType
+import org.maplibre.nativeffi.generated.StyleTileScheme
+import org.maplibre.nativeffi.generated.StyleTileSourceOptions
+import org.maplibre.nativeffi.generated.StyleVectorTileEncoding
+import org.maplibre.nativeffi.generated.Vec3
+import org.maplibre.nativeffi.runtime.CommandCompletion
+import org.maplibre.nativeffi.runtime.awaitCommitted
+import org.maplibre.nativeffi.runtime.runSuspendTest
+import org.maplibre.nativeffi.runtime.use
 
 class MapHandleTest {
 
-  // BND-110: global-state lifetime and copied JSON values.
+  // global-state lifetime and copied JSON values.
   @Test
-  fun globalStateUsesStyleDefaultsAndResetsOnStyleReplacement() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      MapHandle.create(runtime, MapOptions()).use { map ->
-        assertEquals("{}", map.getGlobalState().decodeToString())
-        assertFailsWith<InvalidStateException> {
-          map.setGlobalStateProperty("theme", "true".encodeToByteArray())
-        }
+  fun globalStateUsesStyleDefaultsAndResetsOnStyleReplacement(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+      runtime.mapCreate(GeneratedApi.mapOptionsDefault()).await().use { map ->
+        assertEquals("{}", map.getGlobalState().await().decodeToString())
+        assertCommandFailed(
+          map.setGlobalStateProperty("theme", "true".encodeToByteArray()).await(),
+          MaplibreStatus.INVALID_STATE,
+        )
         val style =
           """{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}"""
             .encodeToByteArray()
-        map.setStyleJson(style)
-        assertEquals("""{"theme":"light"}""", map.getGlobalState().decodeToString())
+        map.setStyleJson(style).awaitCommitted()
+        assertEquals("""{"theme":"light"}""", map.getGlobalState().await().decodeToString())
         val input = """["dark",{"enabled":true}]""".encodeToByteArray()
-        map.setGlobalStateProperty("theme", input)
+        val submitted = map.setGlobalStateProperty("theme", input)
         input.fill(0)
-        val snapshot = map.getGlobalState()
+        submitted.awaitCommitted()
+        val snapshot = map.getGlobalState().await()
         assertEquals("""{"theme":["dark",{"enabled":true}]}""", snapshot.decodeToString())
-        assertFailsWith<InvalidArgumentException> {
-          map.setGlobalStateProperty("theme", "[".encodeToByteArray())
-        }
-        map.setGlobalStateProperty("theme", "null".encodeToByteArray())
-        assertEquals("""{"theme":"light"}""", map.getGlobalState().decodeToString())
+        assertCommandFailed(
+          map.setGlobalStateProperty("theme", "[".encodeToByteArray()).await(),
+          MaplibreStatus.INVALID_ARGUMENT,
+        )
+        map.setGlobalStateProperty("theme", "null".encodeToByteArray()).awaitCommitted()
+        assertEquals("""{"theme":"light"}""", map.getGlobalState().await().decodeToString())
         assertEquals("""{"theme":["dark",{"enabled":true}]}""", snapshot.decodeToString())
-        assertIs<WrongThreadException>(failureFromBackgroundThread { map.getGlobalState() })
-        map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
-        assertEquals("{}", map.getGlobalState().decodeToString())
-        map.setGlobalStateProperty("theme", "false".encodeToByteArray())
-        map.setGlobalStateProperty("theme", "null".encodeToByteArray())
-        assertEquals("""{"theme":null}""", map.getGlobalState().decodeToString())
+        map
+          .setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
+          .awaitCommitted()
+        assertEquals("{}", map.getGlobalState().await().decodeToString())
+        map.setGlobalStateProperty("theme", "false".encodeToByteArray()).awaitCommitted()
+        map.setGlobalStateProperty("theme", "null".encodeToByteArray()).awaitCommitted()
+        assertEquals("""{"theme":null}""", map.getGlobalState().await().decodeToString())
       }
     }
   }
 
   @Test
-  fun layerBaseAccessorsReachNativeThroughDowncalls() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-          },
+  fun layerBaseAccessorsReachNativeThroughDowncalls(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+            )
         )
         .use { map ->
-          map.setStyleJson(
-            ("{\"version\":8,\"sources\":{\"geo\":{\"type\":\"geojson\",\"data\":" +
-                "{\"type\":\"FeatureCollection\",\"features\":[]}}},\"layers\":[" +
-                "{\"id\":\"bg\",\"type\":\"background\"}," +
-                "{\"id\":\"fill\",\"type\":\"fill\",\"source\":\"geo\"}]}")
-              .encodeToByteArray()
-          )
+          map
+            .setStyleJson(
+              ("{\"version\":8,\"sources\":{\"geo\":{\"type\":\"geojson\",\"data\":" +
+                  "{\"type\":\"FeatureCollection\",\"features\":[]}}},\"layers\":[" +
+                  "{\"id\":\"bg\",\"type\":\"background\"}," +
+                  "{\"id\":\"fill\",\"type\":\"fill\",\"source\":\"geo\"}]}")
+                .encodeToByteArray()
+            )
+            .awaitCommitted()
 
-          assertEquals("", map.layerSourceLayer("fill"))
-          map.setLayerSourceLayer("fill", "roads")
-          assertEquals("roads", map.layerSourceLayer("fill"))
-          assertEquals("geo", map.layerSourceId("fill"))
+          assertNull(map.copyLayerSourceLayer("fill").await())
+          // An unset source layer reads as absent through the copied layer info.
+          assertNull(assertNotNull(map.getStyleLayerInfo("fill").await()).sourceLayer)
+          map.setLayerSourceLayer("fill", "roads").awaitCommitted()
+          assertEquals("roads", map.copyLayerSourceLayer("fill").await())
+          assertEquals("geo", map.copyLayerSourceId("fill").await())
 
           // A background layer takes no source.
-          assertFailsWith<InvalidArgumentException> { map.setLayerSourceLayer("bg", "roads") }
+          assertCommandFailed(
+            map.setLayerSourceLayer("bg", "roads").await(),
+            MaplibreStatus.INVALID_ARGUMENT,
+          )
+          assertNull(map.copyLayerSourceLayer("bg").await())
 
           // An unset zoom range crosses the boundary as infinities.
-          assertEquals(Double.NEGATIVE_INFINITY, map.layerMinZoom("fill"))
-          assertEquals(Double.POSITIVE_INFINITY, map.layerMaxZoom("fill"))
-          map.setLayerMinZoom("fill", 4.0)
-          map.setLayerMaxZoom("fill", 12.5)
-          assertEquals(4.0, map.layerMinZoom("fill"))
-          assertEquals(12.5, map.layerMaxZoom("fill"))
+          val unbounded = assertNotNull(map.getStyleLayerInfo("fill").await())
+          assertEquals("fill", unbounded.info.type)
+          assertEquals(Double.NEGATIVE_INFINITY, unbounded.info.minZoom)
+          assertEquals(Double.POSITIVE_INFINITY, unbounded.info.maxZoom)
+          assertEquals(StyleLayerVisibility.VISIBLE, unbounded.info.visibility)
+          // The info's source flags feed the copy operations.
+          assertEquals("geo", unbounded.sourceId)
+          assertEquals("roads", unbounded.sourceLayer)
 
-          assertEquals(StyleLayerVisibility.VISIBLE, map.layerVisibility("fill"))
-          map.setLayerVisibility("fill", StyleLayerVisibility.NONE)
-          assertEquals(StyleLayerVisibility.NONE, map.layerVisibility("fill"))
+          map.setLayerMinZoom("fill", 4.0).awaitCommitted()
+          map.setLayerMaxZoom("fill", 12.5).awaitCommitted()
+          map.setLayerVisibility("fill", StyleLayerVisibility.NONE).awaitCommitted()
+          val bounded = assertNotNull(map.getStyleLayerInfo("fill").await())
+          assertEquals(4.0, bounded.info.minZoom)
+          assertEquals(12.5, bounded.info.maxZoom)
+          assertEquals(StyleLayerVisibility.NONE, bounded.info.visibility)
 
-          assertFailsWith<InvalidArgumentException> {
-            map.setLayerVisibility("fill", StyleLayerVisibility(900))
-          }
+          // A sourceless layer reports absent source fields.
+          val background = assertNotNull(map.getStyleLayerInfo("bg").await())
+          assertEquals("background", background.info.type)
+          assertNull(background.sourceId)
+          assertNull(background.sourceLayer)
+
+          // No layer carries this ID.
+          assertNull(map.getStyleLayerInfo("missing").await())
+
+          assertCommandFailed(
+            map.setLayerVisibility("fill", StyleLayerVisibility(900u)).await(),
+            MaplibreStatus.INVALID_ARGUMENT,
+          )
+          assertEquals(
+            StyleLayerVisibility.NONE,
+            map.getStyleLayerInfo("fill").await()?.info?.visibility,
+          )
         }
     }
   }
 
   @Test
-  fun styleTransitionOptionsRoundTripThroughDowncalls() {
+  fun styleTransitionOptionsRoundTripThroughDowncalls(): Unit = runSuspendTest {
     val transitionStyleJson =
       "{\"version\":8,\"transition\":{\"duration\":750,\"delay\":100}," +
         "\"sources\":{},\"layers\":[]}"
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-          },
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+            )
         )
         .use { map ->
           // Duration and delay are absent until a style loads; the placement flag always
           // holds a value.
-          val empty = map.styleTransitionOptions()
+          val empty = map.getStyleTransitionOptions().await()
           assertNull(empty.durationMs)
           assertNull(empty.delayMs)
           assertEquals(true, empty.enablePlacementTransitions)
 
           // The style parser supplies a 300ms default duration.
-          map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}".encodeToByteArray())
-          val parsed = map.styleTransitionOptions()
+          map
+            .setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}".encodeToByteArray())
+            .awaitCommitted()
+          val parsed = map.getStyleTransitionOptions().await()
           assertEquals(300.0, parsed.durationMs)
           assertNull(parsed.delayMs)
 
-          map.setStyleJson(transitionStyleJson.encodeToByteArray())
-          val declared = map.styleTransitionOptions()
+          map.setStyleJson(transitionStyleJson.encodeToByteArray()).awaitCommitted()
+          val declared = map.getStyleTransitionOptions().await()
           assertEquals(750.0, declared.durationMs)
           assertEquals(100.0, declared.delayMs)
           assertEquals(true, declared.enablePlacementTransitions)
 
-          // A present zero stays distinguishable from an absent field, and an absent field
+          // A present zero stays distinguishable from an absent field, and an absent
+          // field
           // clears what the style declared.
           val options =
-            StyleTransitionOptions().apply {
-              durationMs = 0.0
-              enablePlacementTransitions = false
-            }
-          map.setStyleTransitionOptions(options)
-          assertEquals(options, map.styleTransitionOptions())
+            GeneratedApi.styleTransitionOptionsDefault()
+              .copy(durationMs = 0.0, enablePlacementTransitions = false)
+          map.setStyleTransitionOptions(options).awaitCommitted()
+          assertEquals(options, map.getStyleTransitionOptions().await())
 
           // Omitting the flag leaves the cross-fade on.
-          map.setStyleTransitionOptions(StyleTransitionOptions().apply { durationMs = 250.0 })
-          assertEquals(true, map.styleTransitionOptions().enablePlacementTransitions)
+          map
+            .setStyleTransitionOptions(
+              GeneratedApi.styleTransitionOptionsDefault().copy(durationMs = 250.0)
+            )
+            .awaitCommitted()
+          assertEquals(true, map.getStyleTransitionOptions().await().enablePlacementTransitions)
 
           // Loading a style replaces the override with what that style declares.
-          map.setStyleJson(transitionStyleJson.encodeToByteArray())
-          assertEquals(declared, map.styleTransitionOptions())
+          map.setStyleJson(transitionStyleJson.encodeToByteArray()).awaitCommitted()
+          assertEquals(declared, map.getStyleTransitionOptions().await())
 
-          assertFailsWith<InvalidArgumentException> {
-            map.setStyleTransitionOptions(StyleTransitionOptions().apply { delayMs = -1.0 })
-          }
+          assertCommandFailed(
+            map
+              .setStyleTransitionOptions(
+                GeneratedApi.styleTransitionOptionsDefault().copy(delayMs = -1.0)
+              )
+              .await(),
+            MaplibreStatus.INVALID_ARGUMENT,
+          )
+          assertEquals(declared, map.getStyleTransitionOptions().await())
         }
     }
   }
 
   @Test
-  fun canonicalTileIdRejectsOutOfRangeInputs() {
-    assertFailsWith<InvalidArgumentException> { CanonicalTileId(0, UInt.MAX_VALUE.toLong() + 1, 0) }
-  }
-
-  @Test
-  fun mapCreateStyleAndCloseRetainsRuntime() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
+  fun mapCreateStyleAndCloseRetainsRuntime(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
     val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          scaleFactor = 1.0
-          mapMode = MapMode.STATIC
-        },
-      )
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault()
+                  .initialExtent
+                  .copy(width = 64u, height = 64u, scaleFactor = 1.0),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
 
     assertFalse(map.isClosed)
     assertSame(runtime, map.runtime())
-    assertFailsWith<InvalidStateException> { runtime.close() }
+    assertFailsWith<InvalidStateException> { runtime.close().await() }
 
-    map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
-    map.setStyleUrl("https://example.com/style.json")
-    map.close()
-    map.close()
+    map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
+    map.setStyleUrl("https://example.com/style.json").await()
+    map.close().await()
+    map.close().await()
 
     assertTrue(map.isClosed)
     assertFailsWith<InvalidStateException> {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
     }
-    runtime.close()
+    runtime.close().await()
     assertTrue(runtime.isClosed)
   }
 
   @Test
-  fun mapSizeReportsCreationExtentAndPixelRatio() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
+  fun mapSizeReportsCreationExtentAndPixelRatio(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
     val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 512
-          height = 256
-          scaleFactor = 2.0
-        },
-      )
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault()
+                  .initialExtent
+                  .copy(width = 512u, height = 256u, scaleFactor = 2.0)
+            )
+        )
+        .await()
 
-    val size = map.size
-    assertEquals(512, size.width)
-    assertEquals(256, size.height)
+    val snapshot = map.snapshotGet()
+    val size = snapshot.logicalExtent
+    assertEquals(512u, size.width)
+    assertEquals(256u, size.height)
     assertEquals(2.0, size.scaleFactor)
-    assertEquals(MapSize(512, 256, 2.0), size)
-    assertEquals(MapSize(512, 256, 2.0).hashCode(), size.hashCode())
+    assertEquals(LogicalExtent(512u, 256u, 2.0), size)
+    assertEquals(LogicalExtent(512u, 256u, 2.0).hashCode(), size.hashCode())
 
-    map.close()
-    runtime.close()
+    // A resize that keeps the creation scale factor publishes the new extent.
+    map.resize(LogicalExtent(320u, 200u, 2.0)).awaitCommitted()
+    assertEquals(LogicalExtent(320u, 200u, 2.0), map.snapshotGet().logicalExtent)
+
+    // A different scale factor is rejected, and the published extent does not move.
+    assertFailsWith<InvalidArgumentException> { map.resize(LogicalExtent(320u, 200u, 1.0)).await() }
+    assertEquals(LogicalExtent(320u, 200u, 2.0), map.snapshotGet().logicalExtent)
+
+    map.close().await()
+    runtime.close().await()
   }
 
   @Test
-  fun styleSourceJsonCanBeAddedInspectedListedAndRemoved() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
+  fun styleSourceJsonCanBeAddedInspectedListedAndRemoved(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
     val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          mapMode = MapMode.STATIC
-        },
-      )
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
 
     try {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
-      map.addStyleSourceJson("places", geoJsonSource())
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
+      map.addStyleSourceJson("places", geoJsonSource()).await()
 
-      assertTrue(map.styleSourceExists("places"))
-      assertEquals(SourceType.GEOJSON, map.styleSourceType("places"))
-      assertEquals(SourceType.GEOJSON, map.styleSourceInfo("places")?.type)
-      assertTrue(map.styleSourceIds().contains("places"))
-      assertTrue(map.removeStyleSource("places"))
-      assertFalse(map.styleSourceExists("places"))
-      assertFalse(map.removeStyleSource("places"))
+      assertEquals(StyleSourceType.GEOJSON, map.getStyleSourceInfo("places").await()?.info?.type)
+      assertTrue(map.listStyleSourceIds().await().contains("places"))
+      map.removeStyleSource("places").awaitCommitted()
+      assertNull(map.getStyleSourceInfo("places").await())
+      assertCommandFailed(map.removeStyleSource("places").await(), MaplibreStatus.NOT_FOUND)
     } finally {
-      map.close()
-      runtime.close()
+      map.close().await()
+      runtime.close().await()
     }
   }
 
   @Test
-  fun styleSourceVolatilityCanBeToggled() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
+  fun styleSourceVolatilityCanBeToggled(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
     val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          mapMode = MapMode.STATIC
-        },
-      )
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
 
     try {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
-      map.addStyleSourceJson("places", geoJsonSource())
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
+      map.addStyleSourceJson("places", geoJsonSource()).await()
 
-      assertFalse(assertNotNull(map.styleSourceInfo("places")).volatileSource)
-      map.setStyleSourceVolatile("places", true)
-      assertTrue(assertNotNull(map.styleSourceInfo("places")).volatileSource)
-      map.setStyleSourceVolatile("places", false)
-      assertFalse(assertNotNull(map.styleSourceInfo("places")).volatileSource)
-      assertFailsWith<InvalidArgumentException> { map.setStyleSourceVolatile("missing", true) }
+      assertFalse(assertNotNull(map.getStyleSourceInfo("places").await()).info.isVolatile)
+      map.setStyleSourceVolatile("places", true).awaitCommitted()
+      assertTrue(assertNotNull(map.getStyleSourceInfo("places").await()).info.isVolatile)
+      map.setStyleSourceVolatile("places", false).awaitCommitted()
+      assertFalse(assertNotNull(map.getStyleSourceInfo("places").await()).info.isVolatile)
+      assertCommandFailed(
+        map.setStyleSourceVolatile("missing", true).await(),
+        MaplibreStatus.NOT_FOUND,
+      )
     } finally {
-      map.close()
-      runtime.close()
+      map.close().await()
+      runtime.close().await()
     }
   }
 
-  // BND-109.
-
   @Test
-  fun styleSourceInfoCopiesUrlAndInlineTileMetadataPastNativeLifetime() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
+  fun styleSourceInfoCopiesUrlAndInlineTileMetadataPastNativeLifetime(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
     val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          mapMode = MapMode.STATIC
-        },
-      )
-    lateinit var retainedInfo: SourceInfo
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
+    lateinit var retainedInfo: StyleSourceResult
     val tileUrls =
       listOf("https://a.example.com/{z}/{x}/{y}.pbf", "https://b.example.com/{z}/{x}/{y}.pbf")
     val bounds = LatLngBounds(LatLng(-5.0, -10.0), LatLng(15.0, 20.0))
     try {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
-      map.addVectorSourceUrl("remote", "https://example.com/vector.json", null)
-      val remote = assertNotNull(map.styleSourceInfo("remote"))
+      map
+        .setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
+        .awaitCommitted()
+      map.addVectorSourceUrl("remote", "https://example.com/vector.json").awaitCommitted()
+      val remote = assertNotNull(map.getStyleSourceInfo("remote").await())
       assertEquals("https://example.com/vector.json", remote.url)
-      assertNull(remote.tileJson)
+      assertNull(remote.info.tilejson)
 
-      map.addVectorSourceTiles(
-        "inline",
-        tileUrls,
-        TileSourceOptions().apply {
-          minZoom = 0.0
-          maxZoom = 12.0
-          attribution = "inline attribution"
-          scheme = TileScheme.TMS
-          this.bounds = bounds
-          tileSize = 256
-          vectorEncoding = VectorTileEncoding.MLT
-        },
-      )
-
-      retainedInfo = assertNotNull(map.styleSourceInfo("inline"))
-      assertNull(retainedInfo.url)
-      assertEquals("inline attribution", retainedInfo.attribution)
-      assertEquals(tileUrls, retainedInfo.tileJson?.tileUrls)
-      assertEquals(0.0, retainedInfo.tileJson?.minZoom)
-      assertEquals(12.0, retainedInfo.tileJson?.maxZoom)
-      assertEquals(TileScheme.TMS, retainedInfo.tileJson?.scheme)
-      assertEquals(bounds, retainedInfo.tileJson?.bounds)
-      assertEquals(512, retainedInfo.tileSize)
-      assertEquals(VectorTileEncoding.MLT, retainedInfo.vectorEncoding)
-      assertNull(retainedInfo.rasterDemEncoding)
-      assertTrue(map.removeStyleSource("inline"))
-    } finally {
-      map.close()
-      runtime.close()
-    }
-
-    assertEquals(tileUrls, retainedInfo.tileJson?.tileUrls)
-    assertEquals(bounds, retainedInfo.tileJson?.bounds)
-  }
-
-  @Test
-  fun geoJsonSourcesCanBeAddedAndUpdated() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          mapMode = MapMode.STATIC
-        },
-      )
-
-    try {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
-      map.addGeoJsonSourceUrl("remote-places", "https://example.com/places.geojson", null)
-      assertEquals(SourceType.GEOJSON, map.styleSourceType("remote-places"))
-      map.setGeoJsonSourceUrl("remote-places", "https://example.com/updated.geojson")
-
-      val options =
-        GeoJsonSourceOptions().apply {
-          minZoom = 0.0
-          maxZoom = 14.0
-          tolerance = 0.5
-          tileSize = 256
-          buffer = 64
-          lineMetrics = true
-        }
-      GeoJsonSourceDataHandle.create(geoJsonData(), options).use { initialData ->
-        map.addGeoJsonSourceData("inline-places", initialData)
-      }
-      assertEquals(SourceType.GEOJSON, map.styleSourceType("inline-places"))
-      GeoJsonSourceDataHandle.create(
-          "{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]}".encodeToByteArray(),
-          options,
-        )
-        .use { updatedData -> map.setGeoJsonSourceData("inline-places", updatedData) }
-      map.setGeoJsonSourceSynchronousTiling("inline-places", true)
-      map.setGeoJsonSourceSynchronousTiling("inline-places", false)
-
-      GeoJsonSourceDataHandle.create(nearbyPoints(), clusterOptions()).use { clusteredData ->
-        map.addGeoJsonSourceData("clustered-places", clusteredData)
-      }
-      assertEquals(SourceType.GEOJSON, map.styleSourceType("clustered-places"))
-      assertFailsWith<InvalidArgumentException> {
-        map.setGeoJsonSourceSynchronousTiling("no-such-source", true)
-      }
-
-      // Option values reach native validation rather than being dropped by the binding.
-      assertFailsWith<InvalidArgumentException> {
-        map.addGeoJsonSourceUrl(
-          "invalid-zooms",
-          "https://example.com/places.geojson",
-          GeoJsonSourceOptions().apply {
-            minZoom = 12.0
-            maxZoom = 4.0
-          },
-        )
-      }
-      assertFalse(map.styleSourceExists("invalid-zooms"))
-      assertFailsWith<InvalidArgumentException> {
-        map.addGeoJsonSourceUrl(
-          "invalid-cluster-properties",
-          "https://example.com/places.geojson",
-          GeoJsonSourceOptions().apply {
-            clusterProperties = "\"not an object\"".encodeToByteArray()
-          },
-        )
-      }
-    } finally {
-      map.close()
-      runtime.close()
-    }
-  }
-
-  @Test
-  fun customGeometrySourcesCanBeManaged() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          mapMode = MapMode.STATIC
-        },
-      )
-
-    try {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
-      map.addCustomGeometrySource(
-        "custom-places",
-        CustomGeometrySourceOptions(
-            object : CustomGeometrySourceCallback {
-              override fun fetchTile(tileId: CanonicalTileId) {}
-            }
-          )
-          .apply {
-            minZoom = 0.0
-            maxZoom = 14.0
-            tolerance = 0.375
-            tileSize = 512
-            buffer = 64
-            clip = true
-            wrap = false
-          },
-      )
-
-      assertTrue(map.styleSourceExists("custom-places"))
-      assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType("custom-places"))
-
-      val tileId = CanonicalTileId(0, 0, 0)
-      map.setCustomGeometrySourceTileData("custom-places", tileId, geoJsonData())
-      map.invalidateCustomGeometrySourceTile("custom-places", tileId)
-      map.invalidateCustomGeometrySourceRegion(
-        "custom-places",
-        LatLngBounds(LatLng(-1.0, -1.0), LatLng(1.0, 1.0)),
-      )
-
-      assertTrue(map.removeStyleSource("custom-places"))
-      assertFalse(map.styleSourceExists("custom-places"))
-    } finally {
-      map.close()
-      runtime.close()
-    }
-  }
-
-  @Test
-  fun customMvtVectorSourcesCanBeManaged() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          mapMode = MapMode.STATIC
-        },
-      )
-
-    try {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
-      map.addCustomMvtVectorSource(
-        "custom-mvt",
-        CustomMvtVectorSourceOptions(
-            object : CustomMvtVectorSourceCallback {
-              override fun fetchTile(tileId: CanonicalTileId) {}
-            }
-          )
-          .apply {
-            minZoom = 0.0
-            maxZoom = 14.0
-          },
-      )
-
-      assertTrue(map.styleSourceExists("custom-mvt"))
-      assertEquals(SourceType.CUSTOM_MVT_VECTOR, map.styleSourceType("custom-mvt"))
-
-      val tileId = CanonicalTileId(0, 0, 0)
-      map.setCustomMvtVectorSourceTileData("custom-mvt", tileId, ByteArray(0))
-      map.setCustomMvtVectorSourceTileError("custom-mvt", tileId, "tile missing")
-      map.invalidateCustomMvtVectorSourceTile("custom-mvt", tileId)
-
-      assertFailsWith<InvalidArgumentException> {
-        map.addCustomMvtVectorSource(
-          "custom-mvt",
-          CustomMvtVectorSourceOptions(
-            object : CustomMvtVectorSourceCallback {
-              override fun fetchTile(tileId: CanonicalTileId) {}
-            }
+      map
+        .addVectorSourceTiles(
+          "inline",
+          tileUrls,
+          StyleTileSourceOptions(
+            minZoom = 0.0,
+            maxZoom = 12.0,
+            attribution = "inline attribution",
+            scheme = StyleTileScheme.TMS,
+            bounds = bounds,
+            tileSize = 256u,
+            vectorEncoding = StyleVectorTileEncoding.MLT,
           ),
         )
+        .awaitCommitted()
+
+      retainedInfo = assertNotNull(map.getStyleSourceInfo("inline").await())
+      assertNull(retainedInfo.url)
+      assertEquals("inline attribution", retainedInfo.attribution)
+      assertEquals(tileUrls, retainedInfo.tileUrls)
+      assertEquals(0.0, retainedInfo.info.tilejson?.minZoom)
+      assertEquals(12.0, retainedInfo.info.tilejson?.maxZoom)
+      assertEquals(StyleTileScheme.TMS, retainedInfo.info.tilejson?.scheme)
+      assertEquals(bounds, retainedInfo.info.bounds)
+      assertEquals(512u, retainedInfo.info.tileSize)
+      assertEquals(StyleVectorTileEncoding.MLT, retainedInfo.info.vectorEncoding)
+      assertNull(retainedInfo.info.rasterEncoding)
+      map.removeStyleSource("inline").awaitCommitted()
+    } finally {
+      map.close().await()
+      runtime.close().await()
+    }
+
+    assertEquals(tileUrls, retainedInfo.tileUrls)
+    assertEquals(bounds, retainedInfo.info.bounds)
+  }
+
+  @Test
+  fun styleSourceUrlAttributionAndTileUrlsCopyIndependently(): Unit = runSuspendTest {
+    val tileUrls =
+      listOf("https://a.example.com/{z}/{x}/{y}.pbf", "https://b.example.com/{z}/{x}/{y}.pbf")
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .use { map ->
+          map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()).awaitCommitted()
+          map
+            .addVectorSourceTiles(
+              "inline",
+              tileUrls,
+              StyleTileSourceOptions(attribution = "inline attribution"),
+            )
+            .awaitCommitted()
+          map.addVectorSourceUrl("remote", "https://example.com/vector.json").awaitCommitted()
+
+          // An inline tile source carries its tile URLs and no source URL.
+          assertEquals("inline attribution", map.copyStyleSourceAttribution("inline").await())
+          assertNull(map.copyStyleSourceUrl("inline").await())
+          assertEquals(tileUrls, map.getStyleSourceTileUrls("inline").await()?.tileUrls)
+
+          // A URL-backed tile source carries the reverse. Its attribution arrives with
+          // the
+          // TileJSON the URL resolves to, so it reads as absent until that load finishes.
+          assertEquals("https://example.com/vector.json", map.copyStyleSourceUrl("remote").await())
+          assertEquals(emptyList(), map.getStyleSourceTileUrls("remote").await()?.tileUrls)
+          assertNull(map.copyStyleSourceAttribution("remote").await())
+
+          // No source carries this ID.
+          assertNull(map.copyStyleSourceAttribution("missing").await())
+          assertNull(map.copyStyleSourceUrl("missing").await())
+          assertNull(map.getStyleSourceTileUrls("missing").await())
+        }
+    }
+  }
+
+  @Test
+  fun geoJsonSourcesCanBeAddedAndUpdated(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    val map =
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
+
+    try {
+      map
+        .setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
+        .awaitCommitted()
+      map
+        .addGeojsonSourceUrl("remote-places", "https://example.com/places.geojson", null)
+        .awaitCommitted()
+      assertEquals(
+        StyleSourceType.GEOJSON,
+        map.getStyleSourceInfo("remote-places").await()?.info?.type,
+      )
+      map
+        .setGeojsonSourceUrl("remote-places", "https://example.com/updated.geojson")
+        .awaitCommitted()
+
+      val inlineOptions =
+        GeojsonSourceOptions(
+          minZoom = 0.0,
+          maxZoom = 14.0,
+          tolerance = 0.5,
+          tileSize = 256u,
+          buffer = 64u,
+          lineMetrics = true,
+        )
+      GeneratedApi.geojsonSourceDataCreate(geoJsonData(), inlineOptions).use { data ->
+        map.addGeojsonSourceData("inline-places", data).awaitCommitted()
+      }
+      assertEquals(
+        StyleSourceType.GEOJSON,
+        map.getStyleSourceInfo("inline-places").await()?.info?.type,
+      )
+      GeneratedApi.geojsonSourceDataCreate(
+          ("{\"type\":\"Feature\",\"geometry\":{\"type\":\"LineString\"," +
+              "\"coordinates\":[[0,0],[1,1]]},\"properties\":{}}")
+            .encodeToByteArray(),
+          inlineOptions,
+        )
+        .use { update -> map.setGeojsonSourceData("inline-places", update).awaitCommitted() }
+
+      GeneratedApi.geojsonSourceDataCreate(nearbyPoints(), clusterOptions()).use { clustered ->
+        map.addGeojsonSourceData("clustered-places", clustered).awaitCommitted()
+      }
+      assertEquals(
+        StyleSourceType.GEOJSON,
+        map.getStyleSourceInfo("clustered-places").await()?.info?.type,
+      )
+
+      assertFailsWith<InvalidArgumentException> {
+        map
+          .addGeojsonSourceUrl(
+            "invalid-zooms",
+            "https://example.com/places.geojson",
+            GeojsonSourceOptions(minZoom = 12.0, maxZoom = 4.0),
+          )
+          .await()
+      }
+      assertNull(map.getStyleSourceInfo("invalid-zooms").await())
+      assertCommandFailed(
+        map
+          .addGeojsonSourceUrl(
+            "invalid-cluster-properties",
+            "https://example.com/places.geojson",
+            GeojsonSourceOptions(clusterProperties = "\"not an object\"".encodeToByteArray()),
+          )
+          .await(),
+        MaplibreStatus.INVALID_ARGUMENT,
+      )
+      assertNull(map.getStyleSourceInfo("invalid-cluster-properties").await())
+    } finally {
+      map.close().await()
+      runtime.close().await()
+    }
+  }
+
+  @Test
+  fun customGeometrySourcesCanBeManaged(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    val map =
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
+
+    try {
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
+      map
+        .addCustomGeometrySource(
+          "custom-places",
+          CustomGeometrySourceOptions(
+            fetchTile = {},
+            minZoom = 0.0,
+            maxZoom = 14.0,
+            tolerance = 0.375,
+            tileSize = 512u,
+            buffer = 64u,
+            clip = true,
+            wrap = false,
+          ),
+        )
+        .await()
+
+      assertEquals(
+        StyleSourceType.CUSTOM_VECTOR,
+        map.getStyleSourceInfo("custom-places").await()?.info?.type,
+      )
+
+      val tileId = CanonicalTileId(0u, 0u, 0u)
+      map.setCustomGeometrySourceTileData("custom-places", tileId, geoJsonData())
+      map.invalidateCustomGeometrySourceTile("custom-places", tileId).await()
+      map
+        .invalidateCustomGeometrySourceRegion(
+          "custom-places",
+          LatLngBounds(LatLng(-1.0, -1.0), LatLng(1.0, 1.0)),
+        )
+        .await()
+
+      map.removeStyleSource("custom-places").awaitCommitted()
+      assertNull(map.getStyleSourceInfo("custom-places").await())
+    } finally {
+      map.close().await()
+      runtime.close().await()
+    }
+  }
+
+  @Test
+  fun customMvtVectorSourcesCanBeManaged(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    val map =
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
+
+    try {
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
+      map
+        .addCustomMvtVectorSource(
+          "custom-mvt",
+          CustomMvtVectorSourceOptions(fetchTile = {}, minZoom = 0.0, maxZoom = 14.0),
+        )
+        .await()
+
+      assertEquals(
+        StyleSourceType.CUSTOM_MVT_VECTOR,
+        map.getStyleSourceInfo("custom-mvt").await()?.info?.type,
+      )
+
+      val tileId = CanonicalTileId(0u, 0u, 0u)
+      map.setCustomMvtVectorSourceTileData("custom-mvt", tileId, ByteArray(0)).await()
+      map.setCustomMvtVectorSourceTileError("custom-mvt", tileId, "tile missing").await()
+      map.invalidateCustomMvtVectorSourceTile("custom-mvt", tileId).await()
+
+      // A second source under the same ID is rejected, and the first one stays installed.
+      assertCommandFailed(
+        map
+          .addCustomMvtVectorSource("custom-mvt", CustomMvtVectorSourceOptions(fetchTile = {}))
+          .await(),
+        MaplibreStatus.INVALID_ARGUMENT,
+      )
+
+      map.removeStyleSource("custom-mvt").awaitCommitted()
+      assertNull(map.getStyleSourceInfo("custom-mvt").await())
+    } finally {
+      map.close().await()
+      runtime.close().await()
+    }
+  }
+
+  // Every live custom source keeps its own callback state, past the ten-slot JavaCPP
+  // function-pointer pool that per-source thunks would exhaust on Android.
+
+  @Test
+  fun elevenLiveCustomSourcesStayRegistered(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    val map =
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
+
+    try {
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
+      val geometryOptions = CustomGeometrySourceOptions(fetchTile = {})
+      val mvtOptions = CustomMvtVectorSourceOptions(fetchTile = {})
+      val geometryIds = (1..11).map { "custom-$it" }
+      val mvtIds = (1..11).map { "custom-mvt-$it" }
+      geometryIds.forEach { map.addCustomGeometrySource(it, geometryOptions).await() }
+      mvtIds.forEach { map.addCustomMvtVectorSource(it, mvtOptions).await() }
+      (geometryIds + mvtIds).forEach { id -> assertNotNull(map.getStyleSourceInfo(id).await(), id) }
+
+      map.removeStyleSource("custom-1").awaitCommitted()
+      map.removeStyleSource("custom-mvt-1").awaitCommitted()
+      map.addCustomGeometrySource("custom-12", geometryOptions).await()
+      map.addCustomMvtVectorSource("custom-mvt-12", mvtOptions).await()
+      assertNotNull(map.getStyleSourceInfo("custom-12").await())
+      assertNotNull(map.getStyleSourceInfo("custom-mvt-12").await())
+      assertNull(map.getStyleSourceInfo("custom-1").await())
+      assertNull(map.getStyleSourceInfo("custom-mvt-1").await())
+    } finally {
+      map.close().await()
+      runtime.close().await()
+    }
+  }
+
+  @Test
+  fun featureStateRoundTripsThroughTheMapStore(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    val map =
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
+
+    try {
+      val selector = FeatureStateSelector("point", featureId = "feature-1")
+
+      // The store answers before any source loads, and missing state reads as an empty
+      // object.
+      assertEquals("{}", map.getFeatureState(selector).await().decodeToString())
+
+      map
+        .setFeatureState(selector, """{"hover":true,"radius":20}""".encodeToByteArray())
+        .awaitCommitted()
+      val stored = map.getFeatureState(selector).await().decodeToString()
+      assertTrue(stored.contains("\"hover\":true"), stored)
+      assertTrue(stored.contains("\"radius\":20"), stored)
+
+      // State must be one JSON object.
+      assertFailsWith<InvalidArgumentException> {
+        map.setFeatureState(selector, "[]".encodeToByteArray()).await()
       }
 
-      assertTrue(map.removeStyleSource("custom-mvt"))
-      assertFalse(map.styleSourceExists("custom-mvt"))
+      // A state key narrows the removal to that one member.
+      map
+        .removeFeatureState(
+          FeatureStateSelector("point", featureId = "feature-1", stateKey = "hover")
+        )
+        .awaitCommitted()
+      val afterRemove = map.getFeatureState(selector).await().decodeToString()
+      assertFalse(afterRemove.contains("hover"), afterRemove)
+      assertTrue(afterRemove.contains("\"radius\":20"), afterRemove)
+
+      map.removeFeatureState(selector).awaitCommitted()
+      assertEquals("{}", map.getFeatureState(selector).await().decodeToString())
     } finally {
-      map.close()
-      runtime.close()
+      map.close().await()
+      runtime.close().await()
     }
   }
 
   @Test
-  fun sixLiveCustomGeometrySourcesStayRegistered() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-            mapMode = MapMode.STATIC
-          },
-        )
-        .use { map ->
-          map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
-          val options =
-            CustomGeometrySourceOptions(
-              object : CustomGeometrySourceCallback {
-                override fun fetchTile(tileId: CanonicalTileId) {}
-              }
-            )
-          val ids = (1..6).map { "custom-$it" }
-          ids.forEach { map.addCustomGeometrySource(it, options) }
-          ids.forEach { id -> assertTrue(map.styleSourceExists(id), id) }
-
-          assertTrue(map.removeStyleSource("custom-1"))
-          map.addCustomGeometrySource("custom-7", options)
-          assertTrue(map.styleSourceExists("custom-7"))
-          assertFalse(map.styleSourceExists("custom-1"))
-        }
-    }
-  }
-
-  @Test
-  fun sixLiveCustomMvtVectorSourcesStayRegistered() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-            mapMode = MapMode.STATIC
-          },
-        )
-        .use { map ->
-          map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
-          val options =
-            CustomMvtVectorSourceOptions(
-              object : CustomMvtVectorSourceCallback {
-                override fun fetchTile(tileId: CanonicalTileId) {}
-              }
-            )
-          val ids = (1..6).map { "custom-mvt-$it" }
-          ids.forEach { map.addCustomMvtVectorSource(it, options) }
-          ids.forEach { id -> assertTrue(map.styleSourceExists(id), id) }
-
-          assertTrue(map.removeStyleSource("custom-mvt-1"))
-          map.addCustomMvtVectorSource("custom-mvt-7", options)
-          assertTrue(map.styleSourceExists("custom-mvt-7"))
-          assertFalse(map.styleSourceExists("custom-mvt-1"))
-        }
-    }
-  }
-
-  @Test
-  fun tileSourcesCanBeAddedAndInspected() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
+  fun tileSourcesCanBeAddedAndInspected(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
     val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          mapMode = MapMode.STATIC
-        },
-      )
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
 
     try {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
-      map.addVectorSourceUrl(
-        "roads",
-        "https://example.com/vector.json",
-        TileSourceOptions().apply {
-          minZoom = 1.0
-          maxZoom = 12.0
-          attribution = "vector attribution"
-          scheme = TileScheme.XYZ
-          vectorEncoding = VectorTileEncoding.MVT
-        },
-      )
-      map.addRasterSourceTiles(
-        "satellite",
-        listOf("https://example.com/raster/{z}/{x}/{y}.png"),
-        TileSourceOptions().apply { tileSize = 256 },
-      )
-      map.addRasterDemSourceTiles(
-        "terrain",
-        listOf("https://example.com/terrain/{z}/{x}/{y}.png"),
-        TileSourceOptions().apply {
-          tileSize = 512
-          rasterDemEncoding = RasterDemEncoding.TERRARIUM
-        },
-      )
+      map
+        .setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
+        .awaitCommitted()
+      map
+        .addVectorSourceUrl(
+          "roads",
+          "https://example.com/vector.json",
+          StyleTileSourceOptions(
+            minZoom = 1.0,
+            maxZoom = 12.0,
+            attribution = "vector attribution",
+            scheme = StyleTileScheme.XYZ,
+            vectorEncoding = StyleVectorTileEncoding.MVT,
+          ),
+        )
+        .awaitCommitted()
+      map
+        .addRasterSourceTiles(
+          "satellite",
+          listOf("https://example.com/raster/{z}/{x}/{y}.png"),
+          StyleTileSourceOptions(tileSize = 256u),
+        )
+        .awaitCommitted()
+      map
+        .addRasterDemSourceTiles(
+          "terrain",
+          listOf("https://example.com/terrain/{z}/{x}/{y}.png"),
+          StyleTileSourceOptions(tileSize = 512u, rasterEncoding = StyleRasterDemEncoding.TERRARIUM),
+        )
+        .awaitCommitted()
 
-      assertEquals(SourceType.VECTOR, map.styleSourceType("roads"))
-      val rasterInfo = assertNotNull(map.styleSourceInfo("satellite"))
-      assertEquals(SourceType.RASTER, rasterInfo.type)
-      assertEquals(256, rasterInfo.tileSize)
-      assertEquals(SourceType.RASTER_DEM, map.styleSourceType("terrain"))
-      assertEquals(RasterDemEncoding.TERRARIUM, map.styleSourceInfo("terrain")?.rasterDemEncoding)
-      assertTrue(map.styleSourceIds().containsAll(listOf("roads", "satellite", "terrain")))
-    } finally {
-      map.close()
-      runtime.close()
-    }
-  }
-
-  @Test
-  fun styleLayerJsonCanBeAddedInspectedListedAndRemoved() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          mapMode = MapMode.STATIC
-        },
+      assertEquals(StyleSourceType.VECTOR, map.getStyleSourceInfo("roads").await()?.info?.type)
+      val rasterInfo = assertNotNull(map.getStyleSourceInfo("satellite").await())
+      assertEquals(StyleSourceType.RASTER, rasterInfo.info.type)
+      assertEquals(256u, rasterInfo.info.tileSize)
+      assertEquals(
+        StyleSourceType.RASTER_DEM,
+        map.getStyleSourceInfo("terrain").await()?.info?.type,
       )
-
-    try {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
-      map.addStyleLayerJson(backgroundLayer(), "")
-      map.addLocationIndicatorLayer("puck", "")
-      map.setLocationIndicatorLocation("puck", LatLng(12.0, 34.0), 56.0)
-      map.setLocationIndicatorBearing("puck", 78.0)
-      map.setLocationIndicatorAccuracyRadius("puck", 9.0)
-      map.moveStyleLayer("puck", "background")
-
-      assertTrue(map.styleLayerExists("background"))
-      assertEquals("background", map.styleLayerType("background"))
-      assertTrue(map.styleLayerExists("puck"))
-      assertTrue(map.styleLayerIds().contains("background"))
-      assertTrue(map.styleLayerIds().contains("puck"))
+      assertEquals(
+        StyleRasterDemEncoding.TERRARIUM,
+        map.getStyleSourceInfo("terrain").await()?.info?.rasterEncoding,
+      )
       assertTrue(
-        map.styleLayerJson("background")!!.decodeToString().contains("\"type\":\"background\"")
+        map.listStyleSourceIds().await().containsAll(listOf("roads", "satellite", "terrain"))
       )
-      map.setLayerProperty("background", "background-opacity", "0.5".encodeToByteArray())
-      assertEquals("0.5", map.layerProperty("background", "background-opacity")?.decodeToString())
-      map.setStyleLightProperty("anchor", "\"viewport\"".encodeToByteArray())
-      assertEquals("\"viewport\"", map.styleLightProperty("anchor")?.decodeToString())
-      assertTrue(map.removeStyleLayer("background"))
-      assertTrue(map.removeStyleLayer("puck"))
-      assertFalse(map.styleLayerExists("background"))
-      assertFalse(map.removeStyleLayer("background"))
     } finally {
-      map.close()
-      runtime.close()
+      map.close().await()
+      runtime.close().await()
     }
   }
 
-  // BND-105: the layer stack lists in style order with optional source fields.
   @Test
-  fun styleLayersListTheLayerStackInStyleOrder() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
+  fun styleLayerJsonCanBeAddedInspectedListedAndRemoved(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
     val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          mapMode = MapMode.STATIC
-        },
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
+
+    try {
+      map
+        .setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
+        .awaitCommitted()
+      map.addStyleLayerJson(backgroundLayer(), "").awaitCommitted()
+      map.addLocationIndicatorLayer("puck", "").awaitCommitted()
+      map.setLocationIndicatorLocation("puck", LatLng(12.0, 34.0), 56.0).awaitCommitted()
+      map.setLocationIndicatorBearing("puck", 78.0).awaitCommitted()
+      map.setLocationIndicatorAccuracyRadius("puck", 9.0).awaitCommitted()
+      map.moveStyleLayer("puck", "background").awaitCommitted()
+
+      assertEquals("background", map.getStyleLayerInfo("background").await()?.info?.type)
+      assertNotNull(map.getStyleLayerInfo("puck").await())
+      assertTrue(map.listStyleLayerIds().await().contains("background"))
+      assertTrue(map.listStyleLayerIds().await().contains("puck"))
+      assertTrue(
+        map
+          .getStyleLayerJson("background")
+          .await()!!
+          .decodeToString()
+          .contains("\"type\":\"background\"")
       )
+      map
+        .setLayerProperty("background", "background-opacity", "0.5".encodeToByteArray())
+        .awaitCommitted()
+      assertEquals(
+        "0.5",
+        map.getLayerProperty("background", "background-opacity").await()?.decodeToString(),
+      )
+      map.setStyleLightProperty("anchor", "\"viewport\"".encodeToByteArray()).awaitCommitted()
+      assertEquals("\"viewport\"", map.getStyleLightProperty("anchor").await()?.decodeToString())
+      map.removeStyleLayer("background").awaitCommitted()
+      map.removeStyleLayer("puck").awaitCommitted()
+      assertNull(map.getStyleLayerInfo("background").await())
+      assertCommandFailed(map.removeStyleLayer("background").await(), MaplibreStatus.NOT_FOUND)
+    } finally {
+      map.close().await()
+      runtime.close().await()
+    }
+  }
+
+  @Test
+  fun metersPerPixelQueryObservesCameraCommands(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    val map = runtime.mapCreate(GeneratedApi.mapOptionsDefault()).await()
+    try {
+      map.updateCamera(CameraUpdate(camera = CameraOptions(zoom = 3.0))).awaitCommitted()
+      val projection = map.projectionCreate().await()
+      try {
+        val meters = map.metersPerPixelAtLatitude(45.0).await()
+        assertEquals(meters, projection.metersPerPixelAtLatitude(45.0), 1e-10)
+        map.updateCamera(CameraUpdate(camera = CameraOptions(zoom = 4.0))).awaitCommitted()
+        assertEquals(meters / 2, map.metersPerPixelAtLatitude(45.0).await(), 1e-10)
+        assertEquals(meters, projection.metersPerPixelAtLatitude(45.0), 1e-10)
+      } finally {
+        projection.close()
+      }
+    } finally {
+      map.close().await()
+      runtime.close().await()
+    }
+  }
+
+  // the layer stack lists in style order with optional source fields.
+  @Test
+  fun styleLayersListTheLayerStackInStyleOrder(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    val map =
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
 
     try {
       map.setStyleJson(
@@ -744,641 +953,286 @@ class MapHandleTest {
 
       assertEquals(
         listOf(
-          StyleLayerInfo("roads", "line", "tiles", "transportation"),
-          StyleLayerInfo("sky", "background", null, null),
+          StyleLayerEntry("roads", "line", "tiles", "transportation"),
+          StyleLayerEntry("sky", "background", null, null),
         ),
-        map.styleLayers(),
+        map.listStyleLayers().await(),
       )
     } finally {
-      map.close()
-      runtime.close()
+      map.close().await()
+      runtime.close().await()
     }
   }
 
   @Test
-  fun styleImageCanBeSetCopiedInspectedAndRemoved() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
+  fun styleImageCanBeSetCopiedInspectedAndRemoved(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
     val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          mapMode = MapMode.STATIC
-        },
-      )
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
 
     try {
-      val image = PremultipliedRgba8Image(1, 1, 4, byteArrayOf(1, 2, 3, 4))
-      val options =
-        StyleImageOptions().apply {
-          pixelRatio = 2.0f
-          sdf = true
-        }
+      val image = PremultipliedRgba8Image(1u, 1u, 4u, byteArrayOf(1, 2, 3, 4))
+      val options = StyleImageOptions(pixelRatio = 2.0f, sdf = true)
 
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
       map.setStyleImage("dot", image, options)
 
-      assertTrue(map.styleImageExists("dot"))
-      val info = map.styleImageInfo("dot")
-      assertEquals(1, info?.width)
-      assertEquals(1, info?.height)
-      assertEquals(4, info?.stride)
-      assertEquals(4, info?.byteLength)
-      assertEquals(2.0f, info?.pixelRatio)
-      assertEquals(true, info?.sdf)
-      assertEquals(image, map.copyStyleImagePremultipliedRgba8("dot")?.image)
-      assertEquals(2.0f, map.copyStyleImagePremultipliedRgba8("dot")?.pixelRatio)
-      assertEquals(true, map.copyStyleImagePremultipliedRgba8("dot")?.sdf)
-      assertTrue(map.removeStyleImage("dot"))
-      assertFalse(map.styleImageExists("dot"))
-      assertFalse(map.removeStyleImage("dot"))
+      val info = map.getStyleImageInfo("dot").await()
+      assertEquals(1u, info?.info?.width)
+      assertEquals(1u, info?.info?.height)
+      assertEquals(4u, info?.info?.stride)
+      assertEquals(4uL, info?.info?.byteLength)
+      assertEquals(2.0f, info?.info?.pixelRatio)
+      assertEquals(true, info?.info?.sdf)
+      // The pixel copy carries the bytes alone; the metadata stays in the info query.
+      assertContentEquals(image.pixels, map.copyStyleImagePremultipliedRgba8("dot").await())
+      assertNull(map.copyStyleImagePremultipliedRgba8("missing").await())
+      map.removeStyleImage("dot").awaitCommitted()
+      assertNull(map.getStyleImageInfo("dot").await())
+      assertNull(map.copyStyleImagePremultipliedRgba8("dot").await())
+      assertCommandFailed(map.removeStyleImage("dot").await(), MaplibreStatus.NOT_FOUND)
     } finally {
-      map.close()
-      runtime.close()
+      map.close().await()
+      runtime.close().await()
     }
   }
 
   @Test
-  fun imageSourcesCanBeAddedUpdatedAndInspected() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
+  fun imageSourcesCanBeAddedUpdatedAndInspected(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
     val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          mapMode = MapMode.STATIC
-        },
-      )
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
 
     try {
-      val image = PremultipliedRgba8Image(1, 1, 4, byteArrayOf(1, 2, 3, 4))
+      val image = PremultipliedRgba8Image(1u, 1u, 4u, byteArrayOf(1, 2, 3, 4))
       val coordinates = imageCoordinates()
       val moved = listOf(LatLng(1.0, 0.0), LatLng(1.0, 1.0), LatLng(0.0, 1.0), LatLng(0.0, 0.0))
 
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
-      map.addImageSourceUrl("overlay", coordinates, "https://example.com/image.png")
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
+      map.addImageSourceUrl("overlay", coordinates, "https://example.com/image.png").await()
 
-      assertEquals(SourceType.IMAGE, map.styleSourceType("overlay"))
-      assertEquals(coordinates, map.imageSourceCoordinates("overlay"))
-      map.setImageSourceUrl("overlay", "https://example.com/updated-image.png")
-      map.setImageSourceImage("overlay", image)
-      map.setImageSourceCoordinates("overlay", moved)
-      assertEquals(moved, map.imageSourceCoordinates("overlay"))
-      assertEquals(null, map.imageSourceCoordinates("missing-overlay"))
+      assertEquals(StyleSourceType.IMAGE, map.getStyleSourceInfo("overlay").await()?.info?.type)
+      assertEquals(coordinates, map.getImageSourceCoordinates("overlay").await())
+      map.setImageSourceUrl("overlay", "https://example.com/updated-image.png").await()
+      map.setImageSourceImage("overlay", image).await()
+      map.setImageSourceCoordinates("overlay", moved).await()
+      assertEquals(moved, map.getImageSourceCoordinates("overlay").await())
+      assertEquals(null, map.getImageSourceCoordinates("missing-overlay").await())
 
       map.addImageSourceImage("inline-overlay", coordinates, image)
-      assertEquals(SourceType.IMAGE, map.styleSourceInfo("inline-overlay")?.type)
+      assertEquals(
+        StyleSourceType.IMAGE,
+        map.getStyleSourceInfo("inline-overlay").await()?.info?.type,
+      )
     } finally {
-      map.close()
-      runtime.close()
+      map.close().await()
+      runtime.close().await()
     }
   }
 
+  // The command completion generation fences a later snapshot: a snapshot at or past it
+  // observes the commit.
   @Test
-  fun mapDebugControlsCanBeReadAndWritten() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          mapMode = MapMode.CONTINUOUS
-        },
-      )
-
-    try {
-      assertTrue(map.debugOptions.isEmpty())
-      map.debugOptions = setOf(DebugOption.TILE_BORDERS, DebugOption.TIMESTAMPS)
-      assertEquals(setOf(DebugOption.TILE_BORDERS, DebugOption.TIMESTAMPS), map.debugOptions)
-      map.debugOptions = emptySet()
-      assertTrue(map.debugOptions.isEmpty())
-
-      assertFalse(map.isRenderingStatsViewEnabled)
-      map.isRenderingStatsViewEnabled = true
-      assertTrue(map.isRenderingStatsViewEnabled)
-      map.isRenderingStatsViewEnabled = false
-      assertFalse(map.isRenderingStatsViewEnabled)
-
-      map.requestRepaint()
-      map.isFullyLoaded
-      map.dumpDebugLogs()
-    } finally {
-      map.close()
-      runtime.close()
-    }
-  }
-
-  @Test
-  fun mapOptionPropertiesCanBeRoundTripped() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 128
-          height = 128
-          mapMode = MapMode.STATIC
-        },
-      )
-
-    try {
-      map.viewportOptions =
-        ViewportOptions().apply {
-          northOrientation = NorthOrientation.UP
-          constrainMode = ConstrainMode.HEIGHT_ONLY
-          viewportMode = ViewportMode.DEFAULT
-          frustumOffset = EdgeInsets.ZERO
-        }
-      val viewport = map.viewportOptions
-      assertEquals(NorthOrientation.UP, viewport.northOrientation)
-      assertEquals(ConstrainMode.HEIGHT_ONLY, viewport.constrainMode)
-      assertEquals(ViewportMode.DEFAULT, viewport.viewportMode)
-      assertEquals(EdgeInsets.ZERO, viewport.frustumOffset)
-
-      map.tileOptions =
-        TileOptions().apply {
-          prefetchZoomDelta = 2
-          lodMinRadius = 1.5
-          lodScale = 2.5
-          lodPitchThreshold = 30.0
-          lodZoomShift = 1.0
-          lodMode = TileLodMode.DEFAULT
-        }
-      val tile = map.tileOptions
-      assertEquals(2, tile.prefetchZoomDelta)
-      assertEquals(1.5, tile.lodMinRadius)
-      assertEquals(2.5, tile.lodScale)
-      assertEquals(30.0, tile.lodPitchThreshold)
-      assertEquals(1.0, tile.lodZoomShift)
-      assertEquals(TileLodMode.DEFAULT, tile.lodMode)
-
-      map.projectionMode =
-        ProjectionModeOptions().apply {
-          axonometric = false
-          xSkew = 0.0
-          ySkew = 0.0
-        }
-      val projectionMode = map.projectionMode
-      assertEquals(false, projectionMode.axonometric)
-      assertEquals(0.0, projectionMode.xSkew)
-      assertEquals(0.0, projectionMode.ySkew)
-    } finally {
-      map.close()
-      runtime.close()
-    }
-  }
-
-  @Test
-  fun cameraCommandsAndProjectionCameraCanBeUsed() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 128
-          height = 128
-          mapMode = MapMode.STATIC
-        },
-      )
-
-    try {
-      val camera =
-        CameraOptions().apply {
-          center = LatLng(10.0, 20.0)
-          zoom = 3.0
-          bearing = 15.0
-          pitch = 20.0
-          padding = EdgeInsets.ZERO
-          anchor = ScreenPoint(64.0, 64.0)
-        }
-      map.jumpTo(camera)
-      assertNear(requireNotNull(camera.center), requireNotNull(map.camera.center))
-      assertEquals(3.0, map.camera.zoom ?: 0.0, 1e-6)
-      // BND-070: successive snapshots of an unchanged camera compare equal.
-      assertEquals(map.camera, map.camera)
-
-      val animation =
-        AnimationOptions().apply {
-          durationMs = 0.0
-          minZoom = 2.0
-          easing = UnitBezier(0.0, 0.0, 1.0, 1.0)
-        }
-      map.easeTo(CameraOptions().apply { zoom = 3.25 }, animation)
-      map.flyTo(CameraOptions().apply { zoom = 3.5 }, null)
-      map.moveBy(0.0, 0.0)
-      map.moveByAnimated(0.0, 0.0, null)
-      map.scaleBy(1.0, null)
-      map.scaleByAnimated(1.0, ScreenPoint(64.0, 64.0), animation)
-      map.rotateBy(ScreenPoint(0.0, 0.0), ScreenPoint(1.0, 1.0))
-      map.rotateByAnimated(ScreenPoint(0.0, 0.0), ScreenPoint(1.0, 1.0), null)
-      map.pitchBy(0.0)
-      map.pitchByAnimated(0.0, null)
-      map.cancelTransitions()
-
-      assertFalse(map.isGestureInProgress)
-      map.isGestureInProgress = true
-      map.moveBy(8.0, -4.0)
-      assertTrue(map.isGestureInProgress)
-      map.isGestureInProgress = false
-      assertFalse(map.isGestureInProgress)
-
-      val fit =
-        CameraFitOptions().apply {
-          padding = EdgeInsets.ZERO
-          bearing = 0.0
-          pitch = 0.0
-        }
-      val bounds = LatLngBounds(LatLng(-1.0, -1.0), LatLng(1.0, 1.0))
-      assertTrue(map.cameraForLatLngBounds(bounds, fit).center != null)
-      assertTrue(
-        map.cameraForLatLngs(listOf(bounds.southwest, bounds.northeast), null).center != null
-      )
-      assertTrue(map.cameraForGeometry(pointGeometry(), fit).center != null)
-      assertTrue(map.latLngBoundsForCamera(camera).southwest.latitude.isFinite())
-      assertTrue(map.latLngBoundsForCameraUnwrapped(camera).southwest.latitude.isFinite())
-
-      val projection = map.createProjection()
-      try {
-        projection.setCamera(camera)
-        assertNear(requireNotNull(camera.center), requireNotNull(projection.camera.center))
-        projection.setVisibleCoordinates(
-          listOf(bounds.southwest, bounds.northeast),
-          EdgeInsets.ZERO,
+  fun committedCommandGenerationFencesTheSnapshot(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+            )
         )
-        assertTrue(projection.camera.center != null)
-        projection.setVisibleGeometry(pointGeometry(), EdgeInsets.ZERO)
-        assertTrue(projection.camera.center != null)
-      } finally {
-        projection.close()
-      }
-
-      map.bounds =
-        BoundOptions().apply {
-          this.bounds = BoundsConstraint.Bounded(bounds)
-          minZoom = 1.0
-          maxZoom = 10.0
-          minPitch = 0.0
-          maxPitch = 45.0
+        .await()
+        .use { map ->
+          val debug =
+            MapDebugOption(MapDebugOption.TILE_BORDERS.rawValue or MapDebugOption.OVERDRAW.rawValue)
+          val generation = map.setDebugOptions(debug).awaitCommitted().generation
+          assertTrue(generation > 0uL, "committed command must publish a generation")
+          val snapshot = map.snapshotGet()
+          assertTrue(snapshot.generation >= generation)
+          assertEquals(debug, snapshot.debugOptions)
         }
-      val boundOptions = map.bounds
-      assertEquals(BoundsConstraint.Bounded(bounds), boundOptions.bounds)
-      assertEquals(1.0, boundOptions.minZoom ?: 0.0, 1e-6)
-      assertEquals(10.0, boundOptions.maxZoom ?: 0.0, 1e-6)
-      assertEquals(0.0, boundOptions.minPitch ?: -1.0, 1e-6)
-      assertEquals(45.0, boundOptions.maxPitch ?: 0.0, 1e-6)
-
-      map.freeCameraOptions =
-        org.maplibre.nativeffi.camera.FreeCameraOptions().apply {
-          position = Vec3(0.0, 0.0, 1.0)
-          orientation = Quaternion(0.0, 0.0, 0.0, 1.0)
-        }
-      assertTrue(map.freeCameraOptions.position != null)
-      assertTrue(map.freeCameraOptions.orientation != null)
-    } finally {
-      map.close()
-      runtime.close()
-    }
-  }
-
-  // BND-087, BND-102.
-
-  @Test
-  fun cameraTransitionIdsReportEveryTerminalOutcomeOnce() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-        },
-      )
-
-    try {
-      // A zero-duration ease resolves inside the call. An id above Long.MAX_VALUE
-      // round-trips as the unsigned bit pattern the caller passed in.
-      val instantId = (Long.MAX_VALUE.toULong() + 1UL).toLong()
-      map.easeTo(CameraOptions().apply { zoom = 2.0 }, transitionAnimation(instantId, 0.0))
-      val instant = drainCameraEvents(runtime)
-      assertEquals(listOf(instantId), instant.finishedTransitionIds)
-      assertEquals(CameraChangeMode.IMMEDIATE, instant.lastChangeMode)
-
-      map.easeTo(CameraOptions().apply { zoom = 12.0 }, transitionAnimation(11L, 5_000.0))
-      assertEquals(emptyList(), drainCameraEvents(runtime).finishedTransitionIds)
-
-      // A later camera command supersedes the running transition, ending it.
-      map.easeTo(CameraOptions().apply { zoom = 13.0 }, transitionAnimation(12L, 5_000.0))
-      val superseded = drainCameraEvents(runtime)
-      assertEquals(listOf(11L), superseded.finishedTransitionIds)
-      assertEquals(CameraChangeMode.ANIMATED, superseded.lastChangeMode)
-
-      map.cancelTransitions()
-      assertEquals(listOf(12L), drainCameraEvents(runtime).finishedTransitionIds)
-
-      // Omitting the id leaves the transition silent.
-      map.easeTo(
-        CameraOptions().apply { zoom = 14.0 },
-        AnimationOptions().apply { durationMs = 0.0 },
-      )
-      assertEquals(emptyList(), drainCameraEvents(runtime).finishedTransitionIds)
-    } finally {
-      map.close()
-      runtime.close()
     }
   }
 
   @Test
-  fun completedCameraTransitionReportsItsIdOnceAndReachesTheRequestedCamera() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          mapMode = MapMode.STATIC
-        },
-      )
-
-    try {
-      map.easeTo(CameraOptions().apply { zoom = 5.0 }, transitionAnimation(21L, 5_000.0))
-      // A still-image request runs a static map's pending transitions to their end.
-      map.requestStillImage()
-
-      val finished = mutableListOf<Long>()
-      val cameraEventTypes = mutableListOf<RuntimeEventType>()
-      var rounds = 0
-      while (finished.isEmpty() && rounds < 10_000) {
-        runtime.pump(0)
-        val events = drainCameraEvents(runtime)
-        finished += events.finishedTransitionIds
-        cameraEventTypes += events.cameraEventTypes
-        rounds++
-        runtime.pump(1)
-      }
-      assertEquals(listOf(21L), finished)
-      assertEquals(5.0, map.camera.zoom ?: 0.0, 1e-6)
-
-      // The transition reports its end once; later pumping adds nothing.
-      repeat(100) {
-        runtime.pump(0)
-        val events = drainCameraEvents(runtime)
-        finished += events.finishedTransitionIds
-        cameraEventTypes += events.cameraEventTypes
-      }
-      assertEquals(listOf(21L), finished)
-
-      // The transition reports its end ahead of the camera change that settles it.
-      val finishedIndex = cameraEventTypes.indexOf(RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED)
-      assertTrue(
-        cameraEventTypes.drop(finishedIndex + 1).contains(RuntimeEventType.MAP_CAMERA_DID_CHANGE),
-        "camera-did-change did not follow the transition: $cameraEventTypes",
-      )
-    } finally {
-      map.close()
-      runtime.close()
-    }
-  }
-
-  private fun transitionAnimation(transitionId: Long, durationMs: Double): AnimationOptions =
-    AnimationOptions().apply {
-      this.transitionId = transitionId
-      this.durationMs = durationMs
-    }
-
-  private class CameraEvents(
-    val finishedTransitionIds: List<Long>,
-    val lastChangeMode: CameraChangeMode?,
-    /** Camera event types in queue order, so a test can assert their order. */
-    val cameraEventTypes: List<RuntimeEventType>,
-  )
-
-  private fun drainCameraEvents(runtime: RuntimeHandle): CameraEvents {
-    val finished = mutableListOf<Long>()
-    val types = mutableListOf<RuntimeEventType>()
-    var lastChangeMode: CameraChangeMode? = null
-    for (event in runtime.drainEvents().events) {
-      when (event.type) {
-        RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED -> {
-          finished +=
-            assertIs<RuntimeEventPayload.CameraTransitionFinished>(event.payload).transitionId
-          types += event.type
-        }
-        RuntimeEventType.MAP_CAMERA_DID_CHANGE -> {
-          lastChangeMode = CameraChangeMode(event.code)
-          types += event.type
-        }
-      }
-    }
-    return CameraEvents(finished, lastChangeMode, types)
-  }
-
-  @Test
-  fun boundsConstraintDistinguishesUnboundedFromWorldBounds() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 128
-          height = 128
-          mapMode = MapMode.STATIC
-        },
-      )
-
-    fun jumpedLongitude(longitude: Double): Double {
-      map.jumpTo(
-        CameraOptions().apply {
-          center = LatLng(0.0, longitude)
-          zoom = 2.0
-        }
-      )
-      return requireNotNull(map.camera.center).longitude
-    }
-
-    try {
-      // An unbounded map wraps across the antimeridian.
-      assertEquals(BoundsConstraint.Unbounded, map.bounds.bounds)
-      assertEquals(-160.0, jumpedLongitude(200.0), 1e-6)
-
-      val world = LatLngBounds(LatLng(-90.0, -180.0), LatLng(90.0, 180.0))
-      map.bounds = BoundOptions().apply { bounds = BoundsConstraint.Bounded(world) }
-      assertEquals(BoundsConstraint.Bounded(world), map.bounds.bounds)
-      // World bounds clamp at the antimeridian instead of wrapping.
-      assertEquals(180.0, jumpedLongitude(200.0), 1e-6)
-
-      map.bounds = BoundOptions().apply { bounds = BoundsConstraint.Unbounded }
-      assertEquals(BoundsConstraint.Unbounded, map.bounds.bounds)
-      // Releasing the constraint restores antimeridian wrapping.
-      assertEquals(-160.0, jumpedLongitude(200.0), 1e-6)
-    } finally {
-      map.close()
-      runtime.close()
-    }
-  }
-
-  @Test
-  fun mapCoordinateConversionsCanBeRoundTripped() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 128
-          height = 128
-          mapMode = MapMode.STATIC
-        },
-      )
-
-    try {
-      val coordinate = LatLng(0.0, 0.0)
-      val point = map.pixelForLatLng(coordinate)
-      val roundTrip = map.latLngForPixel(point)
-      assertNear(coordinate, roundTrip)
-
-      val coordinates = listOf(LatLng(0.0, 0.0), LatLng(10.0, 20.0))
-      val points = map.pixelsForLatLngs(coordinates)
-      assertEquals(coordinates.size, points.size)
-      val coordinateRoundTrips = map.latLngsForPixels(points)
-      assertEquals(coordinates.size, coordinateRoundTrips.size)
-      coordinates.zip(coordinateRoundTrips).forEach { (expected, actual) ->
-        assertNear(expected, actual)
-      }
-
-      assertEquals(emptyList(), map.pixelsForLatLngs(emptyList()))
-      assertEquals(emptyList(), map.latLngsForPixels(emptyList()))
-    } finally {
-      map.close()
-      runtime.close()
-    }
-  }
-
-  @Test
-  fun unwrappedCoordinateConversionsPreserveVisibleWorldCopies() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 1024
-          height = 512
-          mapMode = MapMode.STATIC
-        },
-      )
-
-    try {
-      map.jumpTo(
-        CameraOptions().apply {
-          center = LatLng(0.0, 180.0)
-          zoom = 0.0
-        }
-      )
-      val points = listOf(ScreenPoint(0.0, 256.0), ScreenPoint(1024.0, 256.0))
-      val wrapped = map.latLngsForPixels(points)
-      val unwrapped = map.latLngsForPixelsUnwrapped(points)
-
-      assertTrue(wrapped.all { it.longitude in -180.0..180.0 })
-      assertTrue(unwrapped[1].longitude - unwrapped[0].longitude > 360.0)
-      assertTrue(map.latLngForPixel(points[1]).longitude in -180.0..180.0)
-      assertEquals(unwrapped[1].longitude, map.latLngForPixelUnwrapped(points[1]).longitude, 1e-10)
-      map.createProjection().use { projection ->
-        assertTrue(projection.latLngForPixel(points[1]).longitude in -180.0..180.0)
-        assertEquals(
-          unwrapped[1].longitude,
-          projection.latLngForPixelUnwrapped(points[1]).longitude,
-          1e-10,
+  fun snapshotFieldsRoundTripThroughTheirSetCommands(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+            )
         )
-      }
-    } finally {
-      map.close()
-      runtime.close()
-    }
-  }
+        .await()
+        .use { map ->
+          assertEquals(MapDebugOption(0u), map.snapshotGet().debugOptions)
+          assertFalse(map.snapshotGet().renderingStatsViewEnabled)
 
-  @Test
-  fun metersPerPixelMatchesProjectionAndFollowsZoom() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map = MapHandle.create(runtime, MapOptions().apply { mapMode = MapMode.STATIC })
+          map.setRenderingStatsViewEnabled(true).awaitCommitted()
+          assertTrue(map.snapshotGet().renderingStatsViewEnabled)
 
-    try {
-      val latitude = 45.0
-      map.jumpTo(
-        CameraOptions().apply {
-          center = LatLng(latitude, 0.0)
-          zoom = 4.0
+          val viewport = MapViewportOptions(northOrientation = NorthOrientation.DOWN)
+          map.setViewportOptions(viewport).awaitCommitted()
+          assertEquals(NorthOrientation.DOWN, map.snapshotGet().viewport.northOrientation)
+
+          val tile = MapTileOptions(prefetchZoomDelta = 3u, lodScale = 1.5)
+          map.setTileOptions(tile).awaitCommitted()
+          val tileSnapshot = map.snapshotGet().tile
+          assertEquals(3u, tileSnapshot.prefetchZoomDelta)
+          assertEquals(1.5, tileSnapshot.lodScale)
+
+          val bounds =
+            BoundOptions(
+              minZoom = 2.0,
+              maxZoom = 15.0,
+              bounds = LatLngBounds(LatLng(-10.0, -10.0), LatLng(10.0, 10.0)),
+            )
+          map.setBounds(bounds).awaitCommitted()
+          val boundsSnapshot = map.snapshotGet().bounds
+          assertEquals(2.0, boundsSnapshot.minZoom)
+          assertEquals(15.0, boundsSnapshot.maxZoom)
+          assertEquals(bounds.bounds, boundsSnapshot.bounds)
+
+          val freeCamera =
+            FreeCameraOptions(
+              position = Vec3(0.5, 0.5, 0.5),
+              orientation = Quaternion(0.0, 0.0, 0.0, 1.0),
+            )
+          map.setFreeCameraOptions(freeCamera).awaitCommitted()
+          val freeCameraSnapshot = map.snapshotGet().freeCamera
+          kotlin.test.assertNotNull(freeCameraSnapshot.position)
+          kotlin.test.assertNotNull(freeCameraSnapshot.orientation)
+
+          val projectionMode = ProjectionMode(axonometric = true, xSkew = 0.5, ySkew = 0.25)
+          map.setProjectionMode(projectionMode).awaitCommitted()
+          val projectionModeSnapshot = map.snapshotGet().projectionMode
+          assertEquals(true, projectionModeSnapshot.axonometric)
+          assertEquals(0.5, projectionModeSnapshot.xSkew)
+          assertEquals(0.25, projectionModeSnapshot.ySkew)
+
+          // The debug dump writes to the log; the map keeps serving commands after it.
+          map.dumpDebugLogs().awaitCommitted()
+          assertTrue(map.snapshotGet().renderingStatsViewEnabled)
         }
-      )
-      val metersPerPixel = map.metersPerPixelAtLatitude(latitude)
-      map.createProjection().use { projection ->
-        assertEquals(metersPerPixel, projection.metersPerPixelAtLatitude(latitude), 1e-9)
-      }
-
-      map.jumpTo(CameraOptions().apply { zoom = 5.0 })
-      assertEquals(metersPerPixel / 2.0, map.metersPerPixelAtLatitude(latitude), 1e-9)
-    } finally {
-      map.close()
-      runtime.close()
     }
   }
 
   @Test
-  fun emptyBatchConversionsFromAnotherThreadReportWrongThread() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map = MapHandle.create(runtime, MapOptions())
-    try {
-      val calls =
-        listOf<() -> Unit>(
-          { map.pixelsForLatLngs(emptyList()) },
-          { map.latLngsForPixels(emptyList()) },
-          { map.latLngsForPixelsUnwrapped(emptyList()) },
+  fun repaintIsAcceptedOnlyByAContinuousMap(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+            )
         )
-      calls.forEach { call -> assertIs<WrongThreadException>(failureFromBackgroundThread(call)) }
-    } finally {
-      map.close()
-      runtime.close()
+        .await()
+        .use { map -> map.requestRepaint().awaitCommitted() }
+
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
+        .use { map -> assertFailsWith<InvalidStateException> { map.requestRepaint().await() } }
     }
   }
 
   @Test
-  fun mapProjectionCoordinateConversionsCanBeRoundTrippedAndClosed() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 128
-          height = 128
-          mapMode = MapMode.STATIC
-        },
-      )
+  fun cameraFitAndBoundsQueriesResolveBehindEarlierCommands(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault()
+                  .initialExtent
+                  .copy(width = 1024u, height = 512u, scaleFactor = 1.0),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
+        .use { map ->
+          val camera = CameraOptions(center = LatLng(10.0, 20.0), zoom = 3.0)
+          map.updateCamera(CameraUpdate(camera = camera)).awaitCommitted()
 
-    try {
-      val projection = map.createProjection()
-      assertFalse(projection.isClosed)
-      val coordinate = LatLng(0.0, 0.0)
-      val point = projection.pixelForLatLng(coordinate)
-      val roundTrip = projection.latLngForPixel(point)
-      assertNear(coordinate, roundTrip)
+          val fit = CameraFitOptions(padding = EdgeInsets(), bearing = 0.0, pitch = 0.0)
+          val bounds = LatLngBounds(LatLng(-1.0, -2.0), LatLng(1.0, 2.0))
 
-      map.close()
-      assertFailsWith<InvalidStateException> { map.pixelsForLatLngs(emptyList()) }
-      assertFailsWith<InvalidStateException> { map.latLngsForPixels(emptyList()) }
-      assertFailsWith<InvalidStateException> { map.latLngsForPixelsUnwrapped(emptyList()) }
-      val detachedPoint = projection.pixelForLatLng(coordinate)
-      assertNear(coordinate, projection.latLngForPixel(detachedPoint))
+          // Fitting the bounds and fitting its two corners name the same camera.
+          val fromBounds = map.cameraForLatLngBounds(bounds, fit).await()
+          val fromCoordinates =
+            map.cameraForLatLngs(listOf(bounds.southwest, bounds.northeast), fit).await()
+          val boundsCenter = assertNotNull(fromBounds.center)
+          assertEquals(0.0, boundsCenter.latitude, 1e-6)
+          assertEquals(0.0, boundsCenter.longitude, 1e-6)
+          assertEquals(fromBounds.center, fromCoordinates.center)
+          assertEquals(fromBounds.zoom, fromCoordinates.zoom)
 
-      projection.close()
-      projection.close()
-      assertTrue(projection.isClosed)
-      assertFailsWith<InvalidStateException> { projection.pixelForLatLng(coordinate) }
-    } finally {
-      map.close()
-      runtime.close()
+          // A single point fits at the point itself.
+          val fromGeometry = map.cameraForGeometry(pointGeometry(), fit).await()
+          val geometryCenter = assertNotNull(fromGeometry.center)
+          assertEquals(0.0, geometryCenter.latitude, 1e-6)
+          assertEquals(0.0, geometryCenter.longitude, 1e-6)
+
+          // The wrapped bounds cover the camera's own center.
+          val covered = map.latLngBoundsForCamera(camera).await()
+          assertTrue(covered.southwest.latitude <= 10.0 && covered.northeast.latitude >= 10.0)
+          assertTrue(covered.southwest.longitude in -180.0..180.0)
+          assertTrue(covered.northeast.longitude in -180.0..180.0)
+
+          // A viewport that straddles the antimeridian reads its east edge past 180.
+          val antimeridian = CameraOptions(center = LatLng(0.0, 179.0), zoom = 3.0)
+          val wrappedAcrossSeam = map.latLngBoundsForCamera(antimeridian).await()
+          val unwrappedAcrossSeam = map.latLngBoundsForCameraUnwrapped(antimeridian).await()
+          assertTrue(wrappedAcrossSeam.southwest.longitude in -180.0..180.0)
+          assertTrue(wrappedAcrossSeam.northeast.longitude in -180.0..180.0)
+          // The unwrapped east edge stays in the world copy it was read from, so the span
+          // is the 90 degrees the viewport covers rather than the 270 the wrapped hull
+          // spans.
+          assertTrue(unwrappedAcrossSeam.northeast.longitude > 180.0)
+          assertEquals(
+            90.0,
+            unwrappedAcrossSeam.northeast.longitude - unwrappedAcrossSeam.southwest.longitude,
+            1e-3,
+          )
+        }
     }
   }
+
+  /** A GeoJSON point at Null Island, for the geometry-fitting queries. */
+  private fun pointGeometry(): ByteArray =
+    "{\"type\":\"Point\",\"coordinates\":[0,0]}".encodeToByteArray()
 
   private fun geoJsonSource(): ByteArray =
     "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}"
@@ -1394,14 +1248,14 @@ class MapHandleTest {
         "]}")
       .encodeToByteArray()
 
-  private fun clusterOptions(): GeoJsonSourceOptions =
-    GeoJsonSourceOptions().apply {
-      cluster = true
-      clusterRadius = 50
-      clusterMaxZoom = 14.0
-      clusterMinPoints = 2
-      clusterProperties = "{\"total\":[\"+\",[\"get\",\"weight\"]]}".encodeToByteArray()
-    }
+  private fun clusterOptions(): GeojsonSourceOptions =
+    GeojsonSourceOptions(
+      cluster = true,
+      clusterRadius = 50u,
+      clusterMaxZoom = 14.0,
+      clusterMinPoints = 2u,
+      clusterProperties = "{\"total\":[\"+\",[\"get\",\"weight\"]]}".encodeToByteArray(),
+    )
 
   private fun geoJsonData(): ByteArray =
     ("{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"id\":1," +
@@ -1414,43 +1268,172 @@ class MapHandleTest {
   private fun backgroundLayer(): ByteArray =
     "{\"id\":\"background\",\"type\":\"background\"}".encodeToByteArray()
 
-  private fun pointGeometry(): ByteArray =
-    "{\"type\":\"Point\",\"coordinates\":[0,0]}".encodeToByteArray()
+  @Test
+  fun projectionUnwrappedConversionPreservesVisibleWorldCopy(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    val map =
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault()
+                  .initialExtent
+                  .copy(width = 1024u, height = 512u, scaleFactor = 1.0),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
+
+    try {
+      map
+        .updateCamera(CameraUpdate(camera = CameraOptions(center = LatLng(0.0, 179.0), zoom = 0.0)))
+        .await()
+
+      val projection = map.projectionCreate().await()
+      try {
+        // The right edge of the viewport sits in the next world copy at this camera.
+        val rightEdge = ScreenPoint(1023.0, 256.0)
+        val wrapped = projection.latLngForPixel(rightEdge)
+        val unwrapped = projection.latLngForPixelUnwrapped(rightEdge)
+
+        assertTrue(wrapped.longitude in -180.0..180.0)
+        assertTrue(unwrapped.longitude > 180.0, "the right edge sits in a later world copy")
+        val worldCopies = (unwrapped.longitude - wrapped.longitude) / 360.0
+        assertEquals(kotlin.math.round(worldCopies), worldCopies, 1e-9)
+        assertEquals(wrapped.latitude, unwrapped.latitude, 1e-9)
+      } finally {
+        projection.close()
+      }
+    } finally {
+      map.close().await()
+      runtime.close().await()
+    }
+  }
+
+  @Test
+  fun mapCoordinateConversionsRoundTrip(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    val map =
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault()
+                  .initialExtent
+                  .copy(width = 128u, height = 128u, scaleFactor = 1.0),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
+
+    try {
+      val coordinate = LatLng(0.0, 0.0)
+      val point = map.pixelForLatLng(coordinate).await()
+      val roundTrip = map.latLngForPixel(point).await()
+      assertEquals(coordinate.latitude, roundTrip.latitude, 1e-6)
+      assertEquals(coordinate.longitude, roundTrip.longitude, 1e-6)
+
+      val coordinates = listOf(LatLng(0.0, 0.0), LatLng(10.0, 20.0))
+      val points = map.pixelsForLatLngs(coordinates).await()
+      assertEquals(coordinates.size, points.size)
+      val batchRoundTrips = map.latLngsForPixels(points).await()
+      assertEquals(coordinates.size, batchRoundTrips.size)
+      coordinates.zip(batchRoundTrips).forEach { (expected, actual) ->
+        assertEquals(expected.latitude, actual.latitude, 1e-6)
+        assertEquals(expected.longitude, actual.longitude, 1e-6)
+      }
+
+      // An empty batch still queues one query and answers with an empty list.
+      assertEquals(emptyList(), map.pixelsForLatLngs(emptyList()).await())
+      assertEquals(emptyList(), map.latLngsForPixels(emptyList()).await())
+      assertEquals(emptyList(), map.latLngsForPixelsUnwrapped(emptyList()).await())
+    } finally {
+      map.close().await()
+      runtime.close().await()
+    }
+  }
+
+  @Test
+  fun mapUnwrappedConversionsPreserveVisibleWorldCopies(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    val map =
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault()
+                  .initialExtent
+                  .copy(width = 1024u, height = 512u, scaleFactor = 1.0),
+              mapMode = MapMode.STATIC,
+            )
+        )
+        .await()
+
+    try {
+      map
+        .updateCamera(CameraUpdate(camera = CameraOptions(center = LatLng(0.0, 180.0), zoom = 0.0)))
+        .await()
+
+      // The viewport is two world copies wide, so its edges name the same wrapped longitude
+      // in different copies.
+      val points = listOf(ScreenPoint(0.0, 256.0), ScreenPoint(1024.0, 256.0))
+      val wrapped = map.latLngsForPixels(points).await()
+      val unwrapped = map.latLngsForPixelsUnwrapped(points).await()
+
+      assertTrue(wrapped.all { it.longitude in -180.0..180.0 })
+      assertTrue(unwrapped[1].longitude - unwrapped[0].longitude > 360.0)
+      assertTrue(map.latLngForPixel(points[1]).await().longitude in -180.0..180.0)
+      assertEquals(
+        unwrapped[1].longitude,
+        map.latLngForPixelUnwrapped(points[1]).await().longitude,
+        1e-10,
+      )
+    } finally {
+      map.close().await()
+      runtime.close().await()
+    }
+  }
 
   private fun imageCoordinates(): List<LatLng> =
     listOf(LatLng(0.0, 0.0), LatLng(0.0, 1.0), LatLng(1.0, 1.0), LatLng(1.0, 0.0))
 
-  private fun assertNear(expected: LatLng, actual: LatLng) {
-    assertEquals(expected.latitude, actual.latitude, 1e-6)
-    assertEquals(expected.longitude, actual.longitude, 1e-6)
+  private fun assertCommandFailed(completion: CommandCompletion, status: MaplibreStatus) {
+    assertEquals(CommandDisposition.FAILED, completion.disposition)
+    assertEquals(status, completion.status)
+    assertTrue(completion.diagnostic.isNotEmpty())
   }
 
   @Test
-  fun loadedStyleDocumentAndUrlReadBackWhatWasLoaded() {
+  fun loadedStyleDocumentAndUrlReadBackWhatWasLoaded(): Unit = runSuspendTest {
     val styleJson = "{\"version\":8,\"sources\":{},\"layers\":[]}"
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-          },
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+            )
         )
+        .await()
         .use { map ->
-          assertTrue(map.loadedStyleJson().isEmpty())
-          assertEquals("", map.styleUrl())
+          assertTrue(map.loadedStyleJson().await().isEmpty())
+          assertEquals("", map.styleUrl().await())
 
           // The document reads back byte-for-byte.
-          map.setStyleJson(styleJson.encodeToByteArray())
-          assertEquals(styleJson, map.loadedStyleJson().decodeToString())
+          map.setStyleJson(styleJson.encodeToByteArray()).await()
+          assertEquals(styleJson, map.loadedStyleJson().await().decodeToString())
           // Inline JSON clears the URL.
-          assertEquals("", map.styleUrl())
+          assertEquals("", map.styleUrl().await())
 
           // setStyleUrl records request state before the load can succeed; the document
           // still reports the style that last parsed.
-          map.setStyleUrl("https://example.com/style.json")
-          assertEquals("https://example.com/style.json", map.styleUrl())
-          assertEquals(styleJson, map.loadedStyleJson().decodeToString())
+          map.setStyleUrl("https://example.com/style.json").await()
+          assertEquals("https://example.com/style.json", map.styleUrl().await())
+          assertEquals(styleJson, map.loadedStyleJson().await().decodeToString())
         }
     }
   }

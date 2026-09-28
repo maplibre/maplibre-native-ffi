@@ -13,6 +13,10 @@ class MaplibreExceptionTest {
     assertEquals(MaplibreStatus.WRONG_THREAD, MaplibreStatus.fromNative(-3))
     assertEquals(MaplibreStatus.UNSUPPORTED, MaplibreStatus.fromNative(-4))
     assertEquals(MaplibreStatus.NATIVE_ERROR, MaplibreStatus.fromNative(-5))
+    assertEquals(MaplibreStatus.CANCELLED, MaplibreStatus.fromNative(-6))
+    assertEquals(MaplibreStatus.BUSY, MaplibreStatus.fromNative(-7))
+    assertEquals(MaplibreStatus.TARGET_LOST, MaplibreStatus.fromNative(-8))
+    assertEquals(MaplibreStatus.NOT_READY, MaplibreStatus.fromNative(-9))
     assertEquals(MaplibreStatus(-127), MaplibreStatus.fromNative(-127))
   }
 

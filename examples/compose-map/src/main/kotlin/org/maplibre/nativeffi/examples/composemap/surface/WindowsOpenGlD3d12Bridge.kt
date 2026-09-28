@@ -319,7 +319,8 @@ private constructor(private val kind: Kind, private val label: String) : AutoClo
       WglContextHandles(
         deviceContext = NativeHandle(deviceContext),
         shareContext = NativeHandle(shareContext),
-        // Null makes the native WGL descriptor resolve entry points from the current context.
+        // Null makes the native WGL descriptor resolve entry points from the current
+        // context.
         getProcAddress = NativeHandle(0),
       )
 

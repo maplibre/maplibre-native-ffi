@@ -16,7 +16,7 @@ import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.system.MemoryUtil.memAddress
 import org.lwjgl.system.macosx.CoreFoundation
-import org.maplibre.nativeffi.render.RenderBackend
+import org.maplibre.nativeffi.generated.RenderBackendFlag
 
 internal class MetalContext
 private constructor(
@@ -29,7 +29,7 @@ private constructor(
 
   override fun window(): Long = window
 
-  override fun backend(): RenderBackend = RenderBackend.METAL
+  override fun backend(): RenderBackendFlag = RenderBackendFlag.METAL
 
   fun deviceAddress(): Long = device
 

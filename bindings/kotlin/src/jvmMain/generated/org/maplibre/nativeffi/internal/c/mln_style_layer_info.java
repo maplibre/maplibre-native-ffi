@@ -16,10 +16,11 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  * {@snippet lang=c :
  * struct mln_style_layer_info {
  *     uint32_t size;
- *     mln_buffer_view id;
+ *     uint32_t reserved;
  *     mln_buffer_view type;
- *     mln_buffer_view source_id;
- *     mln_buffer_view source_layer;
+ *     double min_zoom;
+ *     double max_zoom;
+ *     uint32_t visibility;
  * }
  * }
  */
@@ -31,11 +32,12 @@ public class mln_style_layer_info {
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
         MapLibreNativeC.C_INT.withName("size"),
-        MemoryLayout.paddingLayout(4),
-        mln_buffer_view.layout().withName("id"),
+        MapLibreNativeC.C_INT.withName("reserved"),
         mln_buffer_view.layout().withName("type"),
-        mln_buffer_view.layout().withName("source_id"),
-        mln_buffer_view.layout().withName("source_layer")
+        MapLibreNativeC.C_DOUBLE.withName("min_zoom"),
+        MapLibreNativeC.C_DOUBLE.withName("max_zoom"),
+        MapLibreNativeC.C_INT.withName("visibility"),
+        MemoryLayout.paddingLayout(4)
     ).withName("mln_style_layer_info");
 
     /**
@@ -89,48 +91,48 @@ public class mln_style_layer_info {
         struct.set(size$LAYOUT, size$OFFSET, fieldValue);
     }
 
-    private static final GroupLayout id$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("id"));
+    private static final OfInt reserved$LAYOUT = (OfInt)$LAYOUT.select(groupElement("reserved"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * mln_buffer_view id
+     * uint32_t reserved
      * }
      */
-    public static final GroupLayout id$layout() {
-        return id$LAYOUT;
+    public static final OfInt reserved$layout() {
+        return reserved$LAYOUT;
     }
 
-    private static final long id$OFFSET = $LAYOUT.byteOffset(groupElement("id"));
+    private static final long reserved$OFFSET = $LAYOUT.byteOffset(groupElement("reserved"));
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * mln_buffer_view id
+     * uint32_t reserved
      * }
      */
-    public static final long id$offset() {
-        return id$OFFSET;
+    public static final long reserved$offset() {
+        return reserved$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * mln_buffer_view id
+     * uint32_t reserved
      * }
      */
-    public static MemorySegment id(MemorySegment struct) {
-        return struct.asSlice(id$OFFSET, id$LAYOUT.byteSize());
+    public static int reserved(MemorySegment struct) {
+        return struct.get(reserved$LAYOUT, reserved$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * mln_buffer_view id
+     * uint32_t reserved
      * }
      */
-    public static void id(MemorySegment struct, MemorySegment fieldValue) {
-        MemorySegment.copy(fieldValue, 0L, struct, id$OFFSET, id$LAYOUT.byteSize());
+    public static void reserved(MemorySegment struct, int fieldValue) {
+        struct.set(reserved$LAYOUT, reserved$OFFSET, fieldValue);
     }
 
     private static final GroupLayout type$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("type"));
@@ -177,92 +179,136 @@ public class mln_style_layer_info {
         MemorySegment.copy(fieldValue, 0L, struct, type$OFFSET, type$LAYOUT.byteSize());
     }
 
-    private static final GroupLayout source_id$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("source_id"));
+    private static final OfDouble min_zoom$LAYOUT = (OfDouble)$LAYOUT.select(groupElement("min_zoom"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * mln_buffer_view source_id
+     * double min_zoom
      * }
      */
-    public static final GroupLayout source_id$layout() {
-        return source_id$LAYOUT;
+    public static final OfDouble min_zoom$layout() {
+        return min_zoom$LAYOUT;
     }
 
-    private static final long source_id$OFFSET = $LAYOUT.byteOffset(groupElement("source_id"));
+    private static final long min_zoom$OFFSET = $LAYOUT.byteOffset(groupElement("min_zoom"));
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * mln_buffer_view source_id
+     * double min_zoom
      * }
      */
-    public static final long source_id$offset() {
-        return source_id$OFFSET;
+    public static final long min_zoom$offset() {
+        return min_zoom$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * mln_buffer_view source_id
+     * double min_zoom
      * }
      */
-    public static MemorySegment source_id(MemorySegment struct) {
-        return struct.asSlice(source_id$OFFSET, source_id$LAYOUT.byteSize());
+    public static double min_zoom(MemorySegment struct) {
+        return struct.get(min_zoom$LAYOUT, min_zoom$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * mln_buffer_view source_id
+     * double min_zoom
      * }
      */
-    public static void source_id(MemorySegment struct, MemorySegment fieldValue) {
-        MemorySegment.copy(fieldValue, 0L, struct, source_id$OFFSET, source_id$LAYOUT.byteSize());
+    public static void min_zoom(MemorySegment struct, double fieldValue) {
+        struct.set(min_zoom$LAYOUT, min_zoom$OFFSET, fieldValue);
     }
 
-    private static final GroupLayout source_layer$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("source_layer"));
+    private static final OfDouble max_zoom$LAYOUT = (OfDouble)$LAYOUT.select(groupElement("max_zoom"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * mln_buffer_view source_layer
+     * double max_zoom
      * }
      */
-    public static final GroupLayout source_layer$layout() {
-        return source_layer$LAYOUT;
+    public static final OfDouble max_zoom$layout() {
+        return max_zoom$LAYOUT;
     }
 
-    private static final long source_layer$OFFSET = $LAYOUT.byteOffset(groupElement("source_layer"));
+    private static final long max_zoom$OFFSET = $LAYOUT.byteOffset(groupElement("max_zoom"));
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * mln_buffer_view source_layer
+     * double max_zoom
      * }
      */
-    public static final long source_layer$offset() {
-        return source_layer$OFFSET;
+    public static final long max_zoom$offset() {
+        return max_zoom$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * mln_buffer_view source_layer
+     * double max_zoom
      * }
      */
-    public static MemorySegment source_layer(MemorySegment struct) {
-        return struct.asSlice(source_layer$OFFSET, source_layer$LAYOUT.byteSize());
+    public static double max_zoom(MemorySegment struct) {
+        return struct.get(max_zoom$LAYOUT, max_zoom$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * mln_buffer_view source_layer
+     * double max_zoom
      * }
      */
-    public static void source_layer(MemorySegment struct, MemorySegment fieldValue) {
-        MemorySegment.copy(fieldValue, 0L, struct, source_layer$OFFSET, source_layer$LAYOUT.byteSize());
+    public static void max_zoom(MemorySegment struct, double fieldValue) {
+        struct.set(max_zoom$LAYOUT, max_zoom$OFFSET, fieldValue);
+    }
+
+    private static final OfInt visibility$LAYOUT = (OfInt)$LAYOUT.select(groupElement("visibility"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * uint32_t visibility
+     * }
+     */
+    public static final OfInt visibility$layout() {
+        return visibility$LAYOUT;
+    }
+
+    private static final long visibility$OFFSET = $LAYOUT.byteOffset(groupElement("visibility"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * uint32_t visibility
+     * }
+     */
+    public static final long visibility$offset() {
+        return visibility$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * uint32_t visibility
+     * }
+     */
+    public static int visibility(MemorySegment struct) {
+        return struct.get(visibility$LAYOUT, visibility$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * uint32_t visibility
+     * }
+     */
+    public static void visibility(MemorySegment struct, int fieldValue) {
+        struct.set(visibility$LAYOUT, visibility$OFFSET, fieldValue);
     }
 
     /**

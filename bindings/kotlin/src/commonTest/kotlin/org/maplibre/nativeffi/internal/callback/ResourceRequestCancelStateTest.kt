@@ -14,8 +14,6 @@ import org.maplibre.nativeffi.error.MaplibreStatus
 
 @OptIn(ExperimentalAtomicApi::class)
 class ResourceRequestCancelStateTest {
-  // BND-198.
-
   @Test
   fun dispatchRunsTheCallbackOnceAndContainsItsFailure() {
     val registration = ResourceRequestCancelRegistration()

@@ -7,154 +7,170 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.Maplibre
+import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
-import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.generated.AmbientCacheOperation
+import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.NetworkStatus
+import org.maplibre.nativeffi.generated.OfflineGeometryRegionDefinition
+import org.maplibre.nativeffi.generated.OfflineRegionDefinition
+import org.maplibre.nativeffi.generated.OfflineRegionDefinitionData
+import org.maplibre.nativeffi.generated.OfflineRegionDownloadState
+import org.maplibre.nativeffi.generated.ResourceErrorReason
+import org.maplibre.nativeffi.generated.ResourceKind
+import org.maplibre.nativeffi.generated.ResourceProvider
+import org.maplibre.nativeffi.generated.ResourceProviderDecision
+import org.maplibre.nativeffi.generated.ResourceResponse
+import org.maplibre.nativeffi.generated.ResourceResponseStatus
+import org.maplibre.nativeffi.generated.ResourceTransform
+import org.maplibre.nativeffi.generated.RuntimeEvent
+import org.maplibre.nativeffi.generated.RuntimeEventPayload
+import org.maplibre.nativeffi.generated.RuntimeEventSourceType
+import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.map.MapOptions
-import org.maplibre.nativeffi.offline.OfflineRegionDefinition
-import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
-import org.maplibre.nativeffi.resource.ResourceErrorReason
-import org.maplibre.nativeffi.resource.ResourceKind
-import org.maplibre.nativeffi.resource.ResourceProviderCallback
-import org.maplibre.nativeffi.resource.ResourceProviderDecision
 import org.maplibre.nativeffi.resource.ResourceRequestHandle
-import org.maplibre.nativeffi.resource.ResourceResponse
-import org.maplibre.nativeffi.resource.ResourceResponseStatus
-import org.maplibre.nativeffi.resource.ResourceTransformCallback
+import org.maplibre.nativeffi.sleepMillis
 
 @OptIn(ExperimentalAtomicApi::class)
 class RuntimeHandleTest {
   @Test
-  fun runtimeRunsOnceAndCloses() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
+  fun runtimeRunsOnceAndCloses(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
 
     assertFalse(runtime.isClosed)
-    runtime.pump(0)
-    runtime.close()
-    runtime.close()
+    runtime.barrier().await()
+    val tornDown = runtime.close()
+    // A second close reports the same teardown instead of starting another one.
+    assertEquals(tornDown, runtime.close())
 
     assertTrue(runtime.isClosed)
-    assertFailsWith<InvalidStateException> { runtime.pump(0) }
+    assertFailsWith<InvalidStateException> { runtime.barrier().await() }
   }
 
   @Test
-  fun freshRuntimeDrainsAnEmptyBatch() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      val batch = runtime.drainEvents()
-      assertEquals(emptyList(), batch.events)
-      assertEquals(0L, batch.remainingCount)
+  fun runtimeCloseReportsTheEndOfNativeTeardown(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    val map =
+      runtime
+        .mapCreate(
+          GeneratedApi.mapOptionsDefault()
+            .copy(
+              initialExtent =
+                GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+            )
+        )
+        .await()
+    map.setStyleUrl("custom://never-served.json").await()
+    map.close()
+
+    // The report arrives only after the released map's teardown finishes too.
+    runtime.close().await()
+
+    assertTrue(runtime.isClosed)
+    assertTrue(map.isClosed)
+  }
+
+  @Test
+  fun freshRuntimeDrainsAnEmptyBatch(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+      assertEquals(emptyList(), runtime.drainEvents().use { it.get().events })
     }
   }
 
   @Test
-  fun ambientCacheOperationRetainsRuntimeUntilDiscarded() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val operation = runtime.startAmbientCacheOperation(AmbientCacheOperation.INVALIDATE)
-
-    assertFalse(operation.isClosed)
-    assertFailsWith<InvalidStateException> { runtime.close() }
-
-    operation.close()
-    operation.close()
-
-    assertTrue(operation.isClosed)
+  fun ambientCacheOperationRemainsUsableAfterRuntimeClose(): Unit = runSuspendTest {
+    val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
+    val completion = runtime.runAmbientCacheOperation(AmbientCacheOperation.INVALIDATE)
     runtime.close()
     assertTrue(runtime.isClosed)
+    completion.await()
   }
 
   @Test
-  fun setMaximumAmbientCacheSizeReachesNativeAndRejectsNegativeSize() {
-    val runtime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
-    val operation = runtime.startSetMaximumAmbientCacheSize(8L shl 20)
+  fun setMaximumAmbientCacheSizeReachesNative(): Unit = runSuspendTest {
+    val runtime =
+      GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:"))
+    runtime.setMaximumAmbientCacheSize(8uL shl 20).await()
 
-    assertEquals(OfflineOperationKind.SET_MAXIMUM_AMBIENT_CACHE_SIZE, operation.kind)
-    assertFalse(operation.isClosed)
-    operation.close()
-
-    // Binding-owned validation fails before crossing into C.
-    assertFailsWith<InvalidArgumentException> { runtime.startSetMaximumAmbientCacheSize(-1L) }
     runtime.close()
   }
 
   @Test
-  fun offlineDownloadStateUnknownRawValueRejectsBeforeNativeCall() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+  fun offlineDownloadStateUnknownRawValueIsRejectedByNative(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
       assertFailsWith<InvalidArgumentException> {
-        runtime.startSetOfflineRegionDownloadState(1, OfflineRegionDownloadState(900))
+        runtime.offlineRegionSetDownloadState(1, OfflineRegionDownloadState(900u)).await()
       }
     }
   }
 
   @Test
-  fun geometryOfflineRegionDefinitionStartsOperation() {
-    RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" }).use { runtime ->
-      val operation =
-        runtime.startCreateOfflineRegion(
-          OfflineRegionDefinition.GeometryRegion(
-            "custom://style.json",
-            "{\"type\":\"Point\",\"coordinates\":[2,1]}".encodeToByteArray(),
-            0.0,
-            1.0,
-            1.0f,
-            false,
-          ),
-          ByteArray(0),
-        )
-      assertEquals(OfflineOperationKind.REGION_CREATE, operation.kind)
-      assertEquals(OfflineOperationResultKind.REGION, operation.resultKind)
-      operation.close()
-      assertTrue(operation.isClosed)
-    }
+  fun geometryOfflineRegionDefinitionStartsOperation(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:"))
+      .use { runtime ->
+        val region =
+          runtime
+            .offlineRegionCreate(
+              OfflineRegionDefinition(
+                OfflineRegionDefinitionData.Geometry(
+                  OfflineGeometryRegionDefinition(
+                    "custom://style.json",
+                    "{\"type\":\"Point\",\"coordinates\":[2,1]}".encodeToByteArray(),
+                    0.0,
+                    1.0,
+                    1.0f,
+                    false,
+                  )
+                )
+              ),
+              ByteArray(0),
+            )
+            .await()
+        assertTrue(region.id > 0)
+      }
   }
 
   @Test
-  fun offlineRegionsListCompletesAndConsumesOperation() {
-    RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" }).use { runtime ->
-      val operation = runtime.startOfflineRegions()
-
-      val completed = waitForOperation(runtime, operation)
-      assertEquals(OfflineOperationKind.REGIONS_LIST, completed.operationKind)
-      assertEquals(OfflineOperationResultKind.REGION_LIST, completed.resultKind)
-
-      assertTrue(runtime.takeOfflineRegionsResult(operation).isEmpty())
-      assertTrue(operation.isClosed)
-      assertFailsWith<InvalidStateException> { runtime.takeOfflineRegionsResult(operation) }
-    }
+  fun offlineRegionsListCompletesAndConsumesOperation(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:"))
+      .use { runtime -> assertTrue(runtime.offlineRegionsList().await().isEmpty()) }
   }
 
-  // BND-155.
   @Test
-  fun resourceProviderSeesSchemeAliasAndItsResolvedUrl() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+  fun resourceProviderSeesSchemeAliasAndItsResolvedUrl(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
       val resolvedUrl = AtomicReference<String?>(null)
-      runtime.setResourceProvider(
-        ResourceProviderCallback { request, handle ->
-          if (request.requestedUrl != "maplibre://maps/style") {
-            return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
-          }
-          resolvedUrl.store(request.resolvedUrl)
-          handle.complete(
-            ResourceResponse(ResourceResponseStatus.OK).apply {
-              bytes = STYLE_JSON.encodeToByteArray()
-            }
+      runtime
+        .setResourceProvider(
+          ResourceProvider(
+            callback = provider@{ request, handle ->
+                if (request.requestedUrl != "maplibre://maps/style") {
+                  return@provider ResourceProviderDecision.PASS_THROUGH
+                }
+                resolvedUrl.store(request.resolvedUrl)
+                handle.resourceRequestComplete(
+                  ResourceResponse(ResourceResponseStatus.OK)
+                    .copy(bytes = EMPTY_STYLE_JSON.encodeToByteArray())
+                )
+                ResourceProviderDecision.HANDLE
+              }
           )
-          ResourceProviderDecision.HANDLE
-        }
-      )
-      val map =
-        MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-          },
         )
+        .await()
+      val map =
+        runtime
+          .mapCreate(
+            GeneratedApi.mapOptionsDefault()
+              .copy(
+                initialExtent =
+                  GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+              )
+          )
+          .await()
       try {
-        map.setStyleUrl("maplibre://maps/style")
+        map.setStyleUrl("maplibre://maps/style").await()
         assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED))
         assertEquals("https://demotiles.maplibre.org/style.json", resolvedUrl.load())
       } finally {
@@ -164,48 +180,52 @@ class RuntimeHandleTest {
   }
 
   @Test
-  fun resourceProviderCompletesStyleRequestThroughRuntime() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+  fun resourceProviderCompletesStyleRequestThroughRuntime(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
       val calls = AtomicInt(0)
       val callbackError = AtomicReference<Throwable?>(null)
-      runtime.setResourceProvider(
-        ResourceProviderCallback { request, handle ->
-          try {
-            if (request.requestedUrl != "custom://style.json") {
-              return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
-            }
-            calls.addAndFetch(1)
-            assertEquals(ResourceKind.STYLE, request.kind)
-            handle.complete(
-              ResourceResponse(ResourceResponseStatus.OK).apply {
-                bytes = STYLE_JSON.encodeToByteArray()
+      runtime
+        .setResourceProvider(
+          ResourceProvider(
+            callback = provider@{ request, handle ->
+                try {
+                  if (request.requestedUrl != "custom://style.json") {
+                    return@provider ResourceProviderDecision.PASS_THROUGH
+                  }
+                  calls.addAndFetch(1)
+                  assertEquals(ResourceKind.STYLE, request.kind)
+                  handle.resourceRequestComplete(
+                    ResourceResponse(ResourceResponseStatus.OK)
+                      .copy(bytes = EMPTY_STYLE_JSON.encodeToByteArray())
+                  )
+                  ResourceProviderDecision.HANDLE
+                } catch (error: Throwable) {
+                  callbackError.store(error)
+                  throw error
+                }
               }
-            )
-            ResourceProviderDecision.HANDLE
-          } catch (error: Throwable) {
-            callbackError.store(error)
-            throw error
-          }
-        }
-      )
-      val map =
-        MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-          },
+          )
         )
+        .await()
+      val map =
+        runtime
+          .mapCreate(
+            GeneratedApi.mapOptionsDefault()
+              .copy(
+                initialExtent =
+                  GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+              )
+          )
+          .await()
       try {
-        map.setStyleUrl("custom://style.json")
+        map.setStyleUrl("custom://style.json").await()
         val event = waitForMapEventRecord(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
         val copiedMessage = event.message
         assertEquals(RuntimeEventSourceType.MAP, event.sourceType)
-        assertEquals(map, event.mapSource)
-        assertNull(event.runtimeSource)
+        assertTrue(event.source != 0uL)
         assertEquals(RuntimeEventPayload.None, event.payload)
         // A drained value stays readable after the next drain ends the batch window.
-        runtime.drainEvents()
+        runtime.drainEvents().use { it.get().events }
         assertEquals(copiedMessage, event.message)
         callbackError.load()?.let { throw AssertionError("resource provider callback failed", it) }
         assertEquals(1, calls.load())
@@ -216,38 +236,43 @@ class RuntimeHandleTest {
   }
 
   @Test
-  fun handledResourceRequestCanCompleteAfterTheProviderReturns() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+  fun handledResourceRequestCanCompleteAfterTheProviderReturns(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
       val handledRequest = AtomicReference<ResourceRequestHandle?>(null)
-      runtime.setResourceProvider(
-        ResourceProviderCallback { request, handle ->
-          if (request.requestedUrl != "custom://deferred-style.json") {
-            return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
-          }
-          handledRequest.store(handle)
-          ResourceProviderDecision.HANDLE
-        }
-      )
+      runtime
+        .setResourceProvider(
+          ResourceProvider(
+            callback = provider@{ request, handle ->
+                if (request.requestedUrl != "custom://deferred-style.json") {
+                  return@provider ResourceProviderDecision.PASS_THROUGH
+                }
+                handledRequest.store(handle)
+                ResourceProviderDecision.HANDLE
+              }
+          )
+        )
+        .await()
       val map =
-        MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-          },
-        )
+        runtime
+          .mapCreate(
+            GeneratedApi.mapOptionsDefault()
+              .copy(
+                initialExtent =
+                  GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+              )
+          )
+          .await()
       try {
-        map.setStyleUrl("custom://deferred-style.json")
+        map.setStyleUrl("custom://deferred-style.json").await()
         val handle = waitForHandledRequest(runtime, handledRequest)
-        assertFalse(handle.isCancelled())
-        handle.complete(
-          ResourceResponse(ResourceResponseStatus.OK).apply {
-            bytes = STYLE_JSON.encodeToByteArray()
-          }
+        assertFalse(handle.resourceRequestCancelled())
+        handle.resourceRequestComplete(
+          ResourceResponse(ResourceResponseStatus.OK)
+            .copy(bytes = EMPTY_STYLE_JSON.encodeToByteArray())
         )
-        assertFailsWith<InvalidStateException> { handle.isCancelled() }
+        assertFalse(handle.resourceRequestCancelled())
         assertFailsWith<InvalidStateException> {
-          handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
+          handle.resourceRequestComplete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
         }
         assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED))
       } finally {
@@ -257,40 +282,46 @@ class RuntimeHandleTest {
   }
 
   @Test
-  fun resourceErrorBecomesACopiedMapLoadingFailureEvent() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      runtime.setResourceProvider(
-        ResourceProviderCallback { request, handle ->
-          if (request.requestedUrl != "custom://error-style.json") {
-            return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
-          }
-          handle.complete(
-            ResourceResponse(ResourceResponseStatus.ERROR).apply {
-              errorReason = ResourceErrorReason.NOT_FOUND
-              errorMessage = "custom style failed"
-            }
+  fun resourceErrorBecomesACopiedMapLoadingFailureEvent(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+      runtime
+        .setResourceProvider(
+          ResourceProvider(
+            callback = provider@{ request, handle ->
+                if (request.requestedUrl != "custom://error-style.json") {
+                  return@provider ResourceProviderDecision.PASS_THROUGH
+                }
+                handle.resourceRequestComplete(
+                  ResourceResponse(ResourceResponseStatus.ERROR)
+                    .copy(
+                      errorReason = ResourceErrorReason.NOT_FOUND,
+                      errorMessage = "custom style failed",
+                    )
+                )
+                ResourceProviderDecision.HANDLE
+              }
           )
-          ResourceProviderDecision.HANDLE
-        }
-      )
-      val map =
-        MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-          },
         )
+        .await()
+      val map =
+        runtime
+          .mapCreate(
+            GeneratedApi.mapOptionsDefault()
+              .copy(
+                initialExtent =
+                  GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+              )
+          )
+          .await()
       try {
-        map.setStyleUrl("custom://error-style.json")
+        map.setStyleUrl("custom://error-style.json").await()
         val event = waitForMapEventRecord(runtime, map, RuntimeEventType.MAP_LOADING_FAILED)
         val copiedMessage = event.message
         assertEquals(RuntimeEventSourceType.MAP, event.sourceType)
-        assertEquals(map, event.mapSource)
-        assertNull(event.runtimeSource)
+        assertTrue(event.source != 0uL)
         assertTrue(copiedMessage.contains("custom style failed"))
         // A drained value stays readable after the next drain ends the batch window.
-        runtime.drainEvents()
+        runtime.drainEvents().use { it.get().events }
         assertEquals(copiedMessage, event.message)
       } finally {
         map.close()
@@ -299,205 +330,200 @@ class RuntimeHandleTest {
   }
 
   @Test
-  fun closingAMapCancelsItsOutstandingResourceRequest() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+  fun closingAMapCancelsItsOutstandingResourceRequest(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
       val handledRequest = AtomicReference<ResourceRequestHandle?>(null)
-      runtime.setResourceProvider(
-        ResourceProviderCallback { request, handle ->
-          if (request.requestedUrl != "custom://cancelled-style.json") {
-            return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
-          }
-          handledRequest.store(handle)
-          ResourceProviderDecision.HANDLE
-        }
-      )
-      val map =
-        MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-          },
+      runtime
+        .setResourceProvider(
+          ResourceProvider(
+            callback = provider@{ request, handle ->
+                if (request.requestedUrl != "custom://cancelled-style.json") {
+                  return@provider ResourceProviderDecision.PASS_THROUGH
+                }
+                handledRequest.store(handle)
+                ResourceProviderDecision.HANDLE
+              }
+          )
         )
-      map.setStyleUrl("custom://cancelled-style.json")
+        .await()
+      val map =
+        runtime
+          .mapCreate(
+            GeneratedApi.mapOptionsDefault()
+              .copy(
+                initialExtent =
+                  GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+              )
+          )
+          .await()
+      map.setStyleUrl("custom://cancelled-style.json").await()
       val handle = waitForHandledRequest(runtime, handledRequest)
 
       map.close()
 
       assertTrue(waitForRequestCancellation(runtime, handle))
       assertFailsWith<InvalidStateException> {
-        handle.complete(
-          ResourceResponse(ResourceResponseStatus.OK).apply {
-            bytes = STYLE_JSON.encodeToByteArray()
-          }
+        handle.resourceRequestComplete(
+          ResourceResponse(ResourceResponseStatus.OK)
+            .copy(bytes = EMPTY_STYLE_JSON.encodeToByteArray())
         )
       }
       handle.close()
     }
   }
 
-  // BND-198.
   @Test
-  fun cancelCallbackRunsOnceWhenTheMapDiscardsItsRequest() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+  fun cancelCallbackRunsOnceWhenTheMapDiscardsItsRequest(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
       val handledRequest = captureHandledRequest(runtime, "custom://cancel-callback-style.json")
       val map = createSmallMap(runtime)
-      map.setStyleUrl("custom://cancel-callback-style.json")
+      map.setStyleUrl("custom://cancel-callback-style.json").await()
       val handle = waitForHandledRequest(runtime, handledRequest)
       val cancels = AtomicInt(0)
       val rejectedCancels = AtomicInt(0)
-      handle.setCancelCallback { cancels.addAndFetch(1) }
+      handle.resourceRequestSetCancelCallback { cancels.addAndFetch(1) }
       // The request keeps its first callback.
       assertFailsWith<InvalidStateException> {
-        handle.setCancelCallback { rejectedCancels.addAndFetch(1) }
+        handle.resourceRequestSetCancelCallback { rejectedCancels.addAndFetch(1) }
       }
 
-      map.close()
+      map.close().await()
 
-      assertTrue(
-        waitForCondition {
-          runtime.pump(1)
-          cancels.load() == 1
-        }
-      )
-      assertTrue(handle.isCancelled())
-      repeat(CANCEL_SETTLE_PUMPS) {
-        runtime.pump(1)
-        waitForAsyncTestWork()
+      assertTrue(waitForCondition { cancels.load() == 1 })
+      assertTrue(handle.resourceRequestCancelled())
+      repeat(CANCEL_SETTLE_ROUNDS) {
+        runtime.barrier().await()
+        sleepMillis(1)
       }
       assertEquals(1, cancels.load())
       assertEquals(0, rejectedCancels.load())
 
       handle.close()
 
-      assertFailsWith<InvalidStateException> { handle.setCancelCallback {} }
+      assertFailsWith<InvalidStateException> { handle.resourceRequestSetCancelCallback {} }
     }
   }
 
-  // BND-198.
   @Test
-  fun cancelCallbackMayCloseItsOwnRequest() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+  fun cancelCallbackMayCloseItsOwnRequest(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
       val handledRequest = captureHandledRequest(runtime, "custom://self-closing-style.json")
       val map = createSmallMap(runtime)
-      map.setStyleUrl("custom://self-closing-style.json")
+      map.setStyleUrl("custom://self-closing-style.json").await()
       val handle = waitForHandledRequest(runtime, handledRequest)
       val closes = AtomicInt(0)
-      handle.setCancelCallback {
+      handle.resourceRequestSetCancelCallback {
         handle.close()
         closes.addAndFetch(1)
       }
 
-      map.close()
+      map.close().await()
 
-      assertTrue(
-        waitForCondition {
-          runtime.pump(1)
-          closes.load() == 1
-        }
-      )
-      assertFailsWith<InvalidStateException> { handle.isCancelled() }
+      assertTrue(waitForCondition { closes.load() == 1 })
+      assertFailsWith<InvalidStateException> { handle.resourceRequestCancelled() }
       handle.close()
     }
   }
 
-  // BND-198.
   @Test
-  fun cancelCallbackRegisteredAfterCancellationRunsBeforeRegistrationReturns() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+  fun lateCancelRegistrationReportsCancellationWithoutInvokingCallback(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
       val handledRequest =
         captureHandledRequest(runtime, "custom://late-cancel-callback-style.json")
       val map = createSmallMap(runtime)
-      map.setStyleUrl("custom://late-cancel-callback-style.json")
+      map.setStyleUrl("custom://late-cancel-callback-style.json").await()
       val handle = waitForHandledRequest(runtime, handledRequest)
-      map.close()
+      map.close().await()
       assertTrue(waitForRequestCancellation(runtime, handle))
 
       val cancels = AtomicInt(0)
-      val completionFailure = AtomicReference<Throwable?>(null)
-      handle.setCancelCallback {
-        cancels.addAndFetch(1)
-        completionFailure.store(
-          runCatching { handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT)) }
-            .exceptionOrNull()
-        )
+      assertTrue(handle.resourceRequestSetCancelCallback { cancels.addAndFetch(1) })
+      assertEquals(0, cancels.load())
+      assertFailsWith<InvalidStateException> {
+        handle.resourceRequestComplete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
       }
-
-      assertEquals(1, cancels.load())
-      assertTrue(completionFailure.load() is InvalidStateException)
       handle.close()
     }
   }
 
-  // BND-198.
   @Test
-  fun cancelCallbackStaysUninvokedForACompletedRequest() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+  fun cancelCallbackStaysUninvokedForACompletedRequest(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
       val handledRequest = captureHandledRequest(runtime, "custom://completed-cancel-style.json")
       val map = createSmallMap(runtime)
-      map.setStyleUrl("custom://completed-cancel-style.json")
+      map.setStyleUrl("custom://completed-cancel-style.json").await()
       val handle = waitForHandledRequest(runtime, handledRequest)
       val cancels = AtomicInt(0)
-      handle.setCancelCallback { cancels.addAndFetch(1) }
-      handle.complete(
-        ResourceResponse(ResourceResponseStatus.OK).apply { bytes = STYLE_JSON.encodeToByteArray() }
+      handle.resourceRequestSetCancelCallback { cancels.addAndFetch(1) }
+      handle.resourceRequestComplete(
+        ResourceResponse(ResourceResponseStatus.OK)
+          .copy(bytes = EMPTY_STYLE_JSON.encodeToByteArray())
       )
       assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED))
 
       // MapLibre runs its cancel hook on every request teardown, including a completed one.
-      map.close()
+      map.close().await()
 
-      repeat(CANCEL_SETTLE_PUMPS) {
-        runtime.pump(1)
-        waitForAsyncTestWork()
+      repeat(CANCEL_SETTLE_ROUNDS) {
+        runtime.barrier().await()
+        sleepMillis(1)
       }
       assertEquals(0, cancels.load())
     }
   }
 
-  // BND-154.
   @Test
-  fun resourceProviderIsConsultedUntilClearedWhileMapIsLive() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+  fun resourceProviderIsConsultedUntilClearedWhileMapIsLive(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
       val firstCalls = AtomicInt(0)
       val secondCalls = AtomicInt(0)
-      runtime.setResourceProvider(
-        ResourceProviderCallback { _, _ ->
-          firstCalls.addAndFetch(1)
-          ResourceProviderDecision.PASS_THROUGH
-        }
-      )
-      val map =
-        MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-          },
+      runtime
+        .setResourceProvider(
+          ResourceProvider(
+            callback = provider@{ _, _ ->
+                firstCalls.addAndFetch(1)
+                ResourceProviderDecision.PASS_THROUGH
+              }
+          )
         )
+        .await()
+      val map =
+        runtime
+          .mapCreate(
+            GeneratedApi.mapOptionsDefault()
+              .copy(
+                initialExtent =
+                  GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+              )
+          )
+          .await()
       try {
         loadUnservedStyle(runtime, map, "jar:file:/packaged/first.json")
         assertTrue(firstCalls.load() > 0)
 
-        runtime.setResourceProvider(
-          ResourceProviderCallback { _, _ ->
-            secondCalls.addAndFetch(1)
-            ResourceProviderDecision.PASS_THROUGH
-          }
-        )
+        runtime
+          .setResourceProvider(
+            ResourceProvider(
+              callback = provider@{ _, _ ->
+                  secondCalls.addAndFetch(1)
+                  ResourceProviderDecision.PASS_THROUGH
+                }
+            )
+          )
+          .await()
         val firstCallsAfterReplace = firstCalls.load()
         loadUnservedStyle(runtime, map, "jar:file:/packaged/second.json")
         assertTrue(secondCalls.load() > 0)
         assertEquals(firstCallsAfterReplace, firstCalls.load())
 
-        runtime.clearResourceProvider()
+        runtime.clearResourceProvider().await()
         val secondCallsAfterClear = secondCalls.load()
         loadUnservedStyle(runtime, map, "jar:file:/packaged/third.json")
         assertEquals(firstCallsAfterReplace, firstCalls.load())
         assertEquals(secondCallsAfterClear, secondCalls.load())
 
         // Clearing an already cleared provider stays a successful no-op.
-        runtime.clearResourceProvider()
+        runtime.clearResourceProvider().await()
       } finally {
         map.close()
       }
@@ -505,89 +531,96 @@ class RuntimeHandleTest {
   }
 
   @Test
-  fun resourceTransformRewritesStyleRequestsUntilCleared() {
-    val previousNetworkStatus = Maplibre.networkStatus
-    Maplibre.setNetworkStatus(NetworkStatus.ONLINE)
+  fun resourceTransformRewritesStyleRequestsUntilCleared(): Unit = runSuspendTest {
+    val previousNetworkStatus = GeneratedApi.networkStatusGet()
+    GeneratedApi.networkStatusSet(NetworkStatus.ONLINE)
     try {
-      RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
         val calls = AtomicInt(0)
         val lastUrl = AtomicReference<String?>(null)
         val lastKind = AtomicReference<ResourceKind?>(null)
-        runtime.setResourceTransform(
-          ResourceTransformCallback { request ->
-            lastUrl.store(request.url)
-            lastKind.store(request.kind)
-            calls.addAndFetch(1)
-            "unsupported://rewritten-style.json"
-          }
-        )
+        runtime
+          .setResourceTransform(
+            ResourceTransform(
+              callback = transform@{ kind, url, response ->
+                  calls.addAndFetch(1)
+                  lastUrl.store(url)
+                  lastKind.store(kind)
+                  GeneratedApi.resourceTransformResponseSetUrl(
+                    response,
+                    "unsupported://rewritten-style.json",
+                  )
+                }
+            )
+          )
+          .await()
         val map =
-          MapHandle.create(
-            runtime,
-            MapOptions().apply {
-              width = 64
-              height = 64
-            },
-          )
+          runtime
+            .mapCreate(
+              GeneratedApi.mapOptionsDefault()
+                .copy(
+                  initialExtent =
+                    GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+                )
+            )
+            .await()
         try {
-          map.setStyleUrl("http://example.invalid/original-style.json")
-          assertTrue(
-            waitForCondition {
-              runtime.pump(1)
-              calls.load() > 0
-            }
-          )
-          assertEquals(1, calls.load())
+          map.setStyleUrl("http://example.invalid/original-style.json").await()
+          waitForMapLoadingFailure(runtime, map)
+          val callsBeforeClear = calls.load()
+          assertTrue(callsBeforeClear > 0)
           assertEquals("http://example.invalid/original-style.json", lastUrl.load())
           assertEquals(ResourceKind.STYLE, lastKind.load())
 
-          runtime.clearResourceTransform()
-          map.setStyleUrl("unsupported://after-clear-style.json")
-          repeat(100) {
-            runtime.pump(1)
-            // Keep native loading moving while proving the retired transform stays retired.
-            runtime.drainEvents()
-            assertEquals(1, calls.load())
-          }
+          runtime.clearResourceTransform().await()
+          map.setStyleUrl("unsupported://after-clear-style.json").await()
+          waitForMapLoadingFailure(runtime, map, "unsupported://after-clear-style.json")
+          assertEquals(callsBeforeClear, calls.load())
         } finally {
-          map.close()
+          map.close().await()
         }
       }
     } finally {
-      Maplibre.setNetworkStatus(previousNetworkStatus)
+      GeneratedApi.networkStatusSet(previousNetworkStatus)
     }
   }
 
   @Test
-  fun passThroughResourceRequestExpiresAfterTheProviderReturns() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+  fun passThroughResourceRequestExpiresAfterTheProviderReturns(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
       val requestHandle = AtomicReference<ResourceRequestHandle?>(null)
-      runtime.setResourceProvider(
-        ResourceProviderCallback { request, handle ->
-          if (request.requestedUrl == "custom://pass-through-style.json") {
-            requestHandle.store(handle)
-          }
-          ResourceProviderDecision.PASS_THROUGH
-        }
-      )
-      val map =
-        MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-          },
+      runtime
+        .setResourceProvider(
+          ResourceProvider(
+            callback = provider@{ request, handle ->
+                if (request.requestedUrl == "custom://pass-through-style.json") {
+                  requestHandle.store(handle)
+                }
+                ResourceProviderDecision.PASS_THROUGH
+              }
+          )
         )
+        .await()
+      val map =
+        runtime
+          .mapCreate(
+            GeneratedApi.mapOptionsDefault()
+              .copy(
+                initialExtent =
+                  GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+              )
+          )
+          .await()
       try {
-        map.setStyleUrl("custom://pass-through-style.json")
+        map.setStyleUrl("custom://pass-through-style.json").await()
         val handle = waitForHandledRequest(runtime, requestHandle)
         assertEquals(
           RuntimeEventType.MAP_LOADING_FAILED,
           waitForMapEventRecord(runtime, map, RuntimeEventType.MAP_LOADING_FAILED).type,
         )
-        assertFailsWith<InvalidStateException> { handle.isCancelled() }
+        assertFailsWith<InvalidStateException> { handle.resourceRequestCancelled() }
         assertFailsWith<InvalidStateException> {
-          handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
+          handle.resourceRequestComplete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
         }
       } finally {
         map.close()
@@ -596,154 +629,152 @@ class RuntimeHandleTest {
   }
 
   @Test
-  fun runtimeCloseDuringResourceProviderCallbackRejectsBeforeNativeDestroy() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      val closeError = AtomicReference<Throwable?>(null)
-      runtime.setResourceProvider(
-        ResourceProviderCallback { request, _ ->
-          if (request.requestedUrl == "custom://close-during-provider.json") {
-            closeError.store(assertFailsWith<InvalidStateException> { runtime.close() })
-          }
-          ResourceProviderDecision.PASS_THROUGH
+  fun runtimeCloseDuringResourceProviderCallbackRejectsBeforeNativeDestroy(): Unit =
+    runSuspendTest {
+      GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+        val closeError = AtomicReference<Throwable?>(null)
+        runtime
+          .setResourceProvider(
+            ResourceProvider(
+              callback = provider@{ request, _ ->
+                  if (request.requestedUrl == "custom://close-during-provider.json") {
+                    closeError.store(assertFailsWith<InvalidStateException> { runtime.close() })
+                  }
+                  ResourceProviderDecision.PASS_THROUGH
+                }
+            )
+          )
+          .await()
+        val map =
+          runtime
+            .mapCreate(
+              GeneratedApi.mapOptionsDefault()
+                .copy(
+                  initialExtent =
+                    GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+                )
+            )
+            .await()
+        try {
+          map.setStyleUrl("custom://close-during-provider.json").await()
+          assertTrue(waitForCondition { closeError.load() != null })
+          assertFalse(runtime.isClosed)
+        } finally {
+          map.close()
         }
-      )
-      val map =
-        MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-          },
-        )
-      try {
-        map.setStyleUrl("custom://close-during-provider.json")
-        assertTrue(
-          waitForCondition {
-            runtime.pump(1)
-            closeError.load() != null
-          }
-        )
-        assertFalse(runtime.isClosed)
-      } finally {
-        map.close()
       }
     }
-  }
 
   @Test
-  fun runtimeCloseDuringResourceTransformCallbackRejectsBeforeNativeDestroy() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      val closeError = AtomicReference<Throwable?>(null)
-      runtime.setResourceTransform(
-        ResourceTransformCallback { request ->
-          if (request.url == "http://example.invalid/close-during-transform.json") {
-            closeError.store(assertFailsWith<InvalidStateException> { runtime.close() })
-          }
-          "unsupported://close-during-transform.json"
+  fun runtimeCloseDuringResourceTransformCallbackRejectsBeforeNativeDestroy(): Unit =
+    runSuspendTest {
+      GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+        val closeError = AtomicReference<Throwable?>(null)
+        runtime
+          .setResourceTransform(
+            ResourceTransform(
+              callback = transform@{ kind, url, response ->
+                  if (url == "http://example.invalid/close-during-transform.json") {
+                    closeError.store(assertFailsWith<InvalidStateException> { runtime.close() })
+                  }
+                  GeneratedApi.resourceTransformResponseSetUrl(
+                    response,
+                    "unsupported://close-during-transform.json",
+                  )
+                }
+            )
+          )
+          .await()
+        val map =
+          runtime
+            .mapCreate(
+              GeneratedApi.mapOptionsDefault()
+                .copy(
+                  initialExtent =
+                    GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+                )
+            )
+            .await()
+        try {
+          map.setStyleUrl("http://example.invalid/close-during-transform.json").await()
+          assertTrue(waitForCondition { closeError.load() != null })
+          assertFalse(runtime.isClosed)
+        } finally {
+          map.close()
         }
-      )
-      val map =
-        MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-          },
-        )
-      try {
-        map.setStyleUrl("http://example.invalid/close-during-transform.json")
-        assertTrue(
-          waitForCondition {
-            runtime.pump(1)
-            closeError.load() != null
-          }
-        )
-        assertFalse(runtime.isClosed)
-      } finally {
-        map.close()
       }
     }
-  }
 
-  private fun waitForOperation(
-    runtime: RuntimeHandle,
-    operation: OfflineOperationHandle<*>,
-  ): RuntimeEventPayload.OfflineOperationCompleted {
-    repeat(10_000) {
-      runtime.pump(0)
-      for (event in runtime.drainEvents().events) {
-        val completed = event.payload as? RuntimeEventPayload.OfflineOperationCompleted ?: continue
-        if (completed.operationId != operation.id) continue
-        assertEquals(RuntimeEventType.OFFLINE_OPERATION_COMPLETED, event.type)
-        assertEquals(operation.kind, completed.operationKind)
-        assertEquals(operation.resultKind, completed.resultKind)
-        assertEquals(MaplibreStatus.OK.nativeCode, completed.resultStatus)
-        return completed
-      }
-      runtime.pump(1)
-      waitForAsyncTestWork()
-    }
-    error("offline operation did not complete: ${operation.id}")
-  }
-
-  private fun waitForMapEvent(
+  private suspend fun waitForMapEvent(
     runtime: RuntimeHandle,
     map: MapHandle,
     type: RuntimeEventType,
   ): Boolean {
     repeat(10_000) {
-      runtime.pump(0)
-      if (runtime.drainEvents().events.any { it.type == type && it.mapSource == map }) return true
-      runtime.pump(1)
-      waitForAsyncTestWork()
+      runtime.barrier().await()
+      if (
+        runtime
+          .drainEvents()
+          .use { it.get().events }
+          .any { it.type == type && it.sourceType == RuntimeEventSourceType.MAP }
+      )
+        return true
+      runtime.barrier().await()
+      sleepMillis(1)
     }
     return false
   }
 
-  private fun waitForMapEventRecord(
+  private suspend fun waitForMapEventRecord(
     runtime: RuntimeHandle,
     map: MapHandle,
     type: RuntimeEventType,
   ): RuntimeEvent {
     repeat(10_000) {
-      runtime.pump(0)
-      for (event in runtime.drainEvents().events) {
-        if (event.type == type && event.mapSource == map) return event
+      runtime.barrier().await()
+      for (event in runtime.drainEvents().use { it.get().events }) {
+        if (event.type == type && event.sourceType == RuntimeEventSourceType.MAP) return event
       }
-      runtime.pump(1)
-      waitForAsyncTestWork()
+      runtime.barrier().await()
+      sleepMillis(1)
     }
     error("runtime event $type did not arrive")
   }
 
   /** Installs a provider that handles [url] without completing it and hands the request out. */
-  private fun captureHandledRequest(
+  private suspend fun captureHandledRequest(
     runtime: RuntimeHandle,
     url: String,
   ): AtomicReference<ResourceRequestHandle?> {
     val handledRequest = AtomicReference<ResourceRequestHandle?>(null)
-    runtime.setResourceProvider(
-      ResourceProviderCallback { request, handle ->
-        if (request.requestedUrl != url) {
-          return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
-        }
-        handledRequest.store(handle)
-        ResourceProviderDecision.HANDLE
-      }
-    )
+    runtime
+      .setResourceProvider(
+        ResourceProvider(
+          callback = provider@{ request, handle ->
+              if (request.requestedUrl != url) {
+                return@provider ResourceProviderDecision.PASS_THROUGH
+              }
+              handledRequest.store(handle)
+              ResourceProviderDecision.HANDLE
+            }
+        )
+      )
+      .await()
     return handledRequest
   }
 
-  private fun createSmallMap(runtime: RuntimeHandle): MapHandle =
-    MapHandle.create(
-      runtime,
-      MapOptions().apply {
-        width = 64
-        height = 64
-      },
-    )
+  private suspend fun createSmallMap(runtime: RuntimeHandle): MapHandle =
+    runtime
+      .mapCreate(
+        GeneratedApi.mapOptionsDefault()
+          .copy(
+            initialExtent =
+              GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+          )
+      )
+      .await()
 
-  private fun waitForHandledRequest(
+  private suspend fun waitForHandledRequest(
     runtime: RuntimeHandle,
     handledRequest: AtomicReference<ResourceRequestHandle?>,
   ): ResourceRequestHandle {
@@ -751,20 +782,20 @@ class RuntimeHandleTest {
       handledRequest.load()?.let {
         return it
       }
-      runtime.pump(1)
-      waitForAsyncTestWork()
+      runtime.barrier().await()
+      sleepMillis(1)
     }
     error("resource provider did not receive handled request")
   }
 
-  private fun waitForRequestCancellation(
+  private suspend fun waitForRequestCancellation(
     runtime: RuntimeHandle,
     handle: ResourceRequestHandle,
   ): Boolean {
     repeat(10_000) {
-      if (handle.isCancelled()) return true
-      runtime.pump(1)
-      waitForAsyncTestWork()
+      if (handle.resourceRequestCancelled()) return true
+      runtime.barrier().await()
+      sleepMillis(1)
     }
     return false
   }
@@ -773,42 +804,41 @@ class RuntimeHandleTest {
    * Loads a style URL whose scheme no file source serves; the failure names the scheme and URL,
    * proving the request reached the network file source.
    */
-  private fun loadUnservedStyle(runtime: RuntimeHandle, map: MapHandle, styleUrl: String) {
-    map.setStyleUrl(styleUrl)
+  private suspend fun loadUnservedStyle(runtime: RuntimeHandle, map: MapHandle, styleUrl: String) {
+    map.setStyleUrl(styleUrl).await()
     val message = waitForMapLoadingFailure(runtime, map, styleUrl)
     assertTrue(message.contains("\"jar\""), "unexpected loading failure message: $message")
   }
 
-  private fun waitForMapLoadingFailure(
+  private suspend fun waitForMapLoadingFailure(
     runtime: RuntimeHandle,
     map: MapHandle,
-    styleUrl: String,
+    styleUrl: String? = null,
   ): String {
     repeat(10_000) {
-      runtime.pump(0)
-      for (event in runtime.drainEvents().events) {
+      runtime.barrier().await()
+      for (event in runtime.drainEvents().use { it.get().events }) {
         if (
           event.type == RuntimeEventType.MAP_LOADING_FAILED &&
-            event.mapSource == map &&
-            event.message.contains(styleUrl)
+            event.sourceType == RuntimeEventSourceType.MAP &&
+            (styleUrl == null || event.message.contains(styleUrl))
         ) {
           return event.message
         }
       }
-      runtime.pump(1)
-      waitForAsyncTestWork()
+      runtime.barrier().await()
+      sleepMillis(1)
     }
     error("map loading failure for $styleUrl did not arrive")
   }
 
-  private fun waitForCondition(condition: () -> Boolean): Boolean {
+  private suspend fun waitForCondition(condition: suspend () -> Boolean): Boolean {
     repeat(10_000) {
       if (condition()) return true
-      waitForAsyncTestWork()
+      sleepMillis(1)
     }
     return false
   }
 }
 
-private const val CANCEL_SETTLE_PUMPS = 50
-private const val STYLE_JSON = """{"version":8,"sources":{},"layers":[]}"""
+private const val CANCEL_SETTLE_ROUNDS = 50

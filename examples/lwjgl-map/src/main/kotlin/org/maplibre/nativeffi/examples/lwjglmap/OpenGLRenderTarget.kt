@@ -1,15 +1,18 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
+import org.maplibre.nativeffi.generated.EglContextDescriptor
+import org.maplibre.nativeffi.generated.OpenglBorrowedTextureDescriptor
+import org.maplibre.nativeffi.generated.OpenglClientApi
+import org.maplibre.nativeffi.generated.OpenglContextDescriptor
+import org.maplibre.nativeffi.generated.OpenglContextDescriptorData
+import org.maplibre.nativeffi.generated.OpenglContextOwnership
+import org.maplibre.nativeffi.generated.OpenglOwnedTextureDescriptor
+import org.maplibre.nativeffi.generated.OpenglSurfaceDescriptor
+import org.maplibre.nativeffi.generated.RenderResult
+import org.maplibre.nativeffi.generated.WglContextDescriptor
 import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.render.EglContextDescriptor
 import org.maplibre.nativeffi.render.NativePointer
-import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
-import org.maplibre.nativeffi.render.OpenGLContextDescriptor
-import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
-import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
-import org.maplibre.nativeffi.render.RenderResult
 import org.maplibre.nativeffi.render.RenderSessionHandle
-import org.maplibre.nativeffi.render.WglContextDescriptor
 
 internal object OpenGLRenderTarget {
   fun attach(
@@ -30,12 +33,16 @@ internal object OpenGLRenderTarget {
     viewport: Viewport,
   ): RenderTarget {
     val descriptor =
-      OpenGLSurfaceDescriptor(
+      OpenglSurfaceDescriptor(
         RenderTarget.extent(viewport),
         descriptor(context),
         NativePointer.ofAddress(context.surfaceAddress()),
       )
-    return Surface(map.attachOpenGLSurface(descriptor))
+    return Surface(
+      map.openglSurfaceAttach(descriptor, RenderTarget.callerDriverOptions).let { attachment ->
+        RenderTarget.finishAttachment(attachment.session, attachment.ready)
+      }
+    )
   }
 
   private fun attachOwnedTexture(
@@ -44,11 +51,15 @@ internal object OpenGLRenderTarget {
     viewport: Viewport,
   ): RenderTarget {
     val descriptor =
-      OpenGLOwnedTextureDescriptor(RenderTarget.extent(viewport), descriptor(context))
+      OpenglOwnedTextureDescriptor(RenderTarget.extent(viewport), descriptor(context))
     var session: RenderSessionHandle? = null
     var compositor: OpenGLTextureCompositor? = null
     try {
-      session = map.attachOpenGLOwnedTexture(descriptor)
+      session =
+        map.openglOwnedTextureAttach(descriptor, RenderTarget.ownedTextureOptions).let { attachment
+          ->
+          RenderTarget.finishAttachment(attachment.session, attachment.ready)
+        }
       compositor = OpenGLTextureCompositor(context, viewport)
       return OwnedTexture(session, compositor)
     } catch (error: RuntimeException) {
@@ -68,7 +79,13 @@ internal object OpenGLRenderTarget {
     var compositor: OpenGLTextureCompositor? = null
     try {
       texture = OpenGLBorrowedTexture(context, viewport)
-      session = map.attachOpenGLBorrowedTexture(borrowedDescriptor(context, viewport, texture))
+      session =
+        map
+          .openglBorrowedTextureAttach(
+            borrowedDescriptor(context, viewport, texture),
+            RenderTarget.callerDriverOptions,
+          )
+          .let { attachment -> RenderTarget.finishAttachment(attachment.session, attachment.ready) }
       compositor = OpenGLTextureCompositor(context, viewport)
       return BorrowedTexture(context, session, compositor, texture)
     } catch (error: RuntimeException) {
@@ -83,42 +100,53 @@ internal object OpenGLRenderTarget {
     context: OpenGLContext,
     viewport: Viewport,
     texture: OpenGLBorrowedTexture,
-  ): OpenGLBorrowedTextureDescriptor =
-    OpenGLBorrowedTextureDescriptor(
+  ): OpenglBorrowedTextureDescriptor =
+    OpenglBorrowedTextureDescriptor(
       RenderTarget.extent(viewport),
-      viewport.framebufferWidth(),
-      viewport.framebufferHeight(),
+      viewport.framebufferWidth().toUInt(),
+      viewport.framebufferHeight().toUInt(),
       descriptor(context),
-      texture.texture(),
-      texture.target(),
+      texture.texture().toUInt(),
+      texture.target().toUInt(),
     )
 
-  private fun descriptor(context: OpenGLContext): OpenGLContextDescriptor =
-    if (context.isGles) {
-      EglContextDescriptor(
-        NativePointer.ofAddress(context.eglDisplayAddress()),
-        NativePointer.ofAddress(context.eglConfigAddress()),
-        NativePointer.ofAddress(context.eglContextAddress()),
-        NativePointer.NULL_POINTER,
-      )
-    } else {
-      WglContextDescriptor(
-        NativePointer.ofAddress(context.hdcAddress()),
-        NativePointer.ofAddress(context.wglContextAddress()),
-        NativePointer.NULL_POINTER,
-      )
-    }
+  private fun descriptor(context: OpenGLContext): OpenglContextDescriptor =
+    OpenglContextDescriptor(
+      ownership = OpenglContextOwnership.SHARED,
+      data =
+        if (context.isGles) {
+          OpenglContextDescriptorData.Egl(
+            EglContextDescriptor(
+              display = NativePointer.ofAddress(context.eglDisplayAddress()),
+              config = NativePointer.ofAddress(context.eglConfigAddress()),
+              shareContext = NativePointer.ofAddress(context.eglContextAddress()),
+              clientApi = OpenglClientApi.GLES,
+              getProcAddress = NativePointer.NULL_POINTER,
+            )
+          )
+        } else {
+          OpenglContextDescriptorData.Wgl(
+            WglContextDescriptor(
+              deviceContext = NativePointer.ofAddress(context.hdcAddress()),
+              shareContext = NativePointer.ofAddress(context.wglContextAddress()),
+              getProcAddress = NativePointer.NULL_POINTER,
+            )
+          )
+        },
+    )
 
   private class Surface(private val session: RenderSessionHandle) : RenderTarget {
     override fun resize(viewport: Viewport) {
-      session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
+      RenderTarget.completeDriverOperation(session, session.resize(RenderTarget.extent(viewport)))
     }
 
-    override fun renderUpdate(): Boolean =
-      session.renderUpdate().result != RenderResult.TARGET_NOT_READY
+    override fun renderUpdate(): Boolean {
+      val result = RenderTarget.renderFrame(session) ?: return false
+      return result.disposition == RenderResult.RENDERED && !result.needsRepaint
+    }
 
     override fun close() {
-      session.close()
+      RenderTarget.closeSession(session)
     }
   }
 
@@ -128,32 +156,46 @@ internal object OpenGLRenderTarget {
   ) : RenderTarget {
     override fun resize(viewport: Viewport) {
       compositor.resize(viewport)
-      session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
+      RenderTarget.completeDriverOperation(session, session.resize(RenderTarget.extent(viewport)))
     }
 
     override fun renderUpdate(): Boolean {
-      val result = session.renderUpdate().result
-      if (result != RenderResult.RENDERED) {
-        return result != RenderResult.TARGET_NOT_READY
-      }
-      session.acquireOpenGLOwnedTextureFrame().use { frameHandle ->
-        val frame = frameHandle.frame()
-        check(frame.width() > 0 && frame.height() > 0) {
-          "MapLibre returned an empty OpenGL owned texture frame"
+      val result = RenderTarget.renderFrame(session) ?: return false
+      if (result.disposition != RenderResult.RENDERED) return false
+      // An empty ring keeps the previously composited frame on screen.
+      val frameHandle =
+        try {
+          session.acquireFrame()
+        } catch (error: org.maplibre.nativeffi.error.MaplibreException) {
+          if (error.status == org.maplibre.nativeffi.error.MaplibreStatus.NOT_READY) return false
+          throw error
         }
-        check(frame.target() == OpenGLTextureCompositor.TEXTURE_TARGET) {
-          "MapLibre owned texture target is ${frame.target()}, expected GL_TEXTURE_2D"
+      try {
+        frameHandle.withGetProducerSync { sync ->
+          check(sync.kind == org.maplibre.nativeffi.generated.GpuSyncKind.CPU_COMPLETE) {
+            "OpenGL compositor requires CPU-complete producer work"
+          }
+          frameHandle.withGetOpenglTexture { frame ->
+            check(frame.width > 0u && frame.height > 0u) {
+              "MapLibre returned an empty OpenGL owned texture frame"
+            }
+            check(frame.target == OpenGLTextureCompositor.TEXTURE_TARGET.toUInt()) {
+              "MapLibre owned texture target is ${frame.target}, expected GL_TEXTURE_2D"
+            }
+            compositor.drawTexture(frame.texture.toInt())
+          }
         }
-        compositor.drawTexture(frame.texture())
+      } finally {
+        frameHandle.release()
       }
-      return true
+      return !result.needsRepaint
     }
 
     override fun close() {
       try {
         compositor.close()
       } finally {
-        session.close()
+        RenderTarget.closeSession(session)
       }
     }
   }
@@ -164,31 +206,38 @@ internal object OpenGLRenderTarget {
     private val compositor: OpenGLTextureCompositor,
     private var texture: OpenGLBorrowedTexture,
   ) : RenderTarget {
+    private var sessionReleased = false
+
     /** Local to the render loop thread: allocate a texture at the new size and hand it over. */
     override fun resize(viewport: Viewport) {
       compositor.resize(viewport)
       val replacement = OpenGLBorrowedTexture(context, viewport)
       try {
-        session.setOpenGLBorrowedTextureTarget(borrowedDescriptor(context, viewport, replacement))
+        RenderTarget.completeDriverOperation(
+          session,
+          session.openglBorrowedTextureSetTarget(borrowedDescriptor(context, viewport, replacement)),
+        )
       } catch (error: RuntimeException) {
         // A failed handover leaves it unknown which target the session holds, so detach before
         // either is released.
         RenderTarget.detachSuppressed(error, session)
+        sessionReleased = true
         RenderTarget.closeSuppressed(error, replacement)
         throw error
       }
       // Released only once the session has taken the replacement.
       texture.close()
       texture = replacement
+      // A handover replaces only the graphics resource, so the map still needs the new
+      // extent.
+      RenderTarget.resizeMap(session.map(), viewport)
     }
 
     override fun renderUpdate(): Boolean {
-      val result = session.renderUpdate().result
-      if (result != RenderResult.RENDERED) {
-        return result != RenderResult.TARGET_NOT_READY
-      }
+      val result = RenderTarget.renderFrame(session) ?: return false
+      if (result.disposition != RenderResult.RENDERED) return false
       compositor.drawTexture(texture.texture())
-      return true
+      return !result.needsRepaint
     }
 
     override fun close() {
@@ -196,7 +245,7 @@ internal object OpenGLRenderTarget {
         compositor.close()
       } finally {
         try {
-          session.close()
+          RenderTarget.closeSession(session, sessionReleased)
         } finally {
           texture.close()
         }

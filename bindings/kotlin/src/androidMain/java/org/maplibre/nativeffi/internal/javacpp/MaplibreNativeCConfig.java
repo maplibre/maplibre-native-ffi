@@ -11,10 +11,13 @@ import org.bytedeco.javacpp.tools.InfoMapper;
         @Platform(
             includepath = {"../../include"},
             cinclude = {
+              "maplibre_native_c/binding.h",
               "maplibre_native_c/base.h",
               "maplibre_native_c/diagnostics.h",
               "maplibre_native_c/logging.h",
               "maplibre_native_c/android.h",
+              "maplibre_native_c/completion.h",
+              "maplibre_native_c/wake.h",
               "maplibre_native_c/runtime.h",
               "maplibre_native_c/camera.h",
               "maplibre_native_c/render_target.h",
@@ -24,15 +27,26 @@ import org.bytedeco.javacpp.tools.InfoMapper;
               "maplibre_native_c/projection.h",
               "maplibre_native_c/query.h",
               "maplibre_native_c/style.h",
-              "maplibre_native_c/map.h"
+              "maplibre_native_c/map.h",
+              "maplibre_native_c/callback_adapter.h",
+              "maplibre_native_c/plugin.h"
             },
             link = {"maplibre-native-c"}),
     target = "org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC")
 public class MaplibreNativeCConfig implements InfoMapper {
   @Override
   public void map(InfoMap infoMap) {
+    infoMap.put(
+        new Info("MLN_ADAPTER_RESOURCE_KIND_ANY")
+            .javaText("public static final int MLN_ADAPTER_RESOURCE_KIND_ANY = 0xffffffff;"));
+    infoMap.put(new Info("mln_plugin_register_function_v1").cast().pointerTypes("Pointer"));
     infoMap.put(new Info("MLN_API", "MLN_NOEXCEPT").cppTypes().annotations());
     infoMap.put(
-        new Info("__cplusplus", "MAPLIBRE_NATIVE_C_BASE_H", "MAPLIBRE_NATIVE_C_H").define(false));
+        new Info(
+                "defined(MLN_BINDGEN) && defined(__clang__)",
+                "__cplusplus",
+                "MAPLIBRE_NATIVE_C_BASE_H",
+                "MAPLIBRE_NATIVE_C_H")
+            .define(false));
   }
 }

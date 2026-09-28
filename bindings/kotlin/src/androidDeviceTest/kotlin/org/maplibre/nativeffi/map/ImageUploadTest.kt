@@ -5,28 +5,33 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import org.maplibre.nativeffi.error.InvalidArgumentException
-import org.maplibre.nativeffi.render.PremultipliedRgba8Image
-import org.maplibre.nativeffi.runtime.RuntimeHandle
-import org.maplibre.nativeffi.runtime.RuntimeOptions
-import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.MapMode
+import org.maplibre.nativeffi.generated.PremultipliedRgba8Image
+import org.maplibre.nativeffi.generated.StyleImageOptions
+import org.maplibre.nativeffi.runtime.runSuspendTest
+import org.maplibre.nativeffi.runtime.use
 
 class ImageUploadTest {
   @Test
-  fun paddedStyleImagesSurviveArrayReleaseAndCollection() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      MapHandle.create(runtime, MapOptions().apply { mapMode = MapMode.STATIC }).use { map ->
-        map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
-        for (width in listOf(2, 128)) {
-          val expected = uploadImage(map, width)
-          System.gc()
-          val copied = assertNotNull(map.copyStyleImagePremultipliedRgba8("image"))
-          assertContentEquals(expected, copied.image.pixels)
+  fun paddedStyleImagesSurviveArrayReleaseAndCollection(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+      runtime
+        .mapCreate(GeneratedApi.mapOptionsDefault().copy(mapMode = MapMode.STATIC))
+        .await()
+        .use { map ->
+          map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
+          for (width in listOf(2, 128)) {
+            val expected = uploadImage(map, width)
+            Runtime.getRuntime().gc()
+            val copied = assertNotNull(map.copyStyleImagePremultipliedRgba8("image").await())
+            assertContentEquals(expected, copied)
+          }
         }
-      }
     }
   }
 
-  private fun uploadImage(map: MapHandle, width: Int): ByteArray {
+  private suspend fun uploadImage(map: MapHandle, width: Int): ByteArray {
     val rowBytes = width * 4
     val stride = rowBytes + 8
     val pixels = ByteArray(stride * width) { 99 }
@@ -38,9 +43,12 @@ class ImageUploadTest {
         color.copyInto(expected, y * rowBytes + x * 4)
       }
     }
-    val image = PremultipliedRgba8Image(width, width, stride, pixels)
-    assertFailsWith<InvalidArgumentException> { map.setStyleImage("", image, StyleImageOptions()) }
-    map.setStyleImage("image", image, StyleImageOptions())
+    val image = PremultipliedRgba8Image(width.toUInt(), width.toUInt(), stride.toUInt(), pixels)
+    assertFailsWith<InvalidArgumentException> {
+      map.setStyleImage("", image, StyleImageOptions()).await()
+    }
+    map.setStyleImage("image", image, StyleImageOptions()).await()
+    // The submit copies the padded rows into native memory, so the caller's array is untouched.
     assertContentEquals(pixels, image.pixels)
     return expected
   }

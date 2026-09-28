@@ -1,61 +1,43 @@
 package org.maplibre.nativeffi.runtime
 
+import java.lang.foreign.Arena
+import java.lang.foreign.ValueLayout
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
-import org.maplibre.nativeffi.internal.loader.NativeAccess.JvmStructs
-import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.map.MapOptions
+import kotlin.test.assertIs
+import org.maplibre.nativeffi.generated.GeneratedValues
+import org.maplibre.nativeffi.generated.RuntimeEventPayload
+import org.maplibre.nativeffi.internal.c.mln_runtime_event
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_payload
 
 class RuntimeEventJvmTest {
   @Test
-  fun unknownDomainsAndEventsFromReleasedMapsCopyWithoutResurrectingHandles() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-        },
-      )
-    val mapId = map.nativeHandleId()
-    map.close()
-    try {
-      val orphan =
-        runtime.copyEventForTesting(
-          RuntimeEventType.MAP_STYLE_LOADED.nativeValue,
-          RuntimeEventSourceType.MAP.nativeValue,
-          mapId,
-          0,
-          RuntimeEventPayload.None,
-          "",
-        )
-      assertNull(orphan.mapSource)
-      assertNull(orphan.runtimeSource)
-      assertEquals(mapId, orphan.sourceId)
-
-      val unknown =
-        runtime.copyEventForTesting(
-          900,
-          901,
-          0x5AL,
-          902,
-          JvmStructs.unknownRuntimePayload(903, byteArrayOf(1, 2, 3)),
-          "future event",
-        )
-      assertEquals(900, unknown.type.nativeValue)
-      assertEquals(901, unknown.sourceType.nativeValue)
-      assertEquals(0x5AL, unknown.sourceId)
-      assertNull(unknown.mapSource)
-      assertNull(unknown.runtimeSource)
-      assertEquals("future event", unknown.message)
-      val payload = unknown.payload as RuntimeEventPayload.Unknown
-      assertEquals(903, payload.rawPayloadType)
-      assertContentEquals(byteArrayOf(1, 2, 3), payload.payloadBytes)
-    } finally {
-      runtime.close()
-    }
+  fun unknownEventCopiesItsDiscriminantsAndOnlyThePayloadWindow() {
+    val event =
+      Arena.ofConfined().use { arena ->
+        val native = mln_runtime_event.allocate(arena)
+        mln_runtime_event.type(native, 900)
+        mln_runtime_event.source_type(native, 901)
+        mln_runtime_event.source(native, 0x5aL)
+        mln_runtime_event.code(native, 902)
+        mln_runtime_event.payload_type(native, 903)
+        val payload = mln_runtime_event.payload(native)
+        payload.set(ValueLayout.JAVA_BYTE, 0, 1)
+        payload.set(ValueLayout.JAVA_BYTE, 1, 2)
+        payload.set(ValueLayout.JAVA_BYTE, 2, 3)
+        GeneratedValues.readRuntimeEvent(native, "future event").also {
+          payload.set(ValueLayout.JAVA_BYTE, 0, 9)
+        }
+      }
+    assertEquals(900u, event.type.rawValue)
+    assertEquals(901u, event.sourceType.rawValue)
+    assertEquals(0x5auL, event.source)
+    assertEquals(902, event.code)
+    assertEquals("future event", event.message)
+    val payload = assertIs<RuntimeEventPayload.Unknown>(event.payload)
+    assertEquals(903u, payload.tag)
+    assertEquals(mln_runtime_event_payload.sizeof().toInt(), payload.bytes.size)
+    assertContentEquals(byteArrayOf(1, 2, 3), payload.bytes.take(3).toByteArray())
   }
 }

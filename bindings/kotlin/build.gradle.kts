@@ -1,9 +1,11 @@
 import java.time.Duration
 import org.gradle.api.tasks.testing.Test
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
+import org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
@@ -148,23 +150,51 @@ kotlin {
       }
     }
 
-    if (name == "linuxX64" || name == "linuxArm64") {
-      val eglLibDir =
-        if (name == "linuxX64") "/usr/lib/x86_64-linux-gnu" else "/usr/lib/aarch64-linux-gnu"
-      binaries.all { linkerOpts("-L$eglLibDir") }
+    if (name == "linuxX64" || name == "linuxArm64" || name == "macosArm64") {
+      val linuxTarget = name.startsWith("linux")
+      val fixture = rootProject.file("tests/graphics")
+      val vulkanHeaders =
+        rootProject.file("third_party/maplibre-native/vendor/Vulkan-Headers/include")
+      val objectFile = layout.buildDirectory.file("graphics-test/$name/graphics.o")
+      val compileGraphics =
+        tasks.register<Exec>("compileTestGraphics${name.replaceFirstChar { it.uppercase() }}") {
+          inputs.dir(fixture)
+          inputs.dir(vulkanHeaders)
+          outputs.file(objectFile)
+          doFirst { objectFile.get().asFile.parentFile.mkdirs() }
+          commandLine(
+            "clang",
+            "-std=c11",
+            "-fPIC",
+            "-c",
+            "-I${fixture.resolve("include")}",
+            "-I$vulkanHeaders",
+            fixture.resolve("graphics.c"),
+            "-o",
+            objectFile.get().asFile,
+          )
+        }
+      binaries.withType<TestExecutable>().configureEach {
+        linkTaskProvider.configure {
+          dependsOn(compileGraphics)
+          inputs.file(objectFile)
+        }
+        linkerOpts(objectFile.get().asFile.absolutePath)
+        if (linuxTarget) linkerOpts("-ldl")
+      }
       compilations.getByName("test") {
-        cinterops {
-          create("egl") {
-            defFile(project.file("src/linuxTest/cinterop/egl.def"))
-            includeDirs(project.file("src/linuxTest/cinterop"))
-            compilerOpts("-I${project.file("src/linuxTest/cinterop")}")
-          }
+        cinterops.create("testGraphics") {
+          defFile(project.file("src/desktopNativeTest/cinterop/graphics.def"))
+          includeDirs(fixture.resolve("include"))
         }
       }
     }
   }
 
   sourceSets {
+    // Deferred is part of the public binding surface.
+    commonMain.dependencies { api(libs.coroutines) }
+
     androidMain { dependencies { implementation(libs.javacpp) } }
 
     named("androidDeviceTest") {
@@ -176,6 +206,8 @@ kotlin {
     }
 
     commonTest.dependencies { implementation(kotlin("test")) }
+    matching { it.name == "linuxTest" || it.name == "macosTest" }
+      .configureEach { kotlin.srcDir("src/desktopNativeTest/kotlin") }
 
     configureEach {
       if (
@@ -239,6 +271,9 @@ dependencies {
   "jvmTestImplementation"(platform(libs.lwjgl.bom))
   "jvmTestImplementation"(libs.lwjgl)
   "jvmTestImplementation"(libs.lwjgl.egl)
+  "jvmTestImplementation"(libs.lwjgl.vulkan)
+  "jvmTestImplementation"(libs.lwjgl.glfw)
+  "jvmTestRuntimeOnly"(variantOf(libs.lwjgl.glfw) { classifier(lwjglNative) })
   "jvmTestRuntimeOnly"(variantOf(libs.lwjgl) { classifier(lwjglNative) })
 }
 
@@ -251,10 +286,23 @@ extensions.extraProperties["maplibreAndroidBindingLibsDirectory"] = packagedAndr
 
 apply(from = "gradle/javacpp-android.gradle.kts")
 
+apply(from = "gradle/graphics-tests.gradle.kts")
+
 tasks.named<KotlinJvmCompile>("compileKotlinJvm") { source(checkedInJextractSources) }
 
 androidComponents {
   onVariants { variant ->
+    variant.deviceTests.values.forEach { test ->
+      androidTargets.forEach { target ->
+        test.sources.jniLibs?.addStaticSourceDirectory(
+          layout.buildDirectory
+            .dir("generated/jniLibs/graphicsTest/${target.cargoTarget}")
+            .get()
+            .asFile
+            .absolutePath
+        )
+      }
+    }
     // Android KMP does not currently expose a task-provider-backed generated Java source hook.
     // Keep the explicit task dependencies below in sync with this static source directory.
     variant.sources.java?.addStaticSourceDirectory(
@@ -290,6 +338,12 @@ class TestClasspathArguments(@get:Classpath val classpath: FileCollection) :
 tasks.named<Test>("jvmTest") {
   jvmArgs("--enable-native-access=ALL-UNNAMED")
   jvmArgumentProviders.add(TestClasspathArguments(classpath))
+  if (maplibreNativeC.hostLibraryDirs.isNotEmpty()) {
+    systemProperty(
+      "org.lwjgl.librarypath",
+      maplibreNativeC.hostLibraryDirs.joinToString(File.pathSeparator) { it.absolutePath },
+    )
+  }
   systemProperty("org.maplibre.nativeffi.library.path", maplibreNativeC.libraryPath.absolutePath)
   systemProperty(
     "org.maplibre.nativeffi.library.dirs",
@@ -302,12 +356,14 @@ tasks.named<Test>("jvmTest") {
       .withPropertyName("maplibreNativeCLoaderLibraryDirs")
     inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
   }
+  testLogging { exceptionFormat = TestExceptionFormat.FULL }
 }
 
 tasks.withType<KotlinNativeTest>().configureEach {
   timeout.set(Duration.ofMinutes(5))
   testLogging {
     events(TestLogEvent.STARTED, TestLogEvent.PASSED, TestLogEvent.SKIPPED, TestLogEvent.FAILED)
+    exceptionFormat = TestExceptionFormat.FULL
   }
 }
 

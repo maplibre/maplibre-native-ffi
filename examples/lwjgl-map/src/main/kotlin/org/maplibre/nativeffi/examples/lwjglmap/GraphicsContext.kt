@@ -1,11 +1,11 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
-import org.maplibre.nativeffi.render.RenderBackend
+import org.maplibre.nativeffi.generated.RenderBackendFlag
 
 internal interface GraphicsContext : AutoCloseable {
   fun window(): Long
 
-  fun backend(): RenderBackend
+  fun backend(): RenderBackendFlag
 
   fun resize(viewport: Viewport) {}
 
@@ -17,15 +17,15 @@ internal interface GraphicsContext : AutoCloseable {
       title: String,
       width: Int,
       height: Int,
-      backends: Set<RenderBackend>,
+      backends: RenderBackendFlag,
     ): GraphicsContext {
-      if (backends.contains(RenderBackend.METAL)) {
+      if (backends.contains(RenderBackendFlag.METAL)) {
         return MetalContext.create(title, width, height)
       }
-      if (backends.contains(RenderBackend.OPENGL)) {
+      if (backends.contains(RenderBackendFlag.OPENGL)) {
         return OpenGLContext.create(title, width, height)
       }
-      if (backends.contains(RenderBackend.VULKAN)) {
+      if (backends.contains(RenderBackendFlag.VULKAN)) {
         return VulkanContext.create(title, width, height)
       }
       throw IllegalStateException(

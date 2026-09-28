@@ -17,11 +17,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  * struct mln_rendered_query_geometry {
  *     uint32_t size;
  *     uint32_t type;
- *     union {
- *         mln_screen_point point;
- *         mln_screen_box box;
- *         mln_screen_line_string line_string;
- *     } data;
+ *     mln_rendered_query_geometry_data data;
  * }
  * }
  */
@@ -34,7 +30,7 @@ public class mln_rendered_query_geometry {
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
         MapLibreNativeC.C_INT.withName("size"),
         MapLibreNativeC.C_INT.withName("type"),
-        mln_rendered_query_geometry.data.layout().withName("data")
+        mln_rendered_query_geometry_data.layout().withName("data")
     ).withName("mln_rendered_query_geometry");
 
     /**
@@ -132,221 +128,12 @@ public class mln_rendered_query_geometry {
         struct.set(type$LAYOUT, type$OFFSET, fieldValue);
     }
 
-    /**
-     * {@snippet lang=c :
-     * union {
-     *     mln_screen_point point;
-     *     mln_screen_box box;
-     *     mln_screen_line_string line_string;
-     * }
-     * }
-     */
-    public static class data {
-
-        data() {
-            // Should not be called directly
-        }
-
-        private static final GroupLayout $LAYOUT = MemoryLayout.unionLayout(
-            mln_screen_point.layout().withName("point"),
-            mln_screen_box.layout().withName("box"),
-            mln_screen_line_string.layout().withName("line_string")
-        ).withName("$anon$51:3");
-
-        /**
-         * The layout of this union
-         */
-        public static final GroupLayout layout() {
-            return $LAYOUT;
-        }
-
-        private static final GroupLayout point$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("point"));
-
-        /**
-         * Layout for field:
-         * {@snippet lang=c :
-         * mln_screen_point point
-         * }
-         */
-        public static final GroupLayout point$layout() {
-            return point$LAYOUT;
-        }
-
-        private static final long point$OFFSET = $LAYOUT.byteOffset(groupElement("point"));
-
-        /**
-         * Offset for field:
-         * {@snippet lang=c :
-         * mln_screen_point point
-         * }
-         */
-        public static final long point$offset() {
-            return point$OFFSET;
-        }
-
-        /**
-         * Getter for field:
-         * {@snippet lang=c :
-         * mln_screen_point point
-         * }
-         */
-        public static MemorySegment point(MemorySegment union) {
-            return union.asSlice(point$OFFSET, point$LAYOUT.byteSize());
-        }
-
-        /**
-         * Setter for field:
-         * {@snippet lang=c :
-         * mln_screen_point point
-         * }
-         */
-        public static void point(MemorySegment union, MemorySegment fieldValue) {
-            MemorySegment.copy(fieldValue, 0L, union, point$OFFSET, point$LAYOUT.byteSize());
-        }
-
-        private static final GroupLayout box$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("box"));
-
-        /**
-         * Layout for field:
-         * {@snippet lang=c :
-         * mln_screen_box box
-         * }
-         */
-        public static final GroupLayout box$layout() {
-            return box$LAYOUT;
-        }
-
-        private static final long box$OFFSET = $LAYOUT.byteOffset(groupElement("box"));
-
-        /**
-         * Offset for field:
-         * {@snippet lang=c :
-         * mln_screen_box box
-         * }
-         */
-        public static final long box$offset() {
-            return box$OFFSET;
-        }
-
-        /**
-         * Getter for field:
-         * {@snippet lang=c :
-         * mln_screen_box box
-         * }
-         */
-        public static MemorySegment box(MemorySegment union) {
-            return union.asSlice(box$OFFSET, box$LAYOUT.byteSize());
-        }
-
-        /**
-         * Setter for field:
-         * {@snippet lang=c :
-         * mln_screen_box box
-         * }
-         */
-        public static void box(MemorySegment union, MemorySegment fieldValue) {
-            MemorySegment.copy(fieldValue, 0L, union, box$OFFSET, box$LAYOUT.byteSize());
-        }
-
-        private static final GroupLayout line_string$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("line_string"));
-
-        /**
-         * Layout for field:
-         * {@snippet lang=c :
-         * mln_screen_line_string line_string
-         * }
-         */
-        public static final GroupLayout line_string$layout() {
-            return line_string$LAYOUT;
-        }
-
-        private static final long line_string$OFFSET = $LAYOUT.byteOffset(groupElement("line_string"));
-
-        /**
-         * Offset for field:
-         * {@snippet lang=c :
-         * mln_screen_line_string line_string
-         * }
-         */
-        public static final long line_string$offset() {
-            return line_string$OFFSET;
-        }
-
-        /**
-         * Getter for field:
-         * {@snippet lang=c :
-         * mln_screen_line_string line_string
-         * }
-         */
-        public static MemorySegment line_string(MemorySegment union) {
-            return union.asSlice(line_string$OFFSET, line_string$LAYOUT.byteSize());
-        }
-
-        /**
-         * Setter for field:
-         * {@snippet lang=c :
-         * mln_screen_line_string line_string
-         * }
-         */
-        public static void line_string(MemorySegment union, MemorySegment fieldValue) {
-            MemorySegment.copy(fieldValue, 0L, union, line_string$OFFSET, line_string$LAYOUT.byteSize());
-        }
-
-        /**
-         * Obtains a slice of {@code arrayParam} which selects the array element at {@code index}.
-         * The returned segment has address {@code arrayParam.address() + index * layout().byteSize()}
-         */
-        public static MemorySegment asSlice(MemorySegment array, long index) {
-            return array.asSlice(layout().byteSize() * index);
-        }
-
-        /**
-         * The size (in bytes) of this union
-         */
-        public static long sizeof() { return layout().byteSize(); }
-
-        /**
-         * Allocate a segment of size {@code layout().byteSize()} using {@code allocator}
-         */
-        public static MemorySegment allocate(SegmentAllocator allocator) {
-            return allocator.allocate(layout());
-        }
-
-        /**
-         * Allocate an array of size {@code elementCount} using {@code allocator}.
-         * The returned segment has size {@code elementCount * layout().byteSize()}.
-         */
-        public static MemorySegment allocateArray(long elementCount, SegmentAllocator allocator) {
-            return allocator.allocate(MemoryLayout.sequenceLayout(elementCount, layout()));
-        }
-
-        /**
-         * Reinterprets {@code addr} using target {@code arena} and {@code cleanupAction} (if any).
-         * The returned segment has size {@code layout().byteSize()}
-         */
-        public static MemorySegment reinterpret(MemorySegment addr, Arena arena, Consumer<MemorySegment> cleanup) {
-            return reinterpret(addr, 1, arena, cleanup);
-        }
-
-        /**
-         * Reinterprets {@code addr} using target {@code arena} and {@code cleanupAction} (if any).
-         * The returned segment has size {@code elementCount * layout().byteSize()}
-         */
-        public static MemorySegment reinterpret(MemorySegment addr, long elementCount, Arena arena, Consumer<MemorySegment> cleanup) {
-            return addr.reinterpret(layout().byteSize() * elementCount, arena, cleanup);
-        }
-    }
-
     private static final GroupLayout data$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("data"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * union {
-     *     mln_screen_point point;
-     *     mln_screen_box box;
-     *     mln_screen_line_string line_string;
-     * } data
+     * mln_rendered_query_geometry_data data
      * }
      */
     public static final GroupLayout data$layout() {
@@ -358,11 +145,7 @@ public class mln_rendered_query_geometry {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * union {
-     *     mln_screen_point point;
-     *     mln_screen_box box;
-     *     mln_screen_line_string line_string;
-     * } data
+     * mln_rendered_query_geometry_data data
      * }
      */
     public static final long data$offset() {
@@ -372,11 +155,7 @@ public class mln_rendered_query_geometry {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * union {
-     *     mln_screen_point point;
-     *     mln_screen_box box;
-     *     mln_screen_line_string line_string;
-     * } data
+     * mln_rendered_query_geometry_data data
      * }
      */
     public static MemorySegment data(MemorySegment struct) {
@@ -386,11 +165,7 @@ public class mln_rendered_query_geometry {
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * union {
-     *     mln_screen_point point;
-     *     mln_screen_box box;
-     *     mln_screen_line_string line_string;
-     * } data
+     * mln_rendered_query_geometry_data data
      * }
      */
     public static void data(MemorySegment struct, MemorySegment fieldValue) {
