@@ -226,7 +226,9 @@ def callback_thunk(value, field, values, platform):
     failure = literal(callback.failure, callback, values, platform)
     token = token_expression(callback.context, platform)
     owner = "null"
-    if callback.reentry_policy and callback.reentry_policy.owner_parameter:
+    if callback.reentry_policy and callback.reentry_policy.registration_owner:
+        owner = "root.owner"
+    elif callback.reentry_policy and callback.reentry_policy.owner_parameter:
         parameter = next(
             p
             for p in callback.parameters
@@ -613,38 +615,27 @@ def operation(plan, values, platform):
 def direct_conversions(values, platform):
     stubs, thunks = [], []
     for callback_value, release in getattr(values, "direct_callbacks", {}).values():
-        callback = values.bound.callbacks[callback_value.native]
         public = name(callback_value.native)
-        if release:
-            wrapper = SimpleNamespace(
-                native="mln_generated_"
-                + callback_value.native.removeprefix("mln_")
-                + "_registration"
-            )
-            field = SimpleNamespace(name="callback", value=callback_value)
-            function, thunk = callback_thunk(wrapper, field, values, platform)
-            thunks.append(thunk)
-            stubs.append(
-                f"  val {public}Stub = {stub(callback_value.native, function, values, platform)}"
-            )
-            release_plan = values.bound.callbacks[release.native]
-            parameter = release_plan.parameters[0]
-            release_function = "generatedDirectRelease" + public
-            thunks.append(
-                f"private fun {release_function}({identifier(parameter.name)}: {native_type(parameter.value, values, platform)}) {{ try {{ {ROOTS}.release({token_expression(parameter.name, platform)}) }} catch (_: Throwable) {{}} }}"
-            )
-            stubs.append(
-                f"  val {public}ReleaseStub = {stub(release.native, release_function, values, platform)}"
-            )
-        else:
-            parameter = callback.parameters[0]
-            function = "generatedDirect" + public
-            thunks.append(
-                f"private fun {function}({identifier(parameter.name)}: {native_type(parameter.value, values, platform)}) {{ try {{ org.maplibre.nativeffi.internal.callback.DecisionCancelRegistry.dispatch({token_expression(parameter.name, platform)}) }} catch (_: Throwable) {{}} }}"
-            )
-            stubs.append(
-                f"  val {public}Stub = {stub(callback_value.native, function, values, platform)}"
-            )
+        wrapper = SimpleNamespace(
+            native="mln_generated_"
+            + callback_value.native.removeprefix("mln_")
+            + "_registration"
+        )
+        field = SimpleNamespace(name="callback", value=callback_value)
+        function, thunk = callback_thunk(wrapper, field, values, platform)
+        thunks.append(thunk)
+        stubs.append(
+            f"  val {public}Stub = {stub(callback_value.native, function, values, platform)}"
+        )
+        release_plan = values.bound.callbacks[release.native]
+        parameter = release_plan.parameters[0]
+        release_function = "generatedDirectRelease" + public
+        thunks.append(
+            f"private fun {release_function}({identifier(parameter.name)}: {native_type(parameter.value, values, platform)}) {{ try {{ {ROOTS}.release({token_expression(parameter.name, platform)}) }} catch (_: Throwable) {{}} }}"
+        )
+        stubs.append(
+            f"  val {public}ReleaseStub = {stub(release.native, release_function, values, platform)}"
+        )
     if not stubs:
         return ""
     annotation = (
@@ -661,6 +652,14 @@ def direct_conversions(values, platform):
 
 
 def direct_operation(plan, values, platform):
+    """Lower a registration whose root native releases after its last callback.
+
+    A receiver's registration roots in that receiver's callback owner, so a
+    callback that captures its receiver cannot keep it reachable, while native
+    release still frees the root first when the receiver stays live. A
+    registration that native reports it did not store frees its root before
+    returning.
+    """
     from .kotlin_ir import admission, receiver_value
 
     if len(plan.direct_registrations) != 1:
@@ -675,13 +674,33 @@ def direct_operation(plan, values, platform):
     release = next(
         (p.value for p in plan.inputs if p.name == registration.release_callback), None
     )
+    if release is None:
+        raise Unsupported("direct callback registration requires a native release")
+    policy = callback.reentry_policy
+    owned = bool(policy and policy.registration_owner)
+    if owned and not plan.receiver:
+        raise Unsupported("registration-owned reentry requires a receiver handle")
+    condition = registration.accepted_unless
+    if condition and callback_value.nullable:
+        raise Unsupported("a conditional registration cannot clear its callback")
+    roles = {
+        plan.receiver,
+        registration.callback,
+        registration.user_data,
+        registration.release_callback,
+        condition,
+    }
+    if any(p.name not in roles for p in plan.function.parameters):
+        raise Unsupported(
+            "direct callback registration takes only its registration parameters"
+        )
     values.check(callback_value)
     if not hasattr(values, "direct_callbacks"):
         values.direct_callbacks = {}
     values.direct_callbacks[callback_value.native] = (callback_value, release)
     public = name(callback_value.native)
     method = identifier(plan.name.removeprefix("mln_"))
-    returns = "Boolean" if registration.accepted_unless else "Unit"
+    returns = "Boolean" if condition else "Unit"
     params = f"callback: {values.public(callback_value)}"
     if platform == "commonMain":
         return f"  public fun {method}({params}): {returns}\n"
@@ -700,36 +719,6 @@ def direct_operation(plan, values, platform):
         if platform == "androidMain"
         else "token.toCPointer<ByteVar>()"
     )
-    loaded = (
-        "NativeAccess.ensureLoaded(); "
-        if platform in {"jvmMain", "androidMain"}
-        else ""
-    )
-    if release:
-        pointer = f"GeneratedDirectCallbacks.{public}Stub"
-        releaser = f"GeneratedDirectCallbacks.{public}ReleaseStub"
-        disabled = (
-            f"if (callback == null) {{ BindingStatus.check({prefix}{plan.name}({null}, {null}, {null})); return }}; "
-            if callback_value.nullable
-            else ""
-        )
-        return f"  public actual fun {method}({params}) {{ {loaded}{admission(plan)}; {disabled}{SCOPE}().use {{ registrations -> val token = registrations.register(Generated{public}Registration(callback)); BindingStatus.check({prefix}{plan.name}({pointer}, {token}, {releaser})); registrations.accept(org.maplibre.nativeffi.internal.callback.CallbackOwner.global) }} }}\n"
-    if (
-        not registration.owner_release
-        or not registration.accepted_unless
-        or not callback.reentry_policy
-        or not callback.reentry_policy.registration_owner
-    ):
-        raise Unsupported(
-            "direct callback requires native release or a verified owner retirement"
-        )
-    arena = (
-        "Arena.ofConfined().use { arena ->"
-        if platform == "jvmMain"
-        else "PointerScope().use { arena ->"
-        if platform == "androidMain"
-        else "memScoped { val arena = this;"
-    )
     output = (
         "arena.allocate(ValueLayout.JAVA_BOOLEAN)"
         if platform == "jvmMain"
@@ -737,7 +726,6 @@ def direct_operation(plan, values, platform):
         if platform == "androidMain"
         else "alloc<BooleanVar>()"
     )
-    output_pointer = "out" if platform != "nativeMain" else "out.ptr"
     read = (
         "out.get(ValueLayout.JAVA_BOOLEAN, 0)"
         if platform == "jvmMain"
@@ -745,15 +733,62 @@ def direct_operation(plan, values, platform):
         if platform == "androidMain"
         else "out.value"
     )
-    allowed = (
-        "setOf("
-        + ", ".join('"' + op + '"' for op in callback.reentry_policy.operations)
+    arena = (
+        "Arena.ofConfined().use { arena ->"
+        if platform == "jvmMain"
+        else "PointerScope().use { arena ->"
+        if platform == "androidMain"
+        else "memScoped {"
+    )
+
+    def call(disabled):
+        arguments = []
+        for parameter in plan.function.parameters:
+            if parameter.name == plan.receiver:
+                arguments.append("raw")
+            elif parameter.name == registration.callback:
+                arguments.append(
+                    null if disabled else f"GeneratedDirectCallbacks.{public}Stub"
+                )
+            elif parameter.name == registration.user_data:
+                arguments.append(null if disabled else token)
+            elif parameter.name == registration.release_callback:
+                arguments.append(
+                    null
+                    if disabled
+                    else f"GeneratedDirectCallbacks.{public}ReleaseStub"
+                )
+            else:
+                arguments.append("out.ptr" if platform == "nativeMain" else "out")
+        return f"BindingStatus.check({prefix}{plan.name}({', '.join(arguments)}))"
+
+    owner = (
+        "bindingCallbacks"
+        if plan.receiver
+        else "org.maplibre.nativeffi.internal.callback.CallbackOwner.global"
+    )
+    register = (
+        f"val token = registrations.register(Generated{public}Registration(callback)"
+        + (", raw.toLong()" if owned else "")
         + ")"
     )
-    invoke = f"{{ val scope = {ADMISSION}.scope(owner, {allowed}); try {{ callback() }} finally {{ scope.close() }} }}"
-    call = f"{prefix}{plan.name}(raw, GeneratedDirectCallbacks.{public}Stub, {token}, {output_pointer})"
-    family = name(receiver_value(plan).native)
-    return f"  public actual fun {method}({params}): Boolean {{ {loaded}val owner = binding{family}Handle().toLong(); {admission(plan)}; return bindingRegister{family}Cancel({invoke}) {{ raw, token -> {arena} val out = {output}; val status = {call}; org.maplibre.nativeffi.internal.callback.DecisionCancelSetResult(status, {read}) }} }} }}\n"
+    if condition:
+        flag = identifier(condition)
+        body = f"{SCOPE}().use {{ registrations -> {arena} {register}; val out = {output}; {call(False)}; val {flag} = {read}; if (!{flag}) registrations.accept({owner}); {flag} }} }}"
+    else:
+        body = f"{SCOPE}().use {{ registrations -> {register}; {call(False)}; registrations.accept({owner}) }}"
+    if callback_value.nullable:
+        body = f"if (callback == null) {call(True)} else {body}"
+    if plan.receiver:
+        body = f"bindingRead{name(receiver_value(plan).native)} {{ raw -> {body} }}"
+    loaded = (
+        "NativeAccess.ensureLoaded(); "
+        if platform in {"jvmMain", "androidMain"}
+        else ""
+    )
+    if condition:
+        return f"  public actual fun {method}({params}): Boolean {{ {loaded}{admission(plan)}; return {body} }}\n"
+    return f"  public actual fun {method}({params}) {{ {loaded}{admission(plan)}; {body} }}\n"
 
 
 def android_bridge(values):

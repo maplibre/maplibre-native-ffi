@@ -12,7 +12,7 @@ import org.maplibre.nativeffi.internal.status.Status as BindingStatus
 
 @OptIn(ExperimentalForeignApi::class)
 public actual abstract class GeneratedRuntimeOperations internal actual constructor() {
-  internal val bindingCallbacks = org.maplibre.nativeffi.internal.callback.CallbackOwner()
+  internal actual val bindingCallbacks = org.maplibre.nativeffi.internal.callback.CallbackOwner()
 
   internal abstract fun bindingRuntimeHandle(): ULong
 

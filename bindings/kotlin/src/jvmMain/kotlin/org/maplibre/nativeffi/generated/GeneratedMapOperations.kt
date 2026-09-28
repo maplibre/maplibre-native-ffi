@@ -16,7 +16,7 @@ import org.maplibre.nativeffi.internal.status.Status as BindingStatus
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
 public actual abstract class GeneratedMapOperations internal actual constructor() {
-  internal val bindingCallbacks = org.maplibre.nativeffi.internal.callback.CallbackOwner()
+  internal actual val bindingCallbacks = org.maplibre.nativeffi.internal.callback.CallbackOwner()
 
   internal abstract fun bindingMapHandle(): Long
 

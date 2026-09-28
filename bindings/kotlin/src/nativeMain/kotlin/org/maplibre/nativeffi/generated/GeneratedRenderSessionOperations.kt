@@ -15,7 +15,7 @@ import platform.posix.size_tVar
 
 @OptIn(ExperimentalForeignApi::class)
 public actual abstract class GeneratedRenderSessionOperations internal actual constructor() {
-  internal val bindingCallbacks = org.maplibre.nativeffi.internal.callback.CallbackOwner()
+  internal actual val bindingCallbacks = org.maplibre.nativeffi.internal.callback.CallbackOwner()
 
   internal abstract fun bindingRenderSessionHandle(): ULong
 

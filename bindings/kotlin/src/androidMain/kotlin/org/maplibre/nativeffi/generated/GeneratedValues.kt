@@ -4082,7 +4082,7 @@ private fun generatedGeneratedResourceRequestCancelCallbackRegistrationCallback(
     val invoke = value.callback
     val callbackScope =
       org.maplibre.nativeffi.internal.callback.CallbackAdmission.scope(
-        null,
+        root.owner,
         setOf(
           "mln_resource_request_complete",
           "mln_resource_request_cancelled",

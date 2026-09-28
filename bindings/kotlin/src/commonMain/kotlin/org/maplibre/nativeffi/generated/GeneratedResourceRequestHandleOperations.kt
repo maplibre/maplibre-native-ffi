@@ -5,6 +5,8 @@ import org.maplibre.nativeffi.generated.*
 import org.maplibre.nativeffi.internal.callback.*
 
 public expect abstract class GeneratedResourceRequestHandleOperations internal constructor() {
+  internal val bindingCallbacks: org.maplibre.nativeffi.internal.callback.CallbackOwner
+
   public fun resourceRequestCancelled(): Boolean
 
   public fun resourceRequestComplete(response: ResourceResponse): Unit

@@ -13,7 +13,7 @@ import org.maplibre.nativeffi.runtime.CommandCompletion
 
 @OptIn(ExperimentalForeignApi::class)
 public actual abstract class GeneratedMapOperations internal actual constructor() {
-  internal val bindingCallbacks = org.maplibre.nativeffi.internal.callback.CallbackOwner()
+  internal actual val bindingCallbacks = org.maplibre.nativeffi.internal.callback.CallbackOwner()
 
   internal abstract fun bindingMapHandle(): ULong
 

@@ -49,7 +49,8 @@ def hooks(bound, native, plans):
         None,
     )
     return Hooks(
-        read=bool(decision) or any(needs_read(plan) for plan in members),
+        read=bool(decision)
+        or any(needs_read(plan) or plan.direct_registrations for plan in members),
         close=any(plan.consumes and not plan.completion for plan in members),
         retire=any(plan.consumes and plan.completion for plan in members),
         issued=any(plan.receiver_access == "issued" for plan in members),
@@ -175,9 +176,6 @@ def owner(bound, native, plans, platform):
         )
         body.append(
             f"  internal override fun bindingComplete{family}(call: ({typ}) -> Int) {{ state.complete {{ call(handle) }} }}"
-        )
-        body.append(
-            f"  internal override fun bindingRegister{family}Cancel(callback: () -> Unit, call: ({typ}, Long) -> org.maplibre.nativeffi.internal.callback.DecisionCancelSetResult): Boolean = state.registerCancel(callback) {{ token -> call(handle, token) }}"
         )
         if needs.close:
             # The release waits for in-flight calls and may run after this call

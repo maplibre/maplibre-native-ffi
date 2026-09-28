@@ -1,8 +1,5 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
-import org.maplibre.nativeffi.internal.callback.DecisionCancelRegistration
-import org.maplibre.nativeffi.internal.callback.DecisionCancelSetResult
-import org.maplibre.nativeffi.internal.callback.DecisionCancelState
 import org.maplibre.nativeffi.internal.status.Status
 
 /**
@@ -19,15 +16,11 @@ internal class DecisionOwnerState(
   private val passThrough: UInt,
   dispose: (Long) -> Unit,
 ) {
-  private val registration = DecisionCancelRegistration()
-  private val cancel = DecisionCancelState(typeName, registration)
-
   /**
    * The release half of this state. It holds no host callback, so unreachable-owner cleanup can
-   * hold it without keeping an owner that a cancel callback captures reachable.
+   * hold it without keeping reachable an owner that its own cancel callback captures.
    */
-  val core: DecisionOwnerCore =
-    DecisionOwnerCore(typeName, ReleaseNative(handle, dispose, registration))
+  val core: DecisionOwnerCore = DecisionOwnerCore(typeName, ReleaseNative(handle, dispose))
 
   /** Whether close or completion has marked the owner, even while borrows still drain. */
   val isClosed: Boolean
@@ -50,20 +43,8 @@ internal class DecisionOwnerState(
     }
   }
 
-  /** Installs [callback] and returns whether native reported the owner already cancelled. */
-  fun registerCancel(
-    callback: () -> Unit,
-    setNative: (token: Long) -> DecisionCancelSetResult,
-  ): Boolean = core.withLiveHandle {
-    val cancelled = cancel.register(callback, setNative) != null
-    if (core.isClosed) cancel.drop()
-    cancelled
-  }
-
   fun close() {
-    cancel.drop()
     core.close()
-    cancel.drop()
   }
 
   /** Settles the callback's [raw] decision and returns the value native receives. */
@@ -75,29 +56,15 @@ internal class DecisionOwnerState(
     }
 
   /** Settles a callback that threw instead of deciding. */
-  fun finishException(): UInt =
-    core.finishException()?.let(::finish) ?: handedBack(UNKNOWN_DECISION)
+  fun finishException(): UInt = core.finishException()?.let(::finish) ?: UNKNOWN_DECISION
 
   private fun finish(decision: DecisionOwnerCore.Decision): UInt =
-    if (decision == DecisionOwnerCore.Decision.PASS_THROUGH) handedBack(passThrough) else accept
+    if (decision == DecisionOwnerCore.Decision.PASS_THROUGH) passThrough else accept
 
-  private fun handedBack(result: UInt): UInt {
-    cancel.drop()
-    registration.dispose()
-    return result
-  }
-
-  private class ReleaseNative(
-    private val handle: Long,
-    private val dispose: (Long) -> Unit,
-    private val registration: DecisionCancelRegistration,
-  ) : () -> Unit {
+  private class ReleaseNative(private val handle: Long, private val dispose: (Long) -> Unit) :
+    () -> Unit {
     override fun invoke() {
-      try {
-        dispose(handle)
-      } finally {
-        registration.dispose()
-      }
+      dispose(handle)
     }
   }
 

@@ -13,18 +13,13 @@ import org.maplibre.nativeffi.internal.status.Status as BindingStatus
 
 public actual abstract class GeneratedResourceRequestHandleOperations
 internal actual constructor() {
-  internal val bindingCallbacks = org.maplibre.nativeffi.internal.callback.CallbackOwner()
+  internal actual val bindingCallbacks = org.maplibre.nativeffi.internal.callback.CallbackOwner()
 
   internal abstract fun bindingResourceRequestHandleHandle(): Long
 
   internal abstract fun <T> bindingReadResourceRequestHandle(block: (Long) -> T): T
 
   internal abstract fun bindingCompleteResourceRequestHandle(call: (Long) -> Int)
-
-  internal abstract fun bindingRegisterResourceRequestHandleCancel(
-    callback: () -> Unit,
-    call: (Long, Long) -> org.maplibre.nativeffi.internal.callback.DecisionCancelSetResult,
-  ): Boolean
 
   internal abstract fun bindingIssuedResourceRequestHandleHandle(): Long
 
@@ -89,24 +84,38 @@ internal actual constructor() {
     }
   }
 
-  public actual fun resourceRequestSetCancelCallback(callback: ResourceRequestCancelCallback) {
+  public actual fun resourceRequestSetCancelCallback(
+    callback: ResourceRequestCancelCallback
+  ): Boolean {
     try {
       NativeAccess.ensureLoaded()
       org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(
         bindingResourceRequestHandleHandle().toLong(),
         "mln_resource_request_set_cancel_callback",
       )
-      org.maplibre.nativeffi.internal.callback.CallbackRegistrationScope().use { registrations ->
-        val token =
-          registrations.register(GeneratedResourceRequestCancelCallbackRegistration(callback))
-        BindingStatus.check(
-          MapLibreNativeC.mln_resource_request_set_cancel_callback(
-            GeneratedDirectCallbacks.ResourceRequestCancelCallbackStub,
-            MemorySegment.ofAddress(token),
-            GeneratedDirectCallbacks.ResourceRequestCancelCallbackReleaseStub,
-          )
-        )
-        registrations.accept(org.maplibre.nativeffi.internal.callback.CallbackOwner.global)
+      return bindingReadResourceRequestHandle { raw ->
+        org.maplibre.nativeffi.internal.callback.CallbackRegistrationScope().use { registrations ->
+          Arena.ofConfined().use { arena ->
+            val token =
+              registrations.register(
+                GeneratedResourceRequestCancelCallbackRegistration(callback),
+                raw.toLong(),
+              )
+            val out = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+            BindingStatus.check(
+              MapLibreNativeC.mln_resource_request_set_cancel_callback(
+                raw,
+                GeneratedDirectCallbacks.ResourceRequestCancelCallbackStub,
+                MemorySegment.ofAddress(token),
+                GeneratedDirectCallbacks.ResourceRequestCancelCallbackReleaseStub,
+                out,
+              )
+            )
+            val outCancelled = out.get(ValueLayout.JAVA_BOOLEAN, 0)
+            if (!outCancelled) registrations.accept(bindingCallbacks)
+            outCancelled
+          }
+        }
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)

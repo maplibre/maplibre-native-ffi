@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi.resource
 
+import java.lang.foreign.Arena
+import java.lang.foreign.ValueLayout
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -12,13 +14,16 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.ResourceProvider
 import org.maplibre.nativeffi.generated.ResourceProviderDecision
 import org.maplibre.nativeffi.generated.ResourceRequestHandle
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC
-import org.maplibre.nativeffi.internal.callback.DecisionCancelRegistry
-import org.maplibre.nativeffi.internal.callback.DecisionCancelSetResult
 import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.internal.loader.NativeAccess
+import org.maplibre.nativeffi.runtime.runSuspendTest
+import org.maplibre.nativeffi.runtime.use
 
 class ResourceRequestHandleJvmTest {
   @Test
@@ -74,41 +79,62 @@ class ResourceRequestHandleJvmTest {
   }
 
   @Test
-  fun unreachableHandleWithSelfCapturingCancelCallbackReleasesNativeRequest() {
-    val released = CountDownLatch(1)
-    registerUnreachable(released)
-    repeat(100) {
-      if (released.await(20, TimeUnit.MILLISECONDS)) return
-      System.gc()
+  fun unreachableHandleWithSelfCapturingCancelCallbackReleasesNativeRequest(): Unit =
+    runSuspendTest {
+      GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+        val raw = AtomicLong(0)
+        runtime.setResourceProvider(selfCapturingCancelProvider(raw)).await()
+        val map =
+          runtime
+            .mapCreate(
+              GeneratedApi.mapOptionsDefault()
+                .copy(
+                  initialExtent =
+                    GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
+                )
+            )
+            .await()
+        try {
+          map.setStyleUrl(SELF_CAPTURING_URL).await()
+          var rounds = 0
+          while (raw.get() == 0L && rounds++ < 10_000) {
+            runtime.barrier().await()
+            Thread.sleep(1)
+          }
+          assertTrue(raw.get() != 0L, "resource provider did not receive the request")
+          // Only the handle's own cancel callback captures it, and the map keeps the request live.
+          val released =
+            (0 until 100).any {
+              System.gc()
+              Thread.sleep(20)
+              isReleased(raw.get())
+            }
+          assertTrue(released, "self-capturing cancel callback kept its owner reachable")
+        } finally {
+          map.release().await()
+        }
+      }
     }
-    assertEquals(0L, released.count, "self-capturing callback kept its owner reachable")
-  }
 
-  private fun registerUnreachable(released: CountDownLatch) {
-    val handle =
-      ResourceRequestHandle(SyntheticHandles.resourceRequest(), dispose = { released.countDown() })
-    handle.bindingRegisterResourceRequestHandleCancel({ handle.close() }) { _, _ ->
-      DecisionCancelSetResult(0, false)
-    }
-    handle.finishBindingDecision(ResourceProviderDecision.HANDLE.rawValue)
-  }
-
-  @Test
-  fun providerPassThroughDisarmsCancellationWithoutReleasingTwice() {
-    val token = AtomicLong(0)
-    var releases = 0
-    val handle = ResourceRequestHandle(SyntheticHandles.resourceRequest(), dispose = { releases++ })
-    handle.bindingRegisterResourceRequestHandleCancel({}) { _, registered ->
-      token.set(registered)
-      DecisionCancelSetResult(0, false)
-    }
-    assertTrue(DecisionCancelRegistry.isRegisteredForTesting(token.get()))
-    assertEquals(
-      ResourceProviderDecision.PASS_THROUGH.rawValue,
-      handle.finishBindingDecision(ResourceProviderDecision.PASS_THROUGH.rawValue),
+  private fun selfCapturingCancelProvider(raw: AtomicLong) =
+    ResourceProvider(
+      callback = provider@{ request, handle ->
+          if (request.requestedUrl != SELF_CAPTURING_URL) {
+            return@provider ResourceProviderDecision.PASS_THROUGH
+          }
+          assertFalse(handle.resourceRequestSetCancelCallback { handle.close() })
+          raw.set(handle.bindingIssuedResourceRequestHandleHandle())
+          ResourceProviderDecision.HANDLE
+        }
     )
-    assertFalse(DecisionCancelRegistry.isRegisteredForTesting(token.get()))
-    handle.close()
-    assertEquals(0, releases)
-  }
+
+  private fun isReleased(raw: Long): Boolean =
+    Arena.ofConfined().use { arena ->
+      MapLibreNativeC.mln_resource_request_cancelled(
+        raw,
+        arena.allocate(ValueLayout.JAVA_BOOLEAN),
+      ) != MaplibreStatus.OK.nativeCode
+    }
 }
+
+private const val SELF_CAPTURING_URL = "custom://self-capturing-cancel-style.json"

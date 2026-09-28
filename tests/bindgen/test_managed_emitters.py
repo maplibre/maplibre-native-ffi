@@ -86,6 +86,43 @@ void mln_measurement_destroy(mln_measurement_handle owner);
         # A release named close() is inherited instead of wrapped.
         self.assertNotIn("fun close()", files[generated.format("jvmMain", "MapHandle")])
 
+    def test_kotlin_conditional_registration_roots_in_its_receiver_until_native_release(
+        self,
+    ):
+        api = self.parse(
+            """
+typedef void (*mln_release)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
+typedef void (*mln_watch)(void *context BIND("kind=context;lifetime=owner")) BIND("reentry=protocol;reentry_owner=registration;reentry_calls=mln_map_close;thread=native;failure=contain");
+BIND("execution=immediate;registration=callback;user_data=context;release_callback=release;accepted_unless=done")
+mln_status mln_map_watch(mln_map map, mln_watch callback, void *context BIND("kind=context;ownership=borrowed"), mln_release release, _Bool *done BIND("direction=out"));
+""",
+            map_handle=True,
+        )
+        self.assertEqual(kotlin.coverage(api)["unsupported"], {})
+        files = kotlin.generate(api)
+        generated = "src/{}/kotlin/org/maplibre/nativeffi/generated/{}.kt"
+        self.assertIn(
+            "fun mapWatch(callback: Watch): Boolean",
+            files[generated.format("commonMain", "GeneratedMapOperations")],
+        )
+        operation = files[generated.format("jvmMain", "GeneratedMapOperations")]
+        self.assertIn("bindingReadMap { raw ->", operation)
+        self.assertIn(
+            "registrations.register(GeneratedWatchRegistration(callback), raw.toLong())",
+            operation,
+        )
+        self.assertIn(
+            "MapLibreNativeC.mln_map_watch(raw, GeneratedDirectCallbacks.WatchStub, MemorySegment.ofAddress(token), GeneratedDirectCallbacks.WatchReleaseStub, out)",
+            operation,
+        )
+        # Native keeps nothing it reports through the condition, so the scope frees that root.
+        self.assertIn(
+            "if (!done) registrations.accept(bindingCallbacks); done", operation
+        )
+        values = files[generated.format("jvmMain", "GeneratedValues")]
+        self.assertIn("CallbackAdmission.scope(root.owner,", values)
+        self.assertIn("CallbackRoots.release(context.address())", values)
+
     def parse(self, source, header="metrics.h", map_handle=False):
         prelude = PRELUDE
         if map_handle:

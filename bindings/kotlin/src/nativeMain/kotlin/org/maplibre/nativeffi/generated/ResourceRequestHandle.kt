@@ -31,11 +31,6 @@ internal constructor(
     state.complete { call(handle) }
   }
 
-  internal override fun bindingRegisterResourceRequestHandleCancel(
-    callback: () -> Unit,
-    call: (ULong, Long) -> org.maplibre.nativeffi.internal.callback.DecisionCancelSetResult,
-  ): Boolean = state.registerCancel(callback) { token -> call(handle, token) }
-
   internal override fun bindingCloseResourceRequestHandle(call: (ULong) -> Int) {
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(
       handle.toLong(),

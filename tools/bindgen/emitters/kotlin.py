@@ -161,24 +161,29 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                     if platform == "commonMain"
                     else f"public actual abstract class {class_name} internal actual constructor() {{\n"
                 )
-                if platform != "commonMain":
-                    callback_owner = any(
-                        (operation.registrations or operation.direct_registrations)
-                        and (
-                            (
-                                operation.receiver
-                                and kotlin_ir.receiver_value(operation).native
-                                == receiver
-                            )
-                            or any(
-                                output.handle.native == receiver
-                                for output in operation.owned_outputs
-                            )
+                callback_owner = any(
+                    (operation.registrations or operation.direct_registrations)
+                    and (
+                        (
+                            operation.receiver
+                            and kotlin_ir.receiver_value(operation).native == receiver
                         )
-                        for operation in bound.operations
+                        or any(
+                            output.handle.native == receiver
+                            for output in operation.owned_outputs
+                        )
                     )
-                    if callback_owner:
-                        source += "  internal val bindingCallbacks = org.maplibre.nativeffi.internal.callback.CallbackOwner()\n"
+                    for operation in bound.operations
+                )
+                # Common code sees the owner too, so shared tests can observe
+                # which registrations native still holds.
+                if callback_owner:
+                    source += (
+                        "  internal val bindingCallbacks: org.maplibre.nativeffi.internal.callback.CallbackOwner\n"
+                        if platform == "commonMain"
+                        else "  internal actual val bindingCallbacks = org.maplibre.nativeffi.internal.callback.CallbackOwner()\n"
+                    )
+                if platform != "commonMain":
                     raw = "ULong" if platform == "nativeMain" else "Long"
                     needs = kotlin_owners.hooks(
                         bound,
@@ -192,7 +197,6 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                         source += f"  internal abstract fun <T> bindingRead{family}(block: ({raw}) -> T): T\n"
                     if needs.decision:
                         source += f"  internal abstract fun bindingComplete{family}(call: ({raw}) -> Int)\n"
-                        source += f"  internal abstract fun bindingRegister{family}Cancel(callback: () -> Unit, call: ({raw}, Long) -> org.maplibre.nativeffi.internal.callback.DecisionCancelSetResult): Boolean\n"
                     if needs.issued:
                         source += f"  internal abstract fun bindingIssued{family}Handle(): {raw}\n"
                     if needs.close:

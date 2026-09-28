@@ -382,15 +382,19 @@ class RuntimeHandleTest {
       val handle = waitForHandledRequest(runtime, handledRequest)
       val cancels = AtomicInt(0)
       val rejectedCancels = AtomicInt(0)
-      handle.resourceRequestSetCancelCallback { cancels.addAndFetch(1) }
-      // The request keeps its first callback.
+      assertFalse(handle.resourceRequestSetCancelCallback { cancels.addAndFetch(1) })
+      // The request keeps its first callback, and the rejected one keeps no root.
       assertFailsWith<InvalidStateException> {
         handle.resourceRequestSetCancelCallback { rejectedCancels.addAndFetch(1) }
       }
+      assertEquals(1, handle.bindingCallbacks.rootCountForTesting())
 
       map.release().await()
 
       assertTrue(waitForCondition { cancels.load() == 1 })
+      // Native releases the callback once it returns, before the request itself is released.
+      assertTrue(waitForCondition { handle.bindingCallbacks.rootCountForTesting() == 0 })
+      assertFalse(handle.isClosed)
       assertTrue(handle.resourceRequestCancelled())
       repeat(CANCEL_SETTLE_ROUNDS) {
         runtime.barrier().await()
@@ -439,6 +443,8 @@ class RuntimeHandleTest {
 
       val cancels = AtomicInt(0)
       assertTrue(handle.resourceRequestSetCancelCallback { cancels.addAndFetch(1) })
+      // Native stored nothing, so the binding frees the callback at once.
+      assertEquals(0, handle.bindingCallbacks.rootCountForTesting())
       assertEquals(0, cancels.load())
       assertFailsWith<InvalidStateException> {
         handle.resourceRequestComplete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
@@ -470,6 +476,65 @@ class RuntimeHandleTest {
         sleepMillis(1)
       }
       assertEquals(0, cancels.load())
+      assertEquals(1, handle.bindingCallbacks.rootCountForTesting())
+      handle.close()
+      assertEquals(0, handle.bindingCallbacks.rootCountForTesting())
+    }
+  }
+
+  @Test
+  fun releasingANeverCancelledRequestReleasesItsCancelCallback(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+      val handledRequest = captureHandledRequest(runtime, "custom://released-cancel-style.json")
+      val map = createSmallMap(runtime)
+      map.setStyleUrl("custom://released-cancel-style.json").await()
+      val handle = waitForHandledRequest(runtime, handledRequest)
+      val cancels = AtomicInt(0)
+      assertFalse(handle.resourceRequestSetCancelCallback { cancels.addAndFetch(1) })
+      assertEquals(1, handle.bindingCallbacks.rootCountForTesting())
+
+      handle.close()
+
+      assertEquals(0, handle.bindingCallbacks.rootCountForTesting())
+      map.release().await()
+      repeat(CANCEL_SETTLE_ROUNDS) {
+        runtime.barrier().await()
+        sleepMillis(1)
+      }
+      assertEquals(0, cancels.load())
+    }
+  }
+
+  @Test
+  fun passThroughReleasesACancelCallbackRegisteredDuringTheDecision(): Unit = runSuspendTest {
+    GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
+      val handledRequest = AtomicReference<ResourceRequestHandle?>(null)
+      val cancels = AtomicInt(0)
+      runtime
+        .setResourceProvider(
+          ResourceProvider(
+            callback = provider@{ request, handle ->
+                if (request.requestedUrl == "custom://pass-through-cancel-style.json") {
+                  handle.resourceRequestSetCancelCallback { cancels.addAndFetch(1) }
+                  handledRequest.store(handle)
+                }
+                ResourceProviderDecision.PASS_THROUGH
+              }
+          )
+        )
+        .await()
+      val map = createSmallMap(runtime)
+      try {
+        map.setStyleUrl("custom://pass-through-cancel-style.json").await()
+        val handle = waitForHandledRequest(runtime, handledRequest)
+
+        // Native retires a passed-through request, and with it the callback registered on it.
+        assertTrue(waitForCondition { handle.bindingCallbacks.rootCountForTesting() == 0 })
+        assertTrue(handle.isClosed)
+        assertEquals(0, cancels.load())
+      } finally {
+        map.release().await()
+      }
     }
   }
 

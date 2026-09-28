@@ -7,6 +7,8 @@ import org.maplibre.nativeffi.internal.callback.*
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
 public expect abstract class GeneratedMapOperations internal constructor() {
+  internal val bindingCallbacks: org.maplibre.nativeffi.internal.callback.CallbackOwner
+
   public fun addColorReliefLayer(
     layerId: String,
     sourceId: String,
