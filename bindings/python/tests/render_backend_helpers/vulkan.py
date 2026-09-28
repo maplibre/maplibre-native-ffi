@@ -9,7 +9,7 @@ from importlib import abc, metadata, util
 from pathlib import Path
 from typing import Any, Self
 
-from maplibre_native_ffi import render
+from maplibre_native_ffi import api as render
 
 
 class VulkanUnavailableError(RuntimeError):
@@ -114,16 +114,16 @@ def _function_address(name: str) -> int:
     return _addr(vk.ffi.addressof(vk.lib, name))
 
 
-def _pointer(value: Any, name: str) -> render.NativePointer:
-    return render.NativePointer(_addr(value), _diagnostic_name=name)
+def _pointer(value: Any, name: str) -> int:
+    return _addr(value)
 
 
-def _handle(value: Any, name: str) -> render.VulkanHandle:
+def _handle(value: Any, name: str) -> int:
     try:
         bits = int(value)
     except TypeError:
         bits = _addr(value)
-    return render.VulkanHandle(bits, _diagnostic_name=name)
+    return bits
 
 
 def _extension_name(extension: Any) -> str:

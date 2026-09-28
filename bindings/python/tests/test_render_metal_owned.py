@@ -1,17 +1,32 @@
 from __future__ import annotations
 
-import threading
+import gc
 import time
-from collections.abc import Callable
-from dataclasses import dataclass
+import weakref
+from collections.abc import Callable, Iterator
+from contextlib import closing
+from dataclasses import dataclass, replace
 
 import maplibre_native_ffi as mln
 import pytest
-from maplibre_native_ffi import camera, query, render
+from maplibre_native_ffi import api as render
+from maplibre_native_ffi.api import CameraOptions
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
+    assert_abandon_retires_the_session,
     assert_cluster_feature_extensions,
+    assert_frame_demands_report_their_own_tokens,
     assert_geojson_cluster_source,
+    assert_invalid_state,
+    assert_session_maintenance_commands_round_trip,
+    assert_texture_ring_exhaustion_reports_not_ready,
+    close_session,
+    finish_render_operation,
+    map_extent,
+    read_texture_info,
+    release_frame,
+    render_until_update,
+    request_and_finish_frame,
     skip_or_fail_fixture_setup,
 )
 
@@ -39,8 +54,10 @@ class MetalOwnedSession:
         width: int = 32,
         height: int = 16,
         scale_factor: float = 1.0,
+        driver: mln.RenderDriverKind = mln.RenderDriverKind.CORE_WORKER,
+        ring_depth: int = 1,
     ) -> MetalOwnedSession:
-        if not mln.supported_render_backends() & mln.RenderBackend.METAL:
+        if not mln.supported_render_backend_mask() & mln.RenderBackendFlag.METAL:
             skip_or_fail_fixture_setup(
                 "native library does not support Metal render sessions",
                 "metal",
@@ -53,15 +70,25 @@ class MetalOwnedSession:
                 "metal",
             )
 
-        runtime = mln.RuntimeHandle()
+        runtime = mln.runtime_create()
         try:
-            map_handle = runtime.create_map(
-                mln.MapOptions(width=64, height=64, mode=mln.MapMode.STATIC)
-            )
-            try:
-                session = map_handle.attach_metal_owned_texture(
-                    context.owned_texture_descriptor(width, height, scale_factor)
+            map_handle = runtime.map_create(
+                replace(
+                    mln.MapOptions.default(),
+                    map_mode=mln.MapMode.CONTINUOUS,
+                    initial_extent=mln.LogicalExtent(width, height, scale_factor),
                 )
+            ).result(timeout=5)
+            try:
+                session, attach = map_handle.metal_owned_texture_attach(
+                    context.owned_texture_descriptor(width, height, scale_factor),
+                    replace(
+                        mln.RenderSessionAttachOptions.default(),
+                        driver=driver,
+                        requested_texture_ring_depth=ring_depth,
+                    ),
+                )
+                finish_render_operation(session, attach)
             except BaseException:
                 map_handle.close()
                 raise
@@ -74,7 +101,7 @@ class MetalOwnedSession:
 
     def close(self) -> None:
         if not self.session.closed:
-            self.session.close()
+            close_session(self.session)
         if not self.map.closed:
             self.map.close()
         if not self.runtime.closed:
@@ -84,11 +111,11 @@ class MetalOwnedSession:
     def render_once(self) -> None:
         self.map.set_style_json(EMPTY_STYLE_JSON.encode())
         frame = wait_for_metal_frame(self, lambda _: True)
-        frame.close()
+        release_frame(frame)
 
 
 @pytest.fixture
-def metal_owned_session() -> MetalOwnedSession:
+def metal_owned_session() -> Iterator[MetalOwnedSession]:
     fixture = MetalOwnedSession.create()
     try:
         yield fixture
@@ -96,390 +123,269 @@ def metal_owned_session() -> MetalOwnedSession:
         fixture.close()
 
 
-def request_still_image_if_needed(map_handle: mln.MapHandle) -> None:
-    try:
-        map_handle.request_still_image()
-    except mln.InvalidStateError as error:
-        if "pending still-image request" not in error.diagnostic:
-            raise
-
-
-def wait_for_texture_info(
-    fixture: MetalOwnedSession,
-    *,
-    iterations: int = 5000,
-) -> render.TextureImageInfo:
-    fixture.map.set_style_json(EMPTY_STYLE_JSON.encode())
-    request_still_image_if_needed(fixture.map)
-    for _ in range(iterations):
-        fixture.runtime.pump()
-        for event in fixture.runtime.drain_events().events:
-            if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
-                try:
-                    fixture.session.render_update()
-                except mln.InvalidStateError:
-                    pass
-        try:
-            return fixture.session.texture_image_info()
-        except mln.InvalidStateError:
-            time.sleep(0.001)
-    raise AssertionError("Metal texture readback metadata was not observed")
-
-
 def wait_for_metal_frame(
     fixture: MetalOwnedSession,
     predicate: Callable[[render.MetalOwnedTextureFrame], bool],
     *,
     iterations: int = 5000,
-) -> render.MetalOwnedTextureFrameHandle:
-    request_still_image_if_needed(fixture.map)
+) -> render.AcquiredFrameHandle:
     last_frame: render.MetalOwnedTextureFrame | None = None
     for _ in range(iterations):
-        fixture.runtime.pump()
-        for event in fixture.runtime.drain_events().events:
-            if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
-                try:
-                    fixture.session.render_update()
-                except mln.InvalidStateError:
-                    pass
+        # Forced rather than render-if-needed: a settled style would otherwise
+        # report NO_UPDATE forever and never fill a ring slot.
+        request_and_finish_frame(fixture.session, flags=render.FrameDemandFlag(0))
         try:
-            frame = fixture.session.acquire_metal_owned_texture_frame()
-        except mln.InvalidStateError:
+            frame = fixture.session.acquire_frame()
+        except mln.InvalidStateError, mln.NotReadyError:
+            # No slot holds a frame this host has not already taken.
             time.sleep(0.001)
             continue
-        last_frame = frame.frame
+        last_frame = frame.with_metal_texture(lambda view: view)
         if predicate(last_frame):
             return frame
-        frame.close()
-        time.sleep(0.001)
+        release_frame(frame)
     raise AssertionError(f"matching Metal frame was not observed; last={last_frame!r}")
 
 
-def set_target_calls(
-    session: render.RenderSessionHandle,
-) -> tuple[Callable[[], object], ...]:
-    """Return one `set_*_target` call per backend and target kind.
-
-    Every descriptor here names null backend handles, which is all these tests
-    need: the acquired-frame guard and the session's owner thread are both
-    checked before any handle is read.
-    """
-    extent = render.RenderTargetExtent(16, 16, 1.0)
-    return (
-        lambda: session.set_metal_surface_target(
-            render.MetalSurfaceDescriptor(extent=extent)
-        ),
-        lambda: session.set_vulkan_surface_target(
-            render.VulkanSurfaceDescriptor(extent=extent)
-        ),
-        lambda: session.set_opengl_surface_target(
-            render.OpenGLSurfaceDescriptor(extent=extent)
-        ),
-        lambda: session.set_metal_borrowed_texture_target(
-            render.MetalBorrowedTextureDescriptor(
-                extent=extent, physical_width=16, physical_height=16
-            )
-        ),
-        lambda: session.set_vulkan_borrowed_texture_target(
-            render.VulkanBorrowedTextureDescriptor(
-                extent=extent, physical_width=16, physical_height=16
-            )
-        ),
-        lambda: session.set_opengl_borrowed_texture_target(
-            render.OpenGLBorrowedTextureDescriptor(
-                extent=extent, physical_width=16, physical_height=16
-            )
-        ),
+def test_core_worker_renders_and_releases_owned_metal_frame(
+    metal_owned_session: MetalOwnedSession,
+) -> None:
+    metal_owned_session.map.set_style_json(EMPTY_STYLE_JSON.encode())
+    render_until_update(metal_owned_session.runtime, metal_owned_session.session)
+    result = metal_owned_session.session.get_snapshot().latest_result
+    assert result == render.RenderResult.RENDERED
+    frame = metal_owned_session.session.acquire_frame()
+    assert frame.get_result().disposition == result
+    assert frame.with_metal_texture(lambda view: view.texture) != 0
+    assert (
+        frame.with_metal_texture(lambda view: view.device)
+        == metal_owned_session.context.descriptor().device
     )
+    release_frame(frame)
+    assert frame.closed
+
+    # A rendered frame carries the map's repaint request with its result. A
+    # static empty style settles, so the signal clears within a few frames
+    # once nothing asks to draw again.
+    for token in range(2, 200):
+        settled = request_and_finish_frame(metal_owned_session.session, token=token)
+        assert settled.token == token
+        if (
+            settled.disposition == render.RenderResult.RENDERED
+            and settled.needs_repaint is False
+        ):
+            break
+        time.sleep(0.01)
+    else:
+        raise AssertionError("needs_repaint never cleared for a static style")
 
 
-def assert_invalid_state(call: Callable[[], object]) -> None:
-    with pytest.raises(mln.InvalidStateError) as raised:
-        call()
-    assert raised.value.status == mln.MaplibreStatus.INVALID_STATE
+def test_core_worker_reads_owned_metal_texture(
+    metal_owned_session: MetalOwnedSession,
+) -> None:
+    info = read_texture_info(
+        metal_owned_session.runtime,
+        metal_owned_session.map,
+        metal_owned_session.session,
+    )
+    # Readback metadata describes the attached extent and a row-padded buffer.
+    assert info.width == 32
+    assert info.height == 16
+    assert info.stride >= info.width * 4
+    assert info.byte_length >= info.stride * info.height
+
+    image = finish_render_operation(
+        metal_owned_session.session,
+        metal_owned_session.session.texture_read_premultiplied_rgba8(),
+    )
+    assert image.info == info
+    assert len(image.data) == info.byte_length
+
+
+def test_owned_metal_session_reports_core_worker_capabilities(
+    metal_owned_session: MetalOwnedSession,
+) -> None:
+    capabilities = metal_owned_session.session.get_capabilities()
+    snapshot = metal_owned_session.session.get_snapshot()
+    assert capabilities.driver == render.RenderDriverKind.CORE_WORKER
+    assert capabilities.texture_ring_depth in (1, 2, 3)
+    assert snapshot.driver == render.RenderDriverKind.CORE_WORKER
 
 
 def test_attach_returns_public_render_session_and_rejects_second_session(
     metal_owned_session: MetalOwnedSession,
 ) -> None:
     session = metal_owned_session.session
-
     assert isinstance(session, render.RenderSessionHandle)
     assert not session.closed
-    assert not session.detached
 
-    with pytest.raises(mln.InvalidStateError) as raised:
-        metal_owned_session.map.attach_metal_owned_texture(
-            metal_owned_session.context.owned_texture_descriptor(32, 16, 1.0)
+    # A map drives at most one session, so a second attach is rejected and
+    # leaves the first one usable.
+    assert_invalid_state(
+        lambda: metal_owned_session.map.metal_owned_texture_attach(
+            metal_owned_session.context.owned_texture_descriptor(32, 16, 1.0),
+            replace(
+                mln.RenderSessionAttachOptions.default(),
+                driver=mln.RenderDriverKind.CORE_WORKER,
+            ),
         )
-
-    assert raised.value.status == mln.MaplibreStatus.INVALID_STATE
+    )
     assert not session.closed
 
 
-def test_render_update_without_pending_update_reports_no_update_and_keeps_session_live(
+def test_detached_session_leaves_the_map_free_to_close(
     metal_owned_session: MetalOwnedSession,
 ) -> None:
-    update = metal_owned_session.session.render_update()
-    assert update.result == render.RenderResult.NO_UPDATE
-    assert update.needs_repaint is False
+    session = metal_owned_session.session
+    assert_invalid_state(metal_owned_session.map.close)
 
-    assert not metal_owned_session.session.closed
-    metal_owned_session.session.resize(32, 16, 1.0)
+    close_session(session)
+    assert session.closed
+    metal_owned_session.map.close()
 
 
-def test_resize_updates_metal_owned_texture_frame_extent(
+def test_frame_demand_without_a_newer_update_reports_no_update(
     metal_owned_session: MetalOwnedSession,
 ) -> None:
     metal_owned_session.render_once()
 
-    metal_owned_session.session.resize(16, 8, 2.0)
-    # The map applies the new logical size on its next pump, and a static map
-    # renders only on request, so pump the resize through before requesting the
-    # still image. A render before that pump reports the pending size.
-    assert (
-        metal_owned_session.session.render_update().result
-        == render.RenderResult.SIZE_PENDING
+    # Draining the settled style leaves nothing newer, so a render-if-needed
+    # demand terminates without drawing and keeps the session live.
+    for token in range(2, 64):
+        result = request_and_finish_frame(metal_owned_session.session, token=token)
+        if result.disposition == render.RenderResult.NO_UPDATE:
+            break
+        time.sleep(0.01)
+    else:
+        raise AssertionError("a settled style never reported NO_UPDATE")
+
+    assert result.needs_repaint is False
+    assert not metal_owned_session.session.closed
+
+
+def test_resize_updates_owned_metal_texture_frame_extent(
+    metal_owned_session: MetalOwnedSession,
+) -> None:
+    metal_owned_session.render_once()
+
+    finish_render_operation(
+        metal_owned_session.session,
+        metal_owned_session.session.resize(render.RenderTargetExtent(16, 8, 1.0)),
     )
-    metal_owned_session.runtime.pump()
+    # The session-owned texture is sized in device pixels, which at the
+    # session's fixed scale factor of 1 is the logical extent.
     frame = wait_for_metal_frame(
         metal_owned_session,
-        lambda info: (
-            info.width == 32 and info.height == 16 and info.scale_factor == 2.0
-        ),
+        lambda info: info.width == 16,
     )
     try:
-        info = frame.frame
-        assert info.width == 32
-        assert info.height == 16
-        assert info.scale_factor == pytest.approx(2.0)
-        assert info.generation >= 2
+        info = frame.with_metal_texture(lambda view: view)
+        assert info.height == 8
+        assert info.scale_factor == pytest.approx(1.0)
+        assert info.generation >= 1
     finally:
-        frame.close()
+        release_frame(frame)
 
 
-def test_cpu_readback_metadata_capacity_and_reusable_buffer(
+def test_map_size_follows_attach_and_session_resize(
     metal_owned_session: MetalOwnedSession,
 ) -> None:
-    info = wait_for_texture_info(metal_owned_session)
+    # Attachment sizes the map from the target rather than from map creation.
+    assert map_extent(metal_owned_session.map) == (32, 16, pytest.approx(1.0))
 
-    assert info.width == 32
-    assert info.height == 16
-    assert info.stride >= info.width * 4
-    assert info.byte_length >= info.stride * info.height
-
-    undersized = bytearray([0x7F] * (info.byte_length - 1))
-    with pytest.raises(mln.InvalidArgumentError) as raised:
-        metal_owned_session.session.read_premultiplied_rgba8_into(undersized)
-    assert raised.value.status == mln.MaplibreStatus.INVALID_ARGUMENT
-    assert set(undersized) == {0x7F}
-
-    reusable = bytearray(info.byte_length)
-    copied = metal_owned_session.session.read_premultiplied_rgba8_into(reusable)
-    assert copied == info
-    assert len(reusable) == info.byte_length
-
-
-def test_metal_frame_acquire_release_and_backend_handles(
-    metal_owned_session: MetalOwnedSession,
-) -> None:
-    metal_owned_session.render_once()
-
-    frame = metal_owned_session.session.acquire_metal_owned_texture_frame()
-    assert isinstance(frame, render.MetalOwnedTextureFrameHandle)
-    info = frame.frame
-    assert info.width == 32
-    assert info.height == 16
-    assert info.scale_factor == pytest.approx(1.0)
-    assert info.generation >= 1
-    assert info.frame_id >= 0
-    assert info.pixel_format != 0
-
-    texture = frame.texture
-    device = frame.device
-    assert isinstance(texture, render.NativePointer)
-    assert isinstance(device, render.NativePointer)
-    assert texture.address != 0
-    assert device.address == metal_owned_session.context.descriptor().device.address
-
-    frame.close()
-    assert frame.closed
-    assert_invalid_state(lambda: frame.texture)
-    assert_invalid_state(lambda: frame.device)
-
-
-def test_metal_frame_release_failure_leaves_frame_live_for_later_release() -> None:
-    class FakeNativeFrame:
-        closed = False
-        close_calls = 0
-
-        def frame(self) -> dict[str, object]:
-            return {
-                "generation": 1,
-                "width": 32,
-                "height": 16,
-                "scale_factor": 1.0,
-                "frame_id": 7,
-                "texture": 0x1000,
-                "device": 0x2000,
-                "pixel_format": 80,
-            }
-
-        def texture_address(self) -> int:
-            if self.closed:
-                raise mln.InvalidStateError(
-                    None, "MetalOwnedTextureFrameHandle is closed"
-                )
-            return 0x1000
-
-        def device_address(self) -> int:
-            if self.closed:
-                raise mln.InvalidStateError(
-                    None, "MetalOwnedTextureFrameHandle is closed"
-                )
-            return 0x2000
-
-        def close(self) -> None:
-            self.close_calls += 1
-            if self.close_calls == 1:
-                raise mln.InvalidStateError(None, "frame release failed")
-            self.closed = True
-
-    native = FakeNativeFrame()
-    frame = render.MetalOwnedTextureFrameHandle._from_native(native)
-
-    assert frame.texture.address == 0x1000
-    with pytest.raises(mln.InvalidStateError, match="frame release failed"):
-        frame.close()
-
-    assert not frame.closed
-    assert frame.texture.address == 0x1000
-    assert native.close_calls == 1
-
-    frame.close()
-    assert frame.closed
-    assert native.close_calls == 2
-    assert_invalid_state(lambda: frame.texture)
-
-
-def test_active_metal_frame_rejects_nested_acquire_and_session_operations(
-    metal_owned_session: MetalOwnedSession,
-) -> None:
-    metal_owned_session.render_once()
-
-    frame = metal_owned_session.session.acquire_metal_owned_texture_frame()
-    point_query = query.RenderedQueryGeometry.point_geometry(
-        camera.ScreenPoint(0.0, 0.0)
+    # An applied resize updates the map viewport.
+    finish_render_operation(
+        metal_owned_session.session,
+        metal_owned_session.session.resize(render.RenderTargetExtent(48, 24, 1.0)),
     )
-    feature = b'{"type":"Feature","geometry":null,"properties":{}}'
+    assert map_extent(metal_owned_session.map) == (48, 24, pytest.approx(1.0))
 
-    calls: tuple[Callable[[], object], ...] = (
-        lambda: metal_owned_session.session.resize(16, 16, 1.0),
-        metal_owned_session.session.render_update,
-        metal_owned_session.session.detach,
-        metal_owned_session.session.reduce_memory_use,
-        metal_owned_session.session.clear_data,
-        metal_owned_session.session.dump_debug_logs,
-        metal_owned_session.session.texture_image_info,
-        lambda: metal_owned_session.session.read_premultiplied_rgba8_into(bytearray(4)),
-        metal_owned_session.session.acquire_metal_owned_texture_frame,
-        metal_owned_session.session.acquire_vulkan_owned_texture_frame,
-        metal_owned_session.session.acquire_opengl_owned_texture_frame,
-        lambda: metal_owned_session.session.query_rendered_features(point_query),
-        lambda: metal_owned_session.session.query_source_features("point"),
-        lambda: metal_owned_session.session.query_feature_extensions(
-            "point",
-            feature,
-            "x",
-            "y",
-        ),
-        metal_owned_session.session.close,
-        *set_target_calls(metal_owned_session.session),
-    )
-    try:
-        for call in calls:
-            assert_invalid_state(call)
-        assert not metal_owned_session.session.closed
-    finally:
-        frame.close()
+    # The scale factor is fixed at attachment, so a session resize that changes
+    # it is rejected before any command is submitted.
+    with pytest.raises(mln.InvalidArgumentError):
+        metal_owned_session.session.resize(render.RenderTargetExtent(48, 24, 2.0))
+    assert map_extent(metal_owned_session.map) == (48, 24, pytest.approx(1.0))
 
 
-def test_stale_metal_frame_handles_cannot_expose_backend_handles_after_reuse(
-    metal_owned_session: MetalOwnedSession,
-) -> None:
-    metal_owned_session.render_once()
+def test_metal_frame_view_reserves_frame_and_parent_owners(metal_owned_session):
+    frame = wait_for_metal_frame(metal_owned_session, lambda _: True)
 
-    stale_frame = metal_owned_session.session.acquire_metal_owned_texture_frame()
-    stale_texture = stale_frame.texture
-    stale_device = stale_frame.device
-    stale_frame.close()
+    def inspect(view):
+        assert view.texture != 0
+        assert view.device == metal_owned_session.context.descriptor().device
+        assert (view.width, view.height) == (32, 16)
+        assert_invalid_state(frame.close)
+        assert_invalid_state(metal_owned_session.session.close)
+        assert_invalid_state(metal_owned_session.session.abandon)
+        assert_invalid_state(metal_owned_session.map.close)
 
-    for pointer in (stale_texture, stale_device):
-        assert_invalid_state(lambda pointer=pointer: pointer.address)
-    assert_invalid_state(lambda: stale_frame.texture)
-    assert_invalid_state(lambda: stale_frame.device)
-
-    next_frame = metal_owned_session.session.acquire_metal_owned_texture_frame()
-    try:
-        assert next_frame.texture.address != 0
-        for pointer in (stale_texture, stale_device):
-            assert_invalid_state(lambda pointer=pointer: pointer.address)
-    finally:
-        next_frame.close()
+    frame.with_metal_texture(inspect)
+    release_frame(frame)
+    assert_invalid_state(lambda: frame.with_metal_texture(inspect))
 
 
-def test_real_metal_render_session_reports_wrong_thread_errors(
-    metal_owned_session: MetalOwnedSession,
-) -> None:
-    calls: tuple[Callable[[], object], ...] = (
-        lambda: metal_owned_session.session.resize(16, 16, 1.0),
-        metal_owned_session.session.render_update,
-        metal_owned_session.session.create_projection,
-        metal_owned_session.session.acquire_metal_owned_texture_frame,
-        metal_owned_session.session.close,
-        *set_target_calls(metal_owned_session.session),
-    )
-
-    def run_call(call: Callable[[], object], observed: list[Exception]) -> None:
-        try:
-            call()
-        except mln.WrongThreadError as error:
-            observed.append(error)
-
-    for call in calls:
-        observed: list[Exception] = []
-        thread = threading.Thread(target=run_call, args=(call, observed))
-        thread.start()
-        thread.join()
-
-        assert len(observed) == 1
-        assert isinstance(observed[0], mln.WrongThreadError)
-        assert observed[0].status == mln.MaplibreStatus.WRONG_THREAD
-        assert not metal_owned_session.session.closed
-
-
-def test_set_target_reports_unsupported_for_a_session_owned_texture(
-    metal_owned_session: MetalOwnedSession,
-) -> None:
-    """Spec coverage: BND-176.
-
-    A session-owned texture is sized and replaced by its session, so it takes a
-    resize rather than a replacement. The session's target kind is checked
-    before the descriptor, so the null texture below is never read.
-    """
-    with pytest.raises(mln.UnsupportedFeatureError) as raised:
-        metal_owned_session.session.set_metal_borrowed_texture_target(
-            render.MetalBorrowedTextureDescriptor(
-                extent=render.RenderTargetExtent(32, 16, 1.0),
-                physical_width=32,
-                physical_height=16,
-            )
+def test_stale_metal_frame_cannot_open_a_view_after_slot_reuse(metal_owned_session):
+    stale = wait_for_metal_frame(metal_owned_session, lambda _: True)
+    release_frame(stale)
+    with wait_for_metal_frame(metal_owned_session, lambda _: True) as current:
+        assert current.with_metal_texture(lambda view: view.texture) != 0
+        assert_invalid_state(
+            lambda: stale.with_metal_texture(lambda view: view.texture)
         )
-    assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
 
-    # The rejection left the session rendering into the texture it owns.
-    metal_owned_session.session.resize(32, 16, 1.0)
-    metal_owned_session.render_once()
+
+def test_sibling_frame_finalization_preserves_an_active_view():
+    with (
+        closing(
+            MetalOwnedSession.create(
+                ring_depth=2, driver=mln.RenderDriverKind.CALLER_GRAPHICS_THREAD
+            )
+        ) as fixture,
+        wait_for_metal_frame(fixture, lambda _: True) as frame,
+    ):
+        request_and_finish_frame(
+            fixture.session, token=2, flags=render.FrameDemandFlag(0)
+        )
+        siblings = [fixture.session.acquire_frame()]
+        retired = weakref.ref(siblings[0])
+
+        def inspect(view):
+            siblings.clear()
+            gc.collect()
+            assert retired() is None
+            assert view.texture != 0
+            with pytest.raises(mln.TargetLostError):
+                frame.with_metal_texture(lambda _: None)
+
+        frame.with_metal_texture(inspect)
+        frame.close()
+        fixture.session.close()
+
+
+def test_session_close_is_rejected_while_a_frame_lease_is_held(
+    metal_owned_session: MetalOwnedSession,
+) -> None:
+    session = metal_owned_session.session
+    frame = wait_for_metal_frame(metal_owned_session, lambda _: True)
+    try:
+        assert session.get_snapshot().acquired_frame_count == 1
+        # The host still holds a ring slot, so the session cannot retire.
+        assert_invalid_state(session.close)
+        assert not session.closed
+    finally:
+        release_frame(frame)
+
+    assert session.get_snapshot().acquired_frame_count == 0
+
+
+def test_metal_frame_release_rejection_preserves_ownership(metal_owned_session):
+    frame = wait_for_metal_frame(metal_owned_session, lambda _: True)
+    with pytest.raises(mln.UnsupportedFeatureError):
+        frame.close(replace(mln.GpuSync.default(), kind=mln.GpuSyncKind(999)))
+    assert not frame.closed
+    assert frame.with_metal_texture(lambda view: view.texture) != 0
+    frame.close()
+    assert frame.closed
 
 
 def test_cluster_feature_extension_queries_resolve_unsigned_cluster_id_and_limit(
@@ -502,37 +408,109 @@ def test_typed_geojson_source_options_cluster_nearby_points(
     )
 
 
-def test_rendered_projection_keeps_rendered_camera_and_outlives_session(
+def test_metal_frame_demands_report_their_own_tokens(
+    metal_owned_session: MetalOwnedSession,
+) -> None:
+    metal_owned_session.render_once()
+    assert_frame_demands_report_their_own_tokens(metal_owned_session.session)
+
+
+def test_metal_texture_ring_exhaustion_reports_not_ready(
+    metal_owned_session: MetalOwnedSession,
+) -> None:
+    metal_owned_session.render_once()
+    assert_texture_ring_exhaustion_reports_not_ready(
+        metal_owned_session.session,
+        metal_owned_session.session.acquire_frame,
+    )
+
+
+def test_metal_session_maintenance_commands_round_trip(
+    metal_owned_session: MetalOwnedSession,
+) -> None:
+    metal_owned_session.render_once()
+    assert_session_maintenance_commands_round_trip(metal_owned_session.session)
+
+
+def test_metal_frame_lease_releases_itself_when_its_scope_ends(
+    metal_owned_session: MetalOwnedSession,
+) -> None:
+    lease = wait_for_metal_frame(metal_owned_session, lambda _: True)
+    with lease:
+        assert not lease.closed
+        assert metal_owned_session.session.get_snapshot().acquired_frame_count == 1
+    assert lease.closed
+    assert metal_owned_session.session.get_snapshot().acquired_frame_count == 0
+
+
+def test_metal_owned_session_rejects_a_borrowed_texture_target(
+    metal_owned_session: MetalOwnedSession,
+) -> None:
+    metal_owned_session.render_once()
+
+    # A session-owned ring cannot be handed a caller-owned texture, and the
+    # retarget kind is checked before any host handle is read.
+    with pytest.raises(mln.UnsupportedFeatureError) as raised:
+        metal_owned_session.session.metal_borrowed_texture_set_target(
+            replace(
+                render.MetalBorrowedTextureDescriptor.default(),
+                extent=render.RenderTargetExtent(32, 16, 1.0),
+                physical_width=32,
+                physical_height=16,
+            )
+        )
+    assert raised.value.status == mln.Status.UNSUPPORTED
+
+    # The rejection left the session rendering.
+    assert (
+        request_and_finish_frame(
+            metal_owned_session.session, token=7001, flags=render.FrameDemandFlag(0)
+        ).disposition
+        == render.RenderResult.RENDERED
+    )
+
+
+def test_metal_abandon_retires_the_session_and_its_map():
+    fixture = MetalOwnedSession.create(
+        driver=mln.RenderDriverKind.CALLER_GRAPHICS_THREAD
+    )
+    try:
+        fixture.render_once()
+        assert_abandon_retires_the_session(fixture.session, fixture.map)
+    finally:
+        fixture.close()
+
+
+def test_rendered_projection_retains_the_rendered_camera(
     metal_owned_session: MetalOwnedSession,
 ) -> None:
     fixture = metal_owned_session
     with pytest.raises(mln.InvalidStateError):
-        fixture.session.create_projection()
-    fixture.map.jump_to(camera.CameraOptions(zoom=3))
+        fixture.session.projection_create()
+    fixture.map.update_camera(
+        replace(
+            mln.CameraUpdate.default(),
+            mode=mln.CameraUpdateMode.JUMP,
+            camera=CameraOptions(zoom=3),
+            animation=mln.AnimationOptions.default(),
+        )
+    ).result(timeout=5)
     fixture.render_once()
-    with fixture.session.acquire_metal_owned_texture_frame():
-        fixture.map.jump_to(camera.CameraOptions(zoom=6))
-        fixture.runtime.pump()
-        projection = fixture.session.create_projection()
-    try:
-        assert fixture.map.get_camera().zoom == pytest.approx(6)
-        assert projection.get_camera().zoom == pytest.approx(3)
-        fixture.session.resize(16, 8, 1.0)
+    fixture.map.update_camera(
+        replace(
+            mln.CameraUpdate.default(),
+            mode=mln.CameraUpdateMode.JUMP,
+            camera=CameraOptions(zoom=6),
+            animation=mln.AnimationOptions.default(),
+        )
+    ).result(timeout=5)
+    with fixture.session.projection_create() as projection:
+        assert projection.get_camera().zoom == 3
+        finish_render_operation(
+            fixture.session,
+            fixture.session.resize(render.RenderTargetExtent(16, 16, 1)),
+        )
         with pytest.raises(mln.InvalidStateError):
-            fixture.session.create_projection()
-        fixture.session.close()
-        fixture.map.close()
-        results: list[float | None] = []
-
-        def use_snapshot() -> None:
-            results.append(projection.get_camera().zoom)
-            projection.close()
-
-        thread = threading.Thread(target=use_snapshot)
-        thread.start()
-        thread.join()
-        assert results == [pytest.approx(3)]
-        assert projection.closed
-    finally:
-        if not projection.closed:
-            projection.close()
+            fixture.session.projection_create()
+        fixture.close()
+        assert projection.get_camera().zoom == 3

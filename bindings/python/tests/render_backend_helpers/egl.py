@@ -41,12 +41,12 @@ if sys.platform == "darwin":
     ctypes.CDLL = _MacAngleCDLL  # type: ignore[assignment]
     ctypes.cdll._dlltype = _MacAngleCDLL  # type: ignore[attr-defined]
 
-from maplibre_native_ffi import render
+from maplibre_native_ffi import api as render
 from OpenGL import EGL
 from OpenGL import GLES3 as GL
 
 
-class EglUnavailableError(RuntimeError):
+class EGLUnavailableError(RuntimeError):
     pass
 
 
@@ -61,8 +61,8 @@ def _addr(value: Any) -> int:
     return ctypes.cast(value, ctypes.c_void_p).value or 0
 
 
-def _pointer(value: Any, name: str) -> render.NativePointer:
-    return render.NativePointer(_addr(value), _diagnostic_name=name)
+def _pointer(value: Any, name: str) -> int:
+    return _addr(value)
 
 
 def current_context_address() -> int:
@@ -85,24 +85,24 @@ def _display() -> Any:
 
 
 @dataclass(slots=True)
-class EglContext:
+class EGLContext:
     display: Any
     config: Any
     context: Any
     _closed: bool = False
 
     @classmethod
-    def create(cls) -> EglContext:
+    def create(cls) -> EGLContext:
         display = _display()
         if _addr(display) == 0:
             msg = "EGL display creation returned EGL_NO_DISPLAY"
-            raise EglUnavailableError(msg)
+            raise EGLUnavailableError(msg)
 
         major = EGL.EGLint()
         minor = EGL.EGLint()
         if not EGL.eglInitialize(display, major, minor):
             msg = "eglInitialize failed"
-            raise EglUnavailableError(msg)
+            raise EGLUnavailableError(msg)
 
         configs = (EGL.EGLConfig * 8)()
         config_count = EGL.EGLint()
@@ -134,16 +134,16 @@ class EglContext:
         ):
             EGL.eglTerminate(display)
             msg = "eglChooseConfig failed"
-            raise EglUnavailableError(msg)
+            raise EGLUnavailableError(msg)
         if config_count.value == 0:
             EGL.eglTerminate(display)
             msg = "no EGL OpenGL pbuffer config was found"
-            raise EglUnavailableError(msg)
+            raise EGLUnavailableError(msg)
 
         if not EGL.eglBindAPI(EGL.EGL_OPENGL_ES_API):
             EGL.eglTerminate(display)
             msg = "eglBindAPI(EGL_OPENGL_ES_API) failed"
-            raise EglUnavailableError(msg)
+            raise EGLUnavailableError(msg)
 
         context = EGL.eglCreateContext(
             display,
@@ -158,36 +158,37 @@ class EglContext:
         if _addr(context) == 0:
             EGL.eglTerminate(display)
             msg = "eglCreateContext failed"
-            raise EglUnavailableError(msg)
+            raise EGLUnavailableError(msg)
 
         return cls(display=display, config=configs[0], context=context)
 
-    def descriptor(self) -> render.EglContextDescriptor:
-        return render.EglContextDescriptor(
-            display=_pointer(self.display, "EGLDisplay"),
-            config=_pointer(self.config, "EGLConfig"),
-            share_context=_pointer(self.context, "EGLContext"),
-            get_proc_address=render.NativePointer(
-                EGL.eglGetProcAddress(b"eglGetProcAddress"),
-                _diagnostic_name="eglGetProcAddress",
+    def descriptor(self) -> render.OpenGLContextDescriptor:
+        return render.OpenGLContextDescriptor(
+            ownership=render.OpenGLContextOwnership.SHARED,
+            data=render.OpenGLContextDescriptorEGLVariant(
+                render.EGLContextDescriptor(
+                    display=_pointer(self.display, "EGLDisplay"),
+                    config=_pointer(self.config, "EGLConfig"),
+                    share_context=_pointer(self.context, "EGLContext"),
+                    client_api=render.OpenGLClientApi.GLES,
+                    get_proc_address=EGL.eglGetProcAddress(b"eglGetProcAddress"),
+                )
             ),
         )
 
-    def dedicated_descriptor(self) -> render.EglContextDescriptor:
-        """Describe a session that owns this thread's context.
-
-        A dedicated session joins no share group and creates its context for the
-        client API it names, so it carries no share context.
-        """
-        return render.EglContextDescriptor(
-            display=_pointer(self.display, "EGLDisplay"),
-            config=_pointer(self.config, "EGLConfig"),
-            client_api=render.OpenGLClientApi.GLES,
-            get_proc_address=render.NativePointer(
-                EGL.eglGetProcAddress(b"eglGetProcAddress"),
-                _diagnostic_name="eglGetProcAddress",
-            ),
+    def dedicated_descriptor(self) -> render.OpenGLContextDescriptor:
+        """Describe a session that owns its context without a share group."""
+        return render.OpenGLContextDescriptor(
             ownership=render.OpenGLContextOwnership.DEDICATED,
+            data=render.OpenGLContextDescriptorEGLVariant(
+                render.EGLContextDescriptor(
+                    display=_pointer(self.display, "EGLDisplay"),
+                    config=_pointer(self.config, "EGLConfig"),
+                    share_context=0,
+                    client_api=render.OpenGLClientApi.GLES,
+                    get_proc_address=EGL.eglGetProcAddress(b"eglGetProcAddress"),
+                )
+            ),
         )
 
     def owned_texture_descriptor(
@@ -206,18 +207,18 @@ class EglContext:
         width: int = 64,
         height: int = 64,
         scale_factor: float = 1.0,
-    ) -> EglPbufferSurface:
-        return EglPbufferSurface.create(self, width, height, scale_factor)
+    ) -> EGLPbufferSurface:
+        return EGLPbufferSurface.create(self, width, height, scale_factor)
 
     def borrowed_texture(
         self,
         width: int = 64,
         height: int = 64,
         scale_factor: float = 1.0,
-    ) -> EglBorrowedTexture:
-        return EglBorrowedTexture.create(self, width, height, scale_factor)
+    ) -> EGLBorrowedTexture:
+        return EGLBorrowedTexture.create(self, width, height, scale_factor)
 
-    def make_current(self, surface: EglPbufferSurface) -> None:
+    def make_current(self, surface: EGLPbufferSurface) -> None:
         if not EGL.eglMakeCurrent(
             self.display,
             surface.surface,
@@ -225,7 +226,7 @@ class EglContext:
             self.context,
         ):
             msg = "eglMakeCurrent failed"
-            raise EglUnavailableError(msg)
+            raise EGLUnavailableError(msg)
 
     def clear_current(self) -> None:
         EGL.eglMakeCurrent(
@@ -251,9 +252,9 @@ class EglContext:
 
 
 @dataclass(slots=True)
-class EglBorrowedTexture:
-    context: EglContext
-    surface: EglPbufferSurface
+class EGLBorrowedTexture:
+    context: EGLContext
+    surface: EGLPbufferSurface
     texture: int
     width: int
     height: int
@@ -263,18 +264,18 @@ class EglBorrowedTexture:
     @classmethod
     def create(
         cls,
-        context: EglContext,
+        context: EGLContext,
         width: int,
         height: int,
         scale_factor: float,
-    ) -> EglBorrowedTexture:
+    ) -> EGLBorrowedTexture:
         surface = context.pbuffer_surface(width, height, scale_factor)
         try:
             context.make_current(surface)
             texture = int(GL.glGenTextures(1))
             if texture == 0:
                 msg = "glGenTextures returned 0"
-                raise EglUnavailableError(msg)
+                raise EGLUnavailableError(msg)
             GL.glBindTexture(GL.GL_TEXTURE_2D, texture)
             GL.glTexParameteri(
                 GL.GL_TEXTURE_2D,
@@ -334,7 +335,7 @@ class EglBorrowedTexture:
             status = GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER)
             if status != GL.GL_FRAMEBUFFER_COMPLETE:
                 msg = f"borrowed texture framebuffer is incomplete: 0x{status:x}"
-                raise EglUnavailableError(msg)
+                raise EGLUnavailableError(msg)
             pixels = (ctypes.c_ubyte * (self.width * self.height * 4))()
             GL.glReadPixels(
                 0,
@@ -391,8 +392,8 @@ class EglBorrowedTexture:
 
 
 @dataclass(slots=True)
-class EglPbufferSurface:
-    context: EglContext
+class EGLPbufferSurface:
+    context: EGLContext
     surface: Any
     width: int
     height: int
@@ -402,11 +403,11 @@ class EglPbufferSurface:
     @classmethod
     def create(
         cls,
-        context: EglContext,
+        context: EGLContext,
         width: int,
         height: int,
         scale_factor: float,
-    ) -> EglPbufferSurface:
+    ) -> EGLPbufferSurface:
         surface = EGL.eglCreatePbufferSurface(
             context.display,
             context.config,
@@ -420,7 +421,7 @@ class EglPbufferSurface:
         )
         if _addr(surface) == 0:
             msg = "eglCreatePbufferSurface failed"
-            raise EglUnavailableError(msg)
+            raise EGLUnavailableError(msg)
         return cls(context, surface, width, height, scale_factor)
 
     def descriptor(self) -> render.OpenGLSurfaceDescriptor:

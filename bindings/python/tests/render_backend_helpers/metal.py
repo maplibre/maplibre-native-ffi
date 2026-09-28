@@ -5,7 +5,7 @@ from typing import Any, Self
 
 import Metal
 import Quartz
-from maplibre_native_ffi import render
+from maplibre_native_ffi import api as render
 
 
 class MetalUnavailableError(RuntimeError):
@@ -20,8 +20,8 @@ def _addr(value: Any) -> int:
         raise MetalUnavailableError(msg) from None
 
 
-def _pointer(value: Any, name: str) -> render.NativePointer:
-    return render.NativePointer(_addr(value), _diagnostic_name=name)
+def _pointer(value: Any, name: str) -> int:
+    return _addr(value)
 
 
 @dataclass(slots=True)
