@@ -26,6 +26,9 @@ MAP_HANDLE = (
 
 
 class ManagedEmitterTests(unittest.TestCase):
+    def dart_map(self, source):
+        return dart.generate(self.parse(source, map_handle=True))
+
     def kotlin_map(self, source, platform="jvmMain"):
         api = self.parse(source, map_handle=True)
         return kotlin.generate(api)[
@@ -90,11 +93,11 @@ mln_status mln_map_run(mln_map map, double {parameter}, const mln_completion *do
             local = "`class`" if parameter == "class" else parameter + "Value"
             self.assertIn(f"{local}: Double", kotlin_source)
             self.assertIn(f"bindingMapHandle(), {local}, completion", kotlin_source)
-            source = dart.generate(api)
-            self.assertIn(f"double {parameter}Value", source)
+            dart_source = self.dart_map(source)
+            self.assertIn(f"double {parameter}Value", dart_source)
             self.assertIn(
                 "raw.mln_map_run(_handle.raw, " + parameter + "Value, completion)",
-                source,
+                dart_source,
             )
 
     def test_public_method_name_collisions_are_rejected(self):
@@ -105,12 +108,12 @@ BIND("execution=query;result=double;shape=value;ownership=borrowed")
 mln_status mln_map_readScale(mln_map map, const mln_completion *completion);
 """
         api = self.parse(header)
-        for emitter in (dotnet, dart):
-            self.assertEqual(emitter.coverage(api)["generated"], [])
+        self.assertEqual(dotnet.coverage(api)["generated"], [])
         owned = self.parse(header, map_handle=True)
-        self.assertEqual(
-            set(kotlin.coverage(owned)["generated"]) - {"mln_map_close"}, set()
-        )
+        for emitter in (dart, kotlin):
+            self.assertEqual(
+                set(emitter.coverage(owned)["generated"]) - {"mln_map_close"}, set()
+            )
 
     def test_dart_command_requires_owner_receipt_runtime(self):
         api = self.parse("""
@@ -125,9 +128,8 @@ mln_status mln_map_projection_change(mln_map_projection projection, const mln_co
 BIND("execution=query;result=double;shape=value;ownership=borrowed")
 mln_status mln_map_class(mln_map map, const mln_completion *completion);
 """
-        api = self.parse(source)
         self.assertIn("fun `class`()", self.kotlin_map(source, "commonMain"))
-        self.assertIn("classValue()", dart.generate(api))
+        self.assertIn("classValue()", self.dart_map(source))
 
     def test_nullable_input_cannot_be_silently_required(self):
         header = """
@@ -143,7 +145,7 @@ mln_status mln_map_set_label(mln_map map,
         source = self.kotlin_map(header)
         self.assertIn("text: String?", source)
         self.assertIn("GeneratedValues.optionalStringView(arena, text)", source)
-        source = dart.generate(api)
+        source = self.dart_map(header)
         self.assertIn("String? text", source)
         self.assertIn("text == null ? arena<raw.mln_buffer_view>().ref", source)
 

@@ -11,7 +11,6 @@ from .kotlin_values import (
     generated_owners,
     identifier,
     name,
-    public_handles,
     release_is_asynchronous,
 )
 
@@ -35,7 +34,7 @@ def signature(plan, values):
         values.views.add(plan.outputs[0].value.element.native)
     receiver = next((p for p in plan.inputs if p.name == plan.receiver), None)
     receiver_type = receiver_value(plan) if receiver else None
-    if receiver and receiver_type.native not in public_handles(values.bound):
+    if receiver and receiver_type.native not in values.bound.public_handles:
         raise Unsupported("operation requires its generated owner")
     if plan.execution not in {
         "command",
@@ -547,7 +546,7 @@ def owned_operation(plan, values, platform):
     method, parameters, inputs, result, result_type = signature(plan, values)
     immediate_owner = bool(plan.owned_outputs)
     handle = plan.owned_outputs[0].handle if immediate_owner else result.handle
-    if handle.native not in public_handles(values.bound):
+    if handle.native not in values.bound.public_handles:
         raise Unsupported("owned result needs an adoption boundary")
     family = name(handle.native)
     factory = family[0].lower() + family[1:]

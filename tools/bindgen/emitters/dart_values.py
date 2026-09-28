@@ -49,18 +49,42 @@ SCALARS = {
 }
 
 
-HANDLE_CLASSES = {
-    "mln_map": "MapHandle",
-    "mln_runtime": "RuntimeHandle",
-    "mln_map_projection": "MapProjectionHandle",
-    "mln_render_session": "RenderSessionHandle",
-    "mln_geojson_source_data": "GeoJsonSourceDataHandle",
-    "mln_buffer": "BufferHandle",
-    "mln_event_batch": "EventBatchHandle",
-    "mln_render_frame_batch": "RenderFrameBatchHandle",
-    "mln_acquired_frame": "AcquiredFrame",
-    "mln_resource_request_handle": "ResourceRequestHandle",
+# Hand-written Dart owners: the generated operations mixin each uses, its public
+# class, and its native handle type. Every other public handle gets a generated
+# owner named after its C type.
+HANDWRITTEN_OWNERS = {
+    "mln_acquired_frame": ("AcquiredFrame", "AcquiredFrame", "NativeAcquiredFrame"),
+    "mln_geojson_source_data": (
+        "GeoJsonSourceData",
+        "GeoJsonSourceDataHandle",
+        "NativeGeoJsonSourceData",
+    ),
+    "mln_map": ("Map", "MapHandle", "NativeMap"),
+    "mln_map_projection": ("Projection", "MapProjectionHandle", "NativeMapProjection"),
+    "mln_render_session": (
+        "RenderSession",
+        "RenderSessionHandle",
+        "NativeRenderSession",
+    ),
+    "mln_resource_request_handle": (
+        "ResourceRequest",
+        "ResourceRequestHandle",
+        "NativeResourceRequest",
+    ),
+    "mln_runtime": ("Runtime", "RuntimeHandle", "NativeRuntime"),
 }
+
+
+def owner_names(native: str) -> tuple[str, str, str]:
+    """The operations mixin, public class, and native type for a handle."""
+    if native in HANDWRITTEN_OWNERS:
+        return HANDWRITTEN_OWNERS[native]
+    name = public_name(native)
+    return name, name + "Handle", "Native" + name
+
+
+def generated_owners(bound) -> list[str]:
+    return sorted(bound.public_handles.keys() - HANDWRITTEN_OWNERS.keys())
 
 
 class Unsupported(ValueError):
@@ -116,7 +140,7 @@ class Values:
     def check(self, value):
         if value.ownership == "owned":
             raise Unsupported(f"{value.native}: owned result needs adoption")
-        if value.kind == "handle" and value.native in HANDLE_CLASSES:
+        if value.kind == "handle" and value.native in self.bound.public_handles:
             return
         if value.kind == "native_pointer":
             return
@@ -230,7 +254,7 @@ class Values:
     def public(self, value):
         self.check(value)
         if value.kind == "handle":
-            name = HANDLE_CLASSES[value.native]
+            name = owner_names(value.native)[1]
         elif value.kind == "native_pointer":
             name = "NativePointer"
         elif value.kind in {"scalar", "enum"}:

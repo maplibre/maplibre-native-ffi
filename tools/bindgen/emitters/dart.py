@@ -13,60 +13,23 @@ from tools.bindgen.names import camel, type_name
 from tools.bindgen.native_capture import copy_kind
 from tools.bindgen.semantic import BoundApi, OperationPlan
 
-from .dart_values import Unsupported, Values, public_name
-
-OWNERS = {
-    "mln_map": "Map",
-    "mln_map_projection": "Projection",
-    "mln_runtime": "Runtime",
-    "mln_render_session": "RenderSession",
-    "mln_acquired_frame": "AcquiredFrame",
-    "mln_geojson_source_data": "GeoJsonSourceData",
-    "mln_buffer": "Buffer",
-    "mln_event_batch": "EventBatch",
-    "mln_render_frame_batch": "RenderFrameBatch",
-    "mln_resource_request_handle": "ResourceRequest",
-}
-NATIVE_HANDLES = {
-    "Map": "NativeMap",
-    "Projection": "NativeMapProjection",
-    "Runtime": "NativeRuntime",
-    "RenderSession": "NativeRenderSession",
-    "AcquiredFrame": "NativeAcquiredFrame",
-    "GeoJsonSourceData": "NativeGeoJsonSourceData",
-    "Buffer": "NativeBuffer",
-    "EventBatch": "NativeEventBatch",
-    "RenderFrameBatch": "NativeRenderFrameBatch",
-    "ResourceRequest": "NativeResourceRequest",
-}
-
-
-OWNED_CLASSES = {
-    "mln_runtime": ("RuntimeHandle", "NativeRuntime"),
-    "mln_render_session": ("RenderSessionHandle", "NativeRenderSession"),
-    "mln_map": ("MapHandle", "NativeMap"),
-    "mln_map_projection": ("MapProjectionHandle", "NativeMapProjection"),
-    "mln_geojson_source_data": ("GeoJsonSourceDataHandle", "NativeGeoJsonSourceData"),
-    "mln_acquired_frame": ("AcquiredFrame", "NativeAcquiredFrame"),
-    "mln_buffer": ("BufferHandle", "NativeBuffer"),
-    "mln_event_batch": ("EventBatchHandle", "NativeEventBatch"),
-    "mln_render_frame_batch": ("RenderFrameBatchHandle", "NativeRenderFrameBatch"),
-}
+from .dart_values import (
+    Unsupported,
+    Values,
+    generated_owners,
+    owner_names,
+    public_name,
+)
 
 
 def adopt_owner(owned, expression, receiver, function, values):
-    if owned.handle.native not in OWNED_CLASSES:
+    if owned.handle.native not in values.bound.public_handles:
         raise Unsupported("owned output requires a generated class")
-    public, native = OWNED_CLASSES[owned.handle.native]
+    _, public, native = owner_names(owned.handle.native)
     parent = ""
     if owned.parent_parameter:
         parent = (
-            "this as "
-            + {
-                "mln_runtime": "RuntimeHandle",
-                "mln_map": "MapHandle",
-                "mln_render_session": "RenderSessionHandle",
-            }[owned.handle.parent]
+            "this as " + owner_names(owned.handle.parent)[1]
             if receiver and function.parameters[0].name == owned.parent_parameter
             else camel(owned.parent_parameter)
         )
@@ -131,9 +94,9 @@ def lower_direct_registration(plan, values):
                 "owner cancellation requires verified provider decision protocol"
             )
         return (
-            OWNERS[
+            owner_names(
                 next(p.value.native for p in plan.inputs if p.name == plan.receiver)
-            ],
+            )[0],
             "  bool setCancelCallback(void Function() callback) => _registerResourceCancellation(this as ResourceRequestHandle, callback);\n",
         )
     adapters = [
@@ -178,14 +141,20 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
         receiver
         and function.parameters
         and function.parameters[0].type.pointee
-        and type_name(function.parameters[0].type.pointee) in OWNERS
+        and type_name(function.parameters[0].type.pointee)
+        in values.bound.public_handles
     ):
         receiver = type_name(function.parameters[0].type.pointee)
         receiver_reference = True
-    owner = OWNERS.get(receiver, "Globals")
+    owner = (
+        owner_names(receiver)[0]
+        if receiver in values.bound.public_handles
+        else "Globals"
+    )
     if owner == "Globals":
         receiver = None
     execution = plan.execution
+    # Command receipts are implemented by these hand-written owners only.
     if execution == "command" and receiver not in {
         "mln_map",
         "mln_runtime",
@@ -706,11 +675,18 @@ def generate(api: Api | BoundApi) -> str:
         )
         else "",
     ]
+    native_types = {
+        owner_names(native)[0]: owner_names(native)[2]
+        for native in values.bound.public_handles
+    }
+    generated_mixins = {
+        owner_names(native)[0] for native in generated_owners(values.bound)
+    }
     for owner, bodies in sorted(methods.items()):
         if owner == "Globals":
             chunks.extend(bodies)
             continue
-        handle = NATIVE_HANDLES[owner]
+        handle = native_types[owner]
         chunks.append(
             f"mixin _Generated{owner}Operations implements Finalizable {{\n"
             + (
@@ -739,9 +715,10 @@ def generate(api: Api | BoundApi) -> str:
             chunks.append("  void _invalidateBorrowedViews();\n")
         chunks.extend(bodies)
         chunks.append("}\n")
-        if owner in {"Buffer", "EventBatch", "RenderFrameBatch"}:
+        if owner in generated_mixins:
             public = owner + "Handle"
             chunks.append(
+                f"/// {owner} handle id.\nextension type const {handle}(int raw) implements NativeHandle {{}}\n\n"
                 f"final class {public} with _Generated{owner}Operations {{\n  {public}._({handle} handle) : _state = NativeHandleState(handle, '{public}');\n  @override final NativeHandleState<{handle}> _state;\n  @override {handle} get _handle => _state.handle;\n  bool get isClosed => _state.isClosed;\n}}\n"
             )
     chunks.append(render_scoped_views(compile_api(api), generated, values))

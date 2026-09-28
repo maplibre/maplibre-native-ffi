@@ -272,6 +272,16 @@ class BoundApi:
         }
 
     @property
+    def public_handles(self) -> dict[str, HandlePlan]:
+        """Handles a host can own; runtime-adapter handles stay internal."""
+        runtime = {operation.name for operation in self.runtime_operations}
+        return {
+            name: handle
+            for name, handle in self.handles.items()
+            if handle.release not in runtime
+        }
+
+    @property
     def operations_by_name(self) -> dict[str, OperationPlan]:
         return {operation.name: operation for operation in self.operations}
 

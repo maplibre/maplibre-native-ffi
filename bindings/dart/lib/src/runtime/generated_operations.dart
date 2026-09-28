@@ -3558,6 +3558,9 @@ mixin _GeneratedBufferOperations implements Finalizable {
   });
 }
 
+/// Buffer handle id.
+extension type const NativeBuffer(int raw) implements NativeHandle {}
+
 final class BufferHandle with _GeneratedBufferOperations {
   BufferHandle._(NativeBuffer handle)
     : _state = NativeHandleState(handle, 'BufferHandle');
@@ -3588,6 +3591,9 @@ mixin _GeneratedEventBatchOperations implements Finalizable {
     threadLastErrorMessage,
   );
 }
+
+/// EventBatch handle id.
+extension type const NativeEventBatch(int raw) implements NativeHandle {}
 
 final class EventBatchHandle with _GeneratedEventBatchOperations {
   EventBatchHandle._(NativeEventBatch handle)
@@ -6753,6 +6759,9 @@ mixin _GeneratedRenderFrameBatchOperations implements Finalizable {
     threadLastErrorMessage,
   );
 }
+
+/// RenderFrameBatch handle id.
+extension type const NativeRenderFrameBatch(int raw) implements NativeHandle {}
 
 final class RenderFrameBatchHandle with _GeneratedRenderFrameBatchOperations {
   RenderFrameBatchHandle._(NativeRenderFrameBatch handle)

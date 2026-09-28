@@ -153,7 +153,7 @@ class Values:
             return
         if value.kind == "native_pointer":
             return
-        if value.kind == "handle" and value.native in public_handles(self.bound):
+        if value.kind == "handle" and value.native in self.bound.public_handles:
             return
         if value.ownership == "owned" or value.registration or value.response:
             raise Unsupported("value needs an ownership or callback protocol")
@@ -1176,18 +1176,8 @@ class Values:
         )
 
 
-def public_handles(bound) -> set[str]:
-    """Handles a host can own; runtime-adapter handles stay internal."""
-    runtime = {plan.name for plan in bound.runtime_operations}
-    return {
-        native
-        for native, handle in bound.handles.items()
-        if handle.release not in runtime
-    }
-
-
 def generated_owners(bound) -> list[str]:
-    return sorted(public_handles(bound) - HANDWRITTEN_OWNERS.keys())
+    return sorted(bound.public_handles.keys() - HANDWRITTEN_OWNERS.keys())
 
 
 def release_is_asynchronous(bound, handle) -> bool:

@@ -31,11 +31,5 @@ extension type const NativeResourceRequest(int raw) implements NativeHandle {}
 /// Acquired texture frame handle id.
 extension type const NativeAcquiredFrame(int raw) implements NativeHandle {}
 
-/// Owned copied byte buffer.
-extension type const NativeBuffer(int raw) implements NativeHandle {}
-
-/// Owned runtime event batch.
-extension type const NativeEventBatch(int raw) implements NativeHandle {}
-
-/// Owned render result batch.
-extension type const NativeRenderFrameBatch(int raw) implements NativeHandle {}
+// Handles without a hand-written owner get their extension type alongside
+// their generated owner in generated_operations.dart.

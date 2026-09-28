@@ -12,8 +12,9 @@ from tools.bindgen.native_ports import generate
 
 HEADER = """
 #define BIND(x) __attribute__((annotate("mln:" x)))
-typedef unsigned long long mln_map;
+typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_close;dispose=mln_map_close;parent=none");
 typedef int mln_status;
+BIND("execution=immediate") void mln_map_close(mln_map map);
 typedef struct mln_completion { void *state; } mln_completion;
 typedef struct mln_sample_point { unsigned int x; unsigned int y; } mln_sample_point;
 typedef void (*mln_sample_notification)(void *context BIND("kind=context;lifetime=owner"), mln_sample_point point) BIND("thread=native;failure=contain");

@@ -102,8 +102,7 @@ BIND("execution=immediate") void mln_widget_close(mln_widget widget);
 BIND("execution=query;result=double;shape=value;ownership=borrowed")
 mln_status mln_widget_scale(mln_widget widget, const mln_completion *completion);
 """)
-        # Dart owners are still hand-written per handle type.
-        for emitter in (e for e in EMITTERS if e is not dart):
+        for emitter in EMITTERS:
             with self.subTest(emitter=emitter.__name__):
                 coverage = emitter.coverage(api)
                 self.assertIn("mln_widget_scale", coverage["generated"])
