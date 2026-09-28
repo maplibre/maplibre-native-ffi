@@ -55,11 +55,6 @@ def registration_body(plan, values, body, status=None):
         if plan.receiver and not plan.owned_outputs
         else "_NativeCallbackPorts()"
     )
-    releases = (
-        "_callbackReleases"
-        if plan.receiver and not plan.owned_outputs
-        else "NativeCallbackReleases()"
-    )
     if status:
         body = body.replace(
             "      return status;",
@@ -77,7 +72,7 @@ def registration_body(plan, values, body, status=None):
                 lines.insert(index + 1, "      registrations.accept();")
                 break
         body = "\n".join(lines)
-    return f"      final registrations = _NativeRegistrations({roots}, {releases});\n      try {{\n{body}\n      }} finally {{ registrations.close(); }}"
+    return f"      final registrations = _NativeRegistrations({roots});\n      try {{\n{body}\n      }} finally {{ registrations.close(); }}"
 
 
 def lower_direct_registration(plan, values):
@@ -113,11 +108,11 @@ def lower_direct_registration(plan, values):
         "Globals",
         f"""  void logSetCallback(LogCallback callback, {{bool consume = false}}) {{
     final state = _LogCallbackState(callback, consume: consume);
-    _logCallbackRoots.register(state.pointer.cast(), state.close, arena: state.arena);
+    _callbackReleases.register(state.pointer.cast(), state.close, arena: state.arena);
     try {{
       _check(raw.{plan.name}(Native.addressOf<NativeFunction<raw.{callback.native}Function>>(raw.{adapter.function}), state.pointer.cast(), Native.addressOf<NativeFunction<raw.mln_log_callback_releaseFunction>>(raw.mln_adapter_dart_release)));
       _logCallbackState = state;
-    }} catch (_) {{ _logCallbackRoots.reject(state.pointer.cast()); rethrow; }}
+    }} catch (_) {{ _callbackReleases.reject(state.pointer.cast()); rethrow; }}
   }}
 """,
     )
@@ -583,15 +578,14 @@ def registration_runtime(values):
     methods = []
     for value in descriptors:
         public = public_name(value.native)
-        roots = "ports" if values.port_callbacks(value) else "releases"
+        roots = "ports" if values.port_callbacks(value) else "_callbackReleases"
         methods.append(
             f"  Pointer<raw.{value.native}> prepare{public}({public} value) {{ final registration = _prepare{public}(value, {roots}); _pending.add(registration); return registration.pointer; }}"
         )
     return (
         """final class _NativeRegistrations {
-  _NativeRegistrations(this.ports, this.releases);
+  _NativeRegistrations(this.ports);
   final _NativeCallbackPorts ports;
-  final NativeCallbackReleases releases;
   final _pending = <_NativeRegistration>[];
   bool _accepted = false;
   void accept() { _accepted = true; }
@@ -688,8 +682,6 @@ def generate(api: Api | BoundApi) -> str:
             chunks.append(f"  NativeHandleState<{handle}> get _state;\n")
         if any("_callbackPorts" in body for body in bodies):
             chunks.append("  _NativeCallbackPorts get _callbackPorts;\n")
-        if any("_callbackReleases" in body for body in bodies):
-            chunks.append("  NativeCallbackReleases get _callbackReleases;\n")
         chunks.extend(bodies)
         chunks.append("}\n")
         if owner in generated_mixins:

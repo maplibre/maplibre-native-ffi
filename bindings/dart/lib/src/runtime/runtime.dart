@@ -32,6 +32,19 @@ final MaplibreNativeCApi _c = MaplibreNativeCApi.open();
 
 const int _resourceKindWildcard = 0xffffffff;
 
+/// Native release roots for the adapter rule contexts and the log callback.
+///
+/// Native code retires each registration with a release message, which can
+/// arrive after the owner that registered it is closed or collected. Nothing
+/// here captures an owner, so one set serves the isolate.
+final _callbackReleases = NativeCallbackReleases();
+
+/// Native release roots for queued resource providers, one set per runtime.
+///
+/// A provider callback can capture its runtime, so these roots live only as
+/// long as that runtime and never keep it reachable.
+final _resourceProviderReleases = Expando<NativeCallbackReleases>();
+
 final class CallbackPortLifecycleProbe {
   CallbackPortLifecycleProbe._(this._port);
   final _NativeCallbackPort _port;
@@ -144,18 +157,7 @@ final class RuntimeHandle with _GeneratedRuntimeOperations {
   @override
   final NativeHandleState<NativeRuntime> _state;
   @override
-  final _callbackReleases = NativeCallbackReleases();
-  @override
   final _callbackPorts = _NativeCallbackPorts();
-
-  void _releaseNativeCallback(Pointer<Void> userData) =>
-      _callbackReleases.reject(userData);
-
-  void _registerNativeCallback(
-    Pointer<Void> userData,
-    void Function() release, {
-    NativeOwnedArena? arena,
-  }) => _callbackReleases.register(userData, release, arena: arena);
 
   @override
   NativeRuntime get _handle => _state.handle;
@@ -173,7 +175,9 @@ final class RuntimeHandle with _GeneratedRuntimeOperations {
   ) {
     final state = _ResourceProviderCallbackState(provider);
     final userData = state.pointer.cast<Void>();
-    _registerNativeCallback(userData, state.retire, arena: state.arena);
+    final releases = _resourceProviderReleases[this] ??=
+        NativeCallbackReleases();
+    releases.register(userData, state.retire, arena: state.arena);
     return _startCommand(
       (completion) => withNativeArena((arena) {
         final nativeProvider = arena<raw.mln_resource_provider>();
@@ -191,7 +195,7 @@ final class RuntimeHandle with _GeneratedRuntimeOperations {
           completion,
         );
       }),
-      onRejected: () => _releaseNativeCallback(userData),
+      onRejected: () => releases.reject(userData),
     );
   }
 }
@@ -247,13 +251,13 @@ final class GeoJsonSourceDataHandle with _GeneratedGeoJsonSourceDataOperations {
 final class MapHandle with _GeneratedMapOperations {
   MapHandle._(this._runtime, NativeMap handle)
     : _state = NativeHandleState(handle, 'MapHandle');
+  // Keeps the parent runtime reachable while the map lives.
+  // ignore: unused_field
   final RuntimeHandle _runtime;
   @override
   final NativeHandleState<NativeMap> _state;
   @override
   NativeMap get _handle => _state.handle;
-  @override
-  NativeCallbackReleases get _callbackReleases => _runtime._callbackReleases;
   @override
   final _callbackPorts = _NativeCallbackPorts();
   bool get isClosed => _state.isClosed;

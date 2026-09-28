@@ -1,6 +1,5 @@
 part of 'runtime.dart';
 
-final _logCallbackRoots = NativeCallbackReleases();
 _LogCallbackState? _logCallbackState;
 
 final class _LogCallbackState extends RetainedCallbackState {

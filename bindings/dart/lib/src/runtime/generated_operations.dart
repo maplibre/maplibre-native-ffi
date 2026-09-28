@@ -9,9 +9,8 @@ final class _NativeRegistration<T extends Struct> {
 }
 
 final class _NativeRegistrations {
-  _NativeRegistrations(this.ports, this.releases);
+  _NativeRegistrations(this.ports);
   final _NativeCallbackPorts ports;
-  final NativeCallbackReleases releases;
   final _pending = <_NativeRegistration>[];
   bool _accepted = false;
   void accept() {
@@ -51,7 +50,7 @@ final class _NativeRegistrations {
   Pointer<raw.mln_http_header_transform> prepareHttpHeaderTransform(
     HttpHeaderTransform value,
   ) {
-    final registration = _prepareHttpHeaderTransform(value, releases);
+    final registration = _prepareHttpHeaderTransform(value, _callbackReleases);
     _pending.add(registration);
     return registration.pointer;
   }
@@ -59,7 +58,7 @@ final class _NativeRegistrations {
   Pointer<raw.mln_resource_provider> prepareResourceProvider(
     ResourceProvider value,
   ) {
-    final registration = _prepareResourceProvider(value, releases);
+    final registration = _prepareResourceProvider(value, _callbackReleases);
     _pending.add(registration);
     return registration.pointer;
   }
@@ -67,7 +66,7 @@ final class _NativeRegistrations {
   Pointer<raw.mln_resource_transform> prepareResourceTransform(
     ResourceTransform value,
   ) {
-    final registration = _prepareResourceTransform(value, releases);
+    final registration = _prepareResourceTransform(value, _callbackReleases);
     _pending.add(registration);
     return registration.pointer;
   }
@@ -3741,7 +3740,7 @@ void logSetAsyncSeverityMask(LogSeverityMask mask) => withNativeArena((arena) {
 
 void logSetCallback(LogCallback callback, {bool consume = false}) {
   final state = _LogCallbackState(callback, consume: consume);
-  _logCallbackRoots.register(
+  _callbackReleases.register(
     state.pointer.cast(),
     state.close,
     arena: state.arena,
@@ -3760,7 +3759,7 @@ void logSetCallback(LogCallback callback, {bool consume = false}) {
     );
     _logCallbackState = state;
   } catch (_) {
-    _logCallbackRoots.reject(state.pointer.cast());
+    _callbackReleases.reject(state.pointer.cast());
     rethrow;
   }
 }
@@ -3919,10 +3918,7 @@ RenderedQueryGeometry renderedQueryGeometryPoint(ScreenPoint point) =>
     });
 
 RuntimeHandle runtimeCreate(RuntimeOptions options) => withNativeArena((arena) {
-  final registrations = _NativeRegistrations(
-    _NativeCallbackPorts(),
-    NativeCallbackReleases(),
-  );
+  final registrations = _NativeRegistrations(_NativeCallbackPorts());
   try {
     final outRuntime = arena<Uint64>();
     _check(
@@ -4037,8 +4033,6 @@ mixin _GeneratedMapOperations implements Finalizable {
 
   _NativeCallbackPorts get _callbackPorts;
 
-  NativeCallbackReleases get _callbackReleases;
-
   Future<CommandCompletion> addColorReliefLayer(
     String layerId,
     String sourceId, {
@@ -4060,10 +4054,7 @@ mixin _GeneratedMapOperations implements Finalizable {
     CustomGeometrySourceOptions options,
   ) => _startCommand(
     (completion) => withNativeArena((arena) {
-      final registrations = _NativeRegistrations(
-        _callbackPorts,
-        _callbackReleases,
-      );
+      final registrations = _NativeRegistrations(_callbackPorts);
       try {
         final status = raw.mln_map_add_custom_geometry_source(
           _handle.raw,
@@ -4086,10 +4077,7 @@ mixin _GeneratedMapOperations implements Finalizable {
     CustomMvtVectorSourceOptions options,
   ) => _startCommand(
     (completion) => withNativeArena((arena) {
-      final registrations = _NativeRegistrations(
-        _callbackPorts,
-        _callbackReleases,
-      );
+      final registrations = _NativeRegistrations(_callbackPorts);
       try {
         final status = raw.mln_map_add_custom_mvt_vector_source(
           _handle.raw,
@@ -5831,10 +5819,7 @@ mixin _GeneratedMapOperations implements Finalizable {
           raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
       elementSize: 0,
       start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(
-          _NativeCallbackPorts(),
-          NativeCallbackReleases(),
-        );
+        final registrations = _NativeRegistrations(_NativeCallbackPorts());
         try {
           final outSession = arena<Uint64>();
           final status = raw.mln_metal_borrowed_texture_attach(
@@ -5897,10 +5882,7 @@ mixin _GeneratedMapOperations implements Finalizable {
           raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
       elementSize: 0,
       start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(
-          _NativeCallbackPorts(),
-          NativeCallbackReleases(),
-        );
+        final registrations = _NativeRegistrations(_NativeCallbackPorts());
         try {
           final outSession = arena<Uint64>();
           final status = raw.mln_metal_owned_texture_attach(
@@ -5963,10 +5945,7 @@ mixin _GeneratedMapOperations implements Finalizable {
           raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
       elementSize: 0,
       start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(
-          _NativeCallbackPorts(),
-          NativeCallbackReleases(),
-        );
+        final registrations = _NativeRegistrations(_NativeCallbackPorts());
         try {
           final outSession = arena<Uint64>();
           final status = raw.mln_metal_surface_attach(
@@ -6029,10 +6008,7 @@ mixin _GeneratedMapOperations implements Finalizable {
           raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
       elementSize: 0,
       start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(
-          _NativeCallbackPorts(),
-          NativeCallbackReleases(),
-        );
+        final registrations = _NativeRegistrations(_NativeCallbackPorts());
         try {
           final outSession = arena<Uint64>();
           final status = raw.mln_opengl_borrowed_texture_attach(
@@ -6095,10 +6071,7 @@ mixin _GeneratedMapOperations implements Finalizable {
           raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
       elementSize: 0,
       start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(
-          _NativeCallbackPorts(),
-          NativeCallbackReleases(),
-        );
+        final registrations = _NativeRegistrations(_NativeCallbackPorts());
         try {
           final outSession = arena<Uint64>();
           final status = raw.mln_opengl_owned_texture_attach(
@@ -6161,10 +6134,7 @@ mixin _GeneratedMapOperations implements Finalizable {
           raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
       elementSize: 0,
       start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(
-          _NativeCallbackPorts(),
-          NativeCallbackReleases(),
-        );
+        final registrations = _NativeRegistrations(_NativeCallbackPorts());
         try {
           final outSession = arena<Uint64>();
           final status = raw.mln_opengl_surface_attach(
@@ -6227,10 +6197,7 @@ mixin _GeneratedMapOperations implements Finalizable {
           raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
       elementSize: 0,
       start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(
-          _NativeCallbackPorts(),
-          NativeCallbackReleases(),
-        );
+        final registrations = _NativeRegistrations(_NativeCallbackPorts());
         try {
           final outSession = arena<Uint64>();
           final status = raw.mln_vulkan_borrowed_texture_attach(
@@ -6293,10 +6260,7 @@ mixin _GeneratedMapOperations implements Finalizable {
           raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
       elementSize: 0,
       start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(
-          _NativeCallbackPorts(),
-          NativeCallbackReleases(),
-        );
+        final registrations = _NativeRegistrations(_NativeCallbackPorts());
         try {
           final outSession = arena<Uint64>();
           final status = raw.mln_vulkan_owned_texture_attach(
@@ -6359,10 +6323,7 @@ mixin _GeneratedMapOperations implements Finalizable {
           raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
       elementSize: 0,
       start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(
-          _NativeCallbackPorts(),
-          NativeCallbackReleases(),
-        );
+        final registrations = _NativeRegistrations(_NativeCallbackPorts());
         try {
           final outSession = arena<Uint64>();
           final status = raw.mln_vulkan_surface_attach(
@@ -6425,10 +6386,7 @@ mixin _GeneratedMapOperations implements Finalizable {
           raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
       elementSize: 0,
       start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(
-          _NativeCallbackPorts(),
-          NativeCallbackReleases(),
-        );
+        final registrations = _NativeRegistrations(_NativeCallbackPorts());
         try {
           final outSession = arena<Uint64>();
           final status = raw.mln_webgpu_borrowed_texture_attach(
@@ -6491,10 +6449,7 @@ mixin _GeneratedMapOperations implements Finalizable {
           raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
       elementSize: 0,
       start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(
-          _NativeCallbackPorts(),
-          NativeCallbackReleases(),
-        );
+        final registrations = _NativeRegistrations(_NativeCallbackPorts());
         try {
           final outSession = arena<Uint64>();
           final status = raw.mln_webgpu_owned_texture_attach(
@@ -6557,10 +6512,7 @@ mixin _GeneratedMapOperations implements Finalizable {
           raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
       elementSize: 0,
       start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(
-          _NativeCallbackPorts(),
-          NativeCallbackReleases(),
-        );
+        final registrations = _NativeRegistrations(_NativeCallbackPorts());
         try {
           final outSession = arena<Uint64>();
           final status = raw.mln_webgpu_surface_attach(
@@ -7233,8 +7185,6 @@ mixin _GeneratedRuntimeOperations implements Finalizable {
 
   _NativeCallbackPorts get _callbackPorts;
 
-  NativeCallbackReleases get _callbackReleases;
-
   Future<MapHandle> mapCreate(MapOptions options) => startNativeCompletion(
     copyKind:
         raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_MAP,
@@ -7570,10 +7520,7 @@ mixin _GeneratedRuntimeOperations implements Finalizable {
             .MLN_ADAPTER_COMPLETION_COPY_FLAT,
         elementSize: 0,
         start: (completion) => withNativeArena((arena) {
-          final registrations = _NativeRegistrations(
-            _callbackPorts,
-            _callbackReleases,
-          );
+          final registrations = _NativeRegistrations(_callbackPorts);
           try {
             final status = raw.mln_runtime_set_http_header_transform(
               _handle.raw,
@@ -7614,10 +7561,7 @@ mixin _GeneratedRuntimeOperations implements Finalizable {
             .MLN_ADAPTER_COMPLETION_COPY_FLAT,
         elementSize: 0,
         start: (completion) => withNativeArena((arena) {
-          final registrations = _NativeRegistrations(
-            _callbackPorts,
-            _callbackReleases,
-          );
+          final registrations = _NativeRegistrations(_callbackPorts);
           try {
             final status = raw.mln_runtime_set_resource_provider(
               _handle.raw,
@@ -7643,10 +7587,7 @@ mixin _GeneratedRuntimeOperations implements Finalizable {
             .MLN_ADAPTER_COMPLETION_COPY_FLAT,
         elementSize: 0,
         start: (completion) => withNativeArena((arena) {
-          final registrations = _NativeRegistrations(
-            _callbackPorts,
-            _callbackReleases,
-          );
+          final registrations = _NativeRegistrations(_callbackPorts);
           try {
             final status = raw.mln_runtime_set_resource_transform(
               _handle.raw,
