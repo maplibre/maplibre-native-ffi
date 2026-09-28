@@ -21,6 +21,7 @@ void tearDown(void) {
 
 int main(void) {
   UNITY_BEGIN();
+  run_browser_run_loop_abi_tests();
   run_browser_http_abi_tests();
   run_callback_adapter_abi_tests();
   run_core_abi_tests();
@@ -35,10 +36,12 @@ int main(void) {
   run_render_target_lifecycle_abi_tests();
   run_render_thread_abi_tests();
   run_query_abi_tests();
+  run_completion_abi_tests();
+  run_projection_abi_tests();
   run_mlt_decode_abi_tests();
   run_resources_abi_tests();
   run_runtime_events_abi_tests();
-  run_runtime_wake_abi_tests();
+  run_runtime_lifecycle_abi_tests();
   run_style_values_abi_tests();
   const int failures = UNITY_END();
   // main() runs on a pthread under -sPROXY_TO_PTHREAD, where a graphics device
