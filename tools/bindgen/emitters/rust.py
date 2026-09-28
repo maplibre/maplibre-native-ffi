@@ -27,7 +27,9 @@ SCALARS = {
     "size_t": "usize",
     "uint8_t": "u8",
 }
-OWNERS = {
+# Hand-written Rust owners and the modules that define them. Other public
+# handles without a parent get a generated owner.
+HANDWRITTEN_OWNERS = {
     "mln_geojson_source_data": ("geojson", "GeoJsonSourceDataHandle"),
     "mln_acquired_frame": ("frame", "AcquiredFrameHandle"),
     "mln_map": ("map", "MapHandle"),
@@ -37,8 +39,9 @@ OWNERS = {
 }
 
 
-HANDLE_TYPES = {native: "crate::" + owner for native, (_, owner) in OWNERS.items()}
-HANDLE_TYPES["mln_geojson_source_data"] = "crate::GeoJsonSourceDataHandle"
+HANDLE_TYPES = {
+    native: "crate::" + owner for native, (_, owner) in HANDWRITTEN_OWNERS.items()
+}
 
 
 def adopt_owned(owned, raw, value_types):
@@ -766,7 +769,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         if value.kind == "enum":
             value_types.add(value)
     value_types.direct_callbacks = {}
-    value_types.owners = dict(OWNERS)
+    value_types.owners = dict(HANDWRITTEN_OWNERS)
     value_types.handle_types = dict(HANDLE_TYPES)
     owned_declarations = []
     for handle in bound.handles.values():
