@@ -435,3 +435,7 @@ run = 'PYTHONPATH="$MISE_MONOREPO_ROOT/ci${PYTHONPATH:+:$PYTHONPATH}" uv run --n
 [tasks."kotlin:prepare-release"]
 description = "Merge, sign, and publish Kotlin Maven repositories."
 run = 'python3 ci/kotlin_release.py "$@"'
+
+[tasks."bindings:test-generator"]
+description = "Test compiler extraction, contract diagnostics, and language lowering."
+run = "uv run --no-sync python -m unittest discover -s tests/bindgen"

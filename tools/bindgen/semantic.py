@@ -1,0 +1,1279 @@
+"""Resolve C declarations into shared, statically compiled binding plans.
+
+Plans contain semantic decisions, never target-language source. Backends render
+these plans and keep allocation, callback roots, and scheduling in their runtime.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field, replace
+from typing import TypedDict
+
+from .model import Api, CType, Field, Function, ModelError
+from .schema import is_completion, validate
+
+
+@dataclass(frozen=True)
+class Presence:
+    mask: str | None = None
+    bit: str | None = None
+    tag: str | None = None
+    variant: str | None = None
+
+
+@dataclass(frozen=True)
+class HandlePlan:
+    native: str
+    release: str
+    parent: str | None
+    dispose: str | None = None
+    release_consumes: str = "success"
+    abandon: str | None = None
+    release_inputs: tuple[str, ...] = ()
+    finalize: tuple[str, ...] = ()
+    parent_retention: str = "strong"
+    dispose_invalidates: str = "self"
+    view_begin: str | None = None
+    view_end: str | None = None
+
+
+@dataclass(frozen=True)
+class TransitionPlan:
+    phase: str
+    action: str
+    resource: str
+
+
+@dataclass(frozen=True)
+class OwnedOutputPlan:
+    parameter: str
+    handle: HandlePlan
+    parent_parameter: str | None
+
+
+@dataclass(frozen=True)
+class CompletionPlan:
+    parameter: str
+    immediate_owners: tuple[OwnedOutputPlan, ...]
+    result_owned: bool
+    transitions: tuple[TransitionPlan, ...]
+    inline: bool = True
+    native_release: str = "quiescence"
+    result_owner: OwnedOutputPlan | None = None
+
+
+@dataclass(frozen=True)
+class DecisionPlan:
+    parameter: str
+    handle: HandlePlan
+    accept: str
+    pass_through: str
+    complete: str
+    cancelled: str
+    cancel_registration: str
+    wait_retired: str
+    transitions: tuple[TransitionPlan, ...]
+
+
+@dataclass(frozen=True)
+class PresenceGroup:
+    mask: str
+    bit: str | None
+    fields: tuple[str, ...]
+    type: str | None = None
+
+
+@dataclass(frozen=True)
+class MaskFlag:
+    mask: str
+    name: str
+    value: int
+
+
+@dataclass(frozen=True)
+class RegistrationDescriptorPlan:
+    callbacks: tuple[str, ...]
+    user_data: str
+    release: str
+    transfer: str = "acceptance"
+    retire: str = "quiescence"
+
+
+@dataclass(frozen=True)
+class CallbackResponsePlan:
+    native: str
+    context: str
+    callbacks: tuple[str, ...]
+    methods: tuple[str, ...]
+    lifetime: str = "callback"
+
+
+@dataclass(frozen=True)
+class ItemBufferPlan:
+    field: str
+    data: str
+    size: str
+    offset: str
+    length: str
+    encoding: str
+
+
+@dataclass(frozen=True)
+class ValuePlan:
+    kind: str
+    native: str
+    ctype: CType
+    ownership: str = "value"
+    encoding: str | None = None
+    lifetime: str = "call"
+    nullable: bool = False
+    optional: str | None = None
+    length: str | None = None
+    stride: str | None = None
+    item_buffer: ItemBufferPlan | None = None
+    fields: tuple[FieldPlan, ...] = ()
+    element: ValuePlan | None = None
+    handle: HandlePlan | None = None
+    enum_kind: str | None = None
+    enum_underlying: CType | None = None
+    scalar_carrier: str | None = None
+    enum_values: tuple[tuple[str, int], ...] = ()
+    default: str | None = None
+    tag: str | None = None
+    empty_variant: tuple[str, int] | None = None
+    presence_groups: tuple[PresenceGroup, ...] = ()
+    mask_flags: tuple[MaskFlag, ...] = ()
+    registration: RegistrationDescriptorPlan | None = None
+    response: CallbackResponsePlan | None = None
+    projection: ValuePlan | None = None
+
+
+@dataclass(frozen=True)
+class FieldPlan:
+    name: str
+    value: ValuePlan
+    presence: Presence | None = None
+    default: str | None = None
+    role: str = "value"
+
+
+@dataclass(frozen=True)
+class ParameterPlan:
+    name: str
+    value: ValuePlan
+    direction: str
+    consumes: str | None = None
+
+
+@dataclass(frozen=True)
+class CallbackReentryPlan:
+    owner_parameter: str | None
+    owner_type: str
+    operations: tuple[str, ...]
+    registration_owner: bool = False
+
+
+@dataclass(frozen=True)
+class CallbackPlan:
+    native: str
+    parameters: tuple[ParameterPlan, ...]
+    result: ValuePlan
+    failure: str | None = None
+    thread: str | None = None
+    decision: DecisionPlan | None = None
+    context: str | None = None
+    reentry: str = "allow"
+    reentry_policy: CallbackReentryPlan | None = None
+
+
+@dataclass(frozen=True)
+class RegistrationPlan:
+    parameter: str
+    descriptor: str
+    callbacks: tuple[str, ...]
+    user_data: str
+    release: str
+    transfer: str = "acceptance"
+    retire: str = "quiescence"
+    path: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class DirectRegistrationPlan:
+    callback: str
+    user_data: str
+    release_callback: str | None
+    owner_release: str | None
+    accepted_unless: str | None
+    transfer: str = "acceptance"
+
+
+@dataclass(frozen=True)
+class BorrowedViewPlan:
+    owner_parameter: str
+    owner: HandlePlan
+    invalidated_by: tuple[str, ...]
+    retention: str = "strong"
+
+
+@dataclass(frozen=True)
+class OperationPlan:
+    function: Function
+    execution: str
+    receiver: str | None
+    inputs: tuple[ParameterPlan, ...]
+    outputs: tuple[ParameterPlan, ...]
+    result: ValuePlan | None
+    registrations: tuple[RegistrationPlan, ...] = ()
+    consumes: str | None = None
+    role: str = "public"
+    support_for: str | None = None
+    completion: CompletionPlan | None = None
+    owned_outputs: tuple[OwnedOutputPlan, ...] = ()
+    direct_registrations: tuple[DirectRegistrationPlan, ...] = ()
+    view: BorrowedViewPlan | None = None
+    scoped_receiver: str | None = None
+    receiver_access: str = "live"
+
+    @property
+    def name(self) -> str:
+        return self.function.name
+
+
+@dataclass(frozen=True)
+class CallbackAdapterPlan:
+    function: str
+    callback: str
+    context: str
+    invokes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class BoundApi:
+    source: Api
+    operations: tuple[OperationPlan, ...]
+    values: dict[str, ValuePlan]
+    callbacks: dict[str, CallbackPlan]
+    handles: dict[str, HandlePlan]
+    diagnostics: tuple[str, ...] = ()
+    unsupported: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    runtime_operations: tuple[OperationPlan, ...] = ()
+    callback_adapters: tuple[CallbackAdapterPlan, ...] = ()
+
+    @property
+    def public_values(self) -> dict[str, ValuePlan]:
+        return {
+            name: value
+            for name, value in self.values.items()
+            if name not in self.source.runtime_types
+        }
+
+    @property
+    def operations_by_name(self) -> dict[str, OperationPlan]:
+        return {operation.name: operation for operation in self.operations}
+
+
+def type_name(value: CType) -> str:
+    return value.declaration or value.spelling.removeprefix("const ")
+
+
+def layout_control(field: Field) -> str | None:
+    """Return the validated initialization role of an ABI-only field."""
+    if field.bit_width is not None:
+        return None
+    if (
+        field.metadata == {"kind": "size", "default": "sizeof"}
+        and field.type.canonical == "unsigned int"
+    ):
+        return "size"
+    if field.metadata == {
+        "kind": "reserved",
+        "default": "0",
+    } and field.type.canonical in {
+        "unsigned int",
+        "unsigned long long",
+        "unsigned long",
+    }:
+        return "reserved"
+    return None
+
+
+SCALAR_CANONICAL_TYPES = frozenset(
+    {
+        "void",
+        "_Bool",
+        "bool",
+        "char",
+        "signed char",
+        "unsigned char",
+        "short",
+        "unsigned short",
+        "int",
+        "unsigned int",
+        "long",
+        "unsigned long",
+        "long long",
+        "unsigned long long",
+        "float",
+        "double",
+        "long double",
+        "__int128",
+        "unsigned __int128",
+    }
+)
+
+
+class ValueAttributes(TypedDict):
+    native: str
+    ctype: CType
+    ownership: str
+    encoding: str | None
+    lifetime: str
+    nullable: bool
+    optional: str | None
+    length: str | None
+    stride: str | None
+    item_buffer: ItemBufferPlan | None
+
+
+class Binder:
+    def __init__(self, api: Api):
+        validate(api)
+        self.api = api
+        self.records = api.records_by_name
+        self.typedefs = api.typedefs_by_name
+        self.enums = {enum.name: enum for enum in api.enums}
+        self.values: dict[str, ValuePlan] = {}
+        self.callbacks: dict[str, CallbackPlan] = {}
+        self.resolving: set[str] = set()
+        self.handles = {
+            name: HandlePlan(
+                name,
+                typedef.metadata["release"],
+                None
+                if typedef.metadata.get("parent", "none") == "none"
+                else typedef.metadata["parent"],
+                typedef.metadata.get("dispose"),
+                typedef.metadata.get(
+                    "release_consumes",
+                    "always"
+                    if api.functions_by_name[
+                        typedef.metadata["release"]
+                    ].return_type.kind
+                    == "void"
+                    else "success",
+                ),
+                typedef.metadata.get("abandon"),
+                tuple(
+                    parameter.name
+                    for parameter in api.functions_by_name[
+                        typedef.metadata["release"]
+                    ].parameters[1:]
+                    if not is_completion(parameter.type)
+                    and parameter.metadata.get("direction", "in") != "out"
+                ),
+                (typedef.metadata["dispose"],)
+                if typedef.metadata.get("dispose")
+                else tuple(
+                    filter(
+                        None,
+                        (typedef.metadata.get("abandon"), typedef.metadata["release"]),
+                    )
+                ),
+                dispose_invalidates=typedef.metadata.get("dispose_invalidates", "self"),
+                view_begin=typedef.metadata.get("view_begin"),
+                view_end=typedef.metadata.get("view_end"),
+            )
+            for name, typedef in self.typedefs.items()
+            if typedef.metadata.get("kind") == "handle"
+            and "release" in typedef.metadata
+        }
+
+    def scalar_carrier(self, type_: CType) -> str:
+        """Preserve portable integer typedefs before Clang's host ABI expansion."""
+        portable = {
+            "bool",
+            "_Bool",
+            "float",
+            "double",
+            "void",
+            "char",
+            "size_t",
+            "ptrdiff_t",
+            "intptr_t",
+            "uintptr_t",
+            *(f"{sign}int{bits}_t" for sign in ("", "u") for bits in (8, 16, 32, 64)),
+        }
+        seen = set()
+        while True:
+            spelling = type_.spelling.removeprefix("const ")
+            if spelling in portable:
+                return spelling
+            if spelling in seen or spelling not in self.typedefs:
+                return type_.canonical.removeprefix("const ")
+            seen.add(spelling)
+            type_ = self.typedefs[spelling].type
+
+    def value(self, type_: CType, metadata: dict[str, str], context: str) -> ValuePlan:
+        name = type_name(type_)
+        typedef = self.typedefs.get(name)
+        combined = dict(typedef.metadata) if typedef else {}
+        combined.update(metadata)
+        metadata = combined
+        common: ValueAttributes = {
+            "native": name,
+            "ctype": type_,
+            "ownership": metadata.get("ownership", "value"),
+            "encoding": metadata.get("encoding"),
+            "lifetime": metadata.get("lifetime", "call"),
+            "nullable": metadata.get("nullable") == "true",
+            "optional": metadata.get("optional"),
+            "length": metadata.get("length"),
+            "stride": metadata.get("stride"),
+            "item_buffer": ItemBufferPlan(
+                metadata["item_name"],
+                metadata["item_buffer"],
+                metadata["item_buffer_size"],
+                metadata["item_offset"],
+                metadata["item_length"],
+                metadata["item_encoding"],
+            )
+            if "item_buffer" in metadata
+            else None,
+        }
+        if metadata.get("kind") == "native_pointer":
+            return ValuePlan(kind="native_pointer", **common)
+        if type_.volatile or type_.restrict:
+            # These qualifiers remain in the CType for raw ABI emission.
+            pass
+        resolved = typedef.type if typedef else type_
+        enum_name = metadata.get("enum", name)
+        if enum_name in self.enums and resolved.kind != "pointer":
+            enum = self.enums[enum_name]
+            common["native"] = enum_name
+            return ValuePlan(
+                kind="enum",
+                enum_kind=enum.metadata.get("kind", "open"),
+                enum_underlying=enum.underlying_type,
+                scalar_carrier=self.scalar_carrier(enum.underlying_type),
+                enum_values=tuple((item.name, item.value) for item in enum.values),
+                **common,
+            )
+        if name in self.handles:
+            return ValuePlan(kind="handle", handle=self.handles[name], **common)
+        if name == "mln_buffer_view":
+            record = self.records.get(name)
+            if (
+                record is None
+                or tuple(f.name for f in record.fields)
+                != (
+                    "data",
+                    "size",
+                )
+                or record.fields[0].type.kind != "pointer"
+                or record.fields[0].type.pointee is None
+                or record.fields[0].type.pointee.kind != "void"
+                or record.fields[1].type.canonical
+                not in {"unsigned long", "unsigned long long", "unsigned int"}
+            ):
+                raise ModelError([f"{context}: buffer view requires data and size"])
+            common["encoding"] = metadata.get("encoding", "bytes")
+            return ValuePlan(kind="buffer", **common)
+        if resolved.kind == "pointer":
+            pointee = resolved.pointee
+            if pointee is None:
+                raise ModelError([f"{context}: pointer has no pointee"])
+            if pointee.kind == "function":
+                if name in self.typedefs and name not in self.callbacks:
+                    self.callbacks[name] = self.callback(name)
+                return ValuePlan(kind="callback", **common)
+            if metadata.get("kind") in {"native_pointer", "context", "erased"}:
+                return ValuePlan(kind="native_pointer", **common)
+            child_metadata = {
+                key: value
+                for key, value in metadata.items()
+                if key in {"encoding", "ownership", "lifetime", "enum", "tag"}
+            }
+            child_name = type_name(pointee)
+            if metadata.get("direction") in {"out", "inout"}:
+                if pointee.kind != "pointer" and metadata.get("length") not in {
+                    None,
+                    "1",
+                }:
+                    element = self.value(
+                        pointee, child_metadata, context + " output element"
+                    )
+                    return ValuePlan(kind="array", element=element, **common)
+                if pointee.kind == "pointer" and "length" in metadata:
+                    child_metadata["length"] = metadata["length"]
+                element = self.value(pointee, child_metadata, context + " output")
+                return ValuePlan(kind="reference", element=element, **common)
+            if metadata.get("length") == "1":
+                element = self.value(pointee, child_metadata, context + " pointee")
+                return ValuePlan(kind="reference", element=element, **common)
+            if metadata.get("length") == "nul":
+                if pointee.kind not in {"char_s", "char_u", "schar", "uchar"}:
+                    raise ModelError([f"{context}: nul length requires character data"])
+                return ValuePlan(kind="buffer", **common)
+            if "length" in metadata:
+                if metadata.get("encoding") in {"utf8", "json", "bytes"} and (
+                    pointee.kind in {"char_s", "char_u", "schar", "uchar"}
+                    or pointee.canonical.removeprefix("const ")
+                    in {"char", "signed char", "unsigned char"}
+                ):
+                    return ValuePlan(kind="buffer", **common)
+                if child_name == "void":
+                    if metadata.get("encoding") not in {"utf8", "json", "bytes"}:
+                        raise ModelError([f"{context}: erased bytes require encoding"])
+                    return ValuePlan(kind="buffer", **common)
+                element = self.value(pointee, child_metadata, context + " element")
+                return ValuePlan(kind="array", element=element, **common)
+            raise ModelError([f"{context}: pointer requires length or native kind"])
+        if resolved.kind == "array":
+            if resolved.element is None or resolved.length is None:
+                raise ModelError([f"{context}: array requires a fixed extent"])
+            common["length"] = str(resolved.length)
+            return ValuePlan(
+                kind="array",
+                element=self.value(resolved.element, {}, context + " element"),
+                **common,
+            )
+        if name in self.records:
+            record = self.records[name]
+            if not record.complete:
+                raise ModelError([f"{context}: incomplete record has no value layout"])
+            if name in self.resolving:
+                raise ModelError(
+                    [f"{context}: recursive record requires a lifetime boundary"]
+                )
+            record_metadata = {**record.metadata, **metadata}
+            if name in self.values:
+                return replace(
+                    self.values[name],
+                    **common,
+                    tag=record_metadata.get("tag", self.values[name].tag),
+                    empty_variant=next(
+                        (
+                            (item.name, item.value)
+                            for enum in self.api.enums
+                            for item in enum.values
+                            if item.name == record_metadata.get("empty_variant")
+                        ),
+                        self.values[name].empty_variant,
+                    ),
+                )
+            self.resolving.add(name)
+            try:
+                fields = []
+                for item in record.fields:
+                    field_context = f"{item.location}: {name}.{item.name}"
+                    if item.bit_width is not None:
+                        raise ModelError(
+                            [
+                                f"{field_context}: bitfield has no portable ABI conversion"
+                            ]
+                        )
+                    presence = None
+                    if any(key in item.metadata for key in ("mask", "tag", "variant")):
+                        presence = Presence(
+                            **{
+                                key: item.metadata.get(key)
+                                for key in ("mask", "bit", "tag", "variant")
+                            }
+                        )
+                    fields.append(
+                        FieldPlan(
+                            item.name,
+                            self.value(item.type, item.metadata, field_context),
+                            presence,
+                            item.metadata.get("default"),
+                            item.metadata.get("kind", "value"),
+                        )
+                    )
+                storage_roles = {}
+                for member in fields:
+                    if member.value.stride:
+                        storage_roles[member.value.stride] = "stride"
+                    if member.value.item_buffer:
+                        storage_roles[member.value.item_buffer.data] = "arena"
+                        storage_roles[member.value.item_buffer.size] = "count"
+                fields = [
+                    replace(member, role=storage_roles[member.name])
+                    if member.name in storage_roles
+                    else member
+                    for member in fields
+                ]
+                if record.kind == "union" and any(
+                    member.presence is None or member.presence.variant is None
+                    for member in fields
+                ):
+                    raise ModelError(
+                        [f"{context}: every union member requires a variant"]
+                    )
+                value = ValuePlan(
+                    kind="union" if record.kind == "union" else "record",
+                    fields=tuple(fields),
+                    projection=self.value(
+                        CType(
+                            "record",
+                            record_metadata["projection"],
+                            "struct " + record_metadata["projection"],
+                            record_metadata["projection"],
+                        ),
+                        {},
+                        context + " projection",
+                    )
+                    if "projection" in record_metadata
+                    else None,
+                    default=record_metadata.get("default"),
+                    tag=record_metadata.get("tag"),
+                    empty_variant=next(
+                        (
+                            (item.name, item.value)
+                            for enum in self.api.enums
+                            for item in enum.values
+                            if item.name == record_metadata.get("empty_variant")
+                        ),
+                        None,
+                    ),
+                    presence_groups=tuple(
+                        PresenceGroup(
+                            mask,
+                            bit,
+                            tuple(
+                                member.name
+                                for member in fields
+                                if member.presence
+                                and member.presence.mask == mask
+                                and member.presence.bit == bit
+                            ),
+                            next(
+                                (
+                                    member.metadata.get("group_type")
+                                    for member in record.fields
+                                    if member.metadata.get("mask") == mask
+                                    and member.metadata.get("bit") == bit
+                                ),
+                                None,
+                            ),
+                        )
+                        for mask, bit in dict.fromkeys(
+                            (member.presence.mask, member.presence.bit)
+                            for member in fields
+                            if member.presence and member.presence.mask
+                        )
+                    ),
+                    response=self.response(record.name)
+                    if record_metadata.get("kind") == "callback_response"
+                    else None,
+                    registration=RegistrationDescriptorPlan(
+                        tuple(
+                            member.name
+                            for member in fields
+                            if member.value.kind == "callback"
+                            and member.name != record_metadata["release"]
+                        ),
+                        record_metadata["user_data"],
+                        record_metadata["release"],
+                    )
+                    if record_metadata.get("kind") == "callback_registration"
+                    else None,
+                    mask_flags=tuple(
+                        MaskFlag(control.name, flag, flag_value)
+                        for control in fields
+                        if control.role == "presence_mask"
+                        for flag, flag_value in control.value.enum_values
+                        if flag_value > 0
+                        and flag_value & (flag_value - 1) == 0
+                        and not any(
+                            member.presence
+                            and member.presence.mask == control.name
+                            and member.presence.bit == flag
+                            for member in fields
+                        )
+                    ),
+                    **common,
+                )
+                self.values[name] = value
+                for group in value.presence_groups:
+                    if group.type and group.type not in self.values:
+                        grouped = self.typedefs.get(group.type)
+                        grouped_type = (
+                            CType(
+                                "typedef",
+                                group.type,
+                                grouped.type.canonical,
+                                group.type,
+                            )
+                            if grouped
+                            else CType(
+                                "record", group.type, "struct " + group.type, group.type
+                            )
+                        )
+                        self.value(grouped_type, {}, context + " presence group")
+                return value
+            finally:
+                self.resolving.remove(name)
+        if resolved.kind == "function":
+            return ValuePlan(kind="callback", **common)
+        if resolved.canonical.removeprefix(
+            "const "
+        ) in SCALAR_CANONICAL_TYPES or resolved.kind in {
+            "void",
+            "bool",
+            "char_s",
+            "char_u",
+            "schar",
+            "uchar",
+            "short",
+            "ushort",
+            "int",
+            "uint",
+            "long",
+            "ulong",
+            "longlong",
+            "ulonglong",
+            "float",
+            "double",
+            "longdouble",
+            "int128",
+            "uint128",
+        }:
+            return ValuePlan(
+                kind="scalar", scalar_carrier=self.scalar_carrier(type_), **common
+            )
+        if typedef and resolved.declaration and resolved.declaration != name:
+            return replace(self.value(resolved, metadata, context), **common)
+        raise ModelError([f"{context}: unresolved value {name} ({resolved.kind})"])
+
+    def operation(self, function: Function) -> OperationPlan:
+        context = f"{function.location}: {function.name}"
+        inputs, outputs, registrations = [], [], []
+        receiver = function.metadata.get("receiver")
+        if receiver is None and function.parameters:
+            first = function.parameters[0]
+            first_type = (
+                first.type.pointee if first.type.kind == "pointer" else first.type
+            )
+            if (
+                first.metadata.get("direction", "in") != "out"
+                and first_type
+                and type_name(first_type) in self.handles
+            ):
+                receiver = first.name
+        for parameter in function.parameters:
+            if is_completion(parameter.type):
+                continue
+            metadata = parameter.metadata
+            value = self.value(
+                parameter.type, metadata, f"{context} parameter {parameter.name}"
+            )
+            direction = metadata.get("direction", "in")
+            plan = ParameterPlan(
+                parameter.name, value, direction, metadata.get("consumes")
+            )
+
+            def validate_input_layout(item, parameter_name=parameter.name):
+                if (
+                    item.stride
+                    or item.item_buffer
+                    or any(member.role in {"stride", "arena"} for member in item.fields)
+                ):
+                    raise ModelError(
+                        [
+                            f"{context} parameter {parameter_name}: strided or arena-backed record requires an input reconstruction contract"
+                        ]
+                    )
+                if item.element:
+                    validate_input_layout(item.element)
+                for member in item.fields:
+                    validate_input_layout(member.value)
+
+            if direction != "out":
+                validate_input_layout(value)
+            (outputs if direction == "out" else inputs).append(plan)
+
+            def collect_registrations(
+                descriptor, path=(), parameter_name=parameter.name
+            ):
+                if descriptor.kind == "reference" and descriptor.element:
+                    collect_registrations(descriptor.element, path)
+                elif descriptor.kind == "record":
+                    registration = descriptor.registration
+                    if registration:
+                        registrations.append(
+                            RegistrationPlan(
+                                parameter_name,
+                                descriptor.native,
+                                registration.callbacks,
+                                registration.user_data,
+                                registration.release,
+                                registration.transfer,
+                                registration.retire,
+                                path,
+                            )
+                        )
+                    else:
+                        for member in descriptor.fields:
+                            collect_registrations(member.value, (*path, member.name))
+
+            collect_registrations(value)
+        result = None
+        metadata = function.metadata
+        if "result" in metadata and metadata["result"] != "void":
+            result_name = metadata["result"]
+            typedef = self.typedefs.get(result_name)
+            type_ = (
+                CType("typedef", result_name, typedef.type.canonical, result_name)
+                if typedef
+                else CType(result_name, result_name, result_name)
+            )
+            result = self.value(type_, metadata, context + " completion")
+            if (
+                result.ownership == "owned"
+                and result.handle
+                and not result.handle.dispose
+            ):
+                raise ModelError(
+                    [
+                        f"{context}: owned result requires a disposal contract for abandoned delivery"
+                    ]
+                )
+            if metadata.get("shape") == "array":
+                result = ValuePlan(
+                    "array",
+                    result.native,
+                    result.ctype,
+                    ownership=metadata.get("ownership", "borrowed"),
+                    lifetime="completion",
+                    nullable=result.nullable,
+                    length="value_count",
+                    element=replace(result, nullable=False),
+                )
+        elif not any(is_completion(p.type) for p in function.parameters):
+            if type_name(function.return_type) not in {"void", "mln_status"}:
+                result = self.value(function.return_type, metadata, context + " return")
+        support = metadata.get("support")
+        for name, typedef in self.typedefs.items():
+            if typedef.metadata.get("default") == function.name:
+                support = "default:" + name
+                break
+        completion_parameter = next(
+            (
+                parameter.name
+                for parameter in function.parameters
+                if is_completion(parameter.type)
+            ),
+            None,
+        )
+        owners = []
+        for output in outputs:
+            value = (
+                output.value.element
+                if output.value.kind == "reference"
+                else output.value
+            )
+            if value and value.handle and value.ownership == "owned":
+                parent = next(
+                    (
+                        parameter.name
+                        for parameter in inputs
+                        if parameter.value.native == value.handle.parent
+                    ),
+                    None,
+                )
+                if value.handle.parent and parent is None:
+                    raise ModelError(
+                        [
+                            f"{context}: owned output {output.name} requires its parent handle input"
+                        ]
+                    )
+                owners.append(OwnedOutputPlan(output.name, value.handle, parent))
+        completion = None
+        if completion_parameter:
+            transitions = [
+                TransitionPlan(
+                    "prepare", "reserve_caller_and_native_roots", completion_parameter
+                ),
+                TransitionPlan("reject", "release_both_roots", completion_parameter),
+                TransitionPlan("capture", "copy_borrowed_payload", "result"),
+                TransitionPlan(
+                    "deliver", "adopt_owned_payload_transactionally", "result"
+                ),
+                TransitionPlan("abandon", "dispose_unadopted_payload", "result"),
+                TransitionPlan(
+                    "native_release", "release_native_root", completion_parameter
+                ),
+                TransitionPlan(
+                    "caller_release", "release_caller_root", completion_parameter
+                ),
+            ]
+            for owner in owners:
+                transitions.extend(
+                    (
+                        TransitionPlan("prepare", "reserve_parent", owner.parameter),
+                        TransitionPlan(
+                            "accept", "adopt_immediate_owner", owner.parameter
+                        ),
+                        TransitionPlan(
+                            "reject", "release_parent_reservation", owner.parameter
+                        ),
+                        TransitionPlan(
+                            "completion_failure",
+                            "retain_immediate_owner",
+                            owner.parameter,
+                        ),
+                    )
+                )
+            result_value = (
+                result.element if result and result.kind == "array" else result
+            )
+            result_owner = None
+            if (
+                result_value
+                and result_value.handle
+                and result_value.ownership == "owned"
+            ):
+                parent = next(
+                    (
+                        parameter.name
+                        for parameter in inputs
+                        if parameter.value.native == result_value.handle.parent
+                    ),
+                    None,
+                )
+                if result_value.handle.parent and parent is None:
+                    raise ModelError(
+                        [
+                            f"{context}: owned completion requires its parent handle input"
+                        ]
+                    )
+                result_owner = OwnedOutputPlan("result", result_value.handle, parent)
+                transitions.extend(
+                    (
+                        TransitionPlan("prepare", "reserve_parent", "result"),
+                        TransitionPlan(
+                            "reject", "release_parent_reservation", "result"
+                        ),
+                        TransitionPlan(
+                            "deliver", "transfer_parent_to_result", "result"
+                        ),
+                        TransitionPlan(
+                            "abandon", "release_parent_after_disposal", "result"
+                        ),
+                    )
+                )
+            completion = CompletionPlan(
+                completion_parameter,
+                tuple(owners),
+                bool(result and result.ownership == "owned"),
+                tuple(transitions),
+                result_owner=result_owner,
+            )
+        consumes = metadata.get("consumes")
+        for handle in self.handles.values():
+            if function.name in {handle.release, handle.dispose}:
+                consumes = handle.release_consumes
+                if function.name == handle.dispose and function.name != handle.release:
+                    support = "dispose:" + handle.native
+                break
+        for parameter in inputs:
+            if parameter.consumes:
+                consumed = (
+                    parameter.value.element
+                    if parameter.value.kind == "reference"
+                    else parameter.value
+                )
+                if consumed.kind != "handle" or parameter.name != receiver:
+                    raise ModelError(
+                        [
+                            f"{context}: consumed input requires its managed handle receiver"
+                        ]
+                    )
+                if consumes and consumes != parameter.consumes:
+                    raise ModelError([f"{context}: conflicting consumption rules"])
+                consumes = parameter.consumes
+        if consumes and receiver is None:
+            raise ModelError(
+                [f"{context}: consumption requires a managed handle receiver"]
+            )
+        view = None
+        if "view_owner" in metadata:
+            parameter = next(
+                p for p in function.parameters if p.name == metadata["view_owner"]
+            )
+            handle = self.handles[type_name(parameter.type)]
+            invalidated_by = []
+            current = handle
+            while current:
+                invalidated_by.extend(
+                    operation
+                    for operation in (current.release, current.dispose, current.abandon)
+                    if operation
+                )
+                current = self.handles.get(current.parent) if current.parent else None
+            view = BorrowedViewPlan(
+                parameter.name, handle, tuple(dict.fromkeys(invalidated_by))
+            )
+        return OperationPlan(
+            function,
+            metadata["execution"],
+            receiver,
+            tuple(inputs),
+            tuple(outputs),
+            result,
+            tuple(registrations),
+            consumes,
+            "support" if support else "public",
+            support,
+            completion,
+            tuple(owners),
+            (
+                DirectRegistrationPlan(
+                    metadata["registration"],
+                    metadata["user_data"],
+                    metadata.get("release_callback"),
+                    metadata.get("owner_release"),
+                    metadata.get("accepted_unless"),
+                ),
+            )
+            if "registration" in metadata
+            else (),
+            view,
+            next(
+                (
+                    parameter.name
+                    for parameter in (*inputs, *outputs)
+                    if function.parameters
+                    and parameter.name == function.parameters[0].name
+                    and parameter.value.element
+                    and parameter.value.element.response
+                ),
+                None,
+            ),
+            next(
+                (
+                    parameter.metadata.get("handle_access", "live")
+                    for parameter in function.parameters
+                    if parameter.name == receiver
+                ),
+                "live",
+            ),
+        )
+
+    def response(self, name: str) -> CallbackResponsePlan:
+        record = self.records[name]
+        contexts = [
+            f.name for f in record.fields if f.metadata.get("kind") == "context"
+        ]
+        if len(contexts) != 1:
+            raise ModelError(
+                [f"{record.location}: callback response requires one context field"]
+            )
+        callbacks = tuple(
+            t.name
+            for t in self.typedefs.values()
+            if t.type.pointee
+            and t.type.pointee.kind == "function"
+            and any(
+                p.type.pointee
+                and type_name(p.type.pointee) == name
+                and p.metadata.get("direction") in {"out", "inout"}
+                for p in t.parameters
+            )
+        )
+        methods = tuple(
+            f.name
+            for f in self.api.functions
+            if f.parameters
+            and f.parameters[0].type.pointee
+            and type_name(f.parameters[0].type.pointee) == name
+        )
+        if not callbacks or not methods:
+            raise ModelError(
+                [f"{record.location}: callback response requires callbacks and methods"]
+            )
+        return CallbackResponsePlan(name, contexts[0], callbacks, methods)
+
+    def callback(self, name: str) -> CallbackPlan:
+        typedef = self.typedefs[name]
+        function = typedef.type.pointee
+        assert function is not None and function.result is not None
+        context = f"{typedef.location}: {name}"
+        if "failure" not in typedef.metadata or "thread" not in typedef.metadata:
+            raise ModelError(
+                [f"{context}: callback requires failure and thread contracts"]
+            )
+        contexts = [
+            parameter.name
+            for parameter in typedef.parameters
+            if parameter.metadata.get("kind") == "context"
+        ]
+        if len(contexts) > 1:
+            raise ModelError(
+                [f"{context}: callback requires at most one context parameter"]
+            )
+        return CallbackPlan(
+            name,
+            tuple(
+                ParameterPlan(
+                    parameter.name,
+                    self.value(
+                        parameter.type,
+                        parameter.metadata,
+                        context + " parameter " + parameter.name,
+                    ),
+                    parameter.metadata.get("direction", "in"),
+                    parameter.metadata.get("consumes"),
+                )
+                for parameter in typedef.parameters
+            ),
+            self.value(
+                function.result,
+                {"enum": typedef.metadata["enum"]}
+                if "enum" in typedef.metadata
+                else {},
+                context + " return",
+            ),
+            typedef.metadata["failure"],
+            typedef.metadata["thread"],
+            self.decision(typedef),
+            contexts[0] if contexts else None,
+            typedef.metadata.get("reentry", "allow"),
+            self.callback_reentry(typedef),
+        )
+
+    def callback_reentry(self, typedef) -> CallbackReentryPlan | None:
+        metadata = typedef.metadata
+        if metadata.get("reentry") != "protocol":
+            return None
+        owner = metadata["reentry_owner"]
+        if owner == "registration":
+            function = next(
+                f
+                for f in self.api.functions
+                if f.metadata.get("registration")
+                and any(
+                    p.name == f.metadata["registration"]
+                    and p.type.declaration == typedef.name
+                    for p in f.parameters
+                )
+            )
+            type_ = function.parameters[0].type
+        else:
+            type_ = next(p.type for p in typedef.parameters if p.name == owner)
+        type_ = type_.pointee or type_
+        return CallbackReentryPlan(
+            None if owner == "registration" else owner,
+            type_name(type_),
+            tuple(metadata["reentry_calls"].split(",")),
+            owner == "registration",
+        )
+
+    def decision(self, typedef) -> DecisionPlan | None:
+        metadata = typedef.metadata
+        if "decision_handle" not in metadata:
+            return None
+        parameter = next(
+            p for p in typedef.parameters if p.name == metadata["decision_handle"]
+        )
+        handle = self.handles[type_name(parameter.type)]
+        resource = parameter.name
+        return DecisionPlan(
+            resource,
+            handle,
+            metadata["decision_accept"],
+            metadata["decision_pass"],
+            metadata["complete"],
+            metadata["cancelled"],
+            metadata["cancel_registration"],
+            metadata["wait_retired"],
+            (
+                TransitionPlan("enter", "borrow_provisional_owner", resource),
+                TransitionPlan("complete_enter", "mark_completion_terminal", resource),
+                TransitionPlan("complete_enter", "force_accept_decision", resource),
+                TransitionPlan("accept", "adopt_provisional_owner", resource),
+                TransitionPlan(
+                    "pass_through", "invalidate_provisional_owner", resource
+                ),
+                TransitionPlan("release_enter", "force_accept_decision", resource),
+                TransitionPlan("release", "wait_for_inflight_request_calls", resource),
+                TransitionPlan("release", "release_native_owner", resource),
+                TransitionPlan("release_return", "retire_cancel_callback", resource),
+            ),
+        )
+
+    def bind(self, *, require_complete: bool = False) -> BoundApi:
+        operations, diagnostics, unsupported = [], [], {}
+        for enum in self.api.enums:
+            self.values[enum.name] = self.value(
+                CType("enum", enum.name, "enum " + enum.name, enum.name),
+                {},
+                f"{enum.location}: enum {enum.name}",
+            )
+        for name, typedef in self.typedefs.items():
+            if typedef.type.pointee and typedef.type.pointee.kind == "function":
+                try:
+                    self.callbacks[name] = self.callback(name)
+                except ModelError as error:
+                    unsupported[name] = tuple(error.diagnostics)
+                    diagnostics.extend(error.diagnostics)
+        for function in self.api.functions:
+            try:
+                operations.append(self.operation(function))
+            except ModelError as error:
+                unsupported[function.name] = tuple(error.diagnostics)
+                diagnostics.extend(error.diagnostics)
+        for function in self.api.functions:
+            if "context_type" in function.metadata:
+                name = function.metadata["context_type"]
+                type_ = (
+                    self.typedefs[name].type
+                    if name in self.typedefs
+                    else CType("record", name, "struct " + name, name)
+                )
+                self.value(
+                    CType("typedef", name, type_.canonical, name),
+                    {},
+                    f"{function.location}: adapter context",
+                )
+        if require_complete and diagnostics:
+            raise ModelError(diagnostics)
+        return BoundApi(
+            self.api,
+            tuple(
+                operation
+                for operation in operations
+                if operation.name not in self.api.runtime_exports
+            ),
+            self.values,
+            self.callbacks,
+            self.handles,
+            tuple(sorted(set(diagnostics))),
+            unsupported,
+            tuple(
+                operation
+                for operation in operations
+                if operation.name in self.api.runtime_exports
+            ),
+            tuple(
+                CallbackAdapterPlan(
+                    f.name,
+                    f.metadata["callback_adapter"],
+                    f.metadata["context_type"],
+                    tuple(filter(None, f.metadata.get("invokes", "").split(","))),
+                )
+                for f in self.api.functions
+                if "callback_adapter" in f.metadata
+            ),
+        )
+
+
+def bind(api: Api, *, require_complete: bool = False) -> BoundApi:
+    return Binder(api).bind(require_complete=require_complete)
+
+
+def resolve_value(
+    api: Api, type_: CType, metadata: dict[str, str], context: str
+) -> ValuePlan:
+    return Binder(api).value(type_, metadata, context)
