@@ -190,9 +190,6 @@ type bindingState struct {
 	deciding       bool
 	completed      bool
 	completing     bool
-	waitRetired    func(uint64)
-	cancelTicket   cgo.Handle
-	cancelRoot     weak.Pointer[bindingCallbackTicket]
 	pendingRelease uint64
 }
 
@@ -249,7 +246,7 @@ func bindingAdopt(raw uint64, parent any, dispose func(uint64)) *bindingOwner {
 		state.raw = 0
 		state.mu.Unlock()
 		if raw != 0 {
-			state.disposeNative(raw)
+			state.dispose(raw)
 		}
 	}, state)
 	return owner
@@ -415,13 +412,10 @@ func (state *bindingState) finishDecision(decision, accept, pass uint32) uint32 
 		state.raw = 0
 		state.pendingRelease = 0
 		decision = pass
-		if state.cancelTicket != 0 {
-			go func() { state.waitRetired(state.issued); state.retireCancel() }()
-		}
 	}
 	state.mu.Unlock()
 	if release != 0 {
-		state.disposeNative(release)
+		state.dispose(release)
 	}
 	return decision
 }
@@ -439,20 +433,14 @@ func (state *bindingState) reserveCompletion() (uint64, func(bool)) {
 		state.mu.Lock()
 		state.completing = false
 		state.completed = state.completed || accepted
-		root := state.cancelRoot.Value()
 		var release uint64
 		if !state.deciding {
 			release = state.pendingRelease
 			state.pendingRelease = 0
 		}
 		state.mu.Unlock()
-		if accepted && root != nil {
-			root.mu.Lock()
-			root.value = nil
-			root.mu.Unlock()
-		}
 		if release != 0 {
-			state.disposeNative(release)
+			state.dispose(release)
 		}
 	}
 }
@@ -471,22 +459,7 @@ func (state *bindingState) closeDecision() {
 	}
 	state.mu.Unlock()
 	if raw != 0 {
-		state.disposeNative(raw)
-	}
-}
-
-func (state *bindingState) disposeNative(raw uint64) {
-	state.dispose(raw)
-	state.retireCancel()
-}
-
-func (state *bindingState) retireCancel() {
-	state.mu.Lock()
-	ticket := state.cancelTicket
-	state.cancelTicket = 0
-	state.mu.Unlock()
-	if ticket != 0 {
-		mlnGoCallbackRelease(C.binding_address(C.uintptr_t(ticket)))
+		state.dispose(raw)
 	}
 }
 

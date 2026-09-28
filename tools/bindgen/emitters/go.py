@@ -97,22 +97,8 @@ def lower(api):
             raise ModelError(
                 [f"{native}: automatic ownership requires an unconditional disposer"]
             )
-        waiting = next(
-            (
-                p
-                for p in bound.operations
-                if p.receiver_access == "issued"
-                and any(i.value.native == native for i in p.inputs)
-            ),
-            None,
-        )
-        finish = (
-            f"owner.state.waitRetired = func(raw uint64) {{ C.{waiting.name}(C.{native}(raw)) }}; "
-            if waiting
-            else ""
-        )
         owners.append(
-            f"type {owner} struct {{ *bindingOwner }}\nfunc adopt{owner}(raw uint64, parent any) *{owner} {{ owner := &{owner}{{bindingAdopt(raw,parent,func(raw uint64){{ C.{disposer}(C.{native}(raw)) }})}}; {finish}return owner }}"
+            f"type {owner} struct {{ *bindingOwner }}\nfunc adopt{owner}(raw uint64, parent any) *{owner} {{ owner := &{owner}{{bindingAdopt(raw,parent,func(raw uint64){{ C.{disposer}(C.{native}(raw)) }})}}; return owner }}"
         )
         used_support.add(disposer)
     go, header, c = [], [], []

@@ -192,8 +192,9 @@ func TestRuntimeResourceTransformRejectsNilCallback(t *testing.T) {
 
 // a request the provider handled but never completed reports one
 // cancellation when the map that asked for it goes away, the callback can
-// close that request from inside itself, and a second registration on the same
-// request reports invalid state.
+// close that request from inside itself, a second registration on the same
+// request reports invalid state, and native code releases the registration
+// once the callback returns.
 func TestResourceRequestCancelCallbackReportsDiscardedRequest(t *testing.T) {
 	const styleURL = "jar:file:/packaged/cancelled-style.json"
 	requested := make(chan struct{}, 1)
@@ -239,10 +240,14 @@ func TestResourceRequestCancelCallbackReportsDiscardedRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewMap(): %v", err)
 	}
+	baseline := bindingCallbackCount.Load()
 	if _, err := m.SetStyleURL(styleURL); err != nil {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
 	waitForResourceSignalValue(t, requested, "the provider to receive the style request")
+	if got := bindingCallbackCount.Load() - baseline; got != 1 {
+		t.Fatalf("live cancel registrations before cancellation = %d, want 1", got)
+	}
 	// Map teardown discards the request the provider never completed, and the
 	// cancel callback runs on the thread that discards it.
 	teardown, err := m.Close()
@@ -266,11 +271,14 @@ func TestResourceRequestCancelCallbackReportsDiscardedRequest(t *testing.T) {
 	if got := cancelCalls.Load(); got != 1 {
 		t.Fatalf("cancel callback calls = %d, want 1", got)
 	}
+	if got := bindingCallbackCount.Load() - baseline; got != 0 {
+		t.Fatalf("live cancel registrations after the callback = %d, want 0", got)
+	}
 }
 
-// registering on a request MapLibre already cancelled runs the
-// callback before SetCancelCallback returns, and a closed request rejects
-// registration as closed.
+// registering on a request MapLibre already cancelled reports the
+// cancellation without storing or running the callback, and a closed request
+// rejects registration as closed.
 func TestResourceRequestCancelCallbackRunsForAlreadyCancelledRequest(t *testing.T) {
 	const styleURL = "jar:file:/packaged/late-cancel-style.json"
 	handles := make(chan *ResourceRequestHandle, 1)
@@ -312,9 +320,15 @@ func TestResourceRequestCancelCallbackRunsForAlreadyCancelledRequest(t *testing.
 	waitForResourceRequestCancelled(t, handle)
 
 	var calls int
+	baseline := bindingCallbackCount.Load()
 	cancelled, err := handle.SetCancelCallback(func() { calls++ })
 	if err != nil || !cancelled || calls != 0 {
 		t.Fatalf("already cancelled registration: %v, %v, calls %d", cancelled, err, calls)
+	}
+	// The binding frees the unstored registration itself, and native code never
+	// releases it.
+	if got := bindingCallbackCount.Load() - baseline; got != 0 {
+		t.Fatalf("live cancel registrations after an already cancelled registration = %d, want 0", got)
 	}
 
 	handle.Close()
@@ -324,14 +338,19 @@ func TestResourceRequestCancelCallbackRunsForAlreadyCancelledRequest(t *testing.
 	if calls != 0 {
 		t.Fatalf("cancel callback calls after Close = %d, want 0", calls)
 	}
+	if got := bindingCallbackCount.Load() - baseline; got != 0 {
+		t.Fatalf("live cancel registrations after Close = %d, want 0", got)
+	}
 }
 
 // a request the provider completed is not reported as cancelled, even
-// once the map that asked for it goes away.
+// once the map that asked for it goes away, and closing the request releases
+// the registration whose callback never ran.
 func TestResourceRequestCancelCallbackSkipsCompletedRequest(t *testing.T) {
 	const styleURL = "jar:file:/packaged/completed-style.json"
 	var cancelCalls atomic.Int64
 	var providerErr atomic.Value
+	handles := make(chan *ResourceRequestHandle, 1)
 
 	runtime, err := RuntimeCreate(DefaultRuntimeOptions())
 	if err != nil {
@@ -355,6 +374,10 @@ func TestResourceRequestCancelCallbackSkipsCompletedRequest(t *testing.T) {
 		}); err != nil {
 			providerErr.Store(err)
 		}
+		select {
+		case handles <- handle:
+		default:
+		}
 		return ResourceProviderDecisionHandle
 	}}); err != nil {
 		_ = closeRuntimeForTest(runtime)
@@ -365,10 +388,12 @@ func TestResourceRequestCancelCallbackSkipsCompletedRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewMap(): %v", err)
 	}
+	baseline := bindingCallbackCount.Load()
 	if _, err := m.SetStyleURL(styleURL); err != nil {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
 	waitForRuntimeEvent(t, runtime, RuntimeEventTypeMapStyleLoaded)
+	handle := waitForResourceSignalValue(t, handles, "the provider to receive the style request")
 	teardown, err := m.Close()
 	if err != nil {
 		t.Fatalf("Map Close(): %v", err)
@@ -382,6 +407,13 @@ func TestResourceRequestCancelCallbackSkipsCompletedRequest(t *testing.T) {
 	}
 	if got := cancelCalls.Load(); got != 0 {
 		t.Fatalf("cancel callback calls for a completed request = %d, want 0", got)
+	}
+	if got := bindingCallbackCount.Load() - baseline; got != 1 {
+		t.Fatalf("live cancel registrations before Close = %d, want 1", got)
+	}
+	handle.Close()
+	if got := bindingCallbackCount.Load() - baseline; got != 0 {
+		t.Fatalf("live cancel registrations after Close = %d, want 0", got)
 	}
 }
 

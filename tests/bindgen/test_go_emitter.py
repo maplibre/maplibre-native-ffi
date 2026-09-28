@@ -153,3 +153,32 @@ mln_status mln_seed_plant(mln_seed seed, mln_forest forest, mln_tree *out_tree B
             source = go.generate(api)["generated_api.go"]
         self.assertIn("func (receiver *SeedHandle) Plant(forest *ForestHandle)", source)
         self.assertIn("adoptTreeHandle(uint64(outputOutTree), input1)", source)
+
+    def test_receiver_registration_transfers_its_root_unless_rejected(self):
+        with TemporaryDirectory() as directory:
+            include = Path(directory)
+            (include / "api.h").write_text("""
+#include <stdbool.h>
+#define BIND(x) __attribute__((annotate("mln:" x)))
+typedef int mln_status;
+typedef unsigned long long mln_ticket BIND("kind=handle;release=mln_ticket_release;parent=none");
+typedef void (*release_context)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
+typedef void (*cancel)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
+BIND("execution=immediate") void mln_ticket_release(mln_ticket ticket);
+BIND("execution=immediate;registration=callback;user_data=context;release_callback=release;accepted_unless=cancelled")
+mln_status mln_ticket_on_cancel(mln_ticket ticket, cancel callback, void *context BIND("kind=context"), release_context release, bool *cancelled BIND("direction=out"));
+""")
+            api = parse_headers(include)
+            validate(api)
+            source = go.generate(api)["generated_api.go"]
+        self.assertIn(
+            "func (receiver *TicketHandle) OnCancel(callback func()) (bool, error)",
+            source,
+        )
+        self.assertIn(
+            "C.mln_ticket_on_cancel(C.mln_ticket(raw), nativeCallback, context, nativeRelease, &rejected)",
+            source,
+        )
+        self.assertIn(
+            "if !bool(rejected) { arena.accept(receiver.bindingOwner) }", source
+        )

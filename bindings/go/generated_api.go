@@ -13,9 +13,7 @@ import "C"
 
 import (
 	"runtime"
-	"runtime/cgo"
 	"unsafe"
-	"weak"
 )
 
 type AmbientCacheOperation uint32
@@ -4834,7 +4832,6 @@ type ResourceRequestHandle struct{ *bindingOwner }
 
 func adoptResourceRequestHandle(raw uint64, parent any) *ResourceRequestHandle {
 	owner := &ResourceRequestHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_resource_request_release(C.mln_resource_request_handle(raw)) })}
-	owner.state.waitRetired = func(raw uint64) { C.mln_resource_request_wait_until_retired(C.mln_resource_request_handle(raw)) }
 	return owner
 }
 
@@ -9951,23 +9948,22 @@ func (receiver *ResourceRequestHandle) SetCancelCallback(callback func()) (bool,
 		if callback != nil {
 			context = arena.register(ResourceRequestSetCancelCallbackRegistration{Callback: callback}, receiver.state.issued)
 		}
+		var nativeCallback C.mln_resource_request_cancel_callback
+		var nativeRelease C.mln_runtime_callback_release
+		if callback != nil {
+			nativeCallback = C.mln_resource_request_cancel_callback(C.binding_mln_resource_request_set_cancel_callback_registration_callback)
+			nativeRelease = C.mln_runtime_callback_release(C.binding_release)
+		}
 		raw, done := receiver.bindingAcquire(false)
 		defer done()
-		receiver.state.mu.Lock()
-		defer receiver.state.mu.Unlock()
-		if receiver.state.cancelTicket != 0 {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "cancellation callback already registered")})
-		}
-		var alreadyRetired C.bool
+		var rejected C.bool
 		bindingCheck(func() int32 {
-			return int32(C.mln_resource_request_set_cancel_callback(C.mln_resource_request_handle(raw), C.mln_resource_request_cancel_callback(C.binding_mln_resource_request_set_cancel_callback_registration_callback), context, nil, &alreadyRetired))
+			return int32(C.mln_resource_request_set_cancel_callback(C.mln_resource_request_handle(raw), nativeCallback, context, nativeRelease, &rejected))
 		})
-		if !bool(alreadyRetired) && context != nil {
-			receiver.state.cancelTicket = cgo.Handle(uintptr(context))
-			receiver.state.cancelRoot = weak.Make(arena.callbacks[0])
+		if !bool(rejected) {
 			arena.accept(receiver.bindingOwner)
 		}
-		return bool(alreadyRetired)
+		return bool(rejected)
 	})
 }
 

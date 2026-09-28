@@ -189,6 +189,8 @@ def direct_operation(plan, values):
     from ..semantic import FieldPlan, RegistrationDescriptorPlan, ValuePlan
 
     registration = plan.direct_registrations[0]
+    if not registration.release_callback:
+        raise ModelError([f"{plan.name}: callback requires a release relationship"])
     callback_parameter = next(p for p in plan.inputs if p.name == registration.callback)
     callback = values.api.callbacks[callback_parameter.value.native]
     descriptor = ValuePlan(
@@ -199,7 +201,7 @@ def direct_operation(plan, values):
         registration=RegistrationDescriptorPlan(
             (registration.callback,),
             registration.user_data,
-            registration.release_callback or "release",
+            registration.release_callback,
         ),
     )
     validate(values, descriptor)
@@ -208,8 +210,9 @@ def direct_operation(plan, values):
     callback_type = signature(values, callback)
     symbol = "binding_" + descriptor.native + "_" + registration.callback
     args = {
-        registration.callback: f"(C.{callback.native})(C.{symbol})",
+        registration.callback: "nativeCallback",
         registration.user_data: "context",
+        registration.release_callback: "nativeRelease",
     }
     setup = ["arena := &bindingArena{}; defer arena.close()"]
     receiver = next((p for p in plan.inputs if p.name == plan.receiver), None)
@@ -220,39 +223,6 @@ def direct_operation(plan, values):
     setup.append(
         f"var context unsafe.Pointer; if callback != nil {{ context = arena.register({typename}{{{name(registration.callback)}: callback}}, {identity}) }}"
     )
-    if registration.owner_release:
-        setup.insert(
-            0,
-            'if receiver == nil || receiver.bindingOwner == nil { panic(bindingFailure{newBindingError(ErrInvalidState,"nil handle")}) }',
-        )
-        owner = values.owner(receiver.value.native)
-        args[receiver.name] = f"C.{receiver.value.native}(raw)"
-        if len(plan.outputs) != 1 or callback.result.native != "void":
-            raise ModelError([f"{plan.name}: unsupported owner callback result"])
-        output = plan.outputs[0]
-        args[output.name] = "&alreadyRetired"
-        # TEMPORARY: the owner roots the callback until release, so native
-        # release is not requested yet.
-        if registration.release_callback:
-            args[registration.release_callback] = "nil"
-        setup.append("raw, done := receiver.bindingAcquire(false); defer done()")
-        setup.append("receiver.state.mu.Lock(); defer receiver.state.mu.Unlock()")
-        setup.append(
-            'if receiver.state.cancelTicket != 0 { panic(bindingFailure{newBindingError(ErrInvalidState, "cancellation callback already registered")}) }'
-        )
-        setup.append(f"var alreadyRetired {values.c_type(output.value.element)}")
-        call = f"C.{plan.name}({', '.join(args[p.name] for p in plan.function.parameters)})"
-        setup.append(f"bindingCheck(func() int32 {{ return int32({call}) }})")
-        setup.append(
-            "if !bool(alreadyRetired) && context != nil { receiver.state.cancelTicket = cgo.Handle(uintptr(context)); receiver.state.cancelRoot = weak.Make(arena.callbacks[0]); arena.accept(receiver.bindingOwner) }"
-        )
-        setup.append("return bool(alreadyRetired)")
-        method = name(
-            plan.name.removeprefix(receiver.value.native.removesuffix("_handle") + "_")
-        )
-        return f"func (receiver *{owner}) {method}(callback {callback_type}) (bool,error) {{ return bindingCall(func() bool {{ {'; '.join(setup)} }}) }}"
-    if not registration.release_callback:
-        raise ModelError([f"{plan.name}: callback requires a release relationship"])
     release_parameter = next(
         p for p in plan.inputs if p.name == registration.release_callback
     )
@@ -261,13 +231,44 @@ def direct_operation(plan, values):
         if values.api.callbacks[release_parameter.value.native].reentry == "forbid"
         else "binding_release"
     )
-    args[registration.callback] = "nativeCallback"
-    args[registration.release_callback] = "nativeRelease"
     setup.append(
         f"var nativeCallback C.{callback.native}; var nativeRelease C.{release_parameter.value.native}; if callback != nil {{ nativeCallback = (C.{callback.native})(C.{symbol}); nativeRelease = (C.{release_parameter.value.native})(C.{release}) }}"
     )
+    owner = "nil"
+    if receiver:
+        setup.insert(
+            0,
+            'if receiver == nil || receiver.bindingOwner == nil { panic(bindingFailure{newBindingError(ErrInvalidState,"nil handle")}) }',
+        )
+        args[receiver.name] = f"C.{receiver.value.native}(raw)"
+        setup.append("raw, done := receiver.bindingAcquire(false); defer done()")
+        owner = "receiver.bindingOwner"
+    result, returned, accept = "struct{}", "struct{}{}", f"arena.accept({owner})"
+    if registration.accepted_unless:
+        output = next(p for p in plan.outputs if p.name == registration.accepted_unless)
+        if len(plan.outputs) != 1:
+            raise ModelError([f"{plan.name}: unsupported direct callback outputs"])
+        args[output.name] = "&rejected"
+        setup.append(f"var rejected {values.c_type(output.value.element)}")
+        result, returned = "bool", "bool(rejected)"
+        # A rejected registration stores nothing, so the arena releases it.
+        accept = f"if !bool(rejected) {{ {accept} }}"
+    elif plan.outputs:
+        raise ModelError([f"{plan.name}: unsupported direct callback outputs"])
     call = f"C.{plan.name}({', '.join(args[p.name] for p in plan.function.parameters)})"
-    setup.append(
-        f"bindingCheck(func() int32 {{ return int32({call}) }}); arena.accept(nil); return struct{{}}{{}}"
-    )
-    return f"func {name(plan.name.removeprefix('mln_'))}(callback {callback_type}) error {{ _,err := bindingCall(func() struct{{}} {{ {'; '.join(setup)} }}); return err }}"
+    setup.append(f"bindingCheck(func() int32 {{ return int32({call}) }})")
+    setup.append(accept)
+    setup.append(f"return {returned}")
+    body = f"bindingCall(func() {result} {{ {'; '.join(setup)} }})"
+    if receiver:
+        method = name(
+            plan.name.removeprefix(receiver.value.native.removesuffix("_handle") + "_")
+        )
+        signature_ = f"func (receiver *{values.owner(receiver.value.native)}) {method}(callback {callback_type})"
+    else:
+        signature_ = (
+            f"func {name(plan.name.removeprefix('mln_'))}(callback {callback_type})"
+        )
+    if result == "bool":
+        return f"{signature_} (bool, error) {{ return {body} }}"
+    return f"{signature_} error {{ _, err := {body}; return err }}"
