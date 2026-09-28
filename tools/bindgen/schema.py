@@ -42,7 +42,6 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "registration",
         "user_data",
         "release_callback",
-        "owner_release",
         "accepted_unless",
         "view_owner",
         "callback_adapter",
@@ -423,8 +422,7 @@ def validate(api: Api) -> None:
                     f"{context}: support requires a checked default-constructor consumer"
                 )
         if (
-            metadata.keys()
-            & {"user_data", "release_callback", "owner_release", "accepted_unless"}
+            metadata.keys() & {"user_data", "release_callback", "accepted_unless"}
             and "registration" not in metadata
         ):
             errors.append(
@@ -449,12 +447,8 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{context}: registration user_data requires a void context parameter"
                 )
-            # TEMPORARY: owner_release may accompany release_callback while the
-            # bindings move to native release.
-            if not ("release_callback" in metadata or "owner_release" in metadata):
-                errors.append(
-                    f"{context}: registration requires a release callback or owner release"
-                )
+            if "release_callback" not in metadata:
+                errors.append(f"{context}: registration requires a release callback")
             if "release_callback" in metadata:
                 release = parameters.get(metadata["release_callback"])
                 release_type = (
@@ -472,21 +466,6 @@ def validate(api: Api) -> None:
                 ):
                     errors.append(
                         f"{context}: release_callback requires a void callback taking its context"
-                    )
-            if "owner_release" in metadata:
-                owner = (
-                    api.typedefs_by_name.get(
-                        function.parameters[0].type.declaration or ""
-                    )
-                    if function.parameters
-                    else None
-                )
-                if (
-                    owner is None
-                    or owner.metadata.get("release") != metadata["owner_release"]
-                ):
-                    errors.append(
-                        f"{context}: owner_release must match the receiver handle release"
                     )
             if "accepted_unless" in metadata:
                 condition = parameters.get(metadata["accepted_unless"])

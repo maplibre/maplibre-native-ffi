@@ -1052,8 +1052,7 @@ MLN_API mln_status mln_resource_request_cancelled(
  */
 MLN_BINDING(
   "execution=immediate;registration=callback;user_data=user_data;"
-  "release_callback=release_user_data;accepted_unless=out_cancelled;"
-  "owner_release=mln_resource_request_release"
+  "release_callback=release_user_data;accepted_unless=out_cancelled"
 )
 MLN_API mln_status mln_resource_request_set_cancel_callback(
   mln_resource_request_handle handle,

@@ -591,11 +591,12 @@ BIND("execution=immediate") mln_status release_frame(
 typedef enum decision : unsigned { DELEGATE = 0, CLAIM = 1 } decision;
 typedef unsigned long request BIND("kind=handle;release=release_request;parent=none");
 typedef void (*cancel)(void *context BIND("kind=context")) BIND("thread=native;failure=contain");
+typedef void (*release_cancel)(void *context BIND("kind=context")) BIND("thread=native;failure=contain");
 typedef unsigned (*provider)(request ticket) BIND("thread=native;failure=DELEGATE;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=answer;cancelled=is_cancelled;cancel_registration=on_cancel;wait_retired=await_retirement");
 BIND("execution=immediate") mln_status answer(request value, unsigned response);
 BIND("execution=immediate") mln_status is_cancelled(request value, bool *result BIND("direction=out"));
-BIND("execution=immediate;registration=callback;user_data=context;owner_release=release_request;accepted_unless=cancelled") mln_status on_cancel(
-  request value, cancel callback, void *context BIND("kind=context"), bool *cancelled BIND("direction=out"));
+BIND("execution=immediate;registration=callback;user_data=context;release_callback=release;accepted_unless=cancelled") mln_status on_cancel(
+  request value, cancel callback, void *context BIND("kind=context"), release_cancel release, bool *cancelled BIND("direction=out"));
 BIND("execution=immediate") void release_request(request value);
 BIND("execution=immediate") mln_status await_retirement(request value BIND("handle_access=issued"));
 """
@@ -614,8 +615,8 @@ BIND("execution=immediate") mln_status await_retirement(request value BIND("hand
         )
         registration = model.operations_by_name["on_cancel"].direct_registrations[0]
         self.assertEqual(
-            (registration.owner_release, registration.accepted_unless),
-            ("release_request", "cancelled"),
+            (registration.release_callback, registration.accepted_unless),
+            ("release", "cancelled"),
         )
         for before, after, error in (
             (
@@ -633,9 +634,9 @@ BIND("execution=immediate") mln_status await_retirement(request value BIND("hand
             ),
             ("accepted_unless=cancelled", "accepted_unless=value", "boolean output"),
             (
-                "owner_release=release_request",
-                "owner_release=answer",
-                "receiver handle release",
+                "release_callback=release",
+                "release_callback=value",
+                "void callback taking its context",
             ),
         ):
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):

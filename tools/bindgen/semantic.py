@@ -206,7 +206,6 @@ class DirectRegistrationPlan:
     callback: str
     user_data: str
     release_callback: str | None
-    owner_release: str | None
     accepted_unless: str | None
     transfer: str = "acceptance"
 
@@ -1046,7 +1045,6 @@ class Binder:
                     metadata["registration"],
                     metadata["user_data"],
                     metadata.get("release_callback"),
-                    metadata.get("owner_release"),
                     metadata.get("accepted_unless"),
                 ),
             )
