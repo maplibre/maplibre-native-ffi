@@ -7,11 +7,3 @@ Uint8List _copyBufferView(raw.mln_buffer_view view) {
   }
   return Uint8List.fromList(view.data.cast<Uint8>().asTypedList(view.size));
 }
-
-void _checkNativeCString(String value) {
-  if (value.contains('\u0000')) {
-    throwInvalidArgument(
-      'null-terminated strings must not contain embedded NUL',
-    );
-  }
-}

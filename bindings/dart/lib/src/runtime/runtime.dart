@@ -20,7 +20,6 @@ import '../internal/memory/memory.dart';
 import '../internal/status/status.dart';
 import '../internal/value/uint64.dart';
 import '../render/native_pointer.dart';
-import '../resource/resource.dart';
 
 part 'runtime_resource_callbacks.dart';
 part 'runtime_logging.dart';
@@ -29,8 +28,6 @@ part 'runtime_offline.dart';
 part 'runtime_render_handles.dart';
 
 final MaplibreNativeCApi _c = MaplibreNativeCApi.open();
-
-const int _resourceKindWildcard = 0xffffffff;
 
 /// Native release roots for the adapter rule contexts and the log callback.
 ///
@@ -66,12 +63,12 @@ typedef ResourceProviderCallback =
 final class QueuedResourceProvider {
   /// Creates a resource provider with native-owned routing rules.
   QueuedResourceProvider({
-    required List<ResourceProviderRoute> routes,
+    required List<AdapterQueuedResourceProviderRoute> routes,
     required this.callback,
   }) : routes = List.unmodifiable(routes);
 
-  /// Exact routes handled by this provider.
-  final List<ResourceProviderRoute> routes;
+  /// Routes handled by this provider.
+  final List<AdapterQueuedResourceProviderRoute> routes;
 
   /// Callback invoked on the receiver isolate for matching requests.
   final ResourceProviderCallback callback;

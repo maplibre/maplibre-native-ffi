@@ -1,30 +1,24 @@
 part of 'runtime.dart';
 
-int _resourceRouteFlags(ResourceProviderRoute route) {
-  var flags = raw
-      .mln_adapter_resource_route_flags
-      .MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE;
-  if (route.matchGlob) {
-    flags |= raw
-        .mln_adapter_resource_route_flags
-        .MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB;
-  }
-  if (route.useRequestedUrl) {
-    flags |= raw
-        .mln_adapter_resource_route_flags
-        .MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL;
-  }
-  return flags;
-}
-
 final class _ResourceProviderCallbackState extends RetainedCallbackState {
   _ResourceProviderCallbackState(QueuedResourceProvider provider)
     : _callback = provider.callback {
     var queueAccepted = false;
     var wakeCreated = false;
     try {
-      for (final route in provider.routes) {
-        _checkNativeCString(route.url);
+      final routes = provider.routes;
+      pointer = arena<raw.mln_adapter_queued_resource_provider>();
+      pointer.ref.route_count = routes.length;
+      pointer.ref.routes = routes.isEmpty
+          ? nullptr.cast<raw.mln_adapter_queued_resource_provider_route>()
+          : arena<raw.mln_adapter_queued_resource_provider_route>(
+              routes.length,
+            );
+      for (var index = 0; index < routes.length; index += 1) {
+        pointer.ref.routes[index] = _writeAdapterQueuedResourceProviderRoute(
+          routes[index],
+          arena,
+        ).ref;
       }
       wake = NativeWakeState(() => runUpcall(drain));
       wakeCreated = true;
@@ -39,23 +33,6 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
         queue = outQueue.value;
         arena.adoptHandle(queue);
       });
-      pointer = arena<raw.mln_adapter_queued_resource_provider>();
-      pointer.ref.route_count = provider.routes.length;
-      pointer.ref.routes = provider.routes.isEmpty
-          ? nullptr.cast<raw.mln_adapter_queued_resource_provider_route>()
-          : arena<raw.mln_adapter_queued_resource_provider_route>(
-              provider.routes.length,
-            );
-      for (var index = 0; index < provider.routes.length; index += 1) {
-        final route = provider.routes[index];
-        pointer.ref.routes[index].kind =
-            route.kind?.rawValue ?? _resourceKindWildcard;
-        pointer.ref.routes[index].flags = _resourceRouteFlags(route);
-        pointer.ref.routes[index].url = nativeUtf8CString(
-          route.url,
-          arena,
-        ).pointer.cast();
-      }
       pointer.ref.queue = queue;
     } catch (_) {
       if (wakeCreated && !queueAccepted) wake.reject();

@@ -21,6 +21,10 @@ from .dart_values import (
     public_name,
 )
 
+# Values whose generated class and writer the hand-written queued resource
+# provider in runtime_resource_callbacks.dart consumes.
+HANDWRITTEN_VALUES = ("mln_adapter_queued_resource_provider_route",)
+
 
 def adopt_owner(owned, expression, receiver, function, values):
     if owned.handle.native not in values.bound.public_handles:
@@ -499,6 +503,9 @@ def lower(api: Api | BoundApi):
             generated.append(plan.name)
         except Unsupported as error:
             unsupported[plan.name] = f"{plan.function.location}: {error}"
+    for native in HANDWRITTEN_VALUES:
+        if native in bound.values:
+            values.check(bound.values[native])
     return methods, generated, unsupported, values
 
 
@@ -605,6 +612,11 @@ def generate(api: Api | BoundApi) -> str:
         )
     )
     needed.update("_read" + public_name(value.native) for value in values.projections)
+    needed.update(
+        "_write" + public_name(native)
+        for native in HANDWRITTEN_VALUES
+        if native in values.used
+    )
     while True:
         expanded = needed | set(
             re.findall(

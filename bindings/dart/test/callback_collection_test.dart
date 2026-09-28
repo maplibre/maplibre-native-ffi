@@ -25,8 +25,11 @@ Future<WeakReference<RuntimeHandle>> _unreachableProvider() async {
   final runtime = runtimeCreate(runtimeOptionsDefault());
   await runtime.setQueuedResourceProvider(
     QueuedResourceProvider(
-      routes: const [
-        ResourceProviderRoute(kind: ResourceKind.style, url: 'capture://style'),
+      routes: [
+        AdapterQueuedResourceProviderRoute(
+          kind: ResourceKind.style.rawValue,
+          url: 'capture://style',
+        ),
       ],
       callback: (_, request) {
         runtime.identity;

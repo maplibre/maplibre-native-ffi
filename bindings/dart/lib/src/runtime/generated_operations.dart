@@ -3032,6 +3032,20 @@ _NativeRegistration<raw.mln_http_header_transform> _prepareHttpHeaderTransform(
   }
 }
 
+Pointer<raw.mln_adapter_queued_resource_provider_route>
+_writeAdapterQueuedResourceProviderRoute(
+  AdapterQueuedResourceProviderRoute value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_adapter_queued_resource_provider_route>();
+  result.ref.kind = _generatedInteger(value.kind, 0, 4294967295);
+  result.ref.flags = _generatedInteger(value.flags, 0, 4294967295);
+  result.ref.url = value.url == null
+      ? nullptr
+      : nativeUtf8CString(value.url!, arena).pointer.cast<Char>();
+  return result;
+}
+
 Pointer<raw.mln_adapter_resource_provider_rule>
 _writeAdapterResourceProviderRule(
   AdapterResourceProviderRule value,

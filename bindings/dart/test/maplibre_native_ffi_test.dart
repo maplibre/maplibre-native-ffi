@@ -423,9 +423,9 @@ void main() {
     var providerCalls = 0;
     runtime.setQueuedResourceProvider(
       QueuedResourceProvider(
-        routes: const [
-          ResourceProviderRoute(
-            kind: ResourceKind.style,
+        routes: [
+          AdapterQueuedResourceProviderRoute(
+            kind: ResourceKind.style.rawValue,
             url: 'custom://different-style.json',
           ),
         ],
@@ -457,8 +457,11 @@ void main() {
 
     runtime.setQueuedResourceProvider(
       QueuedResourceProvider(
-        routes: const [
-          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+        routes: [
+          AdapterQueuedResourceProviderRoute(
+            kind: ResourceKind.style.rawValue,
+            url: styleUrl,
+          ),
         ],
         callback: (request, handle) {
           requests.add(request);
@@ -516,11 +519,13 @@ void main() {
 
     runtime.setQueuedResourceProvider(
       QueuedResourceProvider(
-        routes: const [
-          ResourceProviderRoute(
-            kind: ResourceKind.style,
+        routes: [
+          AdapterQueuedResourceProviderRoute(
+            kind: ResourceKind.style.rawValue,
             url: aliasUrl,
-            useRequestedUrl: true,
+            flags: raw
+                .mln_adapter_resource_route_flags
+                .MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL,
           ),
         ],
         callback: (request, handle) {
@@ -559,8 +564,14 @@ void main() {
 
     runtime.setQueuedResourceProvider(
       QueuedResourceProvider(
-        routes: const [
-          ResourceProviderRoute(url: '$origin**', matchGlob: true),
+        routes: [
+          AdapterQueuedResourceProviderRoute(
+            kind: raw.MLN_ADAPTER_RESOURCE_KIND_ANY,
+            url: '$origin**',
+            flags: raw
+                .mln_adapter_resource_route_flags
+                .MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB,
+          ),
         ],
         callback: (request, handle) {
           claimed.add(request.resolvedUrl!);
@@ -605,7 +616,9 @@ void main() {
       const aliasUrl = 'maplibre://maps/style';
       const normalizedUrl = 'https://demotiles.maplibre.org/style.json';
 
-      Future<ResourceRequest> claimedBy(ResourceProviderRoute route) async {
+      Future<ResourceRequest> claimedBy(
+        AdapterQueuedResourceProviderRoute route,
+      ) async {
         final runtime = runtimeCreate(runtimeOptionsDefault());
         final requests = <ResourceRequest>[];
         runtime.setQueuedResourceProvider(
@@ -632,18 +645,20 @@ void main() {
       }
 
       final byResolved = await claimedBy(
-        const ResourceProviderRoute(
-          kind: ResourceKind.style,
+        AdapterQueuedResourceProviderRoute(
+          kind: ResourceKind.style.rawValue,
           url: normalizedUrl,
         ),
       );
       expect(byResolved.requestedUrl, aliasUrl);
 
       final byRequested = await claimedBy(
-        const ResourceProviderRoute(
-          kind: ResourceKind.style,
+        AdapterQueuedResourceProviderRoute(
+          kind: ResourceKind.style.rawValue,
           url: aliasUrl,
-          useRequestedUrl: true,
+          flags: raw
+              .mln_adapter_resource_route_flags
+              .MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL,
         ),
       );
       expect(byRequested.resolvedUrl, normalizedUrl);
@@ -657,8 +672,11 @@ void main() {
 
     runtime.setQueuedResourceProvider(
       QueuedResourceProvider(
-        routes: const [
-          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+        routes: [
+          AdapterQueuedResourceProviderRoute(
+            kind: ResourceKind.style.rawValue,
+            url: styleUrl,
+          ),
         ],
         callback: (_, handle) {
           token = handle;
@@ -691,8 +709,11 @@ void main() {
 
     runtime.setQueuedResourceProvider(
       QueuedResourceProvider(
-        routes: const [
-          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+        routes: [
+          AdapterQueuedResourceProviderRoute(
+            kind: ResourceKind.style.rawValue,
+            url: styleUrl,
+          ),
         ],
         callback: (_, handle) {
           token = handle;
@@ -739,8 +760,11 @@ void main() {
 
     runtime.setQueuedResourceProvider(
       QueuedResourceProvider(
-        routes: const [
-          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+        routes: [
+          AdapterQueuedResourceProviderRoute(
+            kind: ResourceKind.style.rawValue,
+            url: styleUrl,
+          ),
         ],
         callback: (_, _) {
           calls += 1;
@@ -775,8 +799,11 @@ void main() {
 
     runtime.setQueuedResourceProvider(
       QueuedResourceProvider(
-        routes: const [
-          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+        routes: [
+          AdapterQueuedResourceProviderRoute(
+            kind: ResourceKind.style.rawValue,
+            url: styleUrl,
+          ),
         ],
         callback: (_, handle) {
           handle.close();
@@ -825,8 +852,11 @@ void main() {
 
       runtime.setQueuedResourceProvider(
         QueuedResourceProvider(
-          routes: const [
-            ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+          routes: [
+            AdapterQueuedResourceProviderRoute(
+              kind: ResourceKind.style.rawValue,
+              url: styleUrl,
+            ),
           ],
           callback: (_, handle) {
             token = handle;
@@ -878,8 +908,11 @@ void main() {
 
     runtime.setQueuedResourceProvider(
       QueuedResourceProvider(
-        routes: const [
-          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+        routes: [
+          AdapterQueuedResourceProviderRoute(
+            kind: ResourceKind.style.rawValue,
+            url: styleUrl,
+          ),
         ],
         callback: (_, handle) {
           handle.setCancelCallback(() => cancels += 1);
@@ -916,8 +949,11 @@ void main() {
 
     runtime.setQueuedResourceProvider(
       QueuedResourceProvider(
-        routes: const [
-          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+        routes: [
+          AdapterQueuedResourceProviderRoute(
+            kind: ResourceKind.style.rawValue,
+            url: styleUrl,
+          ),
         ],
         callback: (_, handle) {
           token = handle;
@@ -1694,8 +1730,11 @@ void main() {
       expect(
         () => runtime.setQueuedResourceProvider(
           QueuedResourceProvider(
-            routes: const [
-              ResourceProviderRoute(url: 'https://example.com/provider\u0000x'),
+            routes: [
+              AdapterQueuedResourceProviderRoute(
+                kind: raw.MLN_ADAPTER_RESOURCE_KIND_ANY,
+                url: 'https://example.com/provider\u0000x',
+              ),
             ],
             callback: (_, _) {},
           ),
@@ -1746,9 +1785,9 @@ void main() {
       );
       runtime.setQueuedResourceProvider(
         QueuedResourceProvider(
-          routes: const [
-            ResourceProviderRoute(
-              kind: ResourceKind.style,
+          routes: [
+            AdapterQueuedResourceProviderRoute(
+              kind: ResourceKind.style.rawValue,
               url: 'https://example.com/provider-style.json',
             ),
           ],
