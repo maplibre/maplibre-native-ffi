@@ -104,6 +104,17 @@ mln_status mln_map_entry(mln_map map, const mln_completion *completion);
         self.assertEqual(result["generated"], [])
         self.assertIn("collide", result["unsupported"]["mln_map_entry"])
 
+    def test_operations_cannot_take_owner_member_names(self):
+        api = self.parse("""
+typedef unsigned long long mln_host BIND("kind=handle;release=mln_host_destroy;parent=none");
+BIND("execution=immediate") mln_status mln_host_destroy(mln_host host);
+BIND("execution=immediate") mln_status mln_host_closed(mln_host host, bool *out BIND("direction=out"));
+""")
+        result = python.coverage(api)
+        # The release alone becomes close.
+        self.assertEqual(result["generated"], ["mln_host_destroy"])
+        self.assertIn("owner member", result["unsupported"]["mln_host_closed"])
+
     def test_tagged_union_wrapper_keeps_payload_record_and_unknown_tag(self):
         api = self.parse("""
 typedef enum mln_event_kind { MLN_EVENT_NONE = 0, MLN_EVENT_FRAME = 1 } mln_event_kind;

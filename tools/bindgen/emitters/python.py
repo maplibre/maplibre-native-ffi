@@ -45,20 +45,9 @@ def unsupported(function: Function | Record, reason: str) -> ModelError:
     return ModelError([f"{function.location}: Python: {function.name}: {reason}"])
 
 
-RUNTIME_METHODS = {
-    "state",
-    "native",
-    "ensure_open",
-    "closed",
-    "runtime",
-    "handle",
-    "drop",
-    "new",
-    "submit_map_operation",
-    "submit_map_command",
-    "add_tile_source_url_with",
-    "add_tile_source_tiles_with",
-}
+# Members every handle owner defines. The release operation alone becomes
+# `close`; any other operation with one of these names would shadow a member.
+OWNER_MEMBERS = {"state", "closed", "close"}
 LOCAL_NAMES = {
     "self",
     "py",
@@ -179,19 +168,22 @@ def operation(
     name = function.name.removeprefix(
         native_owner.removesuffix("_handle") + "_"
     ).removeprefix("mln_")
-    if (
+    release = bool(
         receiver
         and receiver.value.handle
         and plan.name == receiver.value.handle.release
-    ):
+    )
+    if release:
         name = "close"
     if plan.view:
         name = "with_" + name.removeprefix("get_")
     if iskeyword(name) or name in RUST_KEYWORDS:
         name += "_"
-    if not safe_identifier(name) or name in RUNTIME_METHODS:
+    if not safe_identifier(name):
+        raise unsupported(function, f"method identifier {name!r} is not safe")
+    if name in OWNER_MEMBERS and not release:
         raise unsupported(
-            function, f"method identifier {name!r} requires a runtime method adapter"
+            function, f"method identifier {name!r} collides with an owner member"
         )
     if plan.consumes and receiver is None:
         raise unsupported(function, "consuming operation needs a matching owner state")
