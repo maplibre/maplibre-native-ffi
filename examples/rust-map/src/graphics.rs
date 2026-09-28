@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use maplibre_native_ffi::RenderBackendMask;
+use maplibre_native_ffi::RenderBackendFlag;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::Window;
 use winit::window::WindowAttributes;
@@ -20,18 +20,18 @@ pub struct GraphicsContext(Box<OpenGLContext>);
 #[cfg(maplibre_render_backend = "vulkan")]
 pub struct GraphicsContext(Box<VulkanContext>);
 
-pub fn required_backend() -> RenderBackendMask {
+pub fn required_backend() -> RenderBackendFlag {
     #[cfg(maplibre_render_backend = "metal")]
     {
-        RenderBackendMask::METAL
+        RenderBackendFlag::METAL
     }
     #[cfg(maplibre_render_backend = "opengl")]
     {
-        RenderBackendMask::OPENGL
+        RenderBackendFlag::OPENGL
     }
     #[cfg(maplibre_render_backend = "vulkan")]
     {
-        RenderBackendMask::VULKAN
+        RenderBackendFlag::VULKAN
     }
 }
 
@@ -40,7 +40,7 @@ impl GraphicsContext {
     pub fn create_window(
         event_loop: &ActiveEventLoop,
         window_attributes: WindowAttributes,
-        backends: RenderBackendMask,
+        backends: RenderBackendFlag,
     ) -> Result<(Window, Self), Box<dyn Error>> {
         if !backends.contains(required_backend()) {
             return Err(
@@ -76,7 +76,7 @@ impl GraphicsContext {
     pub fn create_window(
         event_loop: &ActiveEventLoop,
         window_attributes: WindowAttributes,
-        backends: RenderBackendMask,
+        backends: RenderBackendFlag,
     ) -> Result<(Window, Self), Box<dyn Error>> {
         if !backends.contains(required_backend()) {
             return Err(
@@ -110,7 +110,7 @@ impl GraphicsContext {
     pub fn create_window(
         event_loop: &ActiveEventLoop,
         window_attributes: WindowAttributes,
-        backends: RenderBackendMask,
+        backends: RenderBackendFlag,
     ) -> Result<(Window, Self), Box<dyn Error>> {
         if !backends.contains(required_backend()) {
             return Err(

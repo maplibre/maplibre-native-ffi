@@ -9,7 +9,6 @@ compile_error!("rust-map metal backend is only supported on macOS");
 compile_error!("rust-map opengl backend is only supported on Linux and Windows");
 
 mod app;
-mod channel;
 mod graphics;
 mod input;
 mod map_state;
@@ -33,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let Some(mode) = parse_args(std::env::args().skip(1))? else {
         return Ok(());
     };
-    let backends = maplibre_native_ffi::supported_render_backends();
+    let backends = maplibre_native_ffi::supported_render_backend_mask()?;
     println!("native render backends: {}", render_backend_label(backends));
     if !supports_usable_backend(backends) {
         return Err(
@@ -41,17 +40,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .into(),
         );
     }
-    maplibre_native_ffi::set_log_callback(|record| {
-        eprintln!(
-            "MapLibre {:?} {:?} {}: {}",
-            record.severity, record.event, record.code, record.message
-        );
-        true
-    })?;
+    maplibre_native_ffi::log_set_callback(Some(std::sync::Arc::new(
+        |severity, event, code, message| {
+            eprintln!("MapLibre {:?} {:?} {}: {}", severity, event, code, message);
+            1
+        },
+    )))?;
     struct ClearLogCallback;
     impl Drop for ClearLogCallback {
         fn drop(&mut self) {
-            let _ = maplibre_native_ffi::clear_log_callback();
+            let _ = maplibre_native_ffi::log_clear_callback();
         }
     }
     let _clear_log_callback = ClearLogCallback;
@@ -89,15 +87,15 @@ fn print_usage() {
     );
 }
 
-fn render_backend_label(backends: maplibre_native_ffi::RenderBackendMask) -> String {
+fn render_backend_label(backends: maplibre_native_ffi::RenderBackendFlag) -> String {
     let mut labels = Vec::new();
-    if backends.contains(maplibre_native_ffi::RenderBackendMask::METAL) {
+    if backends.contains(maplibre_native_ffi::RenderBackendFlag::METAL) {
         labels.push("metal");
     }
-    if backends.contains(maplibre_native_ffi::RenderBackendMask::OPENGL) {
+    if backends.contains(maplibre_native_ffi::RenderBackendFlag::OPENGL) {
         labels.push("opengl");
     }
-    if backends.contains(maplibre_native_ffi::RenderBackendMask::VULKAN) {
+    if backends.contains(maplibre_native_ffi::RenderBackendFlag::VULKAN) {
         labels.push("vulkan");
     }
     if labels.is_empty() {
@@ -107,6 +105,6 @@ fn render_backend_label(backends: maplibre_native_ffi::RenderBackendMask) -> Str
     }
 }
 
-fn supports_usable_backend(backends: maplibre_native_ffi::RenderBackendMask) -> bool {
+fn supports_usable_backend(backends: maplibre_native_ffi::RenderBackendFlag) -> bool {
     backends.contains(graphics::required_backend())
 }

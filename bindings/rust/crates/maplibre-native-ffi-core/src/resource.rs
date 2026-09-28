@@ -1,337 +1,13 @@
-use std::ffi::{CString, c_char, c_void};
+pub use crate::generated::ResourceProviderDecision;
+#[cfg(test)]
+use crate::generated::ResourceResponse;
+use crate::{Error, ErrorKind, Result};
+use maplibre_native_ffi_sys as sys;
+use std::ffi::c_void;
 use std::fmt;
-use std::marker::PhantomData;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 use std::sync::{Arc, Mutex, Weak};
-
-use maplibre_native_ffi_sys as sys;
-
-use crate::enums::{
-    resource_kind_from_raw, resource_loading_method_from_raw, resource_priority_from_raw,
-    resource_storage_policy_from_raw, resource_usage_from_raw,
-};
-use crate::{
-    Error, ErrorKind, ResourceErrorReason, ResourceKind, ResourceLoadingMethod, ResourcePriority,
-    ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, Result,
-};
-
-/// Byte range requested for a network resource.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub struct ByteRange {
-    pub start: u64,
-    pub end: u64,
-}
-
-/// Copied request passed to a runtime-scoped resource provider callback.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub struct ResourceRequest {
-    /// URL entering the network layer, preserving configured scheme aliases.
-    pub requested_url: String,
-    /// URL to fetch, after tile server normalization.
-    pub resolved_url: String,
-    pub kind: ResourceKind,
-    pub raw_kind: u32,
-    pub loading_method: ResourceLoadingMethod,
-    pub raw_loading_method: u32,
-    pub priority: ResourcePriority,
-    pub raw_priority: u32,
-    pub usage: ResourceUsage,
-    pub raw_usage: u32,
-    pub storage_policy: ResourceStoragePolicy,
-    pub raw_storage_policy: u32,
-    pub range: Option<ByteRange>,
-    pub prior_modified_unix_ms: Option<i64>,
-    pub prior_expires_unix_ms: Option<i64>,
-    pub prior_etag: Option<String>,
-    pub prior_data: Vec<u8>,
-}
-
-/// Copies a borrowed native resource request into owned Rust data.
-///
-/// # Safety
-///
-/// `raw` and all nested pointers must remain valid for the duration of this
-/// call. Resource provider trampolines typically receive this storage from the
-/// C callback and copy it before returning.
-pub unsafe fn copy_resource_request(raw: &sys::mln_resource_request) -> Result<ResourceRequest> {
-    let prior_data = if raw.prior_data_size == 0 {
-        Vec::new()
-    } else if raw.prior_data.is_null() {
-        return Err(Error::invalid_argument(
-            "resource request prior_data must not be null when prior_data_size is nonzero",
-        ));
-    } else {
-        // SAFETY: The caller promised raw and nested request storage are valid
-        // for this call; copy the borrowed bytes immediately.
-        unsafe { std::slice::from_raw_parts(raw.prior_data, raw.prior_data_size) }.to_vec()
-    };
-
-    let prior_etag = if raw.prior_etag.is_null() {
-        None
-    } else {
-        // SAFETY: The caller promised raw points to callback-duration storage.
-        Some(unsafe { crate::string::copy_c_string(raw.prior_etag) }?)
-    };
-
-    Ok(ResourceRequest {
-        // SAFETY: The caller promised raw points to callback-duration storage.
-        requested_url: unsafe { crate::string::copy_c_string(raw.requested_url) }?,
-        // SAFETY: The caller promised raw points to callback-duration storage.
-        resolved_url: unsafe { crate::string::copy_c_string(raw.resolved_url) }?,
-        kind: resource_kind_from_raw(raw.kind),
-        raw_kind: raw.kind,
-        loading_method: resource_loading_method_from_raw(raw.loading_method),
-        raw_loading_method: raw.loading_method,
-        priority: resource_priority_from_raw(raw.priority),
-        raw_priority: raw.priority,
-        usage: resource_usage_from_raw(raw.usage),
-        raw_usage: raw.usage,
-        storage_policy: resource_storage_policy_from_raw(raw.storage_policy),
-        raw_storage_policy: raw.storage_policy,
-        range: raw.has_range.then_some(ByteRange {
-            start: raw.range_start,
-            end: raw.range_end,
-        }),
-        prior_modified_unix_ms: raw.has_prior_modified.then_some(raw.prior_modified_unix_ms),
-        prior_expires_unix_ms: raw.has_prior_expires.then_some(raw.prior_expires_unix_ms),
-        prior_etag,
-        prior_data,
-    })
-}
-
-/// Decision returned by a resource provider callback.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum ResourceProviderDecision {
-    /// Let native OnlineFileSource handle the request.
-    PassThrough,
-    /// Keep ownership of the request handle and complete or release it later.
-    Handle,
-}
-
-/// Response used to complete a handled resource request.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct ResourceResponse {
-    pub status: ResourceResponseStatus,
-    pub error_reason: ResourceErrorReason,
-    pub bytes: Vec<u8>,
-    pub error_message: Option<String>,
-    pub must_revalidate: bool,
-    pub modified_unix_ms: Option<i64>,
-    pub expires_unix_ms: Option<i64>,
-    pub etag: Option<String>,
-    pub retry_after_unix_ms: Option<i64>,
-}
-
-impl ResourceResponse {
-    pub fn ok(bytes: impl Into<Vec<u8>>) -> Self {
-        Self {
-            status: ResourceResponseStatus::Ok,
-            bytes: bytes.into(),
-            ..Self::default()
-        }
-    }
-
-    pub fn no_content() -> Self {
-        Self {
-            status: ResourceResponseStatus::NoContent,
-            ..Self::default()
-        }
-    }
-
-    pub fn not_modified() -> Self {
-        Self {
-            status: ResourceResponseStatus::NotModified,
-            ..Self::default()
-        }
-    }
-
-    pub fn error(reason: ResourceErrorReason, message: impl Into<String>) -> Self {
-        Self {
-            status: ResourceResponseStatus::Error,
-            error_reason: reason,
-            error_message: Some(message.into()),
-            ..Self::default()
-        }
-    }
-}
-
-impl Default for ResourceResponse {
-    fn default() -> Self {
-        Self {
-            status: ResourceResponseStatus::Ok,
-            error_reason: ResourceErrorReason::None,
-            bytes: Vec::new(),
-            error_message: None,
-            must_revalidate: false,
-            modified_unix_ms: None,
-            expires_unix_ms: None,
-            etag: None,
-            retry_after_unix_ms: None,
-        }
-    }
-}
-
-pub struct NativeResourceResponse<'a> {
-    raw: sys::mln_resource_response,
-    _response: PhantomData<&'a ResourceResponse>,
-    _error_message: Option<CString>,
-    _etag: Option<CString>,
-}
-
-impl<'a> NativeResourceResponse<'a> {
-    fn new(response: &'a ResourceResponse) -> Result<Self> {
-        let error_message = response
-            .error_message
-            .as_deref()
-            .map(crate::string::c_string)
-            .transpose()?;
-        let etag = response
-            .etag
-            .as_deref()
-            .map(crate::string::c_string)
-            .transpose()?;
-        Ok(Self {
-            raw: sys::mln_resource_response {
-                size: std::mem::size_of::<sys::mln_resource_response>() as u32,
-                status: response.status.as_raw(),
-                error_reason: response.error_reason.raw_value(),
-                bytes: if response.bytes.is_empty() {
-                    ptr::null()
-                } else {
-                    response.bytes.as_ptr()
-                },
-                byte_count: response.bytes.len(),
-                error_message: error_message
-                    .as_ref()
-                    .map_or(ptr::null(), |message| message.as_ptr()),
-                must_revalidate: response.must_revalidate,
-                has_modified: response.modified_unix_ms.is_some(),
-                modified_unix_ms: response.modified_unix_ms.unwrap_or_default(),
-                has_expires: response.expires_unix_ms.is_some(),
-                expires_unix_ms: response.expires_unix_ms.unwrap_or_default(),
-                etag: etag.as_ref().map_or(ptr::null(), |etag| etag.as_ptr()),
-                has_retry_after: response.retry_after_unix_ms.is_some(),
-                retry_after_unix_ms: response.retry_after_unix_ms.unwrap_or_default(),
-            },
-            _response: PhantomData,
-            _error_message: error_message,
-            _etag: etag,
-        })
-    }
-
-    pub fn as_ptr(&self) -> *const sys::mln_resource_response {
-        &self.raw
-    }
-}
-
-impl AsRef<sys::mln_resource_response> for NativeResourceResponse<'_> {
-    fn as_ref(&self) -> &sys::mln_resource_response {
-        &self.raw
-    }
-}
-
-pub fn resource_response_to_native(
-    response: &ResourceResponse,
-) -> Result<NativeResourceResponse<'_>> {
-    NativeResourceResponse::new(response)
-}
-
-pub type ResourceProviderCallbackFn = unsafe extern "C" fn(
-    *mut c_void,
-    *const sys::mln_resource_request,
-    sys::mln_resource_request_handle,
-) -> u32;
-
-pub fn resource_provider_descriptor(
-    callback: Option<ResourceProviderCallbackFn>,
-    user_data: *mut c_void,
-) -> sys::mln_resource_provider {
-    sys::mln_resource_provider {
-        size: std::mem::size_of::<sys::mln_resource_provider>() as u32,
-        callback,
-        user_data,
-    }
-}
-
-pub type ResourceTransformCallbackFn = unsafe extern "C" fn(
-    *mut c_void,
-    u32,
-    *const c_char,
-    *mut sys::mln_resource_transform_response,
-) -> sys::mln_status;
-
-pub fn resource_transform_descriptor(
-    callback: Option<ResourceTransformCallbackFn>,
-    user_data: *mut c_void,
-) -> sys::mln_resource_transform {
-    sys::mln_resource_transform {
-        size: std::mem::size_of::<sys::mln_resource_transform>() as u32,
-        callback,
-        user_data,
-    }
-}
-
-pub type HttpHeaderTransformCallbackFn = unsafe extern "C" fn(
-    *mut c_void,
-    u32,
-    *const c_char,
-    *mut sys::mln_http_header_transform_response,
-) -> sys::mln_status;
-
-pub fn http_header_transform_descriptor(
-    callback: Option<HttpHeaderTransformCallbackFn>,
-    user_data: *mut c_void,
-) -> sys::mln_http_header_transform {
-    sys::mln_http_header_transform {
-        size: std::mem::size_of::<sys::mln_http_header_transform>() as u32,
-        callback,
-        user_data,
-    }
-}
-
-/// Initializes an HTTP header transform callback response.
-///
-/// # Safety
-///
-/// `out_response` must be null or point to writable callback-duration storage.
-pub unsafe fn initialize_http_header_transform_response(
-    out_response: *mut sys::mln_http_header_transform_response,
-) -> sys::mln_status {
-    if out_response.is_null() {
-        return sys::MLN_STATUS_INVALID_ARGUMENT;
-    }
-    // SAFETY: The caller promised writable callback-duration storage.
-    unsafe {
-        (*out_response).size =
-            std::mem::size_of::<sys::mln_http_header_transform_response>() as u32;
-    }
-    sys::MLN_STATUS_OK
-}
-
-/// Initializes a resource transform callback response to an empty replacement.
-///
-/// # Safety
-///
-/// `out_response` must be null or point to writable callback-duration storage.
-pub unsafe fn initialize_resource_transform_response(
-    out_response: *mut sys::mln_resource_transform_response,
-) -> sys::mln_status {
-    if out_response.is_null() {
-        return sys::MLN_STATUS_INVALID_ARGUMENT;
-    }
-    // SAFETY: The caller promised writable callback-duration storage, and the
-    // null check above guards the write.
-    unsafe {
-        (*out_response).size = std::mem::size_of::<sys::mln_resource_transform_response>() as u32;
-        (*out_response).url = ptr::null();
-    }
-    sys::MLN_STATUS_OK
-}
 
 pub fn status_for_error(error: &Error) -> sys::mln_status {
     if let Some(status) = error.raw_status() {
@@ -342,6 +18,11 @@ pub fn status_for_error(error: &Error) -> sys::mln_status {
         ErrorKind::InvalidState => sys::MLN_STATUS_INVALID_STATE,
         ErrorKind::WrongThread => sys::MLN_STATUS_WRONG_THREAD,
         ErrorKind::Unsupported => sys::MLN_STATUS_UNSUPPORTED,
+        ErrorKind::Cancelled => sys::MLN_STATUS_CANCELLED,
+        ErrorKind::Busy => sys::MLN_STATUS_BUSY,
+        ErrorKind::TargetLost => sys::MLN_STATUS_TARGET_LOST,
+        ErrorKind::NotReady => sys::MLN_STATUS_NOT_READY,
+        ErrorKind::NotFound => sys::MLN_STATUS_NOT_FOUND,
         ErrorKind::NativeError | ErrorKind::AbiVersionMismatch | ErrorKind::UnknownStatus => {
             sys::MLN_STATUS_NATIVE_ERROR
         }
@@ -357,6 +38,8 @@ pub type CompleteRequestFn = unsafe extern "C" fn(
 pub type CancelledRequestFn =
     unsafe extern "C" fn(sys::mln_resource_request_handle, *mut bool) -> sys::mln_status;
 pub type ReleaseRequestFn = unsafe extern "C" fn(sys::mln_resource_request_handle);
+pub type WaitRetiredRequestFn =
+    unsafe extern "C" fn(sys::mln_resource_request_handle) -> sys::mln_status;
 pub type SetCancelCallbackFn = unsafe extern "C" fn(
     sys::mln_resource_request_handle,
     sys::mln_resource_request_cancel_callback,
@@ -369,19 +52,16 @@ pub type CancelCallback = dyn FnOnce() + Send + 'static;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ResourceRequestHandleFns {
+    #[cfg(test)]
     complete: CompleteRequestFn,
     cancelled: CancelledRequestFn,
     set_cancel_callback: SetCancelCallbackFn,
     release: ReleaseRequestFn,
+    wait_retired: WaitRetiredRequestFn,
 }
 
 impl ResourceRequestHandleFns {
-    pub const NATIVE: Self = Self {
-        complete: sys::mln_resource_request_complete,
-        cancelled: sys::mln_resource_request_cancelled,
-        set_cancel_callback: sys::mln_resource_request_set_cancel_callback,
-        release: sys::mln_resource_request_release,
-    };
+    pub const NATIVE: Self = crate::generated::RESOURCE_REQUEST_HANDLE_FUNCTIONS;
 
     /// Creates a function table for a native resource request handle.
     ///
@@ -389,20 +69,26 @@ impl ResourceRequestHandleFns {
     ///
     /// The functions must implement the same ownership contract as the C API:
     /// `complete`, `cancelled`, and `set_cancel_callback` operate on the
-    /// matching handle type, `set_cancel_callback` never invokes the callback
-    /// and stops using its `user_data` once `release` returns, and `release`
-    /// releases a provider-owned handle exactly once.
+    /// matching handle type, `set_cancel_callback` never invokes the callback,
+    /// and `release` releases a provider-owned handle exactly once. Release
+    /// waits for cancellation on another thread; self-release can return before
+    /// the current cancellation callback finishes. `wait_retired` waits
+    /// until native has released the request and every cancellation callback
+    /// has returned, including after a PassThrough decision.
     pub const unsafe fn new(
-        complete: CompleteRequestFn,
+        _complete: CompleteRequestFn,
         cancelled: CancelledRequestFn,
         set_cancel_callback: SetCancelCallbackFn,
         release: ReleaseRequestFn,
+        wait_retired: WaitRetiredRequestFn,
     ) -> Self {
         Self {
-            complete,
+            #[cfg(test)]
+            complete: _complete,
             cancelled,
             set_cancel_callback,
             release,
+            wait_retired,
         }
     }
 }
@@ -412,15 +98,15 @@ impl ResourceRequestHandleFns {
 /// # Safety
 ///
 /// `user_data` must be the pointer `ResourceRequestHandleState` registered
-/// with the C API, which the C API stops using once the request's release
-/// returns.
+/// with the C API. Its raw weak reference remains allocated until the native
+/// retirement wait confirms that cancellation is quiescent.
 unsafe extern "C" fn cancel_callback_trampoline(user_data: *mut c_void) {
     let Some(token) = ptr::NonNull::new(user_data.cast::<ResourceRequestHandleState>()) else {
         return;
     };
     // SAFETY: The token came from Weak::into_raw in set_cancel_callback, and
-    // the state reclaims it only after native release returns, when the C API
-    // no longer invokes this callback. Handing the weak reference back through
+    // the state reclaims it only after native retirement confirms that no
+    // callback is running or can arrive. Handing the weak reference back through
     // into_raw leaves the registration's count untouched.
     let weak = unsafe { Weak::from_raw(token.as_ptr()) };
     let state = weak.upgrade();
@@ -444,6 +130,7 @@ struct ResourceRequestHandleInner {
     release_accounted_for: bool,
     closed: bool,
     completed: bool,
+    completing: bool,
     /// The registered host callback. Taken before it runs, so it runs once.
     cancel_callback: Option<Box<CancelCallback>>,
     /// `Weak<ResourceRequestHandleState>` handed to the C API as `user_data`,
@@ -500,6 +187,7 @@ impl ResourceRequestHandleState {
                 release_accounted_for: false,
                 closed: false,
                 completed: false,
+                completing: false,
                 cancel_callback: None,
                 cancel_token: 0,
             }),
@@ -511,35 +199,93 @@ impl ResourceRequestHandleState {
         sys::mln_resource_request_handle(inner.handle)
     }
 
+    #[cfg(test)]
     pub fn complete(&self, response: &ResourceResponse) -> Result<()> {
-        let native = resource_response_to_native(response)?;
-        let mut inner = self.lock_inner()?;
-        if inner.completed {
-            return Err(Error::new(
-                ErrorKind::InvalidState,
-                None,
-                "ResourceRequestHandle is already completed",
-            ));
-        }
-        if inner.closed {
-            return Err(Error::invalid_argument("ResourceRequestHandle is closed"));
-        }
+        let mut arena = crate::input::InputArena::default();
+        let native = response.to_native(&mut arena)?;
+        self.complete_with(|handle| {
+            // SAFETY: complete_with reserves this handle and native owns the input storage.
+            crate::check(unsafe { (self.fns.complete)(handle, &native) })
+        })
+    }
 
-        inner.completed = true;
-        inner.closed = true;
+    /// Reserves one completion attempt without holding a lock across native code.
+    /// An accepted response completes the request but leaves its owner live.
+    pub fn complete_with(
+        &self,
+        complete: impl FnOnce(sys::mln_resource_request_handle) -> Result<()>,
+    ) -> Result<()> {
+        let handle = {
+            let mut inner = self.lock_inner()?;
+            if inner.completed || inner.completing {
+                return Err(Error::new(
+                    ErrorKind::InvalidState,
+                    None,
+                    "resource request completion is already accepted or in progress",
+                ));
+            }
+            if inner.closed {
+                return Err(Error::new(
+                    ErrorKind::InvalidState,
+                    None,
+                    "resource request is closed",
+                ));
+            }
+            inner.completing = true;
+            Self::native_handle(&inner)
+        };
+        let mut reservation = RequestCompletionReservation {
+            state: self,
+            accepted: false,
+        };
+        let result = complete(handle);
+        reservation.accepted = result.is_ok();
+        drop(reservation);
+        result
+    }
+
+    fn finish_completion(&self, accepted: bool) {
+        let mut inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        inner.completing = false;
+        inner.completed |= accepted;
+        let callback = if accepted {
+            inner.cancel_callback.take()
+        } else {
+            None
+        };
         let handle = Self::native_handle(&inner);
-        // SAFETY: handle is live while not closed/released, and native response
-        // points to storage retained for this call. The C API copies contents.
-        let status = unsafe { (self.fns.complete)(handle, native.as_ptr()) };
-        // A completed request never runs its cancel callback.
-        let callback = inner.cancel_callback.take();
-        let release = inner.decision_finalized
+        let release = inner.closed
+            && inner.decision_finalized
             && inner.provider_owned
             && Self::take_release_locked(&mut inner);
         drop(inner);
         self.release_now(release, handle);
         drop(callback);
-        crate::check(status)
+    }
+
+    /// Returns the issued generation ID, including after this owner closes.
+    pub fn issued_handle(&self) -> sys::mln_resource_request_handle {
+        let inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        Self::native_handle(&inner)
+    }
+
+    /// Copies the live generational handle before a non-consuming native call.
+    pub fn native_for_call(&self) -> Result<sys::mln_resource_request_handle> {
+        let inner = self.lock_inner()?;
+        if inner.closed {
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                None,
+                "resource request is closed",
+            ));
+        }
+        Ok(Self::native_handle(&inner))
     }
 
     /// Registers the host callback that runs when MapLibre cancels the request.
@@ -547,9 +293,24 @@ impl ResourceRequestHandleState {
     /// A request accepts one registration. When the C API reports that the
     /// request was already cancelled, the callback runs before this returns.
     pub fn set_cancel_callback(self: &Arc<Self>, callback: Box<CancelCallback>) -> Result<()> {
+        if let Some(callback) = self.register_cancel_callback(callback)? {
+            run_cancel_callback_contained(callback);
+        }
+        Ok(())
+    }
+
+    /// Returns the callback when native already cancelled and stored no registration.
+    pub fn register_cancel_callback(
+        self: &Arc<Self>,
+        callback: Box<CancelCallback>,
+    ) -> Result<Option<Box<CancelCallback>>> {
         let mut inner = self.lock_inner()?;
         if inner.closed {
-            return Err(Error::invalid_argument("ResourceRequestHandle is closed"));
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                None,
+                "resource request is closed",
+            ));
         }
         if inner.cancel_callback.is_some() {
             return Err(Error::new(
@@ -567,7 +328,7 @@ impl ResourceRequestHandleState {
         // lock stays held across it and a concurrent close waits for this
         // registration like any other in-flight use.
         // SAFETY: handle is live while not closed. user_data is a weak
-        // reference this state reclaims only after native release returns, and
+        // reference this state reclaims only after native retirement, and
         // cancelled points to writable bool storage for this call.
         let status = unsafe {
             (self.fns.set_cancel_callback)(
@@ -579,7 +340,9 @@ impl ResourceRequestHandleState {
         };
         if let Err(error) = crate::check(status) {
             // Native stored nothing, so the slot goes back to empty.
-            drop(inner.cancel_callback.take());
+            let callback = inner.cancel_callback.take();
+            drop(inner);
+            drop(callback);
             return Err(error);
         }
         // Native stored nothing for a request MapLibre already cancelled, so
@@ -591,16 +354,17 @@ impl ResourceRequestHandleState {
             None
         };
         drop(inner);
-        if let Some(callback) = inline {
-            run_cancel_callback_contained(callback);
-        }
-        Ok(())
+        Ok(inline)
     }
 
     pub fn is_cancelled(&self) -> Result<bool> {
         let inner = self.lock_inner()?;
         if inner.closed {
-            return Err(Error::invalid_argument("ResourceRequestHandle is closed"));
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                None,
+                "resource request is closed",
+            ));
         }
         let mut cancelled = false;
         // SAFETY: handle is live while not closed/released, and cancelled points
@@ -619,7 +383,8 @@ impl ResourceRequestHandleState {
         inner.closed = true;
         let callback = inner.cancel_callback.take();
         let handle = Self::native_handle(&inner);
-        let release = inner.decision_finalized
+        let release = !inner.completing
+            && inner.decision_finalized
             && inner.provider_owned
             && Self::take_release_locked(&mut inner);
         drop(inner);
@@ -638,11 +403,16 @@ impl ResourceRequestHandleState {
                 sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH
             };
         }
-        if inner.completed || matches!(decision, ResourceProviderDecision::Handle) {
+        if inner.closed
+            || inner.completed
+            || inner.completing
+            || matches!(decision, ResourceProviderDecision::Handle)
+        {
             inner.decision_finalized = true;
             inner.provider_owned = true;
             let handle = Self::native_handle(&inner);
-            let release = inner.closed && Self::take_release_locked(&mut inner);
+            let release =
+                inner.closed && !inner.completing && Self::take_release_locked(&mut inner);
             drop(inner);
             self.release_now(release, handle);
             sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
@@ -660,7 +430,7 @@ impl ResourceRequestHandleState {
         let completed = self
             .inner
             .lock()
-            .map(|inner| inner.completed)
+            .map(|inner| inner.closed || inner.completed || inner.completing)
             .unwrap_or(false);
         if completed {
             return self.finish_provider_decision(ResourceProviderDecision::Handle);
@@ -730,6 +500,17 @@ impl ResourceRequestHandleState {
     }
 }
 
+struct RequestCompletionReservation<'a> {
+    state: &'a ResourceRequestHandleState,
+    accepted: bool,
+}
+
+impl Drop for RequestCompletionReservation<'_> {
+    fn drop(&mut self) {
+        self.state.finish_completion(self.accepted);
+    }
+}
+
 impl Drop for ResourceRequestHandleState {
     fn drop(&mut self) {
         let inner = self
@@ -739,97 +520,122 @@ impl Drop for ResourceRequestHandleState {
         let handle = Self::native_handle(inner);
         let release = inner.provider_owned && Self::take_release_locked(inner);
         let token = inner.cancel_token;
-        self.release_now(release, handle);
-        if token != 0 {
-            // SAFETY: The token came from Weak::into_raw in set_cancel_callback.
-            // Every path that lets this state drop has released the native
-            // request first, and the C API stops using user_data once release
-            // returns, so no cancel callback can still be arriving.
-            drop(unsafe { Weak::from_raw(token as *const Self) });
+        if !release && token == 0 {
+            return;
+        }
+        let release_native = self.fns.release;
+        let wait_retired = self.fns.wait_retired;
+        let finalize = move || {
+            if release {
+                // SAFETY: take_release_locked grants this call exactly once.
+                unsafe { release_native(handle) };
+            }
+            if token != 0 {
+                // PassThrough leaves retirement to native after the provider
+                // returns. Self-release also permits the current cancel
+                // callback to finish after release returns.
+                // SAFETY: The issued handle remains valid for retirement waits.
+                let status = unsafe { wait_retired(handle) };
+                if status == sys::MLN_STATUS_OK {
+                    // SAFETY: Native cancellation is now quiescent.
+                    drop(unsafe { Weak::from_raw(token as *const Self) });
+                }
+            }
+        };
+        if token == 0 {
+            crate::callback::finalize(finalize);
+        } else {
+            // The last strong reference may belong to the native cancellation
+            // trampoline; waiting on that same callback would deadlock.
+            crate::callback::defer(Box::new(finalize));
         }
     }
-}
-
-/// Copied request passed to a runtime-scoped resource transform callback.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub struct ResourceTransformRequest {
-    pub kind: ResourceKind,
-    pub raw_kind: u32,
-    pub url: String,
-}
-
-/// Copied request passed to an outgoing HTTP header transform callback.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub struct HttpHeaderTransformRequest {
-    pub kind: ResourceKind,
-    pub raw_kind: u32,
-    pub url: String,
-}
-
-/// One owned outgoing HTTP request header.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub struct HttpHeader {
-    pub name: String,
-    pub value: String,
-}
-
-impl HttpHeader {
-    pub fn new(name: impl Into<String>, value: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            value: value.into(),
-        }
-    }
-}
-
-/// Copies an HTTP header transform request into owned Rust data.
-///
-/// # Safety
-///
-/// `url` must point to a valid NUL-terminated string for this call.
-pub unsafe fn copy_http_header_transform_request(
-    raw_kind: u32,
-    url: *const c_char,
-) -> Result<HttpHeaderTransformRequest> {
-    // SAFETY: The caller promises url follows the C callback contract.
-    let request_url = unsafe { crate::string::copy_c_string(url) }?;
-    Ok(HttpHeaderTransformRequest {
-        kind: resource_kind_from_raw(raw_kind),
-        raw_kind,
-        url: request_url,
-    })
-}
-
-/// Copies a resource transform callback request into owned Rust data.
-///
-/// # Safety
-///
-/// `url` must be null or point to a valid NUL-terminated string for the
-/// duration of this call.
-pub unsafe fn copy_resource_transform_request(
-    raw_kind: u32,
-    url: *const c_char,
-) -> Result<ResourceTransformRequest> {
-    // SAFETY: The caller promises url follows the C callback contract.
-    let request_url = unsafe { crate::string::copy_c_string(url) }?;
-    Ok(ResourceTransformRequest {
-        kind: resource_kind_from_raw(raw_kind),
-        raw_kind,
-        url: request_url,
-    })
 }
 
 #[cfg(test)]
 mod tests {
-    use std::ffi::CString;
     use std::sync::Mutex as StdMutex;
     use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
     use std::time::{Duration, Instant};
 
     use super::*;
+    fn ok_response(bytes: impl Into<Vec<u8>>) -> ResourceResponse {
+        ResourceResponse {
+            status: crate::ResourceResponseStatus::Ok,
+            bytes: bytes.into(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn pass_through_cancel_token_waits_for_native_retirement() {
+        static RETIREMENT: StdMutex<
+            Option<(std::sync::mpsc::Sender<()>, std::sync::mpsc::Receiver<()>)>,
+        > = StdMutex::new(None);
+        unsafe extern "C" fn wait_retired(
+            _handle: sys::mln_resource_request_handle,
+        ) -> sys::mln_status {
+            let (entered, proceed) = RETIREMENT.lock().unwrap().take().unwrap();
+            entered.send(()).unwrap();
+            proceed.recv_timeout(Duration::from_secs(5)).unwrap();
+            sys::MLN_STATUS_OK
+        }
+        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
+        let (entered_sender, entered) = std::sync::mpsc::channel();
+        let (proceed, proceed_receiver) = std::sync::mpsc::channel();
+        *RETIREMENT.lock().unwrap() = Some((entered_sender, proceed_receiver));
+        let mut state = fake_state();
+        Arc::get_mut(&mut state).unwrap().fns.wait_retired = wait_retired;
+        state
+            .set_cancel_callback(Box::new(|| {
+                panic!("unowned request callback must be disarmed")
+            }))
+            .unwrap();
+        state.finish_provider_decision(ResourceProviderDecision::PassThrough);
+        drop(state);
+        entered
+            .recv_timeout(Duration::from_secs(5))
+            .expect("token reclamation must wait for native retirement");
+        // Native may have captured the token before the provider returned.
+        // The weak allocation remains valid even though its owner is gone.
+        fire_registered_cancel();
+        *REGISTERED_CANCEL.lock().unwrap() = None;
+        proceed.send(()).unwrap();
+        let (finished, finish) = std::sync::mpsc::channel();
+        crate::callback::defer(Box::new(move || finished.send(()).unwrap()));
+        finish.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn last_request_reference_releases_off_the_callback_stack() {
+        static RELEASED: StdMutex<Option<std::sync::mpsc::Sender<std::thread::ThreadId>>> =
+            StdMutex::new(None);
+        unsafe extern "C" fn record_release(_handle: sys::mln_resource_request_handle) {
+            RELEASED
+                .lock()
+                .unwrap()
+                .take()
+                .unwrap()
+                .send(std::thread::current().id())
+                .unwrap();
+        }
+        let (sender, receiver) = std::sync::mpsc::channel();
+        *RELEASED.lock().unwrap() = Some(sender);
+        let mut fns = fake_fns();
+        fns.release = record_release;
+        // SAFETY: This handle reaches only the local fake function table.
+        let state =
+            unsafe { ResourceRequestHandleState::new(sys::mln_resource_request_handle(7), fns) }
+                .unwrap();
+        state.finish_provider_decision(ResourceProviderDecision::Handle);
+        let _policy = crate::callback::PolicyScope::enter(&[], 0);
+        drop(state);
+        let releasing_thread = receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("native release must progress off the callback stack");
+        assert_ne!(releasing_thread, std::thread::current().id());
+    }
 
     static HANDLE_TEST_LOCK: StdMutex<()> = StdMutex::new(());
     static COMPLETE_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -918,6 +724,12 @@ mod tests {
         unsafe { callback.unwrap()(user_data as *mut c_void) };
     }
 
+    unsafe extern "C" fn fake_wait_retired(
+        _handle: sys::mln_resource_request_handle,
+    ) -> sys::mln_status {
+        sys::MLN_STATUS_OK
+    }
+
     fn fake_fns() -> ResourceRequestHandleFns {
         // SAFETY: These fake functions implement the native handle contract for tests.
         unsafe {
@@ -926,6 +738,7 @@ mod tests {
                 fake_cancelled,
                 fake_set_cancel_callback,
                 fake_release,
+                fake_wait_retired,
             )
         }
     }
@@ -971,122 +784,13 @@ mod tests {
     }
     #[test]
     fn resource_request_handle_preserves_all_64_bits() {
+        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
         let state = fake_state();
         let inner = state.lock_inner().unwrap();
         assert_eq!(
             ResourceRequestHandleState::native_handle(&inner).0,
             0x0c00_0000_0000_0034
         );
-    }
-
-    #[test]
-    fn resource_request_copies_nested_storage() {
-        let mut requested_url = CString::new("maplibre://tiles/2/1/1.pbf").unwrap();
-        let mut resolved_url = CString::new("https://example.test/tile").unwrap();
-        let mut etag = CString::new("abc").unwrap();
-        let mut prior_data = [1_u8, 2, 3];
-        let raw = sys::mln_resource_request {
-            size: std::mem::size_of::<sys::mln_resource_request>() as u32,
-            requested_url: requested_url.as_ptr(),
-            resolved_url: resolved_url.as_ptr(),
-            kind: sys::MLN_RESOURCE_KIND_TILE,
-            loading_method: sys::MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY,
-            priority: sys::MLN_RESOURCE_PRIORITY_LOW,
-            usage: sys::MLN_RESOURCE_USAGE_ONLINE,
-            storage_policy: sys::MLN_RESOURCE_STORAGE_POLICY_PERMANENT,
-            has_range: true,
-            range_start: 5,
-            range_end: 10,
-            has_prior_modified: true,
-            prior_modified_unix_ms: 123,
-            has_prior_expires: true,
-            prior_expires_unix_ms: 456,
-            prior_etag: etag.as_ptr(),
-            prior_data: prior_data.as_ptr(),
-            prior_data_size: prior_data.len(),
-        };
-
-        // SAFETY: raw points to live local backing storage for this call.
-        let copied = unsafe { copy_resource_request(&raw) }.unwrap();
-        requested_url = CString::new("maplibre://changed").unwrap();
-        resolved_url = CString::new("https://changed.test").unwrap();
-        etag = CString::new("changed").unwrap();
-        prior_data.fill(9);
-
-        assert_eq!(requested_url.as_bytes(), b"maplibre://changed");
-        assert_eq!(resolved_url.as_bytes(), b"https://changed.test");
-        assert_eq!(etag.as_bytes(), b"changed");
-        assert_eq!(copied.requested_url, "maplibre://tiles/2/1/1.pbf");
-        assert_eq!(copied.resolved_url, "https://example.test/tile");
-        assert_eq!(copied.prior_etag.as_deref(), Some("abc"));
-        assert_eq!(copied.prior_data, vec![1, 2, 3]);
-        assert_eq!(copied.range, Some(ByteRange { start: 5, end: 10 }));
-        assert_eq!(copied.kind, ResourceKind::Tile);
-    }
-
-    #[test]
-    fn resource_request_rejects_nonempty_null_prior_data() {
-        let url = CString::new("https://example.test/tile").unwrap();
-        let raw = sys::mln_resource_request {
-            size: std::mem::size_of::<sys::mln_resource_request>() as u32,
-            requested_url: url.as_ptr(),
-            resolved_url: url.as_ptr(),
-            kind: sys::MLN_RESOURCE_KIND_TILE,
-            loading_method: sys::MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY,
-            priority: sys::MLN_RESOURCE_PRIORITY_LOW,
-            usage: sys::MLN_RESOURCE_USAGE_ONLINE,
-            storage_policy: sys::MLN_RESOURCE_STORAGE_POLICY_PERMANENT,
-            has_range: false,
-            range_start: 0,
-            range_end: 0,
-            has_prior_modified: false,
-            prior_modified_unix_ms: 0,
-            has_prior_expires: false,
-            prior_expires_unix_ms: 0,
-            prior_etag: ptr::null(),
-            prior_data: ptr::null(),
-            prior_data_size: 1,
-        };
-
-        // SAFETY: raw points to live local backing storage for this call.
-        let Err(error) = (unsafe { copy_resource_request(&raw) }) else {
-            panic!("nonempty null prior_data should fail");
-        };
-        assert!(error.to_string().contains("prior_data must not be null"));
-    }
-
-    #[test]
-    fn resource_response_materializes_error_and_cache_fields() {
-        let mut response = ResourceResponse::error(ResourceErrorReason::RateLimit, "slow down");
-        response.must_revalidate = true;
-        response.modified_unix_ms = Some(10);
-        response.expires_unix_ms = Some(20);
-        response.etag = Some("v1".into());
-        response.retry_after_unix_ms = Some(30);
-
-        let native = resource_response_to_native(&response).unwrap();
-        let raw = native.as_ref();
-
-        assert_eq!(raw.status, sys::MLN_RESOURCE_RESPONSE_STATUS_ERROR);
-        assert_eq!(raw.error_reason, sys::MLN_RESOURCE_ERROR_REASON_RATE_LIMIT);
-        assert!(raw.must_revalidate);
-        assert!(raw.has_modified);
-        assert!(raw.has_expires);
-        assert!(raw.has_retry_after);
-        assert!(!raw.error_message.is_null());
-        assert!(!raw.etag.is_null());
-    }
-
-    #[test]
-    fn resource_response_materializes_nonempty_bytes() {
-        let response = ResourceResponse::ok([1, 2, 3]);
-
-        let native = resource_response_to_native(&response).unwrap();
-        let raw = native.as_ref();
-
-        assert_eq!(raw.status, sys::MLN_RESOURCE_RESPONSE_STATUS_OK);
-        assert_eq!(raw.byte_count, 3);
-        assert!(!raw.bytes.is_null());
     }
 
     #[test]
@@ -1108,41 +812,81 @@ mod tests {
     }
 
     #[test]
+    fn explicit_close_claims_provider_decision_and_releases_once() {
+        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
+        for exception in [false, true] {
+            let state = fake_state();
+            state.close();
+            state.close();
+            assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
+            let decision = if exception {
+                state.finish_provider_exception()
+            } else {
+                state.finish_provider_decision(ResourceProviderDecision::PassThrough)
+            };
+            assert_eq!(decision, sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE);
+            assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+            drop(state);
+            assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+        }
+    }
+
+    #[test]
     fn request_handle_rejects_double_successful_completion() {
         let _guard = HANDLE_TEST_LOCK.lock().unwrap();
         let state = fake_state();
 
-        state.complete(&ResourceResponse::ok([1, 2, 3])).unwrap();
-        let error = state
-            .complete(&ResourceResponse::ok([4, 5, 6]))
-            .unwrap_err();
+        state.complete(&ok_response([1, 2, 3])).unwrap();
+        let error = state.complete(&ok_response([4, 5, 6])).unwrap_err();
 
         assert_eq!(error.kind(), ErrorKind::InvalidState);
         assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 1);
     }
 
     #[test]
-    fn request_handle_completion_that_reaches_c_is_terminal_on_error() {
+    fn request_completion_rejection_is_retryable_and_success_retains_owner() {
         let _guard = HANDLE_TEST_LOCK.lock().unwrap();
-        let state = fake_state();
+        let state = handled_fake_state();
+        COMPLETE_STATUS.store(sys::MLN_STATUS_INVALID_ARGUMENT, Ordering::SeqCst);
         assert_eq!(
-            state.finish_provider_decision(ResourceProviderDecision::Handle),
-            sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
+            state.complete(&ok_response([1])).unwrap_err().kind(),
+            ErrorKind::InvalidArgument
         );
-        COMPLETE_STATUS.store(sys::MLN_STATUS_INVALID_STATE, Ordering::SeqCst);
-
-        let error = state
-            .complete(&ResourceResponse::ok([1, 2, 3]))
-            .unwrap_err();
-
-        assert_eq!(error.kind(), ErrorKind::InvalidState);
-        assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
+        COMPLETE_STATUS.store(sys::MLN_STATUS_OK, Ordering::SeqCst);
+        state.complete(&ok_response([2])).unwrap();
+        assert!(state.native_for_call().is_ok());
+        assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 2);
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
+        state.close();
         assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
-        let error = state
-            .complete(&ResourceResponse::ok([4, 5, 6]))
-            .unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::InvalidState);
-        assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn completion_reservation_allows_reentry_and_restores_after_panic() {
+        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
+        let state = handled_fake_state();
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            state.complete_with(|_| {
+                assert!(state.native_for_call().is_ok());
+                assert_eq!(
+                    state.complete_with(|_| Ok(())).unwrap_err().kind(),
+                    ErrorKind::InvalidState
+                );
+                panic!("conversion failure");
+            })
+        }));
+        assert!(result.is_err());
+        state
+            .complete_with(|_| {
+                state.close();
+                assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+        state.close();
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
     }
 
     #[test]
@@ -1175,7 +919,7 @@ mod tests {
     }
 
     #[test]
-    // Spec coverage: BND-198. The C API reports a request cancelled before
+
     // registration instead of storing the callback, so the binding runs the
     // callback itself, with no lock held, before registration returns.
     fn cancel_registration_on_a_cancelled_request_runs_the_callback_before_returning() {
@@ -1192,7 +936,10 @@ mod tests {
                 callback_calls.fetch_add(1, Ordering::SeqCst);
                 assert_eq!(
                     callback_state
-                        .complete(&ResourceResponse::no_content())
+                        .complete(&ResourceResponse {
+                            status: crate::ResourceResponseStatus::NoContent,
+                            ..Default::default()
+                        })
                         .unwrap_err()
                         .kind(),
                     ErrorKind::InvalidState
@@ -1207,7 +954,7 @@ mod tests {
     }
 
     #[test]
-    // Spec coverage: BND-198. A closed request rejects registration, and a
+
     // second registration reports invalid state, both without reaching C.
     fn cancel_registration_rejects_closed_and_registered_requests() {
         let _guard = HANDLE_TEST_LOCK.lock().unwrap();
@@ -1221,13 +968,13 @@ mod tests {
 
         state.close();
         let error = state.set_cancel_callback(Box::new(|| {})).unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
         assert_eq!(SET_CANCEL_COUNT.load(Ordering::SeqCst), 1);
         assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
     }
 
     #[test]
-    // Spec coverage: BND-198. MapLibre's cancel path runs the callback on its
+
     // own thread, and the callback closes the request it belongs to.
     fn cancel_callback_from_another_thread_may_close_its_request() {
         let _guard = HANDLE_TEST_LOCK.lock().unwrap();
@@ -1252,7 +999,7 @@ mod tests {
     }
 
     #[test]
-    // Spec coverage: BND-153 and BND-198. Native release waits for a cancel
+
     // callback running on another thread, so close must not hold the handle
     // lock across it when that callback calls back into the same handle.
     fn close_holds_no_lock_while_native_release_waits_for_the_callback() {
@@ -1286,7 +1033,7 @@ mod tests {
     }
 
     #[test]
-    // Spec coverage: BND-198. A completed request never runs its callback, and
+
     // completion drops the callback's captures.
     fn completion_drops_the_cancel_callback() {
         let _guard = HANDLE_TEST_LOCK.lock().unwrap();
@@ -1301,14 +1048,21 @@ mod tests {
             .unwrap();
         assert_eq!(Arc::strong_count(&token), 2);
 
-        state.complete(&ResourceResponse::no_content()).unwrap();
+        state
+            .complete(&ResourceResponse {
+                status: crate::ResourceResponseStatus::NoContent,
+                ..Default::default()
+            })
+            .unwrap();
 
         assert_eq!(Arc::strong_count(&token), 1);
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
+        state.close();
         assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
     }
 
     #[test]
-    // Spec coverage: BND-142 and BND-198. The C API releases a passed-through
+
     // request itself, and that release retires the registration.
     fn cancel_registration_leaves_a_passed_through_release_to_native() {
         let _guard = HANDLE_TEST_LOCK.lock().unwrap();
@@ -1322,18 +1076,5 @@ mod tests {
         drop(state);
 
         assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
-    }
-
-    #[test]
-    fn resource_transform_request_copies_url_and_kind() {
-        let url = CString::new("https://example.test/style.json").unwrap();
-        // SAFETY: url points to live local storage for this call.
-        let request =
-            unsafe { copy_resource_transform_request(sys::MLN_RESOURCE_KIND_STYLE, url.as_ptr()) }
-                .unwrap();
-
-        assert_eq!(request.kind, ResourceKind::Style);
-        assert_eq!(request.raw_kind, sys::MLN_RESOURCE_KIND_STYLE);
-        assert_eq!(request.url, "https://example.test/style.json");
     }
 }

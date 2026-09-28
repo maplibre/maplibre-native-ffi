@@ -3,7 +3,6 @@ use std::ffi::{CStr, CString};
 
 use ash::vk;
 use ash::vk::Handle;
-use maplibre_native_ffi::{NativePointer, VulkanHandle};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::Window;
 
@@ -150,47 +149,34 @@ impl VulkanContext {
         self.graphics_queue
     }
 
-    pub fn instance_pointer(&self) -> NativePointer {
-        // SAFETY: The Vulkan instance is live for the render session lifetime.
-        unsafe { NativePointer::from_address(self.instance.handle().as_raw() as usize) }
+    pub fn instance_pointer(&self) -> *mut std::ffi::c_void {
+        (self.instance.handle().as_raw() as usize) as *mut std::ffi::c_void
     }
 
-    pub fn physical_device_pointer(&self) -> NativePointer {
-        // SAFETY: The physical device is live for the render session lifetime.
-        unsafe { NativePointer::from_address(self.physical_device.as_raw() as usize) }
+    pub fn physical_device_pointer(&self) -> *mut std::ffi::c_void {
+        (self.physical_device.as_raw() as usize) as *mut std::ffi::c_void
     }
 
-    pub fn device_pointer(&self) -> NativePointer {
-        // SAFETY: The Vulkan device is live for the render session lifetime.
-        unsafe { NativePointer::from_address(self.device.handle().as_raw() as usize) }
+    pub fn device_pointer(&self) -> *mut std::ffi::c_void {
+        (self.device.handle().as_raw() as usize) as *mut std::ffi::c_void
     }
 
-    pub fn graphics_queue_pointer(&self) -> NativePointer {
-        // SAFETY: The Vulkan queue is live for the render session lifetime.
-        unsafe { NativePointer::from_address(self.graphics_queue.as_raw() as usize) }
+    pub fn graphics_queue_pointer(&self) -> *mut std::ffi::c_void {
+        (self.graphics_queue.as_raw() as usize) as *mut std::ffi::c_void
     }
 
-    pub fn get_instance_proc_addr_pointer(&self) -> NativePointer {
-        // SAFETY: The function pointer remains valid while the ash entry is live.
-        unsafe {
-            NativePointer::from_address(
-                self.entry.static_fn().get_instance_proc_addr as *const () as usize,
-            )
-        }
+    pub fn get_instance_proc_addr_pointer(&self) -> *mut std::ffi::c_void {
+        (self.entry.static_fn().get_instance_proc_addr as *const () as usize)
+            as *mut std::ffi::c_void
     }
 
-    pub fn get_device_proc_addr_pointer(&self) -> NativePointer {
-        // SAFETY: The function pointer remains valid while the ash instance is live.
-        unsafe {
-            NativePointer::from_address(
-                self.instance.fp_v1_0().get_device_proc_addr as *const () as usize,
-            )
-        }
+    pub fn get_device_proc_addr_pointer(&self) -> *mut std::ffi::c_void {
+        (self.instance.fp_v1_0().get_device_proc_addr as *const () as usize)
+            as *mut std::ffi::c_void
     }
 
-    pub fn surface_handle(&self) -> VulkanHandle {
-        // SAFETY: The Vulkan surface is live for the render session lifetime.
-        unsafe { VulkanHandle::from_bits(self.surface.as_raw()) }
+    pub fn surface_handle(&self) -> u64 {
+        self.surface.as_raw()
     }
 
     pub fn graphics_queue_family_index(&self) -> u32 {
@@ -304,14 +290,12 @@ impl BorrowedImage {
         self.view
     }
 
-    pub fn image_handle(&self) -> VulkanHandle {
-        // SAFETY: The Vulkan image is live while the borrowed texture session is live.
-        unsafe { VulkanHandle::from_bits(self.image.as_raw()) }
+    pub fn image_handle(&self) -> u64 {
+        self.image.as_raw()
     }
 
-    pub fn view_handle(&self) -> VulkanHandle {
-        // SAFETY: The Vulkan image view is live while the borrowed texture session is live.
-        unsafe { VulkanHandle::from_bits(self.view.as_raw()) }
+    pub fn view_handle(&self) -> u64 {
+        self.view.as_raw()
     }
 }
 

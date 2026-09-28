@@ -13,6 +13,11 @@ pub enum ErrorKind {
     InvalidState,
     WrongThread,
     Unsupported,
+    Cancelled,
+    Busy,
+    TargetLost,
+    NotReady,
+    NotFound,
     NativeError,
     AbiVersionMismatch,
     UnknownStatus,
@@ -98,6 +103,11 @@ pub fn kind_for_status(status: i32) -> ErrorKind {
         sys::MLN_STATUS_INVALID_STATE => ErrorKind::InvalidState,
         sys::MLN_STATUS_WRONG_THREAD => ErrorKind::WrongThread,
         sys::MLN_STATUS_UNSUPPORTED => ErrorKind::Unsupported,
+        sys::MLN_STATUS_CANCELLED => ErrorKind::Cancelled,
+        sys::MLN_STATUS_BUSY => ErrorKind::Busy,
+        sys::MLN_STATUS_TARGET_LOST => ErrorKind::TargetLost,
+        sys::MLN_STATUS_NOT_READY => ErrorKind::NotReady,
+        sys::MLN_STATUS_NOT_FOUND => ErrorKind::NotFound,
         sys::MLN_STATUS_NATIVE_ERROR => ErrorKind::NativeError,
         _ => ErrorKind::UnknownStatus,
     }
@@ -120,7 +130,7 @@ mod tests {
     use super::*;
 
     #[test]
-    // Spec coverage: BND-021.
+
     fn maps_unknown_status_without_losing_raw_status() {
         let error = Error::from_status_and_diagnostic(-123_456, "future status");
 

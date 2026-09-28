@@ -1,30 +1,39 @@
 use super::*;
 
 fn take_updates(runtime: &mut RuntimeHandle) -> usize {
+    await_runtime_barrier(runtime);
     runtime
-        .drain_events(0)
+        .drain_events()
         .unwrap()
+        .get()
+        .unwrap()
+        .events
         .iter()
-        .filter(|event| event.event_type() == RuntimeEventType::MapRenderUpdateAvailable)
+        .filter(|event| event.r#type == RuntimeEventType::MapRenderUpdateAvailable)
         .count()
 }
 
 #[test]
 fn source_and_image_lifecycle_publish_render_updates() {
-    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let mut runtime = crate::runtime_create(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(runtime.map_create(&MapOptions::default()));
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
     take_updates(&mut runtime);
 
     let data =
-        crate::GeoJsonSourceDataHandle::new(br#"{"type":"FeatureCollection","features":[]}"#, None)
+        crate::geojson_source_data_create(br#"{"type":"FeatureCollection","features":[]}"#, None)
             .unwrap();
     map.add_geojson_source_data("geo", &data).unwrap();
     assert!(take_updates(&mut runtime) > 0, "inline GeoJSON insertion");
-    assert!(map.remove_style_source("geo").unwrap());
+    crate::completion::blocking(map.remove_style_source("geo"));
     assert!(take_updates(&mut runtime) > 0, "source removal");
 
-    let image = PremultipliedRgba8Image::new(TextureImageInfo::new(1, 1, 4, 4), vec![255; 4]);
+    let image = PremultipliedRgba8Image {
+        width: 1,
+        height: 1,
+        stride: 4,
+        pixels: vec![255; 4],
+    };
     let coordinates = [
         LatLng::new(1.0, -1.0),
         LatLng::new(1.0, 1.0),
@@ -42,18 +51,18 @@ fn source_and_image_lifecycle_publish_render_updates() {
     map.remove_style_image("icon").unwrap();
     assert!(take_updates(&mut runtime) > 0, "style image removal");
 
-    data.close();
-    map.close().unwrap();
-    runtime.close().unwrap();
+    data.destroy().unwrap();
+    map.close_and_wait();
+    runtime.close_and_wait();
 }
 
 #[test]
 fn tile_and_transition_options_publish_render_updates() {
-    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let mut runtime = crate::runtime_create(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(runtime.map_create(&MapOptions::default()));
     map.set_style_json(STYLE_WITH_IDS_JSON.as_bytes()).unwrap();
     take_updates(&mut runtime);
-    let initial = map.tile_options().unwrap();
+    let initial = map.snapshot_get().unwrap().tile;
     let mut updates: [MapTileOptions; 6] = std::array::from_fn(|_| MapTileOptions::default());
     updates[0].prefetch_zoom_delta = Some(initial.prefetch_zoom_delta.unwrap() + 1);
     updates[1].lod_min_radius = Some(initial.lod_min_radius.unwrap() + 1.0);
@@ -78,17 +87,21 @@ fn tile_and_transition_options_publish_render_updates() {
     transition.duration_ms = Some(123.0);
     map.set_style_transition_options(&transition).unwrap();
     assert!(take_updates(&mut runtime) > 0, "style transition");
-    map.close().unwrap();
-    runtime.close().unwrap();
+    map.close_and_wait();
+    runtime.close_and_wait();
 }
 
 #[test]
 fn only_effective_feature_state_mutations_publish_updates() {
-    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let mut runtime = crate::runtime_create(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(runtime.map_create(&MapOptions::default()));
     map.set_style_json(STYLE_WITH_IDS_JSON.as_bytes()).unwrap();
     take_updates(&mut runtime);
-    let selector = crate::FeatureStateSelector::new("geo").with_feature_id("point");
+    let selector = crate::FeatureStateSelector {
+        source_id: "geo".into(),
+        feature_id: Some("point".into()),
+        ..Default::default()
+    };
     map.set_feature_state(&selector, br#"{"selected":true}"#)
         .unwrap();
     assert!(take_updates(&mut runtime) > 0);
@@ -100,6 +113,6 @@ fn only_effective_feature_state_mutations_publish_updates() {
     assert!(take_updates(&mut runtime) > 0);
     map.remove_feature_state(&selector).unwrap();
     assert_eq!(take_updates(&mut runtime), 0);
-    map.close().unwrap();
-    runtime.close().unwrap();
+    map.close_and_wait();
+    runtime.close_and_wait();
 }

@@ -15,7 +15,7 @@ const INITIAL_HEIGHT: u32 = 640;
 
 pub fn run(
     mode: Mode,
-    backends: maplibre_native_ffi::RenderBackendMask,
+    backends: maplibre_native_ffi::RenderBackendFlag,
 ) -> Result<(), Box<dyn Error>> {
     let event_loop = EventLoop::new()?;
     let mut shell = Shell::new(mode, backends);
@@ -28,13 +28,13 @@ pub fn run(
 
 struct Shell {
     mode: Mode,
-    backends: maplibre_native_ffi::RenderBackendMask,
+    backends: maplibre_native_ffi::RenderBackendFlag,
     app: Option<App>,
     startup_error: Option<Box<dyn Error>>,
 }
 
 impl Shell {
-    fn new(mode: Mode, backends: maplibre_native_ffi::RenderBackendMask) -> Self {
+    fn new(mode: Mode, backends: maplibre_native_ffi::RenderBackendFlag) -> Self {
         Self {
             mode,
             backends,
@@ -58,7 +58,7 @@ impl ApplicationHandler for Shell {
         // TODO(map-example-spec): Replace fixed timer with a display-paced host
         // loop.
         event_loop.set_control_flow(ControlFlow::WaitUntil(
-            Instant::now() + Duration::from_millis(4),
+            Instant::now() + Duration::from_millis(16),
         ));
     }
 

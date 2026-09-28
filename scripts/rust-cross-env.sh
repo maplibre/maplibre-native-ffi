@@ -68,7 +68,9 @@ case "$1" in
     export "$rustflags_variable=${rustflags# }"
     ;;
   android-*)
-    ndk_prebuilt="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64"
+    if ! ndk_prebuilt="$("$(dirname "${BASH_SOURCE[0]}")/android-ndk-prebuilt.sh")"; then
+      return 2
+    fi
     compiler_target="$cargo_target"
     if [[ "$cargo_target" == armv7-linux-androideabi ]]; then
       compiler_target=armv7a-linux-androideabi
