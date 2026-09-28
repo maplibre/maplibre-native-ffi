@@ -4,140 +4,91 @@ const testing = std.testing;
 const maplibre = @import("maplibre_native_ffi");
 const support = @import("support.zig");
 
-fn expectListContains(list: maplibre.StringList, expected: []const u8) !void {
-    for (list.items) |item| {
-        if (std.mem.eql(u8, item, expected)) return;
-    }
-    return error.MissingListEntry;
-}
-
-fn listIndexOf(list: maplibre.StringList, expected: []const u8) !usize {
-    for (list.items, 0..) |item, index| {
-        if (std.mem.eql(u8, item, expected)) return index;
-    }
-    return error.MissingListEntry;
-}
-
 test "style ID lists are copied into owned Zig output" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    var source_ids = try map.listStyleSourceIds(testing.allocator);
+    var source_ids = try support.listStyleSourceIds(&map);
     defer source_ids.deinit();
-    try expectListContains(source_ids, "point");
+    try support.expectListContains(source_ids, "point");
 
-    var layer_ids = try map.listStyleLayerIds(testing.allocator);
+    var layer_ids = try support.listStyleLayerIds(&map);
     defer layer_ids.deinit();
-    try expectListContains(layer_ids, "background");
-    try expectListContains(layer_ids, "point-circle");
+    try support.expectListContains(layer_ids, "background");
+    try support.expectListContains(layer_ids, "point-circle");
 }
 
-// BND-105: style layer listing copies the layer stack in style order.
+// style layer listing copies the layer stack in style order.
 test "style layer lists are copied into owned Zig output in style order" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-    try map.setStyleJson(testing.allocator,
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.resolve(maplibre.Map, try maplibre.mapCreate(testing.allocator, runtime, try maplibre.mapOptionsDefault()));
+    defer support.closeMap(&map) catch @panic("map close failed");
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map),
         \\{"version":8,"sources":{"tiles":{"type":"vector","tiles":["http://example.invalid/{z}/{x}/{y}.pbf"]}},
         \\"layers":[{"id":"roads","type":"line","source":"tiles","source-layer":"transportation"},
         \\{"id":"sky","type":"background"}]}
-    );
+    ));
     try testing.expect(try support.waitForEvent(&runtime, .map_style_loaded));
 
-    var layers = try map.listStyleLayers(testing.allocator);
+    var layers = try support.resolve(maplibre.generated.OwnedValue([]const maplibre.StyleLayerEntry), try maplibre.mapListStyleLayers(testing.allocator, support.handle(map)));
     defer layers.deinit();
-    try testing.expectEqual(@as(usize, 2), layers.items.len);
+    try testing.expectEqual(@as(usize, 2), layers.value.len);
 
-    const roads = layers.items[0];
+    const roads = layers.value[0];
     try testing.expectEqualStrings("roads", roads.id);
     try testing.expectEqualStrings("line", roads.type);
     try testing.expectEqualStrings("tiles", roads.source_id.?);
     try testing.expectEqualStrings("transportation", roads.source_layer.?);
 
-    const sky = layers.items[1];
+    const sky = layers.value[1];
     try testing.expectEqualStrings("sky", sky.id);
     try testing.expectEqualStrings("background", sky.type);
     try testing.expect(sky.source_id == null);
     try testing.expect(sky.source_layer == null);
 }
 
-test "style layer infos compare copied strings by content" {
-    var left = maplibre.StyleLayerInfo{
-        .allocator = testing.allocator,
-        .id = try testing.allocator.dupe(u8, "roads"),
-        .type = try testing.allocator.dupe(u8, "line"),
-        .source_id = try testing.allocator.dupe(u8, "tiles"),
-        .source_layer = try testing.allocator.dupe(u8, "transportation"),
-    };
-    defer left.deinit();
-    var right = maplibre.StyleLayerInfo{
-        .allocator = testing.allocator,
-        .id = try testing.allocator.dupe(u8, "roads"),
-        .type = try testing.allocator.dupe(u8, "line"),
-        .source_id = try testing.allocator.dupe(u8, "tiles"),
-        .source_layer = try testing.allocator.dupe(u8, "transportation"),
-    };
-    defer right.deinit();
-    try testing.expect(left.eql(right));
-
-    var other_type = right;
-    other_type.type = "fill";
-    try testing.expect(!left.eql(other_type));
-
-    var absent_source_layer = right;
-    absent_source_layer.source_layer = null;
-    var empty_source_layer = right;
-    empty_source_layer.source_layer = "";
-    try testing.expect(!absent_source_layer.eql(empty_source_layer));
-
-    var left_items = [_]maplibre.StyleLayerInfo{left};
-    var right_items = [_]maplibre.StyleLayerInfo{right};
-    const left_list = maplibre.StyleLayerInfoList{ .allocator = testing.allocator, .items = left_items[0..] };
-    const right_list = maplibre.StyleLayerInfoList{ .allocator = testing.allocator, .items = right_items[0..] };
-    try testing.expect(left_list.eql(right_list));
-    try testing.expect(!left_list.eql(.{ .allocator = testing.allocator, .items = right_items[0..0] }));
-}
-
 test "style layer JSON helpers manage lifecycle and order" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    const empty_data = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, "{\"type\":\"FeatureCollection\",\"features\":[]}", null);
-    defer empty_data.release();
-    try map.addGeoJsonSourceData(testing.allocator, "empty-layer-source", empty_data);
-    try map.addStyleLayerJson(testing.allocator, "{\"id\":\"empty-circle\",\"type\":\"circle\",\"source\":\"empty-layer-source\"}", "point-circle");
-    try testing.expect(try map.styleLayerExists("empty-circle"));
+    const empty_data = try maplibre.geojsonSourceDataCreate(testing.allocator, "{\"type\":\"FeatureCollection\",\"features\":[]}", null);
+    defer maplibre.geojsonSourceDataDestroy(support.handle(empty_data)) catch @panic("prepared data destroy failed");
+    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "empty-layer-source", empty_data));
+    try support.expectCommitted(try maplibre.mapAddStyleLayerJson(support.handle(map), "{\"id\":\"empty-circle\",\"type\":\"circle\",\"source\":\"empty-layer-source\"}", "point-circle"));
+    try testing.expect(try support.styleLayerExists(&map, "empty-circle"));
 
-    var before_move = try map.listStyleLayerIds(testing.allocator);
+    var before_move = try support.listStyleLayerIds(&map);
     defer before_move.deinit();
-    try testing.expect((try listIndexOf(before_move, "empty-circle")) < (try listIndexOf(before_move, "point-circle")));
+    try testing.expect(support.listIndexOf(before_move, "empty-circle").? < support.listIndexOf(before_move, "point-circle").?);
 
-    var layer_type = (try map.getStyleLayerType(testing.allocator, "empty-circle")).?;
-    defer layer_type.deinit();
-    try testing.expectEqualStrings("circle", layer_type.value);
+    try support.expectStyleLayerType(&map, "empty-circle", "circle");
 
-    var layer_json = (try map.getStyleLayerJson(testing.allocator, "empty-circle")).?;
+    var layer_json = (try support.styleLayerJson(&map, "empty-circle")).?;
     defer layer_json.deinit();
     try testing.expect(std.mem.indexOf(u8, layer_json.value, "\"id\":\"empty-circle\"") != null);
 
-    try map.moveStyleLayer("empty-circle", "");
-    try testing.expectError(error.InvalidState, map.removeStyleSource(testing.allocator, "empty-layer-source"));
-    try testing.expect(try map.removeStyleLayer("empty-circle"));
-    try testing.expect(!try map.styleLayerExists("empty-circle"));
-    try testing.expect(try map.removeStyleSource(testing.allocator, "empty-layer-source"));
-    try testing.expect((try map.getStyleLayerJson(testing.allocator, "empty-circle")) == null);
+    try support.expectCommitted(try maplibre.mapMoveStyleLayer(support.handle(map), "empty-circle", ""));
+    // A source a layer still uses fails its removal with INVALID_STATE.
+    try testing.expectError(error.InvalidState, support.removeStyleSource(&map, "empty-layer-source"));
+    try testing.expect(try support.removeStyleLayer(&map, "empty-circle"));
+    try testing.expect(!try support.styleLayerExists(&map, "empty-circle"));
+    try testing.expect(try support.removeStyleSource(&map, "empty-layer-source"));
+    // A removal of a missing layer is accepted, then fails with NOT_FOUND.
+    try testing.expect(!try support.removeStyleLayer(&map, "empty-circle"));
+    try testing.expect((try support.styleLayerJson(&map, "empty-circle")) == null);
+    try testing.expect((try support.styleLayerInfo(&map, "empty-circle")) == null);
 }
 
 test "nine-patch style images round-trip stretch, content, and text fit" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
     const pixels = [_]u8{0} ** 16;
     const image = maplibre.PremultipliedRgba8Image{
@@ -151,256 +102,252 @@ test "nine-patch style images round-trip stretch, content, and text fit" {
         .{ .from = 0.0, .to = 1.0 },
         .{ .from = 1.0, .to = 2.0 },
     };
-    try map.setStyleImage(testing.allocator, "patch", image, .{
+    try support.expectCommitted(try maplibre.mapSetStyleImage(testing.allocator, support.handle(map), "patch", image, .{
         .stretch_x = stretch_x[0..],
         .stretch_y = stretch_y[0..],
         .content = .{ .left = 0.5, .top = 0.5, .right = 1.5, .bottom = 1.5 },
         .text_fit_height = .proportional,
-    });
+    }));
 
-    const info = (try map.getStyleImageInfo(testing.allocator, "patch")).?;
-    try testing.expectEqual(@as(usize, 1), info.stretch_x_count);
-    try testing.expectEqual(@as(usize, 2), info.stretch_y_count);
-    try testing.expectEqual(@as(f32, 1.5), info.content.?.right);
+    var info = (try support.styleImageInfo(&map, "patch")).?;
+    defer info.deinit();
+    try testing.expectEqual(@as(usize, 1), info.value.info.stretch_x_count);
+    try testing.expectEqual(@as(usize, 2), info.value.info.stretch_y_count);
+    try testing.expectEqual(@as(f32, 1.5), info.value.info.content.?.right);
     // An absent text fit stays distinguishable from a present default.
-    try testing.expect(info.text_fit_width == null);
-    try testing.expectEqual(maplibre.StyleImageTextFit.proportional, info.text_fit_height.?);
+    try testing.expect(info.value.info.text_fit_width == null);
+    try testing.expectEqual(maplibre.StyleImageTextFit.proportional, info.value.info.text_fit_height.?);
 
-    var stretches = (try map.copyStyleImageStretches(testing.allocator, "patch")).?;
+    var stretches = (try support.styleImageStretches(&map, "patch")).?;
     defer stretches.deinit();
-    try testing.expectEqual(@as(usize, 1), stretches.stretch_x.len);
-    try testing.expectEqual(@as(f32, 1.0), stretches.stretch_x[0].to);
-    try testing.expectEqual(@as(usize, 2), stretches.stretch_y.len);
-    try testing.expectEqual(@as(f32, 2.0), stretches.stretch_y[1].to);
+    try testing.expectEqual(@as(usize, 1), stretches.value.stretch_x.len);
+    try testing.expectEqual(@as(f32, 1.0), stretches.value.stretch_x[0].to);
+    try testing.expectEqual(@as(usize, 2), stretches.value.stretch_y.len);
+    try testing.expectEqual(@as(f32, 2.0), stretches.value.stretch_y[1].to);
 
-    try testing.expect((try map.copyStyleImageStretches(testing.allocator, "missing")) == null);
+    try testing.expect((try support.styleImageStretches(&map, "missing")) == null);
 
     // A backwards interval is rejected by C.
     const backwards = [_]maplibre.ImageStretch{.{ .from = 2.0, .to = 1.0 }};
     try testing.expectError(
         error.InvalidArgument,
-        map.setStyleImage(testing.allocator, "bad", image, .{ .stretch_x = backwards[0..] }),
+        maplibre.mapSetStyleImage(testing.allocator, support.handle(map), "bad", image, .{ .stretch_x = backwards[0..] }),
     );
 }
 
 test "layer base accessors round-trip source, zoom range, and visibility" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
     {
-        var empty = try map.copyLayerSourceLayer(testing.allocator, "point-circle");
-        defer empty.deinit();
-        try testing.expectEqualStrings("", empty.value);
+        try testing.expectEqual(null, try support.layerSourceLayer(&map, "point-circle"));
     }
-    try map.setLayerSourceLayer(testing.allocator, "point-circle", "roads");
+    try support.expectCommitted(try maplibre.mapSetLayerSourceLayer(support.handle(map), "point-circle", "roads"));
     {
-        var source_layer = try map.copyLayerSourceLayer(testing.allocator, "point-circle");
+        var source_layer = (try support.layerSourceLayer(&map, "point-circle")).?;
         defer source_layer.deinit();
         try testing.expectEqualStrings("roads", source_layer.value);
     }
     {
-        var source_id = try map.copyLayerSourceId(testing.allocator, "point-circle");
+        var source_id = (try support.layerSourceId(&map, "point-circle")).?;
         defer source_id.deinit();
         try testing.expectEqualStrings("point", source_id.value);
     }
 
-    // A layer type that takes no source is rejected rather than silently ignored.
-    try testing.expectError(
-        error.InvalidArgument,
-        map.setLayerSourceLayer(testing.allocator, "background", "roads"),
-    );
+    // Semantic rejection is reported asynchronously after command acceptance.
+    try support.expectCommandError(try maplibre.mapSetLayerSourceLayer(support.handle(map), "background", "roads"), error.InvalidArgument);
     {
-        var background_source = try map.copyLayerSourceId(testing.allocator, "background");
-        defer background_source.deinit();
-        try testing.expectEqualStrings("", background_source.value);
+        try testing.expectEqual(null, try support.layerSourceId(&map, "background"));
     }
 
-    // An unset zoom range crosses the boundary as infinities.
-    try testing.expectEqual(
-        -std.math.inf(f64),
-        try map.getLayerMinZoom(testing.allocator, "point-circle"),
-    );
-    try testing.expectEqual(
-        std.math.inf(f64),
-        try map.getLayerMaxZoom(testing.allocator, "point-circle"),
-    );
-    try map.setLayerMinZoom(testing.allocator, "point-circle", 4.0);
-    try map.setLayerMaxZoom(testing.allocator, "point-circle", 12.5);
-    try testing.expectEqual(@as(f64, 4.0), try map.getLayerMinZoom(testing.allocator, "point-circle"));
-    try testing.expectEqual(@as(f64, 12.5), try map.getLayerMaxZoom(testing.allocator, "point-circle"));
+    // The layer-info aggregate carries the type, zoom range, visibility, and
+    // the layer's source IDs. An unset zoom range crosses the boundary as
+    // infinities.
+    var unset = (try support.styleLayerInfo(&map, "point-circle")).?;
+    defer unset.deinit();
+    try testing.expectEqualStrings("circle", unset.value.info.type);
+    try testing.expectEqual(-std.math.inf(f64), unset.value.info.min_zoom);
+    try testing.expectEqual(std.math.inf(f64), unset.value.info.max_zoom);
+    try testing.expectEqual(maplibre.StyleLayerVisibility.visible, unset.value.info.visibility);
+    try testing.expectEqualStrings("point", unset.value.source_id.?);
+    try testing.expectEqualStrings("roads", unset.value.source_layer.?);
+    {
+        // The aggregate and the dedicated copy report the same source ID.
+        var copied_source_id = (try support.layerSourceId(&map, "point-circle")).?;
+        defer copied_source_id.deinit();
+        try testing.expectEqualStrings(unset.value.source_id.?, copied_source_id.value);
+    }
 
-    try testing.expectEqual(
-        maplibre.StyleLayerVisibility.visible,
-        try map.getLayerVisibility(testing.allocator, "point-circle"),
-    );
-    try map.setLayerVisibility(testing.allocator, "point-circle", .none);
-    try testing.expectEqual(
-        maplibre.StyleLayerVisibility.none,
-        try map.getLayerVisibility(testing.allocator, "point-circle"),
-    );
+    try support.expectCommitted(try maplibre.mapSetLayerMinZoom(support.handle(map), "point-circle", 4.0));
+    try support.expectCommitted(try maplibre.mapSetLayerMaxZoom(support.handle(map), "point-circle", 12.5));
+    try support.expectCommitted(try maplibre.mapSetLayerVisibility(support.handle(map), "point-circle", .none));
+    var tuned = (try support.styleLayerInfo(&map, "point-circle")).?;
+    defer tuned.deinit();
+    try testing.expectEqual(@as(f64, 4.0), tuned.value.info.min_zoom);
+    try testing.expectEqual(@as(f64, 12.5), tuned.value.info.max_zoom);
+    try testing.expectEqual(maplibre.StyleLayerVisibility.none, tuned.value.info.visibility);
 
-    // An unknown raw visibility passes through to C, which rejects it.
-    try testing.expectError(
-        error.InvalidArgument,
-        map.setLayerVisibility(testing.allocator, "point-circle", .{ .unknown = 900 }),
-    );
-    try testing.expectError(
-        error.InvalidArgument,
-        map.getLayerMinZoom(testing.allocator, "missing"),
-    );
+    // A layer that names no source reports both IDs absent.
+    var background = (try support.styleLayerInfo(&map, "background")).?;
+    defer background.deinit();
+    try testing.expectEqualStrings("background", background.value.info.type);
+    try testing.expectEqual(@as(?[]const u8, null), background.value.source_id);
+    try testing.expectEqual(@as(?[]const u8, null), background.value.source_layer);
+
+    // An unknown raw visibility is accepted into the ordered queue, then fails.
+    const rejected_visibility =
+        try maplibre.mapSetLayerVisibility(support.handle(map), "point-circle", @enumFromInt(900));
+    try support.expectCommandError(rejected_visibility, error.InvalidArgument);
+    // A missing layer reports not-found through the info getter's found flag.
+    try testing.expect((try support.styleLayerInfo(&map, "missing")) == null);
 }
 
 test "layer properties accept semantic JSON values and return owned snapshots" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setLayerProperty(testing.allocator, "point-circle", "circle-radius", "18");
+    try support.expectCommitted(try maplibre.mapSetLayerProperty(support.handle(map), "point-circle", "circle-radius", "18"));
 
-    var snapshot = (try map.getLayerProperty(testing.allocator, "point-circle", "circle-radius")).?;
+    var snapshot = (try support.layerProperty(&map, "point-circle", "circle-radius")).?;
     defer snapshot.deinit();
     try testing.expectEqualStrings("18.0", snapshot.value);
 }
 
 test "layer filters accept nested semantic JSON arrays and return owned snapshots" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setLayerFilter(testing.allocator, "point-circle", "[\"==\",[\"get\",\"visible\"],true]");
+    try support.expectCommitted(try maplibre.mapSetLayerFilter(testing.allocator, support.handle(map), "point-circle", "[\"==\",[\"get\",\"visible\"],true]"));
 
-    var snapshot = (try map.getLayerFilter(testing.allocator, "point-circle")).?;
+    var snapshot = (try support.layerFilter(&map, "point-circle")).?;
     defer snapshot.deinit();
     try testing.expectEqualStrings("[\"==\",[\"get\",\"visible\"],true]", snapshot.value);
 
-    try map.setLayerFilter(testing.allocator, "point-circle", null);
-    try testing.expect((try map.getLayerFilter(testing.allocator, "point-circle")) == null);
+    try support.expectCommitted(try maplibre.mapSetLayerFilter(testing.allocator, support.handle(map), "point-circle", null));
+    try testing.expect((try support.layerFilter(&map, "point-circle")) == null);
 }
 
 test "style light accepts full JSON and property updates" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setStyleLightJson(testing.allocator, "{\"color\":\"blue\",\"intensity\":0.3,\"position\":[1,2,3]}");
+    try support.expectCommitted(try maplibre.mapSetStyleLightJson(support.handle(map), "{\"color\":\"blue\",\"intensity\":0.3,\"position\":[1,2,3]}"));
 
-    var snapshot = (try map.getStyleLightProperty(testing.allocator, "intensity")).?;
+    var snapshot = (try support.styleLightProperty(&map, "intensity")).?;
     defer snapshot.deinit();
     try testing.expectEqualStrings("0.30000001192092896", snapshot.value);
 
-    try map.setStyleLightProperty(testing.allocator, "intensity", "0.75");
-    var updated = (try map.getStyleLightProperty(testing.allocator, "intensity")).?;
+    try support.expectCommitted(try maplibre.mapSetStyleLightProperty(support.handle(map), "intensity", "0.75"));
+    var updated = (try support.styleLightProperty(&map, "intensity")).?;
     defer updated.deinit();
     try testing.expectEqualStrings("0.75", updated.value);
 
-    try testing.expect((try map.getStyleLightProperty(testing.allocator, "unknown-light-property")) == null);
-    try testing.expectError(error.InvalidArgument, map.setStyleLightProperty(testing.allocator, "intensity", "false"));
+    try testing.expect((try support.styleLightProperty(&map, "unknown-light-property")) == null);
+    try support.expectCommandError(try maplibre.mapSetStyleLightProperty(support.handle(map), "intensity", "false"), error.InvalidArgument);
 }
 
 test "runtime style images copy premultiplied RGBA8 pixels" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
     var pixels = [_]u8{
         10,  20,  30,  255, 40, 50, 60, 255,
         0,   0,   0,   0,   70, 80, 90, 255,
         100, 110, 120, 255, 0,  0,  0,  0,
     };
-    try map.setStyleImage(testing.allocator, "runtime-icon", .{
+    try support.expectCommitted(try maplibre.mapSetStyleImage(testing.allocator, support.handle(map), "runtime-icon", .{
         .width = 2,
         .height = 2,
         .stride = 12,
         .pixels = pixels[0..],
-    }, .{ .pixel_ratio = 2.0, .sdf = true });
+    }, .{ .pixel_ratio = 2.0, .sdf = true }));
     pixels[0] = 200;
 
-    try testing.expect(try map.styleImageExists(testing.allocator, "runtime-icon"));
-    const info = (try map.getStyleImageInfo(testing.allocator, "runtime-icon")).?;
-    try testing.expectEqual(@as(u32, 2), info.width);
-    try testing.expectEqual(@as(u32, 2), info.height);
-    try testing.expectEqual(@as(u32, 8), info.stride);
-    try testing.expectEqual(@as(usize, 16), info.byte_length);
-    try testing.expectApproxEqAbs(@as(f32, 2.0), info.pixel_ratio, 0.000001);
-    try testing.expect(info.sdf);
+    try testing.expect(try support.styleImageExists(&map, "runtime-icon"));
+    var info = (try support.styleImageInfo(&map, "runtime-icon")).?;
+    defer info.deinit();
+    try testing.expectEqual(@as(u32, 2), info.value.info.width);
+    try testing.expectEqual(@as(u32, 2), info.value.info.height);
+    try testing.expectEqual(@as(u32, 8), info.value.info.stride);
+    try testing.expectEqual(@as(usize, 16), info.value.info.byte_length);
+    try testing.expectApproxEqAbs(@as(f32, 2.0), info.value.info.pixel_ratio, 0.000001);
+    try testing.expect(info.value.info.sdf);
 
-    var copied = (try map.copyStyleImagePremultipliedRgba8(testing.allocator, "runtime-icon")).?;
+    var copied = (try support.styleImagePixels(&map, "runtime-icon")).?;
     defer copied.deinit();
     try testing.expectEqualSlices(u8, &[_]u8{
         10, 20, 30, 255, 40,  50,  60,  255,
         70, 80, 90, 255, 100, 110, 120, 255,
-    }, copied.pixels);
+    }, copied.value);
 
     var replacement_pixels = [_]u8{ 1, 2, 3, 4 };
-    try map.setStyleImage(testing.allocator, "runtime-icon", .{ .width = 1, .height = 1, .stride = 4, .pixels = replacement_pixels[0..] }, null);
-    const replacement_info = (try map.getStyleImageInfo(testing.allocator, "runtime-icon")).?;
-    try testing.expectEqual(@as(u32, 1), replacement_info.width);
-    try testing.expectEqual(@as(u32, 1), replacement_info.height);
-    try testing.expectApproxEqAbs(@as(f32, 1.0), replacement_info.pixel_ratio, 0.000001);
-    try testing.expect(!replacement_info.sdf);
+    try support.expectCommitted(try maplibre.mapSetStyleImage(testing.allocator, support.handle(map), "runtime-icon", .{ .width = 1, .height = 1, .stride = 4, .pixels = replacement_pixels[0..] }, null));
+    var replacement_info = (try support.styleImageInfo(&map, "runtime-icon")).?;
+    defer replacement_info.deinit();
+    try testing.expectEqual(@as(u32, 1), replacement_info.value.info.width);
+    try testing.expectEqual(@as(u32, 1), replacement_info.value.info.height);
+    try testing.expectApproxEqAbs(@as(f32, 1.0), replacement_info.value.info.pixel_ratio, 0.000001);
+    try testing.expect(!replacement_info.value.info.sdf);
 
-    try testing.expect(try map.removeStyleImage(testing.allocator, "runtime-icon"));
-    try testing.expect(!try map.styleImageExists(testing.allocator, "runtime-icon"));
-    try testing.expect(!try map.removeStyleImage(testing.allocator, "runtime-icon"));
+    try testing.expect(try support.removeStyleImage(&map, "runtime-icon"));
+    try testing.expect(!try support.styleImageExists(&map, "runtime-icon"));
+    // A removal of a missing image is accepted, then fails with NOT_FOUND.
+    try testing.expect(!try support.removeStyleImage(&map, "runtime-icon"));
 }
 
 test "location indicator helpers set focused properties" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.addLocationIndicatorLayer(testing.allocator, "location", "point-circle");
-    var layer_type = (try map.getStyleLayerType(testing.allocator, "location")).?;
-    defer layer_type.deinit();
-    try testing.expectEqualStrings("location-indicator", layer_type.value);
+    try support.expectCommitted(try maplibre.mapAddLocationIndicatorLayer(support.handle(map), "location", "point-circle"));
+    try support.expectStyleLayerType(&map, "location", "location-indicator");
 
-    try map.setLocationIndicatorLocation(testing.allocator, "location", .{ .latitude = 37.7749, .longitude = -122.4194 }, 12.0);
-    var location = (try map.getLayerProperty(testing.allocator, "location", "location")).?;
+    try support.expectCommitted(try maplibre.mapSetLocationIndicatorLocation(support.handle(map), "location", .{ .latitude = 37.7749, .longitude = -122.4194 }, 12.0));
+    var location = (try support.layerProperty(&map, "location", "location")).?;
     defer location.deinit();
     try testing.expectEqualStrings("[37.7749,-122.4194,12.0]", location.value);
 
-    try map.setLocationIndicatorBearing(testing.allocator, "location", 45.0);
-    var bearing = (try map.getLayerProperty(testing.allocator, "location", "bearing")).?;
+    try support.expectCommitted(try maplibre.mapSetLocationIndicatorBearing(support.handle(map), "location", 45.0));
+    var bearing = (try support.layerProperty(&map, "location", "bearing")).?;
     defer bearing.deinit();
     try testing.expectEqualStrings("45.0", bearing.value);
 
-    try map.setLocationIndicatorAccuracyRadius(testing.allocator, "location", 33.0);
-    var radius = (try map.getLayerProperty(testing.allocator, "location", "accuracy-radius")).?;
+    try support.expectCommitted(try maplibre.mapSetLocationIndicatorAccuracyRadius(support.handle(map), "location", 33.0));
+    var radius = (try support.layerProperty(&map, "location", "accuracy-radius")).?;
     defer radius.deinit();
     try testing.expectEqualStrings("33.0", radius.value);
 
-    try map.setLocationIndicatorImageName(testing.allocator, "location", .top, "top-icon");
-    var top_image = (try map.getLayerProperty(testing.allocator, "location", "top-image")).?;
+    try support.expectCommitted(try maplibre.mapSetLocationIndicatorImageName(support.handle(map), "location", .top, "top-icon"));
+    var top_image = (try support.layerProperty(&map, "location", "top-image")).?;
     defer top_image.deinit();
     try testing.expect(!std.mem.eql(u8, top_image.value, "null"));
-    try map.setLocationIndicatorImageName(testing.allocator, "location", .bearing, "bearing-icon");
-    try map.setLocationIndicatorImageName(testing.allocator, "location", .shadow, "shadow-icon");
+    try support.expectCommitted(try maplibre.mapSetLocationIndicatorImageName(support.handle(map), "location", .bearing, "bearing-icon"));
+    try support.expectCommitted(try maplibre.mapSetLocationIndicatorImageName(support.handle(map), "location", .shadow, "shadow-icon"));
 
-    try testing.expectError(error.InvalidArgument, map.setLocationIndicatorAccuracyRadius(testing.allocator, "location", -1.0));
-    try testing.expectError(error.InvalidArgument, map.setLocationIndicatorBearing(testing.allocator, "point-circle", 1.0));
+    try support.expectCommandError(try maplibre.mapSetLocationIndicatorAccuracyRadius(support.handle(map), "location", -1.0), error.InvalidArgument);
+    try support.expectCommandError(try maplibre.mapSetLocationIndicatorBearing(support.handle(map), "point-circle", 1.0), error.InvalidArgument);
 }
 
 test "style JSON buffers reject invalid values" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try testing.expectError(
-        error.InvalidArgument,
-        map.setLayerProperty(testing.allocator, "point-circle", "circle-radius", "1e999"),
-    );
-    try testing.expectError(
-        error.InvalidArgument,
-        map.setLayerProperty(testing.allocator, "point-circle", "circle-radius", "\"not a radius\""),
-    );
+    try support.expectCommandError(try maplibre.mapSetLayerProperty(support.handle(map), "point-circle", "circle-radius", "1e999"), error.InvalidArgument);
+    try support.expectCommandError(try maplibre.mapSetLayerProperty(support.handle(map), "point-circle", "circle-radius", "\"not a radius\""), error.InvalidArgument);
 }
 
 const transition_style_json =
@@ -408,18 +355,18 @@ const transition_style_json =
 ;
 
 test "style transition options round trip through the C API" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
-    defer map.close() catch @panic("map close failed");
+    defer support.closeMap(&map) catch @panic("map close failed");
 
     // The style parser fills in a 300ms duration when a style declares none.
-    const parsed = try map.getStyleTransitionOptions();
+    const parsed = try support.styleTransitionOptions(&map);
     try testing.expectEqual(@as(?f64, 300.0), parsed.duration_ms);
     try testing.expectEqual(@as(?f64, null), parsed.delay_ms);
 
-    try map.setStyleJson(testing.allocator, transition_style_json);
-    const declared = try map.getStyleTransitionOptions();
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), transition_style_json));
+    const declared = try support.styleTransitionOptions(&map);
     try testing.expectEqual(@as(?f64, 750.0), declared.duration_ms);
     try testing.expectEqual(@as(?f64, 100.0), declared.delay_ms);
     try testing.expectEqual(@as(?bool, true), declared.enable_placement_transitions);
@@ -430,54 +377,51 @@ test "style transition options round trip through the C API" {
         .duration_ms = 0.0,
         .enable_placement_transitions = false,
     };
-    try map.setStyleTransitionOptions(options);
-    try testing.expectEqual(options, try map.getStyleTransitionOptions());
+    try support.expectCommitted(try maplibre.mapSetStyleTransitionOptions(testing.allocator, support.handle(map), options));
+    try testing.expectEqual(options, try support.styleTransitionOptions(&map));
 
     // Omitting the flag leaves the cross-fade on rather than clearing it.
-    try map.setStyleTransitionOptions(.{ .duration_ms = 250.0 });
+    try support.expectCommitted(try maplibre.mapSetStyleTransitionOptions(testing.allocator, support.handle(map), .{ .duration_ms = 250.0 }));
     try testing.expectEqual(
         @as(?bool, true),
-        (try map.getStyleTransitionOptions()).enable_placement_transitions,
+        (try support.styleTransitionOptions(&map)).enable_placement_transitions,
     );
 
     // Loading a style replaces the override with what that style declares.
-    try map.setStyleJson(testing.allocator, transition_style_json);
-    try testing.expectEqual(declared, try map.getStyleTransitionOptions());
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), transition_style_json));
+    try testing.expectEqual(declared, try support.styleTransitionOptions(&map));
 
-    try testing.expectError(
-        error.InvalidArgument,
-        map.setStyleTransitionOptions(.{ .delay_ms = -1.0 }),
-    );
+    try support.expectCommandError(try maplibre.mapSetStyleTransitionOptions(testing.allocator, support.handle(map), .{ .delay_ms = -1.0 }), error.InvalidArgument);
 }
 
-// BND-110: global-state lifetime and copied JSON values.
+// global-state lifetime and copied JSON values.
 test "global state defaults updates and style replacement" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-    try testing.expectError(error.InvalidState, map.setGlobalStateProperty(testing.allocator, "theme", "true"));
-    try map.setStyleJson(testing.allocator,
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    var map = try support.resolve(maplibre.Map, try maplibre.mapCreate(testing.allocator, runtime, try maplibre.mapOptionsDefault()));
+    defer support.closeMap(&map) catch @panic("map close failed");
+    try support.expectCommandError(try maplibre.mapSetGlobalStateProperty(support.handle(map), "theme", "true"), error.InvalidState);
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map),
         \\{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}
-    );
-    var defaults = try map.getGlobalState(testing.allocator);
+    ));
+    var defaults = try support.resolve(maplibre.OwnedValue([]const u8), try maplibre.mapGetGlobalState(testing.allocator, support.handle(map)));
     defer defaults.deinit();
     try testing.expectEqualStrings("{\"theme\":\"light\"}", defaults.value);
-    try map.setGlobalStateProperty(testing.allocator, "theme", "[\"dark\",{\"enabled\":true}]");
-    var snapshot = try map.getGlobalState(testing.allocator);
+    try support.expectCommitted(try maplibre.mapSetGlobalStateProperty(support.handle(map), "theme", "[\"dark\",{\"enabled\":true}]"));
+    var snapshot = try support.resolve(maplibre.OwnedValue([]const u8), try maplibre.mapGetGlobalState(testing.allocator, support.handle(map)));
     defer snapshot.deinit();
-    try map.setGlobalStateProperty(testing.allocator, "theme", "null");
-    var reset = try map.getGlobalState(testing.allocator);
+    try support.expectCommitted(try maplibre.mapSetGlobalStateProperty(support.handle(map), "theme", "null"));
+    var reset = try support.resolve(maplibre.OwnedValue([]const u8), try maplibre.mapGetGlobalState(testing.allocator, support.handle(map)));
     defer reset.deinit();
     try testing.expectEqualStrings(defaults.value, reset.value);
     try testing.expectEqualStrings("{\"theme\":[\"dark\",{\"enabled\":true}]}", snapshot.value);
-    try map.setStyleJson(testing.allocator, "{\"version\":8,\"sources\":{},\"layers\":[]}");
-    var replaced = try map.getGlobalState(testing.allocator);
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), "{\"version\":8,\"sources\":{},\"layers\":[]}"));
+    var replaced = try support.resolve(maplibre.OwnedValue([]const u8), try maplibre.mapGetGlobalState(testing.allocator, support.handle(map)));
     defer replaced.deinit();
     try testing.expectEqualStrings("{}", replaced.value);
-    try map.setGlobalStateProperty(testing.allocator, "theme", "true");
-    try map.setGlobalStateProperty(testing.allocator, "theme", "null");
-    var cleared = try map.getGlobalState(testing.allocator);
+    try support.expectCommitted(try maplibre.mapSetGlobalStateProperty(support.handle(map), "theme", "true"));
+    try support.expectCommitted(try maplibre.mapSetGlobalStateProperty(support.handle(map), "theme", "null"));
+    var cleared = try support.resolve(maplibre.OwnedValue([]const u8), try maplibre.mapGetGlobalState(testing.allocator, support.handle(map)));
     defer cleared.deinit();
     try testing.expectEqualStrings("{\"theme\":null}", cleared.value);
 }

@@ -11,164 +11,75 @@ const HttpServerState = struct {
     err: ?anyerror = null,
 };
 
-fn sleepOneMillisecond() !void {
-    try testing.io.sleep(.fromMilliseconds(1), .awake);
+fn runAmbientCacheOperation(runtime: *maplibre.Runtime, operation: maplibre.AmbientCacheOperation) !void {
+    _ = try support.resolve(void, try maplibre.runtimeRunAmbientCacheOperation(support.handle(runtime), operation));
 }
 
-fn rawStatusError(raw_status: i32) maplibre.NativeStatusError!void {
-    return switch (raw_status) {
-        0 => {},
-        -1 => error.InvalidArgument,
-        -2 => error.InvalidState,
-        -3 => error.WrongThread,
-        -4 => error.Unsupported,
-        -5 => error.NativeError,
-        else => error.UnknownStatus,
-    };
-}
-
-fn waitForOfflineOperation(
-    runtime: *maplibre.RuntimeHandle,
-    operation: maplibre.OfflineOperationHandle,
-) !maplibre.OfflineOperationCompletedPayload {
-    const operation_id = try operation.operationId();
-    for (0..5000) |_| {
-        try runtime.pump(0, null);
-        // One event per drain, so an event this wait is not looking for stays
-        // queued for the wait that is. See support.waitForEvent.
-        while (true) {
-            var batch = try runtime.drainEvents(testing.allocator, 1);
-            defer batch.deinit();
-            if (batch.len() == 0) break;
-            const event = try batch.at(0);
-            const payload = switch (event.payload) {
-                .offline_operation_completed => |completed| completed,
-                else => continue,
-            };
-            if (payload.operation_id != operation_id) continue;
-            try testing.expectEqual(payload.operation_kind.toRaw(), payload.raw_operation_kind);
-            try testing.expectEqual(payload.result_kind.toRaw(), payload.raw_result_kind);
-            try rawStatusError(payload.result_status);
-            return payload;
-        }
-        try sleepOneMillisecond();
-    }
-    return error.EventNotObserved;
-}
-
-fn runAmbientCacheOperation(runtime: *maplibre.RuntimeHandle, operation: maplibre.AmbientCacheOperation) !void {
-    const handle = try runtime.startAmbientCacheOperation(operation);
-    _ = waitForOfflineOperation(runtime, handle) catch |err| {
-        handle.discard() catch {};
-        return err;
-    };
-    try handle.discard();
-}
-
-fn setMaximumAmbientCacheSize(runtime: *maplibre.RuntimeHandle, size: u64) !void {
-    const handle = try runtime.startSetMaximumAmbientCacheSize(size);
-    _ = waitForOfflineOperation(runtime, handle) catch |err| {
-        handle.discard() catch {};
-        return err;
-    };
-    try handle.discard();
+fn setMaximumAmbientCacheSize(runtime: *maplibre.Runtime, size: u64) !void {
+    _ = try support.resolve(void, try maplibre.runtimeSetMaximumAmbientCacheSize(support.handle(runtime), size));
 }
 
 fn createOfflineRegion(
-    runtime: *maplibre.RuntimeHandle,
+    runtime: *maplibre.Runtime,
     allocator: std.mem.Allocator,
     definition: maplibre.OfflineRegionDefinition,
     metadata: []const u8,
-) !maplibre.OwnedOfflineRegion {
-    const handle = try runtime.startCreateOfflineRegion(allocator, definition, metadata);
-    _ = try waitForOfflineOperation(runtime, handle);
-    return runtime.takeOfflineRegion(allocator, handle);
+) !maplibre.OwnedValue(maplibre.OfflineRegionInfo) {
+    return support.resolve(maplibre.OwnedValue(maplibre.OfflineRegionInfo), try maplibre.runtimeOfflineRegionCreate(allocator, runtime.*, definition, metadata));
 }
 
 fn getOfflineRegion(
-    runtime: *maplibre.RuntimeHandle,
-    allocator: std.mem.Allocator,
-    region_id: maplibre.OfflineRegionId,
-) !?maplibre.OwnedOfflineRegion {
-    const handle = try runtime.startGetOfflineRegion(region_id);
-    _ = try waitForOfflineOperation(runtime, handle);
-    return runtime.takeOptionalOfflineRegion(allocator, handle);
+    runtime: *maplibre.Runtime,
+    region_id: i64,
+) !?maplibre.OwnedValue(maplibre.OfflineRegionInfo) {
+    return support.resolve(?maplibre.OwnedValue(maplibre.OfflineRegionInfo), try maplibre.runtimeOfflineRegionGet(testing.allocator, runtime.*, region_id));
 }
 
-fn listOfflineRegions(runtime: *maplibre.RuntimeHandle, allocator: std.mem.Allocator) !maplibre.OfflineRegionList {
-    const handle = try runtime.startListOfflineRegions();
-    _ = try waitForOfflineOperation(runtime, handle);
-    return runtime.takeOfflineRegionList(allocator, handle);
+fn listOfflineRegions(runtime: *maplibre.Runtime) !maplibre.OwnedValue([]const maplibre.OfflineRegionInfo) {
+    return support.resolve(maplibre.OwnedValue([]const maplibre.OfflineRegionInfo), try maplibre.runtimeOfflineRegionsList(testing.allocator, runtime.*));
 }
 
 fn mergeOfflineRegionsDatabase(
-    runtime: *maplibre.RuntimeHandle,
+    runtime: *maplibre.Runtime,
     allocator: std.mem.Allocator,
     side_database_path: []const u8,
-) !maplibre.OfflineRegionList {
-    const handle = try runtime.startMergeOfflineRegionsDatabase(allocator, side_database_path);
-    _ = try waitForOfflineOperation(runtime, handle);
-    return runtime.takeOfflineRegionList(allocator, handle);
+) !maplibre.OwnedValue([]const maplibre.OfflineRegionInfo) {
+    return support.resolve(maplibre.OwnedValue([]const maplibre.OfflineRegionInfo), try maplibre.runtimeOfflineRegionsMergeDatabase(allocator, runtime.*, side_database_path));
 }
 
 fn updateOfflineRegionMetadata(
-    runtime: *maplibre.RuntimeHandle,
-    allocator: std.mem.Allocator,
-    region_id: maplibre.OfflineRegionId,
+    runtime: *maplibre.Runtime,
+    region_id: i64,
     metadata: []const u8,
-) !maplibre.OwnedOfflineRegion {
-    const handle = try runtime.startUpdateOfflineRegionMetadata(region_id, metadata);
-    _ = try waitForOfflineOperation(runtime, handle);
-    return runtime.takeOfflineRegion(allocator, handle);
+) !maplibre.OwnedValue(maplibre.OfflineRegionInfo) {
+    return support.resolve(maplibre.OwnedValue(maplibre.OfflineRegionInfo), try maplibre.runtimeOfflineRegionUpdateMetadata(testing.allocator, runtime.*, region_id, metadata));
 }
 
-fn getOfflineRegionStatus(runtime: *maplibre.RuntimeHandle, region_id: maplibre.OfflineRegionId) !maplibre.OfflineRegionStatus {
-    const handle = try runtime.startGetOfflineRegionStatus(region_id);
-    _ = try waitForOfflineOperation(runtime, handle);
-    return runtime.takeOfflineRegionStatus(handle);
+fn getOfflineRegionStatus(runtime: *maplibre.Runtime, region_id: i64) !maplibre.OfflineRegionStatus {
+    return support.resolve(maplibre.OfflineRegionStatus, try maplibre.runtimeOfflineRegionGetStatus(runtime.*, region_id));
 }
 
-fn setOfflineRegionObserved(runtime: *maplibre.RuntimeHandle, region_id: maplibre.OfflineRegionId, observed: bool) !void {
-    const handle = try runtime.startSetOfflineRegionObserved(region_id, observed);
-    _ = waitForOfflineOperation(runtime, handle) catch |err| {
-        handle.discard() catch {};
-        return err;
-    };
-    try handle.discard();
+fn setOfflineRegionObserved(runtime: *maplibre.Runtime, region_id: i64, observed: bool) !void {
+    _ = try support.resolve(void, try maplibre.runtimeOfflineRegionSetObserved(runtime.*, region_id, observed));
 }
 
 fn setOfflineRegionDownloadState(
-    runtime: *maplibre.RuntimeHandle,
-    region_id: maplibre.OfflineRegionId,
+    runtime: *maplibre.Runtime,
+    region_id: i64,
     download_state: maplibre.OfflineRegionDownloadState,
 ) !void {
-    const handle = try runtime.startSetOfflineRegionDownloadState(region_id, download_state);
-    _ = waitForOfflineOperation(runtime, handle) catch |err| {
-        handle.discard() catch {};
-        return err;
-    };
-    try handle.discard();
+    _ = try support.resolve(void, try maplibre.runtimeOfflineRegionSetDownloadState(runtime.*, region_id, download_state));
 }
 
-fn invalidateOfflineRegion(runtime: *maplibre.RuntimeHandle, region_id: maplibre.OfflineRegionId) !void {
-    const handle = try runtime.startInvalidateOfflineRegion(region_id);
-    _ = waitForOfflineOperation(runtime, handle) catch |err| {
-        handle.discard() catch {};
-        return err;
-    };
-    try handle.discard();
+fn invalidateOfflineRegion(runtime: *maplibre.Runtime, region_id: i64) !void {
+    _ = try support.resolve(void, try maplibre.runtimeOfflineRegionInvalidate(runtime.*, region_id));
 }
 
-fn deleteOfflineRegion(runtime: *maplibre.RuntimeHandle, region_id: maplibre.OfflineRegionId) !void {
-    const handle = try runtime.startDeleteOfflineRegion(region_id);
-    _ = waitForOfflineOperation(runtime, handle) catch |err| {
-        handle.discard() catch {};
-        return err;
-    };
-    try handle.discard();
+fn deleteOfflineRegion(runtime: *maplibre.Runtime, region_id: i64) !void {
+    _ = try support.resolve(void, try maplibre.runtimeOfflineRegionDelete(runtime.*, region_id));
 }
 
-fn waitForStyleLoaded(runtime: *maplibre.RuntimeHandle) !void {
+fn waitForStyleLoaded(runtime: *maplibre.Runtime) !void {
     try testing.expect(try support.waitForEvent(runtime, .map_style_loaded));
 }
 
@@ -212,34 +123,33 @@ fn writeTempStyle() !TempStyle {
 }
 
 test "network status APIs wrap process-global MapLibre status" {
-    const original_status = try maplibre.getNetworkStatus(null);
-    defer maplibre.setNetworkStatus(original_status, null) catch @panic("network status restore failed");
+    const original_status = try maplibre.networkStatusGet();
+    defer maplibre.networkStatusSet(original_status) catch @panic("network status restore failed");
 
-    try maplibre.setNetworkStatus(.offline, null);
-    try testing.expect(std.meta.eql(try maplibre.getNetworkStatus(null), maplibre.NetworkStatus.offline));
+    try maplibre.networkStatusSet(.offline);
+    try testing.expect(std.meta.eql(try maplibre.networkStatusGet(), maplibre.NetworkStatus.offline));
 
-    try maplibre.setNetworkStatus(.online, null);
-    try testing.expect(std.meta.eql(try maplibre.getNetworkStatus(null), maplibre.NetworkStatus.online));
+    try maplibre.networkStatusSet(.online);
+    try testing.expect(std.meta.eql(try maplibre.networkStatusGet(), maplibre.NetworkStatus.online));
 
-    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
-    defer diagnostics.deinit();
-    try testing.expectError(error.InvalidArgument, maplibre.setNetworkStatus(.{ .unknown = 999 }, &diagnostics));
-    try testing.expectEqual(@as(?i32, null), diagnostics.get().?.raw_status);
-    try testing.expect(diagnostics.get().?.message.len > 0);
+    try testing.expectError(error.InvalidArgument, maplibre.networkStatusSet(@enumFromInt(999)));
+    var message = try maplibre.threadLastErrorMessage(testing.allocator);
+    defer message.deinit();
+    try testing.expect(message.value.len > 0);
 }
 
 test "ambient cache operations validate cache configuration" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    var runtime = try support.createRuntime(.{});
     try runAmbientCacheOperation(&runtime, .pack_database);
-    try runtime.close();
+    try support.closeRuntime(&runtime);
 
     var tmp = testing.tmpDir(.{});
     defer tmp.cleanup();
     const cache_path = try tempPath(testing.allocator, tmp.sub_path[0..], "ambient-cache.db");
     defer testing.allocator.free(cache_path);
 
-    var cached_runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-    defer cached_runtime.close() catch @panic("cached runtime close failed");
+    var cached_runtime = try support.createRuntime(.{ .cache_path = cache_path });
+    defer support.closeRuntime(&cached_runtime) catch @panic("cached runtime close failed");
     try runAmbientCacheOperation(&cached_runtime, .reset_database);
     try runAmbientCacheOperation(&cached_runtime, .pack_database);
     try runAmbientCacheOperation(&cached_runtime, .invalidate);
@@ -250,13 +160,13 @@ test "file URL style loads through public binding" {
     var fixture = try writeTempStyle();
     defer fixture.deinit();
 
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setStyleUrl(testing.allocator, fixture.style_url);
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), fixture.style_url));
     try waitForStyleLoaded(&runtime);
 }
 
@@ -269,13 +179,13 @@ test "asset URL style loads through public binding runtime asset path" {
     var fixture = try writeTempStyle();
     defer fixture.deinit();
 
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .asset_path = fixture.dir_path }, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{ .asset_path = fixture.dir_path });
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setStyleUrl(testing.allocator, "asset://style.json");
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), "asset://style.json"));
     try waitForStyleLoaded(&runtime);
 }
 
@@ -288,13 +198,13 @@ test "missing file URL reports map loading failure through public events" {
     const missing_url = try std.fmt.allocPrint(testing.allocator, "file://{s}", .{missing_path});
     defer testing.allocator.free(missing_url);
 
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setStyleUrl(testing.allocator, missing_url);
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), missing_url));
     try testing.expect(try support.waitForEvent(&runtime, .map_loading_failed));
 }
 
@@ -322,20 +232,18 @@ const TransformState = struct {
     calls: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
 };
 
-fn rewriteStyleUrl(context: ?*anyopaque, request: maplibre.ResourceTransformRequest) maplibre.ResourceTransformResponse {
+fn rewriteStyleUrl(context: ?*anyopaque, _: maplibre.ResourceKind, _: []const u8, response: maplibre.ResourceTransformResponse) maplibre.Error!void {
     const state: *TransformState = @ptrCast(@alignCast(context.?));
     _ = state.calls.fetchAdd(1, .seq_cst);
-    _ = request.kind;
-    _ = request.url;
-    return .{ .replacement_url = state.replacement_url };
+    try maplibre.resourceTransformResponseSetUrl(response, state.replacement_url);
 }
 
 fn setResourceTransformOnThread(
-    runtime: *maplibre.RuntimeHandle,
+    runtime: *maplibre.Runtime,
     transform: maplibre.ResourceTransform,
     out_error: *?anyerror,
 ) void {
-    runtime.setResourceTransform(transform) catch |err| {
+    _ = maplibre.runtimeSetResourceTransform(testing.allocator, support.handle(runtime), transform) catch |err| {
         out_error.* = err;
         return;
     };
@@ -371,18 +279,18 @@ fn serveOneHttpStyle(state: *HttpServerState) void {
 }
 
 test "resource transform can be cleared after map creation" {
-    try maplibre.setNetworkStatus(.online, null);
-    defer maplibre.setNetworkStatus(.online, null) catch @panic("network status restore failed");
+    try maplibre.networkStatusSet(.online);
+    defer maplibre.networkStatusSet(.online) catch @panic("network status restore failed");
 
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = TransformState{ .replacement_url = "unsupported://rewritten-style.json" };
-    try runtime.setResourceTransform(.{ .handler = rewriteStyleUrl, .context = &state });
+    try support.expectCommitted(try maplibre.runtimeSetResourceTransform(testing.allocator, support.handle(runtime), .{ .callback = rewriteStyleUrl, .context = &state }));
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-    try runtime.setResourceTransform(null);
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
+    try support.expectCommitted(try maplibre.runtimeClearResourceTransform(support.handle(runtime)));
 
     var address = try std.Io.net.IpAddress.parse("127.0.0.1", 0);
     var server = try address.listen(testing.io, .{ .reuse_address = true });
@@ -396,7 +304,7 @@ test "resource transform can be cleared after map creation" {
     const style_url = try std.fmt.allocPrint(testing.allocator, "http://127.0.0.1:{d}/style.json", .{server.socket.address.getPort()});
     defer testing.allocator.free(style_url);
 
-    try map.setStyleUrl(testing.allocator, style_url);
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), style_url));
     try waitForStyleLoaded(&runtime);
     server_thread.join();
     server_thread_joined = true;
@@ -406,8 +314,8 @@ test "resource transform can be cleared after map creation" {
 }
 
 test "http URL style loads through native network provider" {
-    try maplibre.setNetworkStatus(.online, null);
-    defer maplibre.setNetworkStatus(.online, null) catch @panic("network status restore failed");
+    try maplibre.networkStatusSet(.online);
+    defer maplibre.networkStatusSet(.online) catch @panic("network status restore failed");
 
     var address = try std.Io.net.IpAddress.parse("127.0.0.1", 0);
     var server = try address.listen(testing.io, .{ .reuse_address = true });
@@ -421,13 +329,13 @@ test "http URL style loads through native network provider" {
     const style_url = try std.fmt.allocPrint(testing.allocator, "http://127.0.0.1:{d}/style.json", .{server.socket.address.getPort()});
     defer testing.allocator.free(style_url);
 
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setStyleUrl(testing.allocator, style_url);
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), style_url));
     try waitForStyleLoaded(&runtime);
     server_thread.join();
     server_thread_joined = true;
@@ -443,8 +351,8 @@ const PassThroughProviderState = struct {
 fn passThroughStyleProvider(
     context: ?*anyopaque,
     request: maplibre.ResourceRequest,
-    maybe_handle: ?maplibre.ResourceRequestHandle,
-) maplibre.ResourceProviderDecision {
+    maybe_handle: maplibre.ResourceRequestHandle,
+) maplibre.Error!maplibre.ResourceProviderDecision {
     const state: *PassThroughProviderState = @ptrCast(@alignCast(context.?));
     _ = state.calls.fetchAdd(1, .seq_cst);
     if (std.meta.eql(request.kind, maplibre.ResourceKind.style)) state.saw_style.store(true, .seq_cst);
@@ -453,8 +361,8 @@ fn passThroughStyleProvider(
 }
 
 test "http style can load from ambient cache after online load" {
-    try maplibre.setNetworkStatus(.online, null);
-    defer maplibre.setNetworkStatus(.online, null) catch @panic("network status restore failed");
+    try maplibre.networkStatusSet(.online);
+    defer maplibre.networkStatusSet(.online) catch @panic("network status restore failed");
 
     var tmp = testing.tmpDir(.{});
     defer tmp.cleanup();
@@ -474,12 +382,12 @@ test "http style can load from ambient cache after online load" {
     defer testing.allocator.free(style_url);
 
     {
-        var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-        defer runtime.close() catch @panic("runtime close failed");
+        var runtime = try support.createRuntime(.{ .cache_path = cache_path });
+        defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
         try setMaximumAmbientCacheSize(&runtime, 1024 * 1024);
-        var map = try maplibre.MapHandle.create(&runtime, .{});
-        defer map.close() catch @panic("map close failed");
-        try map.setStyleUrl(testing.allocator, style_url);
+        var map = try support.createMap(&runtime, .{});
+        defer support.closeMap(&map) catch @panic("map close failed");
+        try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), style_url));
         try waitForStyleLoaded(&runtime);
         try runAmbientCacheOperation(&runtime, .pack_database);
     }
@@ -489,18 +397,18 @@ test "http style can load from ambient cache after online load" {
     try testing.expectEqual(@as(?anyerror, null), server_state.err);
     try testing.expect(server_state.served);
 
-    try maplibre.setNetworkStatus(.offline, null);
-    var cached_runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-    defer cached_runtime.close() catch @panic("cached runtime close failed");
-    var cached_map = try maplibre.MapHandle.create(&cached_runtime, .{});
-    defer cached_map.close() catch @panic("cached map close failed");
-    try cached_map.setStyleUrl(testing.allocator, style_url);
+    try maplibre.networkStatusSet(.offline);
+    var cached_runtime = try support.createRuntime(.{ .cache_path = cache_path });
+    defer support.closeRuntime(&cached_runtime) catch @panic("cached runtime close failed");
+    var cached_map = try support.createMap(&cached_runtime, .{});
+    defer support.closeMap(&cached_map) catch @panic("cached map close failed");
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(cached_map), style_url));
     try waitForStyleLoaded(&cached_runtime);
 }
 
 test "resource provider pass-through delegates to native HTTP" {
-    try maplibre.setNetworkStatus(.online, null);
-    defer maplibre.setNetworkStatus(.online, null) catch @panic("network status restore failed");
+    try maplibre.networkStatusSet(.online);
+    defer maplibre.networkStatusSet(.online) catch @panic("network status restore failed");
 
     var address = try std.Io.net.IpAddress.parse("127.0.0.1", 0);
     var server = try address.listen(testing.io, .{ .reuse_address = true });
@@ -515,14 +423,14 @@ test "resource provider pass-through delegates to native HTTP" {
     defer testing.allocator.free(style_url);
 
     var state = PassThroughProviderState{};
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-    try runtime.setResourceProvider(.{ .handler = passThroughStyleProvider, .context = &state });
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
+    try support.expectCommitted(try maplibre.runtimeSetResourceProvider(testing.allocator, support.handle(runtime), .{ .callback = passThroughStyleProvider, .context = &state }));
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setStyleUrl(testing.allocator, style_url);
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), style_url));
     try waitForStyleLoaded(&runtime);
     server_thread.join();
     server_thread_joined = true;
@@ -532,77 +440,36 @@ test "resource provider pass-through delegates to native HTTP" {
     try testing.expect(state.saw_style.load(.seq_cst));
 }
 
-test "resource transform rewrites network style URL" {
-    try maplibre.setNetworkStatus(.online, null);
-    defer maplibre.setNetworkStatus(.online, null) catch @panic("network status restore failed");
+// A replacement transform, installed from another thread, is the one every
+// later request reaches.
+test "a replacement resource transform rewrites later style URLs" {
+    try maplibre.networkStatusSet(.online);
+    defer maplibre.networkStatusSet(.online) catch @panic("network status restore failed");
 
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
-    const original_url = "http://example.invalid/original-style.json";
-    var state = TransformState{
-        .replacement_url = "unsupported://rewritten-style.json",
-    };
-    var replacement_state = TransformState{
-        .replacement_url = "unsupported://unexpected-replacement.json",
-    };
-    try runtime.setResourceTransform(.{ .handler = rewriteStyleUrl, .context = &state });
+    var state = TransformState{ .replacement_url = "unsupported://original-transform.json" };
+    var replacement_state = TransformState{ .replacement_url = "unsupported://replacement.json" };
+    try support.expectCommitted(try maplibre.runtimeSetResourceTransform(testing.allocator, support.handle(runtime), .{ .callback = rewriteStyleUrl, .context = &state }));
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var replacement_error: ?anyerror = error.Unexpected;
+    const replacement = maplibre.ResourceTransform{ .callback = rewriteStyleUrl, .context = &replacement_state };
+    const thread = try std.Thread.spawn(.{}, setResourceTransformOnThread, .{ &runtime, replacement, &replacement_error });
+    thread.join();
+    try testing.expect(replacement_error == null);
 
-    try runtime.setResourceTransform(.{ .handler = rewriteStyleUrl, .context = &replacement_state });
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setStyleUrl(testing.allocator, original_url);
-    for (0..1000) |_| {
-        try runtime.pump(0, null);
-        _ = try support.drainEvents(&runtime);
-        if (replacement_state.calls.load(.seq_cst) > 0) break;
-        try sleepOneMillisecond();
-    }
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), "http://example.invalid/original-style.json"));
+
+    // The rewritten URL names a scheme no provider serves, so the load fails
+    // rather than reaching the original host.
+    try testing.expect(try support.waitForEvent(&runtime, .map_loading_failed));
 
     try testing.expectEqual(@as(usize, 0), state.calls.load(.seq_cst));
     try testing.expect(replacement_state.calls.load(.seq_cst) > 0);
-}
-
-test "failed resource transform replacement keeps previous callback" {
-    try maplibre.setNetworkStatus(.online, null);
-    defer maplibre.setNetworkStatus(.online, null) catch @panic("network status restore failed");
-
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var state = TransformState{
-        .replacement_url = "unsupported://active-transform.json",
-    };
-    var replacement_state = TransformState{
-        .replacement_url = "unsupported://failed-replacement.json",
-    };
-    try runtime.setResourceTransform(.{ .handler = rewriteStyleUrl, .context = &state });
-
-    var replacement_error: ?anyerror = null;
-    const failed_replacement = maplibre.ResourceTransform{ .handler = rewriteStyleUrl, .context = &replacement_state };
-    const thread = try std.Thread.spawn(.{}, setResourceTransformOnThread, .{
-        &runtime,
-        failed_replacement,
-        &replacement_error,
-    });
-    thread.join();
-    try testing.expectEqual(error.WrongThread, replacement_error.?);
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    try map.setStyleUrl(testing.allocator, "http://example.invalid/original-style.json");
-    for (0..1000) |_| {
-        try runtime.pump(0, null);
-        _ = try support.drainEvents(&runtime);
-        if (state.calls.load(.seq_cst) > 0) break;
-        try sleepOneMillisecond();
-    }
-
-    try testing.expect(state.calls.load(.seq_cst) > 0);
-    try testing.expectEqual(@as(usize, 0), replacement_state.calls.load(.seq_cst));
 }
 
 const ProviderState = struct {
@@ -622,11 +489,11 @@ const ProviderState = struct {
 fn customStyleProvider(
     context: ?*anyopaque,
     request: maplibre.ResourceRequest,
-    maybe_handle: ?maplibre.ResourceRequestHandle,
-) maplibre.ResourceProviderDecision {
+    maybe_handle: maplibre.ResourceRequestHandle,
+) maplibre.Error!maplibre.ResourceProviderDecision {
     const state: *ProviderState = @ptrCast(@alignCast(context.?));
     _ = state.calls.fetchAdd(1, .seq_cst);
-    if (!std.mem.eql(u8, request.requested_url, "custom://style.json")) return .pass_through;
+    if (!std.mem.eql(u8, (request.requested_url orelse ""), "custom://style.json")) return .pass_through;
 
     state.saw_style.store(std.meta.eql(request.kind, maplibre.ResourceKind.style), .seq_cst);
     state.saw_all_loading.store(std.meta.eql(request.loading_method, maplibre.ResourceLoadingMethod.all), .seq_cst);
@@ -635,20 +502,20 @@ fn customStyleProvider(
     state.saw_permanent_storage.store(std.meta.eql(request.storage_policy, maplibre.ResourceStoragePolicy.permanent), .seq_cst);
     state.saw_no_range.store(request.range == null, .seq_cst);
 
-    const handle = maybe_handle orelse return .pass_through;
-    const is_cancelled = handle.cancelled() catch true;
+    const handle = maybe_handle;
+    const is_cancelled = maplibre.resourceRequestCancelled(support.handle(handle)) catch true;
     state.saw_cancelled_query.store(!is_cancelled, .seq_cst);
-    handle.complete(.{ .bytes = support.style_json }) catch {
-        handle.release();
+    maplibre.resourceRequestComplete(testing.allocator, support.handle(handle), .{ .bytes = support.style_json }) catch {
+        maplibre.resourceRequestRelease(support.handle(handle)) catch {};
         return .pass_through;
     };
-    handle.complete(.{ .bytes = support.style_json }) catch |err| {
+    maplibre.resourceRequestComplete(testing.allocator, support.handle(handle), .{ .bytes = support.style_json }) catch |err| {
         if (err == error.AlreadyCompleted) state.saw_second_complete_error.store(true, .seq_cst);
     };
-    handle.release();
-    handle.release();
-    _ = handle.cancelled() catch |err| {
-        if (err == error.ClosedHandle) state.saw_after_release_error.store(true, .seq_cst);
+    maplibre.resourceRequestRelease(support.handle(handle)) catch {};
+    maplibre.resourceRequestRelease(support.handle(handle)) catch {};
+    _ = maplibre.resourceRequestCancelled(support.handle(handle)) catch |err| {
+        if (err == error.InvalidState) state.saw_after_release_error.store(true, .seq_cst);
     };
     _ = state.completions.fetchAdd(1, .seq_cst);
     return .handle;
@@ -673,8 +540,8 @@ const PmtilesRangeProviderState = struct {
                 std.Thread.yield() catch {};
             }
             defer self.range_lock.unlock();
-            self.range_start = range.start;
-            self.range_end = range.end;
+            self.range_start = range.range_start;
+            self.range_end = range.range_end;
         }
         self.recorded_pmtiles_request.store(true, .seq_cst);
     }
@@ -698,73 +565,72 @@ const PmtilesRangeProviderState = struct {
 fn pmtilesRangeProvider(
     context: ?*anyopaque,
     request: maplibre.ResourceRequest,
-    maybe_handle: ?maplibre.ResourceRequestHandle,
-) maplibre.ResourceProviderDecision {
+    maybe_handle: maplibre.ResourceRequestHandle,
+) maplibre.Error!maplibre.ResourceProviderDecision {
     const state: *PmtilesRangeProviderState = @ptrCast(@alignCast(context.?));
-    const handle = maybe_handle orelse return .pass_through;
+    const handle = maybe_handle;
 
-    if (std.mem.eql(u8, request.requested_url, pmtiles_style_url)) {
+    if (std.mem.eql(u8, (request.requested_url orelse ""), pmtiles_style_url)) {
         state.markStyle(request);
-        handle.complete(.{ .bytes = pmtiles_style_json }) catch {
-            handle.release();
+        maplibre.resourceRequestComplete(testing.allocator, support.handle(handle), .{ .bytes = pmtiles_style_json }) catch {
+            maplibre.resourceRequestRelease(support.handle(handle)) catch {};
             return .pass_through;
         };
-        handle.release();
+        maplibre.resourceRequestRelease(support.handle(handle)) catch {};
         return .handle;
     }
 
-    if (std.mem.eql(u8, request.requested_url, pmtiles_archive_url)) {
+    if (std.mem.eql(u8, (request.requested_url orelse ""), pmtiles_archive_url)) {
         state.markPmtilesRequest(request);
-        handle.complete(.{
+        maplibre.resourceRequestComplete(testing.allocator, support.handle(handle), .{
             .status = .@"error",
             .error_reason = .not_found,
             .error_message = "pmtiles archive intentionally unavailable",
         }) catch {
-            handle.release();
+            maplibre.resourceRequestRelease(support.handle(handle)) catch {};
             return .pass_through;
         };
-        handle.release();
+        maplibre.resourceRequestRelease(support.handle(handle)) catch {};
         return .handle;
     }
 
     return .pass_through;
 }
 
-fn waitForPmtilesRangeRequest(runtime: *maplibre.RuntimeHandle, state: *PmtilesRangeProviderState) !void {
+fn waitForPmtilesRangeRequest(state: *PmtilesRangeProviderState) !void {
     for (0..1000) |_| {
-        try runtime.pump(0, null);
         if (state.recorded_pmtiles_request.load(.seq_cst)) return;
-        try sleepOneMillisecond();
+        try support.sleepOneMillisecond();
     }
     return error.ProviderNotCalled;
 }
 
 test "resource provider observes PMTiles range metadata" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = PmtilesRangeProviderState{};
-    try runtime.setResourceProvider(.{ .handler = pmtilesRangeProvider, .context = &state });
+    try support.expectCommitted(try maplibre.runtimeSetResourceProvider(testing.allocator, support.handle(runtime), .{ .callback = pmtilesRangeProvider, .context = &state }));
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setStyleUrl(testing.allocator, pmtiles_style_url);
-    try waitForPmtilesRangeRequest(&runtime, &state);
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), pmtiles_style_url));
+    try waitForPmtilesRangeRequest(&state);
     try state.expectObservedRequest();
 }
 
 test "custom URL style loads through resource provider" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = ProviderState{};
-    try runtime.setResourceProvider(.{ .handler = customStyleProvider, .context = &state });
+    try support.expectCommitted(try maplibre.runtimeSetResourceProvider(testing.allocator, support.handle(runtime), .{ .callback = customStyleProvider, .context = &state }));
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setStyleUrl(testing.allocator, "custom://style.json");
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), "custom://style.json"));
     try waitForStyleLoaded(&runtime);
     try testing.expect(state.calls.load(.seq_cst) > 0);
     try testing.expectEqual(@as(usize, 1), state.completions.load(.seq_cst));
@@ -789,34 +655,35 @@ const AliasProviderState = struct {
 fn aliasStyleProvider(
     context: ?*anyopaque,
     request: maplibre.ResourceRequest,
-    maybe_handle: ?maplibre.ResourceRequestHandle,
-) maplibre.ResourceProviderDecision {
+    maybe_handle: maplibre.ResourceRequestHandle,
+) maplibre.Error!maplibre.ResourceProviderDecision {
     const state: *AliasProviderState = @ptrCast(@alignCast(context.?));
-    if (!std.mem.eql(u8, request.requested_url, "maplibre://maps/style")) return .pass_through;
-    const handle = maybe_handle orelse return .pass_through;
-    if (request.resolved_url.len <= state.resolved_url.len) {
-        @memcpy(state.resolved_url[0..request.resolved_url.len], request.resolved_url);
-        state.resolved_url_len.store(request.resolved_url.len, .seq_cst);
+    if (!std.mem.eql(u8, (request.requested_url orelse ""), "maplibre://maps/style")) return .pass_through;
+    const handle = maybe_handle;
+    const resolved_url: []const u8 = request.resolved_url orelse "";
+    if (resolved_url.len <= state.resolved_url.len) {
+        @memcpy(state.resolved_url[0..resolved_url.len], resolved_url);
+        state.resolved_url_len.store(resolved_url.len, .seq_cst);
     }
-    handle.complete(.{ .bytes = support.style_json }) catch {
-        handle.release();
+    maplibre.resourceRequestComplete(testing.allocator, support.handle(handle), .{ .bytes = support.style_json }) catch {
+        maplibre.resourceRequestRelease(support.handle(handle)) catch {};
         return .pass_through;
     };
-    handle.release();
+    maplibre.resourceRequestRelease(support.handle(handle)) catch {};
     return .handle;
 }
 
 test "resource provider sees scheme alias and its resolved URL" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = AliasProviderState{};
-    try runtime.setResourceProvider(.{ .handler = aliasStyleProvider, .context = &state });
+    try support.expectCommitted(try maplibre.runtimeSetResourceProvider(testing.allocator, support.handle(runtime), .{ .callback = aliasStyleProvider, .context = &state }));
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setStyleUrl(testing.allocator, "maplibre://maps/style");
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), "maplibre://maps/style"));
     try waitForStyleLoaded(&runtime);
 
     const len = state.resolved_url_len.load(.seq_cst);
@@ -835,8 +702,8 @@ const CountingProviderState = struct {
 fn countingProvider(
     context: ?*anyopaque,
     request: maplibre.ResourceRequest,
-    maybe_handle: ?maplibre.ResourceRequestHandle,
-) maplibre.ResourceProviderDecision {
+    maybe_handle: maplibre.ResourceRequestHandle,
+) maplibre.Error!maplibre.ResourceProviderDecision {
     const state: *CountingProviderState = @ptrCast(@alignCast(context.?));
     _ = state.calls.fetchAdd(1, .seq_cst);
     _ = request;
@@ -846,49 +713,49 @@ fn countingProvider(
 
 // Requests a style whose scheme no file source serves, so the failure event
 // proves the request reached the network file source.
-fn loadProbeStyle(runtime: *maplibre.RuntimeHandle, map: *maplibre.MapHandle, style_url: []const u8) !void {
-    try map.setStyleUrl(testing.allocator, style_url);
+fn loadProbeStyle(runtime: *maplibre.Runtime, map: *maplibre.Map, style_url: []const u8) !void {
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), style_url));
     var event = try support.waitForOwnedEvent(runtime, .map_loading_failed);
     defer event.deinit();
-    try testing.expect(std.mem.indexOf(u8, event.message, "\"jar\"") != null);
+    try testing.expect(std.mem.indexOf(u8, event.value.message, "\"jar\"") != null);
 }
 
 test "resource provider can be replaced and cleared after map creation" {
-    try maplibre.setNetworkStatus(.online, null);
-    defer maplibre.setNetworkStatus(.online, null) catch @panic("network status restore failed");
+    try maplibre.networkStatusSet(.online);
+    defer maplibre.networkStatusSet(.online) catch @panic("network status restore failed");
 
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
     var installed = CountingProviderState{};
-    try runtime.setResourceProvider(.{ .handler = countingProvider, .context = &installed });
+    try support.expectCommitted(try maplibre.runtimeSetResourceProvider(testing.allocator, support.handle(runtime), .{ .callback = countingProvider, .context = &installed }));
     try loadProbeStyle(&runtime, &map, "jar:file:/packaged/first.json");
     try testing.expect(installed.calls.load(.seq_cst) > 0);
 
     var replacement = CountingProviderState{};
-    try runtime.setResourceProvider(.{ .handler = countingProvider, .context = &replacement });
+    try support.expectCommitted(try maplibre.runtimeSetResourceProvider(testing.allocator, support.handle(runtime), .{ .callback = countingProvider, .context = &replacement }));
     const installed_calls = installed.calls.load(.seq_cst);
     try loadProbeStyle(&runtime, &map, "jar:file:/packaged/second.json");
     try testing.expect(replacement.calls.load(.seq_cst) > 0);
     try testing.expectEqual(installed_calls, installed.calls.load(.seq_cst));
 
-    try runtime.setResourceProvider(null);
+    try support.expectCommitted(try maplibre.runtimeClearResourceProvider(support.handle(runtime)));
     const replacement_calls = replacement.calls.load(.seq_cst);
     try loadProbeStyle(&runtime, &map, "jar:file:/packaged/third.json");
     try testing.expectEqual(installed_calls, installed.calls.load(.seq_cst));
     try testing.expectEqual(replacement_calls, replacement.calls.load(.seq_cst));
 
     // Clearing an already cleared provider stays a successful no-op.
-    try runtime.setResourceProvider(null);
+    try support.expectCommitted(try maplibre.runtimeClearResourceProvider(support.handle(runtime)));
 }
 
 const offline_style_url = "http://example.com/offline-style.json";
 
 fn offlineTileDefinition() maplibre.OfflineRegionDefinition {
-    return .{ .tile_pyramid = .{
+    return .{ .data = .{ .tile_pyramid = .{
         .style_url = offline_style_url,
         .bounds = .{
             .southwest = .{ .latitude = 1.0, .longitude = 2.0 },
@@ -898,12 +765,12 @@ fn offlineTileDefinition() maplibre.OfflineRegionDefinition {
         .max_zoom = 6.0,
         .pixel_ratio = 2.0,
         .include_ideographs = true,
-    } };
+    } } };
 }
 
-fn expectOfflineTileRegion(region: *const maplibre.OwnedOfflineRegion, expected_metadata: []const u8) !void {
+fn expectOfflineTileRegion(region: *const maplibre.OfflineRegionInfo, expected_metadata: []const u8) !void {
     try testing.expect(region.id > 0);
-    const definition = region.definition.tile_pyramid;
+    const definition = region.definition.data.tile_pyramid;
     try testing.expectEqualStrings(offline_style_url, definition.style_url);
     try testing.expectEqual(@as(f64, 1.0), definition.bounds.southwest.latitude);
     try testing.expectEqual(@as(f64, 2.0), definition.bounds.southwest.longitude);
@@ -924,47 +791,47 @@ test "offline tile-pyramid regions copy definitions and metadata" {
 
     const metadata = [_]u8{ 1, 2, 3 };
     const updated_metadata = [_]u8{ 4, 5, 6, 7 };
-    var region_id: maplibre.OfflineRegionId = 0;
+    var region_id: i64 = 0;
 
     {
-        var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-        defer runtime.close() catch @panic("runtime close failed");
+        var runtime = try support.createRuntime(.{ .cache_path = cache_path });
+        defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
         var created = try createOfflineRegion(&runtime, testing.allocator, offlineTileDefinition(), metadata[0..]);
         defer created.deinit();
-        region_id = created.id;
-        try expectOfflineTileRegion(&created, metadata[0..]);
+        region_id = created.value.id;
+        try expectOfflineTileRegion(&created.value, metadata[0..]);
 
         const status = try getOfflineRegionStatus(&runtime, region_id);
         try testing.expect(std.meta.eql(status.download_state, maplibre.OfflineRegionDownloadState.inactive));
 
-        var list = try listOfflineRegions(&runtime, testing.allocator);
+        var list = try listOfflineRegions(&runtime);
         defer list.deinit();
-        try testing.expectEqual(@as(usize, 1), list.items.len);
-        try expectOfflineTileRegion(&list.items[0], metadata[0..]);
+        try testing.expectEqual(@as(usize, 1), list.value.len);
+        try expectOfflineTileRegion(&list.value[0], metadata[0..]);
 
-        var updated = try updateOfflineRegionMetadata(&runtime, testing.allocator, region_id, updated_metadata[0..]);
+        var updated = try updateOfflineRegionMetadata(&runtime, region_id, updated_metadata[0..]);
         defer updated.deinit();
-        try expectOfflineTileRegion(&updated, updated_metadata[0..]);
+        try expectOfflineTileRegion(&updated.value, updated_metadata[0..]);
     }
 
     {
-        var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-        defer runtime.close() catch @panic("runtime close failed");
+        var runtime = try support.createRuntime(.{ .cache_path = cache_path });
+        defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
-        var reloaded = (try getOfflineRegion(&runtime, testing.allocator, region_id)) orelse return error.RegionReloadFailed;
+        var reloaded = (try getOfflineRegion(&runtime, region_id)) orelse return error.RegionReloadFailed;
         defer reloaded.deinit();
-        try expectOfflineTileRegion(&reloaded, updated_metadata[0..]);
+        try expectOfflineTileRegion(&reloaded.value, updated_metadata[0..]);
 
         try invalidateOfflineRegion(&runtime, region_id);
         try deleteOfflineRegion(&runtime, region_id);
 
-        const missing = try getOfflineRegion(&runtime, testing.allocator, region_id);
+        const missing = try getOfflineRegion(&runtime, region_id);
         try testing.expect(missing == null);
 
-        var list = try listOfflineRegions(&runtime, testing.allocator);
+        var list = try listOfflineRegions(&runtime);
         defer list.deinit();
-        try testing.expectEqual(@as(usize, 0), list.items.len);
+        try testing.expectEqual(@as(usize, 0), list.value.len);
     }
 }
 
@@ -974,49 +841,41 @@ test "offline region definitions reject invalid public values" {
     const cache_path = try tempPath(testing.allocator, tmp.sub_path[0..], "invalid-offline-cache.db");
     defer testing.allocator.free(cache_path);
 
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{ .cache_path = cache_path });
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var invalid_zoom = offlineTileDefinition();
-    invalid_zoom.tile_pyramid.min_zoom = 8.0;
-    invalid_zoom.tile_pyramid.max_zoom = 2.0;
+    invalid_zoom.data.tile_pyramid.min_zoom = 8.0;
+    invalid_zoom.data.tile_pyramid.max_zoom = 2.0;
     try testing.expectError(error.InvalidArgument, createOfflineRegion(&runtime, testing.allocator, invalid_zoom, &.{}));
 
     var invalid_bounds = offlineTileDefinition();
-    invalid_bounds.tile_pyramid.bounds.southwest.latitude = std.math.inf(f64);
+    invalid_bounds.data.tile_pyramid.bounds.southwest.latitude = std.math.inf(f64);
     try testing.expectError(error.InvalidArgument, createOfflineRegion(&runtime, testing.allocator, invalid_bounds, &.{}));
 
-    try testing.expectError(error.InvalidArgument, createOfflineRegion(&runtime, testing.allocator, .{ .geometry = .{
+    try testing.expectError(error.InvalidArgument, createOfflineRegion(&runtime, testing.allocator, .{ .data = .{ .geometry = .{
         .style_url = offline_style_url,
         .geometry = "{",
         .min_zoom = 5.0,
         .max_zoom = 6.0,
-    } }, &.{}));
+    } } }, &.{}));
 }
 
 test "offline region style URL rejects embedded NUL with binding diagnostic" {
-    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
-    defer diagnostics.deinit();
-    try diagnostics.set(-5, "stale native diagnostic");
-
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var definition = offlineTileDefinition();
-    definition.tile_pyramid.style_url = "asset://offline\x00style.json";
+    definition.data.tile_pyramid.style_url = "asset://offline\x00style.json";
     try testing.expectError(
         error.InvalidString,
-        runtime.startCreateOfflineRegion(testing.allocator, definition, &.{}),
+        maplibre.runtimeOfflineRegionCreate(testing.allocator, runtime, definition, &.{}),
     );
-
-    const diagnostic = diagnostics.get().?;
-    try testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
-    try testing.expectEqualStrings("offline region style_url contains embedded NUL", diagnostic.message);
 }
 
-fn expectOfflineGeometryRegion(region: *const maplibre.OwnedOfflineRegion, expected_metadata: []const u8) !void {
+fn expectOfflineGeometryRegion(region: *const maplibre.OfflineRegionInfo, expected_metadata: []const u8) !void {
     try testing.expect(region.id > 0);
-    const definition = region.definition.geometry;
+    const definition = region.definition.data.geometry;
     try testing.expectEqualStrings(offline_style_url, definition.style_url);
     try testing.expectEqual(@as(f64, 5.0), definition.min_zoom);
     try testing.expectEqual(@as(f64, 6.0), definition.max_zoom);
@@ -1038,18 +897,18 @@ test "offline database merge returns copied region list" {
 
     const metadata = [_]u8{ 5, 4, 3 };
     {
-        var side_runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = side_cache_path }, null);
-        defer side_runtime.close() catch @panic("side runtime close failed");
+        var side_runtime = try support.createRuntime(.{ .cache_path = side_cache_path });
+        defer support.closeRuntime(&side_runtime) catch @panic("side runtime close failed");
         var created = try createOfflineRegion(&side_runtime, testing.allocator, offlineTileDefinition(), metadata[0..]);
         defer created.deinit();
     }
 
-    var main_runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = main_cache_path }, null);
-    defer main_runtime.close() catch @panic("main runtime close failed");
+    var main_runtime = try support.createRuntime(.{ .cache_path = main_cache_path });
+    defer support.closeRuntime(&main_runtime) catch @panic("main runtime close failed");
     var merged = try mergeOfflineRegionsDatabase(&main_runtime, testing.allocator, side_cache_path);
     defer merged.deinit();
-    try testing.expectEqual(@as(usize, 1), merged.items.len);
-    try expectOfflineTileRegion(&merged.items[0], metadata[0..]);
+    try testing.expectEqual(@as(usize, 1), merged.value.len);
+    try expectOfflineTileRegion(&merged.value[0], metadata[0..]);
 }
 
 test "offline geometry regions expose copied geometry values" {
@@ -1059,40 +918,40 @@ test "offline geometry regions expose copied geometry values" {
     defer testing.allocator.free(cache_path);
 
     const metadata = [_]u8{ 7, 8, 9 };
-    var region_id: maplibre.OfflineRegionId = 0;
+    var region_id: i64 = 0;
 
     {
-        var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-        defer runtime.close() catch @panic("runtime close failed");
+        var runtime = try support.createRuntime(.{ .cache_path = cache_path });
+        defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
-        var created = try createOfflineRegion(&runtime, testing.allocator, .{ .geometry = .{
+        var created = try createOfflineRegion(&runtime, testing.allocator, .{ .data = .{ .geometry = .{
             .style_url = offline_style_url,
             .geometry = "{\"type\":\"LineString\",\"coordinates\":[[2,1],[4,3]]}",
             .min_zoom = 5.0,
             .max_zoom = 6.0,
             .pixel_ratio = 2.0,
             .include_ideographs = true,
-        } }, metadata[0..]);
+        } } }, metadata[0..]);
         defer created.deinit();
-        region_id = created.id;
-        try expectOfflineGeometryRegion(&created, metadata[0..]);
+        region_id = created.value.id;
+        try expectOfflineGeometryRegion(&created.value, metadata[0..]);
 
-        var list = try listOfflineRegions(&runtime, testing.allocator);
+        var list = try listOfflineRegions(&runtime);
         defer list.deinit();
-        try testing.expectEqual(@as(usize, 1), list.items.len);
-        try expectOfflineGeometryRegion(&list.items[0], metadata[0..]);
+        try testing.expectEqual(@as(usize, 1), list.value.len);
+        try expectOfflineGeometryRegion(&list.value[0], metadata[0..]);
     }
 
     {
-        var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-        defer runtime.close() catch @panic("runtime close failed");
+        var runtime = try support.createRuntime(.{ .cache_path = cache_path });
+        defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
-        var reloaded = (try getOfflineRegion(&runtime, testing.allocator, region_id)) orelse return error.RegionReloadFailed;
+        var reloaded = (try getOfflineRegion(&runtime, region_id)) orelse return error.RegionReloadFailed;
         defer reloaded.deinit();
-        try expectOfflineGeometryRegion(&reloaded, metadata[0..]);
+        try expectOfflineGeometryRegion(&reloaded.value, metadata[0..]);
 
         try deleteOfflineRegion(&runtime, region_id);
-        const missing = try getOfflineRegion(&runtime, testing.allocator, region_id);
+        const missing = try getOfflineRegion(&runtime, region_id);
         try testing.expect(missing == null);
     }
 }
@@ -1154,26 +1013,25 @@ const AsyncProviderState = struct {
 fn delayedStyleProvider(
     context: ?*anyopaque,
     request: maplibre.ResourceRequest,
-    maybe_handle: ?maplibre.ResourceRequestHandle,
-) maplibre.ResourceProviderDecision {
-    if (!std.mem.startsWith(u8, request.requested_url, "custom://delayed-style")) return .pass_through;
-    const handle = maybe_handle orelse return .pass_through;
+    maybe_handle: maplibre.ResourceRequestHandle,
+) maplibre.Error!maplibre.ResourceProviderDecision {
+    if (!std.mem.startsWith(u8, (request.requested_url orelse ""), "custom://delayed-style")) return .pass_through;
+    const handle = maybe_handle;
     const state: *AsyncProviderState = @ptrCast(@alignCast(context.?));
     state.store(request, handle);
     return .handle;
 }
 
-fn waitForProviderHandle(runtime: *maplibre.RuntimeHandle, state: *AsyncProviderState) !maplibre.ResourceRequestHandle {
+fn waitForProviderHandle(state: *AsyncProviderState) !maplibre.ResourceRequestHandle {
     for (0..1000) |_| {
-        try runtime.pump(0, null);
         if (state.takeHandle()) |handle| return handle;
-        try sleepOneMillisecond();
+        try support.sleepOneMillisecond();
     }
     return error.ProviderNotCalled;
 }
 
 fn completeStyleOnThread(handle: maplibre.ResourceRequestHandle, out_error: *?anyerror) void {
-    handle.complete(.{ .bytes = support.style_json }) catch |err| {
+    maplibre.resourceRequestComplete(testing.allocator, support.handle(handle), .{ .bytes = support.style_json }) catch |err| {
         out_error.* = err;
         return;
     };
@@ -1189,8 +1047,10 @@ const CancellationProbeState = struct {
 
 fn probeCancellationUntilClosed(handle: maplibre.ResourceRequestHandle, state: *CancellationProbeState) void {
     while (!state.stop.load(.seq_cst)) {
-        _ = handle.cancelled() catch |err| {
-            if (err == error.ClosedHandle) {
+        _ = maplibre.resourceRequestCancelled(support.handle(handle)) catch |err| {
+            // A binding lease may precede close while its C call follows it.
+            // The binding rejects closed owners; C rejects retired handle IDs.
+            if (err == error.InvalidState or err == error.InvalidArgument) {
                 state.saw_closed.store(true, .seq_cst);
             } else {
                 state.saw_unexpected_error.store(true, .seq_cst);
@@ -1204,122 +1064,125 @@ fn probeCancellationUntilClosed(handle: maplibre.ResourceRequestHandle, state: *
 }
 
 test "resource provider can complete style request later" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = AsyncProviderState{};
-    try runtime.setResourceProvider(.{ .handler = delayedStyleProvider, .context = &state });
+    try support.expectCommitted(try maplibre.runtimeSetResourceProvider(testing.allocator, support.handle(runtime), .{ .callback = delayedStyleProvider, .context = &state }));
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setStyleUrl(testing.allocator, "custom://delayed-style.json");
-    const handle = try waitForProviderHandle(&runtime, &state);
-    defer handle.release();
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), "custom://delayed-style.json"));
+    const handle = try waitForProviderHandle(&state);
+    defer maplibre.resourceRequestRelease(support.handle(handle)) catch {};
 
     try state.expectObservedRequest();
-    try testing.expect(!try handle.cancelled());
+    try testing.expect(!try maplibre.resourceRequestCancelled(support.handle(handle)));
 
-    try testing.expectError(error.InvalidArgument, handle.complete(.{
-        .status = .@"error",
-        .error_reason = .{ .unknown = 999 },
-    }));
-    try handle.complete(.{ .bytes = support.style_json });
-    try testing.expectError(error.AlreadyCompleted, handle.complete(.{ .bytes = support.style_json }));
+    try testing.expectError(error.InvalidString, maplibre.resourceRequestComplete(testing.allocator, support.handle(handle), .{ .etag = "bad\x00tag" }));
+    try maplibre.resourceRequestComplete(testing.allocator, support.handle(handle), .{ .bytes = support.style_json });
+    try testing.expectError(error.AlreadyCompleted, maplibre.resourceRequestComplete(testing.allocator, support.handle(handle), .{ .bytes = support.style_json }));
     try waitForStyleLoaded(&runtime);
 }
 
 test "released resource request handle copies stay closed after later requests" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = AsyncProviderState{};
-    try runtime.setResourceProvider(.{ .handler = delayedStyleProvider, .context = &state });
+    try support.expectCommitted(try maplibre.runtimeSetResourceProvider(testing.allocator, support.handle(runtime), .{ .callback = delayedStyleProvider, .context = &state }));
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setStyleUrl(testing.allocator, "custom://delayed-style.json");
-    const stale_handle = try waitForProviderHandle(&runtime, &state);
-    stale_handle.release();
-    try testing.expectError(error.ClosedHandle, stale_handle.cancelled());
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), "custom://delayed-style.json"));
+    const stale_handle = try waitForProviderHandle(&state);
+    maplibre.resourceRequestRelease(support.handle(stale_handle)) catch {};
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestCancelled(support.handle(stale_handle)));
 
-    try map.setStyleUrl(testing.allocator, "custom://delayed-style.json");
-    const live_handle = try waitForProviderHandle(&runtime, &state);
-    defer live_handle.release();
-    try testing.expectError(error.ClosedHandle, stale_handle.complete(.{ .bytes = support.style_json }));
-    try testing.expect(!try live_handle.cancelled());
-    try live_handle.complete(.{ .bytes = support.style_json });
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), "custom://delayed-style.json"));
+    const live_handle = try waitForProviderHandle(&state);
+    defer maplibre.resourceRequestRelease(support.handle(live_handle)) catch {};
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestComplete(testing.allocator, support.handle(stale_handle), .{ .bytes = support.style_json }));
+    try testing.expect(!try maplibre.resourceRequestCancelled(support.handle(live_handle)));
+    try maplibre.resourceRequestComplete(testing.allocator, support.handle(live_handle), .{ .bytes = support.style_json });
     try waitForStyleLoaded(&runtime);
 }
 
-test "resource request release is synchronized with cancellation checks" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+test "resource request cancellation checks stay safe across concurrent release" {
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = AsyncProviderState{};
-    try runtime.setResourceProvider(.{ .handler = delayedStyleProvider, .context = &state });
+    try support.expectCommitted(try maplibre.runtimeSetResourceProvider(testing.allocator, support.handle(runtime), .{ .callback = delayedStyleProvider, .context = &state }));
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setStyleUrl(testing.allocator, "custom://delayed-style.json");
-    const handle = try waitForProviderHandle(&runtime, &state);
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), "custom://delayed-style.json"));
+    const handle = try waitForProviderHandle(&state);
+    defer maplibre.resourceRequestRelease(support.handle(handle)) catch {};
 
     var probe = CancellationProbeState{};
-    const thread = try std.Thread.spawn(.{}, probeCancellationUntilClosed, .{ handle, &probe });
-    while (probe.checks.load(.seq_cst) == 0) try sleepOneMillisecond();
+    {
+        const thread = try std.Thread.spawn(.{}, probeCancellationUntilClosed, .{ handle, &probe });
+        defer {
+            probe.stop.store(true, .seq_cst);
+            thread.join();
+        }
+        while (probe.checks.load(.seq_cst) == 0 and !probe.stop.load(.seq_cst)) try support.sleepOneMillisecond();
+        try testing.expect(probe.checks.load(.seq_cst) > 0);
 
-    handle.release();
-    for (0..1000) |_| {
-        if (probe.saw_closed.load(.seq_cst) or probe.saw_unexpected_error.load(.seq_cst)) break;
-        try sleepOneMillisecond();
+        try maplibre.resourceRequestRelease(support.handle(handle));
+        for (0..1000) |_| {
+            if (probe.saw_closed.load(.seq_cst) or probe.saw_unexpected_error.load(.seq_cst)) break;
+            try support.sleepOneMillisecond();
+        }
     }
-    probe.stop.store(true, .seq_cst);
-    thread.join();
 
     try testing.expect(!probe.saw_unexpected_error.load(.seq_cst));
     try testing.expect(probe.saw_closed.load(.seq_cst));
-    try testing.expectError(error.ClosedHandle, handle.cancelled());
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestCancelled(support.handle(handle)));
 }
 
 test "resource request handles stay usable across many handled requests" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = AsyncProviderState{};
-    try runtime.setResourceProvider(.{ .handler = delayedStyleProvider, .context = &state });
+    try support.expectCommitted(try maplibre.runtimeSetResourceProvider(testing.allocator, support.handle(runtime), .{ .callback = delayedStyleProvider, .context = &state }));
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
     for (0..16) |request_index| {
         const style_url = try std.fmt.allocPrint(testing.allocator, "custom://delayed-style-{d}.json", .{request_index});
         defer testing.allocator.free(style_url);
-        try map.setStyleUrl(testing.allocator, style_url);
+        try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), style_url));
 
-        const handle = try waitForProviderHandle(&runtime, &state);
+        const handle = try waitForProviderHandle(&state);
         try state.expectObservedRequest();
-        try testing.expect(!try handle.cancelled());
-        try handle.complete(.{ .bytes = support.style_json });
-        handle.release();
+        try testing.expect(!try maplibre.resourceRequestCancelled(support.handle(handle)));
+        try maplibre.resourceRequestComplete(testing.allocator, support.handle(handle), .{ .bytes = support.style_json });
+        maplibre.resourceRequestRelease(support.handle(handle)) catch {};
         try waitForStyleLoaded(&runtime);
     }
 }
 
 test "resource provider can complete request from another thread" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = AsyncProviderState{};
-    try runtime.setResourceProvider(.{ .handler = delayedStyleProvider, .context = &state });
+    try support.expectCommitted(try maplibre.runtimeSetResourceProvider(testing.allocator, support.handle(runtime), .{ .callback = delayedStyleProvider, .context = &state }));
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setStyleUrl(testing.allocator, "custom://delayed-style.json");
-    const handle = try waitForProviderHandle(&runtime, &state);
-    defer handle.release();
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), "custom://delayed-style.json"));
+    const handle = try waitForProviderHandle(&state);
+    defer maplibre.resourceRequestRelease(support.handle(handle)) catch {};
 
     var completion_error: ?anyerror = error.NativeError;
     const thread = try std.Thread.spawn(.{}, completeStyleOnThread, .{ handle, &completion_error });
@@ -1331,47 +1194,47 @@ test "resource provider can complete request from another thread" {
 fn errorStyleProvider(
     _: ?*anyopaque,
     request: maplibre.ResourceRequest,
-    maybe_handle: ?maplibre.ResourceRequestHandle,
-) maplibre.ResourceProviderDecision {
-    if (!std.mem.eql(u8, request.requested_url, "custom://error-style.json")) return .pass_through;
-    const handle = maybe_handle orelse return .pass_through;
-    handle.complete(.{
+    maybe_handle: maplibre.ResourceRequestHandle,
+) maplibre.Error!maplibre.ResourceProviderDecision {
+    if (!std.mem.eql(u8, (request.requested_url orelse ""), "custom://error-style.json")) return .pass_through;
+    const handle = maybe_handle;
+    maplibre.resourceRequestComplete(testing.allocator, support.handle(handle), .{
         .status = .@"error",
         .error_reason = .not_found,
         .error_message = "custom style failed",
     }) catch {
-        handle.release();
+        maplibre.resourceRequestRelease(support.handle(handle)) catch {};
         return .pass_through;
     };
-    handle.release();
+    maplibre.resourceRequestRelease(support.handle(handle)) catch {};
     return .handle;
 }
 
 test "resource provider error response fails style load" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
-    try runtime.setResourceProvider(.{ .handler = errorStyleProvider });
+    try support.expectCommitted(try maplibre.runtimeSetResourceProvider(testing.allocator, support.handle(runtime), .{ .callback = errorStyleProvider }));
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
+    var map = try support.createMap(&runtime, .{});
+    defer support.closeMap(&map) catch @panic("map close failed");
 
-    try map.setStyleUrl(testing.allocator, "custom://error-style.json");
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), "custom://error-style.json"));
     try testing.expect(try support.waitForEvent(&runtime, .map_loading_failed));
 }
 
 test "offline region download errors are runtime events" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
-    try runtime.setResourceProvider(.{ .handler = errorStyleProvider });
+    try support.expectCommitted(try maplibre.runtimeSetResourceProvider(testing.allocator, support.handle(runtime), .{ .callback = errorStyleProvider }));
 
     var definition = offlineTileDefinition();
-    definition.tile_pyramid.style_url = "custom://error-style.json";
+    definition.data.tile_pyramid.style_url = "custom://error-style.json";
     const metadata = [_]u8{8};
     var created = try createOfflineRegion(&runtime, testing.allocator, definition, metadata[0..]);
     defer created.deinit();
-    const region_id = created.id;
+    const region_id = created.value.id;
 
     try setOfflineRegionObserved(&runtime, region_id, true);
     defer setOfflineRegionObserved(&runtime, region_id, false) catch {};
@@ -1380,50 +1243,45 @@ test "offline region download errors are runtime events" {
 
     var event = try support.waitForOwnedEvent(&runtime, .offline_region_response_error);
     defer event.deinit();
-    try testing.expect(std.meta.eql(event.payload_type, maplibre.RuntimeEventPayloadType.offline_region_response_error));
-    const payload = switch (event.payload) {
+    const payload = switch (event.value.payload) {
         .offline_region_response_error => |payload| payload,
         else => return error.UnexpectedPayload,
     };
     try testing.expectEqual(region_id, payload.region_id);
     try testing.expect(std.meta.eql(payload.reason, maplibre.ResourceErrorReason.not_found));
-    try testing.expect(event.message.len > 0);
+    try testing.expect(event.value.message.len > 0);
 }
 
-fn waitForRequestCancellation(runtime: *maplibre.RuntimeHandle, handle: maplibre.ResourceRequestHandle) !void {
+fn waitForRequestCancellation(handle: maplibre.ResourceRequestHandle) !void {
     for (0..5000) |_| {
-        if (try handle.cancelled()) return;
-        try runtime.pump(0, null);
-        try sleepOneMillisecond();
+        if (try maplibre.resourceRequestCancelled(support.handle(handle))) return;
+        try support.sleepOneMillisecond();
     }
     return error.RequestNotCancelled;
 }
 
 test "resource provider observes cancellation before late completion" {
-    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
-    defer diagnostics.deinit();
-
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = AsyncProviderState{};
-    try runtime.setResourceProvider(.{ .handler = delayedStyleProvider, .context = &state });
+    try support.expectCommitted(try maplibre.runtimeSetResourceProvider(testing.allocator, support.handle(runtime), .{ .callback = delayedStyleProvider, .context = &state }));
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    try map.setStyleUrl(testing.allocator, "custom://delayed-style.json");
-    const handle = try waitForProviderHandle(&runtime, &state);
-    defer handle.release();
+    var map = try support.createMap(&runtime, .{});
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), "custom://delayed-style.json"));
+    const handle = try waitForProviderHandle(&state);
+    defer maplibre.resourceRequestRelease(support.handle(handle)) catch {};
 
-    try map.close();
-    try waitForRequestCancellation(&runtime, handle);
-    try testing.expectError(error.InvalidState, handle.complete(.{ .bytes = support.style_json }));
-    try testing.expectError(error.InvalidState, handle.complete(.{ .bytes = support.style_json }));
-    const diagnostic = diagnostics.get().?;
-    try testing.expectEqual(@as(?i32, -2), diagnostic.raw_status);
-    try testing.expect(diagnostic.message.len > 0);
+    try support.closeMap(&map);
+    try waitForRequestCancellation(handle);
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestComplete(testing.allocator, support.handle(handle), .{ .bytes = support.style_json }));
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestComplete(testing.allocator, support.handle(handle), .{ .bytes = support.style_json }));
+    var message = try maplibre.threadLastErrorMessage(testing.allocator);
+    defer message.deinit();
+    try testing.expect(message.value.len > 0);
 }
 
-// BND-198 covers the cancel callback a provider registers on a handled request.
+// Cancellation registrations remain rooted until the request retires.
 const CancelProbeState = struct {
     handle_lock: std.atomic.Mutex = .unlocked,
     handle: ?maplibre.ResourceRequestHandle = null,
@@ -1456,31 +1314,34 @@ const CancelProbeState = struct {
     }
 };
 
-fn recordCancel(context: ?*anyopaque) void {
+fn recordCancel(context: ?*anyopaque) maplibre.Error!void {
     const state: *CancelProbeState = @ptrCast(@alignCast(context.?));
+    // The release runs before the count, so a test that waits on the count
+    // observes a handle the callback has already retired.
+    if (state.release_inside_callback) {
+        if (state.readHandle()) |handle| maplibre.resourceRequestRelease(support.handle(handle)) catch {};
+    }
     _ = state.cancels.fetchAdd(1, .seq_cst);
-    if (!state.release_inside_callback) return;
-    if (state.readHandle()) |handle| handle.release();
 }
 
 fn cancelProbeProvider(
     context: ?*anyopaque,
     request: maplibre.ResourceRequest,
-    maybe_handle: ?maplibre.ResourceRequestHandle,
-) maplibre.ResourceProviderDecision {
-    if (!std.mem.eql(u8, request.requested_url, "custom://cancel-style.json")) return .pass_through;
-    const handle = maybe_handle orelse return .pass_through;
+    maybe_handle: maplibre.ResourceRequestHandle,
+) maplibre.Error!maplibre.ResourceProviderDecision {
+    if (!std.mem.eql(u8, (request.requested_url orelse ""), "custom://cancel-style.json")) return .pass_through;
+    const handle = maybe_handle;
     const state: *CancelProbeState = @ptrCast(@alignCast(context.?));
     state.storeHandle(handle);
     if (state.register_when_handled) {
-        handle.setCancelCallback(.{ .handler = recordCancel, .context = state }) catch {
-            handle.release();
+        _ = maplibre.resourceRequestSetCancelCallback(support.handle(handle), .{ .call = recordCancel, .context = state }) catch {
+            maplibre.resourceRequestRelease(support.handle(handle)) catch {};
             return .pass_through;
         };
     }
     if (state.complete_when_handled) {
-        handle.complete(.{ .bytes = support.style_json }) catch {
-            handle.release();
+        maplibre.resourceRequestComplete(testing.allocator, support.handle(handle), .{ .bytes = support.style_json }) catch {
+            maplibre.resourceRequestRelease(support.handle(handle)) catch {};
             return .pass_through;
         };
     }
@@ -1488,143 +1349,117 @@ fn cancelProbeProvider(
     return .handle;
 }
 
-fn waitForCancelProbeRequest(
-    runtime: *maplibre.RuntimeHandle,
+/// Reports whether the cancel callback ran at least `expected` times within
+/// `attempts` milliseconds.
+fn cancelCountReaches(
+    counter: *std.atomic.Value(usize),
+    expected: usize,
+    attempts: usize,
+) !bool {
+    for (0..attempts) |_| {
+        if (counter.load(.seq_cst) >= expected) return true;
+        try support.sleepOneMillisecond();
+    }
+    return false;
+}
+
+const CancelProbeRequest = struct {
+    map: maplibre.Map,
+    handle: maplibre.ResourceRequestHandle,
+};
+
+/// Installs `state` as the runtime's resource provider and drives a map style
+/// load through it, returning the map and the request the provider handled.
+fn startCancelProbeRequest(
+    runtime: *maplibre.Runtime,
     state: *CancelProbeState,
-) !maplibre.ResourceRequestHandle {
-    for (0..1000) |_| {
-        try runtime.pump(0, null);
-        if (state.registered.load(.seq_cst)) return state.readHandle().?;
-        try sleepOneMillisecond();
+) !CancelProbeRequest {
+    try support.expectCommitted(try maplibre.runtimeSetResourceProvider(testing.allocator, support.handle(runtime), .{ .callback = cancelProbeProvider, .context = state }));
+
+    var map = try support.createMap(runtime, .{});
+    errdefer support.closeMap(&map) catch {};
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), "custom://cancel-style.json"));
+
+    for (0..5000) |_| {
+        if (state.registered.load(.seq_cst)) {
+            return .{ .map = map, .handle = state.readHandle().? };
+        }
+        try support.sleepOneMillisecond();
     }
     return error.ProviderNotCalled;
 }
 
-fn waitForCancelCount(
-    runtime: *maplibre.RuntimeHandle,
-    counter: *std.atomic.Value(usize),
-    expected: usize,
-) !void {
-    for (0..1000) |_| {
-        if (counter.load(.seq_cst) >= expected) return;
-        try runtime.pump(0, null);
-        try sleepOneMillisecond();
-    }
-    return error.CancelCallbackNotInvoked;
-}
-
-test "cancel callback runs once when the map discards a handled request (BND-198)" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+test "cancel callback runs once when the map discards a handled request" {
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = CancelProbeState{ .register_when_handled = true };
-    try runtime.setResourceProvider(.{ .handler = cancelProbeProvider, .context = &state });
+    var probe = try startCancelProbeRequest(&runtime, &state);
+    defer maplibre.resourceRequestRelease(support.handle(probe.handle)) catch {};
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    try map.setStyleUrl(testing.allocator, "custom://cancel-style.json");
-    const handle = try waitForCancelProbeRequest(&runtime, &state);
-    defer handle.release();
-
-    try testing.expectError(error.InvalidState, handle.setCancelCallback(.{ .handler = recordCancel, .context = &state }));
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestSetCancelCallback(support.handle(probe.handle), .{ .call = recordCancel, .context = &state }));
     try testing.expectEqual(@as(usize, 0), state.cancels.load(.seq_cst));
 
-    try map.close();
-    try waitForCancelCount(&runtime, &state.cancels, 1);
-    try testing.expect(try handle.cancelled());
-    try testing.expectError(error.InvalidState, handle.complete(.{ .bytes = support.style_json }));
+    try support.closeMap(&probe.map);
+    try testing.expect(try cancelCountReaches(&state.cancels, 1, 5000));
+    try testing.expect(try maplibre.resourceRequestCancelled(support.handle(probe.handle)));
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestComplete(testing.allocator, support.handle(probe.handle), .{ .bytes = support.style_json }));
 
     // The registration stays in place after it ran, so the request still
     // rejects another one and nothing runs a second time.
-    try testing.expectError(error.InvalidState, handle.setCancelCallback(.{ .handler = recordCancel, .context = &state }));
-    for (0..50) |_| {
-        try runtime.pump(0, null);
-        try sleepOneMillisecond();
-    }
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestSetCancelCallback(support.handle(probe.handle), .{ .call = recordCancel, .context = &state }));
     try testing.expectEqual(@as(usize, 1), state.cancels.load(.seq_cst));
 
-    handle.release();
-    try testing.expectError(error.ClosedHandle, handle.setCancelCallback(.{ .handler = recordCancel, .context = &state }));
+    maplibre.resourceRequestRelease(support.handle(probe.handle)) catch {};
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestSetCancelCallback(support.handle(probe.handle), .{ .call = recordCancel, .context = &state }));
     try testing.expectEqual(@as(usize, 1), state.cancels.load(.seq_cst));
 }
 
-test "cancel callback can release its own resource request (BND-198)" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+test "cancel callback can release its own resource request" {
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = CancelProbeState{ .register_when_handled = true, .release_inside_callback = true };
-    try runtime.setResourceProvider(.{ .handler = cancelProbeProvider, .context = &state });
+    var probe = try startCancelProbeRequest(&runtime, &state);
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    try map.setStyleUrl(testing.allocator, "custom://cancel-style.json");
-    const handle = try waitForCancelProbeRequest(&runtime, &state);
-
-    try map.close();
-    try waitForCancelCount(&runtime, &state.cancels, 1);
+    try support.closeMap(&probe.map);
+    // The callback releases before it counts, so the count proves the handle
+    // is already retired.
+    try testing.expect(try cancelCountReaches(&state.cancels, 1, 5000));
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestCancelled(support.handle(probe.handle)));
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestSetCancelCallback(support.handle(probe.handle), .{ .call = recordCancel, .context = &state }));
     try testing.expectEqual(@as(usize, 1), state.cancels.load(.seq_cst));
-    try testing.expectError(error.ClosedHandle, handle.cancelled());
-    try testing.expectError(error.ClosedHandle, handle.setCancelCallback(.{ .handler = recordCancel, .context = &state }));
     // A second release of the handle the callback already released is a no-op.
-    handle.release();
+    maplibre.resourceRequestRelease(support.handle(probe.handle)) catch {};
 }
 
-test "cancel callback registered after cancellation runs before registration returns (BND-198)" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
+test "late cancel registration reports cancellation without retaining a callback" {
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var state = CancelProbeState{};
-    try runtime.setResourceProvider(.{ .handler = cancelProbeProvider, .context = &state });
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    try map.setStyleUrl(testing.allocator, "custom://cancel-style.json");
-    const handle = try waitForCancelProbeRequest(&runtime, &state);
-    defer handle.release();
-
-    try map.close();
-    try waitForRequestCancellation(&runtime, handle);
+    var probe = try startCancelProbeRequest(&runtime, &state);
+    defer maplibre.resourceRequestRelease(probe.handle) catch {};
+    try support.closeMap(&probe.map);
+    try waitForRequestCancellation(probe.handle);
+    try testing.expect(try maplibre.resourceRequestSetCancelCallback(probe.handle, .{ .call = recordCancel, .context = &state }));
     try testing.expectEqual(@as(usize, 0), state.cancels.load(.seq_cst));
-
-    try handle.setCancelCallback(.{ .handler = recordCancel, .context = &state });
-    try testing.expectEqual(@as(usize, 1), state.cancels.load(.seq_cst));
-    try testing.expectError(error.InvalidState, handle.setCancelCallback(.{ .handler = recordCancel, .context = &state }));
-    try testing.expectEqual(@as(usize, 1), state.cancels.load(.seq_cst));
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestSetCancelCallback(probe.handle, .{ .call = recordCancel, .context = &state }));
+    try testing.expectEqual(@as(usize, 0), state.cancels.load(.seq_cst));
 }
 
-test "cancel callback registered after cancellation can release its own request (BND-198)" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var state = CancelProbeState{ .release_inside_callback = true };
-    try runtime.setResourceProvider(.{ .handler = cancelProbeProvider, .context = &state });
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    try map.setStyleUrl(testing.allocator, "custom://cancel-style.json");
-    const handle = try waitForCancelProbeRequest(&runtime, &state);
-
-    try map.close();
-    try waitForRequestCancellation(&runtime, handle);
-    try handle.setCancelCallback(.{ .handler = recordCancel, .context = &state });
-    try testing.expectEqual(@as(usize, 1), state.cancels.load(.seq_cst));
-    try testing.expectError(error.ClosedHandle, handle.cancelled());
-}
-
-test "cancel callback stays silent for a completed resource request (BND-198)" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+test "cancel callback stays silent for a completed resource request" {
+    var runtime = try support.createRuntime(.{});
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = CancelProbeState{ .register_when_handled = true, .complete_when_handled = true };
-    try runtime.setResourceProvider(.{ .handler = cancelProbeProvider, .context = &state });
+    var probe = try startCancelProbeRequest(&runtime, &state);
+    defer maplibre.resourceRequestRelease(support.handle(probe.handle)) catch {};
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    try map.setStyleUrl(testing.allocator, "custom://cancel-style.json");
-    const handle = try waitForCancelProbeRequest(&runtime, &state);
-    defer handle.release();
-
+    // Let the response reach the style before the map goes away.
     try waitForStyleLoaded(&runtime);
-    try map.close();
-    for (0..200) |_| {
-        try runtime.pump(0, null);
-        try sleepOneMillisecond();
-    }
+    try support.closeMap(&probe.map);
+    try support.waitForBarrier(&runtime);
+    try testing.expect(!(try cancelCountReaches(&state.cancels, 1, 200)));
     try testing.expectEqual(@as(usize, 0), state.cancels.load(.seq_cst));
 }
 
@@ -1634,16 +1469,17 @@ test "offline region download control emits copied status events" {
     const cache_path = try tempPath(testing.allocator, tmp.sub_path[0..], "events-cache.db");
     defer testing.allocator.free(cache_path);
 
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try support.createRuntime(.{ .cache_path = cache_path });
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     const metadata = [_]u8{9};
     var created = try createOfflineRegion(&runtime, testing.allocator, offlineTileDefinition(), metadata[0..]);
     defer created.deinit();
-    const region_id = created.id;
+    const region_id = created.value.id;
 
-    try testing.expectError(error.InvalidArgument, setOfflineRegionObserved(&runtime, region_id + 1000, true));
-    try testing.expectError(error.InvalidArgument, setOfflineRegionDownloadState(&runtime, region_id, .{ .unknown = 999 }));
+    // A region ID that names nothing reports not-found through the completion.
+    try testing.expectError(error.NotFound, setOfflineRegionObserved(&runtime, region_id + 1000, true));
+    try testing.expectError(error.InvalidArgument, setOfflineRegionDownloadState(&runtime, region_id, @enumFromInt(999)));
 
     try setOfflineRegionObserved(&runtime, region_id, true);
     defer setOfflineRegionObserved(&runtime, region_id, false) catch {};
@@ -1652,12 +1488,11 @@ test "offline region download control emits copied status events" {
 
     var observed = false;
     for (0..5000) |_| {
-        try runtime.pump(0, null);
-        var batch = try runtime.drainEvents(testing.allocator, 0);
+        var batch = try support.drainEventSnapshot(runtime);
         defer batch.deinit();
-        for (0..batch.len()) |index| {
-            const event = try batch.at(index);
-            if (!std.meta.eql(event.event_type, maplibre.RuntimeEventType.offline_region_status_changed)) continue;
+        for (0..batch.value.events.len) |index| {
+            const event = batch.value.events[index];
+            if (!std.meta.eql(event.type, maplibre.RuntimeEventType.offline_region_status_changed)) continue;
             const payload = event.payload.offline_region_status;
             try testing.expectEqual(region_id, payload.region_id);
             try testing.expect(
@@ -1668,7 +1503,7 @@ test "offline region download control emits copied status events" {
             break;
         }
         if (observed) break;
-        try sleepOneMillisecond();
+        try support.sleepOneMillisecond();
     }
     try testing.expect(observed);
 }

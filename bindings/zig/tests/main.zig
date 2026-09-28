@@ -3,6 +3,12 @@ const testing = @import("std").testing;
 const maplibre = @import("maplibre_native_ffi");
 
 comptime {
+    @setEvalBranchQuota(100000);
+    for (@typeInfo(maplibre.generated).@"struct".decls) |decl| {
+        const value = @field(maplibre.generated, decl.name);
+        if (@typeInfo(@TypeOf(value)) == .@"fn" and !@typeInfo(@TypeOf(value)).@"fn".is_generic) _ = &value;
+    }
+    _ = @import("generated_workflows.zig");
     _ = @import("diagnostics.zig");
     _ = @import("runtime.zig");
     _ = @import("map_lifecycle.zig");
@@ -16,16 +22,6 @@ comptime {
     _ = @import("logging.zig");
     _ = @import("render.zig");
     _ = @import("surface.zig");
-}
-
-test "native pointer uses explicit borrowed constructor" {
-    const ptr: *anyopaque = @ptrFromInt(1);
-    const native = maplibre.NativePointer.fromPtr(ptr);
-    try testing.expectEqual(ptr, native.toPtr());
-}
-
-test "package links the native C library" {
-    try testing.expectEqual(@as(u32, 0), maplibre.cAbiVersion());
 }
 
 test "package validates the supported C ABI version" {
