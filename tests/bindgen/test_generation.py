@@ -95,6 +95,20 @@ mln_status mln_map_new_command(mln_map map, bool enabled, const mln_completion *
                     {"mln_map_new_scale", "mln_map_new_command"},
                 )
 
+    def test_a_new_handle_generates_without_emitter_tables(self):
+        api = self.parse("""
+typedef unsigned long long mln_widget BIND("kind=handle;release=mln_widget_close;dispose=mln_widget_close;parent=none");
+BIND("execution=immediate") void mln_widget_close(mln_widget widget);
+BIND("execution=query;result=double;shape=value;ownership=borrowed")
+mln_status mln_widget_scale(mln_widget widget, const mln_completion *completion);
+""")
+        # Dart owners are still hand-written per handle type.
+        for emitter in (e for e in EMITTERS if e is not dart):
+            with self.subTest(emitter=emitter.__name__):
+                coverage = emitter.coverage(api)
+                self.assertIn("mln_widget_scale", coverage["generated"])
+                self.assertNotIn("mln_widget_scale", coverage["unsupported"])
+
     def test_partial_field_metadata_rejects_whole_record_and_operation(self):
         api = self.parse("""
 typedef struct mln_new_entry {

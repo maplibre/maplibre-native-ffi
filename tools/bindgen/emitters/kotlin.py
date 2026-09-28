@@ -6,7 +6,7 @@ from tools.bindgen.model import Api
 from tools.bindgen.semantic import BoundApi
 
 from . import kotlin_callbacks, kotlin_ir
-from .kotlin_values import Unsupported, Values
+from .kotlin_values import Unsupported, Values, generated_owners
 from .kotlin_values import name as value_name
 
 
@@ -147,12 +147,9 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
             plan = bound.operations_by_name[function.name]
             receiver = kotlin_ir.receiver_value(plan).native if plan.receiver else None
             groups.setdefault(receiver, []).append(function)
-        for owner in (
-            "mln_map",
-            "mln_event_batch",
-            "mln_render_frame_batch",
-            "mln_buffer",
-        ):
+        # Every generated owner extends its operations class, even when no
+        # operation names it as a receiver.
+        for owner in ("mln_map", *generated_owners(bound)):
             if owner in bound.handles:
                 groups.setdefault(owner, [])
         for receiver, members in groups.items():

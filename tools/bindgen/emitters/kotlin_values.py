@@ -75,18 +75,23 @@ def native_identifier(native):
 
 from . import kotlin_callbacks
 
-OWNERS = {
-    "mln_event_batch": "org.maplibre.nativeffi.generated.EventBatchHandle",
-    "mln_render_frame_batch": "org.maplibre.nativeffi.generated.RenderFrameBatchHandle",
-    "mln_buffer": "org.maplibre.nativeffi.generated.BufferHandle",
+# Handles whose Kotlin owners are hand-written because they carry runtime
+# behavior beyond close-once. Every other public handle gets a generated owner.
+HANDWRITTEN_OWNERS = {
+    "mln_acquired_frame": "org.maplibre.nativeffi.render.AcquiredFrameHandle",
+    "mln_geojson_source_data": "org.maplibre.nativeffi.style.GeoJsonSourceDataHandle",
+    "mln_map": "org.maplibre.nativeffi.map.MapHandle",
+    "mln_map_projection": "org.maplibre.nativeffi.map.MapProjectionHandle",
     "mln_render_session": "org.maplibre.nativeffi.render.RenderSessionHandle",
     "mln_resource_request_handle": "org.maplibre.nativeffi.resource.ResourceRequestHandle",
-    "mln_acquired_frame": "org.maplibre.nativeffi.render.AcquiredFrameHandle",
-    "mln_map": "org.maplibre.nativeffi.map.MapHandle",
     "mln_runtime": "org.maplibre.nativeffi.runtime.RuntimeHandle",
-    "mln_map_projection": "org.maplibre.nativeffi.map.MapProjectionHandle",
-    "mln_geojson_source_data": "org.maplibre.nativeffi.style.GeoJsonSourceDataHandle",
 }
+
+
+def owner_class(native):
+    return HANDWRITTEN_OWNERS.get(
+        native, f"org.maplibre.nativeffi.generated.{name(native)}Handle"
+    )
 
 
 class Values:
@@ -148,7 +153,7 @@ class Values:
             return
         if value.kind == "native_pointer":
             return
-        if value.kind == "handle" and value.native in OWNERS:
+        if value.kind == "handle" and value.native in public_handles(self.bound):
             return
         if value.ownership == "owned" or value.registration or value.response:
             raise Unsupported("value needs an ownership or callback protocol")
@@ -199,7 +204,7 @@ class Values:
         if value.kind == "native_pointer":
             result = "org.maplibre.nativeffi.render.NativePointer"
         elif value.kind == "handle":
-            result = OWNERS[value.native]
+            result = owner_class(value.native)
         elif value.kind in {"record", "enum"}:
             result = name(value.native)
         elif value.kind == "array":
@@ -1169,3 +1174,23 @@ class Values:
         return "\n".join(result + ["}", ""]) + kotlin_callbacks.conversions(
             self, platform
         )
+
+
+def public_handles(bound) -> set[str]:
+    """Handles a host can own; runtime-adapter handles stay internal."""
+    runtime = {plan.name for plan in bound.runtime_operations}
+    return {
+        native
+        for native, handle in bound.handles.items()
+        if handle.release not in runtime
+    }
+
+
+def generated_owners(bound) -> list[str]:
+    return sorted(public_handles(bound) - HANDWRITTEN_OWNERS.keys())
+
+
+def release_is_asynchronous(bound, handle) -> bool:
+    return any(
+        plan.name == handle.release and plan.completion for plan in bound.operations
+    )

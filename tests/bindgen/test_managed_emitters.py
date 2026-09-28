@@ -18,9 +18,20 @@ typedef int mln_status;
 typedef struct mln_completion { void *state; } mln_completion;
 typedef struct mln_buffer_view { const void *data; unsigned long size; } mln_buffer_view;
 """
+# Kotlin generates operations only for receivers that are handles.
+MAP_HANDLE = (
+    'typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_close;'
+    'dispose=mln_map_close;parent=none");'
+)
 
 
 class ManagedEmitterTests(unittest.TestCase):
+    def kotlin_map(self, source, platform="jvmMain"):
+        api = self.parse(source, map_handle=True)
+        return kotlin.generate(api)[
+            f"src/{platform}/kotlin/org/maplibre/nativeffi/map/GeneratedMapOperations.kt"
+        ]
+
     def test_dotnet_new_owner_uses_shared_release_and_copy_reservation(self):
         api = self.parse("""
 typedef unsigned long long mln_measurement BIND("kind=handle;release=mln_measurement_close;dispose=mln_measurement_close;parent=none");
@@ -42,7 +53,11 @@ mln_status mln_measurement_read(mln_measurement owner, double *out_value BIND("d
         )
         self.assertIn("MlnMeasurement", emitted.files["Internal/C/Handles.g.cs"])
 
-    def parse(self, source, header="metrics.h"):
+    def parse(self, source, header="metrics.h", map_handle=False):
+        prelude = PRELUDE
+        if map_handle:
+            prelude = prelude.replace("typedef unsigned long long mln_map;", MAP_HANDLE)
+            prelude += 'BIND("execution=immediate") void mln_map_close(mln_map map);\n'
         source = re.sub(
             r'BIND\("([^"\n]*)"\)(\s+mln_status mln_map_\w+\(mln_map map)',
             r'BIND("receiver=map;\1")\2',
@@ -50,7 +65,7 @@ mln_status mln_measurement_read(mln_measurement owner, double *out_value BIND("d
         )
         with TemporaryDirectory() as directory:
             path = Path(directory)
-            (path / header).write_text(PRELUDE + source)
+            (path / header).write_text(prelude + source)
             api = parse_headers(path)
         validate(api)
         return api
@@ -58,10 +73,11 @@ mln_status mln_measurement_read(mln_measurement owner, double *out_value BIND("d
     def test_reserved_parameter_and_generated_local_names_are_rejected(self):
         for name in ("class", "completion_value", "arena"):
             parameter = "completion" if name == "completion_value" else name
-            api = self.parse(f"""
+            source = f"""
 BIND("execution=command;result=void;shape=none;ownership=value")
 mln_status mln_map_run(mln_map map, double {parameter}, const mln_completion *done);
-""")
+"""
+            api = self.parse(source)
             for emitter in (dotnet,):
                 with self.subTest(name=name, emitter=emitter.__name__):
                     self.assertEqual(emitter.coverage(api)["generated"], [])
@@ -70,9 +86,7 @@ mln_status mln_map_run(mln_map map, double {parameter}, const mln_completion *do
                         emitter.coverage(api)["unsupported"]["mln_map_run"],
                     )
 
-            kotlin_source = kotlin.generate(api)[
-                "src/jvmMain/kotlin/org/maplibre/nativeffi/map/GeneratedMapOperations.kt"
-            ]
+            kotlin_source = self.kotlin_map(source)
             local = "`class`" if parameter == "class" else parameter + "Value"
             self.assertIn(f"{local}: Double", kotlin_source)
             self.assertIn(f"bindingMapHandle(), {local}, completion", kotlin_source)
@@ -84,14 +98,19 @@ mln_status mln_map_run(mln_map map, double {parameter}, const mln_completion *do
             )
 
     def test_public_method_name_collisions_are_rejected(self):
-        api = self.parse("""
+        header = """
 BIND("execution=query;result=double;shape=value;ownership=borrowed")
 mln_status mln_map_read_scale(mln_map map, const mln_completion *completion);
 BIND("execution=query;result=double;shape=value;ownership=borrowed")
 mln_status mln_map_readScale(mln_map map, const mln_completion *completion);
-""")
-        for emitter in (dotnet, dart, kotlin):
+"""
+        api = self.parse(header)
+        for emitter in (dotnet, dart):
             self.assertEqual(emitter.coverage(api)["generated"], [])
+        owned = self.parse(header, map_handle=True)
+        self.assertEqual(
+            set(kotlin.coverage(owned)["generated"]) - {"mln_map_close"}, set()
+        )
 
     def test_dart_command_requires_owner_receipt_runtime(self):
         api = self.parse("""
@@ -102,31 +121,26 @@ mln_status mln_map_projection_change(mln_map_projection projection, const mln_co
         self.assertEqual(dart.coverage(api)["generated"], [])
 
     def test_reserved_method_identifiers_are_rejected(self):
-        api = self.parse("""
+        source = """
 BIND("execution=query;result=double;shape=value;ownership=borrowed")
 mln_status mln_map_class(mln_map map, const mln_completion *completion);
-""")
-        self.assertIn(
-            "fun `class`()",
-            kotlin.generate(api)[
-                "src/commonMain/kotlin/org/maplibre/nativeffi/map/GeneratedMapOperations.kt"
-            ],
-        )
+"""
+        api = self.parse(source)
+        self.assertIn("fun `class`()", self.kotlin_map(source, "commonMain"))
         self.assertIn("classValue()", dart.generate(api))
 
     def test_nullable_input_cannot_be_silently_required(self):
-        api = self.parse("""
+        header = """
 BIND("execution=command;result=void;shape=none;ownership=value")
 mln_status mln_map_set_label(mln_map map,
   mln_buffer_view text BIND("encoding=utf8;lifetime=call;nullable=true"),
   const mln_completion *completion);
-""")
+"""
+        api = self.parse(header)
         for emitter in (dotnet,):
             self.assertEqual(emitter.coverage(api)["generated"], [])
 
-        source = kotlin.generate(api)[
-            "src/jvmMain/kotlin/org/maplibre/nativeffi/map/GeneratedMapOperations.kt"
-        ]
+        source = self.kotlin_map(header)
         self.assertIn("text: String?", source)
         self.assertIn("GeneratedValues.optionalStringView(arena, text)", source)
         source = dart.generate(api)
@@ -143,13 +157,12 @@ mln_status mln_map_labels(mln_map map, const mln_completion *completion);
                 with self.subTest(absence=absence, emitter=emitter.__name__):
                     self.assertEqual(emitter.coverage(api)["generated"], [])
 
-        nullable = self.parse("""
+        header = """
 BIND("execution=query;result=mln_buffer_view;shape=array;ownership=borrowed;encoding=utf8;nullable=true")
 mln_status mln_map_labels(mln_map map, const mln_completion *completion);
-""")
-        kotlin_source = kotlin.generate(nullable)[
-            "src/jvmMain/kotlin/org/maplibre/nativeffi/map/GeneratedMapOperations.kt"
-        ]
+"""
+        nullable = self.parse(header)
+        kotlin_source = self.kotlin_map(header)
         self.assertIn("Deferred<List<String>?>", kotlin_source)
         self.assertIn(
             "mln_completion_result.value(result).address() == 0L", kotlin_source
@@ -158,19 +171,15 @@ mln_status mln_map_labels(mln_map map, const mln_completion *completion);
         self.assertIn("result.value == nullptr ? null", dart.generate(nullable))
 
     def test_binary_optional_result_requires_empty_conversion(self):
-        api = self.parse("""
+        header = """
 BIND("execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;encoding=bytes;optional=empty")
 mln_status mln_map_bytes(mln_map map, const mln_completion *completion);
-""")
+"""
+        api = self.parse(header)
         for emitter in (dotnet,):
             self.assertEqual(emitter.coverage(api)["generated"], [])
         self.assertIn(".size == 0", dart.generate(api))
-        self.assertIn(
-            ".takeIf { it.isNotEmpty() }",
-            kotlin.generate(api)[
-                "src/jvmMain/kotlin/org/maplibre/nativeffi/map/GeneratedMapOperations.kt"
-            ],
-        )
+        self.assertIn(".takeIf { it.isNotEmpty() }", self.kotlin_map(header))
 
     def test_dotnet_new_record_namespace_and_keyword_fields_are_generated(self):
         api = self.parse("""

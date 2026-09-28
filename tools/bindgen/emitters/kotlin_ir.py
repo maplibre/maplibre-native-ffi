@@ -6,7 +6,14 @@ from dataclasses import replace
 
 from ..managed_contracts import LOCALS
 from . import kotlin_callbacks
-from .kotlin_values import Unsupported, identifier, name
+from .kotlin_values import (
+    Unsupported,
+    generated_owners,
+    identifier,
+    name,
+    public_handles,
+    release_is_asynchronous,
+)
 
 
 def parameter_name(native):
@@ -28,18 +35,7 @@ def signature(plan, values):
         values.views.add(plan.outputs[0].value.element.native)
     receiver = next((p for p in plan.inputs if p.name == plan.receiver), None)
     receiver_type = receiver_value(plan) if receiver else None
-    if receiver and receiver_type.native not in {
-        "mln_map",
-        "mln_runtime",
-        "mln_map_projection",
-        "mln_render_session",
-        "mln_acquired_frame",
-        "mln_buffer",
-        "mln_event_batch",
-        "mln_render_frame_batch",
-        "mln_geojson_source_data",
-        "mln_resource_request_handle",
-    }:
+    if receiver and receiver_type.native not in public_handles(values.bound):
         raise Unsupported("operation requires its generated owner")
     if plan.execution not in {
         "command",
@@ -551,17 +547,7 @@ def owned_operation(plan, values, platform):
     method, parameters, inputs, result, result_type = signature(plan, values)
     immediate_owner = bool(plan.owned_outputs)
     handle = plan.owned_outputs[0].handle if immediate_owner else result.handle
-    if handle.native not in {
-        "mln_map",
-        "mln_map_projection",
-        "mln_geojson_source_data",
-        "mln_acquired_frame",
-        "mln_event_batch",
-        "mln_render_frame_batch",
-        "mln_buffer",
-        "mln_runtime",
-        "mln_render_session",
-    }:
+    if handle.native not in public_handles(values.bound):
         raise Unsupported("owned result needs an adoption boundary")
     family = name(handle.native)
     factory = family[0].lower() + family[1:]
@@ -610,7 +596,7 @@ def owned_operation(plan, values, platform):
     )
 
     def adopt(raw):
-        if handle.native in {"mln_event_batch", "mln_render_frame_batch", "mln_buffer"}:
+        if handle.native in generated_owners(values.bound):
             return family + "Handle(" + raw + ")"
         return (
             "OwnerAdoption."
@@ -643,7 +629,12 @@ def owned_operation(plan, values, platform):
     if plan.completion and not immediate_owner:
         args.append("completion")
         raw = owned_raw(platform)
-        drop = "it.disposeAbandoned()" if handle.native == "mln_map" else "it.close()"
+        # A late owner whose release is asynchronous must not block on it.
+        drop = (
+            "it.disposeAbandoned()"
+            if release_is_asynchronous(values.bound, handle)
+            else "it.close()"
+        )
         expression = (
             "CompletionBridge.submitOwned({ result -> "
             + adopt(raw)

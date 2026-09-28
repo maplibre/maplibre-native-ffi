@@ -1,15 +1,12 @@
 """Owned batch wrappers use the same resolved disposal path on every Kotlin target."""
 
 from .kotlin_ir import needs_read, receiver_value
-from .kotlin_values import name
+from .kotlin_values import generated_owners, name
 
 
 def generate_owners(bound):
     outputs = {}
-    for native in ("mln_event_batch", "mln_render_frame_batch", "mln_buffer"):
-        handle = bound.handles.get(native)
-        if not handle:
-            continue
+    for native in generated_owners(bound):
         family = name(native)
         dispose = family[0].lower() + family[1:]
         for platform in ("commonMain", "jvmMain", "androidMain", "nativeMain"):
