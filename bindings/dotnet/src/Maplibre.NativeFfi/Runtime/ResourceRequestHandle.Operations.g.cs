@@ -124,24 +124,29 @@ public sealed unsafe partial class ResourceRequestHandle : IDisposable
     public bool SetCancelCallback(Action? callback)
     {
         using var read = state.Borrow();
+        using var scope = new NativeCallScope();
         using var retained = this.state.Retain();
         global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
             this,
             "mln_resource_request_set_cancel_callback"
         );
-        using var rootCallback = callback is null ? null : state.PrepareCallback(callback, this);
+        var rootCallback = callback is null
+            ? null
+            : scope.Register(
+                new global::Maplibre.NativeFfi.Internal.Callback.NativeOwnedCallback(callback, this)
+            );
         bool outCancelled = default;
         NativeStatus.Check(
             NativeMethods.mln_resource_request_set_cancel_callback(
                 read.Handle,
                 callback is null ? null : &InvokeResourceRequestCancelCallback,
-                rootCallback is null ? null : rootCallback.Pointer,
-                null,
+                rootCallback,
+                &global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackRoot.Release,
                 &outCancelled
             )
         );
         if (!outCancelled)
-            rootCallback?.Accept();
+            scope.Accept(this.CallbackOwner);
         return outCancelled;
     }
 

@@ -878,7 +878,15 @@ class Values:
             )
         return "\n".join(methods)
 
-    def direct_callback_method(self, plan: ValuePlan, owner: bool = False) -> str:
+    def owned_direct_callback(self, plan: ValuePlan) -> bool:
+        policy = self.bound.callbacks[plan.native].reentry_policy
+        if policy and not policy.registration_owner:
+            raise Unsupported(
+                f"{plan.native}: direct callback requires a registration owner"
+            )
+        return policy is not None
+
+    def direct_callback_method(self, plan: ValuePlan) -> str:
         callback = self.bound.callbacks[plan.native]
         self.supported(plan)
         parameters = ", ".join(
@@ -898,10 +906,7 @@ class Values:
         delegate = self.public_type(plan).removesuffix("?")
         call = (
             f"(({delegate})NativeCallbackRoot.Value(@{callback.context}))({arguments})"
-            if not owner
-            else f"(NativeOwnerCallbackRoot.Value(@{callback.context}) as {delegate})?.Invoke({arguments})"
         )
-        statement = call + ";" if result == "void" else f"return {call};"
         failure = (
             ""
             if result == "void"
@@ -913,24 +918,19 @@ class Values:
             else ""
         )
         table_declaration = ""
-        if callback.reentry_policy:
+        if self.owned_direct_callback(plan):
             policy = callback.reentry_policy
-            if not owner or not policy.registration_owner:
-                raise Unsupported(
-                    f"{plan.native}: direct callback requires a registration owner"
-                )
             table = "Allowed" + public_name(plan.native)
             operations = ", ".join(f'"{item}"' for item in policy.operations)
             table_declaration = (
                 f"    private static readonly string[] {table} = [{operations}];\n"
             )
             guard = (
-                f"var root = NativeOwnerCallbackRoot.Root(@{callback.context}); "
-                f"if (root is null) {{ {failure or 'return;'} }} "
-                f"using var restriction = NativeCallbackGuard.Restrict(root.Owner!, {table}); "
+                f"var owned = (NativeOwnedCallback)NativeCallbackRoot.Value(@{callback.context}); "
+                f"using var restriction = NativeCallbackGuard.Restrict(owned.Owner, {table}); "
             )
-            call = f"(root.Callback as {delegate})?.Invoke({arguments})"
-            statement = call + ";" if result == "void" else f"return {call};"
+            call = f"(({delegate})owned.Callback)({arguments})"
+        statement = call + ";" if result == "void" else f"return {call};"
         return (
             table_declaration
             + "    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]\n"

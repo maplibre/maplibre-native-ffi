@@ -3874,16 +3874,12 @@ internal static unsafe class GeneratedValues
     {
         try
         {
-            var root = NativeOwnerCallbackRoot.Root(@user_data);
-            if (root is null)
-            {
-                return;
-            }
+            var owned = (NativeOwnedCallback)NativeCallbackRoot.Value(@user_data);
             using var restriction = NativeCallbackGuard.Restrict(
-                root.Owner!,
+                owned.Owner,
                 AllowedResourceRequestCancelCallback
             );
-            (root.Callback as Action)?.Invoke();
+            ((Action)owned.Callback)();
         }
         catch { }
     }

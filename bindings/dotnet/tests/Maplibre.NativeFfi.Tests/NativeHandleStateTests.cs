@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Internal.Callback;
 using Maplibre.NativeFfi.Internal.Pointer;
 using Xunit;
 
@@ -49,39 +48,6 @@ public sealed unsafe class NativeHandleStateTests
         {
             using var read = state.Borrow();
         });
-    }
-
-    [BindingSpecTest("", "")]
-    [Fact]
-    public void OwnerCallbackCapturesDoNotRootAbandonedOwnersAndStaleTokensDoNotDispatch()
-    {
-        var released = 0;
-        var abandoned = AbandonRegisteredOwner(() => Interlocked.Increment(ref released));
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-        Assert.False(abandoned.Owner.IsAlive);
-        Assert.Equal(1, released);
-        Assert.Null(NativeOwnerCallbackRoot.Value((void*)abandoned.Token));
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (WeakReference Owner, nint Token) AbandonRegisteredOwner(Action released)
-    {
-        mln_status Release(MlnResourceRequest _)
-        {
-            released();
-            return mln_status.MLN_STATUS_OK;
-        }
-        var state = new NativeHandleState<MlnResourceRequest>(
-            SyntheticHandles.ResourceRequest(1),
-            Release,
-            "Request",
-            Release
-        );
-        using var registration = state.PrepareCallback((Action)(() => GC.KeepAlive(state)));
-        registration.Accept();
-        return (new WeakReference(state), (nint)registration.Pointer);
     }
 
     [BindingSpecTest("")]

@@ -100,12 +100,6 @@ def operation_contract(plan: OperationPlan) -> str | None:
     return None
 
 
-def native_release(registration) -> bool:
-    # TEMPORARY: owner_release still selects the owner-rooted path while the
-    # bindings move to native release.
-    return bool(registration.release_callback) and not registration.owner_release
-
-
 @dataclass(frozen=True)
 class Emission:
     files: dict[str, str]
@@ -316,28 +310,22 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         registration.user_data: registration
         for registration in plan.direct_registrations
     }
+    for registration in plan.direct_registrations:
+        if not registration.release_callback:
+            raise Unsupported("direct callback requires a native release")
     direct_releases = {
-        registration.release_callback: registration
-        for registration in plan.direct_registrations
-        if registration.release_callback
+        registration.release_callback for registration in plan.direct_registrations
     }
     for parameter in function.parameters:
         if parameter.name == (plan.receiver or plan.scoped_receiver):
             continue
         if parameter.name in direct_contexts:
             registration = direct_contexts[parameter.name]
-            root = "root" + pascal(registration.callback)
-            args.append(
-                root
-                if native_release(registration)
-                else f"{root} is null ? null : {root}.Pointer"
-            )
+            args.append("root" + pascal(registration.callback))
             continue
         if parameter.name in direct_releases:
             args.append(
                 "&global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackRoot.Release"
-                if native_release(direct_releases[parameter.name])
-                else "null"
             )
             continue
         if parameter.name in direct:
@@ -346,15 +334,16 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             values.supported(callback_value)
             name = camel(parameter.name)
             parameters.append(f"{values.public_type(callback_value)} {name}")
-            if native_release(registration):
-                scoped = True
-                prologue.append(
-                    f"        var root{pascal(parameter.name)} = {name} is null ? null : scope.Register({name});"
-                )
-            else:
-                prologue.append(
-                    f"        using var root{pascal(parameter.name)} = {name} is null ? null : state.PrepareCallback({name}, this);"
-                )
+            scoped = True
+            # A callback restricted to its registration owner carries that owner.
+            descriptor = (
+                f"new global::Maplibre.NativeFfi.Internal.Callback.NativeOwnedCallback({name}, this)"
+                if values.owned_direct_callback(callback_value)
+                else name
+            )
+            prologue.append(
+                f"        var root{pascal(parameter.name)} = {name} is null ? null : scope.Register({descriptor});"
+            )
             args.append(
                 f"{name} is null ? null : &Invoke{public_type(callback_value.native)}"
             )
@@ -782,21 +771,23 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             result_type, result = "void", None
         body = prologue + [f"        NativeStatus.Check({call});"]
         if scoped:
-            body.append(
-                "        scope.Accept(this.CallbackOwner);"
-                if handle_plan and plan.registrations
-                else "        scope.Accept();"
+            accept = (
+                "scope.Accept(this.CallbackOwner);"
+                if handle_plan and (plan.registrations or plan.direct_registrations)
+                else "scope.Accept();"
             )
-        for registration in plan.direct_registrations:
-            if not native_release(registration):
-                condition = (
-                    f"!{camel(registration.accepted_unless)}"
+            # A rejected registration stores nothing, so the scope releases it.
+            rejected = next(
+                (
+                    registration.accepted_unless
+                    for registration in plan.direct_registrations
                     if registration.accepted_unless
-                    else "true"
-                )
-                body.append(
-                    f"        if ({condition}) root{pascal(registration.callback)}?.Accept();"
-                )
+                ),
+                None,
+            )
+            if rejected:
+                accept = f"if (!{camel(rejected)}) {accept}"
+            body.append("        " + accept)
         if decision_completion:
             body.append("        claim.Accept();")
         if result is not None:
@@ -1178,20 +1169,9 @@ def emit(api: Api | BoundApi) -> Emission:
             for registration in plan.direct_registrations
         )
     }
-    owner_callbacks = {
-        parameter.value.native
-        for plan in bound.operations
-        if plan.function.name in supported
-        for parameter in plan.inputs
-        if any(
-            parameter.name == registration.callback
-            and not native_release(registration)
-            for registration in plan.direct_registrations
-        )
-    }
     converters.extend(
-        values.direct_callback_method(value, name in owner_callbacks)
-        for name, value in sorted(direct_callbacks.items())
+        values.direct_callback_method(value)
+        for _, value in sorted(direct_callbacks.items())
     )
     files["Internal/Struct/GeneratedValues.g.cs"] = (
         "// Generated from the C headers by tools/bindgen. Do not edit.\n#nullable enable\n"

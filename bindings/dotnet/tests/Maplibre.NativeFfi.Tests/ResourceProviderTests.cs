@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Memory;
@@ -131,6 +132,180 @@ public sealed class ResourceProviderTests
         );
         Assert.Equal(1, calls);
         Assert.True(handle.IsClosed);
+    }
+
+    [BindingSpecTest("")]
+    [Fact]
+    public async Task CancelRegistrationIsReleasedOnceItsCallbackReturns()
+    {
+        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        var received = await HandledRequest(runtime);
+        var map = TestHandles.CreateMap(runtime, MapOptions.Default);
+        await map.SetStyleUrlAsync(StyleUrl);
+        using var handle = await received.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken
+        );
+        var cancelled = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        var (accepted, captured) = RegisterCapturing(handle, () => cancelled.TrySetResult());
+        Assert.False(accepted);
+        Assert.True(Alive(captured));
+        await map.CloseAsync();
+        await cancelled.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken
+        );
+        // Native code releases the registration after the callback returns on its
+        // own thread, before the provider releases the request.
+        await WaitUntilCollected(captured);
+        Assert.False(handle.IsClosed);
+    }
+
+    [BindingSpecTest("")]
+    [Fact]
+    public async Task CancelRegistrationIsReleasedWithTheRequestWhenNeverCancelled()
+    {
+        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        var received = await HandledRequest(runtime);
+        using var map = TestHandles.CreateMap(runtime, MapOptions.Default);
+        await map.SetStyleUrlAsync(StyleUrl);
+        var handle = await received.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken
+        );
+        var calls = 0;
+        var (accepted, captured) = RegisterCapturing(
+            handle,
+            () => Interlocked.Increment(ref calls)
+        );
+        Assert.False(accepted);
+        handle.Complete(StyleResponse());
+        RuntimeEventTestHelpers.WaitForMapEvent(runtime, map, RuntimeEventType.MapStyleLoaded);
+        Assert.True(Alive(captured));
+        handle.Close();
+        Assert.False(Alive(captured));
+        Assert.Equal(0, calls);
+    }
+
+    [BindingSpecTest("")]
+    [Fact]
+    public async Task AlreadyCancelledRegistrationKeepsNothing()
+    {
+        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        var received = await HandledRequest(runtime);
+        var map = TestHandles.CreateMap(runtime, MapOptions.Default);
+        await map.SetStyleUrlAsync(StyleUrl);
+        using var handle = await received.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken
+        );
+        await map.CloseAsync();
+        Assert.True(handle.Cancelled());
+        var calls = 0;
+        var (accepted, captured) = RegisterCapturing(
+            handle,
+            () => Interlocked.Increment(ref calls)
+        );
+        Assert.True(accepted);
+        // The request stores nothing, so the binding frees the callback before
+        // the request is released.
+        Assert.False(Alive(captured));
+        handle.Close();
+        Assert.Equal(0, calls);
+    }
+
+    [BindingSpecTest("")]
+    [Fact]
+    public async Task CancelCallbackCapturingItsRequestDoesNotRootAnAbandonedRequest()
+    {
+        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        var abandoned = new TaskCompletionSource<(WeakReference Owner, WeakReference Captured)>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        await runtime.SetResourceProviderAsync(
+            new ResourceProvider(
+                (_, handle) =>
+                {
+                    abandoned.TrySetResult(RegisterCapturingOwner(handle));
+                    return ResourceProviderDecision.Handle;
+                }
+            )
+        );
+        using var map = TestHandles.CreateMap(runtime, MapOptions.Default);
+        await map.SetStyleUrlAsync(StyleUrl);
+        var (owner, captured) = await abandoned.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken
+        );
+        await WaitUntilCollected(owner);
+        await WaitUntilCollected(captured);
+    }
+
+    private static async Task<TaskCompletionSource<ResourceRequestHandle>> HandledRequest(
+        RuntimeHandle runtime
+    )
+    {
+        var received = new TaskCompletionSource<ResourceRequestHandle>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        await runtime.SetResourceProviderAsync(
+            new ResourceProvider(
+                (_, handle) =>
+                {
+                    received.TrySetResult(handle);
+                    return ResourceProviderDecision.Handle;
+                }
+            )
+        );
+        return received;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (bool Cancelled, WeakReference Captured) RegisterCapturing(
+        ResourceRequestHandle handle,
+        Action onCancel
+    )
+    {
+        var captured = new object();
+        var cancelled = handle.SetCancelCallback(() =>
+        {
+            GC.KeepAlive(captured);
+            onCancel();
+        });
+        return (cancelled, new WeakReference(captured));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (WeakReference Owner, WeakReference Captured) RegisterCapturingOwner(
+        ResourceRequestHandle handle
+    )
+    {
+        var captured = new object();
+        Assert.False(
+            handle.SetCancelCallback(() =>
+            {
+                GC.KeepAlive(captured);
+                GC.KeepAlive(handle);
+            })
+        );
+        return (new WeakReference(handle), new WeakReference(captured));
+    }
+
+    private static bool Alive(WeakReference value)
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        return value.IsAlive;
+    }
+
+    private static async Task WaitUntilCollected(WeakReference value)
+    {
+        for (var attempt = 0; attempt < 200 && Alive(value); attempt++)
+            await Task.Delay(10, TestContext.Current.CancellationToken);
+        Assert.False(value.IsAlive);
     }
 
     [BindingSpecTest("")]

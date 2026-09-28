@@ -32,7 +32,6 @@ internal sealed unsafe class NativeHandleState<T>
     private bool pendingRelease;
     private bool claimed;
     private int activeClaims;
-    private List<NativeOwnerCallbackRoot>? callbacks;
     private NativeCallbackOwner? callbackOwner;
     internal NativeCallbackOwner CallbackOwner
     {
@@ -106,7 +105,6 @@ internal sealed unsafe class NativeHandleState<T>
                 )
                 {
                     closed = true;
-                    ClearCallbacks();
                     return;
                 }
             }
@@ -309,63 +307,9 @@ internal sealed unsafe class NativeHandleState<T>
             else if (release)
                 closed = false;
         }
-        if (!accepted)
-            ClearCallbacks();
         if (release)
             Close();
         return accepted;
-    }
-
-    internal Registration PrepareCallback(object callback, object? owner = null)
-    {
-        var root = new NativeOwnerCallbackRoot(callback, owner ?? this);
-        try
-        {
-            var registration = new Registration(this, root);
-            lock (gate)
-            {
-                _ = HandleLocked();
-                (callbacks ??= []).Add(root);
-            }
-            return registration;
-        }
-        catch
-        {
-            root.Dispose();
-            throw;
-        }
-    }
-
-    internal sealed class Registration(NativeHandleState<T> owner, NativeOwnerCallbackRoot root)
-        : IDisposable
-    {
-        private bool accepted;
-        internal void* Pointer => root.Pointer;
-
-        internal void Accept()
-        {
-            accepted = true;
-        }
-
-        public void Dispose()
-        {
-            if (accepted)
-                return;
-            lock (owner.gate)
-            {
-                owner.callbacks?.Remove(root);
-            }
-            root.Dispose();
-        }
-    }
-
-    private void ClearCallbacks()
-    {
-        var registrations = callbacks;
-        callbacks = null;
-        if (registrations is not null)
-            foreach (var registration in registrations)
-                registration.Dispose();
     }
 
     private bool BeginReleaseLocked(out T live)
@@ -411,7 +355,6 @@ internal sealed unsafe class NativeHandleState<T>
 
     private void EndSuccessfulRelease()
     {
-        ClearCallbacks();
         NativeCallbackOwner? owner;
         lock (gate)
         {
