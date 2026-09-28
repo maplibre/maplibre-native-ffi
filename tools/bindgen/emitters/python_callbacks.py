@@ -96,6 +96,8 @@ def input_source(plan, values):
 
 
 def sources(values, plan):
+    from .python import OWNERS
+
     rust, python = [], []
     descriptor = plan.registration
     fields, methods, copies = [], [], []
@@ -103,8 +105,11 @@ def sources(values, plan):
         field = next(f for f in plan.fields if f.name == name)
         callback = values.api.callbacks[field.value.native]
         parameters = [p for p in callback.parameters if p.name != callback.context]
+        decision_owner = (
+            OWNERS[callback.decision.handle.native] if callback.decision else None
+        )
         types = ", ".join(
-            "ResourceRequestHandle"
+            decision_owner
             if callback.decision and p.name == callback.decision.parameter
             else values.type(p.value)
             for p in parameters
@@ -115,7 +120,7 @@ def sources(values, plan):
         fields.append(f"    {name}: Callable[[{types}], {result_type}] | None = None")
         signature = ", ".join(["self"] + [p.name for p in parameters])
         arguments = ", ".join(
-            f"_wrap_response({p.name}, 'ResourceRequestHandle')"
+            f"_wrap_response({p.name}, {decision_owner!r})"
             if callback.decision and p.name == callback.decision.parameter
             else values.facade_copy(p.value, p.name)
             for p in parameters
@@ -131,9 +136,9 @@ def sources(values, plan):
             f"{rust_field(p.name)}: {ffi_type(p.value)}" for p in callback.parameters
         )
 
-        def copy_parameter(parameter, callback=callback):
+        def copy_parameter(parameter, callback=callback, owner=decision_owner):
             if callback.decision and parameter.name == callback.decision.parameter:
-                return "Py::new(py, ResourceRequestHandle { state: ManuallyDrop::new(Arc::clone(&decision_state)), cancel_root: Mutex::new(None) })?"
+                return f"Py::new(py, {owner} {{ state: ManuallyDrop::new(Arc::clone(&decision_state)), cancel_root: Mutex::new(None) }})?"
             value = (
                 parameter.value.element
                 if parameter.value.kind == "reference"

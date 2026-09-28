@@ -127,3 +127,45 @@ mln_status mln_map_event(mln_map map, const mln_completion *completion);
         )
         unknown = values.Event._from_native({"payload": {"kind": None, "tag": 42}})
         self.assertEqual(unknown.payload, values.UnknownVariant(42))
+
+    def test_decision_handle_owner_takes_its_name_from_the_issued_handle(self):
+        api = self.parse("""
+typedef enum decision : unsigned { DELEGATE = 0, CLAIM = 1 } decision;
+typedef unsigned long long mln_host BIND("kind=handle;release=mln_host_destroy;parent=none");
+typedef unsigned long long mln_ticket BIND("kind=handle;release=mln_ticket_release;parent=none");
+typedef void (*release_context)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
+typedef void (*cancel)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
+typedef unsigned (*provider)(void *context BIND("kind=context;lifetime=owner"), mln_ticket ticket) BIND("thread=native;enum=decision;failure=DELEGATE;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=mln_ticket_answer;cancelled=mln_ticket_cancelled;cancel_registration=mln_ticket_on_cancel;wait_retired=mln_ticket_await");
+typedef struct mln_ticket_provider {
+  provider callback;
+  void *user_data BIND("kind=context;ownership=borrowed");
+  release_context release;
+} mln_ticket_provider BIND("kind=callback_registration;user_data=user_data;release=release");
+BIND("execution=immediate") mln_status mln_host_destroy(mln_host host);
+BIND("execution=command;result=void;shape=none;ownership=value")
+mln_status mln_host_set_provider(mln_host host, const mln_ticket_provider *provider BIND("length=1"), const mln_completion *completion);
+BIND("execution=immediate") mln_status mln_ticket_answer(mln_ticket ticket, unsigned response);
+BIND("execution=immediate") mln_status mln_ticket_cancelled(mln_ticket ticket, bool *result BIND("direction=out"));
+BIND("execution=immediate;registration=callback;user_data=context;owner_release=mln_ticket_release;accepted_unless=cancelled") mln_status mln_ticket_on_cancel(
+  mln_ticket ticket, cancel callback, void *context BIND("kind=context"), bool *cancelled BIND("direction=out"));
+BIND("execution=immediate") void mln_ticket_release(mln_ticket ticket);
+BIND("execution=immediate") mln_status mln_ticket_await(mln_ticket ticket BIND("handle_access=issued"));
+""")
+        self.assertEqual(python.coverage(api)["unsupported"], {})
+        files, values = self.materialize(api)
+        native = files["src/generated_operations.rs"]
+        self.assertIn('#[pyclass(name = "_TicketHandle")]', native)
+        self.assertIn("module.add_class::<TicketHandle>()?;", native)
+        self.assertIn("Py::new(py, TicketHandle {", native)
+        self.assertIn(
+            "_wrap_response(ticket, 'TicketHandle')",
+            files["python/maplibre_native_ffi/_generated_values.py"],
+        )
+        self.assertEqual(
+            values.TicketProvider.__annotations__["callback"],
+            "Callable[[TicketHandle], Decision] | None",
+        )
+        self.assertIn(
+            "class TicketHandle(_TicketHandleOperations, NativeHandleMixin):",
+            files["python/maplibre_native_ffi/_generated_owners.py"],
+        )

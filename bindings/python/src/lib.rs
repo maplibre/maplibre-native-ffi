@@ -28,52 +28,6 @@ mod py_errors {
     pyo3::import_exception!(maplibre_native_ffi.errors, WrongThreadError);
 }
 
-#[pyclass(name = "_ResourceRequestHandle")]
-struct ResourceRequestHandle {
-    cancel_root: Mutex<Option<Arc<Mutex<Option<Py<PyAny>>>>>>,
-    // Dropped by hand, with the GIL released; see the Drop impl below.
-    state: ManuallyDrop<Arc<maplibre_core::resource::ResourceRequestHandleState>>,
-}
-
-impl Drop for ResourceRequestHandle {
-    fn drop(&mut self) {
-        // SAFETY: drop runs once, and nothing reads the field after this take.
-        let state = unsafe { ManuallyDrop::take(&mut self.state) };
-        // The last reference releases the native request, and release waits for
-        // a cancel callback running on a MapLibre thread. That callback needs
-        // the GIL this thread holds while collecting the Python handle, so the
-        // release runs detached.
-        generated_finalize(move || drop(state));
-    }
-}
-
-#[pymethods]
-impl ResourceRequestHandle {
-    #[getter]
-    fn closed(&self) -> bool {
-        self.state.native_for_call().is_err()
-    }
-
-    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
-        let root = self.cancel_root.lock().unwrap_or_else(|p| p.into_inner());
-        if let Some(root) = root.as_ref() {
-            if let Some(callback) = root.lock().unwrap_or_else(|p| p.into_inner()).as_ref() {
-                visit.call(callback)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn __clear__(&self) {
-        let root = self
-            .cancel_root
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .take();
-        drop(root);
-    }
-}
-
 #[derive(Debug)]
 struct NativeHandleState<T: maplibre_core::handle::NativeHandle> {
     views_valid: bool,
@@ -420,7 +374,6 @@ fn map_error(error: Error) -> PyErr {
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     maplibre_core::validate_abi_version().map_err(map_error)?;
     register_generated_functions(module)?;
-    module.add_class::<ResourceRequestHandle>()?;
     Ok(())
 }
 

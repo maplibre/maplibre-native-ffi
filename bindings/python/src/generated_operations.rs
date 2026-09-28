@@ -12686,6 +12686,23 @@ impl AcquiredFrameHandle {
     fn closed(&self) -> bool {
         self.state().is_closed()
     }
+    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
+        self.state().traverse_callbacks(&visit)
+    }
+    fn __clear__(&self) {
+        let callbacks = self.state().take_callbacks();
+        drop(callbacks);
+    }
+    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
+        let _ = py;
+        generated_check_reentry()?;
+        GeneratedReadScope::with_native::<sys::mln_acquired_frame, _>(
+            py,
+            Arc::clone(&self.state),
+            sys::mln_adapter_acquired_frame_view_begin,
+            sys::mln_adapter_acquired_frame_view_end,
+        )
+    }
 }
 
 #[pyclass(name = "_BufferHandle")]
@@ -12702,6 +12719,18 @@ impl BufferHandle {
     #[getter]
     fn closed(&self) -> bool {
         self.state().is_closed()
+    }
+    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
+        self.state().traverse_callbacks(&visit)
+    }
+    fn __clear__(&self) {
+        let callbacks = self.state().take_callbacks();
+        drop(callbacks);
+    }
+    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
+        let _ = py;
+        generated_check_reentry()?;
+        GeneratedReadScope::new::<sys::mln_buffer, _>(Arc::clone(&self.state))
     }
 }
 
@@ -12720,6 +12749,18 @@ impl EventBatchHandle {
     fn closed(&self) -> bool {
         self.state().is_closed()
     }
+    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
+        self.state().traverse_callbacks(&visit)
+    }
+    fn __clear__(&self) {
+        let callbacks = self.state().take_callbacks();
+        drop(callbacks);
+    }
+    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
+        let _ = py;
+        generated_check_reentry()?;
+        GeneratedReadScope::new::<sys::mln_event_batch, _>(Arc::clone(&self.state))
+    }
 }
 
 #[pyclass(name = "_GeoJsonSourceDataHandle")]
@@ -12736,6 +12777,18 @@ impl GeoJsonSourceDataHandle {
     #[getter]
     fn closed(&self) -> bool {
         self.state().is_closed()
+    }
+    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
+        self.state().traverse_callbacks(&visit)
+    }
+    fn __clear__(&self) {
+        let callbacks = self.state().take_callbacks();
+        drop(callbacks);
+    }
+    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
+        let _ = py;
+        generated_check_reentry()?;
+        GeneratedReadScope::new::<sys::mln_geojson_source_data, _>(Arc::clone(&self.state))
     }
 }
 
@@ -12754,6 +12807,18 @@ impl MapHandle {
     fn closed(&self) -> bool {
         self.state().is_closed()
     }
+    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
+        self.state().traverse_callbacks(&visit)
+    }
+    fn __clear__(&self) {
+        let callbacks = self.state().take_callbacks();
+        drop(callbacks);
+    }
+    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
+        let _ = py;
+        generated_check_reentry()?;
+        GeneratedReadScope::new::<sys::mln_map, _>(Arc::clone(&self.state))
+    }
 }
 
 #[pyclass(name = "_MapProjectionHandle")]
@@ -12770,6 +12835,18 @@ impl MapProjectionHandle {
     #[getter]
     fn closed(&self) -> bool {
         self.state().is_closed()
+    }
+    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
+        self.state().traverse_callbacks(&visit)
+    }
+    fn __clear__(&self) {
+        let callbacks = self.state().take_callbacks();
+        drop(callbacks);
+    }
+    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
+        let _ = py;
+        generated_check_reentry()?;
+        GeneratedReadScope::new::<sys::mln_map_projection, _>(Arc::clone(&self.state))
     }
 }
 
@@ -12788,6 +12865,18 @@ impl RenderFrameBatchHandle {
     fn closed(&self) -> bool {
         self.state().is_closed()
     }
+    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
+        self.state().traverse_callbacks(&visit)
+    }
+    fn __clear__(&self) {
+        let callbacks = self.state().take_callbacks();
+        drop(callbacks);
+    }
+    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
+        let _ = py;
+        generated_check_reentry()?;
+        GeneratedReadScope::new::<sys::mln_render_frame_batch, _>(Arc::clone(&self.state))
+    }
 }
 
 #[pyclass(name = "_RenderSessionHandle")]
@@ -12804,6 +12893,60 @@ impl RenderSessionHandle {
     #[getter]
     fn closed(&self) -> bool {
         self.state().is_closed()
+    }
+    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
+        self.state().traverse_callbacks(&visit)
+    }
+    fn __clear__(&self) {
+        let callbacks = self.state().take_callbacks();
+        drop(callbacks);
+    }
+    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
+        let _ = py;
+        generated_check_reentry()?;
+        GeneratedReadScope::new::<sys::mln_render_session, _>(Arc::clone(&self.state))
+    }
+}
+
+#[pyclass(name = "_ResourceRequestHandle")]
+struct ResourceRequestHandle {
+    cancel_root: Mutex<Option<Arc<Mutex<Option<Py<PyAny>>>>>>,
+    // Dropped by hand, with the GIL released; see the Drop impl below.
+    state: ManuallyDrop<Arc<maplibre_core::resource::ResourceRequestHandleState>>,
+}
+impl Drop for ResourceRequestHandle {
+    fn drop(&mut self) {
+        // SAFETY: drop runs once, and nothing reads the field after this take.
+        let state = unsafe { ManuallyDrop::take(&mut self.state) };
+        // The last reference releases the native handle, and release waits for
+        // a cancel callback running on a MapLibre thread. That callback needs
+        // the GIL this thread holds while collecting the Python owner, so the
+        // release runs detached.
+        generated_finalize(move || drop(state));
+    }
+}
+#[pymethods]
+impl ResourceRequestHandle {
+    #[getter]
+    fn closed(&self) -> bool {
+        self.state.native_for_call().is_err()
+    }
+    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
+        let root = self.cancel_root.lock().unwrap_or_else(|p| p.into_inner());
+        if let Some(root) = root.as_ref() {
+            if let Some(callback) = root.lock().unwrap_or_else(|p| p.into_inner()).as_ref() {
+                visit.call(callback)?;
+            }
+        }
+        Ok(())
+    }
+    fn __clear__(&self) {
+        let root = self
+            .cancel_root
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .take();
+        drop(root);
     }
 }
 
@@ -12822,10 +12965,6 @@ impl RuntimeHandle {
     fn closed(&self) -> bool {
         self.state().is_closed()
     }
-}
-
-#[pymethods]
-impl AcquiredFrameHandle {
     fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
         self.state().traverse_callbacks(&visit)
     }
@@ -12833,175 +12972,6 @@ impl AcquiredFrameHandle {
         let callbacks = self.state().take_callbacks();
         drop(callbacks);
     }
-}
-
-#[pymethods]
-impl BufferHandle {
-    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
-        self.state().traverse_callbacks(&visit)
-    }
-    fn __clear__(&self) {
-        let callbacks = self.state().take_callbacks();
-        drop(callbacks);
-    }
-}
-
-#[pymethods]
-impl EventBatchHandle {
-    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
-        self.state().traverse_callbacks(&visit)
-    }
-    fn __clear__(&self) {
-        let callbacks = self.state().take_callbacks();
-        drop(callbacks);
-    }
-}
-
-#[pymethods]
-impl GeoJsonSourceDataHandle {
-    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
-        self.state().traverse_callbacks(&visit)
-    }
-    fn __clear__(&self) {
-        let callbacks = self.state().take_callbacks();
-        drop(callbacks);
-    }
-}
-
-#[pymethods]
-impl MapHandle {
-    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
-        self.state().traverse_callbacks(&visit)
-    }
-    fn __clear__(&self) {
-        let callbacks = self.state().take_callbacks();
-        drop(callbacks);
-    }
-}
-
-#[pymethods]
-impl MapProjectionHandle {
-    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
-        self.state().traverse_callbacks(&visit)
-    }
-    fn __clear__(&self) {
-        let callbacks = self.state().take_callbacks();
-        drop(callbacks);
-    }
-}
-
-#[pymethods]
-impl RenderFrameBatchHandle {
-    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
-        self.state().traverse_callbacks(&visit)
-    }
-    fn __clear__(&self) {
-        let callbacks = self.state().take_callbacks();
-        drop(callbacks);
-    }
-}
-
-#[pymethods]
-impl RenderSessionHandle {
-    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
-        self.state().traverse_callbacks(&visit)
-    }
-    fn __clear__(&self) {
-        let callbacks = self.state().take_callbacks();
-        drop(callbacks);
-    }
-}
-
-#[pymethods]
-impl RuntimeHandle {
-    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {
-        self.state().traverse_callbacks(&visit)
-    }
-    fn __clear__(&self) {
-        let callbacks = self.state().take_callbacks();
-        drop(callbacks);
-    }
-}
-
-#[pymethods]
-impl AcquiredFrameHandle {
-    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
-        let _ = py;
-        generated_check_reentry()?;
-        GeneratedReadScope::with_native::<sys::mln_acquired_frame, _>(
-            py,
-            Arc::clone(&self.state),
-            sys::mln_adapter_acquired_frame_view_begin,
-            sys::mln_adapter_acquired_frame_view_end,
-        )
-    }
-}
-
-#[pymethods]
-impl BufferHandle {
-    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
-        let _ = py;
-        generated_check_reentry()?;
-        GeneratedReadScope::new::<sys::mln_buffer, _>(Arc::clone(&self.state))
-    }
-}
-
-#[pymethods]
-impl EventBatchHandle {
-    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
-        let _ = py;
-        generated_check_reentry()?;
-        GeneratedReadScope::new::<sys::mln_event_batch, _>(Arc::clone(&self.state))
-    }
-}
-
-#[pymethods]
-impl GeoJsonSourceDataHandle {
-    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
-        let _ = py;
-        generated_check_reentry()?;
-        GeneratedReadScope::new::<sys::mln_geojson_source_data, _>(Arc::clone(&self.state))
-    }
-}
-
-#[pymethods]
-impl MapHandle {
-    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
-        let _ = py;
-        generated_check_reentry()?;
-        GeneratedReadScope::new::<sys::mln_map, _>(Arc::clone(&self.state))
-    }
-}
-
-#[pymethods]
-impl MapProjectionHandle {
-    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
-        let _ = py;
-        generated_check_reentry()?;
-        GeneratedReadScope::new::<sys::mln_map_projection, _>(Arc::clone(&self.state))
-    }
-}
-
-#[pymethods]
-impl RenderFrameBatchHandle {
-    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
-        let _ = py;
-        generated_check_reentry()?;
-        GeneratedReadScope::new::<sys::mln_render_frame_batch, _>(Arc::clone(&self.state))
-    }
-}
-
-#[pymethods]
-impl RenderSessionHandle {
-    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
-        let _ = py;
-        generated_check_reentry()?;
-        GeneratedReadScope::new::<sys::mln_render_session, _>(Arc::clone(&self.state))
-    }
-}
-
-#[pymethods]
-impl RuntimeHandle {
     fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
         let _ = py;
         generated_check_reentry()?;
@@ -13367,6 +13337,7 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<MapProjectionHandle>()?;
     module.add_class::<RenderFrameBatchHandle>()?;
     module.add_class::<RenderSessionHandle>()?;
+    module.add_class::<ResourceRequestHandle>()?;
     module.add_class::<RuntimeHandle>()?;
     module.add_class::<HttpHeaderTransformResponseScope>()?;
     module.add_class::<ResourceTransformResponseScope>()?;

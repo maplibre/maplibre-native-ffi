@@ -11,7 +11,7 @@ from textwrap import dedent
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters.rust import RUST_KEYWORDS
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
-from tools.bindgen.semantic import BoundApi, OperationPlan
+from tools.bindgen.semantic import BoundApi, DecisionPlan, HandlePlan, OperationPlan
 
 from .python_values import Values, public_name, scalar_type
 
@@ -26,8 +26,11 @@ SCALARS = {
     "int64_t": ("i64", "int"),
     "size_t": ("usize", "int"),
 }
-GENERATED_OWNERS: dict[str, str] = {}
+# Public owner class names by native handle type.
 OWNERS: dict[str, str] = {}
+# Callback decision protocols by the native handle type they issue. Their
+# owners hold the core decision state instead of a NativeHandleState.
+DECISIONS: dict[str, DecisionPlan] = {}
 
 
 def ctype(type_: CType) -> str:
@@ -92,7 +95,7 @@ def result_converter(
         return "None", "None", "py_none", None
     if result.kind == "handle" and result.ownership == "owned" and result.handle:
         owner = OWNERS.get(result.native)
-        if owner not in GENERATED_OWNERS.values():
+        if owner is None or result.native in DECISIONS:
             raise unsupported(
                 plan.function, "owned result needs a supported handle constructor"
             )
@@ -172,14 +175,7 @@ def operation(
     )
     if scoped:
         values.supported(receiver.value)
-    decision = next(
-        (
-            callback.decision
-            for callback in values.api.callbacks.values()
-            if callback.decision and callback.decision.handle.native == native_owner
-        ),
-        None,
-    )
+    decision = DECISIONS.get(native_owner)
     name = function.name.removeprefix(
         native_owner.removesuffix("_handle") + "_"
     ).removeprefix("mln_")
@@ -684,6 +680,83 @@ def operation(
     return owner, rust, facade, stub, product
 
 
+def state_owner(owner: str, handle: HandlePlan) -> str:
+    """Emit the PyO3 class for a handle whose ownership NativeHandleState tracks."""
+    native = handle.native
+    read_scope = (
+        f"GeneratedReadScope::with_native::<sys::{native}, _>(py, Arc::clone(&self.state), sys::{handle.view_begin}, sys::{handle.view_end})"
+        if handle.view_begin
+        else f"GeneratedReadScope::new::<sys::{native}, _>(Arc::clone(&self.state))"
+    )
+    return f"""
+#[pyclass(name = "_{owner}")]
+struct {owner} {{ state: Arc<Mutex<NativeHandleState<sys::{native}>>> }}
+impl {owner} {{
+    fn state(&self) -> MutexGuard<'_, NativeHandleState<sys::{native}>> {{
+        self.state.lock().unwrap_or_else(|p| p.into_inner())
+    }}
+}}
+#[pymethods]
+impl {owner} {{
+    #[getter]
+    fn closed(&self) -> bool {{ self.state().is_closed() }}
+    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {{
+        self.state().traverse_callbacks(&visit)
+    }}
+    fn __clear__(&self) {{
+        let callbacks = self.state().take_callbacks();
+        drop(callbacks);
+    }}
+    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {{
+        let _ = py;
+        generated_check_reentry()?;
+        {read_scope}
+    }}
+}}
+"""
+
+
+def decision_owner(owner: str) -> str:
+    """Emit the PyO3 class for a handle issued by a callback decision protocol."""
+    return f"""
+#[pyclass(name = "_{owner}")]
+struct {owner} {{
+    cancel_root: Mutex<Option<Arc<Mutex<Option<Py<PyAny>>>>>>,
+    // Dropped by hand, with the GIL released; see the Drop impl below.
+    state: ManuallyDrop<Arc<maplibre_core::resource::ResourceRequestHandleState>>,
+}}
+impl Drop for {owner} {{
+    fn drop(&mut self) {{
+        // SAFETY: drop runs once, and nothing reads the field after this take.
+        let state = unsafe {{ ManuallyDrop::take(&mut self.state) }};
+        // The last reference releases the native handle, and release waits for
+        // a cancel callback running on a MapLibre thread. That callback needs
+        // the GIL this thread holds while collecting the Python owner, so the
+        // release runs detached.
+        generated_finalize(move || drop(state));
+    }}
+}}
+#[pymethods]
+impl {owner} {{
+    #[getter]
+    fn closed(&self) -> bool {{ self.state.native_for_call().is_err() }}
+    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {{
+        let root = self.cancel_root.lock().unwrap_or_else(|p| p.into_inner());
+        if let Some(root) = root.as_ref() {{
+            if let Some(callback) = root.lock().unwrap_or_else(|p| p.into_inner()).as_ref() {{
+                visit.call(callback)?;
+            }}
+        }}
+        Ok(())
+    }}
+    fn __clear__(&self) {{
+        let root = self.cancel_root.lock().unwrap_or_else(|p| p.into_inner()).take();
+        drop(root);
+    }}
+}}
+"""
+
+
 def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str]]:
     rust, facade, stubs = defaultdict(list), defaultdict(list), defaultdict(list)
     generated, errors, records = [], {}, set()
@@ -698,15 +771,12 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
             if handle.release not in bound.source.runtime_exports
         }
     )
-    GENERATED_OWNERS.clear()
-    GENERATED_OWNERS.update(
+    DECISIONS.clear()
+    DECISIONS.update(
         {
-            name: owner
-            for name, owner in OWNERS.items()
-            if not any(
-                callback.decision and callback.decision.handle.native == name
-                for callback in bound.callbacks.values()
-            )
+            callback.decision.handle.native: callback.decision
+            for callback in bound.callbacks.values()
+            if callback.decision and callback.decision.handle.native in OWNERS
         }
     )
     values = Values(bound)
@@ -791,51 +861,12 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
             if owner
         )
     )
-    for native_owner, owner in GENERATED_OWNERS.items():
-        files["src/generated_operations.rs"] += f"""\n#[pyclass(name = "_{owner}")]
-struct {owner} {{ state: Arc<Mutex<NativeHandleState<sys::{native_owner}>>> }}
-impl {owner} {{
-    fn state(&self) -> MutexGuard<'_, NativeHandleState<sys::{native_owner}>> {{
-        self.state.lock().unwrap_or_else(|p| p.into_inner())
-    }}
-}}
-#[pymethods]
-impl {owner} {{
-    #[getter]
-    fn closed(&self) -> bool {{ self.state().is_closed() }}
-}}
-"""
     for native_owner, owner in OWNERS.items():
-        if owner == "ResourceRequestHandle":
-            continue
-        state = "self.state()"
-        files["src/generated_operations.rs"] += f"""\n#[pymethods]
-impl {owner} {{
-    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {{
-        {state}.traverse_callbacks(&visit)
-    }}
-    fn __clear__(&self) {{
-        let callbacks = {state}.take_callbacks();
-        drop(callbacks);
-    }}
-}}
-"""
-    for native_owner, owner in OWNERS.items():
-        if owner == "ResourceRequestHandle":
-            continue
-        handle = bound.handles[native_owner]
-        read_scope = f"GeneratedReadScope::new::<sys::{native_owner}, _>(Arc::clone(&self.state))"
-        if handle.view_begin:
-            read_scope = f"GeneratedReadScope::with_native::<sys::{native_owner}, _>(py, Arc::clone(&self.state), sys::{handle.view_begin}, sys::{handle.view_end})"
-        files["src/generated_operations.rs"] += f"""\n#[pymethods]
-impl {owner} {{
-    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {{
-        let _ = py;
-        generated_check_reentry()?;
-        {read_scope}
-    }}
-}}
-"""
+        files["src/generated_operations.rs"] += (
+            decision_owner(owner)
+            if native_owner in DECISIONS
+            else state_owner(owner, bound.handles[native_owner])
+        )
     scope_owners = {
         name: public_name(name) + "Scope"
         for name, value in values.records.items()
@@ -855,7 +886,7 @@ impl {owner} {{
         + "    module.add_class::<GeneratedReadScope>()?;\n"
         + "\n".join(
             f"    module.add_class::<{owner}>()?;"
-            for owner in [*GENERATED_OWNERS.values(), *scope_owners.values()]
+            for owner in [*OWNERS.values(), *scope_owners.values()]
         )
         + "\n".join(
             f"    module.add_function(wrap_pyfunction!({name}, module)?)?;"
