@@ -56,6 +56,36 @@ mln_status mln_measurement_read(mln_measurement owner, double *out_value BIND("d
         )
         self.assertIn("MlnMeasurement", emitted.files["Internal/C/Handles.g.cs"])
 
+    def test_kotlin_owner_retains_its_parent_and_closes_through_release(self):
+        api = self.parse(
+            """
+typedef unsigned long long mln_measurement_handle BIND("kind=handle;release=mln_measurement_destroy;dispose=mln_measurement_destroy;parent=mln_map");
+BIND("execution=immediate")
+mln_status mln_map_measure(mln_map map, mln_measurement_handle *out_owner BIND("direction=out;ownership=owned"));
+BIND("execution=immediate")
+void mln_measurement_destroy(mln_measurement_handle owner);
+""",
+            map_handle=True,
+        )
+        files = kotlin.generate(api)
+        generated = "src/{}/kotlin/org/maplibre/nativeffi/generated/{}.kt"
+        common = files[generated.format("commonMain", "MeasurementHandle")]
+        self.assertIn(
+            "class MeasurementHandle : GeneratedMeasurementHandleOperations, AutoCloseable",
+            common,
+        )
+        owner = files[generated.format("jvmMain", "MeasurementHandle")]
+        self.assertIn("parent: MapHandle,", owner)
+        self.assertIn('HandleStateCore("MeasurementHandle", handle, parent,', owner)
+        self.assertIn("override fun close() { measurementDestroy() }", owner)
+        operations = files[generated.format("jvmMain", "GeneratedMapOperations")]
+        self.assertIn(
+            "MeasurementHandle(it, this@GeneratedMapOperations as org.maplibre.nativeffi.generated.MapHandle)",
+            operations,
+        )
+        # A release named close() is inherited instead of wrapped.
+        self.assertNotIn("fun close()", files[generated.format("jvmMain", "MapHandle")])
+
     def parse(self, source, header="metrics.h", map_handle=False):
         prelude = PRELUDE
         if map_handle:
