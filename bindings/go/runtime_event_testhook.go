@@ -33,9 +33,9 @@ func (event runtimeEventForTest) withMessage(message string) runtimeEventForTest
 	return event
 }
 
-func (event runtimeEventForTest) withRenderFrame(payload RuntimeEventRenderFramePayload) runtimeEventForTest {
+func (event runtimeEventForTest) withRenderFrame(payload RuntimeEventRenderFrame) runtimeEventForTest {
 	event.raw = C.mln_go_runtime_event_with_render_frame(event.raw, C.mln_runtime_event_render_frame{
-		mode:              C.uint32_t(payload.RawMode),
+		mode:              C.uint32_t(payload.Mode),
 		needs_repaint:     C.bool(payload.NeedsRepaint),
 		placement_changed: C.bool(payload.PlacementChanged),
 		stats: C.mln_rendering_stats{
@@ -49,16 +49,16 @@ func (event runtimeEventForTest) withRenderFrame(payload RuntimeEventRenderFrame
 	return event
 }
 
-func (event runtimeEventForTest) withRenderMap(payload RuntimeEventRenderMapPayload) runtimeEventForTest {
+func (event runtimeEventForTest) withRenderMap(payload RuntimeEventRenderMap) runtimeEventForTest {
 	event.raw = C.mln_go_runtime_event_with_render_map(event.raw, C.mln_runtime_event_render_map{
-		mode: C.uint32_t(payload.RawMode),
+		mode: C.uint32_t(payload.Mode),
 	})
 	return event
 }
 
-func (event runtimeEventForTest) withTileAction(payload RuntimeEventTileActionPayload) runtimeEventForTest {
+func (event runtimeEventForTest) withTileAction(payload RuntimeEventTileAction) runtimeEventForTest {
 	event.raw = C.mln_go_runtime_event_with_tile_action(event.raw, C.mln_runtime_event_tile_action{
-		operation: C.uint32_t(payload.RawOperation),
+		operation: C.uint32_t(payload.Operation),
 		tile_id: C.mln_tile_id{
 			overscaled_z: C.uint32_t(payload.TileID.OverscaledZ),
 			wrap:         C.int32_t(payload.TileID.Wrap),
@@ -70,19 +70,19 @@ func (event runtimeEventForTest) withTileAction(payload RuntimeEventTileActionPa
 	return event
 }
 
-func (event runtimeEventForTest) withCameraTransitionFinished(payload RuntimeEventCameraTransitionFinishedPayload) runtimeEventForTest {
+func (event runtimeEventForTest) withCameraTransitionFinished(payload RuntimeEventCameraTransitionFinished) runtimeEventForTest {
 	event.raw = C.mln_go_runtime_event_with_camera_transition_finished(event.raw, C.mln_runtime_event_camera_transition_finished{
 		transition_id: C.uint64_t(payload.TransitionID),
 	})
 	return event
 }
 
-func (event runtimeEventForTest) withOfflineRegionStatus(payload RuntimeEventOfflineRegionStatusPayload) runtimeEventForTest {
+func (event runtimeEventForTest) withOfflineRegionStatus(payload RuntimeEventOfflineRegionStatus) runtimeEventForTest {
 	event.raw = C.mln_go_runtime_event_with_offline_region_status(event.raw, C.mln_runtime_event_offline_region_status{
 		region_id: C.mln_offline_region_id(payload.RegionID),
 		status: C.mln_offline_region_status{
 			size:                               C.uint32_t(unsafe.Sizeof(C.mln_offline_region_status{})),
-			download_state:                     C.uint32_t(payload.Status.RawDownloadState),
+			download_state:                     C.uint32_t(payload.Status.DownloadState),
 			completed_resource_count:           C.uint64_t(payload.Status.CompletedResourceCount),
 			completed_resource_size:            C.uint64_t(payload.Status.CompletedResourceSize),
 			completed_tile_count:               C.uint64_t(payload.Status.CompletedTileCount),
@@ -96,29 +96,18 @@ func (event runtimeEventForTest) withOfflineRegionStatus(payload RuntimeEventOff
 	return event
 }
 
-func (event runtimeEventForTest) withOfflineRegionResponseError(payload RuntimeEventOfflineRegionResponseErrorPayload) runtimeEventForTest {
+func (event runtimeEventForTest) withOfflineRegionResponseError(payload RuntimeEventOfflineRegionResponseError) runtimeEventForTest {
 	event.raw = C.mln_go_runtime_event_with_offline_region_response_error(event.raw, C.mln_runtime_event_offline_region_response_error{
 		region_id: C.mln_offline_region_id(payload.RegionID),
-		reason:    C.uint32_t(payload.RawReason),
+		reason:    C.uint32_t(payload.Reason),
 	})
 	return event
 }
 
-func (event runtimeEventForTest) withOfflineRegionTileCountLimit(payload RuntimeEventOfflineRegionTileCountLimitPayload) runtimeEventForTest {
+func (event runtimeEventForTest) withOfflineRegionTileCountLimit(payload RuntimeEventOfflineRegionTileCountLimit) runtimeEventForTest {
 	event.raw = C.mln_go_runtime_event_with_offline_region_tile_count_limit(event.raw, C.mln_runtime_event_offline_region_tile_count_limit{
 		region_id: C.mln_offline_region_id(payload.RegionID),
 		limit:     C.uint64_t(payload.Limit),
-	})
-	return event
-}
-
-func (event runtimeEventForTest) withOfflineOperationCompleted(payload RuntimeEventOfflineOperationCompletedPayload) runtimeEventForTest {
-	event.raw = C.mln_go_runtime_event_with_offline_operation_completed(event.raw, C.mln_runtime_event_offline_operation_completed{
-		operation_id:   C.mln_offline_operation_id(payload.OperationID),
-		operation_kind: C.uint32_t(payload.OperationKind),
-		result_kind:    C.uint32_t(payload.ResultKind),
-		result_status:  C.int32_t(payload.ResultStatus),
-		found:          C.bool(payload.Found),
 	})
 	return event
 }
@@ -141,13 +130,13 @@ type runtimeEventBatchForTest struct {
 	events   unsafe.Pointer
 	messages unsafe.Pointer
 	stride   uintptr
-	raw      C.mln_runtime_event_batch
+	raw      C.mln_runtime_event_batch_view
 }
 
 // newRuntimeEventBatchForTest lays events out stride bytes apart. A stride wider
 // than this binding's compiled event size is what proves the decoder reads the
 // batch's own stride.
-func newRuntimeEventBatchForTest(stride uintptr, remainingCount uint64, events []runtimeEventForTest) *runtimeEventBatchForTest {
+func newRuntimeEventBatchForTest(stride uintptr, events []runtimeEventForTest) *runtimeEventBatchForTest {
 	if stride < runtimeEventSizeForTest() {
 		stride = runtimeEventSizeForTest()
 	}
@@ -159,7 +148,7 @@ func newRuntimeEventBatchForTest(stride uintptr, remainingCount uint64, events [
 	for index, event := range events {
 		raw := event.raw
 		if len(event.message) > 0 {
-			raw.message_offset = C.uint32_t(len(arena))
+			raw.message_offset = C.uint64_t(len(arena))
 			raw.message_size = C.uint32_t(len(event.message))
 			arena = append(arena, event.message...)
 			arena = append(arena, 0)
@@ -169,14 +158,13 @@ func newRuntimeEventBatchForTest(stride uintptr, remainingCount uint64, events [
 	if len(arena) > 0 {
 		batch.messages = C.CBytes(arena)
 	}
-	batch.raw = C.mln_runtime_event_batch{
-		size:            C.uint32_t(unsafe.Sizeof(C.mln_runtime_event_batch{})),
-		event_size:      C.uint32_t(stride),
-		events:          (*C.mln_runtime_event)(batch.events),
-		event_count:     C.size_t(len(events)),
-		messages:        (*C.char)(batch.messages),
-		messages_size:   C.size_t(len(arena)),
-		remaining_count: C.size_t(remainingCount),
+	batch.raw = C.mln_runtime_event_batch_view{
+		size:          C.uint32_t(unsafe.Sizeof(C.mln_runtime_event_batch_view{})),
+		event_size:    C.uint32_t(stride),
+		events:        (*C.mln_runtime_event)(batch.events),
+		event_count:   C.size_t(len(events)),
+		messages:      (*C.char)(batch.messages),
+		messages_size: C.size_t(len(arena)),
 	}
 	return batch
 }
@@ -199,9 +187,9 @@ func (batch *runtimeEventBatchForTest) payloadWindow(index int) []byte {
 	return unsafe.Slice((*byte)(unsafe.Add(batch.events, offset)), batch.stride-runtimeEventPayloadOffset)
 }
 
-// decodeForTest runs the batch through the same copy path DrainEvents uses.
-func (runtime *RuntimeHandle) decodeForTest(batch *runtimeEventBatchForTest) RuntimeEventBatch {
-	return runtime.copyEventBatch(batch.raw)
+// decodeForTest runs the batch through the same copy path Close uses.
+func (runtime *RuntimeHandle) decodeForTest(batch *runtimeEventBatchForTest) []RuntimeEvent {
+	return copyRuntimeEventBatchView(batch.raw).Events
 }
 
 // runtimeEventSizeForTest is this binding's compiled event size, which a layout
@@ -219,5 +207,7 @@ func offlineRegionStatusForTest(downloadState uint32) OfflineRegionStatus {
 		size:           C.uint32_t(unsafe.Sizeof(C.mln_offline_region_status{})),
 		download_state: C.uint32_t(downloadState),
 	}
-	return offlineRegionStatusFromC(raw)
+	return copyOfflineRegionStatus(raw)
 }
+
+var runtimeEventPayloadOffset = unsafe.Offsetof(C.mln_runtime_event{}.payload)

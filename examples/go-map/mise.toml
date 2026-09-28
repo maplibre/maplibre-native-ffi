@@ -14,6 +14,7 @@ fi
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig:$sdl_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+export CGO_CPPFLAGS="-I$native_install_dir/include -I$MISE_MONOREPO_ROOT/third_party/khronos/include ${CGO_CPPFLAGS:-}"
 export CGO_LDFLAGS="-Wl,-rpath,$native_install_dir/lib -Wl,-rpath,$sdl_prefix/lib ${CGO_LDFLAGS:-}"
 go build -o "$MISE_MONOREPO_ROOT/build/$usage_preset/go-map" .
 '''
@@ -30,6 +31,7 @@ fi
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig:$sdl_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+export CGO_CPPFLAGS="-I$native_install_dir/include -I$MISE_MONOREPO_ROOT/third_party/khronos/include ${CGO_CPPFLAGS:-}"
 go vet ./...
 '''
 
@@ -39,6 +41,7 @@ run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig:$sdl_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+export CGO_CPPFLAGS="-I$native_install_dir/include -I$MISE_MONOREPO_ROOT/third_party/khronos/include ${CGO_CPPFLAGS:-}"
 export LD_LIBRARY_PATH="$native_install_dir/lib:$sdl_prefix/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 go run . "$usage_render_target"
 '''

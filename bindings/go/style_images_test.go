@@ -2,46 +2,30 @@ package maplibre
 
 import (
 	"errors"
-	"runtime"
+	stdruntime "runtime"
+	"slices"
 	"testing"
 	"unsafe"
 )
 
 func TestStyleImageBorrowsPixelsAcrossGC(t *testing.T) {
 	pixels := []byte{1, 2, 3, 4}
-	image := newCPremultipliedRGBA8Image(PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4, Pixels: pixels})
-	defer image.free()
-	runtime.GC()
-	if unsafe.Pointer(image.raw.pixels) != unsafe.Pointer(&pixels[0]) {
+	arena := &bindingArena{}
+	defer arena.close()
+	image := nativePremultipliedRGBA8Image(PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4, Pixels: pixels}, arena)
+	stdruntime.GC()
+	if unsafe.Pointer(image.pixels) != unsafe.Pointer(&pixels[0]) {
 		t.Fatal("native image does not borrow the backing pixels")
 	}
-	if got := unsafe.Slice((*byte)(unsafe.Pointer(image.raw.pixels)), 4); got[0] != 1 || got[3] != 4 {
+	if got := unsafe.Slice((*byte)(unsafe.Pointer(image.pixels)), 4); got[0] != 1 || got[3] != 4 {
 		t.Fatalf("borrowed pixels after GC = %v", got)
 	}
 }
 
 func TestNinePatchStyleImageRoundTripsStretchContentAndTextFit(t *testing.T) {
-	lockOSThreadForTest(t)
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(): %v", err)
 	}
 
@@ -53,14 +37,15 @@ func TestNinePatchStyleImageRoundTripsStretchContentAndTextFit(t *testing.T) {
 		Content:       &ImageContent{Left: 0.5, Top: 0.5, Right: 1.5, Bottom: 1.5},
 		TextFitHeight: &textFit,
 	}
-	if err := m.SetStyleImage("patch", image, options); err != nil {
+	if _, err := m.SetStyleImage("patch", image, &options); err != nil {
 		t.Fatalf("SetStyleImage(): %v", err)
 	}
 
-	info, found, err := m.StyleImageInfo("patch")
+	styleImage, found, err := takeOptionalStyleOperationForTest(m.GetStyleImageInfo("patch"))
 	if err != nil || !found {
-		t.Fatalf("StyleImageInfo(patch) = (%+v, %v, %v)", info, found, err)
+		t.Fatalf("GetStyleImageInfo(patch) = (%+v, %v, %v)", styleImage, found, err)
 	}
+	info := styleImage.Info
 	if info.StretchXCount != 1 || info.StretchYCount != 2 {
 		t.Fatalf("stretch counts = (%d, %d), want (1, 2)", info.StretchXCount, info.StretchYCount)
 	}
@@ -75,10 +60,7 @@ func TestNinePatchStyleImageRoundTripsStretchContentAndTextFit(t *testing.T) {
 		t.Fatalf("TextFitHeight = %v, want proportional", info.TextFitHeight)
 	}
 
-	stretchX, stretchY, found, err := m.StyleImageStretches("patch")
-	if err != nil || !found {
-		t.Fatalf("StyleImageStretches(patch) = (%v, %v, %v, %v)", stretchX, stretchY, found, err)
-	}
+	stretchX, stretchY := styleImage.StretchX, styleImage.StretchY
 	if len(stretchX) != 1 || stretchX[0] != (ImageStretch{From: 0, To: 1}) {
 		t.Fatalf("stretchX = %v, want [{0 1}]", stretchX)
 	}
@@ -86,130 +68,75 @@ func TestNinePatchStyleImageRoundTripsStretchContentAndTextFit(t *testing.T) {
 		t.Fatalf("stretchY = %v, want [{0 1} {1 2}]", stretchY)
 	}
 
-	if _, _, found, err = m.StyleImageStretches("missing"); err != nil || found {
-		t.Fatalf("StyleImageStretches(missing) = (%v, %v), want (false, nil)", found, err)
+	// The narrow copy reports the same intervals the aggregate carries.
+	stretches, found, err := takeOptionalStyleOperationForTest(m.CopyStyleImageStretches("patch"))
+	if err != nil || !found || !slices.Equal(stretches.StretchX, stretchX) || !slices.Equal(stretches.StretchY, stretchY) {
+		t.Fatalf("CopyStyleImageStretches(patch) = (%+v, %v, %v), want %v and %v", stretches, found, err, stretchX, stretchY)
+	}
+	if _, found, err := takeOptionalStyleOperationForTest(m.CopyStyleImageStretches("missing")); err != nil || found {
+		t.Fatalf("CopyStyleImageStretches(missing) = (%v, %v), want (false, nil)", found, err)
+	}
+
+	if _, found, err = takeOptionalStyleOperationForTest(m.GetStyleImageInfo("missing")); err != nil || found {
+		t.Fatalf("GetStyleImageInfo(missing) = (%v, %v), want (false, nil)", found, err)
 	}
 
 	// A backwards interval is rejected by C.
 	bad := StyleImageOptions{StretchX: []ImageStretch{{From: 2, To: 1}}}
-	if err := m.SetStyleImage("bad", image, bad); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := m.SetStyleImage("bad", image, &bad); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetStyleImage(backwards) error = %v; want ErrInvalidArgument", err)
 	}
 }
 
-func TestStyleImageOptionsCloneKeepsStretchPresence(t *testing.T) {
-	options := StyleImageOptions{StretchX: []ImageStretch{}, StretchY: nil}
-	cloned := options.Clone()
-
-	// A present empty slice and an absent one stay distinguishable across a clone.
-	if cloned.StretchX == nil {
-		t.Fatalf("cloned StretchX = nil, want a present empty slice")
-	}
-	if cloned.StretchY != nil {
-		t.Fatalf("cloned StretchY = %v, want nil", cloned.StretchY)
-	}
-	if !options.Equal(cloned) {
-		t.Fatalf("clone %+v is not equal to its source %+v", cloned, options)
-	}
-
-	source := StyleImageOptions{StretchX: []ImageStretch{{From: 0, To: 1}}}
-	independent := source.Clone()
-	source.StretchX[0] = ImageStretch{From: 5, To: 6}
-	if independent.StretchX[0] != (ImageStretch{From: 0, To: 1}) {
-		t.Fatalf("clone StretchX = %v, want the values at clone time", independent.StretchX)
-	}
-}
-
 func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
-	lockOSThreadForTest(t)
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	pixels := []byte{255, 0, 0, 255}
 	pixelRatio := float32(2)
 	sdf := true
-	if err := m.SetStyleImage("marker", PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4, Pixels: pixels}, StyleImageOptions{PixelRatio: &pixelRatio, SDF: &sdf}); err != nil {
+	if _, err := m.SetStyleImage("marker", PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4, Pixels: pixels}, &StyleImageOptions{PixelRatio: &pixelRatio, SDF: &sdf}); err != nil {
 		t.Fatalf("SetStyleImage(): %v", err)
 	}
 	pixels[0] = 0
-	exists, err := m.StyleImageExists("marker")
-	if err != nil {
-		t.Fatalf("StyleImageExists(marker): %v", err)
-	}
-	if !exists {
-		t.Fatal("StyleImageExists(marker)=false, want true")
-	}
-	info, found, err := m.StyleImageInfo("marker")
+	styleImage, found, err := takeOptionalStyleOperationForTest(m.GetStyleImageInfo("marker"))
 	if err != nil {
 		t.Fatalf("StyleImageInfo(marker): %v", err)
 	}
+	info := styleImage.Info
 	if !found || info.Width != 1 || info.Height != 1 || info.Stride != 4 || info.ByteLength != 4 || info.PixelRatio != pixelRatio || info.SDF != sdf {
-		t.Fatalf("StyleImageInfo(marker) = (%+v, %v), want copied 1x1 image metadata", info, found)
+		t.Fatalf("GetStyleImageInfo(marker) = (%+v, %v), want copied 1x1 image metadata", styleImage, found)
 	}
-	copied, found, err := m.StyleImagePremultipliedRGBA8("marker")
-	if err != nil {
-		t.Fatalf("StyleImagePremultipliedRGBA8(marker): %v", err)
-	}
+	copied := styleImage.Pixels
 	if !found || len(copied) != 4 || copied[0] != 255 || copied[1] != 0 || copied[2] != 0 || copied[3] != 255 {
-		t.Fatalf("StyleImagePremultipliedRGBA8(marker) = (%v, %v), want original copied pixels", copied, found)
+		t.Fatalf("GetStyleImageInfo(marker) pixels = (%v, %v), want original copied pixels", copied, found)
 	}
-	// An empty destination is a caller error here, not the C size probe.
-	if _, _, err := m.StyleImagePremultipliedRGBA8Into("marker", nil); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("StyleImagePremultipliedRGBA8Into(empty buffer) error = %v, want ErrInvalidArgument", err)
+	// The narrow copy reports the same pixels the aggregate carries.
+	copiedPixels, found, err := takeOptionalStyleOperationForTest(m.CopyStyleImagePremultipliedRGBA8("marker"))
+	if err != nil || !found || len(copiedPixels) != 4 || copiedPixels[0] != 255 || copiedPixels[3] != 255 {
+		t.Fatalf("StyleImagePremultipliedRGBA8(marker) = (%v, %v, %v), want original copied pixels", copiedPixels, found, err)
 	}
-	removed, err := m.RemoveStyleImage("marker")
-	if err != nil {
-		t.Fatalf("RemoveStyleImage(marker): %v", err)
+	completion, err := m.RemoveStyleImage("marker")
+	requireCommandCommitted(t, completion, err)
+	if _, found, err := takeOptionalStyleOperationForTest(m.GetStyleImageInfo("marker")); err != nil || found {
+		t.Fatalf("StyleImageInfo(marker) after removal = (%v, %v), want (false, nil)", found, err)
 	}
-	if !removed {
-		t.Fatal("RemoveStyleImage(marker)=false, want true")
+	if _, found, err := takeOptionalStyleOperationForTest(m.CopyStyleImagePremultipliedRGBA8("marker")); err != nil || found {
+		t.Fatalf("StyleImagePremultipliedRGBA8(marker) after removal = (%v, %v), want (false, nil)", found, err)
 	}
-	if err := m.SetStyleImage("bad-marker", PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4}, StyleImageOptions{}); !errors.Is(err, ErrInvalidArgument) {
+	completion, err = m.RemoveStyleImage("marker")
+	requireCommandFailedWith(t, completion, err, ErrNotFound)
+	if _, err := m.SetStyleImage("bad-marker", PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4}, &StyleImageOptions{}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetStyleImage(empty pixels) error = %v, want ErrInvalidArgument", err)
 	}
 }
 
 func TestImageSourceCopiesPixelsAndCoordinates(t *testing.T) {
-	lockOSThreadForTest(t)
+	_, m := newRuntimeAndMap(t, nil)
 
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	m, err := runtime.NewMap()
-	if err != nil {
-		_ = runtime.Close()
-		t.Fatalf("NewMap(): %v", err)
-	}
-	defer func() {
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
-	}()
-
-	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	coordinates := []LatLng{
@@ -219,12 +146,12 @@ func TestImageSourceCopiesPixelsAndCoordinates(t *testing.T) {
 		{Latitude: 0, Longitude: 1},
 	}
 	pixels := []byte{0, 255, 0, 255}
-	if err := m.AddImageSourceImage("image-source", coordinates, PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4, Pixels: pixels}); err != nil {
+	if _, err := m.AddImageSourceImage("image-source", coordinates, PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4, Pixels: pixels}); err != nil {
 		t.Fatalf("AddImageSourceImage(): %v", err)
 	}
 	coordinates[0] = LatLng{Latitude: 9, Longitude: 9}
 	pixels[1] = 0
-	gotCoordinates, found, err := m.ImageSourceCoordinates("image-source")
+	gotCoordinates, found, err := takeOptionalSliceForTest(m.GetImageSourceCoordinates("image-source"))
 	if err != nil {
 		t.Fatalf("ImageSourceCoordinates(image-source): %v", err)
 	}
@@ -237,26 +164,26 @@ func TestImageSourceCopiesPixelsAndCoordinates(t *testing.T) {
 		{Latitude: 1, Longitude: 3},
 		{Latitude: 1, Longitude: 2},
 	}
-	if err := m.SetImageSourceCoordinates("image-source", updatedCoordinates); err != nil {
+	if _, err := m.SetImageSourceCoordinates("image-source", updatedCoordinates); err != nil {
 		t.Fatalf("SetImageSourceCoordinates(): %v", err)
 	}
-	if err := m.SetImageSourceImage("image-source", PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4, Pixels: []byte{0, 0, 255, 255}}); err != nil {
+	if _, err := m.SetImageSourceImage("image-source", PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4, Pixels: []byte{0, 0, 255, 255}}); err != nil {
 		t.Fatalf("SetImageSourceImage(): %v", err)
 	}
-	gotCoordinates, found, err = m.ImageSourceCoordinates("image-source")
+	gotCoordinates, found, err = takeOptionalSliceForTest(m.GetImageSourceCoordinates("image-source"))
 	if err != nil {
 		t.Fatalf("ImageSourceCoordinates(image-source after update): %v", err)
 	}
 	if !found || gotCoordinates[0] != updatedCoordinates[0] {
 		t.Fatalf("ImageSourceCoordinates(image-source after update) = (%v, %v), want updated coordinates", gotCoordinates, found)
 	}
-	if err := m.AddImageSourceURL("image-url-source", updatedCoordinates, "asset://fixtures/image.png"); err != nil {
+	if _, err := m.AddImageSourceURL("image-url-source", updatedCoordinates, "asset://fixtures/image.png"); err != nil {
 		t.Fatalf("AddImageSourceURL(): %v", err)
 	}
-	if err := m.SetImageSourceURL("image-url-source", "asset://fixtures/image-2.png"); err != nil {
+	if _, err := m.SetImageSourceURL("image-url-source", "asset://fixtures/image-2.png"); err != nil {
 		t.Fatalf("SetImageSourceURL(): %v", err)
 	}
-	if err := m.AddImageSourceImage("bad-image-source", updatedCoordinates[:3], PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4, Pixels: []byte{0, 0, 0, 0}}); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := m.AddImageSourceImage("bad-image-source", updatedCoordinates[:3], PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4, Pixels: []byte{0, 0, 0, 0}}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("AddImageSourceImage(3 coordinates) error = %v, want ErrInvalidArgument", err)
 	}
 }

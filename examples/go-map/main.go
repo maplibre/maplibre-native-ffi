@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"runtime"
+	stdruntime "runtime"
 	"strings"
 
 	"github.com/jfreymuth/go-sdl3/sdl"
@@ -13,8 +13,9 @@ import (
 )
 
 func main() {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
+	// SDL and OpenGL keep the render-session graphics calls on this thread.
+	stdruntime.LockOSThread()
+	defer stdruntime.UnlockOSThread()
 
 	mode, ok := parseArgs(os.Args[1:])
 	if !ok {
@@ -57,13 +58,13 @@ func run(mode renderTargetMode) (result error) {
 	if err := validateNativeRenderBackend(); err != nil {
 		return err
 	}
-	if err := maplibre.SetLogCallback(func(record maplibre.LogRecord) bool {
-		fmt.Printf("maplibre[%s/%s] %d: %s\n", logSeverity(record.Severity), logEvent(record.Event), record.Code, record.Message)
-		return true
+	if err := maplibre.LogSetCallback(func(severity maplibre.LogSeverity, event maplibre.LogEvent, code int64, message string) uint32 {
+		fmt.Printf("maplibre[%s/%s] %d: %s\n", logSeverity(severity), logEvent(event), code, message)
+		return 1
 	}); err != nil {
 		return err
 	}
-	defer func() { _ = maplibre.ClearLogCallback() }()
+	defer func() { _ = maplibre.LogClearCallback() }()
 
 	if usesEGL() {
 		_ = sdl.SetHint(sdl.HintVideoForceEgl, "1")
@@ -104,41 +105,27 @@ func run(mode renderTargetMode) (result error) {
 	}
 	_ = sdl.GL_SetSwapInterval(1)
 
-	shared := newSharedState()
-	commands := &commandQueue{}
-	published := make(chan runtimeLoopHandles, 1)
-	runtimeDone := make(chan struct{})
-	go func() {
-		defer close(runtimeDone)
-		runRuntimeLoop(view, commands, published, shared)
-	}()
-	handles, ok := <-published
-	if !ok {
-		<-runtimeDone
-		_ = graphics.Close()
-		if failure := shared.firstFailure(); failure != nil {
-			return fmt.Errorf("runtime loop startup failed: %w", failure)
-		}
-		return errors.New("runtime loop stopped before publishing the map")
-	}
-
-	state, err := newRenderMapState(graphics, handles.mapRef, view, mode)
+	mapState, err := newRuntimeMapState(view)
 	if err != nil {
-		shared.requestShutdown()
-		_ = handles.wake.Signal()
-		<-runtimeDone
+		_ = graphics.Close()
+		return err
+	}
+	state, err := newRenderMapState(graphics, mapState.mapRef, view, mode)
+	if err != nil {
 		return errors.Join(
 			fmt.Errorf("render target attach failed: %w", err),
-			shared.firstFailure(),
+			mapState.Close(),
 			graphics.Close(),
 		)
 	}
 	defer func() {
-		result = errors.Join(result, state.finishFrame(), state.closeTarget())
-		shared.requestShutdown()
-		_ = handles.wake.Signal()
-		<-runtimeDone
-		result = errors.Join(result, shared.firstFailure(), graphics.Close())
+		result = errors.Join(
+			result,
+			state.finishFrame(),
+			state.closeTarget(),
+			mapState.Close(),
+			graphics.Close(),
+		)
 	}()
 
 	fmt.Printf("render target: %s\n", mode)
@@ -146,6 +133,8 @@ func run(mode renderTargetMode) (result error) {
 	logControls()
 
 	running := true
+	renderRequested := true
+	viewportDirty := false
 	input := inputController{}
 	handleEvent := func(event *sdl.Event) error {
 		switch event.Type() {
@@ -157,27 +146,23 @@ func run(mode renderTargetMode) (result error) {
 			if view.empty() {
 				return nil
 			}
-			if err := state.resize(view); err != nil {
-				return err
-			}
-			shared.requestRender()
+			viewportDirty = true
+			renderRequested = true
 		default:
 			if view.empty() {
 				return nil
 			}
-			if input.handleEvent(event, commands, view) {
-				if err := handles.wake.Signal(); err != nil {
-					return fmt.Errorf("wake runtime loop failed: %w", err)
-				}
-				shared.requestRender()
+			changed, err := input.handleEvent(event, mapState, view)
+			if err != nil {
+				return err
+			}
+			if changed {
+				renderRequested = true
 			}
 		}
 		return nil
 	}
 	for running {
-		if failure := shared.firstFailure(); failure != nil {
-			return fmt.Errorf("runtime loop failed: %w", failure)
-		}
 		didWork := false
 		var event sdl.Event
 		for sdl.PollEvent(&event) {
@@ -186,16 +171,41 @@ func run(mode renderTargetMode) (result error) {
 				return err
 			}
 		}
+		requested, err := drainEvents(mapState.runtime, mapState.mapID)
+		if err != nil {
+			return err
+		}
+		if requested {
+			renderRequested = true
+			didWork = true
+		}
 
-		if shared.consumeRenderRequest() && !view.empty() && running {
-			completed, err := state.renderUpdate()
+		targetPending, err := state.pollPending()
+		if err != nil {
+			return err
+		}
+		if !targetPending && viewportDirty && !view.empty() {
+			viewportDirty = false
+			// The session resize carries the new logical extent to the map, so
+			// this loop starts one and never resizes the map itself. Starting
+			// it here instead of from the resize event coalesces a live resize
+			// into one outstanding submission.
+			if err := state.resize(view); err != nil {
+				return err
+			}
+			targetPending = true
+		}
+		if !targetPending && renderRequested && !view.empty() && running {
+			renderRequested = false
+			outcome, err := state.driveFrame()
 			if err != nil {
 				return err
 			}
-			if completed {
+			if outcome.rendered {
 				didWork = true
-			} else {
-				shared.requestRender()
+			}
+			if !outcome.rendered || outcome.needsRepaint {
+				renderRequested = true
 			}
 		}
 		if err := state.finishFrame(); err != nil {
@@ -237,15 +247,21 @@ func displayRefreshTimeoutMS(window *sdl.Window) int32 {
 }
 
 func validateNativeRenderBackend() error {
-	backends := maplibre.SupportedRenderBackends()
+	backends, err := maplibre.SupportedRenderBackendMask()
+	if err != nil {
+		return err
+	}
 	fmt.Printf("native render backends: %s\n", renderBackendSupportLabel(backends))
-	if !backends.Has(maplibre.RenderBackendOpenGL) {
+	if !backends.Has(maplibre.RenderBackendFlagOpenGL) {
 		return errors.New("loaded native library does not support OpenGL")
 	}
-	providers := maplibre.SupportedOpenGLContextProviders()
-	required := maplibre.OpenGLContextProviderEGL
-	if runtime.GOOS == "windows" {
-		required = maplibre.OpenGLContextProviderWGL
+	providers, err := maplibre.OpenGLSupportedContextProviderMask()
+	if err != nil {
+		return err
+	}
+	required := maplibre.OpenGLContextProviderFlagEGL
+	if stdruntime.GOOS == "windows" {
+		required = maplibre.OpenGLContextProviderFlagWGL
 	}
 	if !providers.Has(required) {
 		return fmt.Errorf("loaded native library does not support required OpenGL context provider: %s", openGLProviderLabel(required))
@@ -253,15 +269,15 @@ func validateNativeRenderBackend() error {
 	return nil
 }
 
-func renderBackendSupportLabel(mask maplibre.RenderBackendMask) string {
+func renderBackendSupportLabel(mask maplibre.RenderBackendFlag) string {
 	var labels []string
-	if mask.Has(maplibre.RenderBackendMetal) {
+	if mask.Has(maplibre.RenderBackendFlagMetal) {
 		labels = append(labels, "metal")
 	}
-	if mask.Has(maplibre.RenderBackendOpenGL) {
+	if mask.Has(maplibre.RenderBackendFlagOpenGL) {
 		labels = append(labels, "opengl")
 	}
-	if mask.Has(maplibre.RenderBackendVulkan) {
+	if mask.Has(maplibre.RenderBackendFlagVulkan) {
 		labels = append(labels, "vulkan")
 	}
 	if len(labels) == 0 {
@@ -270,11 +286,11 @@ func renderBackendSupportLabel(mask maplibre.RenderBackendMask) string {
 	return strings.Join(labels, ",")
 }
 
-func openGLProviderLabel(provider maplibre.OpenGLContextProviderMask) string {
+func openGLProviderLabel(provider maplibre.OpenGLContextProviderFlag) string {
 	switch provider {
-	case maplibre.OpenGLContextProviderWGL:
+	case maplibre.OpenGLContextProviderFlagWGL:
 		return "wgl"
-	case maplibre.OpenGLContextProviderEGL:
+	case maplibre.OpenGLContextProviderFlagEGL:
 		return "egl"
 	default:
 		return "unknown"

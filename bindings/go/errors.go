@@ -18,17 +18,25 @@ var (
 	ErrInvalidArgument = errors.New("maplibre: invalid argument")
 	// ErrInvalidState reports valid objects used in an invalid lifecycle state.
 	ErrInvalidState = errors.New("maplibre: invalid state")
-	// ErrWrongThread reports use of an owner-thread-affine handle from the wrong
-	// OS thread.
+	// ErrWrongThread reports use of a thread-affine render handle from the
+	// wrong OS thread.
 	ErrWrongThread = errors.New("maplibre: wrong thread")
 	// ErrUnsupported reports a backend, platform, or operation unavailable in
 	// the linked native build.
 	ErrUnsupported = errors.New("maplibre: unsupported")
 	// ErrNative reports a MapLibre Native error converted to a C status.
 	ErrNative = errors.New("maplibre: native error")
-	// ErrABIVersionMismatch reports that the loaded C ABI version is
-	// incompatible with this binding.
-	ErrABIVersionMismatch = errors.New("maplibre: ABI version mismatch")
+	// ErrCancelled reports a terminal cancelled operation.
+	ErrCancelled = errors.New("maplibre: cancelled")
+	// ErrBusy reports a conflicting driver or lifecycle call.
+	ErrBusy = errors.New("maplibre: busy")
+	// ErrTargetLost reports irreversible render-target loss.
+	ErrTargetLost = errors.New("maplibre: target lost")
+	// ErrNotReady reports that a nonblocking call has no result yet.
+	ErrNotReady = errors.New("maplibre: not ready")
+	// ErrNotFound reports a command or operation that named an ID with no live
+	// object behind it.
+	ErrNotFound = errors.New("maplibre: not found")
 	// ErrUnknownStatus reports a status value unknown to this binding version.
 	ErrUnknownStatus = errors.New("maplibre: unknown native status")
 )
@@ -43,13 +51,6 @@ type Error struct {
 
 func newBindingError(kind error, diagnostic string) *Error {
 	return &Error{kind: kind, diagnostic: diagnostic}
-}
-
-func newABIVersionMismatchError(expected, actual uint32) *Error {
-	return newBindingError(
-		ErrABIVersionMismatch,
-		fmt.Sprintf("unsupported MapLibre Native C ABI version %d; expected %d", actual, expected),
-	)
 }
 
 func newStatusError(failure *internalstatus.NativeError) *Error {
@@ -121,6 +122,16 @@ func kindForStatus(status int32) error {
 		return ErrUnsupported
 	case int32(C.MLN_STATUS_NATIVE_ERROR):
 		return ErrNative
+	case int32(C.MLN_STATUS_CANCELLED):
+		return ErrCancelled
+	case int32(C.MLN_STATUS_BUSY):
+		return ErrBusy
+	case int32(C.MLN_STATUS_TARGET_LOST):
+		return ErrTargetLost
+	case int32(C.MLN_STATUS_NOT_READY):
+		return ErrNotReady
+	case int32(C.MLN_STATUS_NOT_FOUND):
+		return ErrNotFound
 	default:
 		return ErrUnknownStatus
 	}
