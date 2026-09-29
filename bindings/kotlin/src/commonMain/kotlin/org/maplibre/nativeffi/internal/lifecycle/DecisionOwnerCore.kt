@@ -10,7 +10,8 @@ import org.maplibre.nativeffi.internal.status.Status
  * Ownership state for a handle that a callback decides to keep or hand back to native.
  *
  * The callback's decision settles who releases the native handle: an accepted handle is released
- * once the host closes it and in-flight calls drain, and a handed-back handle is native's to release.
+ * once the host closes it and in-flight calls drain, and a handed-back handle is native's to
+ * release.
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class DecisionOwnerCore(
@@ -56,11 +57,7 @@ internal class DecisionOwnerCore(
 
   fun finishDecision(decision: Decision): Decision {
     if (!decisionFinalized.compareAndSet(0, 1)) return Decision.ACCEPT
-    return if (
-      isClosed ||
-        completion.load() != COMPLETION_OPEN ||
-        decision == Decision.ACCEPT
-    ) {
+    return if (isClosed || completion.load() != COMPLETION_OPEN || decision == Decision.ACCEPT) {
       nativeReference.markProviderOwned()
       tryReleaseNative()
       Decision.ACCEPT

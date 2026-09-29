@@ -1516,9 +1516,8 @@ static void cancel_callback_runs_when_map_discards_request(void) {
   );
   const mln_resource_request_handle handle = atomic_load(&probe.handle);
   // The context retires as the callback returns, before the request does.
-  for (size_t attempt = 0;
-       atomic_load(&probe.release_count) == 0 &&
-       attempt < teardown_probe_wait_attempts;
+  for (size_t attempt = 0; atomic_load(&probe.release_count) == 0 &&
+                           attempt < teardown_probe_wait_attempts;
        attempt += 1) {
     mln_test_sleep_millisecond();
   }
@@ -1546,9 +1545,10 @@ static void cancel_callback_runs_when_map_discards_request(void) {
 
   mln_resource_request_release(handle);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_resource_request_set_cancel_callback(
-                                   handle, count_cancel, &probe, NULL, &cancelled
-                                 )
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_resource_request_set_cancel_callback(
+      handle, count_cancel, &probe, NULL, &cancelled
+    )
   );
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.release_count));
@@ -1580,10 +1580,10 @@ static void late_cancel_callback_registration_reports_cancelled(void) {
 
   cancelled = false;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_resource_request_set_cancel_callback(
-                     handle, count_cancel, &probe, count_cancel_release,
-                     &cancelled
-                   )
+    MLN_STATUS_OK,
+    mln_resource_request_set_cancel_callback(
+      handle, count_cancel, &probe, count_cancel_release, &cancelled
+    )
   );
   TEST_ASSERT_TRUE(cancelled);
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.cancel_count));
@@ -1613,9 +1613,10 @@ static void cancel_callback_may_release_the_request(void) {
   );
   bool cancelled = false;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_resource_request_set_cancel_callback(
-                                   handle, count_cancel, &probe, NULL, &cancelled
-                                 )
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_resource_request_set_cancel_callback(
+      handle, count_cancel, &probe, NULL, &cancelled
+    )
   );
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
   mln_test_destroy_runtime(runtime);
@@ -1703,9 +1704,10 @@ static uint32_t blocking_cancel_resource_provider(
   atomic_store(&probe->base.handle, handle);
   bool cancelled = true;
   atomic_store(
-    &probe->base.register_status, mln_resource_request_set_cancel_callback(
-                                    handle, block_in_cancel, probe, NULL, &cancelled
-                                  )
+    &probe->base.register_status,
+    mln_resource_request_set_cancel_callback(
+      handle, block_in_cancel, probe, NULL, &cancelled
+    )
   );
   atomic_store(&probe->base.register_reported_cancelled, cancelled);
   atomic_store(&probe->base.provider_entered, true);
