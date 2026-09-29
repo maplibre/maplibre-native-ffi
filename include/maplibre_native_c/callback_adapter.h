@@ -144,11 +144,13 @@ typedef struct mln_adapter_deferred_call_record {
 /**
  * Receives deferred calls on the thread that made them.
  *
- * The listener owns each non-null record and releases it with
+ * Calls can arrive concurrently from several MapLibre threads. The listener
+ * owns each non-null record and releases it with
  * mln_adapter_deferred_call_record_destroy(). It runs once more with a null
  * record when the context is released, after the final call, and frees
- * user_data then. A listener that forwards records to another execution context
- * returns promptly and never calls back into MapLibre.
+ * user_data then. A listener hands each record to the host's own execution
+ * context, such as a queue it wakes, returns promptly, and never calls back
+ * into MapLibre.
  */
 typedef void (*mln_adapter_deferred_call_listener)(
   void* user_data MLN_BINDING("kind=context;lifetime=owner"),
