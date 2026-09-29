@@ -79,16 +79,16 @@ binding_source="$MISE_MONOREPO_ROOT/bindings/rust/crates/maplibre-native-ffi/src
 # under. Tests live in indented `mod tests` blocks, so the names are read from
 # the first function declaration after each `#[test]` attribute at any depth.
 test_sources=(
-  "map/tests/invalidation.rs map::tests::invalidation::"
   "completion.rs completion::tests::"
   "handle.rs handle::tests::"
-  "lib.rs tests::"
   "logging.rs logging::tests::"
-  "map/tests.rs map::tests::"
-  "projection.rs projection::tests::"
-  "render/tests.rs render::tests::"
-  "render/tests/invalidation.rs render::tests::invalidation::"
-  "runtime.rs runtime::tests::"
+  "tests/mod.rs tests::"
+  "tests/map.rs tests::map::"
+  "tests/map/invalidation.rs tests::map::invalidation::"
+  "tests/projection.rs tests::projection::"
+  "tests/render.rs tests::render::"
+  "tests/render/invalidation.rs tests::render::invalidation::"
+  "tests/runtime.rs tests::runtime::"
 )
 
 list_test_names() {
