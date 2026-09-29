@@ -61,17 +61,7 @@ def field_name(name: str) -> str:
 
 
 def public_name(native: str) -> str:
-    acronyms = {
-        "geojson": "GeoJson",
-        "opengl": "OpenGL",
-        "webgpu": "WebGPU",
-        "webgl": "WebGL",
-        "wgl": "WGL",
-        "egl": "EGL",
-    }
-    return "".join(
-        acronyms.get(x, x.capitalize()) for x in native.removeprefix("mln_").split("_")
-    )
+    return "".join(x.capitalize() for x in native.removeprefix("mln_").split("_"))
 
 
 def rust_field(name: str) -> str:

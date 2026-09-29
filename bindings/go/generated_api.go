@@ -32,7 +32,7 @@ const (
 	AnimationOptionFieldVelocity     AnimationOptionField = AnimationOptionField(C.MLN_ANIMATION_OPTION_VELOCITY)
 	AnimationOptionFieldMinZoom      AnimationOptionField = AnimationOptionField(C.MLN_ANIMATION_OPTION_MIN_ZOOM)
 	AnimationOptionFieldEasing       AnimationOptionField = AnimationOptionField(C.MLN_ANIMATION_OPTION_EASING)
-	AnimationOptionFieldTransitionID AnimationOptionField = AnimationOptionField(C.MLN_ANIMATION_OPTION_TRANSITION_ID)
+	AnimationOptionFieldTransitionId AnimationOptionField = AnimationOptionField(C.MLN_ANIMATION_OPTION_TRANSITION_ID)
 )
 
 func (value AnimationOptionField) Has(flags AnimationOptionField) bool { return value&flags == flags }
@@ -134,22 +134,22 @@ func (value CustomGeometrySourceOptionField) Has(flags CustomGeometrySourceOptio
 	return value&flags == flags
 }
 
-type CustomMVTVectorSourceOptionField uint32
+type CustomMvtVectorSourceOptionField uint32
 
 const (
-	CustomMVTVectorSourceOptionFieldMinZoom CustomMVTVectorSourceOptionField = CustomMVTVectorSourceOptionField(C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM)
-	CustomMVTVectorSourceOptionFieldMaxZoom CustomMVTVectorSourceOptionField = CustomMVTVectorSourceOptionField(C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM)
+	CustomMvtVectorSourceOptionFieldMinZoom CustomMvtVectorSourceOptionField = CustomMvtVectorSourceOptionField(C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM)
+	CustomMvtVectorSourceOptionFieldMaxZoom CustomMvtVectorSourceOptionField = CustomMvtVectorSourceOptionField(C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM)
 )
 
-func (value CustomMVTVectorSourceOptionField) Has(flags CustomMVTVectorSourceOptionField) bool {
+func (value CustomMvtVectorSourceOptionField) Has(flags CustomMvtVectorSourceOptionField) bool {
 	return value&flags == flags
 }
 
 type FeatureStateSelectorField uint32
 
 const (
-	FeatureStateSelectorFieldSourceLayerID FeatureStateSelectorField = FeatureStateSelectorField(C.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID)
-	FeatureStateSelectorFieldFeatureID     FeatureStateSelectorField = FeatureStateSelectorField(C.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID)
+	FeatureStateSelectorFieldSourceLayerId FeatureStateSelectorField = FeatureStateSelectorField(C.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID)
+	FeatureStateSelectorFieldFeatureId     FeatureStateSelectorField = FeatureStateSelectorField(C.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID)
 	FeatureStateSelectorFieldStateKey      FeatureStateSelectorField = FeatureStateSelectorField(C.MLN_FEATURE_STATE_SELECTOR_STATE_KEY)
 )
 
@@ -175,24 +175,24 @@ const (
 
 func (value FreeCameraOptionField) Has(flags FreeCameraOptionField) bool { return value&flags == flags }
 
-type GeoJSONSourceOptionField uint32
+type GeojsonSourceOptionField uint32
 
 const (
-	GeoJSONSourceOptionFieldMinZoom           GeoJSONSourceOptionField = GeoJSONSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM)
-	GeoJSONSourceOptionFieldMaxZoom           GeoJSONSourceOptionField = GeoJSONSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM)
-	GeoJSONSourceOptionFieldTolerance         GeoJSONSourceOptionField = GeoJSONSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE)
-	GeoJSONSourceOptionFieldClusterMaxZoom    GeoJSONSourceOptionField = GeoJSONSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM)
-	GeoJSONSourceOptionFieldClusterProperties GeoJSONSourceOptionField = GeoJSONSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES)
-	GeoJSONSourceOptionFieldTileSize          GeoJSONSourceOptionField = GeoJSONSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE)
-	GeoJSONSourceOptionFieldBuffer            GeoJSONSourceOptionField = GeoJSONSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_BUFFER)
-	GeoJSONSourceOptionFieldClusterRadius     GeoJSONSourceOptionField = GeoJSONSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS)
-	GeoJSONSourceOptionFieldClusterMinPoints  GeoJSONSourceOptionField = GeoJSONSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS)
-	GeoJSONSourceOptionFieldLineMetrics       GeoJSONSourceOptionField = GeoJSONSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS)
-	GeoJSONSourceOptionFieldCluster           GeoJSONSourceOptionField = GeoJSONSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER)
-	GeoJSONSourceOptionFieldSynchronousTiling GeoJSONSourceOptionField = GeoJSONSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING)
+	GeojsonSourceOptionFieldMinZoom           GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM)
+	GeojsonSourceOptionFieldMaxZoom           GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM)
+	GeojsonSourceOptionFieldTolerance         GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE)
+	GeojsonSourceOptionFieldClusterMaxZoom    GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM)
+	GeojsonSourceOptionFieldClusterProperties GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES)
+	GeojsonSourceOptionFieldTileSize          GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE)
+	GeojsonSourceOptionFieldBuffer            GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_BUFFER)
+	GeojsonSourceOptionFieldClusterRadius     GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS)
+	GeojsonSourceOptionFieldClusterMinPoints  GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS)
+	GeojsonSourceOptionFieldLineMetrics       GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS)
+	GeojsonSourceOptionFieldCluster           GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER)
+	GeojsonSourceOptionFieldSynchronousTiling GeojsonSourceOptionField = GeojsonSourceOptionField(C.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING)
 )
 
-func (value GeoJSONSourceOptionField) Has(flags GeoJSONSourceOptionField) bool {
+func (value GeojsonSourceOptionField) Has(flags GeojsonSourceOptionField) bool {
 	return value&flags == flags
 }
 
@@ -206,14 +206,14 @@ const (
 	GesturePhaseCancel GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_CANCEL)
 )
 
-type GPUSyncKind uint32
+type GpuSyncKind uint32
 
 const (
-	GPUSyncKindCPUComplete             GPUSyncKind = GPUSyncKind(C.MLN_GPU_SYNC_CPU_COMPLETE)
-	GPUSyncKindMetalSharedEvent        GPUSyncKind = GPUSyncKind(C.MLN_GPU_SYNC_METAL_SHARED_EVENT)
-	GPUSyncKindVulkanTimelineSemaphore GPUSyncKind = GPUSyncKind(C.MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE)
-	GPUSyncKindOpenGLFence             GPUSyncKind = GPUSyncKind(C.MLN_GPU_SYNC_OPENGL_FENCE)
-	GPUSyncKindWebGPUToken             GPUSyncKind = GPUSyncKind(C.MLN_GPU_SYNC_WEBGPU_TOKEN)
+	GpuSyncKindCpuComplete             GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_CPU_COMPLETE)
+	GpuSyncKindMetalSharedEvent        GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_METAL_SHARED_EVENT)
+	GpuSyncKindVulkanTimelineSemaphore GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE)
+	GpuSyncKindOpenglFence             GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_OPENGL_FENCE)
+	GpuSyncKindWebgpuToken             GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_WEBGPU_TOKEN)
 )
 
 type LocationIndicatorImageKind uint32
@@ -235,7 +235,7 @@ const (
 	LogEventRender          LogEvent = LogEvent(C.MLN_LOG_EVENT_RENDER)
 	LogEventStyle           LogEvent = LogEvent(C.MLN_LOG_EVENT_STYLE)
 	LogEventDatabase        LogEvent = LogEvent(C.MLN_LOG_EVENT_DATABASE)
-	LogEventHTTPRequest     LogEvent = LogEvent(C.MLN_LOG_EVENT_HTTP_REQUEST)
+	LogEventHttpRequest     LogEvent = LogEvent(C.MLN_LOG_EVENT_HTTP_REQUEST)
 	LogEventSprite          LogEvent = LogEvent(C.MLN_LOG_EVENT_SPRITE)
 	LogEventImage           LogEvent = LogEvent(C.MLN_LOG_EVENT_IMAGE)
 	LogEventGraphicsBackend LogEvent = LogEvent(C.MLN_LOG_EVENT_GRAPHICS_BACKEND)
@@ -344,39 +344,39 @@ const (
 	OfflineRegionDownloadStateActive   OfflineRegionDownloadState = OfflineRegionDownloadState(C.MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE)
 )
 
-type OpenGLClientAPI uint32
+type OpenglClientApi uint32
 
 const (
-	OpenGLClientAPIUnspecified OpenGLClientAPI = OpenGLClientAPI(C.MLN_OPENGL_CLIENT_API_UNSPECIFIED)
-	OpenGLClientAPIGl          OpenGLClientAPI = OpenGLClientAPI(C.MLN_OPENGL_CLIENT_API_GL)
-	OpenGLClientAPIGles        OpenGLClientAPI = OpenGLClientAPI(C.MLN_OPENGL_CLIENT_API_GLES)
+	OpenglClientApiUnspecified OpenglClientApi = OpenglClientApi(C.MLN_OPENGL_CLIENT_API_UNSPECIFIED)
+	OpenglClientApiGl          OpenglClientApi = OpenglClientApi(C.MLN_OPENGL_CLIENT_API_GL)
+	OpenglClientApiGles        OpenglClientApi = OpenglClientApi(C.MLN_OPENGL_CLIENT_API_GLES)
 )
 
-type OpenGLContextOwnership uint32
+type OpenglContextOwnership uint32
 
 const (
-	OpenGLContextOwnershipShared    OpenGLContextOwnership = OpenGLContextOwnership(C.MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED)
-	OpenGLContextOwnershipDedicated OpenGLContextOwnership = OpenGLContextOwnership(C.MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED)
+	OpenglContextOwnershipShared    OpenglContextOwnership = OpenglContextOwnership(C.MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED)
+	OpenglContextOwnershipDedicated OpenglContextOwnership = OpenglContextOwnership(C.MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED)
 )
 
-type OpenGLContextPlatform uint32
+type OpenglContextPlatform uint32
 
 const (
-	OpenGLContextPlatformUnspecified OpenGLContextPlatform = OpenGLContextPlatform(C.MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED)
-	OpenGLContextPlatformWGL         OpenGLContextPlatform = OpenGLContextPlatform(C.MLN_OPENGL_CONTEXT_PLATFORM_WGL)
-	OpenGLContextPlatformEGL         OpenGLContextPlatform = OpenGLContextPlatform(C.MLN_OPENGL_CONTEXT_PLATFORM_EGL)
-	OpenGLContextPlatformWebGL       OpenGLContextPlatform = OpenGLContextPlatform(C.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL)
+	OpenglContextPlatformUnspecified OpenglContextPlatform = OpenglContextPlatform(C.MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED)
+	OpenglContextPlatformWgl         OpenglContextPlatform = OpenglContextPlatform(C.MLN_OPENGL_CONTEXT_PLATFORM_WGL)
+	OpenglContextPlatformEgl         OpenglContextPlatform = OpenglContextPlatform(C.MLN_OPENGL_CONTEXT_PLATFORM_EGL)
+	OpenglContextPlatformWebgl       OpenglContextPlatform = OpenglContextPlatform(C.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL)
 )
 
-type OpenGLContextProviderFlag uint32
+type OpenglContextProviderFlag uint32
 
 const (
-	OpenGLContextProviderFlagWGL   OpenGLContextProviderFlag = OpenGLContextProviderFlag(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL)
-	OpenGLContextProviderFlagEGL   OpenGLContextProviderFlag = OpenGLContextProviderFlag(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL)
-	OpenGLContextProviderFlagWebGL OpenGLContextProviderFlag = OpenGLContextProviderFlag(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL)
+	OpenglContextProviderFlagWgl   OpenglContextProviderFlag = OpenglContextProviderFlag(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL)
+	OpenglContextProviderFlagEgl   OpenglContextProviderFlag = OpenglContextProviderFlag(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL)
+	OpenglContextProviderFlagWebgl OpenglContextProviderFlag = OpenglContextProviderFlag(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL)
 )
 
-func (value OpenGLContextProviderFlag) Has(flags OpenGLContextProviderFlag) bool {
+func (value OpenglContextProviderFlag) Has(flags OpenglContextProviderFlag) bool {
 	return value&flags == flags
 }
 
@@ -393,8 +393,8 @@ func (value ProjectionModeField) Has(flags ProjectionModeField) bool { return va
 type QueriedFeatureField uint32
 
 const (
-	QueriedFeatureFieldSourceID      QueriedFeatureField = QueriedFeatureField(C.MLN_QUERIED_FEATURE_SOURCE_ID)
-	QueriedFeatureFieldSourceLayerID QueriedFeatureField = QueriedFeatureField(C.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID)
+	QueriedFeatureFieldSourceId      QueriedFeatureField = QueriedFeatureField(C.MLN_QUERIED_FEATURE_SOURCE_ID)
+	QueriedFeatureFieldSourceLayerId QueriedFeatureField = QueriedFeatureField(C.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID)
 	QueriedFeatureFieldState         QueriedFeatureField = QueriedFeatureField(C.MLN_QUERIED_FEATURE_STATE)
 )
 
@@ -412,8 +412,8 @@ type RenderBackendFlag uint32
 const (
 	RenderBackendFlagMetal  RenderBackendFlag = RenderBackendFlag(C.MLN_RENDER_BACKEND_FLAG_METAL)
 	RenderBackendFlagVulkan RenderBackendFlag = RenderBackendFlag(C.MLN_RENDER_BACKEND_FLAG_VULKAN)
-	RenderBackendFlagOpenGL RenderBackendFlag = RenderBackendFlag(C.MLN_RENDER_BACKEND_FLAG_OPENGL)
-	RenderBackendFlagWebGPU RenderBackendFlag = RenderBackendFlag(C.MLN_RENDER_BACKEND_FLAG_WEBGPU)
+	RenderBackendFlagOpengl RenderBackendFlag = RenderBackendFlag(C.MLN_RENDER_BACKEND_FLAG_OPENGL)
+	RenderBackendFlagWebgpu RenderBackendFlag = RenderBackendFlag(C.MLN_RENDER_BACKEND_FLAG_WEBGPU)
 )
 
 func (value RenderBackendFlag) Has(flags RenderBackendFlag) bool { return value&flags == flags }
@@ -470,7 +470,7 @@ const (
 type RenderedFeatureQueryOptionField uint32
 
 const (
-	RenderedFeatureQueryOptionFieldIDs RenderedFeatureQueryOptionField = RenderedFeatureQueryOptionField(C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS)
+	RenderedFeatureQueryOptionFieldIds RenderedFeatureQueryOptionField = RenderedFeatureQueryOptionField(C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS)
 )
 
 func (value RenderedFeatureQueryOptionField) Has(flags RenderedFeatureQueryOptionField) bool {
@@ -505,7 +505,7 @@ const (
 	ResourceKindTile        ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_TILE)
 	ResourceKindGlyphs      ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_GLYPHS)
 	ResourceKindSpriteImage ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_SPRITE_IMAGE)
-	ResourceKindSpriteJSON  ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_SPRITE_JSON)
+	ResourceKindSpriteJson  ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_SPRITE_JSON)
 	ResourceKindImage       ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_IMAGE)
 )
 
@@ -534,7 +534,7 @@ const (
 type ResourceResponseStatus uint32
 
 const (
-	ResourceResponseStatusOK          ResourceResponseStatus = ResourceResponseStatus(C.MLN_RESOURCE_RESPONSE_STATUS_OK)
+	ResourceResponseStatusOk          ResourceResponseStatus = ResourceResponseStatus(C.MLN_RESOURCE_RESPONSE_STATUS_OK)
 	ResourceResponseStatusError       ResourceResponseStatus = ResourceResponseStatus(C.MLN_RESOURCE_RESPONSE_STATUS_ERROR)
 	ResourceResponseStatusNoContent   ResourceResponseStatus = ResourceResponseStatus(C.MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT)
 	ResourceResponseStatusNotModified ResourceResponseStatus = ResourceResponseStatus(C.MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED)
@@ -637,7 +637,7 @@ const (
 type SourceFeatureQueryOptionField uint32
 
 const (
-	SourceFeatureQueryOptionFieldIDs SourceFeatureQueryOptionField = SourceFeatureQueryOptionField(C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS)
+	SourceFeatureQueryOptionFieldIds SourceFeatureQueryOptionField = SourceFeatureQueryOptionField(C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS)
 )
 
 func (value SourceFeatureQueryOptionField) Has(flags SourceFeatureQueryOptionField) bool {
@@ -647,7 +647,7 @@ func (value SourceFeatureQueryOptionField) Has(flags SourceFeatureQueryOptionFie
 type Status int32
 
 const (
-	StatusOK              Status = Status(C.MLN_STATUS_OK)
+	StatusOk              Status = Status(C.MLN_STATUS_OK)
 	StatusInvalidArgument Status = Status(C.MLN_STATUS_INVALID_ARGUMENT)
 	StatusInvalidState    Status = Status(C.MLN_STATUS_INVALID_STATE)
 	StatusWrongThread     Status = Status(C.MLN_STATUS_WRONG_THREAD)
@@ -664,7 +664,7 @@ type StyleImageOptionField uint32
 
 const (
 	StyleImageOptionFieldPixelRatio    StyleImageOptionField = StyleImageOptionField(C.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO)
-	StyleImageOptionFieldSDF           StyleImageOptionField = StyleImageOptionField(C.MLN_STYLE_IMAGE_OPTION_SDF)
+	StyleImageOptionFieldSdf           StyleImageOptionField = StyleImageOptionField(C.MLN_STYLE_IMAGE_OPTION_SDF)
 	StyleImageOptionFieldStretchX      StyleImageOptionField = StyleImageOptionField(C.MLN_STYLE_IMAGE_OPTION_STRETCH_X)
 	StyleImageOptionFieldStretchY      StyleImageOptionField = StyleImageOptionField(C.MLN_STYLE_IMAGE_OPTION_STRETCH_Y)
 	StyleImageOptionFieldContent       StyleImageOptionField = StyleImageOptionField(C.MLN_STYLE_IMAGE_OPTION_CONTENT)
@@ -689,18 +689,18 @@ const (
 	StyleLayerVisibilityNone    StyleLayerVisibility = StyleLayerVisibility(C.MLN_STYLE_LAYER_VISIBILITY_NONE)
 )
 
-type StyleRasterDEMEncoding uint32
+type StyleRasterDemEncoding uint32
 
 const (
-	StyleRasterDEMEncodingMapbox    StyleRasterDEMEncoding = StyleRasterDEMEncoding(C.MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX)
-	StyleRasterDEMEncodingTerrarium StyleRasterDEMEncoding = StyleRasterDEMEncoding(C.MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM)
+	StyleRasterDemEncodingMapbox    StyleRasterDemEncoding = StyleRasterDemEncoding(C.MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX)
+	StyleRasterDemEncodingTerrarium StyleRasterDemEncoding = StyleRasterDemEncoding(C.MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM)
 )
 
 type StyleSourceInfoField uint32
 
 const (
-	StyleSourceInfoFieldURL            StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_URL)
-	StyleSourceInfoFieldTileJSON       StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_TILEJSON)
+	StyleSourceInfoFieldUrl            StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_URL)
+	StyleSourceInfoFieldTilejson       StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_TILEJSON)
 	StyleSourceInfoFieldBounds         StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_BOUNDS)
 	StyleSourceInfoFieldTileSize       StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_TILE_SIZE)
 	StyleSourceInfoFieldVectorEncoding StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING)
@@ -715,20 +715,20 @@ const (
 	StyleSourceTypeUnknown         StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_UNKNOWN)
 	StyleSourceTypeVector          StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_VECTOR)
 	StyleSourceTypeRaster          StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_RASTER)
-	StyleSourceTypeRasterDEM       StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_RASTER_DEM)
-	StyleSourceTypeGeoJSON         StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_GEOJSON)
+	StyleSourceTypeRasterDem       StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_RASTER_DEM)
+	StyleSourceTypeGeojson         StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_GEOJSON)
 	StyleSourceTypeImage           StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_IMAGE)
 	StyleSourceTypeVideo           StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_VIDEO)
 	StyleSourceTypeAnnotations     StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_ANNOTATIONS)
 	StyleSourceTypeCustomVector    StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR)
-	StyleSourceTypeCustomMVTVector StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR)
+	StyleSourceTypeCustomMvtVector StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR)
 )
 
 type StyleTileScheme uint32
 
 const (
 	StyleTileSchemeXyz StyleTileScheme = StyleTileScheme(C.MLN_STYLE_TILE_SCHEME_XYZ)
-	StyleTileSchemeTMS StyleTileScheme = StyleTileScheme(C.MLN_STYLE_TILE_SCHEME_TMS)
+	StyleTileSchemeTms StyleTileScheme = StyleTileScheme(C.MLN_STYLE_TILE_SCHEME_TMS)
 )
 
 type StyleTileSourceOptionField uint32
@@ -763,8 +763,8 @@ func (value StyleTransitionOptionField) Has(flags StyleTransitionOptionField) bo
 type StyleVectorTileEncoding uint32
 
 const (
-	StyleVectorTileEncodingMVT StyleVectorTileEncoding = StyleVectorTileEncoding(C.MLN_STYLE_VECTOR_TILE_ENCODING_MVT)
-	StyleVectorTileEncodingMLT StyleVectorTileEncoding = StyleVectorTileEncoding(C.MLN_STYLE_VECTOR_TILE_ENCODING_MLT)
+	StyleVectorTileEncodingMvt StyleVectorTileEncoding = StyleVectorTileEncoding(C.MLN_STYLE_VECTOR_TILE_ENCODING_MVT)
+	StyleVectorTileEncodingMlt StyleVectorTileEncoding = StyleVectorTileEncoding(C.MLN_STYLE_VECTOR_TILE_ENCODING_MLT)
 )
 
 type TileLodMode uint32
@@ -795,11 +795,11 @@ const (
 	ViewportModeFlippedY ViewportMode = ViewportMode(C.MLN_VIEWPORT_MODE_FLIPPED_Y)
 )
 
-type WebGLContextKind uint32
+type WebglContextKind uint32
 
 const (
-	WebGLContextKindExisting          WebGLContextKind = WebGLContextKind(C.MLN_WEBGL_CONTEXT_EXISTING)
-	WebGLContextKindTransferredCanvas WebGLContextKind = WebGLContextKind(C.MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS)
+	WebglContextKindExisting          WebglContextKind = WebglContextKind(C.MLN_WEBGL_CONTEXT_EXISTING)
+	WebglContextKindTransferredCanvas WebglContextKind = WebglContextKind(C.MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS)
 )
 
 type OfflineRegionDefinitionData interface{ bindingTag() uint32 }
@@ -820,23 +820,23 @@ func (OfflineRegionDefinitionDataGeometryVariant) bindingTag() uint32 {
 	return uint32(C.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY)
 }
 
-type OpenGLContextDescriptorData interface{ bindingTag() uint32 }
+type OpenglContextDescriptorData interface{ bindingTag() uint32 }
 
-type OpenGLContextDescriptorDataWGLVariant struct{ Value WGLContextDescriptor }
+type OpenglContextDescriptorDataWglVariant struct{ Value WglContextDescriptor }
 
-func (OpenGLContextDescriptorDataWGLVariant) bindingTag() uint32 {
+func (OpenglContextDescriptorDataWglVariant) bindingTag() uint32 {
 	return uint32(C.MLN_OPENGL_CONTEXT_PLATFORM_WGL)
 }
 
-type OpenGLContextDescriptorDataEGLVariant struct{ Value EGLContextDescriptor }
+type OpenglContextDescriptorDataEglVariant struct{ Value EglContextDescriptor }
 
-func (OpenGLContextDescriptorDataEGLVariant) bindingTag() uint32 {
+func (OpenglContextDescriptorDataEglVariant) bindingTag() uint32 {
 	return uint32(C.MLN_OPENGL_CONTEXT_PLATFORM_EGL)
 }
 
-type OpenGLContextDescriptorDataWebGLVariant struct{ Value WebGLContextDescriptor }
+type OpenglContextDescriptorDataWebglVariant struct{ Value WebglContextDescriptor }
 
-func (OpenGLContextDescriptorDataWebGLVariant) bindingTag() uint32 {
+func (OpenglContextDescriptorDataWebglVariant) bindingTag() uint32 {
 	return uint32(C.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL)
 }
 
@@ -913,18 +913,18 @@ func (RuntimeEventPayloadCameraTransitionFinishedVariant) bindingTag() uint32 {
 }
 
 type AnimationOptions struct {
-	DurationMS   *float64
+	DurationMs   *float64
 	Velocity     *float64
 	MinZoom      *float64
 	Easing       *UnitBezier
-	TransitionID *uint64
+	TransitionId *uint64
 }
 
 func copyAnimationOptions(raw C.mln_animation_options) AnimationOptions {
 	var result AnimationOptions
 	if raw.fields&C.MLN_ANIMATION_OPTION_DURATION != 0 {
 		copied := float64(raw.duration_ms)
-		result.DurationMS = &copied
+		result.DurationMs = &copied
 	}
 	if raw.fields&C.MLN_ANIMATION_OPTION_VELOCITY != 0 {
 		copied := float64(raw.velocity)
@@ -940,7 +940,7 @@ func copyAnimationOptions(raw C.mln_animation_options) AnimationOptions {
 	}
 	if raw.fields&C.MLN_ANIMATION_OPTION_TRANSITION_ID != 0 {
 		copied := uint64(raw.transition_id)
-		result.TransitionID = &copied
+		result.TransitionId = &copied
 	}
 	return result
 }
@@ -949,8 +949,8 @@ func nativeAnimationOptions(input AnimationOptions, arena *bindingArena) C.mln_a
 	raw := C.mln_animation_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.DurationMS != nil {
-		raw.duration_ms = C.double((*input.DurationMS))
+	if input.DurationMs != nil {
+		raw.duration_ms = C.double((*input.DurationMs))
 		raw.fields |= C.MLN_ANIMATION_OPTION_DURATION
 	}
 	if input.Velocity != nil {
@@ -965,8 +965,8 @@ func nativeAnimationOptions(input AnimationOptions, arena *bindingArena) C.mln_a
 		raw.easing = nativeUnitBezier((*input.Easing), arena)
 		raw.fields |= C.MLN_ANIMATION_OPTION_EASING
 	}
-	if input.TransitionID != nil {
-		raw.transition_id = C.uint64_t((*input.TransitionID))
+	if input.TransitionId != nil {
+		raw.transition_id = C.uint64_t((*input.TransitionId))
 		raw.fields |= C.MLN_ANIMATION_OPTION_TRANSITION_ID
 	}
 	return raw
@@ -1271,21 +1271,21 @@ func nativeCameraUpdate(input CameraUpdate, arena *bindingArena) C.mln_camera_up
 
 func DefaultCameraUpdate() CameraUpdate { return copyCameraUpdate(C.mln_camera_update_default()) }
 
-type CanonicalTileID struct {
+type CanonicalTileId struct {
 	Z uint32
 	X uint32
 	Y uint32
 }
 
-func copyCanonicalTileID(raw C.mln_canonical_tile_id) CanonicalTileID {
-	var result CanonicalTileID
+func copyCanonicalTileId(raw C.mln_canonical_tile_id) CanonicalTileId {
+	var result CanonicalTileId
 	result.Z = uint32(raw.z)
 	result.X = uint32(raw.x)
 	result.Y = uint32(raw.y)
 	return result
 }
 
-func nativeCanonicalTileID(input CanonicalTileID, arena *bindingArena) C.mln_canonical_tile_id {
+func nativeCanonicalTileId(input CanonicalTileId, arena *bindingArena) C.mln_canonical_tile_id {
 	raw := C.mln_canonical_tile_id{}
 	raw.z = C.uint32_t(input.Z)
 	raw.x = C.uint32_t(input.X)
@@ -1301,8 +1301,8 @@ type CustomGeometrySourceOptions struct {
 	Buffer     *uint32
 	Clip       *bool
 	Wrap       *bool
-	FetchTile  func(CanonicalTileID)
-	CancelTile func(CanonicalTileID)
+	FetchTile  func(CanonicalTileId)
+	CancelTile func(CanonicalTileId)
 }
 
 func copyCustomGeometrySourceOptions(raw C.mln_custom_geometry_source_options) CustomGeometrySourceOptions {
@@ -1387,15 +1387,15 @@ func DefaultCustomGeometrySourceOptions() CustomGeometrySourceOptions {
 	return copyCustomGeometrySourceOptions(C.mln_custom_geometry_source_options_default())
 }
 
-type CustomMVTVectorSourceOptions struct {
+type CustomMvtVectorSourceOptions struct {
 	MinZoom    *float64
 	MaxZoom    *float64
-	FetchTile  func(CanonicalTileID)
-	CancelTile func(CanonicalTileID)
+	FetchTile  func(CanonicalTileId)
+	CancelTile func(CanonicalTileId)
 }
 
-func copyCustomMVTVectorSourceOptions(raw C.mln_custom_mvt_vector_source_options) CustomMVTVectorSourceOptions {
-	var result CustomMVTVectorSourceOptions
+func copyCustomMvtVectorSourceOptions(raw C.mln_custom_mvt_vector_source_options) CustomMvtVectorSourceOptions {
+	var result CustomMvtVectorSourceOptions
 	if raw.fields&C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM != 0 {
 		copied := float64(raw.min_zoom)
 		result.MinZoom = &copied
@@ -1407,7 +1407,7 @@ func copyCustomMVTVectorSourceOptions(raw C.mln_custom_mvt_vector_source_options
 	return result
 }
 
-func nativeCustomMVTVectorSourceOptions(input CustomMVTVectorSourceOptions, arena *bindingArena) C.mln_custom_mvt_vector_source_options {
+func nativeCustomMvtVectorSourceOptions(input CustomMvtVectorSourceOptions, arena *bindingArena) C.mln_custom_mvt_vector_source_options {
 	raw := C.mln_custom_mvt_vector_source_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
@@ -1432,8 +1432,8 @@ func nativeCustomMVTVectorSourceOptions(input CustomMVTVectorSourceOptions, aren
 	return raw
 }
 
-func DefaultCustomMVTVectorSourceOptions() CustomMVTVectorSourceOptions {
-	return copyCustomMVTVectorSourceOptions(C.mln_custom_mvt_vector_source_options_default())
+func DefaultCustomMvtVectorSourceOptions() CustomMvtVectorSourceOptions {
+	return copyCustomMvtVectorSourceOptions(C.mln_custom_mvt_vector_source_options_default())
 }
 
 type EdgeInsets struct {
@@ -1461,39 +1461,39 @@ func nativeEdgeInsets(input EdgeInsets, arena *bindingArena) C.mln_edge_insets {
 	return raw
 }
 
-type EGLContextDescriptor struct {
+type EglContextDescriptor struct {
 	Display        uintptr
 	Config         uintptr
 	ShareContext   uintptr
-	ClientAPI      OpenGLClientAPI
+	ClientApi      OpenglClientApi
 	GetProcAddress uintptr
 }
 
-func copyEGLContextDescriptor(raw C.mln_egl_context_descriptor) EGLContextDescriptor {
-	var result EGLContextDescriptor
+func copyEglContextDescriptor(raw C.mln_egl_context_descriptor) EglContextDescriptor {
+	var result EglContextDescriptor
 	result.Display = uintptr(unsafe.Pointer(raw.display))
 	result.Config = uintptr(unsafe.Pointer(raw.config))
 	result.ShareContext = uintptr(unsafe.Pointer(raw.share_context))
-	result.ClientAPI = OpenGLClientAPI(raw.client_api)
+	result.ClientApi = OpenglClientApi(raw.client_api)
 	result.GetProcAddress = uintptr(unsafe.Pointer(raw.get_proc_address))
 	return result
 }
 
-func nativeEGLContextDescriptor(input EGLContextDescriptor, arena *bindingArena) C.mln_egl_context_descriptor {
+func nativeEglContextDescriptor(input EglContextDescriptor, arena *bindingArena) C.mln_egl_context_descriptor {
 	raw := C.mln_egl_context_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.display = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Display)))
 	raw.config = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Config)))
 	raw.share_context = unsafe.Pointer(C.binding_address(C.uintptr_t(input.ShareContext)))
-	raw.client_api = C.mln_opengl_client_api(input.ClientAPI)
+	raw.client_api = C.mln_opengl_client_api(input.ClientApi)
 	raw.get_proc_address = unsafe.Pointer(C.binding_address(C.uintptr_t(input.GetProcAddress)))
 	return raw
 }
 
 type FeatureStateSelector struct {
-	SourceID      string
-	SourceLayerID *string
-	FeatureID     *string
+	SourceId      string
+	SourceLayerId *string
+	FeatureId     *string
 	StateKey      *string
 }
 
@@ -1501,13 +1501,13 @@ func nativeFeatureStateSelector(input FeatureStateSelector, arena *bindingArena)
 	raw := C.mln_feature_state_selector{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	raw.source_id = C.mln_buffer_view{data: arena.bytes([]byte(input.SourceID)), size: C.size_t(len(input.SourceID))}
-	if input.SourceLayerID != nil {
-		raw.source_layer_id = C.mln_buffer_view{data: arena.bytes([]byte((*input.SourceLayerID))), size: C.size_t(len((*input.SourceLayerID)))}
+	raw.source_id = C.mln_buffer_view{data: arena.bytes([]byte(input.SourceId)), size: C.size_t(len(input.SourceId))}
+	if input.SourceLayerId != nil {
+		raw.source_layer_id = C.mln_buffer_view{data: arena.bytes([]byte((*input.SourceLayerId))), size: C.size_t(len((*input.SourceLayerId)))}
 		raw.fields |= C.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
 	}
-	if input.FeatureID != nil {
-		raw.feature_id = C.mln_buffer_view{data: arena.bytes([]byte((*input.FeatureID))), size: C.size_t(len((*input.FeatureID)))}
+	if input.FeatureId != nil {
+		raw.feature_id = C.mln_buffer_view{data: arena.bytes([]byte((*input.FeatureId))), size: C.size_t(len((*input.FeatureId)))}
 		raw.fields |= C.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
 	}
 	if input.StateKey != nil {
@@ -1582,7 +1582,7 @@ func DefaultFreeCameraOptions() FreeCameraOptions {
 	return copyFreeCameraOptions(C.mln_free_camera_options_default())
 }
 
-type GeoJSONSourceOptions struct {
+type GeojsonSourceOptions struct {
 	MinZoom           *float64
 	MaxZoom           *float64
 	Tolerance         *float64
@@ -1597,8 +1597,8 @@ type GeoJSONSourceOptions struct {
 	SynchronousTiling *bool
 }
 
-func copyGeoJSONSourceOptions(raw C.mln_geojson_source_options) GeoJSONSourceOptions {
-	var result GeoJSONSourceOptions
+func copyGeojsonSourceOptions(raw C.mln_geojson_source_options) GeojsonSourceOptions {
+	var result GeojsonSourceOptions
 	if raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM != 0 {
 		copied := float64(raw.min_zoom)
 		result.MinZoom = &copied
@@ -1650,7 +1650,7 @@ func copyGeoJSONSourceOptions(raw C.mln_geojson_source_options) GeoJSONSourceOpt
 	return result
 }
 
-func nativeGeoJSONSourceOptions(input GeoJSONSourceOptions, arena *bindingArena) C.mln_geojson_source_options {
+func nativeGeojsonSourceOptions(input GeojsonSourceOptions, arena *bindingArena) C.mln_geojson_source_options {
 	raw := C.mln_geojson_source_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
@@ -1705,25 +1705,25 @@ func nativeGeoJSONSourceOptions(input GeoJSONSourceOptions, arena *bindingArena)
 	return raw
 }
 
-func DefaultGeoJSONSourceOptions() GeoJSONSourceOptions {
-	return copyGeoJSONSourceOptions(C.mln_geojson_source_options_default())
+func DefaultGeojsonSourceOptions() GeojsonSourceOptions {
+	return copyGeojsonSourceOptions(C.mln_geojson_source_options_default())
 }
 
-type GPUSync struct {
-	Kind   GPUSyncKind
+type GpuSync struct {
+	Kind   GpuSyncKind
 	Object uint64
 	Value  uint64
 }
 
-func copyGPUSync(raw C.mln_gpu_sync) GPUSync {
-	var result GPUSync
-	result.Kind = GPUSyncKind(raw.kind)
+func copyGpuSync(raw C.mln_gpu_sync) GpuSync {
+	var result GpuSync
+	result.Kind = GpuSyncKind(raw.kind)
 	result.Object = uint64(raw.object)
 	result.Value = uint64(raw.value)
 	return result
 }
 
-func nativeGPUSync(input GPUSync, arena *bindingArena) C.mln_gpu_sync {
+func nativeGpuSync(input GpuSync, arena *bindingArena) C.mln_gpu_sync {
 	raw := C.mln_gpu_sync_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.kind = C.uint32_t(input.Kind)
@@ -1732,18 +1732,18 @@ func nativeGPUSync(input GPUSync, arena *bindingArena) C.mln_gpu_sync {
 	return raw
 }
 
-func DefaultGPUSync() GPUSync { return copyGPUSync(C.mln_gpu_sync_default()) }
+func DefaultGpuSync() GpuSync { return copyGpuSync(C.mln_gpu_sync_default()) }
 
-type HTTPHeaderTransform struct {
-	Callback func(ResourceKind, string, *HTTPHeaderTransformResponseScope) Status
+type HttpHeaderTransform struct {
+	Callback func(ResourceKind, string, *HttpHeaderTransformResponseScope) Status
 }
 
-func copyHTTPHeaderTransform(raw C.mln_http_header_transform) HTTPHeaderTransform {
-	var result HTTPHeaderTransform
+func copyHttpHeaderTransform(raw C.mln_http_header_transform) HttpHeaderTransform {
+	var result HttpHeaderTransform
 	return result
 }
 
-func nativeHTTPHeaderTransform(input HTTPHeaderTransform, arena *bindingArena) C.mln_http_header_transform {
+func nativeHttpHeaderTransform(input HttpHeaderTransform, arena *bindingArena) C.mln_http_header_transform {
 	raw := C.mln_http_header_transform{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Callback != nil {
@@ -1756,7 +1756,7 @@ func nativeHTTPHeaderTransform(input HTTPHeaderTransform, arena *bindingArena) C
 	return raw
 }
 
-type HTTPHeaderTransformResponseScope struct {
+type HttpHeaderTransformResponseScope struct {
 	native *C.mln_http_header_transform_response
 	scope  *bindingScope
 }
@@ -1872,7 +1872,7 @@ func nativeLogicalExtent(input LogicalExtent, arena *bindingArena) C.mln_logical
 type MapOptions struct {
 	InitialExtent   LogicalExtent
 	MapMode         MapMode
-	FastPFOREnabled bool
+	FastPforEnabled bool
 	EventMask       RuntimeEventMask
 }
 
@@ -1880,7 +1880,7 @@ func copyMapOptions(raw C.mln_map_options) MapOptions {
 	var result MapOptions
 	result.InitialExtent = copyLogicalExtent(raw.initial_extent)
 	result.MapMode = MapMode(raw.map_mode)
-	result.FastPFOREnabled = bool(raw.fast_pfor_enabled)
+	result.FastPforEnabled = bool(raw.fast_pfor_enabled)
 	result.EventMask = RuntimeEventMask(raw.event_mask)
 	return result
 }
@@ -1890,7 +1890,7 @@ func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options {
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.initial_extent = nativeLogicalExtent(input.InitialExtent, arena)
 	raw.map_mode = C.uint32_t(input.MapMode)
-	raw.fast_pfor_enabled = C.bool(input.FastPFOREnabled)
+	raw.fast_pfor_enabled = C.bool(input.FastPforEnabled)
 	raw.event_mask = C.uint64_t(input.EventMask)
 	return raw
 }
@@ -2137,7 +2137,7 @@ type MetalOwnedTextureFrame struct {
 	Width       uint32
 	Height      uint32
 	ScaleFactor float64
-	FrameID     uint64
+	FrameId     uint64
 	Texture     uintptr
 	Device      uintptr
 	PixelFormat uint64
@@ -2149,7 +2149,7 @@ func copyMetalOwnedTextureFrame(raw C.mln_metal_owned_texture_frame) MetalOwnedT
 	result.Width = uint32(raw.width)
 	result.Height = uint32(raw.height)
 	result.ScaleFactor = float64(raw.scale_factor)
-	result.FrameID = uint64(raw.frame_id)
+	result.FrameId = uint64(raw.frame_id)
 	result.Texture = uintptr(unsafe.Pointer(raw.texture))
 	result.Device = uintptr(unsafe.Pointer(raw.device))
 	result.PixelFormat = uint64(raw.pixel_format)
@@ -2184,7 +2184,7 @@ func DefaultMetalSurfaceDescriptor() MetalSurfaceDescriptor {
 }
 
 type OfflineGeometryRegionDefinition struct {
-	StyleURL          string
+	StyleUrl          string
 	Geometry          []byte
 	MinZoom           float64
 	MaxZoom           float64
@@ -2194,7 +2194,7 @@ type OfflineGeometryRegionDefinition struct {
 
 func copyOfflineGeometryRegionDefinition(raw C.mln_offline_geometry_region_definition) OfflineGeometryRegionDefinition {
 	var result OfflineGeometryRegionDefinition
-	result.StyleURL = C.GoString(raw.style_url)
+	result.StyleUrl = C.GoString(raw.style_url)
 	result.Geometry = bindingBytes(raw.geometry.data, uint64(raw.geometry.size))
 	result.MinZoom = float64(raw.min_zoom)
 	result.MaxZoom = float64(raw.max_zoom)
@@ -2206,7 +2206,7 @@ func copyOfflineGeometryRegionDefinition(raw C.mln_offline_geometry_region_defin
 func nativeOfflineGeometryRegionDefinition(input OfflineGeometryRegionDefinition, arena *bindingArena) C.mln_offline_geometry_region_definition {
 	raw := C.mln_offline_geometry_region_definition{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.style_url = arena.cstring(input.StyleURL)
+	raw.style_url = arena.cstring(input.StyleUrl)
 	raw.geometry = C.mln_buffer_view{data: arena.bytes(input.Geometry), size: C.size_t(len(input.Geometry))}
 	raw.min_zoom = C.double(input.MinZoom)
 	raw.max_zoom = C.double(input.MaxZoom)
@@ -2250,14 +2250,14 @@ func nativeOfflineRegionDefinition(input OfflineRegionDefinition, arena *binding
 }
 
 type OfflineRegionInfo struct {
-	ID         int64
+	Id         int64
 	Definition OfflineRegionDefinition
 	Metadata   []byte
 }
 
 func copyOfflineRegionInfo(raw C.mln_offline_region_info) OfflineRegionInfo {
 	var result OfflineRegionInfo
-	result.ID = int64(raw.id)
+	result.Id = int64(raw.id)
 	result.Definition = copyOfflineRegionDefinition(raw.definition)
 	result.Metadata = bindingBytes(unsafe.Pointer(raw.metadata), uint64(raw.metadata_size))
 	return result
@@ -2290,7 +2290,7 @@ func copyOfflineRegionStatus(raw C.mln_offline_region_status) OfflineRegionStatu
 }
 
 type OfflineTilePyramidRegionDefinition struct {
-	StyleURL          string
+	StyleUrl          string
 	Bounds            LatLngBounds
 	MinZoom           float64
 	MaxZoom           float64
@@ -2300,7 +2300,7 @@ type OfflineTilePyramidRegionDefinition struct {
 
 func copyOfflineTilePyramidRegionDefinition(raw C.mln_offline_tile_pyramid_region_definition) OfflineTilePyramidRegionDefinition {
 	var result OfflineTilePyramidRegionDefinition
-	result.StyleURL = C.GoString(raw.style_url)
+	result.StyleUrl = C.GoString(raw.style_url)
 	result.Bounds = copyLatLngBounds(raw.bounds)
 	result.MinZoom = float64(raw.min_zoom)
 	result.MaxZoom = float64(raw.max_zoom)
@@ -2312,7 +2312,7 @@ func copyOfflineTilePyramidRegionDefinition(raw C.mln_offline_tile_pyramid_regio
 func nativeOfflineTilePyramidRegionDefinition(input OfflineTilePyramidRegionDefinition, arena *bindingArena) C.mln_offline_tile_pyramid_region_definition {
 	raw := C.mln_offline_tile_pyramid_region_definition{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.style_url = arena.cstring(input.StyleURL)
+	raw.style_url = arena.cstring(input.StyleUrl)
 	raw.bounds = nativeLatLngBounds(input.Bounds, arena)
 	raw.min_zoom = C.double(input.MinZoom)
 	raw.max_zoom = C.double(input.MaxZoom)
@@ -2321,65 +2321,65 @@ func nativeOfflineTilePyramidRegionDefinition(input OfflineTilePyramidRegionDefi
 	return raw
 }
 
-type OpenGLBorrowedTextureDescriptor struct {
+type OpenglBorrowedTextureDescriptor struct {
 	Extent         RenderTargetExtent
 	PhysicalWidth  uint32
 	PhysicalHeight uint32
-	Context        OpenGLContextDescriptor
+	Context        OpenglContextDescriptor
 	Texture        uint32
 	Target         uint32
 }
 
-func copyOpenGLBorrowedTextureDescriptor(raw C.mln_opengl_borrowed_texture_descriptor) OpenGLBorrowedTextureDescriptor {
-	var result OpenGLBorrowedTextureDescriptor
+func copyOpenglBorrowedTextureDescriptor(raw C.mln_opengl_borrowed_texture_descriptor) OpenglBorrowedTextureDescriptor {
+	var result OpenglBorrowedTextureDescriptor
 	result.Extent = copyRenderTargetExtent(raw.extent)
 	result.PhysicalWidth = uint32(raw.physical_width)
 	result.PhysicalHeight = uint32(raw.physical_height)
-	result.Context = copyOpenGLContextDescriptor(raw.context)
+	result.Context = copyOpenglContextDescriptor(raw.context)
 	result.Texture = uint32(raw.texture)
 	result.Target = uint32(raw.target)
 	return result
 }
 
-func nativeOpenGLBorrowedTextureDescriptor(input OpenGLBorrowedTextureDescriptor, arena *bindingArena) C.mln_opengl_borrowed_texture_descriptor {
+func nativeOpenglBorrowedTextureDescriptor(input OpenglBorrowedTextureDescriptor, arena *bindingArena) C.mln_opengl_borrowed_texture_descriptor {
 	raw := C.mln_opengl_borrowed_texture_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
 	raw.physical_height = C.uint32_t(input.PhysicalHeight)
-	raw.context = nativeOpenGLContextDescriptor(input.Context, arena)
+	raw.context = nativeOpenglContextDescriptor(input.Context, arena)
 	raw.texture = C.uint32_t(input.Texture)
 	raw.target = C.uint32_t(input.Target)
 	return raw
 }
 
-func DefaultOpenGLBorrowedTextureDescriptor() OpenGLBorrowedTextureDescriptor {
-	return copyOpenGLBorrowedTextureDescriptor(C.mln_opengl_borrowed_texture_descriptor_default())
+func DefaultOpenglBorrowedTextureDescriptor() OpenglBorrowedTextureDescriptor {
+	return copyOpenglBorrowedTextureDescriptor(C.mln_opengl_borrowed_texture_descriptor_default())
 }
 
-type OpenGLContextDescriptor struct {
-	Ownership OpenGLContextOwnership
-	Data      OpenGLContextDescriptorData
+type OpenglContextDescriptor struct {
+	Ownership OpenglContextOwnership
+	Data      OpenglContextDescriptorData
 }
 
-func copyOpenGLContextDescriptor(raw C.mln_opengl_context_descriptor) OpenGLContextDescriptor {
-	var result OpenGLContextDescriptor
-	result.Ownership = OpenGLContextOwnership(raw.ownership)
-	result.Data = func() OpenGLContextDescriptorData {
+func copyOpenglContextDescriptor(raw C.mln_opengl_context_descriptor) OpenglContextDescriptor {
+	var result OpenglContextDescriptor
+	result.Ownership = OpenglContextOwnership(raw.ownership)
+	result.Data = func() OpenglContextDescriptorData {
 		switch raw.platform {
 		case C.MLN_OPENGL_CONTEXT_PLATFORM_WGL:
-			return OpenGLContextDescriptorDataWGLVariant{Value: copyWGLContextDescriptor((*(*C.mln_wgl_context_descriptor)(unsafe.Pointer(&raw.data))))}
+			return OpenglContextDescriptorDataWglVariant{Value: copyWglContextDescriptor((*(*C.mln_wgl_context_descriptor)(unsafe.Pointer(&raw.data))))}
 		case C.MLN_OPENGL_CONTEXT_PLATFORM_EGL:
-			return OpenGLContextDescriptorDataEGLVariant{Value: copyEGLContextDescriptor((*(*C.mln_egl_context_descriptor)(unsafe.Pointer(&raw.data))))}
+			return OpenglContextDescriptorDataEglVariant{Value: copyEglContextDescriptor((*(*C.mln_egl_context_descriptor)(unsafe.Pointer(&raw.data))))}
 		case C.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL:
-			return OpenGLContextDescriptorDataWebGLVariant{Value: copyWebGLContextDescriptor((*(*C.mln_webgl_context_descriptor)(unsafe.Pointer(&raw.data))))}
+			return OpenglContextDescriptorDataWebglVariant{Value: copyWebglContextDescriptor((*(*C.mln_webgl_context_descriptor)(unsafe.Pointer(&raw.data))))}
 		}
 		return UnknownVariant{Tag: uint32(raw.platform)}
 	}()
 	return result
 }
 
-func nativeOpenGLContextDescriptor(input OpenGLContextDescriptor, arena *bindingArena) C.mln_opengl_context_descriptor {
+func nativeOpenglContextDescriptor(input OpenglContextDescriptor, arena *bindingArena) C.mln_opengl_context_descriptor {
 	raw := C.mln_opengl_context_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.ownership = C.mln_opengl_context_ownership(input.Ownership)
@@ -2388,48 +2388,48 @@ func nativeOpenGLContextDescriptor(input OpenGLContextDescriptor, arena *binding
 	}
 	raw.platform = C.mln_opengl_context_platform(input.Data.bindingTag())
 	switch variant := input.Data.(type) {
-	case OpenGLContextDescriptorDataWGLVariant:
-		*(*C.mln_wgl_context_descriptor)(unsafe.Pointer(&raw.data)) = nativeWGLContextDescriptor(variant.Value, arena)
-	case OpenGLContextDescriptorDataEGLVariant:
-		*(*C.mln_egl_context_descriptor)(unsafe.Pointer(&raw.data)) = nativeEGLContextDescriptor(variant.Value, arena)
-	case OpenGLContextDescriptorDataWebGLVariant:
-		*(*C.mln_webgl_context_descriptor)(unsafe.Pointer(&raw.data)) = nativeWebGLContextDescriptor(variant.Value, arena)
+	case OpenglContextDescriptorDataWglVariant:
+		*(*C.mln_wgl_context_descriptor)(unsafe.Pointer(&raw.data)) = nativeWglContextDescriptor(variant.Value, arena)
+	case OpenglContextDescriptorDataEglVariant:
+		*(*C.mln_egl_context_descriptor)(unsafe.Pointer(&raw.data)) = nativeEglContextDescriptor(variant.Value, arena)
+	case OpenglContextDescriptorDataWebglVariant:
+		*(*C.mln_webgl_context_descriptor)(unsafe.Pointer(&raw.data)) = nativeWebglContextDescriptor(variant.Value, arena)
 	default:
 		arena.fail("unknown input union variant")
 	}
 	return raw
 }
 
-type OpenGLOwnedTextureDescriptor struct {
+type OpenglOwnedTextureDescriptor struct {
 	Extent  RenderTargetExtent
-	Context OpenGLContextDescriptor
+	Context OpenglContextDescriptor
 }
 
-func copyOpenGLOwnedTextureDescriptor(raw C.mln_opengl_owned_texture_descriptor) OpenGLOwnedTextureDescriptor {
-	var result OpenGLOwnedTextureDescriptor
+func copyOpenglOwnedTextureDescriptor(raw C.mln_opengl_owned_texture_descriptor) OpenglOwnedTextureDescriptor {
+	var result OpenglOwnedTextureDescriptor
 	result.Extent = copyRenderTargetExtent(raw.extent)
-	result.Context = copyOpenGLContextDescriptor(raw.context)
+	result.Context = copyOpenglContextDescriptor(raw.context)
 	return result
 }
 
-func nativeOpenGLOwnedTextureDescriptor(input OpenGLOwnedTextureDescriptor, arena *bindingArena) C.mln_opengl_owned_texture_descriptor {
+func nativeOpenglOwnedTextureDescriptor(input OpenglOwnedTextureDescriptor, arena *bindingArena) C.mln_opengl_owned_texture_descriptor {
 	raw := C.mln_opengl_owned_texture_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
-	raw.context = nativeOpenGLContextDescriptor(input.Context, arena)
+	raw.context = nativeOpenglContextDescriptor(input.Context, arena)
 	return raw
 }
 
-func DefaultOpenGLOwnedTextureDescriptor() OpenGLOwnedTextureDescriptor {
-	return copyOpenGLOwnedTextureDescriptor(C.mln_opengl_owned_texture_descriptor_default())
+func DefaultOpenglOwnedTextureDescriptor() OpenglOwnedTextureDescriptor {
+	return copyOpenglOwnedTextureDescriptor(C.mln_opengl_owned_texture_descriptor_default())
 }
 
-type OpenGLOwnedTextureFrame struct {
+type OpenglOwnedTextureFrame struct {
 	Generation     uint64
 	Width          uint32
 	Height         uint32
 	ScaleFactor    float64
-	FrameID        uint64
+	FrameId        uint64
 	Texture        uint32
 	Target         uint32
 	InternalFormat uint32
@@ -2437,13 +2437,13 @@ type OpenGLOwnedTextureFrame struct {
 	Type           uint32
 }
 
-func copyOpenGLOwnedTextureFrame(raw C.mln_opengl_owned_texture_frame) OpenGLOwnedTextureFrame {
-	var result OpenGLOwnedTextureFrame
+func copyOpenglOwnedTextureFrame(raw C.mln_opengl_owned_texture_frame) OpenglOwnedTextureFrame {
+	var result OpenglOwnedTextureFrame
 	result.Generation = uint64(raw.generation)
 	result.Width = uint32(raw.width)
 	result.Height = uint32(raw.height)
 	result.ScaleFactor = float64(raw.scale_factor)
-	result.FrameID = uint64(raw.frame_id)
+	result.FrameId = uint64(raw.frame_id)
 	result.Texture = uint32(raw.texture)
 	result.Target = uint32(raw.target)
 	result.InternalFormat = uint32(raw.internal_format)
@@ -2452,42 +2452,42 @@ func copyOpenGLOwnedTextureFrame(raw C.mln_opengl_owned_texture_frame) OpenGLOwn
 	return result
 }
 
-type OpenGLSurfaceDescriptor struct {
+type OpenglSurfaceDescriptor struct {
 	Extent  RenderTargetExtent
-	Context OpenGLContextDescriptor
+	Context OpenglContextDescriptor
 	Surface uintptr
 }
 
-func copyOpenGLSurfaceDescriptor(raw C.mln_opengl_surface_descriptor) OpenGLSurfaceDescriptor {
-	var result OpenGLSurfaceDescriptor
+func copyOpenglSurfaceDescriptor(raw C.mln_opengl_surface_descriptor) OpenglSurfaceDescriptor {
+	var result OpenglSurfaceDescriptor
 	result.Extent = copyRenderTargetExtent(raw.extent)
-	result.Context = copyOpenGLContextDescriptor(raw.context)
+	result.Context = copyOpenglContextDescriptor(raw.context)
 	result.Surface = uintptr(unsafe.Pointer(raw.surface))
 	return result
 }
 
-func nativeOpenGLSurfaceDescriptor(input OpenGLSurfaceDescriptor, arena *bindingArena) C.mln_opengl_surface_descriptor {
+func nativeOpenglSurfaceDescriptor(input OpenglSurfaceDescriptor, arena *bindingArena) C.mln_opengl_surface_descriptor {
 	raw := C.mln_opengl_surface_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
-	raw.context = nativeOpenGLContextDescriptor(input.Context, arena)
+	raw.context = nativeOpenglContextDescriptor(input.Context, arena)
 	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
 	return raw
 }
 
-func DefaultOpenGLSurfaceDescriptor() OpenGLSurfaceDescriptor {
-	return copyOpenGLSurfaceDescriptor(C.mln_opengl_surface_descriptor_default())
+func DefaultOpenglSurfaceDescriptor() OpenglSurfaceDescriptor {
+	return copyOpenglSurfaceDescriptor(C.mln_opengl_surface_descriptor_default())
 }
 
-type PremultipliedRGBA8Image struct {
+type PremultipliedRgba8Image struct {
 	Width  uint32
 	Height uint32
 	Stride uint32
 	Pixels []byte
 }
 
-func copyPremultipliedRGBA8Image(raw C.mln_premultiplied_rgba8_image) PremultipliedRGBA8Image {
-	var result PremultipliedRGBA8Image
+func copyPremultipliedRgba8Image(raw C.mln_premultiplied_rgba8_image) PremultipliedRgba8Image {
+	var result PremultipliedRgba8Image
 	result.Width = uint32(raw.width)
 	result.Height = uint32(raw.height)
 	result.Stride = uint32(raw.stride)
@@ -2495,7 +2495,7 @@ func copyPremultipliedRGBA8Image(raw C.mln_premultiplied_rgba8_image) Premultipl
 	return result
 }
 
-func nativePremultipliedRGBA8Image(input PremultipliedRGBA8Image, arena *bindingArena) C.mln_premultiplied_rgba8_image {
+func nativePremultipliedRgba8Image(input PremultipliedRgba8Image, arena *bindingArena) C.mln_premultiplied_rgba8_image {
 	raw := C.mln_premultiplied_rgba8_image_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.width = C.uint32_t(input.Width)
@@ -2506,8 +2506,8 @@ func nativePremultipliedRGBA8Image(input PremultipliedRGBA8Image, arena *binding
 	return raw
 }
 
-func DefaultPremultipliedRGBA8Image() PremultipliedRGBA8Image {
-	return copyPremultipliedRGBA8Image(C.mln_premultiplied_rgba8_image_default())
+func DefaultPremultipliedRgba8Image() PremultipliedRgba8Image {
+	return copyPremultipliedRgba8Image(C.mln_premultiplied_rgba8_image_default())
 }
 
 type ProjectedMeters struct {
@@ -2602,8 +2602,8 @@ func nativeQuaternion(input Quaternion, arena *bindingArena) C.mln_quaternion {
 
 type QueriedFeature struct {
 	Feature       []byte
-	SourceID      *string
-	SourceLayerID *string
+	SourceId      *string
+	SourceLayerId *string
 	State         *[]byte
 }
 
@@ -2612,11 +2612,11 @@ func copyQueriedFeature(raw C.mln_queried_feature) QueriedFeature {
 	result.Feature = bindingBytes(raw.feature.data, uint64(raw.feature.size))
 	if raw.fields&C.MLN_QUERIED_FEATURE_SOURCE_ID != 0 {
 		copied := bindingString(raw.source_id.data, uint64(raw.source_id.size))
-		result.SourceID = &copied
+		result.SourceId = &copied
 	}
 	if raw.fields&C.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0 {
 		copied := bindingString(raw.source_layer_id.data, uint64(raw.source_layer_id.size))
-		result.SourceLayerID = &copied
+		result.SourceLayerId = &copied
 	}
 	if raw.fields&C.MLN_QUERIED_FEATURE_STATE != 0 {
 		copied := bindingBytes(raw.state.data, uint64(raw.state.size))
@@ -2761,7 +2761,7 @@ func nativeRenderTargetExtent(input RenderTargetExtent, arena *bindingArena) C.m
 }
 
 type RenderedFeatureQueryOptions struct {
-	LayerIDs []string
+	LayerIds []string
 	Filter   *[]byte
 }
 
@@ -2777,7 +2777,7 @@ func copyRenderedFeatureQueryOptions(raw C.mln_rendered_feature_query_options) R
 			}
 			return result
 		}()
-		result.LayerIDs = copied
+		result.LayerIds = copied
 	}
 	result.Filter = func() *[]byte {
 		if raw.filter == nil {
@@ -2793,12 +2793,12 @@ func nativeRenderedFeatureQueryOptions(input RenderedFeatureQueryOptions, arena 
 	raw := C.mln_rendered_feature_query_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.LayerIDs != nil {
+	if input.LayerIds != nil {
 		{
-			raw.layer_ids = (*C.mln_buffer_view)(arena.array(len(input.LayerIDs), unsafe.Sizeof(*raw.layer_ids)))
-			items := unsafe.Slice(raw.layer_ids, len(input.LayerIDs))
-			raw.layer_id_count = bindingCountLike(raw.layer_id_count, len(input.LayerIDs))
-			for i, item := range input.LayerIDs {
+			raw.layer_ids = (*C.mln_buffer_view)(arena.array(len(input.LayerIds), unsafe.Sizeof(*raw.layer_ids)))
+			items := unsafe.Slice(raw.layer_ids, len(input.LayerIds))
+			raw.layer_id_count = bindingCountLike(raw.layer_id_count, len(input.LayerIds))
+			for i, item := range input.LayerIds {
 				items[i] = C.mln_buffer_view{data: arena.bytes([]byte(item)), size: C.size_t(len(item))}
 			}
 		}
@@ -2895,30 +2895,30 @@ func nativeResourceProvider(input ResourceProvider, arena *bindingArena) C.mln_r
 }
 
 type ResourceRequest struct {
-	RequestedURL        *string
-	ResolvedURL         *string
+	RequestedUrl        *string
+	ResolvedUrl         *string
 	Kind                ResourceKind
 	LoadingMethod       ResourceLoadingMethod
 	Priority            ResourcePriority
 	Usage               ResourceUsage
 	StoragePolicy       ResourceStoragePolicy
 	Range               *ResourceRequestRange
-	PriorModifiedUnixMS *int64
-	PriorExpiresUnixMS  *int64
-	PriorETag           *string
+	PriorModifiedUnixMs *int64
+	PriorExpiresUnixMs  *int64
+	PriorEtag           *string
 	PriorData           []byte
 }
 
 func copyResourceRequest(raw C.mln_resource_request) ResourceRequest {
 	var result ResourceRequest
-	result.RequestedURL = func() *string {
+	result.RequestedUrl = func() *string {
 		if raw.requested_url == nil {
 			return nil
 		}
 		value := C.GoString(raw.requested_url)
 		return &value
 	}()
-	result.ResolvedURL = func() *string {
+	result.ResolvedUrl = func() *string {
 		if raw.resolved_url == nil {
 			return nil
 		}
@@ -2941,13 +2941,13 @@ func copyResourceRequest(raw C.mln_resource_request) ResourceRequest {
 	}
 	if bool(raw.has_prior_modified) {
 		copied := int64(raw.prior_modified_unix_ms)
-		result.PriorModifiedUnixMS = &copied
+		result.PriorModifiedUnixMs = &copied
 	}
 	if bool(raw.has_prior_expires) {
 		copied := int64(raw.prior_expires_unix_ms)
-		result.PriorExpiresUnixMS = &copied
+		result.PriorExpiresUnixMs = &copied
 	}
-	result.PriorETag = func() *string {
+	result.PriorEtag = func() *string {
 		if raw.prior_etag == nil {
 			return nil
 		}
@@ -2971,10 +2971,10 @@ type ResourceResponse struct {
 	Bytes            []byte
 	ErrorMessage     *string
 	MustRevalidate   bool
-	ModifiedUnixMS   *int64
-	ExpiresUnixMS    *int64
-	ETag             *string
-	RetryAfterUnixMS *int64
+	ModifiedUnixMs   *int64
+	ExpiresUnixMs    *int64
+	Etag             *string
+	RetryAfterUnixMs *int64
 }
 
 func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_resource_response {
@@ -2991,19 +2991,19 @@ func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_r
 		raw.error_message = arena.cstring((*input.ErrorMessage))
 	}
 	raw.must_revalidate = C.bool(input.MustRevalidate)
-	if input.ModifiedUnixMS != nil {
-		raw.modified_unix_ms = C.int64_t((*input.ModifiedUnixMS))
+	if input.ModifiedUnixMs != nil {
+		raw.modified_unix_ms = C.int64_t((*input.ModifiedUnixMs))
 		raw.has_modified = true
 	}
-	if input.ExpiresUnixMS != nil {
-		raw.expires_unix_ms = C.int64_t((*input.ExpiresUnixMS))
+	if input.ExpiresUnixMs != nil {
+		raw.expires_unix_ms = C.int64_t((*input.ExpiresUnixMs))
 		raw.has_expires = true
 	}
-	if input.ETag != nil {
-		raw.etag = arena.cstring((*input.ETag))
+	if input.Etag != nil {
+		raw.etag = arena.cstring((*input.Etag))
 	}
-	if input.RetryAfterUnixMS != nil {
-		raw.retry_after_unix_ms = C.int64_t((*input.RetryAfterUnixMS))
+	if input.RetryAfterUnixMs != nil {
+		raw.retry_after_unix_ms = C.int64_t((*input.RetryAfterUnixMs))
 		raw.has_retry_after = true
 	}
 	return raw
@@ -3092,46 +3092,46 @@ func copyRuntimeEventBatchView(raw C.mln_runtime_event_batch_view) RuntimeEventB
 	return result
 }
 
-type RuntimeEventCameraTransitionFinished struct{ TransitionID uint64 }
+type RuntimeEventCameraTransitionFinished struct{ TransitionId uint64 }
 
 func copyRuntimeEventCameraTransitionFinished(raw C.mln_runtime_event_camera_transition_finished) RuntimeEventCameraTransitionFinished {
 	var result RuntimeEventCameraTransitionFinished
-	result.TransitionID = uint64(raw.transition_id)
+	result.TransitionId = uint64(raw.transition_id)
 	return result
 }
 
 type RuntimeEventOfflineRegionResponseError struct {
-	RegionID int64
+	RegionId int64
 	Reason   ResourceErrorReason
 }
 
 func copyRuntimeEventOfflineRegionResponseError(raw C.mln_runtime_event_offline_region_response_error) RuntimeEventOfflineRegionResponseError {
 	var result RuntimeEventOfflineRegionResponseError
-	result.RegionID = int64(raw.region_id)
+	result.RegionId = int64(raw.region_id)
 	result.Reason = ResourceErrorReason(raw.reason)
 	return result
 }
 
 type RuntimeEventOfflineRegionStatus struct {
-	RegionID int64
+	RegionId int64
 	Status   OfflineRegionStatus
 }
 
 func copyRuntimeEventOfflineRegionStatus(raw C.mln_runtime_event_offline_region_status) RuntimeEventOfflineRegionStatus {
 	var result RuntimeEventOfflineRegionStatus
-	result.RegionID = int64(raw.region_id)
+	result.RegionId = int64(raw.region_id)
 	result.Status = copyOfflineRegionStatus(raw.status)
 	return result
 }
 
 type RuntimeEventOfflineRegionTileCountLimit struct {
-	RegionID int64
+	RegionId int64
 	Limit    uint64
 }
 
 func copyRuntimeEventOfflineRegionTileCountLimit(raw C.mln_runtime_event_offline_region_tile_count_limit) RuntimeEventOfflineRegionTileCountLimit {
 	var result RuntimeEventOfflineRegionTileCountLimit
-	result.RegionID = int64(raw.region_id)
+	result.RegionId = int64(raw.region_id)
 	result.Limit = uint64(raw.limit)
 	return result
 }
@@ -3162,13 +3162,13 @@ func copyRuntimeEventRenderMap(raw C.mln_runtime_event_render_map) RuntimeEventR
 
 type RuntimeEventTileAction struct {
 	Operation TileOperation
-	TileID    TileID
+	TileId    TileId
 }
 
 func copyRuntimeEventTileAction(raw C.mln_runtime_event_tile_action) RuntimeEventTileAction {
 	var result RuntimeEventTileAction
 	result.Operation = TileOperation(raw.operation)
-	result.TileID = copyTileID(raw.tile_id)
+	result.TileId = copyTileId(raw.tile_id)
 	return result
 }
 
@@ -3289,7 +3289,7 @@ func nativeScreenPoint(input ScreenPoint, arena *bindingArena) C.mln_screen_poin
 }
 
 type SourceFeatureQueryOptions struct {
-	SourceLayerIDs []string
+	SourceLayerIds []string
 	Filter         *[]byte
 }
 
@@ -3305,7 +3305,7 @@ func copySourceFeatureQueryOptions(raw C.mln_source_feature_query_options) Sourc
 			}
 			return result
 		}()
-		result.SourceLayerIDs = copied
+		result.SourceLayerIds = copied
 	}
 	result.Filter = func() *[]byte {
 		if raw.filter == nil {
@@ -3321,12 +3321,12 @@ func nativeSourceFeatureQueryOptions(input SourceFeatureQueryOptions, arena *bin
 	raw := C.mln_source_feature_query_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.SourceLayerIDs != nil {
+	if input.SourceLayerIds != nil {
 		{
-			raw.source_layer_ids = (*C.mln_buffer_view)(arena.array(len(input.SourceLayerIDs), unsafe.Sizeof(*raw.source_layer_ids)))
-			items := unsafe.Slice(raw.source_layer_ids, len(input.SourceLayerIDs))
-			raw.source_layer_id_count = bindingCountLike(raw.source_layer_id_count, len(input.SourceLayerIDs))
-			for i, item := range input.SourceLayerIDs {
+			raw.source_layer_ids = (*C.mln_buffer_view)(arena.array(len(input.SourceLayerIds), unsafe.Sizeof(*raw.source_layer_ids)))
+			items := unsafe.Slice(raw.source_layer_ids, len(input.SourceLayerIds))
+			raw.source_layer_id_count = bindingCountLike(raw.source_layer_id_count, len(input.SourceLayerIds))
+			for i, item := range input.SourceLayerIds {
 				items[i] = C.mln_buffer_view{data: arena.bytes([]byte(item)), size: C.size_t(len(item))}
 			}
 		}
@@ -3355,7 +3355,7 @@ type StyleImageInfo struct {
 	TextFitWidth  *StyleImageTextFit
 	TextFitHeight *StyleImageTextFit
 	PixelRatio    float32
-	SDF           bool
+	Sdf           bool
 }
 
 func copyStyleImageInfo(raw C.mln_style_image_info) StyleImageInfo {
@@ -3379,7 +3379,7 @@ func copyStyleImageInfo(raw C.mln_style_image_info) StyleImageInfo {
 		result.TextFitHeight = &copied
 	}
 	result.PixelRatio = float32(raw.pixel_ratio)
-	result.SDF = bool(raw.sdf)
+	result.Sdf = bool(raw.sdf)
 	return result
 }
 
@@ -3408,7 +3408,7 @@ func nativeStyleImageInfo(input StyleImageInfo, arena *bindingArena) C.mln_style
 		raw.has_text_fit_height = true
 	}
 	raw.pixel_ratio = C.float(input.PixelRatio)
-	raw.sdf = C.bool(input.SDF)
+	raw.sdf = C.bool(input.Sdf)
 	return raw
 }
 
@@ -3423,7 +3423,7 @@ type StyleImageOptions struct {
 	TextFitWidth  *StyleImageTextFit
 	TextFitHeight *StyleImageTextFit
 	PixelRatio    *float32
-	SDF           *bool
+	Sdf           *bool
 }
 
 func copyStyleImageOptions(raw C.mln_style_image_options) StyleImageOptions {
@@ -3470,7 +3470,7 @@ func copyStyleImageOptions(raw C.mln_style_image_options) StyleImageOptions {
 	}
 	if raw.fields&C.MLN_STYLE_IMAGE_OPTION_SDF != 0 {
 		copied := bool(raw.sdf)
-		result.SDF = &copied
+		result.Sdf = &copied
 	}
 	return result
 }
@@ -3517,8 +3517,8 @@ func nativeStyleImageOptions(input StyleImageOptions, arena *bindingArena) C.mln
 		raw.pixel_ratio = C.float((*input.PixelRatio))
 		raw.fields |= C.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO
 	}
-	if input.SDF != nil {
-		raw.sdf = C.bool((*input.SDF))
+	if input.Sdf != nil {
+		raw.sdf = C.bool((*input.Sdf))
 		raw.fields |= C.MLN_STYLE_IMAGE_OPTION_SDF
 	}
 	return raw
@@ -3589,17 +3589,17 @@ func copyStyleImageStretchesResult(raw C.mln_style_image_stretches_result) Style
 }
 
 type StyleLayerEntry struct {
-	ID          string
+	Id          string
 	Type        string
-	SourceID    *string
+	SourceId    *string
 	SourceLayer *string
 }
 
 func copyStyleLayerEntry(raw C.mln_style_layer_entry) StyleLayerEntry {
 	var result StyleLayerEntry
-	result.ID = bindingString(raw.id.data, uint64(raw.id.size))
+	result.Id = bindingString(raw.id.data, uint64(raw.id.size))
 	result.Type = bindingString(raw._type.data, uint64(raw._type.size))
-	result.SourceID = func() *string {
+	result.SourceId = func() *string {
 		if raw.source_id.size == 0 {
 			return nil
 		}
@@ -3634,14 +3634,14 @@ func copyStyleLayerInfo(raw C.mln_style_layer_info) StyleLayerInfo {
 
 type StyleLayerResult struct {
 	Info        StyleLayerInfo
-	SourceID    *string
+	SourceId    *string
 	SourceLayer *string
 }
 
 func copyStyleLayerResult(raw C.mln_style_layer_result) StyleLayerResult {
 	var result StyleLayerResult
 	result.Info = copyStyleLayerInfo(raw.info)
-	result.SourceID = func() *string {
+	result.SourceId = func() *string {
 		if raw.source_id.size == 0 {
 			return nil
 		}
@@ -3660,21 +3660,21 @@ func copyStyleLayerResult(raw C.mln_style_layer_result) StyleLayerResult {
 
 type StyleSourceInfo struct {
 	Type            StyleSourceType
-	IDSize          uint
+	IdSize          uint
 	IsVolatile      bool
 	AttributionSize *uint
-	URLSize         *uint
-	TileJSON        *StyleSourceTileInfo
+	UrlSize         *uint
+	Tilejson        *StyleSourceTileInfo
 	Bounds          *LatLngBounds
 	TileSize        *uint32
 	VectorEncoding  *StyleVectorTileEncoding
-	RasterEncoding  *StyleRasterDEMEncoding
+	RasterEncoding  *StyleRasterDemEncoding
 }
 
 func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 	var result StyleSourceInfo
 	result.Type = StyleSourceType(raw._type)
-	result.IDSize = uint(raw.id_size)
+	result.IdSize = uint(raw.id_size)
 	result.IsVolatile = bool(raw.is_volatile)
 	if bool(raw.has_attribution) {
 		copied := uint(raw.attribution_size)
@@ -3682,7 +3682,7 @@ func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 	}
 	if raw.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0 {
 		copied := uint(raw.url_size)
-		result.URLSize = &copied
+		result.UrlSize = &copied
 	}
 	if raw.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
 		copied := func() StyleSourceTileInfo {
@@ -3693,7 +3693,7 @@ func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 			inner.Scheme = StyleTileScheme(raw.scheme)
 			return inner
 		}()
-		result.TileJSON = &copied
+		result.Tilejson = &copied
 	}
 	if raw.fields&C.MLN_STYLE_SOURCE_INFO_BOUNDS != 0 {
 		copied := copyLatLngBounds(raw.bounds)
@@ -3708,7 +3708,7 @@ func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 		result.VectorEncoding = &copied
 	}
 	if raw.fields&C.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING != 0 {
-		copied := StyleRasterDEMEncoding(raw.raster_encoding)
+		copied := StyleRasterDemEncoding(raw.raster_encoding)
 		result.RasterEncoding = &copied
 	}
 	return result
@@ -3717,8 +3717,8 @@ func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 type StyleSourceResult struct {
 	Info        StyleSourceInfo
 	Attribution *string
-	URL         *string
-	TileURLs    []string
+	Url         *string
+	TileUrls    []string
 }
 
 func copyStyleSourceResult(raw C.mln_style_source_result) StyleSourceResult {
@@ -3730,7 +3730,7 @@ func copyStyleSourceResult(raw C.mln_style_source_result) StyleSourceResult {
 	}
 	if raw.info.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0 {
 		copied := bindingString(raw.url.data, uint64(raw.url.size))
-		result.URL = &copied
+		result.Url = &copied
 	}
 	if raw.info.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
 		copied := func() []string {
@@ -3742,7 +3742,7 @@ func copyStyleSourceResult(raw C.mln_style_source_result) StyleSourceResult {
 			}
 			return result
 		}()
-		result.TileURLs = copied
+		result.TileUrls = copied
 	}
 	return result
 }
@@ -3763,11 +3763,11 @@ func copyStyleSourceTileInfo(raw C.mln_style_source_tile_info) StyleSourceTileIn
 	return result
 }
 
-type StyleSourceTileURLsResult struct{ TileURLs []string }
+type StyleSourceTileUrlsResult struct{ TileUrls []string }
 
-func copyStyleSourceTileURLsResult(raw C.mln_style_source_tile_urls_result) StyleSourceTileURLsResult {
-	var result StyleSourceTileURLsResult
-	result.TileURLs = func() []string {
+func copyStyleSourceTileUrlsResult(raw C.mln_style_source_tile_urls_result) StyleSourceTileUrlsResult {
+	var result StyleSourceTileUrlsResult
+	result.TileUrls = func() []string {
 		length := bindingLength(uint64(raw.tile_url_count))
 		result := make([]string, length)
 		for i := range result {
@@ -3787,7 +3787,7 @@ type StyleTileSourceOptions struct {
 	Bounds         *LatLngBounds
 	TileSize       *uint32
 	VectorEncoding *StyleVectorTileEncoding
-	RasterEncoding *StyleRasterDEMEncoding
+	RasterEncoding *StyleRasterDemEncoding
 }
 
 func copyStyleTileSourceOptions(raw C.mln_style_tile_source_options) StyleTileSourceOptions {
@@ -3821,7 +3821,7 @@ func copyStyleTileSourceOptions(raw C.mln_style_tile_source_options) StyleTileSo
 		result.VectorEncoding = &copied
 	}
 	if raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING != 0 {
-		copied := StyleRasterDEMEncoding(raw.raster_encoding)
+		copied := StyleRasterDemEncoding(raw.raster_encoding)
 		result.RasterEncoding = &copied
 	}
 	return result
@@ -3871,8 +3871,8 @@ func DefaultStyleTileSourceOptions() StyleTileSourceOptions {
 }
 
 type StyleTransitionOptions struct {
-	DurationMS                 *float64
-	DelayMS                    *float64
+	DurationMs                 *float64
+	DelayMs                    *float64
 	EnablePlacementTransitions *bool
 }
 
@@ -3880,11 +3880,11 @@ func copyStyleTransitionOptions(raw C.mln_style_transition_options) StyleTransit
 	var result StyleTransitionOptions
 	if raw.fields&C.MLN_STYLE_TRANSITION_OPTION_DURATION != 0 {
 		copied := float64(raw.duration_ms)
-		result.DurationMS = &copied
+		result.DurationMs = &copied
 	}
 	if raw.fields&C.MLN_STYLE_TRANSITION_OPTION_DELAY != 0 {
 		copied := float64(raw.delay_ms)
-		result.DelayMS = &copied
+		result.DelayMs = &copied
 	}
 	if raw.fields&C.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS != 0 {
 		copied := bool(raw.enable_placement_transitions)
@@ -3897,12 +3897,12 @@ func nativeStyleTransitionOptions(input StyleTransitionOptions, arena *bindingAr
 	raw := C.mln_style_transition_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.DurationMS != nil {
-		raw.duration_ms = C.double((*input.DurationMS))
+	if input.DurationMs != nil {
+		raw.duration_ms = C.double((*input.DurationMs))
 		raw.fields |= C.MLN_STYLE_TRANSITION_OPTION_DURATION
 	}
-	if input.DelayMS != nil {
-		raw.delay_ms = C.double((*input.DelayMS))
+	if input.DelayMs != nil {
+		raw.delay_ms = C.double((*input.DelayMs))
 		raw.fields |= C.MLN_STYLE_TRANSITION_OPTION_DELAY
 	}
 	if input.EnablePlacementTransitions != nil {
@@ -3958,7 +3958,7 @@ func copyTextureReadbackResult(raw C.mln_texture_readback_result) TextureReadbac
 	return result
 }
 
-type TileID struct {
+type TileId struct {
 	OverscaledZ uint32
 	Wrap        int32
 	CanonicalZ  uint32
@@ -3966,8 +3966,8 @@ type TileID struct {
 	CanonicalY  uint32
 }
 
-func copyTileID(raw C.mln_tile_id) TileID {
-	var result TileID
+func copyTileId(raw C.mln_tile_id) TileId {
+	var result TileId
 	result.OverscaledZ = uint32(raw.overscaled_z)
 	result.Wrap = int32(raw.wrap)
 	result.CanonicalZ = uint32(raw.canonical_z)
@@ -4132,7 +4132,7 @@ type VulkanOwnedTextureFrame struct {
 	Width       uint32
 	Height      uint32
 	ScaleFactor float64
-	FrameID     uint64
+	FrameId     uint64
 	Image       uint64
 	ImageView   uint64
 	Device      uintptr
@@ -4146,7 +4146,7 @@ func copyVulkanOwnedTextureFrame(raw C.mln_vulkan_owned_texture_frame) VulkanOwn
 	result.Width = uint32(raw.width)
 	result.Height = uint32(raw.height)
 	result.ScaleFactor = float64(raw.scale_factor)
-	result.FrameID = uint64(raw.frame_id)
+	result.FrameId = uint64(raw.frame_id)
 	result.Image = uint64(raw.image)
 	result.ImageView = uint64(raw.image_view)
 	result.Device = uintptr(unsafe.Pointer(raw.device))
@@ -4199,21 +4199,21 @@ func nativeWake(input Wake, arena *bindingArena) C.mln_wake {
 	return raw
 }
 
-type WebGLContextDescriptor struct {
-	Kind           WebGLContextKind
+type WebglContextDescriptor struct {
+	Kind           WebglContextKind
 	Context        int32
 	CanvasSelector string
 }
 
-func copyWebGLContextDescriptor(raw C.mln_webgl_context_descriptor) WebGLContextDescriptor {
-	var result WebGLContextDescriptor
-	result.Kind = WebGLContextKind(raw.kind)
+func copyWebglContextDescriptor(raw C.mln_webgl_context_descriptor) WebglContextDescriptor {
+	var result WebglContextDescriptor
+	result.Kind = WebglContextKind(raw.kind)
 	result.Context = int32(raw.context)
 	result.CanvasSelector = bindingString(raw.canvas_selector.data, uint64(raw.canvas_selector.size))
 	return result
 }
 
-func nativeWebGLContextDescriptor(input WebGLContextDescriptor, arena *bindingArena) C.mln_webgl_context_descriptor {
+func nativeWebglContextDescriptor(input WebglContextDescriptor, arena *bindingArena) C.mln_webgl_context_descriptor {
 	raw := C.mln_webgl_context_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.kind = C.uint32_t(input.Kind)
@@ -4222,60 +4222,60 @@ func nativeWebGLContextDescriptor(input WebGLContextDescriptor, arena *bindingAr
 	return raw
 }
 
-type WebGPUBorrowedTextureDescriptor struct {
+type WebgpuBorrowedTextureDescriptor struct {
 	Extent         RenderTargetExtent
 	PhysicalWidth  uint32
 	PhysicalHeight uint32
-	Context        WebGPUContextDescriptor
+	Context        WebgpuContextDescriptor
 	Texture        uintptr
 	TextureView    uintptr
 	Format         uint32
 }
 
-func copyWebGPUBorrowedTextureDescriptor(raw C.mln_webgpu_borrowed_texture_descriptor) WebGPUBorrowedTextureDescriptor {
-	var result WebGPUBorrowedTextureDescriptor
+func copyWebgpuBorrowedTextureDescriptor(raw C.mln_webgpu_borrowed_texture_descriptor) WebgpuBorrowedTextureDescriptor {
+	var result WebgpuBorrowedTextureDescriptor
 	result.Extent = copyRenderTargetExtent(raw.extent)
 	result.PhysicalWidth = uint32(raw.physical_width)
 	result.PhysicalHeight = uint32(raw.physical_height)
-	result.Context = copyWebGPUContextDescriptor(raw.context)
+	result.Context = copyWebgpuContextDescriptor(raw.context)
 	result.Texture = uintptr(unsafe.Pointer(raw.texture))
 	result.TextureView = uintptr(unsafe.Pointer(raw.texture_view))
 	result.Format = uint32(raw.format)
 	return result
 }
 
-func nativeWebGPUBorrowedTextureDescriptor(input WebGPUBorrowedTextureDescriptor, arena *bindingArena) C.mln_webgpu_borrowed_texture_descriptor {
+func nativeWebgpuBorrowedTextureDescriptor(input WebgpuBorrowedTextureDescriptor, arena *bindingArena) C.mln_webgpu_borrowed_texture_descriptor {
 	raw := C.mln_webgpu_borrowed_texture_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
 	raw.physical_height = C.uint32_t(input.PhysicalHeight)
-	raw.context = nativeWebGPUContextDescriptor(input.Context, arena)
+	raw.context = nativeWebgpuContextDescriptor(input.Context, arena)
 	raw.texture = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Texture)))
 	raw.texture_view = unsafe.Pointer(C.binding_address(C.uintptr_t(input.TextureView)))
 	raw.format = C.uint32_t(input.Format)
 	return raw
 }
 
-func DefaultWebGPUBorrowedTextureDescriptor() WebGPUBorrowedTextureDescriptor {
-	return copyWebGPUBorrowedTextureDescriptor(C.mln_webgpu_borrowed_texture_descriptor_default())
+func DefaultWebgpuBorrowedTextureDescriptor() WebgpuBorrowedTextureDescriptor {
+	return copyWebgpuBorrowedTextureDescriptor(C.mln_webgpu_borrowed_texture_descriptor_default())
 }
 
-type WebGPUContextDescriptor struct {
+type WebgpuContextDescriptor struct {
 	Instance uintptr
 	Device   uintptr
 	Queue    uintptr
 }
 
-func copyWebGPUContextDescriptor(raw C.mln_webgpu_context_descriptor) WebGPUContextDescriptor {
-	var result WebGPUContextDescriptor
+func copyWebgpuContextDescriptor(raw C.mln_webgpu_context_descriptor) WebgpuContextDescriptor {
+	var result WebgpuContextDescriptor
 	result.Instance = uintptr(unsafe.Pointer(raw.instance))
 	result.Device = uintptr(unsafe.Pointer(raw.device))
 	result.Queue = uintptr(unsafe.Pointer(raw.queue))
 	return result
 }
 
-func nativeWebGPUContextDescriptor(input WebGPUContextDescriptor, arena *bindingArena) C.mln_webgpu_context_descriptor {
+func nativeWebgpuContextDescriptor(input WebgpuContextDescriptor, arena *bindingArena) C.mln_webgpu_context_descriptor {
 	raw := C.mln_webgpu_context_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.instance = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Instance)))
@@ -4284,49 +4284,49 @@ func nativeWebGPUContextDescriptor(input WebGPUContextDescriptor, arena *binding
 	return raw
 }
 
-type WebGPUOwnedTextureDescriptor struct {
+type WebgpuOwnedTextureDescriptor struct {
 	Extent  RenderTargetExtent
-	Context WebGPUContextDescriptor
+	Context WebgpuContextDescriptor
 }
 
-func copyWebGPUOwnedTextureDescriptor(raw C.mln_webgpu_owned_texture_descriptor) WebGPUOwnedTextureDescriptor {
-	var result WebGPUOwnedTextureDescriptor
+func copyWebgpuOwnedTextureDescriptor(raw C.mln_webgpu_owned_texture_descriptor) WebgpuOwnedTextureDescriptor {
+	var result WebgpuOwnedTextureDescriptor
 	result.Extent = copyRenderTargetExtent(raw.extent)
-	result.Context = copyWebGPUContextDescriptor(raw.context)
+	result.Context = copyWebgpuContextDescriptor(raw.context)
 	return result
 }
 
-func nativeWebGPUOwnedTextureDescriptor(input WebGPUOwnedTextureDescriptor, arena *bindingArena) C.mln_webgpu_owned_texture_descriptor {
+func nativeWebgpuOwnedTextureDescriptor(input WebgpuOwnedTextureDescriptor, arena *bindingArena) C.mln_webgpu_owned_texture_descriptor {
 	raw := C.mln_webgpu_owned_texture_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
-	raw.context = nativeWebGPUContextDescriptor(input.Context, arena)
+	raw.context = nativeWebgpuContextDescriptor(input.Context, arena)
 	return raw
 }
 
-func DefaultWebGPUOwnedTextureDescriptor() WebGPUOwnedTextureDescriptor {
-	return copyWebGPUOwnedTextureDescriptor(C.mln_webgpu_owned_texture_descriptor_default())
+func DefaultWebgpuOwnedTextureDescriptor() WebgpuOwnedTextureDescriptor {
+	return copyWebgpuOwnedTextureDescriptor(C.mln_webgpu_owned_texture_descriptor_default())
 }
 
-type WebGPUOwnedTextureFrame struct {
+type WebgpuOwnedTextureFrame struct {
 	Generation  uint64
 	Width       uint32
 	Height      uint32
 	ScaleFactor float64
-	FrameID     uint64
+	FrameId     uint64
 	Texture     uintptr
 	TextureView uintptr
 	Device      uintptr
 	Format      uint32
 }
 
-func copyWebGPUOwnedTextureFrame(raw C.mln_webgpu_owned_texture_frame) WebGPUOwnedTextureFrame {
-	var result WebGPUOwnedTextureFrame
+func copyWebgpuOwnedTextureFrame(raw C.mln_webgpu_owned_texture_frame) WebgpuOwnedTextureFrame {
+	var result WebgpuOwnedTextureFrame
 	result.Generation = uint64(raw.generation)
 	result.Width = uint32(raw.width)
 	result.Height = uint32(raw.height)
 	result.ScaleFactor = float64(raw.scale_factor)
-	result.FrameID = uint64(raw.frame_id)
+	result.FrameId = uint64(raw.frame_id)
 	result.Texture = uintptr(unsafe.Pointer(raw.texture))
 	result.TextureView = uintptr(unsafe.Pointer(raw.texture_view))
 	result.Device = uintptr(unsafe.Pointer(raw.device))
@@ -4334,51 +4334,51 @@ func copyWebGPUOwnedTextureFrame(raw C.mln_webgpu_owned_texture_frame) WebGPUOwn
 	return result
 }
 
-type WebGPUSurfaceDescriptor struct {
+type WebgpuSurfaceDescriptor struct {
 	Extent  RenderTargetExtent
-	Context WebGPUContextDescriptor
+	Context WebgpuContextDescriptor
 	Surface uintptr
 	Format  uint32
 }
 
-func copyWebGPUSurfaceDescriptor(raw C.mln_webgpu_surface_descriptor) WebGPUSurfaceDescriptor {
-	var result WebGPUSurfaceDescriptor
+func copyWebgpuSurfaceDescriptor(raw C.mln_webgpu_surface_descriptor) WebgpuSurfaceDescriptor {
+	var result WebgpuSurfaceDescriptor
 	result.Extent = copyRenderTargetExtent(raw.extent)
-	result.Context = copyWebGPUContextDescriptor(raw.context)
+	result.Context = copyWebgpuContextDescriptor(raw.context)
 	result.Surface = uintptr(unsafe.Pointer(raw.surface))
 	result.Format = uint32(raw.format)
 	return result
 }
 
-func nativeWebGPUSurfaceDescriptor(input WebGPUSurfaceDescriptor, arena *bindingArena) C.mln_webgpu_surface_descriptor {
+func nativeWebgpuSurfaceDescriptor(input WebgpuSurfaceDescriptor, arena *bindingArena) C.mln_webgpu_surface_descriptor {
 	raw := C.mln_webgpu_surface_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
-	raw.context = nativeWebGPUContextDescriptor(input.Context, arena)
+	raw.context = nativeWebgpuContextDescriptor(input.Context, arena)
 	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
 	raw.format = C.uint32_t(input.Format)
 	return raw
 }
 
-func DefaultWebGPUSurfaceDescriptor() WebGPUSurfaceDescriptor {
-	return copyWebGPUSurfaceDescriptor(C.mln_webgpu_surface_descriptor_default())
+func DefaultWebgpuSurfaceDescriptor() WebgpuSurfaceDescriptor {
+	return copyWebgpuSurfaceDescriptor(C.mln_webgpu_surface_descriptor_default())
 }
 
-type WGLContextDescriptor struct {
+type WglContextDescriptor struct {
 	DeviceContext  uintptr
 	ShareContext   uintptr
 	GetProcAddress uintptr
 }
 
-func copyWGLContextDescriptor(raw C.mln_wgl_context_descriptor) WGLContextDescriptor {
-	var result WGLContextDescriptor
+func copyWglContextDescriptor(raw C.mln_wgl_context_descriptor) WglContextDescriptor {
+	var result WglContextDescriptor
 	result.DeviceContext = uintptr(unsafe.Pointer(raw.device_context))
 	result.ShareContext = uintptr(unsafe.Pointer(raw.share_context))
 	result.GetProcAddress = uintptr(unsafe.Pointer(raw.get_proc_address))
 	return result
 }
 
-func nativeWGLContextDescriptor(input WGLContextDescriptor, arena *bindingArena) C.mln_wgl_context_descriptor {
+func nativeWglContextDescriptor(input WglContextDescriptor, arena *bindingArena) C.mln_wgl_context_descriptor {
 	raw := C.mln_wgl_context_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.device_context = unsafe.Pointer(C.binding_address(C.uintptr_t(input.DeviceContext)))
@@ -4428,12 +4428,12 @@ func (view MetalOwnedTextureFrameView) ScaleFactor() (float64, error) {
 	})
 }
 
-func (view MetalOwnedTextureFrameView) FrameID() (uint64, error) {
+func (view MetalOwnedTextureFrameView) FrameId() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 		view.scope.check()
-		return view.value.FrameID
+		return view.value.FrameId
 	})
 }
 
@@ -4464,12 +4464,12 @@ func (view MetalOwnedTextureFrameView) PixelFormat() (uint64, error) {
 	})
 }
 
-type OpenGLOwnedTextureFrameView struct {
-	value OpenGLOwnedTextureFrame
+type OpenglOwnedTextureFrameView struct {
+	value OpenglOwnedTextureFrame
 	scope *bindingScope
 }
 
-func (view OpenGLOwnedTextureFrameView) Generation() (uint64, error) {
+func (view OpenglOwnedTextureFrameView) Generation() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4478,7 +4478,7 @@ func (view OpenGLOwnedTextureFrameView) Generation() (uint64, error) {
 	})
 }
 
-func (view OpenGLOwnedTextureFrameView) Width() (uint32, error) {
+func (view OpenglOwnedTextureFrameView) Width() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4487,7 +4487,7 @@ func (view OpenGLOwnedTextureFrameView) Width() (uint32, error) {
 	})
 }
 
-func (view OpenGLOwnedTextureFrameView) Height() (uint32, error) {
+func (view OpenglOwnedTextureFrameView) Height() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4496,7 +4496,7 @@ func (view OpenGLOwnedTextureFrameView) Height() (uint32, error) {
 	})
 }
 
-func (view OpenGLOwnedTextureFrameView) ScaleFactor() (float64, error) {
+func (view OpenglOwnedTextureFrameView) ScaleFactor() (float64, error) {
 	return bindingCall(func() float64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4505,16 +4505,16 @@ func (view OpenGLOwnedTextureFrameView) ScaleFactor() (float64, error) {
 	})
 }
 
-func (view OpenGLOwnedTextureFrameView) FrameID() (uint64, error) {
+func (view OpenglOwnedTextureFrameView) FrameId() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 		view.scope.check()
-		return view.value.FrameID
+		return view.value.FrameId
 	})
 }
 
-func (view OpenGLOwnedTextureFrameView) Texture() (uint32, error) {
+func (view OpenglOwnedTextureFrameView) Texture() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4523,7 +4523,7 @@ func (view OpenGLOwnedTextureFrameView) Texture() (uint32, error) {
 	})
 }
 
-func (view OpenGLOwnedTextureFrameView) Target() (uint32, error) {
+func (view OpenglOwnedTextureFrameView) Target() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4532,7 +4532,7 @@ func (view OpenGLOwnedTextureFrameView) Target() (uint32, error) {
 	})
 }
 
-func (view OpenGLOwnedTextureFrameView) InternalFormat() (uint32, error) {
+func (view OpenglOwnedTextureFrameView) InternalFormat() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4541,7 +4541,7 @@ func (view OpenGLOwnedTextureFrameView) InternalFormat() (uint32, error) {
 	})
 }
 
-func (view OpenGLOwnedTextureFrameView) Format() (uint32, error) {
+func (view OpenglOwnedTextureFrameView) Format() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4550,7 +4550,7 @@ func (view OpenGLOwnedTextureFrameView) Format() (uint32, error) {
 	})
 }
 
-func (view OpenGLOwnedTextureFrameView) Type() (uint32, error) {
+func (view OpenglOwnedTextureFrameView) Type() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4559,13 +4559,13 @@ func (view OpenGLOwnedTextureFrameView) Type() (uint32, error) {
 	})
 }
 
-type GPUSyncView struct {
-	value GPUSync
+type GpuSyncView struct {
+	value GpuSync
 	scope *bindingScope
 }
 
-func (view GPUSyncView) Kind() (GPUSyncKind, error) {
-	return bindingCall(func() GPUSyncKind {
+func (view GpuSyncView) Kind() (GpuSyncKind, error) {
+	return bindingCall(func() GpuSyncKind {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 		view.scope.check()
@@ -4573,7 +4573,7 @@ func (view GPUSyncView) Kind() (GPUSyncKind, error) {
 	})
 }
 
-func (view GPUSyncView) Object() (uint64, error) {
+func (view GpuSyncView) Object() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4582,7 +4582,7 @@ func (view GPUSyncView) Object() (uint64, error) {
 	})
 }
 
-func (view GPUSyncView) Value() (uint64, error) {
+func (view GpuSyncView) Value() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4632,12 +4632,12 @@ func (view VulkanOwnedTextureFrameView) ScaleFactor() (float64, error) {
 	})
 }
 
-func (view VulkanOwnedTextureFrameView) FrameID() (uint64, error) {
+func (view VulkanOwnedTextureFrameView) FrameId() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 		view.scope.check()
-		return view.value.FrameID
+		return view.value.FrameId
 	})
 }
 
@@ -4686,12 +4686,12 @@ func (view VulkanOwnedTextureFrameView) Layout() (uint32, error) {
 	})
 }
 
-type WebGPUOwnedTextureFrameView struct {
-	value WebGPUOwnedTextureFrame
+type WebgpuOwnedTextureFrameView struct {
+	value WebgpuOwnedTextureFrame
 	scope *bindingScope
 }
 
-func (view WebGPUOwnedTextureFrameView) Generation() (uint64, error) {
+func (view WebgpuOwnedTextureFrameView) Generation() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4700,7 +4700,7 @@ func (view WebGPUOwnedTextureFrameView) Generation() (uint64, error) {
 	})
 }
 
-func (view WebGPUOwnedTextureFrameView) Width() (uint32, error) {
+func (view WebgpuOwnedTextureFrameView) Width() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4709,7 +4709,7 @@ func (view WebGPUOwnedTextureFrameView) Width() (uint32, error) {
 	})
 }
 
-func (view WebGPUOwnedTextureFrameView) Height() (uint32, error) {
+func (view WebgpuOwnedTextureFrameView) Height() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4718,7 +4718,7 @@ func (view WebGPUOwnedTextureFrameView) Height() (uint32, error) {
 	})
 }
 
-func (view WebGPUOwnedTextureFrameView) ScaleFactor() (float64, error) {
+func (view WebgpuOwnedTextureFrameView) ScaleFactor() (float64, error) {
 	return bindingCall(func() float64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4727,16 +4727,16 @@ func (view WebGPUOwnedTextureFrameView) ScaleFactor() (float64, error) {
 	})
 }
 
-func (view WebGPUOwnedTextureFrameView) FrameID() (uint64, error) {
+func (view WebgpuOwnedTextureFrameView) FrameId() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 		view.scope.check()
-		return view.value.FrameID
+		return view.value.FrameId
 	})
 }
 
-func (view WebGPUOwnedTextureFrameView) UnsafeTexture() (uintptr, error) {
+func (view WebgpuOwnedTextureFrameView) UnsafeTexture() (uintptr, error) {
 	return bindingCall(func() uintptr {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4745,7 +4745,7 @@ func (view WebGPUOwnedTextureFrameView) UnsafeTexture() (uintptr, error) {
 	})
 }
 
-func (view WebGPUOwnedTextureFrameView) UnsafeTextureView() (uintptr, error) {
+func (view WebgpuOwnedTextureFrameView) UnsafeTextureView() (uintptr, error) {
 	return bindingCall(func() uintptr {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4754,7 +4754,7 @@ func (view WebGPUOwnedTextureFrameView) UnsafeTextureView() (uintptr, error) {
 	})
 }
 
-func (view WebGPUOwnedTextureFrameView) UnsafeDevice() (uintptr, error) {
+func (view WebgpuOwnedTextureFrameView) UnsafeDevice() (uintptr, error) {
 	return bindingCall(func() uintptr {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4763,7 +4763,7 @@ func (view WebGPUOwnedTextureFrameView) UnsafeDevice() (uintptr, error) {
 	})
 }
 
-func (view WebGPUOwnedTextureFrameView) Format() (uint32, error) {
+func (view WebgpuOwnedTextureFrameView) Format() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -4793,10 +4793,10 @@ func adoptEventBatchHandle(raw uint64, parent any) *EventBatchHandle {
 	return owner
 }
 
-type GeoJSONSourceDataHandle struct{ *bindingOwner }
+type GeojsonSourceDataHandle struct{ *bindingOwner }
 
-func adoptGeoJSONSourceDataHandle(raw uint64, parent any) *GeoJSONSourceDataHandle {
-	owner := &GeoJSONSourceDataHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_geojson_source_data_destroy(C.mln_geojson_source_data(raw)) })}
+func adoptGeojsonSourceDataHandle(raw uint64, parent any) *GeojsonSourceDataHandle {
+	owner := &GeojsonSourceDataHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_geojson_source_data_destroy(C.mln_geojson_source_data(raw)) })}
 	return owner
 }
 
@@ -4874,7 +4874,7 @@ func (receiver *AcquiredFrameHandle) WithMetalTexture(callback func(MetalOwnedTe
 	return err
 }
 
-func (receiver *AcquiredFrameHandle) WithOpenGLTexture(callback func(OpenGLOwnedTextureFrameView) error) error {
+func (receiver *AcquiredFrameHandle) WithOpenglTexture(callback func(OpenglOwnedTextureFrameView) error) error {
 	_, err := bindingCall(func() struct{} {
 		arena := &bindingArena{}
 		defer arena.close()
@@ -4898,7 +4898,7 @@ func (receiver *AcquiredFrameHandle) WithOpenGLTexture(callback func(OpenGLOwned
 		bindingCheck(func() int32 {
 			return int32(C.mln_acquired_frame_get_opengl_texture(C.mln_acquired_frame(raw), &outputOutFrame))
 		})
-		if err := callback(OpenGLOwnedTextureFrameView{value: copyOpenGLOwnedTextureFrame(outputOutFrame), scope: scope}); err != nil {
+		if err := callback(OpenglOwnedTextureFrameView{value: copyOpenglOwnedTextureFrame(outputOutFrame), scope: scope}); err != nil {
 			panic(bindingFailure{err})
 		}
 		return struct{}{}
@@ -4906,7 +4906,7 @@ func (receiver *AcquiredFrameHandle) WithOpenGLTexture(callback func(OpenGLOwned
 	return err
 }
 
-func (receiver *AcquiredFrameHandle) WithProducerSync(callback func(GPUSyncView) error) error {
+func (receiver *AcquiredFrameHandle) WithProducerSync(callback func(GpuSyncView) error) error {
 	_, err := bindingCall(func() struct{} {
 		arena := &bindingArena{}
 		defer arena.close()
@@ -4930,7 +4930,7 @@ func (receiver *AcquiredFrameHandle) WithProducerSync(callback func(GPUSyncView)
 		bindingCheck(func() int32 {
 			return int32(C.mln_acquired_frame_get_producer_sync(C.mln_acquired_frame(raw), &outputOutSync))
 		})
-		if err := callback(GPUSyncView{value: copyGPUSync(outputOutSync), scope: scope}); err != nil {
+		if err := callback(GpuSyncView{value: copyGpuSync(outputOutSync), scope: scope}); err != nil {
 			panic(bindingFailure{err})
 		}
 		return struct{}{}
@@ -4990,7 +4990,7 @@ func (receiver *AcquiredFrameHandle) WithVulkanTexture(callback func(VulkanOwned
 	return err
 }
 
-func (receiver *AcquiredFrameHandle) WithWebGPUTexture(callback func(WebGPUOwnedTextureFrameView) error) error {
+func (receiver *AcquiredFrameHandle) WithWebgpuTexture(callback func(WebgpuOwnedTextureFrameView) error) error {
 	_, err := bindingCall(func() struct{} {
 		arena := &bindingArena{}
 		defer arena.close()
@@ -5014,7 +5014,7 @@ func (receiver *AcquiredFrameHandle) WithWebGPUTexture(callback func(WebGPUOwned
 		bindingCheck(func() int32 {
 			return int32(C.mln_acquired_frame_get_webgpu_texture(C.mln_acquired_frame(raw), &outputOutFrame))
 		})
-		if err := callback(WebGPUOwnedTextureFrameView{value: copyWebGPUOwnedTextureFrame(outputOutFrame), scope: scope}); err != nil {
+		if err := callback(WebgpuOwnedTextureFrameView{value: copyWebgpuOwnedTextureFrame(outputOutFrame), scope: scope}); err != nil {
 			panic(bindingFailure{err})
 		}
 		return struct{}{}
@@ -5022,7 +5022,7 @@ func (receiver *AcquiredFrameHandle) WithWebGPUTexture(callback func(WebGPUOwned
 	return err
 }
 
-func (receiver *AcquiredFrameHandle) Close(consumerCompletion GPUSync) error {
+func (receiver *AcquiredFrameHandle) Close(consumerCompletion GpuSync) error {
 	_, err := bindingCall(func() struct{} {
 		input1 := consumerCompletion
 		arena := &bindingArena{}
@@ -5038,7 +5038,7 @@ func (receiver *AcquiredFrameHandle) Close(consumerCompletion GPUSync) error {
 		var input1Raw *C.mln_gpu_sync
 		{
 			pointer := (*C.mln_gpu_sync)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeGPUSync(input1, arena)
+			*pointer = nativeGpuSync(input1, arena)
 			input1Raw = pointer
 		}
 		receiverRaw := C.mln_acquired_frame(raw)
@@ -5163,8 +5163,8 @@ func (receiver *EventBatchHandle) Close() error {
 	return err
 }
 
-func GeoJSONSourceDataCreate(data []byte, options *GeoJSONSourceOptions) (*GeoJSONSourceDataHandle, error) {
-	return bindingCall(func() *GeoJSONSourceDataHandle {
+func GeojsonSourceDataCreate(data []byte, options *GeojsonSourceOptions) (*GeojsonSourceDataHandle, error) {
+	return bindingCall(func() *GeojsonSourceDataHandle {
 		input0 := data
 		input1 := options
 		arena := &bindingArena{}
@@ -5176,17 +5176,17 @@ func GeoJSONSourceDataCreate(data []byte, options *GeoJSONSourceOptions) (*GeoJS
 		var input1Raw *C.mln_geojson_source_options
 		if input1 != nil {
 			pointer := (*C.mln_geojson_source_options)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeGeoJSONSourceOptions(*input1, arena)
+			*pointer = nativeGeojsonSourceOptions(*input1, arena)
 			input1Raw = pointer
 		}
 		outputOutData := *new(C.mln_geojson_source_data)
 		bindingCheck(func() int32 { return int32(C.mln_geojson_source_data_create(input0Raw, input1Raw, &outputOutData)) })
-		adopted0 := adoptGeoJSONSourceDataHandle(uint64(outputOutData), nil)
+		adopted0 := adoptGeojsonSourceDataHandle(uint64(outputOutData), nil)
 		return adopted0
 	})
 }
 
-func (receiver *GeoJSONSourceDataHandle) Close() error {
+func (receiver *GeojsonSourceDataHandle) Close() error {
 	_, err := bindingCall(func() struct{} {
 		arena := &bindingArena{}
 		defer arena.close()
@@ -5208,7 +5208,7 @@ func (receiver *GeoJSONSourceDataHandle) Close() error {
 	return err
 }
 
-func (receiver *HTTPHeaderTransformResponseScope) Set(name string, value string) error {
+func (receiver *HttpHeaderTransformResponseScope) Set(name string, value string) error {
 	_, err := bindingCall(func() struct{} {
 		input1 := name
 		input3 := value
@@ -5298,11 +5298,11 @@ func LogSetCallback(callback func(LogSeverity, LogEvent, int64, string) uint32) 
 	return err
 }
 
-func (receiver *MapHandle) AddColorReliefLayer(layerID string, sourceID string, beforeLayerID *string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddColorReliefLayer(layerId string, sourceId string, beforeLayerId *string) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerID
-		input2 := sourceID
-		input3 := beforeLayerID
+		input1 := layerId
+		input2 := sourceId
+		input3 := beforeLayerId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -5330,9 +5330,9 @@ func (receiver *MapHandle) AddColorReliefLayer(layerID string, sourceID string, 
 	})
 }
 
-func (receiver *MapHandle) AddCustomGeometrySource(sourceID string, options CustomGeometrySourceOptions) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddCustomGeometrySource(sourceId string, options CustomGeometrySourceOptions) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := options
 		arena := &bindingArena{}
 		defer arena.close()
@@ -5362,9 +5362,9 @@ func (receiver *MapHandle) AddCustomGeometrySource(sourceID string, options Cust
 	})
 }
 
-func (receiver *MapHandle) AddCustomMVTVectorSource(sourceID string, options CustomMVTVectorSourceOptions) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddCustomMvtVectorSource(sourceId string, options CustomMvtVectorSourceOptions) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := options
 		arena := &bindingArena{}
 		defer arena.close()
@@ -5380,7 +5380,7 @@ func (receiver *MapHandle) AddCustomMVTVectorSource(sourceID string, options Cus
 		var input2Raw *C.mln_custom_mvt_vector_source_options
 		{
 			pointer := (*C.mln_custom_mvt_vector_source_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeCustomMVTVectorSourceOptions(input2, arena)
+			*pointer = nativeCustomMvtVectorSourceOptions(input2, arena)
 			input2Raw = pointer
 		}
 		future, err := startCompletion(func(completion *C.mln_completion) int32 {
@@ -5394,9 +5394,9 @@ func (receiver *MapHandle) AddCustomMVTVectorSource(sourceID string, options Cus
 	})
 }
 
-func (receiver *MapHandle) AddGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddGeojsonSourceData(sourceId string, data *GeojsonSourceDataHandle) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := data
 		arena := &bindingArena{}
 		defer arena.close()
@@ -5424,9 +5424,9 @@ func (receiver *MapHandle) AddGeoJSONSourceData(sourceID string, data *GeoJSONSo
 	})
 }
 
-func (receiver *MapHandle) AddGeoJSONSourceURL(sourceID string, url string, options *GeoJSONSourceOptions) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddGeojsonSourceUrl(sourceId string, url string, options *GeojsonSourceOptions) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := url
 		input3 := options
 		arena := &bindingArena{}
@@ -5445,7 +5445,7 @@ func (receiver *MapHandle) AddGeoJSONSourceURL(sourceID string, url string, opti
 		var input3Raw *C.mln_geojson_source_options
 		if input3 != nil {
 			pointer := (*C.mln_geojson_source_options)(arena.allocate(unsafe.Sizeof(*input3Raw)))
-			*pointer = nativeGeoJSONSourceOptions(*input3, arena)
+			*pointer = nativeGeojsonSourceOptions(*input3, arena)
 			input3Raw = pointer
 		}
 		future, err := startCompletion(func(completion *C.mln_completion) int32 {
@@ -5458,11 +5458,11 @@ func (receiver *MapHandle) AddGeoJSONSourceURL(sourceID string, url string, opti
 	})
 }
 
-func (receiver *MapHandle) AddHillshadeLayer(layerID string, sourceID string, beforeLayerID *string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddHillshadeLayer(layerId string, sourceId string, beforeLayerId *string) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerID
-		input2 := sourceID
-		input3 := beforeLayerID
+		input1 := layerId
+		input2 := sourceId
+		input3 := beforeLayerId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -5490,9 +5490,9 @@ func (receiver *MapHandle) AddHillshadeLayer(layerID string, sourceID string, be
 	})
 }
 
-func (receiver *MapHandle) AddImageSourceImage(sourceID string, coordinates []LatLng, image PremultipliedRGBA8Image) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddImageSourceImage(sourceId string, coordinates []LatLng, image PremultipliedRgba8Image) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := coordinates
 		input4 := image
 		arena := &bindingArena{}
@@ -5517,7 +5517,7 @@ func (receiver *MapHandle) AddImageSourceImage(sourceID string, coordinates []La
 		var input4Raw *C.mln_premultiplied_rgba8_image
 		{
 			pointer := (*C.mln_premultiplied_rgba8_image)(arena.allocate(unsafe.Sizeof(*input4Raw)))
-			*pointer = nativePremultipliedRGBA8Image(input4, arena)
+			*pointer = nativePremultipliedRgba8Image(input4, arena)
 			input4Raw = pointer
 		}
 		future, err := startCompletion(func(completion *C.mln_completion) int32 {
@@ -5530,9 +5530,9 @@ func (receiver *MapHandle) AddImageSourceImage(sourceID string, coordinates []La
 	})
 }
 
-func (receiver *MapHandle) AddImageSourceURL(sourceID string, coordinates []LatLng, url string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddImageSourceUrl(sourceId string, coordinates []LatLng, url string) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := coordinates
 		input4 := url
 		arena := &bindingArena{}
@@ -5566,10 +5566,10 @@ func (receiver *MapHandle) AddImageSourceURL(sourceID string, coordinates []LatL
 	})
 }
 
-func (receiver *MapHandle) AddLocationIndicatorLayer(layerID string, beforeLayerID *string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddLocationIndicatorLayer(layerId string, beforeLayerId *string) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerID
-		input2 := beforeLayerID
+		input1 := layerId
+		input2 := beforeLayerId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -5595,9 +5595,9 @@ func (receiver *MapHandle) AddLocationIndicatorLayer(layerID string, beforeLayer
 	})
 }
 
-func (receiver *MapHandle) AddRasterDEMSourceTiles(sourceID string, tiles []string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddRasterDemSourceTiles(sourceId string, tiles []string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := tiles
 		input4 := options
 		arena := &bindingArena{}
@@ -5635,9 +5635,9 @@ func (receiver *MapHandle) AddRasterDEMSourceTiles(sourceID string, tiles []stri
 	})
 }
 
-func (receiver *MapHandle) AddRasterDEMSourceURL(sourceID string, url string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddRasterDemSourceUrl(sourceId string, url string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := url
 		input3 := options
 		arena := &bindingArena{}
@@ -5669,9 +5669,9 @@ func (receiver *MapHandle) AddRasterDEMSourceURL(sourceID string, url string, op
 	})
 }
 
-func (receiver *MapHandle) AddRasterSourceTiles(sourceID string, tiles []string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddRasterSourceTiles(sourceId string, tiles []string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := tiles
 		input4 := options
 		arena := &bindingArena{}
@@ -5709,9 +5709,9 @@ func (receiver *MapHandle) AddRasterSourceTiles(sourceID string, tiles []string,
 	})
 }
 
-func (receiver *MapHandle) AddRasterSourceURL(sourceID string, url string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddRasterSourceUrl(sourceId string, url string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := url
 		input3 := options
 		arena := &bindingArena{}
@@ -5743,10 +5743,10 @@ func (receiver *MapHandle) AddRasterSourceURL(sourceID string, url string, optio
 	})
 }
 
-func (receiver *MapHandle) AddStyleLayerJSON(layerJSON []byte, beforeLayerID *string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddStyleLayerJson(layerJson []byte, beforeLayerId *string) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerJSON
-		input2 := beforeLayerID
+		input1 := layerJson
+		input2 := beforeLayerId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -5772,10 +5772,10 @@ func (receiver *MapHandle) AddStyleLayerJSON(layerJSON []byte, beforeLayerID *st
 	})
 }
 
-func (receiver *MapHandle) AddStyleSourceJSON(sourceID string, sourceJSON []byte) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddStyleSourceJson(sourceId string, sourceJson []byte) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
-		input2 := sourceJSON
+		input1 := sourceId
+		input2 := sourceJson
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -5799,9 +5799,9 @@ func (receiver *MapHandle) AddStyleSourceJSON(sourceID string, sourceJSON []byte
 	})
 }
 
-func (receiver *MapHandle) AddVectorSourceTiles(sourceID string, tiles []string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddVectorSourceTiles(sourceId string, tiles []string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := tiles
 		input4 := options
 		arena := &bindingArena{}
@@ -5839,9 +5839,9 @@ func (receiver *MapHandle) AddVectorSourceTiles(sourceID string, tiles []string,
 	})
 }
 
-func (receiver *MapHandle) AddVectorSourceURL(sourceID string, url string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddVectorSourceUrl(sourceId string, url string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := url
 		input3 := options
 		arena := &bindingArena{}
@@ -6096,9 +6096,9 @@ func (receiver *MapHandle) CancelTransitions() (*Future[CommandCompletion], erro
 	})
 }
 
-func (receiver *MapHandle) CopyLayerSourceID(layerID string) (*Future[*string], error) {
+func (receiver *MapHandle) CopyLayerSourceId(layerId string) (*Future[*string], error) {
 	return bindingCall(func() *Future[*string] {
-		input1 := layerID
+		input1 := layerId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -6133,9 +6133,9 @@ func (receiver *MapHandle) CopyLayerSourceID(layerID string) (*Future[*string], 
 	})
 }
 
-func (receiver *MapHandle) CopyLayerSourceLayer(layerID string) (*Future[*string], error) {
+func (receiver *MapHandle) CopyLayerSourceLayer(layerId string) (*Future[*string], error) {
 	return bindingCall(func() *Future[*string] {
-		input1 := layerID
+		input1 := layerId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -6170,9 +6170,9 @@ func (receiver *MapHandle) CopyLayerSourceLayer(layerID string) (*Future[*string
 	})
 }
 
-func (receiver *MapHandle) CopyStyleImagePremultipliedRGBA8(imageID string) (*Future[*[]byte], error) {
+func (receiver *MapHandle) CopyStyleImagePremultipliedRgba8(imageId string) (*Future[*[]byte], error) {
 	return bindingCall(func() *Future[*[]byte] {
-		input1 := imageID
+		input1 := imageId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -6204,9 +6204,9 @@ func (receiver *MapHandle) CopyStyleImagePremultipliedRGBA8(imageID string) (*Fu
 	})
 }
 
-func (receiver *MapHandle) CopyStyleImageStretches(imageID string) (*Future[*StyleImageStretchesResult], error) {
+func (receiver *MapHandle) CopyStyleImageStretches(imageId string) (*Future[*StyleImageStretchesResult], error) {
 	return bindingCall(func() *Future[*StyleImageStretchesResult] {
-		input1 := imageID
+		input1 := imageId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -6238,9 +6238,9 @@ func (receiver *MapHandle) CopyStyleImageStretches(imageID string) (*Future[*Sty
 	})
 }
 
-func (receiver *MapHandle) CopyStyleSourceAttribution(sourceID string) (*Future[*string], error) {
+func (receiver *MapHandle) CopyStyleSourceAttribution(sourceId string) (*Future[*string], error) {
 	return bindingCall(func() *Future[*string] {
-		input1 := sourceID
+		input1 := sourceId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -6272,9 +6272,9 @@ func (receiver *MapHandle) CopyStyleSourceAttribution(sourceID string) (*Future[
 	})
 }
 
-func (receiver *MapHandle) CopyStyleSourceURL(sourceID string) (*Future[*string], error) {
+func (receiver *MapHandle) CopyStyleSourceUrl(sourceId string) (*Future[*string], error) {
 	return bindingCall(func() *Future[*string] {
-		input1 := sourceID
+		input1 := sourceId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -6424,9 +6424,9 @@ func (receiver *MapHandle) GetGlobalState() (*Future[[]byte], error) {
 	})
 }
 
-func (receiver *MapHandle) GetImageSourceCoordinates(sourceID string) (*Future[[]LatLng], error) {
+func (receiver *MapHandle) GetImageSourceCoordinates(sourceId string) (*Future[[]LatLng], error) {
 	return bindingCall(func() *Future[[]LatLng] {
-		input1 := sourceID
+		input1 := sourceId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -6461,9 +6461,9 @@ func (receiver *MapHandle) GetImageSourceCoordinates(sourceID string) (*Future[[
 	})
 }
 
-func (receiver *MapHandle) GetLayerFilter(layerID string) (*Future[*[]byte], error) {
+func (receiver *MapHandle) GetLayerFilter(layerId string) (*Future[*[]byte], error) {
 	return bindingCall(func() *Future[*[]byte] {
-		input1 := layerID
+		input1 := layerId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -6495,9 +6495,9 @@ func (receiver *MapHandle) GetLayerFilter(layerID string) (*Future[*[]byte], err
 	})
 }
 
-func (receiver *MapHandle) GetLayerProperty(layerID string, propertyName string) (*Future[*[]byte], error) {
+func (receiver *MapHandle) GetLayerProperty(layerId string, propertyName string) (*Future[*[]byte], error) {
 	return bindingCall(func() *Future[*[]byte] {
-		input1 := layerID
+		input1 := layerId
 		input2 := propertyName
 		arena := &bindingArena{}
 		defer arena.close()
@@ -6532,9 +6532,9 @@ func (receiver *MapHandle) GetLayerProperty(layerID string, propertyName string)
 	})
 }
 
-func (receiver *MapHandle) GetStyleImageInfo(imageID string) (*Future[*StyleImageResult], error) {
+func (receiver *MapHandle) GetStyleImageInfo(imageId string) (*Future[*StyleImageResult], error) {
 	return bindingCall(func() *Future[*StyleImageResult] {
-		input1 := imageID
+		input1 := imageId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -6566,9 +6566,9 @@ func (receiver *MapHandle) GetStyleImageInfo(imageID string) (*Future[*StyleImag
 	})
 }
 
-func (receiver *MapHandle) GetStyleLayerInfo(layerID string) (*Future[*StyleLayerResult], error) {
+func (receiver *MapHandle) GetStyleLayerInfo(layerId string) (*Future[*StyleLayerResult], error) {
 	return bindingCall(func() *Future[*StyleLayerResult] {
-		input1 := layerID
+		input1 := layerId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -6600,9 +6600,9 @@ func (receiver *MapHandle) GetStyleLayerInfo(layerID string) (*Future[*StyleLaye
 	})
 }
 
-func (receiver *MapHandle) GetStyleLayerJSON(layerID string) (*Future[*[]byte], error) {
+func (receiver *MapHandle) GetStyleLayerJson(layerId string) (*Future[*[]byte], error) {
 	return bindingCall(func() *Future[*[]byte] {
-		input1 := layerID
+		input1 := layerId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -6668,9 +6668,9 @@ func (receiver *MapHandle) GetStyleLightProperty(propertyName string) (*Future[*
 	})
 }
 
-func (receiver *MapHandle) GetStyleSourceInfo(sourceID string) (*Future[*StyleSourceResult], error) {
+func (receiver *MapHandle) GetStyleSourceInfo(sourceId string) (*Future[*StyleSourceResult], error) {
 	return bindingCall(func() *Future[*StyleSourceResult] {
-		input1 := sourceID
+		input1 := sourceId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -6702,9 +6702,9 @@ func (receiver *MapHandle) GetStyleSourceInfo(sourceID string) (*Future[*StyleSo
 	})
 }
 
-func (receiver *MapHandle) GetStyleSourceTileURLs(sourceID string) (*Future[*StyleSourceTileURLsResult], error) {
-	return bindingCall(func() *Future[*StyleSourceTileURLsResult] {
-		input1 := sourceID
+func (receiver *MapHandle) GetStyleSourceTileUrls(sourceId string) (*Future[*StyleSourceTileUrlsResult], error) {
+	return bindingCall(func() *Future[*StyleSourceTileUrlsResult] {
+		input1 := sourceId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -6718,7 +6718,7 @@ func (receiver *MapHandle) GetStyleSourceTileURLs(sourceID string) (*Future[*Sty
 		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
 		future, err := startCompletion(func(completion *C.mln_completion) int32 {
 			return int32(C.mln_map_get_style_source_tile_urls(C.mln_map(raw), input1Raw, completion))
-		}, func(result *C.mln_completion_result) (*StyleSourceTileURLsResult, error) {
+		}, func(result *C.mln_completion_result) (*StyleSourceTileUrlsResult, error) {
 			if result.value == nil {
 				return nil, nil
 			}
@@ -6726,7 +6726,7 @@ func (receiver *MapHandle) GetStyleSourceTileURLs(sourceID string) (*Future[*Sty
 			if err != nil {
 				return nil, err
 			}
-			copied := copyStyleSourceTileURLsResult(raw)
+			copied := copyStyleSourceTileUrlsResult(raw)
 			return &copied, nil
 		})
 		if err != nil {
@@ -6764,9 +6764,9 @@ func (receiver *MapHandle) GetStyleTransitionOptions() (*Future[StyleTransitionO
 	})
 }
 
-func (receiver *MapHandle) InvalidateCustomGeometrySourceRegion(sourceID string, bounds LatLngBounds) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) InvalidateCustomGeometrySourceRegion(sourceId string, bounds LatLngBounds) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := bounds
 		arena := &bindingArena{}
 		defer arena.close()
@@ -6791,10 +6791,10 @@ func (receiver *MapHandle) InvalidateCustomGeometrySourceRegion(sourceID string,
 	})
 }
 
-func (receiver *MapHandle) InvalidateCustomGeometrySourceTile(sourceID string, tileID CanonicalTileID) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) InvalidateCustomGeometrySourceTile(sourceId string, tileId CanonicalTileId) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
-		input2 := tileID
+		input1 := sourceId
+		input2 := tileId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -6807,7 +6807,7 @@ func (receiver *MapHandle) InvalidateCustomGeometrySourceTile(sourceID string, t
 		var input1Raw C.mln_buffer_view
 		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
 		var input2Raw C.mln_canonical_tile_id
-		input2Raw = nativeCanonicalTileID(input2, arena)
+		input2Raw = nativeCanonicalTileId(input2, arena)
 		future, err := startCompletion(func(completion *C.mln_completion) int32 {
 			return int32(C.mln_map_invalidate_custom_geometry_source_tile(C.mln_map(raw), input1Raw, input2Raw, completion))
 		}, completionCommand)
@@ -6818,10 +6818,10 @@ func (receiver *MapHandle) InvalidateCustomGeometrySourceTile(sourceID string, t
 	})
 }
 
-func (receiver *MapHandle) InvalidateCustomMVTVectorSourceTile(sourceID string, tileID CanonicalTileID) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) InvalidateCustomMvtVectorSourceTile(sourceId string, tileId CanonicalTileId) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
-		input2 := tileID
+		input1 := sourceId
+		input2 := tileId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -6834,7 +6834,7 @@ func (receiver *MapHandle) InvalidateCustomMVTVectorSourceTile(sourceID string, 
 		var input1Raw C.mln_buffer_view
 		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
 		var input2Raw C.mln_canonical_tile_id
-		input2Raw = nativeCanonicalTileID(input2, arena)
+		input2Raw = nativeCanonicalTileId(input2, arena)
 		future, err := startCompletion(func(completion *C.mln_completion) int32 {
 			return int32(C.mln_map_invalidate_custom_mvt_vector_source_tile(C.mln_map(raw), input1Raw, input2Raw, completion))
 		}, completionCommand)
@@ -7057,7 +7057,7 @@ func (receiver *MapHandle) LatLngsForPixelsUnwrapped(points []ScreenPoint) (*Fut
 	})
 }
 
-func (receiver *MapHandle) ListStyleLayerIDs() (*Future[[]string], error) {
+func (receiver *MapHandle) ListStyleLayerIds() (*Future[[]string], error) {
 	return bindingCall(func() *Future[[]string] {
 		arena := &bindingArena{}
 		defer arena.close()
@@ -7119,7 +7119,7 @@ func (receiver *MapHandle) ListStyleLayers() (*Future[[]StyleLayerEntry], error)
 	})
 }
 
-func (receiver *MapHandle) ListStyleSourceIDs() (*Future[[]string], error) {
+func (receiver *MapHandle) ListStyleSourceIds() (*Future[[]string], error) {
 	return bindingCall(func() *Future[[]string] {
 		arena := &bindingArena{}
 		defer arena.close()
@@ -7150,7 +7150,7 @@ func (receiver *MapHandle) ListStyleSourceIDs() (*Future[[]string], error) {
 	})
 }
 
-func (receiver *MapHandle) LoadedStyleJSON() (*Future[[]byte], error) {
+func (receiver *MapHandle) LoadedStyleJson() (*Future[[]byte], error) {
 	return bindingCall(func() *Future[[]byte] {
 		arena := &bindingArena{}
 		defer arena.close()
@@ -7209,10 +7209,10 @@ func (receiver *MapHandle) MetersPerPixelAtLatitude(latitude float64) (*Future[f
 	})
 }
 
-func (receiver *MapHandle) MoveStyleLayer(layerID string, beforeLayerID *string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) MoveStyleLayer(layerId string, beforeLayerId *string) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerID
-		input2 := beforeLayerID
+		input1 := layerId
+		input2 := beforeLayerId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -7598,9 +7598,9 @@ func (receiver *MapHandle) RemoveFeatureState(selector FeatureStateSelector) (*F
 	})
 }
 
-func (receiver *MapHandle) RemoveStyleImage(imageID string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) RemoveStyleImage(imageId string) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := imageID
+		input1 := imageId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -7622,9 +7622,9 @@ func (receiver *MapHandle) RemoveStyleImage(imageID string) (*Future[CommandComp
 	})
 }
 
-func (receiver *MapHandle) RemoveStyleLayer(layerID string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) RemoveStyleLayer(layerId string) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerID
+		input1 := layerId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -7646,9 +7646,9 @@ func (receiver *MapHandle) RemoveStyleLayer(layerID string) (*Future[CommandComp
 	})
 }
 
-func (receiver *MapHandle) RemoveStyleSource(sourceID string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) RemoveStyleSource(sourceId string) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -7764,10 +7764,10 @@ func (receiver *MapHandle) SetBounds(options BoundOptions) (*Future[CommandCompl
 	})
 }
 
-func (receiver *MapHandle) SetCustomGeometrySourceTileData(sourceID string, tileID CanonicalTileID, data []byte) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetCustomGeometrySourceTileData(sourceId string, tileId CanonicalTileId, data []byte) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
-		input2 := tileID
+		input1 := sourceId
+		input2 := tileId
 		input3 := data
 		arena := &bindingArena{}
 		defer arena.close()
@@ -7781,7 +7781,7 @@ func (receiver *MapHandle) SetCustomGeometrySourceTileData(sourceID string, tile
 		var input1Raw C.mln_buffer_view
 		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
 		var input2Raw C.mln_canonical_tile_id
-		input2Raw = nativeCanonicalTileID(input2, arena)
+		input2Raw = nativeCanonicalTileId(input2, arena)
 		var input3Raw C.mln_buffer_view
 		input3Raw = C.mln_buffer_view{data: arena.bytes(input3), size: C.size_t(len(input3))}
 		future, err := startCompletion(func(completion *C.mln_completion) int32 {
@@ -7794,10 +7794,10 @@ func (receiver *MapHandle) SetCustomGeometrySourceTileData(sourceID string, tile
 	})
 }
 
-func (receiver *MapHandle) SetCustomMVTVectorSourceTileData(sourceID string, tileID CanonicalTileID, data []byte) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetCustomMvtVectorSourceTileData(sourceId string, tileId CanonicalTileId, data []byte) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
-		input2 := tileID
+		input1 := sourceId
+		input2 := tileId
 		input3 := data
 		arena := &bindingArena{}
 		defer arena.close()
@@ -7811,7 +7811,7 @@ func (receiver *MapHandle) SetCustomMVTVectorSourceTileData(sourceID string, til
 		var input1Raw C.mln_buffer_view
 		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
 		var input2Raw C.mln_canonical_tile_id
-		input2Raw = nativeCanonicalTileID(input2, arena)
+		input2Raw = nativeCanonicalTileId(input2, arena)
 		var input3Raw C.mln_buffer_view
 		input3Raw = C.mln_buffer_view{data: arena.bytes(input3), size: C.size_t(len(input3))}
 		future, err := startCompletion(func(completion *C.mln_completion) int32 {
@@ -7824,10 +7824,10 @@ func (receiver *MapHandle) SetCustomMVTVectorSourceTileData(sourceID string, til
 	})
 }
 
-func (receiver *MapHandle) SetCustomMVTVectorSourceTileError(sourceID string, tileID CanonicalTileID, message string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetCustomMvtVectorSourceTileError(sourceId string, tileId CanonicalTileId, message string) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
-		input2 := tileID
+		input1 := sourceId
+		input2 := tileId
 		input3 := message
 		arena := &bindingArena{}
 		defer arena.close()
@@ -7841,7 +7841,7 @@ func (receiver *MapHandle) SetCustomMVTVectorSourceTileError(sourceID string, ti
 		var input1Raw C.mln_buffer_view
 		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
 		var input2Raw C.mln_canonical_tile_id
-		input2Raw = nativeCanonicalTileID(input2, arena)
+		input2Raw = nativeCanonicalTileId(input2, arena)
 		var input3Raw C.mln_buffer_view
 		input3Raw = C.mln_buffer_view{data: arena.bytes([]byte(input3)), size: C.size_t(len(input3))}
 		future, err := startCompletion(func(completion *C.mln_completion) int32 {
@@ -7961,9 +7961,9 @@ func (receiver *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) (*Fut
 	})
 }
 
-func (receiver *MapHandle) SetGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetGeojsonSourceData(sourceId string, data *GeojsonSourceDataHandle) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := data
 		arena := &bindingArena{}
 		defer arena.close()
@@ -7991,9 +7991,9 @@ func (receiver *MapHandle) SetGeoJSONSourceData(sourceID string, data *GeoJSONSo
 	})
 }
 
-func (receiver *MapHandle) SetGeoJSONSourceSynchronousTiling(sourceID string, enabled bool) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetGeojsonSourceSynchronousTiling(sourceId string, enabled bool) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := enabled
 		arena := &bindingArena{}
 		defer arena.close()
@@ -8018,9 +8018,9 @@ func (receiver *MapHandle) SetGeoJSONSourceSynchronousTiling(sourceID string, en
 	})
 }
 
-func (receiver *MapHandle) SetGeoJSONSourceURL(sourceID string, url string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetGeojsonSourceUrl(sourceId string, url string) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := url
 		arena := &bindingArena{}
 		defer arena.close()
@@ -8072,9 +8072,9 @@ func (receiver *MapHandle) SetGlobalStateProperty(propertyName string, value []b
 	})
 }
 
-func (receiver *MapHandle) SetImageSourceCoordinates(sourceID string, coordinates []LatLng) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetImageSourceCoordinates(sourceId string, coordinates []LatLng) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := coordinates
 		arena := &bindingArena{}
 		defer arena.close()
@@ -8105,9 +8105,9 @@ func (receiver *MapHandle) SetImageSourceCoordinates(sourceID string, coordinate
 	})
 }
 
-func (receiver *MapHandle) SetImageSourceImage(sourceID string, image PremultipliedRGBA8Image) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetImageSourceImage(sourceId string, image PremultipliedRgba8Image) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := image
 		arena := &bindingArena{}
 		defer arena.close()
@@ -8123,7 +8123,7 @@ func (receiver *MapHandle) SetImageSourceImage(sourceID string, image Premultipl
 		var input2Raw *C.mln_premultiplied_rgba8_image
 		{
 			pointer := (*C.mln_premultiplied_rgba8_image)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativePremultipliedRGBA8Image(input2, arena)
+			*pointer = nativePremultipliedRgba8Image(input2, arena)
 			input2Raw = pointer
 		}
 		future, err := startCompletion(func(completion *C.mln_completion) int32 {
@@ -8136,9 +8136,9 @@ func (receiver *MapHandle) SetImageSourceImage(sourceID string, image Premultipl
 	})
 }
 
-func (receiver *MapHandle) SetImageSourceURL(sourceID string, url string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetImageSourceUrl(sourceId string, url string) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := url
 		arena := &bindingArena{}
 		defer arena.close()
@@ -8163,9 +8163,9 @@ func (receiver *MapHandle) SetImageSourceURL(sourceID string, url string) (*Futu
 	})
 }
 
-func (receiver *MapHandle) SetLayerFilter(layerID string, filter *[]byte) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetLayerFilter(layerId string, filter *[]byte) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerID
+		input1 := layerId
 		input2 := filter
 		arena := &bindingArena{}
 		defer arena.close()
@@ -8194,9 +8194,9 @@ func (receiver *MapHandle) SetLayerFilter(layerID string, filter *[]byte) (*Futu
 	})
 }
 
-func (receiver *MapHandle) SetLayerMaxZoom(layerID string, maxZoom float64) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetLayerMaxZoom(layerId string, maxZoom float64) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerID
+		input1 := layerId
 		input2 := maxZoom
 		arena := &bindingArena{}
 		defer arena.close()
@@ -8221,9 +8221,9 @@ func (receiver *MapHandle) SetLayerMaxZoom(layerID string, maxZoom float64) (*Fu
 	})
 }
 
-func (receiver *MapHandle) SetLayerMinZoom(layerID string, minZoom float64) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetLayerMinZoom(layerId string, minZoom float64) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerID
+		input1 := layerId
 		input2 := minZoom
 		arena := &bindingArena{}
 		defer arena.close()
@@ -8248,9 +8248,9 @@ func (receiver *MapHandle) SetLayerMinZoom(layerID string, minZoom float64) (*Fu
 	})
 }
 
-func (receiver *MapHandle) SetLayerProperty(layerID string, propertyName string, value []byte) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetLayerProperty(layerId string, propertyName string, value []byte) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerID
+		input1 := layerId
 		input2 := propertyName
 		input3 := value
 		arena := &bindingArena{}
@@ -8278,10 +8278,10 @@ func (receiver *MapHandle) SetLayerProperty(layerID string, propertyName string,
 	})
 }
 
-func (receiver *MapHandle) SetLayerSourceID(layerID string, sourceID string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetLayerSourceId(layerId string, sourceId string) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerID
-		input2 := sourceID
+		input1 := layerId
+		input2 := sourceId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -8305,9 +8305,9 @@ func (receiver *MapHandle) SetLayerSourceID(layerID string, sourceID string) (*F
 	})
 }
 
-func (receiver *MapHandle) SetLayerSourceLayer(layerID string, sourceLayer *string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetLayerSourceLayer(layerId string, sourceLayer *string) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerID
+		input1 := layerId
 		input2 := sourceLayer
 		arena := &bindingArena{}
 		defer arena.close()
@@ -8334,9 +8334,9 @@ func (receiver *MapHandle) SetLayerSourceLayer(layerID string, sourceLayer *stri
 	})
 }
 
-func (receiver *MapHandle) SetLayerVisibility(layerID string, visibility StyleLayerVisibility) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetLayerVisibility(layerId string, visibility StyleLayerVisibility) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerID
+		input1 := layerId
 		input2 := visibility
 		arena := &bindingArena{}
 		defer arena.close()
@@ -8361,9 +8361,9 @@ func (receiver *MapHandle) SetLayerVisibility(layerID string, visibility StyleLa
 	})
 }
 
-func (receiver *MapHandle) SetLocationIndicatorAccuracyRadius(layerID string, radius float64) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetLocationIndicatorAccuracyRadius(layerId string, radius float64) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerID
+		input1 := layerId
 		input2 := radius
 		arena := &bindingArena{}
 		defer arena.close()
@@ -8388,9 +8388,9 @@ func (receiver *MapHandle) SetLocationIndicatorAccuracyRadius(layerID string, ra
 	})
 }
 
-func (receiver *MapHandle) SetLocationIndicatorBearing(layerID string, bearing float64) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetLocationIndicatorBearing(layerId string, bearing float64) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerID
+		input1 := layerId
 		input2 := bearing
 		arena := &bindingArena{}
 		defer arena.close()
@@ -8415,11 +8415,11 @@ func (receiver *MapHandle) SetLocationIndicatorBearing(layerID string, bearing f
 	})
 }
 
-func (receiver *MapHandle) SetLocationIndicatorImageName(layerID string, imageKind LocationIndicatorImageKind, imageID string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetLocationIndicatorImageName(layerId string, imageKind LocationIndicatorImageKind, imageId string) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerID
+		input1 := layerId
 		input2 := imageKind
-		input3 := imageID
+		input3 := imageId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -8445,9 +8445,9 @@ func (receiver *MapHandle) SetLocationIndicatorImageName(layerID string, imageKi
 	})
 }
 
-func (receiver *MapHandle) SetLocationIndicatorLocation(layerID string, coordinate LatLng, altitude float64) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetLocationIndicatorLocation(layerId string, coordinate LatLng, altitude float64) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerID
+		input1 := layerId
 		input2 := coordinate
 		input3 := altitude
 		arena := &bindingArena{}
@@ -8527,9 +8527,9 @@ func (receiver *MapHandle) SetRenderingStatsViewEnabled(enabled bool) (*Future[C
 	})
 }
 
-func (receiver *MapHandle) SetStyleImage(imageID string, image PremultipliedRGBA8Image, options *StyleImageOptions) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetStyleImage(imageId string, image PremultipliedRgba8Image, options *StyleImageOptions) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := imageID
+		input1 := imageId
 		input2 := image
 		input3 := options
 		arena := &bindingArena{}
@@ -8546,7 +8546,7 @@ func (receiver *MapHandle) SetStyleImage(imageID string, image PremultipliedRGBA
 		var input2Raw *C.mln_premultiplied_rgba8_image
 		{
 			pointer := (*C.mln_premultiplied_rgba8_image)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativePremultipliedRGBA8Image(input2, arena)
+			*pointer = nativePremultipliedRgba8Image(input2, arena)
 			input2Raw = pointer
 		}
 		var input3Raw *C.mln_style_image_options
@@ -8565,7 +8565,7 @@ func (receiver *MapHandle) SetStyleImage(imageID string, image PremultipliedRGBA
 	})
 }
 
-func (receiver *MapHandle) SetStyleJSON(json []byte) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetStyleJson(json []byte) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
 		input1 := json
 		arena := &bindingArena{}
@@ -8589,9 +8589,9 @@ func (receiver *MapHandle) SetStyleJSON(json []byte) (*Future[CommandCompletion]
 	})
 }
 
-func (receiver *MapHandle) SetStyleLightJSON(lightJSON []byte) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetStyleLightJson(lightJson []byte) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := lightJSON
+		input1 := lightJson
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -8640,9 +8640,9 @@ func (receiver *MapHandle) SetStyleLightProperty(propertyName string, value []by
 	})
 }
 
-func (receiver *MapHandle) SetStyleSourceVolatile(sourceID string, isVolatile bool) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetStyleSourceVolatile(sourceId string, isVolatile bool) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := isVolatile
 		arena := &bindingArena{}
 		defer arena.close()
@@ -8695,7 +8695,7 @@ func (receiver *MapHandle) SetStyleTransitionOptions(options StyleTransitionOpti
 	})
 }
 
-func (receiver *MapHandle) SetStyleURL(url string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetStyleUrl(url string) (*Future[CommandCompletion], error) {
 	return bindingCall(func() *Future[CommandCompletion] {
 		input1 := url
 		arena := &bindingArena{}
@@ -8793,7 +8793,7 @@ func (receiver *MapHandle) SnapshotGet() (MapSnapshot, error) {
 	})
 }
 
-func (receiver *MapHandle) StyleURL() (*Future[string], error) {
+func (receiver *MapHandle) StyleUrl() (*Future[string], error) {
 	return bindingCall(func() *Future[string] {
 		arena := &bindingArena{}
 		defer arena.close()
@@ -9061,13 +9061,13 @@ func NetworkStatusSet(status NetworkStatus) error {
 	return err
 }
 
-type OpenGLBorrowedTextureAttachResult struct {
+type OpenglBorrowedTextureAttachResult struct {
 	Session    *RenderSessionHandle
 	Completion *Future[struct{}]
 }
 
-func (receiver *MapHandle) OpenGLBorrowedTextureAttach(descriptor OpenGLBorrowedTextureDescriptor, options RenderSessionAttachOptions) (OpenGLBorrowedTextureAttachResult, error) {
-	return bindingCall(func() OpenGLBorrowedTextureAttachResult {
+func (receiver *MapHandle) OpenglBorrowedTextureAttach(descriptor OpenglBorrowedTextureDescriptor, options RenderSessionAttachOptions) (OpenglBorrowedTextureAttachResult, error) {
+	return bindingCall(func() OpenglBorrowedTextureAttachResult {
 		input1 := descriptor
 		input2 := options
 		arena := &bindingArena{}
@@ -9082,7 +9082,7 @@ func (receiver *MapHandle) OpenGLBorrowedTextureAttach(descriptor OpenGLBorrowed
 		var input1Raw *C.mln_opengl_borrowed_texture_descriptor
 		{
 			pointer := (*C.mln_opengl_borrowed_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeOpenGLBorrowedTextureDescriptor(input1, arena)
+			*pointer = nativeOpenglBorrowedTextureDescriptor(input1, arena)
 			input1Raw = pointer
 		}
 		var input2Raw *C.mln_render_session_attach_options
@@ -9100,11 +9100,11 @@ func (receiver *MapHandle) OpenGLBorrowedTextureAttach(descriptor OpenGLBorrowed
 		}
 		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
 		arena.accept(adopted0.bindingOwner)
-		return OpenGLBorrowedTextureAttachResult{Session: adopted0, Completion: future}
+		return OpenglBorrowedTextureAttachResult{Session: adopted0, Completion: future}
 	})
 }
 
-func (receiver *RenderSessionHandle) OpenGLBorrowedTextureSetTarget(descriptor OpenGLBorrowedTextureDescriptor) (*Future[struct{}], error) {
+func (receiver *RenderSessionHandle) OpenglBorrowedTextureSetTarget(descriptor OpenglBorrowedTextureDescriptor) (*Future[struct{}], error) {
 	return bindingCall(func() *Future[struct{}] {
 		input1 := descriptor
 		arena := &bindingArena{}
@@ -9119,7 +9119,7 @@ func (receiver *RenderSessionHandle) OpenGLBorrowedTextureSetTarget(descriptor O
 		var input1Raw *C.mln_opengl_borrowed_texture_descriptor
 		{
 			pointer := (*C.mln_opengl_borrowed_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeOpenGLBorrowedTextureDescriptor(input1, arena)
+			*pointer = nativeOpenglBorrowedTextureDescriptor(input1, arena)
 			input1Raw = pointer
 		}
 		future, err := startCompletion(func(completion *C.mln_completion) int32 {
@@ -9132,13 +9132,13 @@ func (receiver *RenderSessionHandle) OpenGLBorrowedTextureSetTarget(descriptor O
 	})
 }
 
-type OpenGLOwnedTextureAttachResult struct {
+type OpenglOwnedTextureAttachResult struct {
 	Session    *RenderSessionHandle
 	Completion *Future[struct{}]
 }
 
-func (receiver *MapHandle) OpenGLOwnedTextureAttach(descriptor OpenGLOwnedTextureDescriptor, options RenderSessionAttachOptions) (OpenGLOwnedTextureAttachResult, error) {
-	return bindingCall(func() OpenGLOwnedTextureAttachResult {
+func (receiver *MapHandle) OpenglOwnedTextureAttach(descriptor OpenglOwnedTextureDescriptor, options RenderSessionAttachOptions) (OpenglOwnedTextureAttachResult, error) {
+	return bindingCall(func() OpenglOwnedTextureAttachResult {
 		input1 := descriptor
 		input2 := options
 		arena := &bindingArena{}
@@ -9153,7 +9153,7 @@ func (receiver *MapHandle) OpenGLOwnedTextureAttach(descriptor OpenGLOwnedTextur
 		var input1Raw *C.mln_opengl_owned_texture_descriptor
 		{
 			pointer := (*C.mln_opengl_owned_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeOpenGLOwnedTextureDescriptor(input1, arena)
+			*pointer = nativeOpenglOwnedTextureDescriptor(input1, arena)
 			input1Raw = pointer
 		}
 		var input2Raw *C.mln_render_session_attach_options
@@ -9171,28 +9171,28 @@ func (receiver *MapHandle) OpenGLOwnedTextureAttach(descriptor OpenGLOwnedTextur
 		}
 		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
 		arena.accept(adopted0.bindingOwner)
-		return OpenGLOwnedTextureAttachResult{Session: adopted0, Completion: future}
+		return OpenglOwnedTextureAttachResult{Session: adopted0, Completion: future}
 	})
 }
 
-func OpenGLSupportedContextProviderMask() (OpenGLContextProviderFlag, error) {
-	return bindingCall(func() OpenGLContextProviderFlag {
+func OpenglSupportedContextProviderMask() (OpenglContextProviderFlag, error) {
+	return bindingCall(func() OpenglContextProviderFlag {
 		arena := &bindingArena{}
 		defer arena.close()
 		admitted := bindingAdmission(C.binding_operation_mln_opengl_supported_context_provider_mask, 0)
 		defer admitted()
 		nativeResult := C.mln_opengl_supported_context_provider_mask()
-		return OpenGLContextProviderFlag(nativeResult)
+		return OpenglContextProviderFlag(nativeResult)
 	})
 }
 
-type OpenGLSurfaceAttachResult struct {
+type OpenglSurfaceAttachResult struct {
 	Session    *RenderSessionHandle
 	Completion *Future[struct{}]
 }
 
-func (receiver *MapHandle) OpenGLSurfaceAttach(descriptor OpenGLSurfaceDescriptor, options RenderSessionAttachOptions) (OpenGLSurfaceAttachResult, error) {
-	return bindingCall(func() OpenGLSurfaceAttachResult {
+func (receiver *MapHandle) OpenglSurfaceAttach(descriptor OpenglSurfaceDescriptor, options RenderSessionAttachOptions) (OpenglSurfaceAttachResult, error) {
+	return bindingCall(func() OpenglSurfaceAttachResult {
 		input1 := descriptor
 		input2 := options
 		arena := &bindingArena{}
@@ -9207,7 +9207,7 @@ func (receiver *MapHandle) OpenGLSurfaceAttach(descriptor OpenGLSurfaceDescripto
 		var input1Raw *C.mln_opengl_surface_descriptor
 		{
 			pointer := (*C.mln_opengl_surface_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeOpenGLSurfaceDescriptor(input1, arena)
+			*pointer = nativeOpenglSurfaceDescriptor(input1, arena)
 			input1Raw = pointer
 		}
 		var input2Raw *C.mln_render_session_attach_options
@@ -9225,11 +9225,11 @@ func (receiver *MapHandle) OpenGLSurfaceAttach(descriptor OpenGLSurfaceDescripto
 		}
 		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
 		arena.accept(adopted0.bindingOwner)
-		return OpenGLSurfaceAttachResult{Session: adopted0, Completion: future}
+		return OpenglSurfaceAttachResult{Session: adopted0, Completion: future}
 	})
 }
 
-func (receiver *RenderSessionHandle) OpenGLSurfaceSetTarget(descriptor OpenGLSurfaceDescriptor) (*Future[struct{}], error) {
+func (receiver *RenderSessionHandle) OpenglSurfaceSetTarget(descriptor OpenglSurfaceDescriptor) (*Future[struct{}], error) {
 	return bindingCall(func() *Future[struct{}] {
 		input1 := descriptor
 		arena := &bindingArena{}
@@ -9244,7 +9244,7 @@ func (receiver *RenderSessionHandle) OpenGLSurfaceSetTarget(descriptor OpenGLSur
 		var input1Raw *C.mln_opengl_surface_descriptor
 		{
 			pointer := (*C.mln_opengl_surface_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeOpenGLSurfaceDescriptor(input1, arena)
+			*pointer = nativeOpenglSurfaceDescriptor(input1, arena)
 			input1Raw = pointer
 		}
 		future, err := startCompletion(func(completion *C.mln_completion) int32 {
@@ -9571,9 +9571,9 @@ func (receiver *RenderSessionHandle) ProjectionCreate() (*MapProjectionHandle, e
 	})
 }
 
-func (receiver *RenderSessionHandle) QueryFeatureExtensions(sourceID string, feature []byte, extension string, extensionField string, arguments *[]byte) (*Future[[]byte], error) {
+func (receiver *RenderSessionHandle) QueryFeatureExtensions(sourceId string, feature []byte, extension string, extensionField string, arguments *[]byte) (*Future[[]byte], error) {
 	return bindingCall(func() *Future[[]byte] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := feature
 		input3 := extension
 		input4 := extensionField
@@ -9663,9 +9663,9 @@ func (receiver *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuer
 	})
 }
 
-func (receiver *RenderSessionHandle) QuerySourceFeatures(sourceID string, options *SourceFeatureQueryOptions) (*Future[[]QueriedFeature], error) {
+func (receiver *RenderSessionHandle) QuerySourceFeatures(sourceId string, options *SourceFeatureQueryOptions) (*Future[[]QueriedFeature], error) {
 	return bindingCall(func() *Future[[]QueriedFeature] {
-		input1 := sourceID
+		input1 := sourceId
 		input2 := options
 		arena := &bindingArena{}
 		defer arena.close()
@@ -9986,7 +9986,7 @@ func (receiver *ResourceRequestHandle) WaitUntilRetired() error {
 	return err
 }
 
-func (receiver *ResourceTransformResponseScope) SetURL(url string) error {
+func (receiver *ResourceTransformResponseScope) SetUrl(url string) error {
 	_, err := bindingCall(func() struct{} {
 		input1 := url
 		arena := &bindingArena{}
@@ -10029,7 +10029,7 @@ func (receiver *RuntimeHandle) Barrier() (*Future[struct{}], error) {
 	})
 }
 
-func (receiver *RuntimeHandle) ClearHTTPHeaderTransform() (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) ClearHttpHeaderTransform() (*Future[struct{}], error) {
 	return bindingCall(func() *Future[struct{}] {
 		arena := &bindingArena{}
 		defer arena.close()
@@ -10186,9 +10186,9 @@ func (receiver *RuntimeHandle) OfflineRegionCreate(definition OfflineRegionDefin
 	})
 }
 
-func (receiver *RuntimeHandle) OfflineRegionDelete(regionID int64) (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) OfflineRegionDelete(regionId int64) (*Future[struct{}], error) {
 	return bindingCall(func() *Future[struct{}] {
-		input1 := regionID
+		input1 := regionId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -10210,9 +10210,9 @@ func (receiver *RuntimeHandle) OfflineRegionDelete(regionID int64) (*Future[stru
 	})
 }
 
-func (receiver *RuntimeHandle) OfflineRegionGet(regionID int64) (*Future[*OfflineRegionInfo], error) {
+func (receiver *RuntimeHandle) OfflineRegionGet(regionId int64) (*Future[*OfflineRegionInfo], error) {
 	return bindingCall(func() *Future[*OfflineRegionInfo] {
-		input1 := regionID
+		input1 := regionId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -10244,9 +10244,9 @@ func (receiver *RuntimeHandle) OfflineRegionGet(regionID int64) (*Future[*Offlin
 	})
 }
 
-func (receiver *RuntimeHandle) OfflineRegionGetStatus(regionID int64) (*Future[OfflineRegionStatus], error) {
+func (receiver *RuntimeHandle) OfflineRegionGetStatus(regionId int64) (*Future[OfflineRegionStatus], error) {
 	return bindingCall(func() *Future[OfflineRegionStatus] {
-		input1 := regionID
+		input1 := regionId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -10275,9 +10275,9 @@ func (receiver *RuntimeHandle) OfflineRegionGetStatus(regionID int64) (*Future[O
 	})
 }
 
-func (receiver *RuntimeHandle) OfflineRegionInvalidate(regionID int64) (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) OfflineRegionInvalidate(regionId int64) (*Future[struct{}], error) {
 	return bindingCall(func() *Future[struct{}] {
-		input1 := regionID
+		input1 := regionId
 		arena := &bindingArena{}
 		defer arena.close()
 		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
@@ -10299,9 +10299,9 @@ func (receiver *RuntimeHandle) OfflineRegionInvalidate(regionID int64) (*Future[
 	})
 }
 
-func (receiver *RuntimeHandle) OfflineRegionSetDownloadState(regionID int64, state OfflineRegionDownloadState) (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) OfflineRegionSetDownloadState(regionId int64, state OfflineRegionDownloadState) (*Future[struct{}], error) {
 	return bindingCall(func() *Future[struct{}] {
-		input1 := regionID
+		input1 := regionId
 		input2 := state
 		arena := &bindingArena{}
 		defer arena.close()
@@ -10326,9 +10326,9 @@ func (receiver *RuntimeHandle) OfflineRegionSetDownloadState(regionID int64, sta
 	})
 }
 
-func (receiver *RuntimeHandle) OfflineRegionSetObserved(regionID int64, observed bool) (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) OfflineRegionSetObserved(regionId int64, observed bool) (*Future[struct{}], error) {
 	return bindingCall(func() *Future[struct{}] {
-		input1 := regionID
+		input1 := regionId
 		input2 := observed
 		arena := &bindingArena{}
 		defer arena.close()
@@ -10353,9 +10353,9 @@ func (receiver *RuntimeHandle) OfflineRegionSetObserved(regionID int64, observed
 	})
 }
 
-func (receiver *RuntimeHandle) OfflineRegionUpdateMetadata(regionID int64, metadata []byte) (*Future[OfflineRegionInfo], error) {
+func (receiver *RuntimeHandle) OfflineRegionUpdateMetadata(regionId int64, metadata []byte) (*Future[OfflineRegionInfo], error) {
 	return bindingCall(func() *Future[OfflineRegionInfo] {
-		input1 := regionID
+		input1 := regionId
 		input2 := metadata
 		arena := &bindingArena{}
 		defer arena.close()
@@ -10522,7 +10522,7 @@ func (receiver *RuntimeHandle) SetEventMask(mask RuntimeEventMask) error {
 	return err
 }
 
-func (receiver *RuntimeHandle) SetHTTPHeaderTransform(transform HTTPHeaderTransform) (*Future[struct{}], error) {
+func (receiver *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransform) (*Future[struct{}], error) {
 	return bindingCall(func() *Future[struct{}] {
 		input1 := transform
 		arena := &bindingArena{}
@@ -10537,7 +10537,7 @@ func (receiver *RuntimeHandle) SetHTTPHeaderTransform(transform HTTPHeaderTransf
 		var input1Raw *C.mln_http_header_transform
 		{
 			pointer := (*C.mln_http_header_transform)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeHTTPHeaderTransform(input1, arena)
+			*pointer = nativeHttpHeaderTransform(input1, arena)
 			input1Raw = pointer
 		}
 		future, err := startCompletion(func(completion *C.mln_completion) int32 {
@@ -10644,7 +10644,7 @@ func SupportedRenderBackendMask() (RenderBackendFlag, error) {
 	})
 }
 
-func (receiver *RenderSessionHandle) TextureReadPremultipliedRGBA8() (*Future[TextureReadbackResult], error) {
+func (receiver *RenderSessionHandle) TextureReadPremultipliedRgba8() (*Future[TextureReadbackResult], error) {
 	return bindingCall(func() *Future[TextureReadbackResult] {
 		arena := &bindingArena{}
 		defer arena.close()
@@ -10868,13 +10868,13 @@ func (receiver *RenderSessionHandle) VulkanSurfaceSetTarget(descriptor VulkanSur
 	})
 }
 
-type WebGPUBorrowedTextureAttachResult struct {
+type WebgpuBorrowedTextureAttachResult struct {
 	Session    *RenderSessionHandle
 	Completion *Future[struct{}]
 }
 
-func (receiver *MapHandle) WebGPUBorrowedTextureAttach(descriptor WebGPUBorrowedTextureDescriptor, options RenderSessionAttachOptions) (WebGPUBorrowedTextureAttachResult, error) {
-	return bindingCall(func() WebGPUBorrowedTextureAttachResult {
+func (receiver *MapHandle) WebgpuBorrowedTextureAttach(descriptor WebgpuBorrowedTextureDescriptor, options RenderSessionAttachOptions) (WebgpuBorrowedTextureAttachResult, error) {
+	return bindingCall(func() WebgpuBorrowedTextureAttachResult {
 		input1 := descriptor
 		input2 := options
 		arena := &bindingArena{}
@@ -10889,7 +10889,7 @@ func (receiver *MapHandle) WebGPUBorrowedTextureAttach(descriptor WebGPUBorrowed
 		var input1Raw *C.mln_webgpu_borrowed_texture_descriptor
 		{
 			pointer := (*C.mln_webgpu_borrowed_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeWebGPUBorrowedTextureDescriptor(input1, arena)
+			*pointer = nativeWebgpuBorrowedTextureDescriptor(input1, arena)
 			input1Raw = pointer
 		}
 		var input2Raw *C.mln_render_session_attach_options
@@ -10907,11 +10907,11 @@ func (receiver *MapHandle) WebGPUBorrowedTextureAttach(descriptor WebGPUBorrowed
 		}
 		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
 		arena.accept(adopted0.bindingOwner)
-		return WebGPUBorrowedTextureAttachResult{Session: adopted0, Completion: future}
+		return WebgpuBorrowedTextureAttachResult{Session: adopted0, Completion: future}
 	})
 }
 
-func (receiver *RenderSessionHandle) WebGPUBorrowedTextureSetTarget(descriptor WebGPUBorrowedTextureDescriptor) (*Future[struct{}], error) {
+func (receiver *RenderSessionHandle) WebgpuBorrowedTextureSetTarget(descriptor WebgpuBorrowedTextureDescriptor) (*Future[struct{}], error) {
 	return bindingCall(func() *Future[struct{}] {
 		input1 := descriptor
 		arena := &bindingArena{}
@@ -10926,7 +10926,7 @@ func (receiver *RenderSessionHandle) WebGPUBorrowedTextureSetTarget(descriptor W
 		var input1Raw *C.mln_webgpu_borrowed_texture_descriptor
 		{
 			pointer := (*C.mln_webgpu_borrowed_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeWebGPUBorrowedTextureDescriptor(input1, arena)
+			*pointer = nativeWebgpuBorrowedTextureDescriptor(input1, arena)
 			input1Raw = pointer
 		}
 		future, err := startCompletion(func(completion *C.mln_completion) int32 {
@@ -10939,13 +10939,13 @@ func (receiver *RenderSessionHandle) WebGPUBorrowedTextureSetTarget(descriptor W
 	})
 }
 
-type WebGPUOwnedTextureAttachResult struct {
+type WebgpuOwnedTextureAttachResult struct {
 	Session    *RenderSessionHandle
 	Completion *Future[struct{}]
 }
 
-func (receiver *MapHandle) WebGPUOwnedTextureAttach(descriptor WebGPUOwnedTextureDescriptor, options RenderSessionAttachOptions) (WebGPUOwnedTextureAttachResult, error) {
-	return bindingCall(func() WebGPUOwnedTextureAttachResult {
+func (receiver *MapHandle) WebgpuOwnedTextureAttach(descriptor WebgpuOwnedTextureDescriptor, options RenderSessionAttachOptions) (WebgpuOwnedTextureAttachResult, error) {
+	return bindingCall(func() WebgpuOwnedTextureAttachResult {
 		input1 := descriptor
 		input2 := options
 		arena := &bindingArena{}
@@ -10960,7 +10960,7 @@ func (receiver *MapHandle) WebGPUOwnedTextureAttach(descriptor WebGPUOwnedTextur
 		var input1Raw *C.mln_webgpu_owned_texture_descriptor
 		{
 			pointer := (*C.mln_webgpu_owned_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeWebGPUOwnedTextureDescriptor(input1, arena)
+			*pointer = nativeWebgpuOwnedTextureDescriptor(input1, arena)
 			input1Raw = pointer
 		}
 		var input2Raw *C.mln_render_session_attach_options
@@ -10978,17 +10978,17 @@ func (receiver *MapHandle) WebGPUOwnedTextureAttach(descriptor WebGPUOwnedTextur
 		}
 		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
 		arena.accept(adopted0.bindingOwner)
-		return WebGPUOwnedTextureAttachResult{Session: adopted0, Completion: future}
+		return WebgpuOwnedTextureAttachResult{Session: adopted0, Completion: future}
 	})
 }
 
-type WebGPUSurfaceAttachResult struct {
+type WebgpuSurfaceAttachResult struct {
 	Session    *RenderSessionHandle
 	Completion *Future[struct{}]
 }
 
-func (receiver *MapHandle) WebGPUSurfaceAttach(descriptor WebGPUSurfaceDescriptor, options RenderSessionAttachOptions) (WebGPUSurfaceAttachResult, error) {
-	return bindingCall(func() WebGPUSurfaceAttachResult {
+func (receiver *MapHandle) WebgpuSurfaceAttach(descriptor WebgpuSurfaceDescriptor, options RenderSessionAttachOptions) (WebgpuSurfaceAttachResult, error) {
+	return bindingCall(func() WebgpuSurfaceAttachResult {
 		input1 := descriptor
 		input2 := options
 		arena := &bindingArena{}
@@ -11003,7 +11003,7 @@ func (receiver *MapHandle) WebGPUSurfaceAttach(descriptor WebGPUSurfaceDescripto
 		var input1Raw *C.mln_webgpu_surface_descriptor
 		{
 			pointer := (*C.mln_webgpu_surface_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeWebGPUSurfaceDescriptor(input1, arena)
+			*pointer = nativeWebgpuSurfaceDescriptor(input1, arena)
 			input1Raw = pointer
 		}
 		var input2Raw *C.mln_render_session_attach_options
@@ -11021,11 +11021,11 @@ func (receiver *MapHandle) WebGPUSurfaceAttach(descriptor WebGPUSurfaceDescripto
 		}
 		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
 		arena.accept(adopted0.bindingOwner)
-		return WebGPUSurfaceAttachResult{Session: adopted0, Completion: future}
+		return WebgpuSurfaceAttachResult{Session: adopted0, Completion: future}
 	})
 }
 
-func (receiver *RenderSessionHandle) WebGPUSurfaceSetTarget(descriptor WebGPUSurfaceDescriptor) (*Future[struct{}], error) {
+func (receiver *RenderSessionHandle) WebgpuSurfaceSetTarget(descriptor WebgpuSurfaceDescriptor) (*Future[struct{}], error) {
 	return bindingCall(func() *Future[struct{}] {
 		input1 := descriptor
 		arena := &bindingArena{}
@@ -11040,7 +11040,7 @@ func (receiver *RenderSessionHandle) WebGPUSurfaceSetTarget(descriptor WebGPUSur
 		var input1Raw *C.mln_webgpu_surface_descriptor
 		{
 			pointer := (*C.mln_webgpu_surface_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeWebGPUSurfaceDescriptor(input1, arena)
+			*pointer = nativeWebgpuSurfaceDescriptor(input1, arena)
 			input1Raw = pointer
 		}
 		future, err := startCompletion(func(completion *C.mln_completion) int32 {
@@ -11083,7 +11083,7 @@ func mlnGo_mln_custom_geometry_source_options_fetch_tile(native_user_data unsafe
 	if !ok || callbacks.FetchTile == nil {
 		return
 	}
-	callbacks.FetchTile(copyCanonicalTileID(native_tile_id))
+	callbacks.FetchTile(copyCanonicalTileId(native_tile_id))
 	return
 }
 
@@ -11099,7 +11099,7 @@ func mlnGo_mln_custom_geometry_source_options_cancel_tile(native_user_data unsaf
 	if !ok || callbacks.CancelTile == nil {
 		return
 	}
-	callbacks.CancelTile(copyCanonicalTileID(native_tile_id))
+	callbacks.CancelTile(copyCanonicalTileId(native_tile_id))
 	return
 }
 
@@ -11111,11 +11111,11 @@ func mlnGo_mln_custom_mvt_vector_source_options_fetch_tile(native_user_data unsa
 		if recover() != nil {
 		}
 	}()
-	callbacks, ok := bindingCallbackValue[CustomMVTVectorSourceOptions](native_user_data)
+	callbacks, ok := bindingCallbackValue[CustomMvtVectorSourceOptions](native_user_data)
 	if !ok || callbacks.FetchTile == nil {
 		return
 	}
-	callbacks.FetchTile(copyCanonicalTileID(native_tile_id))
+	callbacks.FetchTile(copyCanonicalTileId(native_tile_id))
 	return
 }
 
@@ -11127,11 +11127,11 @@ func mlnGo_mln_custom_mvt_vector_source_options_cancel_tile(native_user_data uns
 		if recover() != nil {
 		}
 	}()
-	callbacks, ok := bindingCallbackValue[CustomMVTVectorSourceOptions](native_user_data)
+	callbacks, ok := bindingCallbackValue[CustomMvtVectorSourceOptions](native_user_data)
 	if !ok || callbacks.CancelTile == nil {
 		return
 	}
-	callbacks.CancelTile(copyCanonicalTileID(native_tile_id))
+	callbacks.CancelTile(copyCanonicalTileId(native_tile_id))
 	return
 }
 
@@ -11179,11 +11179,11 @@ func mlnGo_mln_http_header_transform_callback(native_user_data unsafe.Pointer, n
 	}()
 	scope := bindingNewScope()
 	defer scope.alive.Store(false)
-	callbacks, ok := bindingCallbackValue[HTTPHeaderTransform](native_user_data)
+	callbacks, ok := bindingCallbackValue[HttpHeaderTransform](native_user_data)
 	if !ok || callbacks.Callback == nil {
 		return
 	}
-	result = C.mln_status(callbacks.Callback(ResourceKind(native_kind), C.GoString(native_url), &HTTPHeaderTransformResponseScope{native: native_out_response, scope: scope}))
+	result = C.mln_status(callbacks.Callback(ResourceKind(native_kind), C.GoString(native_url), &HttpHeaderTransformResponseScope{native: native_out_response, scope: scope}))
 	return
 }
 

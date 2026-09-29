@@ -23,7 +23,7 @@ func transitionFinishedIDs(t *testing.T, events []RuntimeEvent) []uint64 {
 		if !ok {
 			t.Fatalf("camera transition event payload = %T, want a transition payload", event.Payload)
 		}
-		ids = append(ids, payload.TransitionID)
+		ids = append(ids, payload.TransitionId)
 	}
 	return ids
 }
@@ -168,14 +168,14 @@ func TestCameraTransitionsRaiseOneFinishedEventPerTransitionID(t *testing.T) {
 	eased, err := easeForTest(
 		m,
 		CameraOptions{Center: pointerTo(LatLng{Latitude: 40, Longitude: 50})},
-		&AnimationOptions{DurationMS: pointerTo(60_000.0), TransitionID: pointerTo(superseded)},
+		&AnimationOptions{DurationMs: pointerTo(60_000.0), TransitionId: pointerTo(superseded)},
 	)
 	requireCommandCommitted(t, eased, err)
 
 	flown, err := flyForTest(
 		m,
 		CameraOptions{Center: pointerTo(LatLng{Latitude: 41, Longitude: 51}), Zoom: pointerTo(float64(6))},
-		&AnimationOptions{DurationMS: pointerTo(60_000.0), TransitionID: pointerTo(cancelled)},
+		&AnimationOptions{DurationMs: pointerTo(60_000.0), TransitionId: pointerTo(cancelled)},
 	)
 	requireCommandCommitted(t, flown, err)
 

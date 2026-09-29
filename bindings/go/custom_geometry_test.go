@@ -23,7 +23,7 @@ func liveCustomGeometrySources(baseline int64) int64 {
 // every event the load produced is queued when this returns.
 func loadStyleForTest(t *testing.T, runtime *RuntimeHandle, m *MapHandle, style string) {
 	t.Helper()
-	completion, err := m.SetStyleJSON([]byte(style))
+	completion, err := m.SetStyleJson([]byte(style))
 	if _, err := awaitForTest(completion, err); err != nil {
 		t.Fatalf("SetStyleJSON completion: %v", err)
 	}
@@ -53,8 +53,8 @@ func TestCustomGeometrySourceDescriptors(t *testing.T) {
 	fetches := 0
 	cancels := 0
 	if _, err := m.AddCustomGeometrySource("custom", CustomGeometrySourceOptions{
-		FetchTile:  func(CanonicalTileID) { fetches++ },
-		CancelTile: func(CanonicalTileID) { cancels++ },
+		FetchTile:  func(CanonicalTileId) { fetches++ },
+		CancelTile: func(CanonicalTileId) { cancels++ },
 		MinZoom:    &minZoom,
 		MaxZoom:    &maxZoom,
 		Tolerance:  &tolerance,
@@ -68,7 +68,7 @@ func TestCustomGeometrySourceDescriptors(t *testing.T) {
 	if fetches != 0 || cancels != 0 {
 		t.Fatalf("callbacks invoked during registration: fetches=%d cancels=%d", fetches, cancels)
 	}
-	tileID := CanonicalTileID{Z: 0, X: 0, Y: 0}
+	tileID := CanonicalTileId{Z: 0, X: 0, Y: 0}
 	if _, err := m.SetCustomGeometrySourceTileData("custom", tileID, []byte(`{"type":"FeatureCollection","features":[]}`)); err != nil {
 		t.Fatalf("SetCustomGeometrySourceTileData(): %v", err)
 	}
@@ -83,7 +83,7 @@ func TestCustomGeometrySourceDescriptors(t *testing.T) {
 	if _, err := m.AddCustomGeometrySource("bad-custom", CustomGeometrySourceOptions{}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("AddCustomGeometrySource(nil fetch) error = %v, want ErrInvalidArgument", err)
 	}
-	rejected, err := m.AddCustomGeometrySource("", CustomGeometrySourceOptions{FetchTile: func(CanonicalTileID) {}})
+	rejected, err := m.AddCustomGeometrySource("", CustomGeometrySourceOptions{FetchTile: func(CanonicalTileId) {}})
 	requireCommandFailedWith(t, rejected, err, ErrInvalidArgument)
 	// The failed command releases its captured descriptor after completion returns.
 	waitForRuntimeBarrier(t, runtime)
@@ -104,7 +104,7 @@ func TestCustomGeometrySourceReleasedWhenStyleLoadDropsIt(t *testing.T) {
 
 	loadStyleForTest(t, runtime, m, backgroundStyleJSON)
 	if _, err := m.AddCustomGeometrySource("custom", CustomGeometrySourceOptions{
-		FetchTile: func(CanonicalTileID) {},
+		FetchTile: func(CanonicalTileId) {},
 	}); err != nil {
 		t.Fatalf("AddCustomGeometrySource(): %v", err)
 	}
@@ -132,7 +132,7 @@ func TestCustomGeometrySourceReleasedByRemovalAndMapClose(t *testing.T) {
 
 	for _, sourceID := range []string{"removed", "surviving"} {
 		if _, err := m.AddCustomGeometrySource(sourceID, CustomGeometrySourceOptions{
-			FetchTile: func(CanonicalTileID) {},
+			FetchTile: func(CanonicalTileId) {},
 		}); err != nil {
 			t.Fatalf("AddCustomGeometrySource(%s): %v", sourceID, err)
 		}

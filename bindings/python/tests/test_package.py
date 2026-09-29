@@ -479,7 +479,7 @@ def _point_collection(*names: str) -> bytes:
 def test_geojson_source_data_prepares_off_thread_without_a_runtime() -> None:
     # Preparation needs no runtime or map and runs on any thread; the handle
     # then installs onto sources owned by a map created afterwards.
-    results: list[style.GeoJsonSourceDataHandle | BaseException] = []
+    results: list[style.GeojsonSourceDataHandle | BaseException] = []
 
     def prepare() -> None:
         try:
@@ -493,7 +493,7 @@ def test_geojson_source_data_prepares_off_thread_without_a_runtime() -> None:
     worker.start()
     worker.join()
     (prepared,) = results
-    assert isinstance(prepared, style.GeoJsonSourceDataHandle)
+    assert isinstance(prepared, style.GeojsonSourceDataHandle)
     with prepared:
         assert prepared.closed is False
         with (
@@ -556,7 +556,7 @@ def test_geojson_source_data_create_validates_cluster_input() -> None:
     bare_geometry = _json_object({"type": "Point", "coordinates": [0.0, 0.0]})
     with pytest.raises(mln.InvalidArgumentError):
         style.geojson_source_data_create(
-            bare_geometry, style.GeoJsonSourceOptions(cluster=True)
+            bare_geometry, style.GeojsonSourceOptions(cluster=True)
         )
 
 
@@ -569,7 +569,7 @@ def test_set_geojson_source_data_rejects_mismatched_baked_in_options() -> None:
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         with style.geojson_source_data_create(
             document,
-            style.GeoJsonSourceOptions(
+            style.GeojsonSourceOptions(
                 cluster=True,
                 cluster_properties=_json_object({"names": ["+", 1]}),
             ),
@@ -586,7 +586,7 @@ def test_set_geojson_source_data_rejects_mismatched_baked_in_options() -> None:
         # properties under the source's layers, so they are rejected too.
         with style.geojson_source_data_create(
             document,
-            style.GeoJsonSourceOptions(
+            style.GeojsonSourceOptions(
                 cluster=True,
                 cluster_properties=_json_object({"renamed": ["+", 1]}),
             ),
@@ -598,7 +598,7 @@ def test_set_geojson_source_data_rejects_mismatched_baked_in_options() -> None:
         # cluster_properties JSON matches regardless of formatting.
         with style.geojson_source_data_create(
             document,
-            style.GeoJsonSourceOptions(
+            style.GeojsonSourceOptions(
                 cluster=True,
                 cluster_properties=b' { "names" : ["+", 1] } ',
             ),
@@ -810,7 +810,7 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
         map_handle.add_geojson_source_url(
             "points",
             "https://example.test/points.geojson",
-            style.GeoJsonSourceOptions(
+            style.GeojsonSourceOptions(
                 min_zoom=1.0,
                 max_zoom=14.0,
                 tolerance=0.5,
@@ -834,7 +834,7 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
         )
         with style.geojson_source_data_create(
             inline_points,
-            style.GeoJsonSourceOptions(
+            style.GeojsonSourceOptions(
                 cluster=True,
                 cluster_radius=40,
                 cluster_max_zoom=12.0,
@@ -2496,7 +2496,7 @@ def test_invalid_opengl_render_target_attach_reports_native_status() -> None:
             (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
         ) as raised:
             map_handle.opengl_owned_texture_attach(
-                render.OpenGLOwnedTextureDescriptor.default()
+                render.OpenglOwnedTextureDescriptor.default()
             )
 
         assert raised.value.status in {
@@ -2514,7 +2514,7 @@ def test_invalid_webgpu_render_target_attach_reports_native_status() -> None:
             (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
         ) as raised:
             map_handle.webgpu_owned_texture_attach(
-                render.WebGPUOwnedTextureDescriptor.default()
+                render.WebgpuOwnedTextureDescriptor.default()
             )
 
         assert raised.value.status in {

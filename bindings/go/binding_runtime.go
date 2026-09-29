@@ -464,6 +464,6 @@ func (state *bindingState) closeDecision() {
 }
 
 // ID returns the live generation ID used to correlate native events.
-func (owner *bindingOwner) ID() (uint64, error) {
+func (owner *bindingOwner) Id() (uint64, error) {
 	return bindingCall(func() uint64 { raw, done := owner.bindingAcquire(false); defer done(); return raw })
 }

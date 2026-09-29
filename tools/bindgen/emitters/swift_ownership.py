@@ -94,12 +94,7 @@ def consumed(plan, owner, values):
 def owner_name(native):
     from .swift import name
 
-    return (
-        name(native.removeprefix("mln_").removesuffix("_handle")).replace(
-            "Geojson", "GeoJSON"
-        )
-        + "Handle"
-    )
+    return name(native.removeprefix("mln_").removesuffix("_handle")) + "Handle"
 
 
 def decision_handles(bound):

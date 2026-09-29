@@ -4,7 +4,7 @@ from ._generated_operations import (
     _AcquiredFrameHandleOperations,
     _BufferHandleOperations,
     _EventBatchHandleOperations,
-    _GeoJsonSourceDataHandleOperations,
+    _GeojsonSourceDataHandleOperations,
     _HttpHeaderTransformResponseScopeOperations,
     _MapHandleOperations,
     _MapProjectionHandleOperations,
@@ -84,8 +84,8 @@ class EventBatchHandle(_EventBatchHandleOperations, NativeHandleMixin):
         return owner
 
 
-class GeoJsonSourceDataHandle(_GeoJsonSourceDataHandleOperations, NativeHandleMixin):
-    _handle_name = "GeoJsonSourceDataHandle"
+class GeojsonSourceDataHandle(_GeojsonSourceDataHandleOperations, NativeHandleMixin):
+    _handle_name = "GeojsonSourceDataHandle"
     _parent: NativeHandleMixin | None
 
     def __init__(self):

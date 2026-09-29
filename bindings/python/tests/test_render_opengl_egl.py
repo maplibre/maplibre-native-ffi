@@ -132,7 +132,7 @@ def _require_native_opengl_egl_support() -> None:
             context_provider="egl",
         )
     if not (
-        mln.opengl_supported_context_provider_mask() & mln.OpenGLContextProviderFlag.EGL
+        mln.opengl_supported_context_provider_mask() & mln.OpenglContextProviderFlag.EGL
     ):
         skip_or_fail_fixture_setup(
             "native library does not support EGL OpenGL contexts",
@@ -200,11 +200,11 @@ def _egl_borrowed_texture(
 
 def wait_for_opengl_frame(
     fixture: OpenGLOwnedSession,
-    predicate: Callable[[render.OpenGLOwnedTextureFrame], bool],
+    predicate: Callable[[render.OpenglOwnedTextureFrame], bool],
     *,
     iterations: int = 5000,
 ) -> render.AcquiredFrameHandle:
-    last_frame: render.OpenGLOwnedTextureFrame | None = None
+    last_frame: render.OpenglOwnedTextureFrame | None = None
     for _ in range(iterations):
         # Forced rather than render-if-needed: a settled style would otherwise
         # report NO_UPDATE forever and never fill a ring slot.
@@ -406,7 +406,7 @@ def test_invalid_opengl_surface_attach_reports_native_status() -> None:
                 (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
             ) as raised:
                 map_handle.opengl_surface_attach(
-                    render.OpenGLSurfaceDescriptor.default()
+                    render.OpenglSurfaceDescriptor.default()
                 )
             assert raised.value.status in {
                 mln.Status.INVALID_ARGUMENT,
@@ -602,7 +602,7 @@ def test_opengl_owned_session_rejects_a_borrowed_texture_target(
     with pytest.raises(mln.UnsupportedFeatureError) as raised:
         opengl_owned_session.session.opengl_borrowed_texture_set_target(
             replace(
-                render.OpenGLBorrowedTextureDescriptor.default(),
+                render.OpenglBorrowedTextureDescriptor.default(),
                 extent=render.RenderTargetExtent(32, 16, 1.0),
                 physical_width=32,
                 physical_height=16,

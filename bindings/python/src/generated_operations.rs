@@ -6066,7 +6066,7 @@ impl EventBatchHandle {
 }
 
 #[pymethods]
-impl GeoJsonSourceDataHandle {
+impl GeojsonSourceDataHandle {
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         generated_check_operation(
@@ -6240,7 +6240,7 @@ impl MapHandle {
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
-        data: &GeoJsonSourceDataHandle,
+        data: &GeojsonSourceDataHandle,
     ) -> PyResult<Py<PyAny>> {
         let storage = &mut GeneratedInputStorage::default();
         generated_check_operation(
@@ -8836,7 +8836,7 @@ impl MapHandle {
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
-        data: &GeoJsonSourceDataHandle,
+        data: &GeojsonSourceDataHandle,
     ) -> PyResult<Py<PyAny>> {
         let storage = &mut GeneratedInputStorage::default();
         generated_check_operation(
@@ -12754,17 +12754,17 @@ impl EventBatchHandle {
     }
 }
 
-#[pyclass(name = "_GeoJsonSourceDataHandle")]
-struct GeoJsonSourceDataHandle {
+#[pyclass(name = "_GeojsonSourceDataHandle")]
+struct GeojsonSourceDataHandle {
     state: Arc<Mutex<NativeHandleState<sys::mln_geojson_source_data>>>,
 }
-impl GeoJsonSourceDataHandle {
+impl GeojsonSourceDataHandle {
     fn state(&self) -> MutexGuard<'_, NativeHandleState<sys::mln_geojson_source_data>> {
         self.state.lock().unwrap_or_else(|p| p.into_inner())
     }
 }
 #[pymethods]
-impl GeoJsonSourceDataHandle {
+impl GeojsonSourceDataHandle {
     #[getter]
     fn closed(&self) -> bool {
         self.state().is_closed()
@@ -13069,7 +13069,7 @@ fn geojson_source_data_create(
     maplibre_core::check(result).map_err(map_error)?;
     Py::new(
         py,
-        GeoJsonSourceDataHandle {
+        GeojsonSourceDataHandle {
             state: Arc::new(Mutex::new(
                 unsafe { NativeHandleState::from_handle(out_data, "mln_geojson_source_data") }
                     .map_err(map_error)?
@@ -13359,7 +13359,7 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<AcquiredFrameHandle>()?;
     module.add_class::<BufferHandle>()?;
     module.add_class::<EventBatchHandle>()?;
-    module.add_class::<GeoJsonSourceDataHandle>()?;
+    module.add_class::<GeojsonSourceDataHandle>()?;
     module.add_class::<MapHandle>()?;
     module.add_class::<MapProjectionHandle>()?;
     module.add_class::<RenderFrameBatchHandle>()?;

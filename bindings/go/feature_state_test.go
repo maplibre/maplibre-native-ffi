@@ -12,7 +12,7 @@ func TestMapFeatureStateRoundTrip(t *testing.T) {
 	_, m := newRuntimeAndMap(t, nil)
 
 	featureID := "42"
-	selector := FeatureStateSelector{SourceID: "source", FeatureID: &featureID}
+	selector := FeatureStateSelector{SourceId: "source", FeatureId: &featureID}
 
 	// Missing feature state reads as an empty JSON object.
 	before, err := awaitForTest(m.GetFeatureState(selector))
@@ -36,8 +36,8 @@ func TestMapFeatureStateRoundTrip(t *testing.T) {
 	// Removing one key returns the feature to the empty object.
 	stateKey := "hover"
 	removeID, err := m.RemoveFeatureState(FeatureStateSelector{
-		SourceID:  "source",
-		FeatureID: &featureID,
+		SourceId:  "source",
+		FeatureId: &featureID,
 		StateKey:  &stateKey,
 	})
 	requireCommandCommitted(t, removeID, err)
@@ -54,7 +54,7 @@ func TestMapFeatureStateRejectsInvalidSelectors(t *testing.T) {
 	_, m := newRuntimeAndMap(t, nil)
 
 	// Set and get require a feature ID.
-	noFeature := FeatureStateSelector{SourceID: "source"}
+	noFeature := FeatureStateSelector{SourceId: "source"}
 	if _, err := m.SetFeatureState(noFeature, []byte(`{"hover":true}`)); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetFeatureState() without feature ID error = %v, want ErrInvalidArgument", err)
 	}
@@ -65,7 +65,7 @@ func TestMapFeatureStateRejectsInvalidSelectors(t *testing.T) {
 	// A state key without a feature ID selects nothing removable.
 	stateKey := "hover"
 	if _, err := m.RemoveFeatureState(FeatureStateSelector{
-		SourceID: "source",
+		SourceId: "source",
 		StateKey: &stateKey,
 	}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("RemoveFeatureState() with key but no feature ID error = %v, want ErrInvalidArgument", err)
@@ -74,7 +74,7 @@ func TestMapFeatureStateRejectsInvalidSelectors(t *testing.T) {
 	// State must be one JSON object. An empty view and a non-object are both
 	// rejected before acceptance.
 	featureID := "42"
-	withFeature := FeatureStateSelector{SourceID: "source", FeatureID: &featureID}
+	withFeature := FeatureStateSelector{SourceId: "source", FeatureId: &featureID}
 	if _, err := m.SetFeatureState(withFeature, nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetFeatureState() with empty state error = %v, want ErrInvalidArgument", err)
 	}

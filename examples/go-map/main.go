@@ -252,16 +252,16 @@ func validateNativeRenderBackend() error {
 		return err
 	}
 	fmt.Printf("native render backends: %s\n", renderBackendSupportLabel(backends))
-	if !backends.Has(maplibre.RenderBackendFlagOpenGL) {
+	if !backends.Has(maplibre.RenderBackendFlagOpengl) {
 		return errors.New("loaded native library does not support OpenGL")
 	}
-	providers, err := maplibre.OpenGLSupportedContextProviderMask()
+	providers, err := maplibre.OpenglSupportedContextProviderMask()
 	if err != nil {
 		return err
 	}
-	required := maplibre.OpenGLContextProviderFlagEGL
+	required := maplibre.OpenglContextProviderFlagEgl
 	if stdruntime.GOOS == "windows" {
-		required = maplibre.OpenGLContextProviderFlagWGL
+		required = maplibre.OpenglContextProviderFlagWgl
 	}
 	if !providers.Has(required) {
 		return fmt.Errorf("loaded native library does not support required OpenGL context provider: %s", openGLProviderLabel(required))
@@ -274,7 +274,7 @@ func renderBackendSupportLabel(mask maplibre.RenderBackendFlag) string {
 	if mask.Has(maplibre.RenderBackendFlagMetal) {
 		labels = append(labels, "metal")
 	}
-	if mask.Has(maplibre.RenderBackendFlagOpenGL) {
+	if mask.Has(maplibre.RenderBackendFlagOpengl) {
 		labels = append(labels, "opengl")
 	}
 	if mask.Has(maplibre.RenderBackendFlagVulkan) {
@@ -286,11 +286,11 @@ func renderBackendSupportLabel(mask maplibre.RenderBackendFlag) string {
 	return strings.Join(labels, ",")
 }
 
-func openGLProviderLabel(provider maplibre.OpenGLContextProviderFlag) string {
+func openGLProviderLabel(provider maplibre.OpenglContextProviderFlag) string {
 	switch provider {
-	case maplibre.OpenGLContextProviderFlagWGL:
+	case maplibre.OpenglContextProviderFlagWgl:
 		return "wgl"
-	case maplibre.OpenGLContextProviderFlagEGL:
+	case maplibre.OpenglContextProviderFlagEgl:
 		return "egl"
 	default:
 		return "unknown"
@@ -316,7 +316,7 @@ func logEvent(event maplibre.LogEvent) string {
 		return "graphics-backend"
 	case maplibre.LogEventRender:
 		return "render"
-	case maplibre.LogEventHTTPRequest:
+	case maplibre.LogEventHttpRequest:
 		return "http"
 	case maplibre.LogEventParseStyle:
 		return "style-parse"

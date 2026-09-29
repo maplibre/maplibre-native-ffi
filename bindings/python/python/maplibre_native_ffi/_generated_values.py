@@ -104,33 +104,33 @@ class RuntimeEventCameraTransitionFinishedVariant:
 
 
 @dataclass(frozen=True, slots=True)
-class OpenGLContextDescriptorWGLVariant:
-    value: WGLContextDescriptor
+class OpenglContextDescriptorWglVariant:
+    value: WglContextDescriptor
     _tag = 1
 
     @classmethod
     def _from_native(cls, raw):
-        return cls(WGLContextDescriptor._from_native(raw))
+        return cls(WglContextDescriptor._from_native(raw))
 
 
 @dataclass(frozen=True, slots=True)
-class OpenGLContextDescriptorEGLVariant:
-    value: EGLContextDescriptor
+class OpenglContextDescriptorEglVariant:
+    value: EglContextDescriptor
     _tag = 2
 
     @classmethod
     def _from_native(cls, raw):
-        return cls(EGLContextDescriptor._from_native(raw))
+        return cls(EglContextDescriptor._from_native(raw))
 
 
 @dataclass(frozen=True, slots=True)
-class OpenGLContextDescriptorWebGLVariant:
-    value: WebGLContextDescriptor
+class OpenglContextDescriptorWebglVariant:
+    value: WebglContextDescriptor
     _tag = 3
 
     @classmethod
     def _from_native(cls, raw):
-        return cls(WebGLContextDescriptor._from_native(raw))
+        return cls(WebglContextDescriptor._from_native(raw))
 
 
 @dataclass(frozen=True, slots=True)
@@ -288,7 +288,7 @@ class FreeCameraOptionField(IntFlag):
     ORIENTATION = 2
 
 
-class GeoJsonSourceOptionField(IntFlag):
+class GeojsonSourceOptionField(IntFlag):
     MIN_ZOOM = 1
     MAX_ZOOM = 2
     TOLERANCE = 4
@@ -413,25 +413,25 @@ class OfflineRegionDownloadState(UnknownIntEnum):
     ACTIVE = 1
 
 
-class OpenGLClientApi(UnknownIntEnum):
+class OpenglClientApi(UnknownIntEnum):
     UNSPECIFIED = 0
     GL = 1
     GLES = 2
 
 
-class OpenGLContextOwnership(UnknownIntEnum):
+class OpenglContextOwnership(UnknownIntEnum):
     SHARED = 0
     DEDICATED = 1
 
 
-class OpenGLContextPlatform(UnknownIntEnum):
+class OpenglContextPlatform(UnknownIntEnum):
     UNSPECIFIED = 0
     WGL = 1
     EGL = 2
     WEBGL = 3
 
 
-class OpenGLContextProviderFlag(IntFlag):
+class OpenglContextProviderFlag(IntFlag):
     WGL = 1
     EGL = 2
     WEBGL = 4
@@ -744,7 +744,7 @@ class ViewportMode(UnknownIntEnum):
     FLIPPED_Y = 1
 
 
-class WebGLContextKind(UnknownIntEnum):
+class WebglContextKind(UnknownIntEnum):
     EXISTING = 0
     TRANSFERRED_CANVAS = 1
 
@@ -1038,11 +1038,11 @@ class EdgeInsets:
 
 
 @dataclass(frozen=True, slots=True)
-class EGLContextDescriptor:
+class EglContextDescriptor:
     display: int
     config: int
     share_context: int
-    client_api: OpenGLClientApi
+    client_api: OpenglClientApi
     get_proc_address: int
 
     @classmethod
@@ -1051,7 +1051,7 @@ class EGLContextDescriptor:
             display=raw["display"],
             config=raw["config"],
             share_context=raw["share_context"],
-            client_api=OpenGLClientApi(raw["client_api"]),
+            client_api=OpenglClientApi(raw["client_api"]),
             get_proc_address=raw["get_proc_address"],
         )
 
@@ -1122,7 +1122,7 @@ class FreeCameraOptions:
 
 
 @dataclass(frozen=True, slots=True)
-class GeoJsonSourceOptions:
+class GeojsonSourceOptions:
     min_zoom: float | None = None
     max_zoom: float | None = None
     tolerance: float | None = None
@@ -1619,11 +1619,11 @@ class OfflineTilePyramidRegionDefinition:
 
 
 @dataclass(frozen=True, slots=True)
-class OpenGLBorrowedTextureDescriptor:
+class OpenglBorrowedTextureDescriptor:
     extent: RenderTargetExtent
     physical_width: int
     physical_height: int
-    context: OpenGLContextDescriptor
+    context: OpenglContextDescriptor
     texture: int
     target: int
 
@@ -1633,7 +1633,7 @@ class OpenGLBorrowedTextureDescriptor:
             extent=RenderTargetExtent._from_native(raw["extent"]),
             physical_width=raw["physical_width"],
             physical_height=raw["physical_height"],
-            context=OpenGLContextDescriptor._from_native(raw["context"]),
+            context=OpenglContextDescriptor._from_native(raw["context"]),
             texture=raw["texture"],
             target=raw["target"],
         )
@@ -1646,25 +1646,25 @@ class OpenGLBorrowedTextureDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class OpenGLContextDescriptor:
-    ownership: OpenGLContextOwnership
+class OpenglContextDescriptor:
+    ownership: OpenglContextOwnership
     data: (
-        OpenGLContextDescriptorWGLVariant
-        | OpenGLContextDescriptorEGLVariant
-        | OpenGLContextDescriptorWebGLVariant
+        OpenglContextDescriptorWglVariant
+        | OpenglContextDescriptorEglVariant
+        | OpenglContextDescriptorWebglVariant
         | UnknownVariant
     )
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            ownership=OpenGLContextOwnership(raw["ownership"]),
+            ownership=OpenglContextOwnership(raw["ownership"]),
             data=_copy_variant(
                 raw["data"],
                 {
-                    "wgl": OpenGLContextDescriptorWGLVariant,
-                    "egl": OpenGLContextDescriptorEGLVariant,
-                    "webgl": OpenGLContextDescriptorWebGLVariant,
+                    "wgl": OpenglContextDescriptorWglVariant,
+                    "egl": OpenglContextDescriptorEglVariant,
+                    "webgl": OpenglContextDescriptorWebglVariant,
                 },
                 None,
             ),
@@ -1672,15 +1672,15 @@ class OpenGLContextDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class OpenGLOwnedTextureDescriptor:
+class OpenglOwnedTextureDescriptor:
     extent: RenderTargetExtent
-    context: OpenGLContextDescriptor
+    context: OpenglContextDescriptor
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
             extent=RenderTargetExtent._from_native(raw["extent"]),
-            context=OpenGLContextDescriptor._from_native(raw["context"]),
+            context=OpenglContextDescriptor._from_native(raw["context"]),
         )
 
     @classmethod
@@ -1691,7 +1691,7 @@ class OpenGLOwnedTextureDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class OpenGLOwnedTextureFrame:
+class OpenglOwnedTextureFrame:
     generation: int
     width: int
     height: int
@@ -1720,16 +1720,16 @@ class OpenGLOwnedTextureFrame:
 
 
 @dataclass(frozen=True, slots=True)
-class OpenGLSurfaceDescriptor:
+class OpenglSurfaceDescriptor:
     extent: RenderTargetExtent
-    context: OpenGLContextDescriptor
+    context: OpenglContextDescriptor
     surface: int
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
             extent=RenderTargetExtent._from_native(raw["extent"]),
-            context=OpenGLContextDescriptor._from_native(raw["context"]),
+            context=OpenglContextDescriptor._from_native(raw["context"]),
             surface=raw["surface"],
         )
 
@@ -2882,26 +2882,26 @@ class Wake:
 
 
 @dataclass(frozen=True, slots=True)
-class WebGLContextDescriptor:
-    kind: WebGLContextKind
+class WebglContextDescriptor:
+    kind: WebglContextKind
     context: int
     canvas_selector: str
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            kind=WebGLContextKind(raw["kind"]),
+            kind=WebglContextKind(raw["kind"]),
             context=raw["context"],
             canvas_selector=raw["canvas_selector"],
         )
 
 
 @dataclass(frozen=True, slots=True)
-class WebGPUBorrowedTextureDescriptor:
+class WebgpuBorrowedTextureDescriptor:
     extent: RenderTargetExtent
     physical_width: int
     physical_height: int
-    context: WebGPUContextDescriptor
+    context: WebgpuContextDescriptor
     texture: int
     texture_view: int
     format: int
@@ -2912,7 +2912,7 @@ class WebGPUBorrowedTextureDescriptor:
             extent=RenderTargetExtent._from_native(raw["extent"]),
             physical_width=raw["physical_width"],
             physical_height=raw["physical_height"],
-            context=WebGPUContextDescriptor._from_native(raw["context"]),
+            context=WebgpuContextDescriptor._from_native(raw["context"]),
             texture=raw["texture"],
             texture_view=raw["texture_view"],
             format=raw["format"],
@@ -2926,7 +2926,7 @@ class WebGPUBorrowedTextureDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class WebGPUContextDescriptor:
+class WebgpuContextDescriptor:
     instance: int
     device: int
     queue: int
@@ -2937,15 +2937,15 @@ class WebGPUContextDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class WebGPUOwnedTextureDescriptor:
+class WebgpuOwnedTextureDescriptor:
     extent: RenderTargetExtent
-    context: WebGPUContextDescriptor
+    context: WebgpuContextDescriptor
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
             extent=RenderTargetExtent._from_native(raw["extent"]),
-            context=WebGPUContextDescriptor._from_native(raw["context"]),
+            context=WebgpuContextDescriptor._from_native(raw["context"]),
         )
 
     @classmethod
@@ -2956,7 +2956,7 @@ class WebGPUOwnedTextureDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class WebGPUOwnedTextureFrame:
+class WebgpuOwnedTextureFrame:
     generation: int
     width: int
     height: int
@@ -2983,9 +2983,9 @@ class WebGPUOwnedTextureFrame:
 
 
 @dataclass(frozen=True, slots=True)
-class WebGPUSurfaceDescriptor:
+class WebgpuSurfaceDescriptor:
     extent: RenderTargetExtent
-    context: WebGPUContextDescriptor
+    context: WebgpuContextDescriptor
     surface: int
     format: int
 
@@ -2993,7 +2993,7 @@ class WebGPUSurfaceDescriptor:
     def _from_native(cls, raw):
         return cls(
             extent=RenderTargetExtent._from_native(raw["extent"]),
-            context=WebGPUContextDescriptor._from_native(raw["context"]),
+            context=WebgpuContextDescriptor._from_native(raw["context"]),
             surface=raw["surface"],
             format=raw["format"],
         )
@@ -3006,7 +3006,7 @@ class WebGPUSurfaceDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class WGLContextDescriptor:
+class WglContextDescriptor:
     device_context: int
     share_context: int
     get_proc_address: int

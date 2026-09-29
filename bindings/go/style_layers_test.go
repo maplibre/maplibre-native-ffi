@@ -11,12 +11,12 @@ import (
 func TestDedicatedStyleLayerHelpers(t *testing.T) {
 	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
-		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	if _, err := m.SetStyleJson([]byte(emptyStyleJSON)); err != nil {
+		t.Fatalf("SetStyleJson(empty style): %v", err)
 	}
-	demOptions := StyleTileSourceOptions{TileSize: pointerTo(uint32(512)), RasterEncoding: pointerTo(StyleRasterDEMEncodingMapbox)}
-	if _, err := m.AddRasterDEMSourceTiles("dem", []string{"https://example.com/dem/{z}/{x}/{y}.png"}, &demOptions); err != nil {
-		t.Fatalf("AddRasterDEMSourceTiles(): %v", err)
+	demOptions := StyleTileSourceOptions{TileSize: pointerTo(uint32(512)), RasterEncoding: pointerTo(StyleRasterDemEncodingMapbox)}
+	if _, err := m.AddRasterDemSourceTiles("dem", []string{"https://example.com/dem/{z}/{x}/{y}.png"}, &demOptions); err != nil {
+		t.Fatalf("AddRasterDemSourceTiles(): %v", err)
 	}
 	if _, err := m.AddHillshadeLayer("hillshade", "dem", nil); err != nil {
 		t.Fatalf("AddHillshadeLayer(): %v", err)
@@ -53,7 +53,7 @@ func TestDedicatedStyleLayerHelpers(t *testing.T) {
 			t.Fatalf("GetStyleLayerInfo(%s) type = (%q, %v), want %q true", id, info.Info.Type, found, wantType)
 		}
 	}
-	ids, err := awaitForTest(m.ListStyleLayerIDs())
+	ids, err := awaitForTest(m.ListStyleLayerIds())
 	if err != nil {
 		t.Fatalf("StyleLayerIDs(): %v", err)
 	}
@@ -96,20 +96,20 @@ func TestStyleLayersListsLayerStackInStyleOrder(t *testing.T) {
 		}
 	}()
 
-	if _, err := awaitForTest(m.SetStyleJSON([]byte(layerListStyleJSON))); err != nil {
-		t.Fatalf("SetStyleJSON(): %v", err)
+	if _, err := awaitForTest(m.SetStyleJson([]byte(layerListStyleJSON))); err != nil {
+		t.Fatalf("SetStyleJson(): %v", err)
 	}
 	layers, err := awaitForTest(m.ListStyleLayers())
 	if err != nil {
 		t.Fatalf("StyleLayers(): %v", err)
 	}
 	// Replace the native backing records before reading the copied result.
-	if _, err := awaitForTest(m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`))); err != nil {
+	if _, err := awaitForTest(m.SetStyleJson([]byte(`{"version":8,"sources":{},"layers":[]}`))); err != nil {
 		t.Fatalf("replace style: %v", err)
 	}
 	want := []StyleLayerEntry{
-		{ID: "roads", Type: "line", SourceID: pointerTo("tiles"), SourceLayer: pointerTo("transportation")},
-		{ID: "bg", Type: "background"},
+		{Id: "roads", Type: "line", SourceId: pointerTo("tiles"), SourceLayer: pointerTo("transportation")},
+		{Id: "bg", Type: "background"},
 	}
 	if len(layers) != len(want) {
 		t.Fatalf("StyleLayers() = %+v, want %d layers", layers, len(want))
@@ -119,8 +119,8 @@ func TestStyleLayersListsLayerStackInStyleOrder(t *testing.T) {
 			t.Errorf("StyleLayers()[%d] = %+v, want %+v", i, layers[i], want[i])
 		}
 	}
-	if layers[1].SourceID != nil || layers[1].SourceLayer != nil {
-		t.Errorf("background layer source fields = (%v, %v), want both absent", layers[1].SourceID, layers[1].SourceLayer)
+	if layers[1].SourceId != nil || layers[1].SourceLayer != nil {
+		t.Errorf("background layer source fields = (%v, %v), want both absent", layers[1].SourceId, layers[1].SourceLayer)
 	}
 }
 
@@ -131,8 +131,8 @@ const layerAccessorStyleJSON = `{"version":8,"sources":{"geo":{"type":"geojson",
 func TestLayerBaseAccessorsRoundTrip(t *testing.T) {
 	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(layerAccessorStyleJSON)); err != nil {
-		t.Fatalf("SetStyleJSON(): %v", err)
+	if _, err := m.SetStyleJson([]byte(layerAccessorStyleJSON)); err != nil {
+		t.Fatalf("SetStyleJson(): %v", err)
 	}
 
 	info, found, err := takeOptionalStyleOperationForTest(m.GetStyleLayerInfo("fill"))
@@ -143,8 +143,8 @@ func TestLayerBaseAccessorsRoundTrip(t *testing.T) {
 		t.Fatalf("SetLayerSourceLayer(): %v", err)
 	}
 	info, found, err = takeOptionalStyleOperationForTest(m.GetStyleLayerInfo("fill"))
-	if err != nil || !found || (info.SourceLayer == nil || *info.SourceLayer != "roads") || (info.SourceID == nil || *info.SourceID != "geo") {
-		t.Fatalf("GetStyleLayerInfo(fill) sources = (%v, %v, %v)", info.SourceID, info.SourceLayer, err)
+	if err != nil || !found || (info.SourceLayer == nil || *info.SourceLayer != "roads") || (info.SourceId == nil || *info.SourceId != "geo") {
+		t.Fatalf("GetStyleLayerInfo(fill) sources = (%v, %v, %v)", info.SourceId, info.SourceLayer, err)
 	}
 
 	// The narrow copies report the same values the aggregate carries.
@@ -152,11 +152,11 @@ func TestLayerBaseAccessorsRoundTrip(t *testing.T) {
 	if err != nil || (sourceLayer == nil || *sourceLayer != "roads") {
 		t.Fatalf("LayerSourceLayer(fill) = (%q, %v), want roads", *sourceLayer, err)
 	}
-	sourceID, err := awaitForTest(m.CopyLayerSourceID("fill"))
+	sourceID, err := awaitForTest(m.CopyLayerSourceId("fill"))
 	if err != nil || (sourceID == nil || *sourceID != "geo") {
 		t.Fatalf("LayerSourceID(fill) = (%q, %v), want geo", *sourceID, err)
 	}
-	if _, err := awaitForTest(m.CopyLayerSourceID("missing")); !errors.Is(err, ErrNotFound) {
+	if _, err := awaitForTest(m.CopyLayerSourceId("missing")); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("LayerSourceID(missing) error = %v, want ErrNotFound", err)
 	}
 
@@ -164,8 +164,8 @@ func TestLayerBaseAccessorsRoundTrip(t *testing.T) {
 	completion, err := m.SetLayerSourceLayer("bg", pointerTo("roads"))
 	requireStyleCommandFailed(t, completion, err)
 	background, found, queryErr := takeOptionalStyleOperationForTest(m.GetStyleLayerInfo("bg"))
-	if queryErr != nil || !found || background.SourceID != nil {
-		t.Fatalf("GetStyleLayerInfo(bg) source = %v, %v; want empty", background.SourceID, queryErr)
+	if queryErr != nil || !found || background.SourceId != nil {
+		t.Fatalf("GetStyleLayerInfo(bg) source = %v, %v; want empty", background.SourceId, queryErr)
 	}
 
 	// An unset zoom range crosses the boundary as infinities.
@@ -205,7 +205,7 @@ func TestLayerBaseAccessorsRoundTrip(t *testing.T) {
 
 	// A background layer carries neither a source ID nor a source layer.
 	if info, found, err := takeOptionalStyleOperationForTest(m.GetStyleLayerInfo("bg")); err != nil || !found ||
-		info.SourceID != nil || info.SourceLayer != nil && *info.SourceLayer != "" {
+		info.SourceId != nil || info.SourceLayer != nil && *info.SourceLayer != "" {
 		t.Fatalf("GetStyleLayerInfo(bg) = (%#v, %v, %v), want found without source fields", info, found, err)
 	}
 
@@ -220,15 +220,15 @@ func TestLayerBaseAccessorsRoundTrip(t *testing.T) {
 func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
 	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
-		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	if _, err := m.SetStyleJson([]byte(emptyStyleJSON)); err != nil {
+		t.Fatalf("SetStyleJson(empty style): %v", err)
 	}
-	if _, err := m.AddStyleSourceJSON("points", []byte(`{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}`)); err != nil {
-		t.Fatalf("AddStyleSourceJSON(points): %v", err)
+	if _, err := m.AddStyleSourceJson("points", []byte(`{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}`)); err != nil {
+		t.Fatalf("AddStyleSourceJson(points): %v", err)
 	}
 	layerJSON := []byte(`{"id":"points-layer","type":"circle","source":"points","paint":{"circle-radius":2}}`)
-	if _, err := m.AddStyleLayerJSON(layerJSON, nil); err != nil {
-		t.Fatalf("AddStyleLayerJSON(): %v", err)
+	if _, err := m.AddStyleLayerJson(layerJSON, nil); err != nil {
+		t.Fatalf("AddStyleLayerJson(): %v", err)
 	}
 	layerJSON[0] = 'x'
 	info, found, err := takeOptionalStyleOperationForTest(m.GetStyleLayerInfo("points-layer"))
@@ -238,7 +238,7 @@ func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
 	if !found || info.Info.Type != "circle" {
 		t.Fatalf("GetStyleLayerInfo(points-layer) type = (%q, %v), want circle true", info.Info.Type, found)
 	}
-	copiedLayer, found, err := takeOptionalStyleOperationForTest(m.GetStyleLayerJSON("points-layer"))
+	copiedLayer, found, err := takeOptionalStyleOperationForTest(m.GetStyleLayerJson("points-layer"))
 	if err != nil {
 		t.Fatalf("StyleLayerJSON(): %v", err)
 	}
@@ -282,11 +282,11 @@ func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
 func TestStyleLightPropertyJSONSnapshots(t *testing.T) {
 	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
-		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	if _, err := m.SetStyleJson([]byte(emptyStyleJSON)); err != nil {
+		t.Fatalf("SetStyleJson(empty style): %v", err)
 	}
-	if _, err := m.SetStyleLightJSON([]byte(`{"anchor":"viewport","color":"#ffffff","intensity":0.5}`)); err != nil {
-		t.Fatalf("SetStyleLightJSON(): %v", err)
+	if _, err := m.SetStyleLightJson([]byte(`{"anchor":"viewport","color":"#ffffff","intensity":0.5}`)); err != nil {
+		t.Fatalf("SetStyleLightJson(): %v", err)
 	}
 	undefined, err := awaitForTest(m.GetStyleLightProperty("does-not-exist"))
 	if err != nil {
@@ -312,10 +312,10 @@ func TestStyleLightPropertyJSONSnapshots(t *testing.T) {
 func TestStyleLayerMetadataForMissingLayers(t *testing.T) {
 	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
-		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	if _, err := m.SetStyleJson([]byte(emptyStyleJSON)); err != nil {
+		t.Fatalf("SetStyleJson(empty style): %v", err)
 	}
-	ids, err := awaitForTest(m.ListStyleLayerIDs())
+	ids, err := awaitForTest(m.ListStyleLayerIds())
 	if err != nil {
 		t.Fatalf("StyleLayerIDs(): %v", err)
 	}
@@ -348,7 +348,7 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 		t.Fatalf("GetStyleTransitionOptions(): %v", err)
 	}
 	// The placement flag always reports, because native always holds a value for it.
-	if defaults.DurationMS != nil || defaults.DelayMS != nil {
+	if defaults.DurationMs != nil || defaults.DelayMs != nil {
 		t.Fatalf("GetStyleTransitionOptions() = %#v, want no duration or delay", defaults)
 	}
 	if defaults.EnablePlacementTransitions == nil || !*defaults.EnablePlacementTransitions {
@@ -356,33 +356,33 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	}
 
 	// The style parser fills in its own 300ms duration for a style that declares no transition.
-	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
-		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	if _, err := m.SetStyleJson([]byte(emptyStyleJSON)); err != nil {
+		t.Fatalf("SetStyleJson(empty style): %v", err)
 	}
 	parsed, err := awaitForTest(m.GetStyleTransitionOptions())
 	if err != nil {
 		t.Fatalf("GetStyleTransitionOptions(): %v", err)
 	}
-	if parsed.DurationMS == nil || *parsed.DurationMS != 300 {
-		t.Fatalf("parsed DurationMS = %v, want 300", parsed.DurationMS)
+	if parsed.DurationMs == nil || *parsed.DurationMs != 300 {
+		t.Fatalf("parsed DurationMS = %v, want 300", parsed.DurationMs)
 	}
-	if parsed.DelayMS != nil {
-		t.Fatalf("parsed DelayMS = %v, want absent", *parsed.DelayMS)
+	if parsed.DelayMs != nil {
+		t.Fatalf("parsed DelayMS = %v, want absent", *parsed.DelayMs)
 	}
 
 	const transitionStyle = `{"version":8,"transition":{"duration":750,"delay":100},"sources":{},"layers":[]}`
-	if _, err := m.SetStyleJSON([]byte(transitionStyle)); err != nil {
-		t.Fatalf("SetStyleJSON(transition style): %v", err)
+	if _, err := m.SetStyleJson([]byte(transitionStyle)); err != nil {
+		t.Fatalf("SetStyleJson(transition style): %v", err)
 	}
 	declared, err := awaitForTest(m.GetStyleTransitionOptions())
 	if err != nil {
 		t.Fatalf("GetStyleTransitionOptions(): %v", err)
 	}
-	if declared.DurationMS == nil || *declared.DurationMS != 750 {
-		t.Fatalf("declared DurationMS = %v, want 750", declared.DurationMS)
+	if declared.DurationMs == nil || *declared.DurationMs != 750 {
+		t.Fatalf("declared DurationMS = %v, want 750", declared.DurationMs)
 	}
-	if declared.DelayMS == nil || *declared.DelayMS != 100 {
-		t.Fatalf("declared DelayMS = %v, want 100", declared.DelayMS)
+	if declared.DelayMs == nil || *declared.DelayMs != 100 {
+		t.Fatalf("declared DelayMS = %v, want 100", declared.DelayMs)
 	}
 	if declared.EnablePlacementTransitions == nil || !*declared.EnablePlacementTransitions {
 		t.Fatal("declared EnablePlacementTransitions = false, want true")
@@ -392,7 +392,7 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	// what the style declared rather than merging into it.
 	zero := 0.0
 	disabled := false
-	options := StyleTransitionOptions{DurationMS: &zero, EnablePlacementTransitions: &disabled}
+	options := StyleTransitionOptions{DurationMs: &zero, EnablePlacementTransitions: &disabled}
 	if _, err := m.SetStyleTransitionOptions(options); err != nil {
 		t.Fatalf("SetStyleTransitionOptions(): %v", err)
 	}
@@ -407,7 +407,7 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	// A literal that sets only a duration must leave the cross-fade alone. Go cannot default a
 	// struct field to true, so an enable-shaped field would have disabled it here.
 	durationOnly := 250.0
-	if _, err := m.SetStyleTransitionOptions(StyleTransitionOptions{DurationMS: &durationOnly}); err != nil {
+	if _, err := m.SetStyleTransitionOptions(StyleTransitionOptions{DurationMs: &durationOnly}); err != nil {
 		t.Fatalf("SetStyleTransitionOptions(): %v", err)
 	}
 	kept, err := awaitForTest(m.GetStyleTransitionOptions())
@@ -418,8 +418,8 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 		t.Fatal("a duration-only literal disabled the placement cross-fade")
 	}
 
-	if _, err := m.SetStyleJSON([]byte(transitionStyle)); err != nil {
-		t.Fatalf("SetStyleJSON(transition style): %v", err)
+	if _, err := m.SetStyleJson([]byte(transitionStyle)); err != nil {
+		t.Fatalf("SetStyleJson(transition style): %v", err)
 	}
 	reloaded, err := awaitForTest(m.GetStyleTransitionOptions())
 	if err != nil {
@@ -430,6 +430,6 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	}
 
 	negative := -1.0
-	completion, err := m.SetStyleTransitionOptions(StyleTransitionOptions{DelayMS: &negative})
+	completion, err := m.SetStyleTransitionOptions(StyleTransitionOptions{DelayMs: &negative})
 	requireStyleCommandFailed(t, completion, err)
 }

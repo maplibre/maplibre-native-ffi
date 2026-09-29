@@ -3,7 +3,7 @@
 internal import CMaplibreNativeC
 import Foundation
 
-public extension GeoJSONSourceDataHandle {
+public extension GeojsonSourceDataHandle {
   func close() throws {
     try NativeCallbackGuard.check(
       owner: self,

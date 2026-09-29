@@ -90,8 +90,8 @@ func TestRuntimeDrainReportsStyleLoadInQueueOrder(t *testing.T) {
 	runtime, m := newRuntimeAndMap(t, nil)
 
 	drainQueuedRuntimeEvents(t, runtime)
-	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
-		t.Fatalf("SetStyleJSON(): %v", err)
+	if _, err := m.SetStyleJson([]byte(emptyStyleJSON)); err != nil {
+		t.Fatalf("SetStyleJson(): %v", err)
 	}
 	// A drain never waits for worker progress, so collect successive batches
 	// until the style load finishes and preserve their queue order.
@@ -218,7 +218,7 @@ func TestMapOptionsEventMaskSuppressesClearedTypesFromCreation(t *testing.T) {
 		t.Fatalf("MapSnapshot.EventMask = %#x, want the style-loaded bit cleared", uint64(mask))
 	}
 
-	style, err := m.SetStyleJSON([]byte(emptyStyleJSON))
+	style, err := m.SetStyleJson([]byte(emptyStyleJSON))
 	if _, err := awaitForTest(style, err); err != nil {
 		t.Fatalf("SetStyleJSON completion: %v", err)
 	}
@@ -255,8 +255,8 @@ func TestRuntimeEventCopiesSurviveTheNextDrain(t *testing.T) {
 	runtime, m := newRuntimeAndMap(t, nil)
 
 	// A failed style load carries text, so this batch holds arena-backed values.
-	if _, err := m.SetStyleURL("unsupported://style.json"); err != nil {
-		t.Fatalf("SetStyleURL(): %v", err)
+	if _, err := m.SetStyleUrl("unsupported://style.json"); err != nil {
+		t.Fatalf("SetStyleUrl(): %v", err)
 	}
 	var kept []RuntimeEvent
 	for range make([]struct{}, 5000) {
@@ -285,12 +285,12 @@ func TestRuntimeEventCopiesSurviveTheNextDrain(t *testing.T) {
 	}
 
 	// Two more style loads reuse the runtime's event and message storage.
-	if _, err := m.SetStyleJSON([]byte(emptyStyleJSON)); err != nil {
-		t.Fatalf("SetStyleJSON(): %v", err)
+	if _, err := m.SetStyleJson([]byte(emptyStyleJSON)); err != nil {
+		t.Fatalf("SetStyleJson(): %v", err)
 	}
 	collectRuntimeEventsUntil(t, runtime, RuntimeEventTypeMapStyleLoaded)
-	if _, err := m.SetStyleURL("also-unsupported://style.json"); err != nil {
-		t.Fatalf("SetStyleURL(): %v", err)
+	if _, err := m.SetStyleUrl("also-unsupported://style.json"); err != nil {
+		t.Fatalf("SetStyleUrl(): %v", err)
 	}
 	collectRuntimeEventsUntil(t, runtime, RuntimeEventTypeMapLoadingFailed)
 
@@ -321,11 +321,11 @@ func TestRuntimeEventDecoderUsesTheBatchStride(t *testing.T) {
 			withMessage("roads").
 			withTileAction(RuntimeEventTileAction{
 				Operation: TileOperationLoadFromCache,
-				TileID:    TileID{OverscaledZ: 9, Wrap: -1, CanonicalZ: 8, CanonicalX: 7, CanonicalY: 6},
+				TileId:    TileId{OverscaledZ: 9, Wrap: -1, CanonicalZ: 8, CanonicalX: 7, CanonicalY: 6},
 			}),
 		newRuntimeEventForTest(RuntimeEventTypeMapCameraTransitionFinished, RuntimeEventSourceTypeMap, 0, 0).
 			withCameraTransitionFinished(RuntimeEventCameraTransitionFinished{
-				TransitionID: 7,
+				TransitionId: 7,
 			}),
 	})
 	defer batch.free()
@@ -341,7 +341,7 @@ func TestRuntimeEventDecoderUsesTheBatchStride(t *testing.T) {
 	}
 	tileVariant, ok := decoded[1].Payload.(RuntimeEventPayloadTileActionVariant)
 	tile := tileVariant.Value
-	if !ok || tile.Operation != TileOperationLoadFromCache || tile.TileID.Wrap != -1 || tile.TileID.CanonicalX != 7 {
+	if !ok || tile.Operation != TileOperationLoadFromCache || tile.TileId.Wrap != -1 || tile.TileId.CanonicalX != 7 {
 		t.Fatalf("tile action payload = %+v", decoded[1].Payload)
 	}
 	if decoded[1].Message != "roads" {
@@ -349,7 +349,7 @@ func TestRuntimeEventDecoderUsesTheBatchStride(t *testing.T) {
 	}
 	transitionVariant, ok := decoded[2].Payload.(RuntimeEventPayloadCameraTransitionFinishedVariant)
 	transition := transitionVariant.Value
-	if !ok || transition.TransitionID != 7 {
+	if !ok || transition.TransitionId != 7 {
 		t.Fatalf("camera transition payload = %+v", decoded[2].Payload)
 	}
 }
@@ -372,14 +372,14 @@ func TestRuntimeEventKnownPayloadsDecodeFromTheUnion(t *testing.T) {
 		newRuntimeEventForTest(RuntimeEventTypeMapRenderMapFinished, RuntimeEventSourceTypeMap, 0, 0).
 			withRenderMap(RuntimeEventRenderMap{Mode: RenderModePartial}),
 		newRuntimeEventForTest(RuntimeEventTypeMapCameraTransitionFinished, RuntimeEventSourceTypeMap, 0, 0).
-			withCameraTransitionFinished(RuntimeEventCameraTransitionFinished{TransitionID: 99}),
+			withCameraTransitionFinished(RuntimeEventCameraTransitionFinished{TransitionId: 99}),
 		newRuntimeEventForTest(RuntimeEventTypeOfflineRegionStatusChanged, RuntimeEventSourceTypeRuntime, 0, 0).
-			withOfflineRegionStatus(RuntimeEventOfflineRegionStatus{RegionID: 5, Status: status}),
+			withOfflineRegionStatus(RuntimeEventOfflineRegionStatus{RegionId: 5, Status: status}),
 		newRuntimeEventForTest(RuntimeEventTypeOfflineRegionResponseError, RuntimeEventSourceTypeRuntime, 0, 0).
 			withMessage("connection reset").
-			withOfflineRegionResponseError(RuntimeEventOfflineRegionResponseError{RegionID: 5, Reason: ResourceErrorReasonConnection}),
+			withOfflineRegionResponseError(RuntimeEventOfflineRegionResponseError{RegionId: 5, Reason: ResourceErrorReasonConnection}),
 		newRuntimeEventForTest(RuntimeEventTypeOfflineRegionTileCountLimitExceeded, RuntimeEventSourceTypeRuntime, 0, 0).
-			withOfflineRegionTileCountLimit(RuntimeEventOfflineRegionTileCountLimit{RegionID: 5, Limit: 6000}),
+			withOfflineRegionTileCountLimit(RuntimeEventOfflineRegionTileCountLimit{RegionId: 5, Limit: 6000}),
 		newRuntimeEventForTest(RuntimeEventTypeMapStyleImageMissing, RuntimeEventSourceTypeMap, 0, 0).
 			withMessage("marker-1"),
 	})
@@ -396,12 +396,12 @@ func TestRuntimeEventKnownPayloadsDecodeFromTheUnion(t *testing.T) {
 	}
 	transitionVariant, ok := decoded[1].Payload.(RuntimeEventPayloadCameraTransitionFinishedVariant)
 	transition := transitionVariant.Value
-	if !ok || transition.TransitionID != 99 {
+	if !ok || transition.TransitionId != 99 {
 		t.Fatalf("transition payload = %+v", decoded[1].Payload)
 	}
 	regionStatusVariant, ok := decoded[2].Payload.(RuntimeEventPayloadOfflineRegionStatusVariant)
 	regionStatus := regionStatusVariant.Value
-	if !ok || regionStatus.RegionID != 5 || regionStatus.Status.CompletedTileCount != 12 || !regionStatus.Status.Complete {
+	if !ok || regionStatus.RegionId != 5 || regionStatus.Status.CompletedTileCount != 12 || !regionStatus.Status.Complete {
 		t.Fatalf("region status payload = %+v", decoded[2].Payload)
 	}
 	responseErrorVariant, ok := decoded[3].Payload.(RuntimeEventPayloadOfflineRegionResponseErrorVariant)
@@ -467,9 +467,9 @@ func TestRuntimeEventUnknownDomainsPreserveRawValues(t *testing.T) {
 func TestRuntimeEventMapSourceUsesRuntimeLocalID(t *testing.T) {
 	runtime, m := newRuntimeAndMap(t, nil)
 
-	mapID, err := m.ID()
+	mapID, err := m.Id()
 	if err != nil {
-		t.Fatalf("ID(): %v", err)
+		t.Fatalf("Id(): %v", err)
 	}
 	batch := newRuntimeEventBatchForTest(0, []runtimeEventForTest{
 		newRuntimeEventForTest(RuntimeEventTypeMapIdle, RuntimeEventSourceTypeMap, uint64(mapID), 0),

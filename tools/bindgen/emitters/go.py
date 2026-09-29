@@ -3,34 +3,6 @@
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import ModelError
 
-INITIALISMS = {
-    "tilejson": "TileJSON",
-    "sdf": "SDF",
-    "ms": "MS",
-    "urls": "URLs",
-    "pfor": "PFOR",
-    "cpu": "CPU",
-    "gpu": "GPU",
-    "opengl": "OpenGL",
-    "webgl": "WebGL",
-    "webgpu": "WebGPU",
-    "http": "HTTP",
-    "egl": "EGL",
-    "wgl": "WGL",
-    "api": "API",
-    "etag": "ETag",
-    "ok": "OK",
-    "tms": "TMS",
-    "mlt": "MLT",
-    "dem": "DEM",
-    "id": "ID",
-    "ids": "IDs",
-    "url": "URL",
-    "json": "JSON",
-    "rgba8": "RGBA8",
-    "mvt": "MVT",
-    "geojson": "GeoJSON",
-}
 GO_KEYWORDS = {
     "break",
     "default",
@@ -65,9 +37,7 @@ def native_identifier(value: str) -> str:
 
 
 def name(value: str) -> str:
-    return "".join(
-        INITIALISMS.get(word, word[:1].upper() + word[1:]) for word in value.split("_")
-    )
+    return "".join(word[:1].upper() + word[1:] for word in value.split("_"))
 
 
 def lower(api):

@@ -29,7 +29,7 @@ class _EventBatchHandle:
     def get(self) -> Any: ...
     def close(self) -> Any: ...
 
-class _GeoJsonSourceDataHandle:
+class _GeojsonSourceDataHandle:
     closed: bool
     id: int
     def close(self) -> Any: ...
@@ -52,10 +52,10 @@ class _MapHandle:
         self, source_id: str, options: CustomMvtVectorSourceOptions | None = None
     ) -> Future[CommandCompletion]: ...
     def add_geojson_source_data(
-        self, source_id: str, data: _GeoJsonSourceDataHandle
+        self, source_id: str, data: _GeojsonSourceDataHandle
     ) -> Future[CommandCompletion]: ...
     def add_geojson_source_url(
-        self, source_id: str, url: str, options: GeoJsonSourceOptions | None = None
+        self, source_id: str, url: str, options: GeojsonSourceOptions | None = None
     ) -> Future[CommandCompletion]: ...
     def add_hillshade_layer(
         self, layer_id: str, source_id: str, before_layer_id: str | None = None
@@ -206,7 +206,7 @@ class _MapHandle:
         self, options: FreeCameraOptions | None = None
     ) -> Future[CommandCompletion]: ...
     def set_geojson_source_data(
-        self, source_id: str, data: _GeoJsonSourceDataHandle
+        self, source_id: str, data: _GeojsonSourceDataHandle
     ) -> Future[CommandCompletion]: ...
     def set_geojson_source_synchronous_tiling(
         self, source_id: str, enabled: bool
@@ -311,17 +311,17 @@ class _MapHandle:
     ) -> dict[str, Any]: ...
     def opengl_borrowed_texture_attach(
         self,
-        descriptor: OpenGLBorrowedTextureDescriptor | None = None,
+        descriptor: OpenglBorrowedTextureDescriptor | None = None,
         options: RenderSessionAttachOptions | None = None,
     ) -> dict[str, Any]: ...
     def opengl_owned_texture_attach(
         self,
-        descriptor: OpenGLOwnedTextureDescriptor | None = None,
+        descriptor: OpenglOwnedTextureDescriptor | None = None,
         options: RenderSessionAttachOptions | None = None,
     ) -> dict[str, Any]: ...
     def opengl_surface_attach(
         self,
-        descriptor: OpenGLSurfaceDescriptor | None = None,
+        descriptor: OpenglSurfaceDescriptor | None = None,
         options: RenderSessionAttachOptions | None = None,
     ) -> dict[str, Any]: ...
     def vulkan_borrowed_texture_attach(
@@ -341,17 +341,17 @@ class _MapHandle:
     ) -> dict[str, Any]: ...
     def webgpu_borrowed_texture_attach(
         self,
-        descriptor: WebGPUBorrowedTextureDescriptor | None = None,
+        descriptor: WebgpuBorrowedTextureDescriptor | None = None,
         options: RenderSessionAttachOptions | None = None,
     ) -> dict[str, Any]: ...
     def webgpu_owned_texture_attach(
         self,
-        descriptor: WebGPUOwnedTextureDescriptor | None = None,
+        descriptor: WebgpuOwnedTextureDescriptor | None = None,
         options: RenderSessionAttachOptions | None = None,
     ) -> dict[str, Any]: ...
     def webgpu_surface_attach(
         self,
-        descriptor: WebGPUSurfaceDescriptor | None = None,
+        descriptor: WebgpuSurfaceDescriptor | None = None,
         options: RenderSessionAttachOptions | None = None,
     ) -> dict[str, Any]: ...
 
@@ -387,10 +387,10 @@ class _RenderSessionHandle:
         self, descriptor: MetalSurfaceDescriptor | None = None
     ) -> Future[None]: ...
     def opengl_borrowed_texture_set_target(
-        self, descriptor: OpenGLBorrowedTextureDescriptor | None = None
+        self, descriptor: OpenglBorrowedTextureDescriptor | None = None
     ) -> Future[None]: ...
     def opengl_surface_set_target(
-        self, descriptor: OpenGLSurfaceDescriptor | None = None
+        self, descriptor: OpenglSurfaceDescriptor | None = None
     ) -> Future[None]: ...
     def abandon(self) -> Any: ...
     def acquire_frame(self) -> Any: ...
@@ -431,10 +431,10 @@ class _RenderSessionHandle:
         self, descriptor: VulkanSurfaceDescriptor | None = None
     ) -> Future[None]: ...
     def webgpu_borrowed_texture_set_target(
-        self, descriptor: WebGPUBorrowedTextureDescriptor | None = None
+        self, descriptor: WebgpuBorrowedTextureDescriptor | None = None
     ) -> Future[None]: ...
     def webgpu_surface_set_target(
-        self, descriptor: WebGPUSurfaceDescriptor | None = None
+        self, descriptor: WebgpuSurfaceDescriptor | None = None
     ) -> Future[None]: ...
 
 class _ResourceRequestHandle:
@@ -496,7 +496,7 @@ class _RuntimeHandle:
 def android_init(jni_env: int, jni_class: int, context: int) -> Any: ...
 def c_version() -> Any: ...
 def geojson_source_data_create(
-    data: bytes, options: GeoJsonSourceOptions | None = None
+    data: bytes, options: GeojsonSourceOptions | None = None
 ) -> Any: ...
 def lat_lng_for_projected_meters(meters: ProjectedMeters) -> Any: ...
 def log_clear_callback() -> Any: ...

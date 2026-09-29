@@ -63,8 +63,8 @@ func TestGPUSyncKeepsHighSemaphoreBits(t *testing.T) {
 
 	arena := &bindingArena{}
 	defer arena.close()
-	raw := nativeGPUSync(GPUSync{
-		Kind:   GPUSyncKindVulkanTimelineSemaphore,
+	raw := nativeGpuSync(GpuSync{
+		Kind:   GpuSyncKindVulkanTimelineSemaphore,
 		Object: uint64(semaphore),
 		Value:  9,
 	}, arena)

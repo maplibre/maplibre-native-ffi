@@ -104,7 +104,7 @@ public extension MapHandle {
 
   func addGeojsonSourceData(
     sourceId bindingArg0: String,
-    data bindingArg1: GeoJSONSourceDataHandle
+    data bindingArg1: GeojsonSourceDataHandle
   ) async throws -> CommandCompletion {
     try await awaitNative {
       try NativeCallbackGuard.check(
@@ -1457,7 +1457,7 @@ public extension MapHandle {
 
   func setGeojsonSourceData(
     sourceId bindingArg0: String,
-    data bindingArg1: GeoJSONSourceDataHandle
+    data bindingArg1: GeojsonSourceDataHandle
   ) async throws -> CommandCompletion {
     try await awaitNative {
       try NativeCallbackGuard.check(

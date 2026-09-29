@@ -22,26 +22,26 @@ func TestGeneratedCallbacksEnforceResponseScopeAndAllowedReentry(t *testing.T) {
 			failures <- err
 		}
 		wrongThread := make(chan error, 1)
-		go func() { wrongThread <- response.SetURL(url) }()
+		go func() { wrongThread <- response.SetUrl(url) }()
 		if err := <-wrongThread; !errors.Is(err, ErrInvalidState) {
 			failures <- err
 		}
 		responses <- response
-		if err := response.SetURL(server.URL); err != nil {
+		if err := response.SetUrl(server.URL); err != nil {
 			failures <- err
 			return StatusInvalidState
 		}
-		return StatusOK
+		return StatusOk
 	}}
 	if _, err := awaitForTest(host.SetResourceTransform(transform)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.SetStyleURL("https://example.test/generated-scope.json"); err != nil {
+	if _, err := m.SetStyleUrl("https://example.test/generated-scope.json"); err != nil {
 		t.Fatal(err)
 	}
 	waitForRuntimeEvent(t, host, RuntimeEventTypeMapStyleLoaded)
 	response := <-responses
-	if err := response.SetURL("expired"); !errors.Is(err, ErrInvalidState) {
+	if err := response.SetUrl("expired"); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("expired response: %v", err)
 	}
 	if _, err := awaitForTest(host.ClearResourceTransform()); err != nil {
@@ -52,7 +52,7 @@ func TestGeneratedCallbacksEnforceResponseScopeAndAllowedReentry(t *testing.T) {
 		if _, err := host.Close(); !errors.Is(err, ErrInvalidState) {
 			failures <- err
 		}
-		if err := handle.Complete(ResourceResponse{Status: ResourceResponseStatusOK, Bytes: []byte(emptyStyleJSON)}); err != nil {
+		if err := handle.Complete(ResourceResponse{Status: ResourceResponseStatusOk, Bytes: []byte(emptyStyleJSON)}); err != nil {
 			failures <- err
 		}
 		dispose := handle.state.dispose
@@ -68,7 +68,7 @@ func TestGeneratedCallbacksEnforceResponseScopeAndAllowedReentry(t *testing.T) {
 	if _, err := awaitForTest(host.SetResourceProvider(provider)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.SetStyleURL("generated-provider://style.json"); err != nil {
+	if _, err := m.SetStyleUrl("generated-provider://style.json"); err != nil {
 		t.Fatal(err)
 	}
 	waitForRuntimeEvent(t, host, RuntimeEventTypeMapStyleLoaded)
@@ -86,7 +86,7 @@ func TestGeneratedCallbacksEnforceResponseScopeAndAllowedReentry(t *testing.T) {
 	if _, err := awaitForTest(host.SetResourceProvider(provider)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.SetStyleURL(server.URL + "/closed-provider"); err != nil {
+	if _, err := m.SetStyleUrl(server.URL + "/closed-provider"); err != nil {
 		t.Fatal(err)
 	}
 	waitForResourceSignalValue(t, retired, "closed provider decision retirement")

@@ -97,7 +97,7 @@ public final class EventBatchHandle: @unchecked Sendable {
   }
 }
 
-struct NativeGeoJSONSourceDataHandle: NativeHandle {
+struct NativeGeojsonSourceDataHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned()
     -> Bool
   {
@@ -105,12 +105,12 @@ struct NativeGeoJSONSourceDataHandle: NativeHandle {
   }
 }
 
-public final class GeoJSONSourceDataHandle: @unchecked Sendable {
-  let handle: NativeHandleBox<NativeGeoJSONSourceDataHandle>
+public final class GeojsonSourceDataHandle: @unchecked Sendable {
+  let handle: NativeHandleBox<NativeGeojsonSourceDataHandle>
   init(adopting raw: mln_geojson_source_data) throws {
     handle = try NativeHandleBox(
-      typeName: "GeoJSONSourceDataHandle",
-      handle: NativeGeoJSONSourceDataHandle(raw: raw)
+      typeName: "GeojsonSourceDataHandle",
+      handle: NativeGeojsonSourceDataHandle(raw: raw)
     )
   }
 
@@ -122,7 +122,7 @@ public final class GeoJSONSourceDataHandle: @unchecked Sendable {
     handle.issued.raw
   }
 
-  func requireLiveHandle() throws -> NativeGeoJSONSourceDataHandle {
+  func requireLiveHandle() throws -> NativeGeojsonSourceDataHandle {
     try handle
       .requireLive()
   }

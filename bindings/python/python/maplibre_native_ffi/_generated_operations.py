@@ -27,7 +27,7 @@ from ._generated_values import (
     FeatureStateSelector,
     FrameDemand,
     FreeCameraOptions,
-    GeoJsonSourceOptions,
+    GeojsonSourceOptions,
     GpuSync,
     HttpHeaderTransform,
     LatLng,
@@ -52,11 +52,11 @@ from ._generated_values import (
     OfflineRegionDownloadState,
     OfflineRegionInfo,
     OfflineRegionStatus,
-    OpenGLBorrowedTextureDescriptor,
-    OpenGLContextProviderFlag,
-    OpenGLOwnedTextureDescriptor,
-    OpenGLOwnedTextureFrame,
-    OpenGLSurfaceDescriptor,
+    OpenglBorrowedTextureDescriptor,
+    OpenglContextProviderFlag,
+    OpenglOwnedTextureDescriptor,
+    OpenglOwnedTextureFrame,
+    OpenglSurfaceDescriptor,
     PremultipliedRgba8Image,
     ProjectedMeters,
     ProjectionMode,
@@ -94,17 +94,17 @@ from ._generated_values import (
     VulkanOwnedTextureDescriptor,
     VulkanOwnedTextureFrame,
     VulkanSurfaceDescriptor,
-    WebGPUBorrowedTextureDescriptor,
-    WebGPUOwnedTextureDescriptor,
-    WebGPUOwnedTextureFrame,
-    WebGPUSurfaceDescriptor,
+    WebgpuBorrowedTextureDescriptor,
+    WebgpuOwnedTextureDescriptor,
+    WebgpuOwnedTextureFrame,
+    WebgpuSurfaceDescriptor,
 )
 
 if TYPE_CHECKING:
     from ._generated_owners import (
         AcquiredFrameHandle,
         EventBatchHandle,
-        GeoJsonSourceDataHandle,
+        GeojsonSourceDataHandle,
         MapHandle,
         MapProjectionHandle,
         RenderFrameBatchHandle,
@@ -133,17 +133,17 @@ class MetalSurfaceAttachResult(NamedTuple):
     completion: Future[None]
 
 
-class OpenGLBorrowedTextureAttachResult(NamedTuple):
+class OpenglBorrowedTextureAttachResult(NamedTuple):
     session: RenderSessionHandle
     completion: Future[None]
 
 
-class OpenGLOwnedTextureAttachResult(NamedTuple):
+class OpenglOwnedTextureAttachResult(NamedTuple):
     session: RenderSessionHandle
     completion: Future[None]
 
 
-class OpenGLSurfaceAttachResult(NamedTuple):
+class OpenglSurfaceAttachResult(NamedTuple):
     session: RenderSessionHandle
     completion: Future[None]
 
@@ -168,17 +168,17 @@ class VulkanSurfaceAttachResult(NamedTuple):
     completion: Future[None]
 
 
-class WebGPUBorrowedTextureAttachResult(NamedTuple):
+class WebgpuBorrowedTextureAttachResult(NamedTuple):
     session: RenderSessionHandle
     completion: Future[None]
 
 
-class WebGPUOwnedTextureAttachResult(NamedTuple):
+class WebgpuOwnedTextureAttachResult(NamedTuple):
     session: RenderSessionHandle
     completion: Future[None]
 
 
-class WebGPUSurfaceAttachResult(NamedTuple):
+class WebgpuSurfaceAttachResult(NamedTuple):
     session: RenderSessionHandle
     completion: Future[None]
 
@@ -196,13 +196,13 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         )
 
     def with_opengl_texture(
-        self, callback: Callable[[OpenGLOwnedTextureFrame], R]
+        self, callback: Callable[[OpenglOwnedTextureFrame], R]
     ) -> R:
         """Call mln_acquired_frame_get_opengl_texture. Native resources remain valid only during the callback."""
         return _with_view(
             self,
             lambda: self._native.with_opengl_texture(),
-            lambda raw: OpenGLOwnedTextureFrame._from_native(raw),
+            lambda raw: OpenglOwnedTextureFrame._from_native(raw),
             callback,
         )
 
@@ -231,13 +231,13 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         )
 
     def with_webgpu_texture(
-        self, callback: Callable[[WebGPUOwnedTextureFrame], R]
+        self, callback: Callable[[WebgpuOwnedTextureFrame], R]
     ) -> R:
         """Call mln_acquired_frame_get_webgpu_texture. Native resources remain valid only during the callback."""
         return _with_view(
             self,
             lambda: self._native.with_webgpu_texture(),
-            lambda raw: WebGPUOwnedTextureFrame._from_native(raw),
+            lambda raw: WebgpuOwnedTextureFrame._from_native(raw),
             callback,
         )
 
@@ -270,8 +270,8 @@ class _EventBatchHandleOperations(GeneratedOperations):
         return self._native.close()
 
 
-class _GeoJsonSourceDataHandleOperations(GeneratedOperations):
-    _native: _native._GeoJsonSourceDataHandle
+class _GeojsonSourceDataHandleOperations(GeneratedOperations):
+    _native: _native._GeojsonSourceDataHandle
 
     def close(self) -> None:
         """Call mln_geojson_source_data_destroy."""
@@ -308,13 +308,13 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.add_custom_mvt_vector_source(source_id, options)
 
     def add_geojson_source_data(
-        self, source_id: str, data: GeoJsonSourceDataHandle
+        self, source_id: str, data: GeojsonSourceDataHandle
     ) -> Future[CommandCompletion]:
         """Call mln_map_add_geojson_source_data."""
         return self._native.add_geojson_source_data(source_id, data._native)
 
     def add_geojson_source_url(
-        self, source_id: str, url: str, options: GeoJsonSourceOptions | None = None
+        self, source_id: str, url: str, options: GeojsonSourceOptions | None = None
     ) -> Future[CommandCompletion]:
         """Call mln_map_add_geojson_source_url."""
         return self._native.add_geojson_source_url(source_id, url, options)
@@ -818,7 +818,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_free_camera_options(options)
 
     def set_geojson_source_data(
-        self, source_id: str, data: GeoJsonSourceDataHandle
+        self, source_id: str, data: GeojsonSourceDataHandle
     ) -> Future[CommandCompletion]:
         """Call mln_map_set_geojson_source_data."""
         return self._native.set_geojson_source_data(source_id, data._native)
@@ -1044,36 +1044,36 @@ class _MapHandleOperations(GeneratedOperations):
 
     def opengl_borrowed_texture_attach(
         self,
-        descriptor: OpenGLBorrowedTextureDescriptor | None = None,
+        descriptor: OpenglBorrowedTextureDescriptor | None = None,
         options: RenderSessionAttachOptions | None = None,
-    ) -> OpenGLBorrowedTextureAttachResult:
+    ) -> OpenglBorrowedTextureAttachResult:
         """Call mln_opengl_borrowed_texture_attach."""
         raw = self._native.opengl_borrowed_texture_attach(descriptor, options)
-        return OpenGLBorrowedTextureAttachResult(
+        return OpenglBorrowedTextureAttachResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
             completion=raw["completion"],
         )
 
     def opengl_owned_texture_attach(
         self,
-        descriptor: OpenGLOwnedTextureDescriptor | None = None,
+        descriptor: OpenglOwnedTextureDescriptor | None = None,
         options: RenderSessionAttachOptions | None = None,
-    ) -> OpenGLOwnedTextureAttachResult:
+    ) -> OpenglOwnedTextureAttachResult:
         """Call mln_opengl_owned_texture_attach."""
         raw = self._native.opengl_owned_texture_attach(descriptor, options)
-        return OpenGLOwnedTextureAttachResult(
+        return OpenglOwnedTextureAttachResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
             completion=raw["completion"],
         )
 
     def opengl_surface_attach(
         self,
-        descriptor: OpenGLSurfaceDescriptor | None = None,
+        descriptor: OpenglSurfaceDescriptor | None = None,
         options: RenderSessionAttachOptions | None = None,
-    ) -> OpenGLSurfaceAttachResult:
+    ) -> OpenglSurfaceAttachResult:
         """Call mln_opengl_surface_attach."""
         raw = self._native.opengl_surface_attach(descriptor, options)
-        return OpenGLSurfaceAttachResult(
+        return OpenglSurfaceAttachResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
             completion=raw["completion"],
         )
@@ -1116,36 +1116,36 @@ class _MapHandleOperations(GeneratedOperations):
 
     def webgpu_borrowed_texture_attach(
         self,
-        descriptor: WebGPUBorrowedTextureDescriptor | None = None,
+        descriptor: WebgpuBorrowedTextureDescriptor | None = None,
         options: RenderSessionAttachOptions | None = None,
-    ) -> WebGPUBorrowedTextureAttachResult:
+    ) -> WebgpuBorrowedTextureAttachResult:
         """Call mln_webgpu_borrowed_texture_attach."""
         raw = self._native.webgpu_borrowed_texture_attach(descriptor, options)
-        return WebGPUBorrowedTextureAttachResult(
+        return WebgpuBorrowedTextureAttachResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
             completion=raw["completion"],
         )
 
     def webgpu_owned_texture_attach(
         self,
-        descriptor: WebGPUOwnedTextureDescriptor | None = None,
+        descriptor: WebgpuOwnedTextureDescriptor | None = None,
         options: RenderSessionAttachOptions | None = None,
-    ) -> WebGPUOwnedTextureAttachResult:
+    ) -> WebgpuOwnedTextureAttachResult:
         """Call mln_webgpu_owned_texture_attach."""
         raw = self._native.webgpu_owned_texture_attach(descriptor, options)
-        return WebGPUOwnedTextureAttachResult(
+        return WebgpuOwnedTextureAttachResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
             completion=raw["completion"],
         )
 
     def webgpu_surface_attach(
         self,
-        descriptor: WebGPUSurfaceDescriptor | None = None,
+        descriptor: WebgpuSurfaceDescriptor | None = None,
         options: RenderSessionAttachOptions | None = None,
-    ) -> WebGPUSurfaceAttachResult:
+    ) -> WebgpuSurfaceAttachResult:
         """Call mln_webgpu_surface_attach."""
         raw = self._native.webgpu_surface_attach(descriptor, options)
-        return WebGPUSurfaceAttachResult(
+        return WebgpuSurfaceAttachResult(
             session=_adopt_value(raw["session"], "RenderSessionHandle", self),
             completion=raw["completion"],
         )
@@ -1225,13 +1225,13 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.metal_surface_set_target(descriptor)
 
     def opengl_borrowed_texture_set_target(
-        self, descriptor: OpenGLBorrowedTextureDescriptor | None = None
+        self, descriptor: OpenglBorrowedTextureDescriptor | None = None
     ) -> Future[None]:
         """Call mln_opengl_borrowed_texture_set_target."""
         return self._native.opengl_borrowed_texture_set_target(descriptor)
 
     def opengl_surface_set_target(
-        self, descriptor: OpenGLSurfaceDescriptor | None = None
+        self, descriptor: OpenglSurfaceDescriptor | None = None
     ) -> Future[None]:
         """Call mln_opengl_surface_set_target."""
         return self._native.opengl_surface_set_target(descriptor)
@@ -1353,13 +1353,13 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.vulkan_surface_set_target(descriptor)
 
     def webgpu_borrowed_texture_set_target(
-        self, descriptor: WebGPUBorrowedTextureDescriptor | None = None
+        self, descriptor: WebgpuBorrowedTextureDescriptor | None = None
     ) -> Future[None]:
         """Call mln_webgpu_borrowed_texture_set_target."""
         return self._native.webgpu_borrowed_texture_set_target(descriptor)
 
     def webgpu_surface_set_target(
-        self, descriptor: WebGPUSurfaceDescriptor | None = None
+        self, descriptor: WebgpuSurfaceDescriptor | None = None
     ) -> Future[None]:
         """Call mln_webgpu_surface_set_target."""
         return self._native.webgpu_surface_set_target(descriptor)
@@ -1538,12 +1538,12 @@ def c_version() -> int:
 
 
 def geojson_source_data_create(
-    data: bytes, options: GeoJsonSourceOptions | None = None
-) -> GeoJsonSourceDataHandle:
+    data: bytes, options: GeojsonSourceOptions | None = None
+) -> GeojsonSourceDataHandle:
     """Call mln_geojson_source_data_create."""
     return _adopt_value(
         _native.geojson_source_data_create(data, options),
-        "GeoJsonSourceDataHandle",
+        "GeojsonSourceDataHandle",
         None,
     )
 
@@ -1579,9 +1579,9 @@ def network_status_set(input_status: NetworkStatus) -> None:
     return _native.network_status_set(input_status)
 
 
-def opengl_supported_context_provider_mask() -> OpenGLContextProviderFlag:
+def opengl_supported_context_provider_mask() -> OpenglContextProviderFlag:
     """Call mln_opengl_supported_context_provider_mask."""
-    return OpenGLContextProviderFlag(_native.opengl_supported_context_provider_mask())
+    return OpenglContextProviderFlag(_native.opengl_supported_context_provider_mask())
 
 
 def plugin_get_register_function_v1() -> int:

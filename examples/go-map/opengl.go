@@ -204,12 +204,12 @@ func (driver *callerDriver) AcquireFrame() (*maplibre.AcquiredFrameHandle, error
 }
 
 func requireCPUCompleteProducer(frame *maplibre.AcquiredFrameHandle) error {
-	return frame.WithProducerSync(func(producer maplibre.GPUSyncView) error {
+	return frame.WithProducerSync(func(producer maplibre.GpuSyncView) error {
 		kind, err := producer.Kind()
 		if err != nil {
 			return err
 		}
-		if kind != maplibre.GPUSyncKindCPUComplete {
+		if kind != maplibre.GpuSyncKindCpuComplete {
 			return fmt.Errorf("go-map cannot wait on producer synchronization kind %d", kind)
 		}
 		return nil
@@ -324,9 +324,9 @@ func (ctx *openGLContext) Close() error {
 	return err
 }
 
-func (ctx *openGLContext) descriptor(texture bool) (maplibre.OpenGLContextDescriptor, error) {
+func (ctx *openGLContext) descriptor(texture bool) (maplibre.OpenglContextDescriptor, error) {
 	if ctx.platform.wgl != nil {
-		return maplibre.OpenGLContextDescriptor{Data: maplibre.OpenGLContextDescriptorDataWGLVariant{Value: maplibre.WGLContextDescriptor{
+		return maplibre.OpenglContextDescriptor{Data: maplibre.OpenglContextDescriptorDataWglVariant{Value: maplibre.WglContextDescriptor{
 			DeviceContext:  nativePointer(ctx.platform.wgl.deviceContext),
 			ShareContext:   nativePointer(unsafe.Pointer(ctx.context)),
 			GetProcAddress: 0,
@@ -336,10 +336,10 @@ func (ctx *openGLContext) descriptor(texture bool) (maplibre.OpenGLContextDescri
 	if texture {
 		config = ctx.platform.egl.pbufferConfig
 		if config == nil {
-			return maplibre.OpenGLContextDescriptor{}, errors.New("no EGL config compatible with the current context supports pbuffer surfaces")
+			return maplibre.OpenglContextDescriptor{}, errors.New("no EGL config compatible with the current context supports pbuffer surfaces")
 		}
 	}
-	return maplibre.OpenGLContextDescriptor{Data: maplibre.OpenGLContextDescriptorDataEGLVariant{Value: maplibre.EGLContextDescriptor{
+	return maplibre.OpenglContextDescriptor{Data: maplibre.OpenglContextDescriptorDataEglVariant{Value: maplibre.EglContextDescriptor{
 		Display:        nativePointer(ctx.platform.egl.display),
 		Config:         nativePointer(config),
 		ShareContext:   nativePointer(unsafe.Pointer(ctx.context)),
@@ -498,8 +498,8 @@ func newOpenGLOwnedTextureTarget(context *openGLContext, v viewport, m *maplibre
 	options := maplibre.DefaultRenderSessionAttachOptions()
 	options.Driver = maplibre.RenderDriverKindCallerGraphicsThread
 	options.RequestedTextureRingDepth = 2
-	attachment, err := m.OpenGLOwnedTextureAttach(
-		maplibre.OpenGLOwnedTextureDescriptor{
+	attachment, err := m.OpenglOwnedTextureAttach(
+		maplibre.OpenglOwnedTextureDescriptor{
 			Extent:  v.extent(),
 			Context: descriptor,
 		},
@@ -557,7 +557,7 @@ func (target *openGLOwnedTextureTarget) DriveFrame() (frameOutcome, error) {
 	}
 	accessErr := requireCPUCompleteProducer(frame)
 	if accessErr == nil {
-		accessErr = frame.WithOpenGLTexture(func(info maplibre.OpenGLOwnedTextureFrameView) error {
+		accessErr = frame.WithOpenglTexture(func(info maplibre.OpenglOwnedTextureFrameView) error {
 			targetID, err := info.Target()
 			if err != nil {
 				return err
@@ -569,8 +569,8 @@ func (target *openGLOwnedTextureTarget) DriveFrame() (frameOutcome, error) {
 			return target.compositor.DrawTexture(targetID, texture)
 		})
 	}
-	releaseErr := frame.Close(maplibre.GPUSync{
-		Kind: maplibre.GPUSyncKindCPUComplete,
+	releaseErr := frame.Close(maplibre.GpuSync{
+		Kind: maplibre.GpuSyncKindCpuComplete,
 	})
 	outcome.rendered = accessErr == nil
 	return outcome, errors.Join(accessErr, releaseErr)
@@ -604,7 +604,7 @@ func newOpenGLBorrowedTextureTarget(context *openGLContext, v viewport, m *mapli
 	}
 	options := maplibre.DefaultRenderSessionAttachOptions()
 	options.Driver = maplibre.RenderDriverKindCallerGraphicsThread
-	attachment, err := m.OpenGLBorrowedTextureAttach(maplibre.OpenGLBorrowedTextureDescriptor{
+	attachment, err := m.OpenglBorrowedTextureAttach(maplibre.OpenglBorrowedTextureDescriptor{
 		Extent:         v.extent(),
 		PhysicalWidth:  v.physicalWidth,
 		PhysicalHeight: v.physicalHeight,
@@ -669,7 +669,7 @@ func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
 	if err != nil {
 		return err
 	}
-	operation, err := target.driver.session.OpenGLBorrowedTextureSetTarget(maplibre.OpenGLBorrowedTextureDescriptor{
+	operation, err := target.driver.session.OpenglBorrowedTextureSetTarget(maplibre.OpenglBorrowedTextureDescriptor{
 		Extent:         v.extent(),
 		PhysicalWidth:  v.physicalWidth,
 		PhysicalHeight: v.physicalHeight,
@@ -742,8 +742,8 @@ func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapH
 	}
 	options := maplibre.DefaultRenderSessionAttachOptions()
 	options.Driver = maplibre.RenderDriverKindCallerGraphicsThread
-	attachment, err := m.OpenGLSurfaceAttach(
-		maplibre.OpenGLSurfaceDescriptor{
+	attachment, err := m.OpenglSurfaceAttach(
+		maplibre.OpenglSurfaceDescriptor{
 			Extent:  v.extent(),
 			Context: descriptor,
 			Surface: context.surface(),
@@ -785,7 +785,7 @@ func (target *openGLSurfaceTarget) Resize(v viewport) error {
 	if err != nil {
 		return err
 	}
-	operation, err := target.driver.session.OpenGLSurfaceSetTarget(maplibre.OpenGLSurfaceDescriptor{
+	operation, err := target.driver.session.OpenglSurfaceSetTarget(maplibre.OpenglSurfaceDescriptor{
 		Extent:  v.extent(),
 		Context: descriptor,
 		Surface: target.context.surface(),

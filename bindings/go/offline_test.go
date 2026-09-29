@@ -37,7 +37,7 @@ func newOfflineRuntimeForTest(t *testing.T) *RuntimeHandle {
 
 func testOfflineTileDefinition() OfflineTilePyramidRegionDefinition {
 	return OfflineTilePyramidRegionDefinition{
-		StyleURL: "http://example.com/offline-style.json",
+		StyleUrl: "http://example.com/offline-style.json",
 		Bounds: LatLngBounds{
 			Southwest: LatLng{Latitude: -1, Longitude: -2},
 			Northeast: LatLng{Latitude: 1, Longitude: 2},
@@ -51,7 +51,7 @@ func testOfflineTileDefinition() OfflineTilePyramidRegionDefinition {
 
 func testOfflineGeometryDefinition() OfflineGeometryRegionDefinition {
 	return OfflineGeometryRegionDefinition{
-		StyleURL:          "http://example.com/offline-geometry-style.json",
+		StyleUrl:          "http://example.com/offline-geometry-style.json",
 		Geometry:          []byte(`{"type":"Polygon","coordinates":[[[-2,-1],[2,-1],[2,1],[-2,1],[-2,-1]]]}`),
 		MinZoom:           0,
 		MaxZoom:           1,
@@ -70,7 +70,7 @@ func TestOfflineRegionOperationsRunAWholeRegionLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OfflineRegionCreate(tile pyramid): %v", err)
 	}
-	if tile.ID == 0 {
+	if tile.Id == 0 {
 		t.Fatal("created offline region ID is zero")
 	}
 	if !bytes.Equal(tile.Metadata, metadata) {
@@ -81,8 +81,8 @@ func TestOfflineRegionOperationsRunAWholeRegionLifecycle(t *testing.T) {
 	if !ok {
 		t.Fatalf("definition = %T, want OfflineTilePyramidRegionDefinition", tile.Definition)
 	}
-	if tileDefinition.StyleURL != testOfflineTileDefinition().StyleURL {
-		t.Fatalf("StyleURL = %q, want %q", tileDefinition.StyleURL, testOfflineTileDefinition().StyleURL)
+	if tileDefinition.StyleUrl != testOfflineTileDefinition().StyleUrl {
+		t.Fatalf("StyleURL = %q, want %q", tileDefinition.StyleUrl, testOfflineTileDefinition().StyleUrl)
 	}
 
 	geometry, err := awaitForTest(runtime.OfflineRegionCreate(offlineDefinitionForTest(testOfflineGeometryDefinition()), nil))
@@ -108,16 +108,16 @@ func TestOfflineRegionOperationsRunAWholeRegionLifecycle(t *testing.T) {
 		t.Fatalf("OfflineRegionsList() = %d regions, want 2", len(regions))
 	}
 
-	stored, err := awaitForTest(runtime.OfflineRegionGet(tile.ID))
+	stored, err := awaitForTest(runtime.OfflineRegionGet(tile.Id))
 	if err != nil {
 		t.Fatalf("OfflineRegion(): %v", err)
 	}
-	if stored == nil || stored.ID != tile.ID {
-		t.Fatalf("OfflineRegion(%d) = %#v, want the stored region", tile.ID, stored)
+	if stored == nil || stored.Id != tile.Id {
+		t.Fatalf("OfflineRegion(%d) = %#v, want the stored region", tile.Id, stored)
 	}
 
 	replacement := []byte{1, 2}
-	updated, err := awaitForTest(runtime.OfflineRegionUpdateMetadata(tile.ID, replacement))
+	updated, err := awaitForTest(runtime.OfflineRegionUpdateMetadata(tile.Id, replacement))
 	if err != nil {
 		t.Fatalf("UpdateOfflineRegionMetadata(): %v", err)
 	}
@@ -125,7 +125,7 @@ func TestOfflineRegionOperationsRunAWholeRegionLifecycle(t *testing.T) {
 		t.Fatalf("updated metadata = %v, want %v", updated.Metadata, replacement)
 	}
 
-	status, err := awaitForTest(runtime.OfflineRegionGetStatus(tile.ID))
+	status, err := awaitForTest(runtime.OfflineRegionGetStatus(tile.Id))
 	if err != nil {
 		t.Fatalf("OfflineRegionStatus(): %v", err)
 	}
@@ -133,27 +133,27 @@ func TestOfflineRegionOperationsRunAWholeRegionLifecycle(t *testing.T) {
 		t.Fatalf("download state = %v, want inactive", status.DownloadState)
 	}
 
-	if _, err := awaitForTest(runtime.OfflineRegionSetObserved(tile.ID, true)); err != nil {
+	if _, err := awaitForTest(runtime.OfflineRegionSetObserved(tile.Id, true)); err != nil {
 		t.Fatalf("SetOfflineRegionObserved(): %v", err)
 	}
-	if _, err := awaitForTest(runtime.OfflineRegionSetDownloadState(tile.ID, OfflineRegionDownloadStateInactive)); err != nil {
+	if _, err := awaitForTest(runtime.OfflineRegionSetDownloadState(tile.Id, OfflineRegionDownloadStateInactive)); err != nil {
 		t.Fatalf("SetOfflineRegionDownloadState(): %v", err)
 	}
-	if _, err := awaitForTest(runtime.OfflineRegionInvalidate(tile.ID)); err != nil {
+	if _, err := awaitForTest(runtime.OfflineRegionInvalidate(tile.Id)); err != nil {
 		t.Fatalf("InvalidateOfflineRegion(): %v", err)
 	}
-	if _, err := awaitForTest(runtime.OfflineRegionDelete(tile.ID)); err != nil {
+	if _, err := awaitForTest(runtime.OfflineRegionDelete(tile.Id)); err != nil {
 		t.Fatalf("DeleteOfflineRegion(): %v", err)
 	}
 
 	// A deleted region is missing, and a get reports that with no record rather
 	// than with an error.
-	deleted, err := awaitForTest(runtime.OfflineRegionGet(tile.ID))
+	deleted, err := awaitForTest(runtime.OfflineRegionGet(tile.Id))
 	if err != nil {
 		t.Fatalf("OfflineRegion() after delete: %v", err)
 	}
 	if deleted != nil {
-		t.Fatalf("OfflineRegion(%d) after delete = %#v, want no record", tile.ID, deleted)
+		t.Fatalf("OfflineRegion(%d) after delete = %#v, want no record", tile.Id, deleted)
 	}
 }
 
@@ -238,12 +238,12 @@ func TestAmbientCacheOperationsKeepStoredOfflineRegions(t *testing.T) {
 		t.Fatalf("AmbientCacheOperation(clear): %v", err)
 	}
 
-	stored, err := awaitForTest(runtime.OfflineRegionGet(region.ID))
+	stored, err := awaitForTest(runtime.OfflineRegionGet(region.Id))
 	if err != nil {
 		t.Fatalf("OfflineRegion(): %v", err)
 	}
-	if stored == nil || stored.ID != region.ID {
-		t.Fatalf("OfflineRegion(%d) after an ambient cache clear = %#v, want the stored region", region.ID, stored)
+	if stored == nil || stored.Id != region.Id {
+		t.Fatalf("OfflineRegion(%d) after an ambient cache clear = %#v, want the stored region", region.Id, stored)
 	}
 }
 
@@ -251,12 +251,12 @@ func TestOfflineRegionStartOperationsValidateGoInputs(t *testing.T) {
 	runtime := newOfflineRuntimeForTest(t)
 
 	definition := testOfflineTileDefinition()
-	definition.StyleURL = "http://example.com/\x00style.json"
+	definition.StyleUrl = "http://example.com/\x00style.json"
 	if _, err := runtime.OfflineRegionCreate(offlineDefinitionForTest(definition), nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("OfflineRegionCreate embedded NUL error = %v, want ErrInvalidArgument", err)
 	}
 	geometryDefinition := testOfflineGeometryDefinition()
-	geometryDefinition.StyleURL = "http://example.com/\x00style.json"
+	geometryDefinition.StyleUrl = "http://example.com/\x00style.json"
 	if _, err := runtime.OfflineRegionCreate(offlineDefinitionForTest(geometryDefinition), nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("OfflineRegionCreate geometry embedded NUL error = %v, want ErrInvalidArgument", err)
 	}

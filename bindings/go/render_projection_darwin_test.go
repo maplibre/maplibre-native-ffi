@@ -17,7 +17,7 @@ func TestRenderedProjectionDarwin(t *testing.T) {
 	if _, err := awaitForTest(m.UpdateCamera(update)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := awaitForTest(m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`))); err != nil {
+	if _, err := awaitForTest(m.SetStyleJson([]byte(`{"version":8,"sources":{},"layers":[]}`))); err != nil {
 		t.Fatal(err)
 	}
 	awaitRenderedMetalFrame(t, session)
@@ -38,7 +38,7 @@ func TestRenderedProjectionDarwin(t *testing.T) {
 	if err != nil || camera.Zoom == nil || *camera.Zoom != 3 {
 		t.Fatalf("rendered camera: %+v, %v", camera, err)
 	}
-	if err := frame.Close(GPUSync{}); err != nil {
+	if err := frame.Close(GpuSync{}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := awaitForTest(session.Resize(RenderTargetExtent{Width: 16, Height: 16, ScaleFactor: 1})); err != nil {

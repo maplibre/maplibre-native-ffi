@@ -42,7 +42,7 @@ public extension Maplibre {
   static func geojsonSourceDataCreate(
     data bindingArg0: Data,
     options bindingArg1: GeojsonSourceOptions? = nil
-  ) throws -> GeoJSONSourceDataHandle {
+  ) throws -> GeojsonSourceDataHandle {
     try mapNativeFailure {
       try NativeCallbackGuard.check(
         owner: nil,
@@ -57,7 +57,7 @@ public extension Maplibre {
         bindingArg1.map { try arena.store($0.nativeValue(arena: arena)) },
         &value0
       ) })
-      return try GeoJSONSourceDataHandle(adopting: value0)
+      return try GeojsonSourceDataHandle(adopting: value0)
     }
   }
 }

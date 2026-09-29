@@ -69,30 +69,30 @@ func TestMapIDIdentifiesEachMapUntilClose(t *testing.T) {
 		}
 	}()
 
-	firstID, err := first.ID()
+	firstID, err := first.Id()
 	if err != nil {
 		_ = closeMapForTest(first)
-		t.Fatalf("ID(): %v", err)
+		t.Fatalf("Id(): %v", err)
 	}
-	secondID, err := second.ID()
+	secondID, err := second.Id()
 	if err != nil {
 		_ = closeMapForTest(first)
-		t.Fatalf("second ID(): %v", err)
+		t.Fatalf("second Id(): %v", err)
 	}
 	if firstID == 0 || firstID == secondID {
 		_ = closeMapForTest(first)
 		t.Fatalf("map IDs = %d and %d, want distinct nonzero IDs", firstID, secondID)
 	}
-	if repeated, err := first.ID(); err != nil || repeated != firstID {
+	if repeated, err := first.Id(); err != nil || repeated != firstID {
 		_ = closeMapForTest(first)
-		t.Fatalf("repeated ID() = %d, %v, want %d, nil", repeated, err, firstID)
+		t.Fatalf("repeated Id() = %d, %v, want %d, nil", repeated, err, firstID)
 	}
 
 	if err := closeMapForTest(first); err != nil {
 		t.Fatalf("Map Close(): %v", err)
 	}
-	if _, err := first.ID(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("ID() after Close error = %v, want ErrInvalidState", err)
+	if _, err := first.Id(); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("Id() after Close error = %v, want ErrInvalidState", err)
 	}
 }
 
@@ -105,53 +105,53 @@ func TestMapCommandsAndStyleLoadingUseNativeABI(t *testing.T) {
 	if _, err := m.RequestStillImage(); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("RequestStillImage() on continuous map error = %v, want ErrInvalidState", err)
 	}
-	if _, err := m.SetStyleJSON([]byte(minimalStyleJSON)); err != nil {
-		t.Fatalf("SetStyleJSON(): %v", err)
+	if _, err := m.SetStyleJson([]byte(minimalStyleJSON)); err != nil {
+		t.Fatalf("SetStyleJson(): %v", err)
 	}
-	if _, err := m.SetStyleURL("http://example.com/style.json"); err != nil {
-		t.Fatalf("SetStyleURL(): %v", err)
+	if _, err := m.SetStyleUrl("http://example.com/style.json"); err != nil {
+		t.Fatalf("SetStyleUrl(): %v", err)
 	}
 }
 
 func TestMapReportsLoadedStyleDocumentAndURL(t *testing.T) {
 	_, m := newRuntimeAndMap(t, nil)
 
-	if document, err := awaitForTest(m.LoadedStyleJSON()); err != nil || len(document) != 0 {
-		t.Fatalf("LoadedStyleJSON() before load = %q, %v, want \"\", nil", document, err)
+	if document, err := awaitForTest(m.LoadedStyleJson()); err != nil || len(document) != 0 {
+		t.Fatalf("LoadedStyleJson() before load = %q, %v, want \"\", nil", document, err)
 	}
-	if url, err := awaitForTest(m.StyleURL()); err != nil || url != "" {
-		t.Fatalf("StyleURL() before load = %q, %v, want \"\", nil", url, err)
+	if url, err := awaitForTest(m.StyleUrl()); err != nil || url != "" {
+		t.Fatalf("StyleUrl() before load = %q, %v, want \"\", nil", url, err)
 	}
 
-	if _, err := m.SetStyleJSON([]byte(minimalStyleJSON)); err != nil {
-		t.Fatalf("SetStyleJSON(): %v", err)
+	if _, err := m.SetStyleJson([]byte(minimalStyleJSON)); err != nil {
+		t.Fatalf("SetStyleJson(): %v", err)
 	}
-	document, err := awaitForTest(m.LoadedStyleJSON())
+	document, err := awaitForTest(m.LoadedStyleJson())
 	if err != nil {
-		t.Fatalf("LoadedStyleJSON(): %v", err)
+		t.Fatalf("LoadedStyleJson(): %v", err)
 	}
 	if string(document) != minimalStyleJSON {
-		t.Fatalf("LoadedStyleJSON() = %q, want %q", document, minimalStyleJSON)
+		t.Fatalf("LoadedStyleJson() = %q, want %q", document, minimalStyleJSON)
 	}
-	if url, err := awaitForTest(m.StyleURL()); err != nil || url != "" {
-		t.Fatalf("StyleURL() after inline JSON = %q, %v, want \"\", nil", url, err)
+	if url, err := awaitForTest(m.StyleUrl()); err != nil || url != "" {
+		t.Fatalf("StyleUrl() after inline JSON = %q, %v, want \"\", nil", url, err)
 	}
 
 	// The URL is request state, recorded before the load can succeed, while the
 	// document still reports the style that last parsed.
 	const styleURL = "http://example.com/style.json"
-	if _, err := m.SetStyleURL(styleURL); err != nil {
-		t.Fatalf("SetStyleURL(): %v", err)
+	if _, err := m.SetStyleUrl(styleURL); err != nil {
+		t.Fatalf("SetStyleUrl(): %v", err)
 	}
-	url, err := awaitForTest(m.StyleURL())
+	url, err := awaitForTest(m.StyleUrl())
 	if err != nil {
-		t.Fatalf("StyleURL(): %v", err)
+		t.Fatalf("StyleUrl(): %v", err)
 	}
 	if url != styleURL {
-		t.Fatalf("StyleURL() = %q, want %q", url, styleURL)
+		t.Fatalf("StyleUrl() = %q, want %q", url, styleURL)
 	}
-	if document, err := awaitForTest(m.LoadedStyleJSON()); err != nil || string(document) != minimalStyleJSON {
-		t.Fatalf("LoadedStyleJSON() after URL request = %q, %v, want the previously parsed document", document, err)
+	if document, err := awaitForTest(m.LoadedStyleJson()); err != nil || string(document) != minimalStyleJSON {
+		t.Fatalf("LoadedStyleJson() after URL request = %q, %v, want the previously parsed document", document, err)
 	}
 }
 
@@ -295,10 +295,10 @@ func TestMapAcceptsFastPFORDecoding(t *testing.T) {
 		t.Fatalf("RuntimeCreate(DefaultRuntimeOptions()): %v", err)
 	}
 	options := mapOptionsForTest(256, 256, 1)
-	if options.FastPFOREnabled {
+	if options.FastPforEnabled {
 		t.Fatalf("mapOptionsForTest().FastPFOREnabled = true; want false")
 	}
-	options.FastPFOREnabled = true
+	options.FastPforEnabled = true
 	m, err := awaitForTest(runtime.MapCreate(options))
 	if err != nil {
 		_ = closeRuntimeForTest(runtime)
@@ -324,10 +324,10 @@ func TestMapDebugOptionRejectUnknownBitsBeforeSubmission(t *testing.T) {
 func TestMapStyleStringsRejectEmbeddedNUL(t *testing.T) {
 	_, m := newRuntimeAndMap(t, nil)
 
-	if _, err := m.SetStyleURL("http://example.com/\x00style.json"); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := m.SetStyleUrl("http://example.com/\x00style.json"); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetStyleURL embedded NUL error = %v, want ErrInvalidArgument", err)
 	}
-	future, err := m.SetStyleJSON([]byte("{\x00}"))
+	future, err := m.SetStyleJson([]byte("{\x00}"))
 	requireStyleCommandFailed(t, future, err)
 }
 
@@ -388,7 +388,7 @@ func TestGlobalStateDefaultsUpdatesAndStyleReplacement(t *testing.T) {
 		}
 		return got
 	}
-	check(m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}`)))
+	check(m.SetStyleJson([]byte(`{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}`)))
 	state(`{"theme":"light"}`)
 	check(m.SetGlobalStateProperty("theme", []byte(`["dark",{"enabled":true}]`)))
 	snapshot := state(`{"theme":["dark",{"enabled":true}]}`)
@@ -397,7 +397,7 @@ func TestGlobalStateDefaultsUpdatesAndStyleReplacement(t *testing.T) {
 	if string(snapshot) != `{"theme":["dark",{"enabled":true}]}` {
 		t.Fatal("snapshot changed")
 	}
-	check(m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)))
+	check(m.SetStyleJson([]byte(`{"version":8,"sources":{},"layers":[]}`)))
 	state(`{}`)
 	check(m.SetGlobalStateProperty("theme", []byte("true")))
 	check(m.SetGlobalStateProperty("theme", []byte("null")))

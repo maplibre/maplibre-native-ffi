@@ -80,8 +80,8 @@ def is_configured_render_backend(
     if context_provider is None:
         return True
     context_provider_flag = {
-        "egl": mln.OpenGLContextProviderFlag.EGL,
-        "wgl": mln.OpenGLContextProviderFlag.WGL,
+        "egl": mln.OpenglContextProviderFlag.EGL,
+        "wgl": mln.OpenglContextProviderFlag.WGL,
     }[context_provider]
     return bool(mln.opengl_supported_context_provider_mask() & context_provider_flag)
 
@@ -480,7 +480,7 @@ def assert_geojson_cluster_source(
     map_handle.set_style_json(EMPTY_STYLE_JSON.encode()).result(timeout=5)
     with style.geojson_source_data_create(
         CLUSTER_POINTS,
-        style.GeoJsonSourceOptions(
+        style.GeojsonSourceOptions(
             cluster=True,
             cluster_radius=60,
             cluster_min_points=2,

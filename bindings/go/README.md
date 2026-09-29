@@ -10,7 +10,7 @@ caller-driver render session while its attachment or detachment is pending.
 
 `DrainEvents` and `DrainFrameResults` return batch owners. Read their copied
 values, then close the batch. Acquired GPU frames expose callback-scoped views:
-use the texture inside `WithOpenGLTexture` or the corresponding backend method,
+use the texture inside `WithOpenglTexture` or the corresponding backend method,
 then close the frame with the host's completion synchronization. View methods
 reject access after the callback returns or from another OS thread.
 

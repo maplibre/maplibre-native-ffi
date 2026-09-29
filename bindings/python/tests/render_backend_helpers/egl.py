@@ -162,30 +162,30 @@ class EGLContext:
 
         return cls(display=display, config=configs[0], context=context)
 
-    def descriptor(self) -> render.OpenGLContextDescriptor:
-        return render.OpenGLContextDescriptor(
-            ownership=render.OpenGLContextOwnership.SHARED,
-            data=render.OpenGLContextDescriptorEGLVariant(
-                render.EGLContextDescriptor(
+    def descriptor(self) -> render.OpenglContextDescriptor:
+        return render.OpenglContextDescriptor(
+            ownership=render.OpenglContextOwnership.SHARED,
+            data=render.OpenglContextDescriptorEglVariant(
+                render.EglContextDescriptor(
                     display=_pointer(self.display, "EGLDisplay"),
                     config=_pointer(self.config, "EGLConfig"),
                     share_context=_pointer(self.context, "EGLContext"),
-                    client_api=render.OpenGLClientApi.GLES,
+                    client_api=render.OpenglClientApi.GLES,
                     get_proc_address=EGL.eglGetProcAddress(b"eglGetProcAddress"),
                 )
             ),
         )
 
-    def dedicated_descriptor(self) -> render.OpenGLContextDescriptor:
+    def dedicated_descriptor(self) -> render.OpenglContextDescriptor:
         """Describe a session that owns its context without a share group."""
-        return render.OpenGLContextDescriptor(
-            ownership=render.OpenGLContextOwnership.DEDICATED,
-            data=render.OpenGLContextDescriptorEGLVariant(
-                render.EGLContextDescriptor(
+        return render.OpenglContextDescriptor(
+            ownership=render.OpenglContextOwnership.DEDICATED,
+            data=render.OpenglContextDescriptorEglVariant(
+                render.EglContextDescriptor(
                     display=_pointer(self.display, "EGLDisplay"),
                     config=_pointer(self.config, "EGLConfig"),
                     share_context=0,
-                    client_api=render.OpenGLClientApi.GLES,
+                    client_api=render.OpenglClientApi.GLES,
                     get_proc_address=EGL.eglGetProcAddress(b"eglGetProcAddress"),
                 )
             ),
@@ -196,8 +196,8 @@ class EGLContext:
         width: int = 64,
         height: int = 64,
         scale_factor: float = 1.0,
-    ) -> render.OpenGLOwnedTextureDescriptor:
-        return render.OpenGLOwnedTextureDescriptor(
+    ) -> render.OpenglOwnedTextureDescriptor:
+        return render.OpenglOwnedTextureDescriptor(
             extent=render.RenderTargetExtent(width, height, scale_factor),
             context=self.descriptor(),
         )
@@ -352,8 +352,8 @@ class EGLBorrowedTexture:
         finally:
             self.context.clear_current()
 
-    def descriptor(self) -> render.OpenGLBorrowedTextureDescriptor:
-        return render.OpenGLBorrowedTextureDescriptor(
+    def descriptor(self) -> render.OpenglBorrowedTextureDescriptor:
+        return render.OpenglBorrowedTextureDescriptor(
             extent=render.RenderTargetExtent(
                 self.width,
                 self.height,
@@ -424,8 +424,8 @@ class EGLPbufferSurface:
             raise EGLUnavailableError(msg)
         return cls(context, surface, width, height, scale_factor)
 
-    def descriptor(self) -> render.OpenGLSurfaceDescriptor:
-        return render.OpenGLSurfaceDescriptor(
+    def descriptor(self) -> render.OpenglSurfaceDescriptor:
+        return render.OpenglSurfaceDescriptor(
             extent=render.RenderTargetExtent(
                 self.width,
                 self.height,
@@ -435,9 +435,9 @@ class EGLPbufferSurface:
             surface=_pointer(self.surface, "EGLSurface"),
         )
 
-    def dedicated_descriptor(self) -> render.OpenGLSurfaceDescriptor:
+    def dedicated_descriptor(self) -> render.OpenglSurfaceDescriptor:
         """Describe this surface for a session that owns this thread."""
-        return render.OpenGLSurfaceDescriptor(
+        return render.OpenglSurfaceDescriptor(
             extent=render.RenderTargetExtent(
                 self.width,
                 self.height,

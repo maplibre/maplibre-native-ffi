@@ -60,11 +60,11 @@ func (event runtimeEventForTest) withTileAction(payload RuntimeEventTileAction) 
 	event.raw = C.mln_go_runtime_event_with_tile_action(event.raw, C.mln_runtime_event_tile_action{
 		operation: C.uint32_t(payload.Operation),
 		tile_id: C.mln_tile_id{
-			overscaled_z: C.uint32_t(payload.TileID.OverscaledZ),
-			wrap:         C.int32_t(payload.TileID.Wrap),
-			canonical_z:  C.uint32_t(payload.TileID.CanonicalZ),
-			canonical_x:  C.uint32_t(payload.TileID.CanonicalX),
-			canonical_y:  C.uint32_t(payload.TileID.CanonicalY),
+			overscaled_z: C.uint32_t(payload.TileId.OverscaledZ),
+			wrap:         C.int32_t(payload.TileId.Wrap),
+			canonical_z:  C.uint32_t(payload.TileId.CanonicalZ),
+			canonical_x:  C.uint32_t(payload.TileId.CanonicalX),
+			canonical_y:  C.uint32_t(payload.TileId.CanonicalY),
 		},
 	})
 	return event
@@ -72,14 +72,14 @@ func (event runtimeEventForTest) withTileAction(payload RuntimeEventTileAction) 
 
 func (event runtimeEventForTest) withCameraTransitionFinished(payload RuntimeEventCameraTransitionFinished) runtimeEventForTest {
 	event.raw = C.mln_go_runtime_event_with_camera_transition_finished(event.raw, C.mln_runtime_event_camera_transition_finished{
-		transition_id: C.uint64_t(payload.TransitionID),
+		transition_id: C.uint64_t(payload.TransitionId),
 	})
 	return event
 }
 
 func (event runtimeEventForTest) withOfflineRegionStatus(payload RuntimeEventOfflineRegionStatus) runtimeEventForTest {
 	event.raw = C.mln_go_runtime_event_with_offline_region_status(event.raw, C.mln_runtime_event_offline_region_status{
-		region_id: C.mln_offline_region_id(payload.RegionID),
+		region_id: C.mln_offline_region_id(payload.RegionId),
 		status: C.mln_offline_region_status{
 			size:                               C.uint32_t(unsafe.Sizeof(C.mln_offline_region_status{})),
 			download_state:                     C.uint32_t(payload.Status.DownloadState),
@@ -98,7 +98,7 @@ func (event runtimeEventForTest) withOfflineRegionStatus(payload RuntimeEventOff
 
 func (event runtimeEventForTest) withOfflineRegionResponseError(payload RuntimeEventOfflineRegionResponseError) runtimeEventForTest {
 	event.raw = C.mln_go_runtime_event_with_offline_region_response_error(event.raw, C.mln_runtime_event_offline_region_response_error{
-		region_id: C.mln_offline_region_id(payload.RegionID),
+		region_id: C.mln_offline_region_id(payload.RegionId),
 		reason:    C.uint32_t(payload.Reason),
 	})
 	return event
@@ -106,7 +106,7 @@ func (event runtimeEventForTest) withOfflineRegionResponseError(payload RuntimeE
 
 func (event runtimeEventForTest) withOfflineRegionTileCountLimit(payload RuntimeEventOfflineRegionTileCountLimit) runtimeEventForTest {
 	event.raw = C.mln_go_runtime_event_with_offline_region_tile_count_limit(event.raw, C.mln_runtime_event_offline_region_tile_count_limit{
-		region_id: C.mln_offline_region_id(payload.RegionID),
+		region_id: C.mln_offline_region_id(payload.RegionId),
 		limit:     C.uint64_t(payload.Limit),
 	})
 	return event

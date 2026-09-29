@@ -39,12 +39,12 @@ func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
 		return nil, fmt.Errorf("map create failed: %w", err)
 	}
 	state.mapRef = mapHandle
-	state.mapID, err = mapHandle.ID()
+	state.mapID, err = mapHandle.Id()
 	if err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("map identity read failed: %w", err)
 	}
-	_, err = mapHandle.SetStyleURL("https://tiles.openfreemap.org/styles/bright")
+	_, err = mapHandle.SetStyleUrl("https://tiles.openfreemap.org/styles/bright")
 	if err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("style load failed: %w", err)
@@ -152,7 +152,7 @@ func (state *runtimeMapState) updateCamera(update maplibre.CameraUpdate) error {
 func cameraUpdate(options maplibre.CameraOptions, durationMS *float64) maplibre.CameraUpdate {
 	update := maplibre.CameraUpdate{Camera: options}
 	if durationMS != nil {
-		animation := maplibre.AnimationOptions{DurationMS: durationMS}
+		animation := maplibre.AnimationOptions{DurationMs: durationMS}
 		update.Mode = maplibre.CameraUpdateModeEase
 		update.Animation = animation
 	}
@@ -160,7 +160,7 @@ func cameraUpdate(options maplibre.CameraOptions, durationMS *float64) maplibre.
 }
 
 func animationOptions(durationMS *float64) maplibre.AnimationOptions {
-	return maplibre.AnimationOptions{DurationMS: durationMS}
+	return maplibre.AnimationOptions{DurationMs: durationMS}
 }
 
 func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID uint64) (bool, error) {

@@ -21,8 +21,8 @@ func countingResourceProvider(calls *atomic.Int64) func(ResourceRequest, *Resour
 // event naming that URL proves the request reached the network file source.
 func loadProbeStyle(t *testing.T, runtime *RuntimeHandle, m *MapHandle, styleURL string) {
 	t.Helper()
-	if _, err := m.SetStyleURL(styleURL); err != nil {
-		t.Fatalf("SetStyleURL(%q): %v", styleURL, err)
+	if _, err := m.SetStyleUrl(styleURL); err != nil {
+		t.Fatalf("SetStyleUrl(%q): %v", styleURL, err)
 	}
 	for range make([]struct{}, 5000) {
 		drained, err := drainEventsForTest(runtime)
@@ -91,11 +91,11 @@ func TestResourceProviderSeesSchemeAliasAndItsResolvedURL(t *testing.T) {
 		t.Fatalf("RuntimeCreate(DefaultRuntimeOptions()): %v", err)
 	}
 	if _, err := runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
-		if *request.RequestedURL != "maplibre://maps/style" {
+		if *request.RequestedUrl != "maplibre://maps/style" {
 			return ResourceProviderDecisionPassThrough
 		}
-		resolvedURL.Store(*request.ResolvedURL)
-		if err := handle.Complete(ResourceResponse{Status: ResourceResponseStatusOK, Bytes: []byte(emptyStyleJSON)}); err != nil {
+		resolvedURL.Store(*request.ResolvedUrl)
+		if err := handle.Complete(ResourceResponse{Status: ResourceResponseStatusOk, Bytes: []byte(emptyStyleJSON)}); err != nil {
 			return ResourceProviderDecisionPassThrough
 		}
 		return ResourceProviderDecisionHandle
@@ -117,8 +117,8 @@ func TestResourceProviderSeesSchemeAliasAndItsResolvedURL(t *testing.T) {
 		}
 	}()
 
-	if _, err := m.SetStyleURL("maplibre://maps/style"); err != nil {
-		t.Fatalf("SetStyleURL(): %v", err)
+	if _, err := m.SetStyleUrl("maplibre://maps/style"); err != nil {
+		t.Fatalf("SetStyleUrl(): %v", err)
 	}
 	waitForRuntimeEvent(t, runtime, RuntimeEventTypeMapStyleLoaded)
 
@@ -149,15 +149,15 @@ func TestRuntimeResourceTransformLifecycle(t *testing.T) {
 		t.Fatalf("RuntimeCreate(DefaultRuntimeOptions()): %v", err)
 	}
 	if _, err := runtime.SetResourceTransform(ResourceTransform{Callback: func(_ ResourceKind, url string, response *ResourceTransformResponseScope) Status {
-		if err := response.SetURL(url + "?first"); err != nil {
+		if err := response.SetUrl(url + "?first"); err != nil {
 			return StatusInvalidArgument
 		}
-		return StatusOK
+		return StatusOk
 	}}); err != nil {
 		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("SetResourceTransform(): %v", err)
 	}
-	if _, err := runtime.SetResourceTransform(ResourceTransform{Callback: func(ResourceKind, string, *ResourceTransformResponseScope) Status { return StatusOK }}); err != nil {
+	if _, err := runtime.SetResourceTransform(ResourceTransform{Callback: func(ResourceKind, string, *ResourceTransformResponseScope) Status { return StatusOk }}); err != nil {
 		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("SetResourceTransform(replace): %v", err)
 	}
@@ -212,7 +212,7 @@ func TestResourceRequestCancelCallbackReportsDiscardedRequest(t *testing.T) {
 		}
 	}()
 	if _, err := runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
-		if *request.RequestedURL != styleURL {
+		if *request.RequestedUrl != styleURL {
 			return ResourceProviderDecisionPassThrough
 		}
 		if _, err := handle.SetCancelCallback(func() {
@@ -241,8 +241,8 @@ func TestResourceRequestCancelCallbackReportsDiscardedRequest(t *testing.T) {
 		t.Fatalf("NewMap(): %v", err)
 	}
 	baseline := bindingCallbackCount.Load()
-	if _, err := m.SetStyleURL(styleURL); err != nil {
-		t.Fatalf("SetStyleURL(): %v", err)
+	if _, err := m.SetStyleUrl(styleURL); err != nil {
+		t.Fatalf("SetStyleUrl(): %v", err)
 	}
 	waitForResourceSignalValue(t, requested, "the provider to receive the style request")
 	if got := bindingCallbackCount.Load() - baseline; got != 1 {
@@ -293,7 +293,7 @@ func TestResourceRequestCancelCallbackRunsForAlreadyCancelledRequest(t *testing.
 		}
 	}()
 	if _, err := runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
-		if *request.RequestedURL != styleURL {
+		if *request.RequestedUrl != styleURL {
 			return ResourceProviderDecisionPassThrough
 		}
 		select {
@@ -310,8 +310,8 @@ func TestResourceRequestCancelCallbackRunsForAlreadyCancelledRequest(t *testing.
 	if err != nil {
 		t.Fatalf("NewMap(): %v", err)
 	}
-	if _, err := m.SetStyleURL(styleURL); err != nil {
-		t.Fatalf("SetStyleURL(): %v", err)
+	if _, err := m.SetStyleUrl(styleURL); err != nil {
+		t.Fatalf("SetStyleUrl(): %v", err)
 	}
 	handle := waitForResourceSignalValue(t, handles, "the provider to receive the style request")
 	if err := closeMapForTest(m); err != nil {
@@ -362,14 +362,14 @@ func TestResourceRequestCancelCallbackSkipsCompletedRequest(t *testing.T) {
 		}
 	}()
 	if _, err := runtime.SetResourceProvider(ResourceProvider{Callback: func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
-		if *request.RequestedURL != styleURL {
+		if *request.RequestedUrl != styleURL {
 			return ResourceProviderDecisionPassThrough
 		}
 		if _, err := handle.SetCancelCallback(func() { cancelCalls.Add(1) }); err != nil {
 			providerErr.Store(err)
 		}
 		if err := handle.Complete(ResourceResponse{
-			Status: ResourceResponseStatusOK,
+			Status: ResourceResponseStatusOk,
 			Bytes:  []byte(minimalStyleJSON),
 		}); err != nil {
 			providerErr.Store(err)
@@ -389,8 +389,8 @@ func TestResourceRequestCancelCallbackSkipsCompletedRequest(t *testing.T) {
 		t.Fatalf("NewMap(): %v", err)
 	}
 	baseline := bindingCallbackCount.Load()
-	if _, err := m.SetStyleURL(styleURL); err != nil {
-		t.Fatalf("SetStyleURL(): %v", err)
+	if _, err := m.SetStyleUrl(styleURL); err != nil {
+		t.Fatalf("SetStyleUrl(): %v", err)
 	}
 	waitForRuntimeEvent(t, runtime, RuntimeEventTypeMapStyleLoaded)
 	handle := waitForResourceSignalValue(t, handles, "the provider to receive the style request")

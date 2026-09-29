@@ -19,29 +19,29 @@ func TestCustomMVTVectorSourceDescriptors(t *testing.T) {
 	maxZoom := 2.0
 	fetches := 0
 	cancels := 0
-	if _, err := m.AddCustomMVTVectorSource("custom-mvt", CustomMVTVectorSourceOptions{
-		FetchTile:  func(CanonicalTileID) { fetches++ },
-		CancelTile: func(CanonicalTileID) { cancels++ },
+	if _, err := m.AddCustomMvtVectorSource("custom-mvt", CustomMvtVectorSourceOptions{
+		FetchTile:  func(CanonicalTileId) { fetches++ },
+		CancelTile: func(CanonicalTileId) { cancels++ },
 		MinZoom:    &minZoom,
 		MaxZoom:    &maxZoom,
 	}); err != nil {
-		t.Fatalf("AddCustomMVTVectorSource(): %v", err)
+		t.Fatalf("AddCustomMvtVectorSource(): %v", err)
 	}
 	if fetches != 0 || cancels != 0 {
 		t.Fatalf("callbacks invoked during registration: fetches=%d cancels=%d", fetches, cancels)
 	}
-	tileID := CanonicalTileID{Z: 0, X: 0, Y: 0}
-	if _, err := m.SetCustomMVTVectorSourceTileData("custom-mvt", tileID, nil); err != nil {
-		t.Fatalf("SetCustomMVTVectorSourceTileData(): %v", err)
+	tileID := CanonicalTileId{Z: 0, X: 0, Y: 0}
+	if _, err := m.SetCustomMvtVectorSourceTileData("custom-mvt", tileID, nil); err != nil {
+		t.Fatalf("SetCustomMvtVectorSourceTileData(): %v", err)
 	}
-	if _, err := m.SetCustomMVTVectorSourceTileError("custom-mvt", tileID, "tile missing"); err != nil {
-		t.Fatalf("SetCustomMVTVectorSourceTileError(): %v", err)
+	if _, err := m.SetCustomMvtVectorSourceTileError("custom-mvt", tileID, "tile missing"); err != nil {
+		t.Fatalf("SetCustomMvtVectorSourceTileError(): %v", err)
 	}
-	if _, err := m.InvalidateCustomMVTVectorSourceTile("custom-mvt", tileID); err != nil {
-		t.Fatalf("InvalidateCustomMVTVectorSourceTile(): %v", err)
+	if _, err := m.InvalidateCustomMvtVectorSourceTile("custom-mvt", tileID); err != nil {
+		t.Fatalf("InvalidateCustomMvtVectorSourceTile(): %v", err)
 	}
 	source, found, err := takeOptionalStyleOperationForTest(m.GetStyleSourceInfo("custom-mvt"))
-	if err != nil || !found || source.Info.Type != StyleSourceTypeCustomMVTVector {
+	if err != nil || !found || source.Info.Type != StyleSourceTypeCustomMvtVector {
 		t.Fatalf("GetStyleSourceInfo(custom-mvt) = (%#v, %v, %v), want a found CustomMVTVector source", source, found, err)
 	}
 	removeID, err := m.RemoveStyleSource("custom-mvt")
@@ -50,10 +50,10 @@ func TestCustomMVTVectorSourceDescriptors(t *testing.T) {
 		t.Fatalf("live callback states after removal = %d, want 0", live)
 	}
 
-	if _, err := m.AddCustomMVTVectorSource("bad-custom", CustomMVTVectorSourceOptions{}); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("AddCustomMVTVectorSource(nil fetch) error = %v, want ErrInvalidArgument", err)
+	if _, err := m.AddCustomMvtVectorSource("bad-custom", CustomMvtVectorSourceOptions{}); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AddCustomMvtVectorSource(nil fetch) error = %v, want ErrInvalidArgument", err)
 	}
-	rejected, err := m.AddCustomMVTVectorSource("", CustomMVTVectorSourceOptions{FetchTile: func(CanonicalTileID) {}})
+	rejected, err := m.AddCustomMvtVectorSource("", CustomMvtVectorSourceOptions{FetchTile: func(CanonicalTileId) {}})
 	requireCommandFailedWith(t, rejected, err, ErrInvalidArgument)
 	// The failed command releases its captured descriptor after completion returns.
 	waitForRuntimeBarrier(t, runtime)
@@ -70,10 +70,10 @@ func TestCustomMVTVectorSourceReleasedWhenStyleLoadDropsIt(t *testing.T) {
 	baseline := bindingCallbackCount.Load()
 
 	loadStyleForTest(t, runtime, m, backgroundStyleJSON)
-	if _, err := m.AddCustomMVTVectorSource("custom-mvt", CustomMVTVectorSourceOptions{
-		FetchTile: func(CanonicalTileID) {},
+	if _, err := m.AddCustomMvtVectorSource("custom-mvt", CustomMvtVectorSourceOptions{
+		FetchTile: func(CanonicalTileId) {},
 	}); err != nil {
-		t.Fatalf("AddCustomMVTVectorSource(): %v", err)
+		t.Fatalf("AddCustomMvtVectorSource(): %v", err)
 	}
 	if live := liveCustomMVTVectorSources(baseline); live != 1 {
 		t.Fatalf("live callback states after the add = %d, want 1", live)
@@ -97,10 +97,10 @@ func TestCustomMVTVectorSourceReleasedByRemovalAndMapClose(t *testing.T) {
 	loadStyleForTest(t, runtime, m, backgroundStyleJSON)
 
 	for _, sourceID := range []string{"removed", "surviving"} {
-		if _, err := m.AddCustomMVTVectorSource(sourceID, CustomMVTVectorSourceOptions{
-			FetchTile: func(CanonicalTileID) {},
+		if _, err := m.AddCustomMvtVectorSource(sourceID, CustomMvtVectorSourceOptions{
+			FetchTile: func(CanonicalTileId) {},
 		}); err != nil {
-			t.Fatalf("AddCustomMVTVectorSource(%s): %v", sourceID, err)
+			t.Fatalf("AddCustomMvtVectorSource(%s): %v", sourceID, err)
 		}
 	}
 	removeID, err := m.RemoveStyleSource("removed")

@@ -158,9 +158,9 @@ func TestMetalOwnedTextureCompletionLifecycleDarwin(t *testing.T) {
 		t.Fatalf("Capabilities() = %#v, want core worker and a two-slot acquirable/readable ring", capabilities)
 	}
 
-	style, err := m.SetStyleJSON([]byte(minimalStyleJSON))
+	style, err := m.SetStyleJson([]byte(minimalStyleJSON))
 	if err != nil {
-		t.Fatalf("SetStyleJSON(): %v", err)
+		t.Fatalf("SetStyleJson(): %v", err)
 	}
 	awaitWithDeadline(t, style)
 	barrier, err := runtime.Barrier()
@@ -196,7 +196,7 @@ func TestMetalOwnedTextureCompletionLifecycleDarwin(t *testing.T) {
 		if width != 32 || height != 16 || texture == 0 || device == 0 {
 			t.Fatalf("texture = %dx%d, %x, %x", width, height, texture, device)
 		}
-		if err := frame.Close(GPUSync{Kind: GPUSyncKindCPUComplete}); !errors.Is(err, ErrBusy) {
+		if err := frame.Close(GpuSync{Kind: GpuSyncKindCpuComplete}); !errors.Is(err, ErrBusy) {
 			t.Fatalf("close during view: %v", err)
 		}
 		return nil
@@ -208,7 +208,7 @@ func TestMetalOwnedTextureCompletionLifecycleDarwin(t *testing.T) {
 		t.Fatalf("expired texture view: %v", err)
 	}
 
-	if err := frame.Close(GPUSync{Kind: GPUSyncKindCPUComplete}); err != nil {
+	if err := frame.Close(GpuSync{Kind: GpuSyncKindCpuComplete}); err != nil {
 		t.Fatalf("AcquiredFrameHandle.Release(): %v", err)
 	}
 	// The lease is consumed, so the frame no longer reads its texture.
@@ -216,13 +216,13 @@ func TestMetalOwnedTextureCompletionLifecycleDarwin(t *testing.T) {
 		t.Fatalf("WithMetalTexture() after release error = %v, want ErrInvalidArgument", err)
 	}
 
-	readback, err := session.TextureReadPremultipliedRGBA8()
+	readback, err := session.TextureReadPremultipliedRgba8()
 	if err != nil {
-		t.Fatalf("TextureReadPremultipliedRGBA8(): %v", err)
+		t.Fatalf("TextureReadPremultipliedRgba8(): %v", err)
 	}
 	image := awaitWithDeadline(t, readback)
 	if image.Info.Width != 32 || image.Info.Height != 16 || len(image.Data) != int(image.Info.ByteLength) {
-		t.Fatalf("TextureReadPremultipliedRGBA8() info = %#v, bytes = %d", image.Info, len(image.Data))
+		t.Fatalf("TextureReadPremultipliedRgba8() info = %#v, bytes = %d", image.Info, len(image.Data))
 	}
 
 	// Leave both old-size ring entries available. Resize must retire them so
@@ -265,7 +265,7 @@ func TestMetalOwnedTextureCompletionLifecycleDarwin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := resizedFrame.Close(GPUSync{Kind: GPUSyncKindCPUComplete}); err != nil {
+	if err := resizedFrame.Close(GpuSync{Kind: GpuSyncKindCpuComplete}); err != nil {
 		t.Fatalf("resized AcquiredFrameHandle.Release(): %v", err)
 	}
 
