@@ -23,6 +23,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "maplibre_native_c/callback_adapter.h"
@@ -227,8 +228,12 @@ struct AdapterArena {
     return result;
   }
   std::vector<std::uint64_t> handles;
+  std::vector<std::pair<mln_runtime_callback_release, void*>> releases;
 
   ~AdapterArena() {
+    for (const auto& [release, context] : releases) {
+      release(context);
+    }
     for (const auto handle : handles) {
       const auto* type =
         mln::core::handle_kind_name(mln::core::handle_kind_of(handle));
@@ -290,6 +295,51 @@ void deliver_completion(
   message.array = {2, values};
   // The VM owns the payload after serialization, including failed delivery.
   static_cast<void>(state.dart_port->post(state.dart_port->port, &message));
+}
+
+// A deferred callback context. Registrations guarantee that release follows
+// the final call, so the state stays immutable while calls read it.
+struct AdapterDeferredState {
+  std::uint32_t callback = 0;
+  mln_adapter_deferred_call_listener listener = nullptr;
+  void* user_data = nullptr;
+  std::optional<DartWake> dart_port;
+};
+
+auto create_deferred_state(std::uint32_t callback, void** out_context)
+  -> std::unique_ptr<AdapterDeferredState> {
+  if (
+    mln::capture::deferred_function(callback) == nullptr ||
+    out_context == nullptr || *out_context != nullptr
+  ) {
+    mln::core::set_thread_error("deferred callback arguments are invalid");
+    return nullptr;
+  }
+  auto state = std::make_unique<AdapterDeferredState>();
+  state->callback = callback;
+  return state;
+}
+
+void post_deferred(
+  const DartWake& port, std::uint32_t callback,
+  mln_adapter_deferred_call_record* record
+) noexcept {
+  auto kind = DartIntegerMessage{3, {static_cast<std::int64_t>(callback)}};
+  auto payload = DartIntegerMessage{};
+  payload.type = 11;
+  payload.native_pointer = {
+    reinterpret_cast<std::intptr_t>(record), 0, [](void*, void* peer) {
+      mln_adapter_deferred_call_record_destroy(
+        static_cast<mln_adapter_deferred_call_record*>(peer)
+      );
+    }
+  };
+  DartIntegerMessage* values[] = {&kind, &payload};
+  auto message = DartIntegerMessage{};
+  message.type = 6;
+  message.array = {2, values};
+  // The VM owns the payload after serialization, including failed delivery.
+  static_cast<void>(port.post(port.port, &message));
 }
 
 auto adapter_completion_callback(
@@ -445,10 +495,9 @@ auto has_flag(std::uint32_t flags, mln_adapter_resource_route_flags flag)
   return (flags & static_cast<std::uint32_t>(flag)) != 0;
 }
 
-auto route_matches_url(
-  const AdapterQueuedResourceProviderRoute& route,
-  const mln_resource_request& request
-) -> bool {
+template <class Route>
+auto route_matches_url(const Route& route, const mln_resource_request& request)
+  -> bool {
   const auto* candidate =
     has_flag(route.flags, MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL)
       ? request.requested_url
@@ -456,9 +505,9 @@ auto route_matches_url(
   return url_matches(route.flags, KnownRouteFlags, route.url, candidate);
 }
 
+template <class Route>
 auto request_matches_route(
-  std::span<const AdapterQueuedResourceProviderRoute> routes,
-  const mln_resource_request& request
+  std::span<const Route> routes, const mln_resource_request& request
 ) -> bool {
   return std::ranges::any_of(routes, [&request](const auto& route) -> bool {
     return matches_rule(route.kind, request.kind) &&
@@ -610,6 +659,89 @@ void destroy_owner_token(void* token) noexcept {
 }
 
 }  // namespace
+
+auto mln::capture::deliver_deferred(
+  void* context, std::uint32_t kind, DeferredRecord* record
+) noexcept -> bool {
+  const auto* state = static_cast<const AdapterDeferredState*>(context);
+  if (state == nullptr || state->callback != kind) return false;
+  if (state->dart_port) {
+    post_deferred(*state->dart_port, kind, &record->view);
+  } else {
+    state->listener(state->user_data, &record->view);
+  }
+  return true;
+}
+
+extern "C" MLN_API auto mln_adapter_deferred_callback_create(
+  std::uint32_t callback, mln_adapter_deferred_call_listener listener,
+  void* listener_user_data, void** out_context
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    auto state = create_deferred_state(callback, out_context);
+    if (state == nullptr || listener == nullptr) {
+      mln::core::set_thread_error("deferred callback arguments are invalid");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    state->listener = listener;
+    state->user_data = listener_user_data;
+    *out_context = state.release();
+    return MLN_STATUS_OK;
+  });
+}
+
+extern "C" MLN_API auto mln_adapter_dart_deferred_callback_create(
+  std::uint32_t callback, void* post_cobject, std::int64_t port,
+  void** out_context
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    auto state = create_deferred_state(callback, out_context);
+    if (state == nullptr || post_cobject == nullptr || port == 0) {
+      mln::core::set_thread_error("deferred callback arguments are invalid");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    state->dart_port =
+      DartWake{reinterpret_cast<DartWake::Post>(post_cobject), port};
+    *out_context = state.release();
+    return MLN_STATUS_OK;
+  });
+}
+
+extern "C" MLN_API auto mln_adapter_deferred_callback_function(
+  std::uint32_t callback
+) noexcept -> void* {
+  return mln::capture::deferred_function(callback);
+}
+
+extern "C" MLN_API void mln_adapter_deferred_callback_release(
+  void* context
+) noexcept {
+  const auto state = std::unique_ptr<AdapterDeferredState>{
+    static_cast<AdapterDeferredState*>(context)
+  };
+  if (state == nullptr) return;
+  if (state->dart_port) {
+    state->dart_port->notify(0);
+  } else {
+    state->listener(state->user_data, nullptr);
+  }
+}
+
+extern "C" MLN_API void mln_adapter_deferred_call_record_adopt(
+  mln_adapter_deferred_call_record* record
+) noexcept {
+  if (record == nullptr || record->owner == nullptr) return;
+  static_cast<mln::capture::DeferredRecord*>(record->owner)->claimed = true;
+}
+
+extern "C" MLN_API void mln_adapter_deferred_call_record_destroy(
+  mln_adapter_deferred_call_record* record
+) noexcept {
+  if (record == nullptr || record->owner == nullptr) return;
+  mln::capture::destroy_deferred(
+    static_cast<mln::capture::DeferredRecord*>(record->owner)
+  );
+}
 
 extern "C" MLN_API auto mln_adapter_completion_create(
   std::uint32_t copy_kind, std::size_t element_size,
@@ -791,6 +923,19 @@ extern "C" MLN_API auto mln_adapter_arena_adopt_handle(
       mln::core::handle_kind_name(mln::core::handle_kind_of(handle));
     static_cast<void>(mln::capture::dispose_owner(type, handle));
   }
+  return status;
+}
+
+extern "C" MLN_API auto mln_adapter_arena_adopt_release(
+  void* arena, mln_runtime_callback_release release, void* context
+) noexcept -> mln_status {
+  if (release == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
+  const auto status = mln::c_api::status_boundary([&]() -> mln_status {
+    if (!arena) return MLN_STATUS_INVALID_ARGUMENT;
+    static_cast<AdapterArena*>(arena)->releases.emplace_back(release, context);
+    return MLN_STATUS_OK;
+  });
+  if (status != MLN_STATUS_OK) release(context);
   return status;
 }
 
@@ -1181,6 +1326,29 @@ extern "C" MLN_API auto mln_adapter_resource_provider_rules_callback(
     }
   }
   return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+}
+
+extern "C" MLN_API auto mln_adapter_routed_resource_provider_callback(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle handle
+) noexcept -> std::uint32_t {
+  // Each route decides which URL it compares, so route matching handles an
+  // absent URL.
+  if (user_data == nullptr || request == nullptr || handle == MLN_HANDLE_NULL) {
+    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  }
+  const auto& provider =
+    *static_cast<const mln_adapter_routed_resource_provider*>(user_data);
+  if (
+    provider.callback == nullptr ||
+    (provider.routes == nullptr && provider.route_count != 0) ||
+    !request_matches_route(
+      std::span{provider.routes, provider.route_count}, *request
+    )
+  ) {
+    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  }
+  return provider.callback(provider.user_data, request, handle);
 }
 
 extern "C" MLN_API auto mln_adapter_queued_resource_provider_callback(

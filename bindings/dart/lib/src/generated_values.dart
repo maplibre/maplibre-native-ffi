@@ -4190,6 +4190,30 @@ final class AdapterResourceProviderRules {
   int get hashCode => Object.hashAll([_generatedValueHash(rules)]);
 }
 
+final class AdapterResourceRoute {
+  const AdapterResourceRoute({
+    this.kind = 0,
+    this.flags = const AdapterResourceRouteFlags.fromRawValue(0),
+    this.url,
+  });
+  final int kind;
+  final AdapterResourceRouteFlags flags;
+  final String? url;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AdapterResourceRoute &&
+      _generatedValueEquals(other.kind, kind) &&
+      _generatedValueEquals(other.flags, flags) &&
+      _generatedValueEquals(other.url, url);
+  @override
+  int get hashCode => Object.hashAll([
+    _generatedValueHash(kind),
+    _generatedValueHash(flags),
+    _generatedValueHash(url),
+  ]);
+}
+
 sealed class ResourceProvider {
   const ResourceProvider._();
   const factory ResourceProvider.empty() = ResourceProviderEmpty;

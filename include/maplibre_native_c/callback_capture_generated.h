@@ -2,6 +2,10 @@
 #ifndef MAPLIBRE_NATIVE_C_CALLBACK_CAPTURE_GENERATED_H
 #define MAPLIBRE_NATIVE_C_CALLBACK_CAPTURE_GENERATED_H
 #include <stdint.h>
+
+#include "maplibre_native_c/base.h"
+#include "maplibre_native_c/logging.h"
+#include "maplibre_native_c/runtime.h"
 typedef enum mln_adapter_completion_copy_kind : uint32_t {
   MLN_ADAPTER_COMPLETION_COPY_FLAT = 0,
   MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW = 3303399434U,
@@ -36,4 +40,22 @@ typedef enum mln_adapter_dart_port_callback : uint32_t {
     1605404209U,
 } mln_adapter_dart_port_callback;
 
+typedef enum mln_adapter_deferred_callback : uint32_t {
+  MLN_ADAPTER_DEFERRED_LOG_CALLBACK = 2203584336U,
+  MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK = 2143245793U,
+} mln_adapter_deferred_callback;
+/** Copied arguments of one deferred mln_log_callback call. */
+typedef struct mln_adapter_log_callback_arguments {
+  uint32_t severity MLN_BINDING("enum=mln_log_severity");
+  uint32_t event MLN_BINDING("enum=mln_log_event");
+  int64_t code;
+  const char* message
+    MLN_BINDING("encoding=utf8;length=nul;ownership=borrowed;lifetime=owner");
+} mln_adapter_log_callback_arguments;
+/** Copied arguments of one deferred mln_resource_provider_callback call. */
+typedef struct mln_adapter_resource_provider_callback_arguments {
+  const mln_resource_request* request
+    MLN_BINDING("length=1;ownership=borrowed;lifetime=owner");
+  mln_resource_request_handle handle;
+} mln_adapter_resource_provider_callback_arguments;
 #endif

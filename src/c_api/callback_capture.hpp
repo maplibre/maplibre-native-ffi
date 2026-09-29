@@ -97,7 +97,52 @@ auto string(Arena<Writing>& arena, const char* value) -> const char* {
   return bytes(arena, value, length + 1);
 }
 
+// One deferred call and the storage that follows it in the same allocation.
+struct DeferredRecord {
+  mln_adapter_deferred_call_record view{};
+  bool claimed = false;
+};
+
+// Hands a copied call to the listener of a deferred callback context. Returns
+// false, leaving the record with the caller, when context does not defer kind.
+auto deliver_deferred(
+  void* context, std::uint32_t kind, DeferredRecord* record
+) noexcept -> bool;
+
+// Copies one call's arguments into a single allocation and delivers it. The
+// generated adapter returns the callback's failure result when this returns
+// false.
+template <class Arguments, class Capture>
+auto defer(
+  void* context, std::uint32_t kind, const Arguments& source, Capture capture
+) noexcept -> bool {
+  static_assert(std::is_trivially_destructible_v<DeferredRecord>);
+  std::byte* storage = nullptr;
+  try {
+    Arena<false> measure{nullptr, sizeof(DeferredRecord)};
+    static_cast<void>(measure.template allocate<Arguments>(1));
+    static_cast<void>(capture(measure, source));
+    storage = static_cast<std::byte*>(::operator new(measure.offset));
+    auto* record = new (storage) DeferredRecord{};
+    Arena<true> write{storage, sizeof(DeferredRecord), measure.offset};
+    auto* arguments = write.template allocate<Arguments>(1);
+    *arguments = capture(write, source);
+    record->view = {record, kind, arguments};
+    if (deliver_deferred(context, kind, record)) return true;
+  } catch (...) {
+  }
+  ::operator delete(storage);
+  return false;
+}
+
 #include "c_api/callback_capture_generated.inc"
+
+inline auto destroy_deferred(DeferredRecord* record) noexcept -> void {
+  if (record == nullptr) return;
+  if (!record->claimed)
+    deferred_discard(record->view.callback, record->view.arguments);
+  ::operator delete(record);
+}
 
 inline auto copy(
   const mln_completion_result& source, std::uint32_t kind,

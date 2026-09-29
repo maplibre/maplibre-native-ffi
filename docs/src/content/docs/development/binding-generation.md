@@ -31,7 +31,7 @@ ownership relationships. Its source is the translation specification:
 | --------------------------------------------------- | --------------------------------- |
 | Accepted attributes and signature constraints       | `tools/bindgen/schema.py`         |
 | Value shapes, presence, and ownership relationships | `tools/bindgen/semantic.py`       |
-| Native copies for deferred completion delivery      | `tools/bindgen/native_capture.py` |
+| Native copies for deferred completions and calls    | `tools/bindgen/native_capture.py` |
 | Language syntax and runtime calls                   | `tools/bindgen/emitters/`         |
 | Header mutation and rejection tests                 | `tests/bindgen/`                  |
 
@@ -70,6 +70,13 @@ when the callback returns a value, VALUE is a value of the result's enum or an
 integer its scalar result holds, the callback has one context parameter, and
 every other parameter is an input borrowed for the call. A decision handle
 transfers to the record, so VALUE must be the decision's accept value.
+
+The native capture compiler generates one arguments record and one adapter
+function per deferred typedef. `mln_adapter_deferred_callback_function()`
+returns the adapter, and its context delivers each record to a listener function
+or a Dart port. A call the adapter cannot copy returns the callback's failure
+result. A record destroyed before the host adopts its decision handle fails that
+request.
 
 A borrowed GPU view holds a native scope through the host callback. The scope
 keeps session resources alive if another frame is finalized. Native retirement

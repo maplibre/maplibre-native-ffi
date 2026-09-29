@@ -9,6 +9,17 @@ namespace Maplibre.NativeFfi.Internal.C
         public mln_completion_result result;
     }
 
+    internal unsafe partial struct mln_adapter_deferred_call_record
+    {
+        public void* owner;
+
+        [NativeTypeName("uint32_t")]
+        public uint callback;
+
+        [NativeTypeName("const void *")]
+        public void* arguments;
+    }
+
     [NativeTypeName("uint32_t")]
     internal enum mln_adapter_url_match_flags : uint
     {
@@ -131,6 +142,32 @@ namespace Maplibre.NativeFfi.Internal.C
         public MlnAdapterResourceRequestQueue queue;
     }
 
+    internal unsafe partial struct mln_adapter_resource_route
+    {
+        [NativeTypeName("uint32_t")]
+        public uint kind;
+
+        [NativeTypeName("uint32_t")]
+        public uint flags;
+
+        [NativeTypeName("const char *")]
+        public sbyte* url;
+    }
+
+    internal unsafe partial struct mln_adapter_routed_resource_provider
+    {
+        [NativeTypeName("const mln_adapter_resource_route *")]
+        public mln_adapter_resource_route* routes;
+
+        [NativeTypeName("size_t")]
+        public nuint route_count;
+
+        [NativeTypeName("mln_resource_provider_callback")]
+        public delegate* unmanaged[Cdecl]<void*, mln_resource_request*, MlnResourceRequest, uint> callback;
+
+        public void* user_data;
+    }
+
     internal unsafe partial struct mln_adapter_queued_resource_request
     {
         public void* owner;
@@ -236,6 +273,24 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern void mln_adapter_completion_record_destroy(mln_adapter_completion_record* record);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_adapter_deferred_callback_create([NativeTypeName("uint32_t")] uint callback, [NativeTypeName("mln_adapter_deferred_call_listener")] delegate* unmanaged[Cdecl]<void*, mln_adapter_deferred_call_record*, void> listener, void* listener_user_data, void** out_context);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_adapter_dart_deferred_callback_create([NativeTypeName("uint32_t")] uint callback, void* post_cobject, [NativeTypeName("int64_t")] long port, void** out_context);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void* mln_adapter_deferred_callback_function([NativeTypeName("uint32_t")] uint callback);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void mln_adapter_deferred_callback_release(void* context);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void mln_adapter_deferred_call_record_adopt(mln_adapter_deferred_call_record* record);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void mln_adapter_deferred_call_record_destroy(mln_adapter_deferred_call_record* record);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_adapter_dart_wake_create(void* post_cobject, [NativeTypeName("int64_t")] long port, mln_wake* out_wake);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -261,6 +316,9 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_adapter_arena_adopt_handle(void* arena, [NativeTypeName("uint64_t")] ulong handle);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_adapter_arena_adopt_release(void* arena, [NativeTypeName("mln_runtime_callback_release")] delegate* unmanaged[Cdecl]<void*, void> release, void* context);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_adapter_dart_release_register(void* post_cobject, [NativeTypeName("int64_t")] long port, void* context, void* arena, [NativeTypeName("uint64_t *")] ulong* out_registration);
@@ -317,6 +375,10 @@ namespace Maplibre.NativeFfi.Internal.C
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("uint32_t")]
         public static extern uint mln_adapter_resource_provider_rules_callback(void* user_data, [NativeTypeName("const mln_resource_request *")] mln_resource_request* request, [NativeTypeName("mln_resource_request_handle")] MlnResourceRequest handle);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        [return: NativeTypeName("uint32_t")]
+        public static extern uint mln_adapter_routed_resource_provider_callback(void* user_data, [NativeTypeName("const mln_resource_request *")] mln_resource_request* request, [NativeTypeName("mln_resource_request_handle")] MlnResourceRequest handle);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("uint32_t")]

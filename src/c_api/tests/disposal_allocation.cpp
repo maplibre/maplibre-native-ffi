@@ -681,6 +681,82 @@ void dart_notification_ports_copy_records_before_retirement() {
   );
 }
 
+void dart_deferred_callbacks_post_records_before_retirement() {
+  struct Message {
+    std::int32_t type;
+    union {
+      std::int64_t integer;
+      struct {
+        std::intptr_t count;
+        Message** values;
+      } array;
+      struct {
+        std::intptr_t pointer;
+        std::intptr_t size;
+        void (*finalize)(void*, void*);
+      } native_pointer;
+    };
+  };
+  static auto deliveries = unsigned{};
+  const auto post = +[](std::int64_t port, Message* message) -> bool {
+    require(port == 29, "unexpected deferred callback port");
+    if (deliveries++ == 0) {
+      require(
+        message->type == 6 && message->array.count == 2 &&
+          message->array.values[0]->integer ==
+            MLN_ADAPTER_DEFERRED_LOG_CALLBACK,
+        "deferred callback message shape changed"
+      );
+      const auto& payload = *message->array.values[1];
+      require(
+        payload.type == 11 && payload.native_pointer.pointer != 0,
+        "deferred record lost its native finalizer"
+      );
+      const auto* record = reinterpret_cast<mln_adapter_deferred_call_record*>(
+        payload.native_pointer.pointer
+      );
+      const auto* arguments =
+        static_cast<const mln_adapter_log_callback_arguments*>(
+          record->arguments
+        );
+      require(
+        arguments->code == 7 &&
+          std::strcmp(arguments->message, "deferred") == 0,
+        "deferred record lost its copied arguments"
+      );
+      // A closed port finalizes the undelivered record.
+      payload.native_pointer.finalize(
+        nullptr, reinterpret_cast<void*>(payload.native_pointer.pointer)
+      );
+    } else {
+      require(
+        message->type == 3 && message->integer == 0,
+        "deferred callback context did not retire"
+      );
+    }
+    return false;
+  };
+  void* context = nullptr;
+  require(
+    mln_adapter_dart_deferred_callback_create(
+      MLN_ADAPTER_DEFERRED_LOG_CALLBACK, reinterpret_cast<void*>(post), 29,
+      &context
+    ) == MLN_STATUS_OK,
+    "Dart deferred callback creation failed"
+  );
+  auto* address =
+    mln_adapter_deferred_callback_function(MLN_ADAPTER_DEFERRED_LOG_CALLBACK);
+  const auto callback = reinterpret_cast<mln_log_callback>(address);
+  require(
+    callback(
+      context, MLN_LOG_SEVERITY_INFO, MLN_LOG_EVENT_GENERAL, 7, "deferred"
+    ) == 1,
+    "deferred log callback did not consume its record"
+  );
+  mln_adapter_deferred_callback_release(context);
+  require(deliveries == 2, "deferred callback did not post and retire");
+}
+
 void dart_ports_release_after_the_host_closes() {
   struct Message {
     std::int32_t type;
@@ -750,6 +826,13 @@ void dart_ports_release_after_the_host_closes() {
     mln_adapter_arena_adopt_handle(arena, queue) == MLN_STATUS_OK,
     "native callback queue adoption failed"
   );
+  static auto context_releases = unsigned{};
+  require(
+    mln_adapter_arena_adopt_release(
+      arena, [](void*) { ++context_releases; }, nullptr
+    ) == MLN_STATUS_OK,
+    "native callback release adoption failed"
+  );
   auto registration = std::uint64_t{};
   require(
     mln_adapter_dart_release_register(
@@ -768,6 +851,9 @@ void dart_ports_release_after_the_host_closes() {
   );
   require(
     queue_releases == 1, "closed isolate leaked its native callback queue"
+  );
+  require(
+    context_releases == 1, "closed isolate leaked an adopted context release"
   );
   arena = mln_adapter_arena_create();
   auto second_registration = std::uint64_t{};
@@ -812,6 +898,7 @@ int main() {
   RUN_DISPOSAL_TEST(borrowed_views_hold_the_session_through_sibling_disposal);
   RUN_DISPOSAL_TEST(dart_ports_release_after_the_host_closes);
   RUN_DISPOSAL_TEST(dart_notification_ports_copy_records_before_retirement);
+  RUN_DISPOSAL_TEST(dart_deferred_callbacks_post_records_before_retirement);
   RUN_DISPOSAL_TEST(undelivered_dart_completion_disposes_its_owned_result);
   RUN_DISPOSAL_TEST(failed_finalizer_token_creation_disposes_the_owner);
   RUN_DISPOSAL_TEST(disposal_retires_an_attached_graph_after_driver_quiescence);

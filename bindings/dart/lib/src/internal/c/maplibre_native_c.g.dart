@@ -102,6 +102,19 @@ external int mln_adapter_arena_adopt_handle(
 );
 
 @ffi.Native<
+  ffi.Int32 Function(
+    ffi.Pointer<ffi.Void>,
+    mln_runtime_callback_release,
+    ffi.Pointer<ffi.Void>,
+  )
+>()
+external int mln_adapter_arena_adopt_release(
+  ffi.Pointer<ffi.Void> arena,
+  mln_runtime_callback_release release,
+  ffi.Pointer<ffi.Void> context,
+);
+
+@ffi.Native<
   ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>, ffi.Size, ffi.Size)
 >()
 external ffi.Pointer<ffi.Void> mln_adapter_arena_allocate(
@@ -193,6 +206,21 @@ external int mln_adapter_dart_completion_create(
   ffi.Pointer<mln_completion> out_completion,
 );
 
+@ffi.Native<
+  ffi.Int32 Function(
+    ffi.Uint32,
+    ffi.Pointer<ffi.Void>,
+    ffi.Int64,
+    ffi.Pointer<ffi.Pointer<ffi.Void>>,
+  )
+>()
+external int mln_adapter_dart_deferred_callback_create(
+  int callback,
+  ffi.Pointer<ffi.Void> post_cobject,
+  int port,
+  ffi.Pointer<ffi.Pointer<ffi.Void>> out_context,
+);
+
 @ffi.Native<ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>, ffi.Int64)>()
 external ffi.Pointer<ffi.Void> mln_adapter_dart_port_create(
   ffi.Pointer<ffi.Void> post_cobject,
@@ -232,6 +260,41 @@ external int mln_adapter_dart_wake_create(
   ffi.Pointer<ffi.Void> post_cobject,
   int port,
   ffi.Pointer<mln_wake> out_wake,
+);
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<mln_adapter_deferred_call_record>)>()
+external void mln_adapter_deferred_call_record_adopt(
+  ffi.Pointer<mln_adapter_deferred_call_record> record,
+);
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<mln_adapter_deferred_call_record>)>()
+external void mln_adapter_deferred_call_record_destroy(
+  ffi.Pointer<mln_adapter_deferred_call_record> record,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    ffi.Uint32,
+    mln_adapter_deferred_call_listener,
+    ffi.Pointer<ffi.Void>,
+    ffi.Pointer<ffi.Pointer<ffi.Void>>,
+  )
+>()
+external int mln_adapter_deferred_callback_create(
+  int callback,
+  mln_adapter_deferred_call_listener listener,
+  ffi.Pointer<ffi.Void> listener_user_data,
+  ffi.Pointer<ffi.Pointer<ffi.Void>> out_context,
+);
+
+@ffi.Native<ffi.Pointer<ffi.Void> Function(ffi.Uint32)>()
+external ffi.Pointer<ffi.Void> mln_adapter_deferred_callback_function(
+  int callback,
+);
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
+external void mln_adapter_deferred_callback_release(
+  ffi.Pointer<ffi.Void> context,
 );
 
 @ffi.Native<
@@ -380,6 +443,19 @@ external int mln_adapter_resource_transform_rewrite_callback(
   int kind,
   ffi.Pointer<ffi.Char> url,
   ffi.Pointer<mln_resource_transform_response> out_response,
+);
+
+@ffi.Native<
+  ffi.Uint32 Function(
+    ffi.Pointer<ffi.Void>,
+    ffi.Pointer<mln_resource_request>,
+    mln_resource_request_handle,
+  )
+>()
+external int mln_adapter_routed_resource_provider_callback(
+  ffi.Pointer<ffi.Void> user_data,
+  ffi.Pointer<mln_resource_request> request,
+  int handle,
 );
 
 @ffi.Native<
@@ -3010,6 +3086,43 @@ sealed class mln_adapter_dart_port_callback {
       1605404209;
 }
 
+typedef mln_adapter_deferred_call_listener =
+    ffi.Pointer<ffi.NativeFunction<mln_adapter_deferred_call_listenerFunction>>;
+typedef mln_adapter_deferred_call_listenerFunction =
+    ffi.Void Function(
+      ffi.Pointer<ffi.Void> user_data,
+      ffi.Pointer<mln_adapter_deferred_call_record> record,
+    );
+typedef Dartmln_adapter_deferred_call_listenerFunction =
+    void Function(
+      ffi.Pointer<ffi.Void> user_data,
+      ffi.Pointer<mln_adapter_deferred_call_record> record,
+    );
+
+final class mln_adapter_deferred_call_record extends ffi.Struct {
+  external ffi.Pointer<ffi.Void> owner;
+
+  @ffi.Uint32()
+  external int callback;
+
+  external ffi.Pointer<ffi.Void> arguments;
+
+  static ffi.Pointer<mln_adapter_deferred_call_record> $allocate(
+    ffi.Allocator $allocator, {
+    required ffi.Pointer<ffi.Void> owner,
+    required int callback,
+    required ffi.Pointer<ffi.Void> arguments,
+  }) => $allocator<mln_adapter_deferred_call_record>()
+    ..ref.owner = owner
+    ..ref.callback = callback
+    ..ref.arguments = arguments;
+}
+
+sealed class mln_adapter_deferred_callback {
+  static const MLN_ADAPTER_DEFERRED_LOG_CALLBACK = -2091382960;
+  static const MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK = 2143245793;
+}
+
 final class mln_adapter_http_header extends ffi.Struct {
   external ffi.Pointer<ffi.Char> name;
 
@@ -3066,6 +3179,31 @@ final class mln_adapter_http_header_transform_rules extends ffi.Struct {
   }) => $allocator<mln_adapter_http_header_transform_rules>()
     ..ref.rules = rules
     ..ref.count = count;
+}
+
+final class mln_adapter_log_callback_arguments extends ffi.Struct {
+  @ffi.Uint32()
+  external int severity;
+
+  @ffi.Uint32()
+  external int event;
+
+  @ffi.Int64()
+  external int code;
+
+  external ffi.Pointer<ffi.Char> message;
+
+  static ffi.Pointer<mln_adapter_log_callback_arguments> $allocate(
+    ffi.Allocator $allocator, {
+    required int severity,
+    required int event,
+    required int code,
+    required ffi.Pointer<ffi.Char> message,
+  }) => $allocator<mln_adapter_log_callback_arguments>()
+    ..ref.severity = severity
+    ..ref.event = event
+    ..ref.code = code
+    ..ref.message = message;
 }
 
 final class mln_adapter_log_callback_state extends ffi.Struct {
@@ -3260,6 +3398,23 @@ final class mln_adapter_queued_resource_request extends ffi.Struct {
     ..ref.prior_data_size = prior_data_size;
 }
 
+final class mln_adapter_resource_provider_callback_arguments
+    extends ffi.Struct {
+  external ffi.Pointer<mln_resource_request> request;
+
+  @mln_resource_request_handle()
+  external int handle;
+
+  static ffi.Pointer<mln_adapter_resource_provider_callback_arguments>
+  $allocate(
+    ffi.Allocator $allocator, {
+    required ffi.Pointer<mln_resource_request> request,
+    required int handle,
+  }) => $allocator<mln_adapter_resource_provider_callback_arguments>()
+    ..ref.request = request
+    ..ref.handle = handle;
+}
+
 final class mln_adapter_resource_provider_rule extends ffi.Struct {
   @ffi.Uint32()
   external int kind;
@@ -3329,10 +3484,53 @@ final class mln_adapter_resource_rewrite_rules extends ffi.Struct {
     ..ref.count = count;
 }
 
+final class mln_adapter_resource_route extends ffi.Struct {
+  @ffi.Uint32()
+  external int kind;
+
+  @ffi.Uint32()
+  external int flags;
+
+  external ffi.Pointer<ffi.Char> url;
+
+  static ffi.Pointer<mln_adapter_resource_route> $allocate(
+    ffi.Allocator $allocator, {
+    required int kind,
+    required int flags,
+    required ffi.Pointer<ffi.Char> url,
+  }) => $allocator<mln_adapter_resource_route>()
+    ..ref.kind = kind
+    ..ref.flags = flags
+    ..ref.url = url;
+}
+
 sealed class mln_adapter_resource_route_flags {
   static const MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE = 0;
   static const MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB = 1;
   static const MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL = 2;
+}
+
+final class mln_adapter_routed_resource_provider extends ffi.Struct {
+  external ffi.Pointer<mln_adapter_resource_route> routes;
+
+  @ffi.Size()
+  external int route_count;
+
+  external mln_resource_provider_callback callback;
+
+  external ffi.Pointer<ffi.Void> user_data;
+
+  static ffi.Pointer<mln_adapter_routed_resource_provider> $allocate(
+    ffi.Allocator $allocator, {
+    required ffi.Pointer<mln_adapter_resource_route> routes,
+    required int route_count,
+    required mln_resource_provider_callback callback,
+    required ffi.Pointer<ffi.Void> user_data,
+  }) => $allocator<mln_adapter_routed_resource_provider>()
+    ..ref.routes = routes
+    ..ref.route_count = route_count
+    ..ref.callback = callback
+    ..ref.user_data = user_data;
 }
 
 sealed class mln_adapter_url_match_flags {

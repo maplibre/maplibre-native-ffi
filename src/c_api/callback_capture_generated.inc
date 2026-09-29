@@ -673,3 +673,117 @@ inline auto dispose_owner(
   }
   return MLN_STATUS_INVALID_ARGUMENT;
 }
+
+template <bool Writing>
+auto capture_mln_adapter_log_callback_arguments(
+  [[maybe_unused]] Arena<Writing>& arena,
+  mln_adapter_log_callback_arguments source
+) -> mln_adapter_log_callback_arguments {
+  auto result = source;
+  result.message = string(arena, source.message);
+  return result;
+}
+inline auto deferred_mln_log_callback(
+  void* user_data, uint32_t severity, uint32_t event, int64_t code,
+  const char* message
+) noexcept -> uint32_t {
+  const auto arguments =
+    mln_adapter_log_callback_arguments{severity, event, code, message};
+  const auto deferred = defer(
+    user_data, MLN_ADAPTER_DEFERRED_LOG_CALLBACK, arguments,
+    [](auto& arena, const mln_adapter_log_callback_arguments& copy) {
+      return capture_mln_adapter_log_callback_arguments(arena, copy);
+    }
+  );
+  return static_cast<uint32_t>(deferred ? 1 : 0);
+}
+template <bool Writing>
+auto capture_mln_adapter_resource_provider_callback_arguments(
+  [[maybe_unused]] Arena<Writing>& arena,
+  mln_adapter_resource_provider_callback_arguments source
+) -> mln_adapter_resource_provider_callback_arguments {
+  auto result = source;
+  result.request = span(
+    arena, source.request, 1,
+    [&]([[maybe_unused]] auto& arena, auto element_1) {
+      auto copied_1 = element_1;
+      copied_1.requested_url = string(arena, element_1.requested_url);
+      copied_1.resolved_url = string(arena, element_1.resolved_url);
+      if (element_1.has_range) {
+      } else {
+        copied_1.range_start = {};
+      }
+      if (element_1.has_range) {
+      } else {
+        copied_1.range_end = {};
+      }
+      if (element_1.has_prior_modified) {
+      } else {
+        copied_1.prior_modified_unix_ms = {};
+      }
+      if (element_1.has_prior_expires) {
+      } else {
+        copied_1.prior_expires_unix_ms = {};
+      }
+      copied_1.prior_etag = string(arena, element_1.prior_etag);
+      copied_1.prior_data =
+        bytes(arena, element_1.prior_data, element_1.prior_data_size);
+      return copied_1;
+    }
+  );
+  return result;
+}
+inline auto deferred_mln_resource_provider_callback(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle handle
+) noexcept -> uint32_t {
+  const auto arguments =
+    mln_adapter_resource_provider_callback_arguments{request, handle};
+  const auto deferred = defer(
+    user_data, MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK, arguments,
+    [](
+      auto& arena, const mln_adapter_resource_provider_callback_arguments& copy
+    ) {
+      return capture_mln_adapter_resource_provider_callback_arguments(
+        arena, copy
+      );
+    }
+  );
+  return static_cast<uint32_t>(
+    deferred ? MLN_RESOURCE_PROVIDER_DECISION_HANDLE
+             : MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH
+  );
+}
+inline auto deferred_function(std::uint32_t kind) noexcept -> void* {
+  switch (kind) {
+    case MLN_ADAPTER_DEFERRED_LOG_CALLBACK:
+      return reinterpret_cast<void*>(&deferred_mln_log_callback);
+    case MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK:
+      return reinterpret_cast<void*>(&deferred_mln_resource_provider_callback);
+    default:
+      return nullptr;
+  }
+}
+// Fails a decision whose record the host released without adopting its
+// handle. The zeroed response is malformed, and the decision's completion
+// function converts a malformed response to an error response.
+inline auto deferred_discard(
+  [[maybe_unused]] std::uint32_t kind, [[maybe_unused]] const void* copied
+) noexcept -> void {
+  switch (kind) {
+    case MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK: {
+      const auto& arguments =
+        *static_cast<const mln_adapter_resource_provider_callback_arguments*>(
+          copied
+        );
+      const auto response = mln_resource_response{};
+      static_cast<void>(
+        mln_resource_request_complete(arguments.handle, &response)
+      );
+      mln_resource_request_release(arguments.handle);
+      break;
+    }
+    default:
+      break;
+  }
+}

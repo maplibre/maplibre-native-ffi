@@ -123,6 +123,124 @@ MLN_API void mln_adapter_completion_record_destroy(
   mln_adapter_completion_record* record MLN_BINDING("length=1")
 ) MLN_NOEXCEPT;
 
+/**
+ * Native-owned copy of one deferred callback call.
+ *
+ * A deferred callback typedef declares the result an adapter may return at
+ * once. The adapter copies the call's arguments into arguments, laid out as the
+ * generated arguments record for callback, and returns that result to
+ * MapLibre. When the result accepts a decision, the record owns the decision
+ * handle until the host adopts it with
+ * mln_adapter_deferred_call_record_adopt().
+ */
+typedef struct mln_adapter_deferred_call_record {
+  void* owner MLN_BINDING("kind=context;lifetime=owner");
+  /** The mln_adapter_deferred_callback value naming the callback typedef. */
+  uint32_t callback;
+  /** Copied arguments, one generated mln_adapter_*_arguments record. */
+  const void* arguments MLN_BINDING("kind=native_pointer;lifetime=owner");
+} mln_adapter_deferred_call_record;
+
+/**
+ * Receives deferred calls on the thread that made them.
+ *
+ * The listener owns each non-null record and releases it with
+ * mln_adapter_deferred_call_record_destroy(). It runs once more with a null
+ * record when the context is released, after the final call, and frees
+ * user_data then. A listener that forwards records to another execution context
+ * returns promptly and never calls back into MapLibre.
+ */
+typedef void (*mln_adapter_deferred_call_listener)(
+  void* user_data MLN_BINDING("kind=context;lifetime=owner"),
+  mln_adapter_deferred_call_record* record
+    MLN_BINDING("ownership=owned;lifetime=owner;length=1;nullable=true")
+) MLN_BINDING("thread=native;failure=contain");
+
+/**
+ * Creates a context that defers one callback typedef to a listener.
+ *
+ * Register mln_adapter_deferred_callback_function(callback) with the returned
+ * context as its user_data and mln_adapter_deferred_callback_release() as its
+ * release callback. The context calls listener for every call it defers. A
+ * call the adapter cannot copy returns the callback's failure result and never
+ * reaches the listener.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when out_context receives the context.
+ * - MLN_STATUS_INVALID_ARGUMENT when callback is not an
+ *   mln_adapter_deferred_callback value, listener is null, or out_context is
+ *   null or does not point to null.
+ * - MLN_STATUS_NATIVE_ERROR when adapter state could not be allocated.
+ */
+MLN_BINDING("execution=immediate")
+MLN_API mln_status mln_adapter_deferred_callback_create(
+  uint32_t callback, mln_adapter_deferred_call_listener listener,
+  void* listener_user_data MLN_BINDING("kind=context;lifetime=owner"),
+  void** out_context MLN_BINDING("direction=out;kind=context;lifetime=owner")
+) MLN_NOEXCEPT;
+
+/**
+ * Creates a deferred callback context that posts records to a Dart port.
+ *
+ * post_cobject is NativeApi.postCObject and port is a Dart SendPort.nativePort.
+ * Each call posts an array of the callback value and the record as a native
+ * pointer whose finalizer destroys an undelivered record. Release posts 0.
+ * Other behavior matches mln_adapter_deferred_callback_create().
+ */
+MLN_BINDING("execution=immediate")
+MLN_API mln_status mln_adapter_dart_deferred_callback_create(
+  uint32_t callback,
+  void* post_cobject MLN_BINDING("kind=native_pointer;lifetime=process"),
+  int64_t port,
+  void** out_context MLN_BINDING("direction=out;kind=context;lifetime=owner")
+) MLN_NOEXCEPT;
+
+/**
+ * Returns the generated function that defers callback, or null.
+ *
+ * The function has the C signature of the callback typedef that callback
+ * names. It returns the typedef's deferred result after delivering a copy.
+ */
+MLN_BINDING("execution=immediate;kind=native_pointer;ownership=borrowed")
+MLN_API void* mln_adapter_deferred_callback_function(
+  uint32_t callback
+) MLN_NOEXCEPT;
+
+/**
+ * Releases a deferred callback context exactly once.
+ *
+ * This function has the signature of mln_runtime_callback_release and
+ * mln_log_callback_release, so a registration passes it as its release
+ * callback. Call it directly when the registering call rejects the context.
+ */
+MLN_BINDING("execution=immediate")
+MLN_API void mln_adapter_deferred_callback_release(
+  void* context MLN_BINDING("kind=context;lifetime=owner")
+) MLN_NOEXCEPT;
+
+/**
+ * Transfers the record's decision handle to the host.
+ *
+ * Call this after constructing the host owner and before destroying the
+ * record. A record without a decision handle is unchanged.
+ */
+MLN_BINDING("execution=immediate")
+MLN_API void mln_adapter_deferred_call_record_adopt(
+  mln_adapter_deferred_call_record* record MLN_BINDING("length=1")
+) MLN_NOEXCEPT;
+
+/**
+ * Releases a deferred call record.
+ *
+ * A decision handle the host did not adopt fails its call: the adapter passes
+ * a zeroed response to the decision's completion function, which the C API
+ * converts to a provider error, and releases the handle. Null is a no-op.
+ */
+MLN_BINDING("execution=immediate")
+MLN_API void mln_adapter_deferred_call_record_destroy(
+  mln_adapter_deferred_call_record* record MLN_BINDING("length=1")
+) MLN_NOEXCEPT;
+
 // This block uses line comments because its examples contain URL patterns that
 // a block comment cannot carry.
 
@@ -321,6 +439,46 @@ typedef struct mln_adapter_queued_resource_provider {
 } mln_adapter_queued_resource_provider;
 
 /**
+ * One route a routed resource provider claims.
+ *
+ * The kind field matches mln_resource_kind values, or
+ * MLN_ADAPTER_RESOURCE_KIND_ANY for every kind. The flags field is a bitwise OR
+ * of mln_adapter_resource_route_flags values choosing which URL the route
+ * compares and how; with no flags the route matches
+ * mln_resource_request.resolved_url exactly.
+ *
+ * The url field is a comparison value, read literally or as a glob pattern
+ * according to flags. A null url or an unknown flag bit makes the route match
+ * nothing. The url pointer has the lifetime of its routed provider.
+ */
+typedef struct mln_adapter_resource_route {
+  uint32_t kind;
+  uint32_t flags MLN_BINDING("enum=mln_adapter_resource_route_flags");
+  const char* url MLN_BINDING(
+    "length=nul;encoding=utf8;ownership=borrowed;"
+    "lifetime=owner;nullable=true"
+  );
+} mln_adapter_resource_route;
+
+/**
+ * A provider that forwards the requests its routes claim to another provider.
+ *
+ * A request that matches a route reaches callback with user_data, and the
+ * routed provider returns that callback's decision. Every other request passes
+ * through to native loading. The routes, their URLs, and user_data stay valid
+ * through the terminal event of the command that replaces or clears this
+ * provider. The routed provider never releases user_data; the owner of this
+ * record releases both together.
+ */
+typedef struct mln_adapter_routed_resource_provider {
+  const mln_adapter_resource_route* routes
+    MLN_BINDING("length=route_count;ownership=borrowed;lifetime=owner");
+  size_t route_count;
+  mln_resource_provider_callback callback;
+  void* user_data MLN_BINDING("kind=context;ownership=borrowed");
+} mln_adapter_routed_resource_provider;
+
+/**
  * A native-owned copy of a resource request.
  *
  * Every pointer field is owned by this record and stays valid until
@@ -473,6 +631,19 @@ MLN_API void mln_adapter_arena_destroy(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_adapter_arena_adopt_handle(
   void* arena MLN_BINDING("kind=context;lifetime=owner"), uint64_t handle
+) MLN_NOEXCEPT;
+
+/**
+ * Transfers a context release on entry; failure runs the release immediately.
+ *
+ * The arena calls release with context once when it is destroyed, before it
+ * frees its allocations.
+ */
+MLN_BINDING("execution=immediate")
+MLN_API mln_status mln_adapter_arena_adopt_release(
+  void* arena MLN_BINDING("kind=context;lifetime=owner"),
+  mln_runtime_callback_release release,
+  void* context MLN_BINDING("kind=context;lifetime=owner")
 ) MLN_NOEXCEPT;
 
 /**
@@ -743,6 +914,24 @@ MLN_BINDING(
   "mln_resource_request_complete,mln_resource_request_release"
 )
 MLN_API uint32_t mln_adapter_resource_provider_rules_callback(
+  void* user_data MLN_BINDING("kind=context;lifetime=owner"),
+  const mln_resource_request* request MLN_BINDING("length=1"),
+  mln_resource_request_handle handle
+) MLN_NOEXCEPT;
+
+/**
+ * The mln_resource_provider_callback implementation for routed providers.
+ *
+ * user_data points to an mln_adapter_routed_resource_provider. A request that
+ * matches one route reaches the provider's callback, and this function returns
+ * its decision. Other requests, and every request of a provider without a
+ * callback, report MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.
+ */
+MLN_BINDING(
+  "execution=immediate;callback_adapter=mln_resource_provider_callback;"
+  "context_type=mln_adapter_routed_resource_provider"
+)
+MLN_API uint32_t mln_adapter_routed_resource_provider_callback(
   void* user_data MLN_BINDING("kind=context;lifetime=owner"),
   const mln_resource_request* request MLN_BINDING("length=1"),
   mln_resource_request_handle handle

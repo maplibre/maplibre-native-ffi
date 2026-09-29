@@ -35,4 +35,35 @@ namespace Maplibre.NativeFfi.Internal.C
         MLN_ADAPTER_DART_PORT_WAKE_CALLBACK = 2393247646U,
         MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK = 1605404209U,
     }
+
+    [NativeTypeName("uint32_t")]
+    internal enum mln_adapter_deferred_callback : uint
+    {
+        MLN_ADAPTER_DEFERRED_LOG_CALLBACK = 2203584336U,
+        MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK = 2143245793U,
+    }
+
+    internal unsafe partial struct mln_adapter_log_callback_arguments
+    {
+        [NativeTypeName("uint32_t")]
+        public uint severity;
+
+        [NativeTypeName("uint32_t")]
+        public uint @event;
+
+        [NativeTypeName("int64_t")]
+        public long code;
+
+        [NativeTypeName("const char *")]
+        public sbyte* message;
+    }
+
+    internal unsafe partial struct mln_adapter_resource_provider_callback_arguments
+    {
+        [NativeTypeName("const mln_resource_request *")]
+        public mln_resource_request* request;
+
+        [NativeTypeName("mln_resource_request_handle")]
+        public MlnResourceRequest handle;
+    }
 }

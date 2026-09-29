@@ -1,12 +1,17 @@
-"""Emit static native capture functions for deferred foreign callbacks."""
+"""Emit static native capture functions for deferred foreign callbacks.
+
+Completion copies preserve an asynchronous result past its callback. Deferred
+callback copies answer a synchronous callback early with its declared deferred
+result and preserve the call's arguments for a host that runs it later.
+"""
 
 from __future__ import annotations
 
 import zlib
 
 from .compiler import compile_api
-from .model import Api, ModelError
-from .semantic import BoundApi
+from .model import Api, CType, ModelError
+from .semantic import BoundApi, FieldPlan, ValuePlan
 
 
 def copy_kind(native: str) -> str:
@@ -15,6 +20,185 @@ def copy_kind(native: str) -> str:
 
 def capture_id(native: str, ownership: str = "borrowed") -> int:
     return zlib.crc32(f"{ownership}:{native}".encode())
+
+
+def deferred_constant(native: str) -> str:
+    return "MLN_ADAPTER_DEFERRED_" + native.removeprefix("mln_").upper()
+
+
+def deferred_id(native: str) -> int:
+    return zlib.crc32(f"deferred:{native}".encode())
+
+
+def arguments_record(native: str) -> str:
+    """The generated record that holds one deferred call's copied arguments."""
+    return "mln_adapter_" + native.removeprefix("mln_") + "_arguments"
+
+
+def deferred_callbacks(bound: BoundApi):
+    """Deferred callback plans with their typedefs, sorted by name."""
+    return [
+        (callback, bound.source.typedefs_by_name[name])
+        for name, callback in sorted(bound.callbacks.items())
+        if callback.deferred
+    ]
+
+
+def arguments_plan(callback) -> ValuePlan:
+    """A record plan whose fields are the callback's non-context parameters."""
+    name = arguments_record(callback.native)
+    return ValuePlan(
+        kind="record",
+        native=name,
+        ctype=CType("record", name, "struct " + name, name),
+        fields=tuple(
+            FieldPlan(parameter.name, parameter.value)
+            for parameter in callback.parameters
+            if parameter.name != callback.context
+        ),
+    )
+
+
+def _field_metadata(parameter) -> str:
+    """Parameter metadata restated for a field whose copy the record owns."""
+    metadata = {
+        key: value
+        for key, value in parameter.metadata.items()
+        if key not in {"direction", "consumes", "kind", "lifetime", "ownership"}
+    }
+    if parameter.type.kind == "pointer":
+        metadata.update(ownership="borrowed", lifetime="owner")
+    if not metadata:
+        return ""
+    items = ";".join(f"{key}={value}" for key, value in metadata.items())
+    return f' MLN_BINDING("{items}")'
+
+
+def _declaration(type_: CType, name: str) -> str:
+    spelling = type_.spelling
+    if type_.kind not in {"pointer", "typedef", "elaborated"} and (
+        "(" in spelling or "[" in spelling
+    ):
+        raise ModelError([f"{name}: deferred argument needs a plain declarator"])
+    if type_.kind == "pointer" and spelling.endswith(" *"):
+        return f"{spelling.removesuffix(' *')}* {name}"
+    return f"{spelling} {name}"
+
+
+def _deferred(bound: BoundApi) -> tuple[list[str], list[str]]:
+    """Declare argument records and generate each deferred callback's adapter."""
+    entries = deferred_callbacks(bound)
+    if not entries:
+        return [], []
+    source = bound.source
+    identities = {0: "released"}
+    for callback, _ in entries:
+        identity = deferred_id(callback.native)
+        if identity in identities:
+            raise ModelError(
+                [
+                    f"deferred identity collision: {callback.native}, {identities[identity]}"
+                ]
+            )
+        identities[identity] = callback.native
+    header = [
+        "typedef enum mln_adapter_deferred_callback : uint32_t {",
+        *(
+            f"  {deferred_constant(callback.native)} = {deferred_id(callback.native)}U,"
+            for callback, _ in entries
+        ),
+        "} mln_adapter_deferred_callback;",
+    ]
+    output = []
+    for callback, typedef in entries:
+        plan = arguments_plan(callback)
+        _validate_capture_ownership(plan)
+        record = plan.native
+        header.extend(
+            [
+                f"/** Copied arguments of one deferred {callback.native} call. */",
+                f"typedef struct {record} {{",
+                *(
+                    f"  {_declaration(parameter.type, parameter.name)}{_field_metadata(parameter)};"
+                    for parameter in typedef.parameters
+                    if parameter.name != callback.context
+                ),
+                f"}} {record};",
+            ]
+        )
+        result = typedef.type.pointee.result.spelling
+        arguments = ", ".join(
+            _declaration(parameter.type, parameter.name)
+            for parameter in typedef.parameters
+        )
+        values = ", ".join(field.name for field in plan.fields)
+        output.extend(
+            [
+                "template <bool Writing>",
+                f"auto capture_{record}([[maybe_unused]] Arena<Writing>& arena, {record} source) -> {record} {{",
+                "  auto result = source;",
+                *_capture(plan, "source", "result", "", 1),
+                "  return result;",
+                "}",
+                f"inline auto deferred_{callback.native}({arguments}) noexcept -> {result} {{",
+                f"  const auto arguments = {record}{{{values}}};",
+                f"  const auto deferred = defer({callback.context}, {deferred_constant(callback.native)}, arguments,",
+                f"    [](auto& arena, const {record}& copy) {{ return capture_{record}(arena, copy); }});",
+                f"  return static_cast<{result}>(deferred ? {callback.deferred} : {callback.failure});",
+                "}",
+            ]
+        )
+    output.extend(
+        [
+            "inline auto deferred_function(std::uint32_t kind) noexcept -> void* {",
+            "  switch (kind) {",
+            *(
+                f"    case {deferred_constant(callback.native)}: return reinterpret_cast<void*>(&deferred_{callback.native});"
+                for callback, _ in entries
+            ),
+            "    default: return nullptr;",
+            "  }",
+            "}",
+            "// Fails a decision whose record the host released without adopting its",
+            "// handle. The zeroed response is malformed, and the decision's completion",
+            "// function converts a malformed response to an error response.",
+            "inline auto deferred_discard([[maybe_unused]] std::uint32_t kind, [[maybe_unused]] const void* copied) noexcept -> void {",
+            "  switch (kind) {",
+        ]
+    )
+    for callback, _ in entries:
+        decision = callback.decision
+        if decision is None:
+            continue
+        complete = source.functions_by_name[decision.complete]
+        response = (
+            complete.parameters[1].type.pointee
+            if len(complete.parameters) == 2
+            else None
+        )
+        if response is None or not response.declaration:
+            raise ModelError(
+                [
+                    f"{callback.native}: deferred decision completion requires one response record"
+                ]
+            )
+        release = source.functions_by_name[decision.handle.release]
+        release_call = f"{decision.handle.release}(arguments.{decision.parameter})"
+        output.extend(
+            [
+                f"    case {deferred_constant(callback.native)}: {{",
+                f"      const auto& arguments = *static_cast<const {arguments_record(callback.native)}*>(copied);",
+                f"      const auto response = {response.declaration}{{}};",
+                f"      static_cast<void>({decision.complete}(arguments.{decision.parameter}, &response));",
+                f"      static_cast<void>({release_call});"
+                if release.return_type.kind != "void"
+                else f"      {release_call};",
+                "      break;",
+                "    }",
+            ]
+        )
+    output.extend(["    default: break;", "  }", "}", ""])
+    return header, output
 
 
 def generate(api: Api | BoundApi) -> dict[str, str]:
@@ -66,6 +250,13 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         "#ifndef MAPLIBRE_NATIVE_C_CALLBACK_CAPTURE_GENERATED_H",
         "#define MAPLIBRE_NATIVE_C_CALLBACK_CAPTURE_GENERATED_H",
         "#include <stdint.h>",
+        *(
+            f'#include "{path}"'
+            for path in sorted(
+                {"maplibre_native_c/base.h"}
+                | {typedef.location.path for _, typedef in deferred_callbacks(bound)}
+            )
+        ),
         "typedef enum mln_adapter_completion_copy_kind : uint32_t {",
         "  MLN_ADAPTER_COMPLETION_COPY_FLAT = 0,",
     ]
@@ -76,7 +267,16 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
     from . import native_ports
 
     port_header, port_output = native_ports.generate(bound)
-    header.extend(["} mln_adapter_completion_copy_kind;", *port_header, "#endif", ""])
+    deferred_header, deferred_output = _deferred(bound)
+    header.extend(
+        [
+            "} mln_adapter_completion_copy_kind;",
+            *port_header,
+            *deferred_header,
+            "#endif",
+            "",
+        ]
+    )
 
     output = ["// Generated by tools/bindgen. Do not edit."]
     for native, plan in sorted(roots.items()):
@@ -178,6 +378,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
             f'  if (std::strcmp(native_type, "{handle.native}") == 0) {{ {body} }}'
         )
     output.extend(["  return MLN_STATUS_INVALID_ARGUMENT;", "}", ""])
+    output.extend(deferred_output)
     return {
         "include/maplibre_native_c/callback_capture_generated.h": "\n".join(header),
         "src/c_api/callback_capture_generated.inc": "\n".join(output),

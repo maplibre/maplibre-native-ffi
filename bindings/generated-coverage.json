@@ -351,7 +351,7 @@
     "src/c_api/callback_capture_generated.inc",
     "src/c_api/callback_port_generated.inc"
   ],
-  "function_count": 301,
+  "function_count": 309,
   "languages": {
     "dart": {
       "generated": [
@@ -2515,6 +2515,7 @@
     "mln_adapter_acquired_frame_view_begin",
     "mln_adapter_acquired_frame_view_end",
     "mln_adapter_arena_adopt_handle",
+    "mln_adapter_arena_adopt_release",
     "mln_adapter_arena_allocate",
     "mln_adapter_arena_create",
     "mln_adapter_arena_destroy",
@@ -2525,12 +2526,18 @@
     "mln_adapter_custom_geometry_callbacks_retire",
     "mln_adapter_custom_mvt_vector_callbacks_retire",
     "mln_adapter_dart_completion_create",
+    "mln_adapter_dart_deferred_callback_create",
     "mln_adapter_dart_port_create",
     "mln_adapter_dart_port_function",
     "mln_adapter_dart_port_release",
     "mln_adapter_dart_release",
     "mln_adapter_dart_release_register",
     "mln_adapter_dart_wake_create",
+    "mln_adapter_deferred_call_record_adopt",
+    "mln_adapter_deferred_call_record_destroy",
+    "mln_adapter_deferred_callback_create",
+    "mln_adapter_deferred_callback_function",
+    "mln_adapter_deferred_callback_release",
     "mln_adapter_http_header_transform_callback",
     "mln_adapter_http_header_validate",
     "mln_adapter_log_callback",
@@ -2548,11 +2555,12 @@
     "mln_adapter_resource_request_queue_acquire",
     "mln_adapter_resource_request_queue_close",
     "mln_adapter_resource_request_queue_create",
-    "mln_adapter_resource_transform_rewrite_callback"
+    "mln_adapter_resource_transform_rewrite_callback",
+    "mln_adapter_routed_resource_provider_callback"
   ],
   "schema_version": 1,
   "semantic": {
-    "resolved_callbacks": 16,
+    "resolved_callbacks": 17,
     "resolved_operations": 264,
     "support_relations": {
       "mln_acquired_frame_dispose": "dispose:mln_acquired_frame",

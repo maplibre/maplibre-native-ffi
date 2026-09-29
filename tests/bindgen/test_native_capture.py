@@ -87,39 +87,100 @@ class NativeCaptureTests(unittest.TestCase):
                 for function in self.api.functions
             ),
         )
-        outputs = generate(api)
-        with tempfile.TemporaryDirectory() as directory:
-            staging = Path(directory)
-            for name, text in outputs.items():
-                relative = name.removeprefix("src/").removeprefix("include/")
-                path = staging / relative
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(text)
-            source = staging / "capture.cpp"
-            source.write_text(CAPTURE_TEST)
-            executable = staging / "capture"
-            subprocess.run(
-                [
-                    "clang++",
-                    "-std=c++20",
-                    "-DMLN_STATIC",
-                    "-Wall",
-                    "-Wextra",
-                    "-Werror",
-                    f"-I{staging}",
-                    f"-I{ROOT / 'include'}",
-                    f"-I{ROOT / 'src'}",
-                    f"-I{ROOT / 'third_party/maplibre-native/include'}",
-                    str(source),
-                    "-o",
-                    str(executable),
-                ],
-                check=True,
-                text=True,
-            )
-            subprocess.run(
-                [str(executable)], check=True, capture_output=True, text=True
-            )
+        compile_and_run(generate(api), CAPTURE_TEST)
+
+    def test_deferred_callbacks_answer_early_and_fail_unadopted_decisions(self):
+        compile_and_run(generate(self.api), DEFERRED_TEST)
+
+
+def compile_and_run(outputs, test_source):
+    with tempfile.TemporaryDirectory() as directory:
+        staging = Path(directory)
+        for name, text in outputs.items():
+            relative = name.removeprefix("src/").removeprefix("include/")
+            path = staging / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
+        source = staging / "capture.cpp"
+        source.write_text(test_source)
+        executable = staging / "capture"
+        subprocess.run(
+            [
+                "clang++",
+                "-std=c++20",
+                "-DMLN_STATIC",
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                f"-I{staging}",
+                f"-I{ROOT / 'include'}",
+                f"-I{ROOT / 'src'}",
+                f"-I{ROOT / 'third_party/maplibre-native/include'}",
+                str(source),
+                "-o",
+                str(executable),
+            ],
+            check=True,
+            text=True,
+        )
+        subprocess.run([str(executable)], check=True, capture_output=True, text=True)
+
+
+DEFERRED_TEST = r"""
+#include <cassert>
+#include <cstring>
+#include "c_api/callback_capture.hpp"
+static mln::capture::DeferredRecord* delivered = nullptr;
+static bool accepting = true;
+auto mln::capture::deliver_deferred(void* context, std::uint32_t kind, DeferredRecord* record) noexcept -> bool {
+  if (!accepting || context == nullptr || kind != record->view.callback) return false;
+  delivered = record;
+  return true;
+}
+static unsigned completions = 0, releases = 0;
+static std::uint32_t completed_size = 1;
+extern "C" mln_status mln_resource_request_complete(mln_resource_request_handle, const mln_resource_response* response) noexcept {
+  ++completions; completed_size = response->size; return MLN_STATUS_OK;
+}
+extern "C" void mln_resource_request_release(mln_resource_request_handle) noexcept { ++releases; }
+extern "C" mln_status mln_map_dispose(mln_map) noexcept { return MLN_STATUS_OK; }
+extern "C" mln_status mln_map_projection_close(mln_map_projection) noexcept { return MLN_STATUS_OK; }
+
+int main() {
+  int context = 0;
+  char message[] = "borrowed";
+  auto* log = reinterpret_cast<mln_log_callback>(mln::capture::deferred_function(MLN_ADAPTER_DEFERRED_LOG_CALLBACK));
+  assert(log(&context, 1, 2, 3, message) == 1);
+  std::memset(message, 0, sizeof(message));
+  const auto* copied = static_cast<const mln_adapter_log_callback_arguments*>(delivered->view.arguments);
+  assert(copied->code == 3 && std::strcmp(copied->message, "borrowed") == 0);
+  mln::capture::destroy_deferred(delivered);
+  accepting = false;
+  assert(log(&context, 1, 2, 3, message) == 0);
+  accepting = true;
+
+  char url[] = "custom://style.json";
+  mln_resource_request request{};
+  request.requested_url = url;
+  auto* provider = reinterpret_cast<mln_resource_provider_callback>(
+    mln::capture::deferred_function(MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK));
+  assert(provider(&context, &request, 9) == MLN_RESOURCE_PROVIDER_DECISION_HANDLE);
+  std::memset(url, 0, sizeof(url));
+  const auto* arguments = static_cast<const mln_adapter_resource_provider_callback_arguments*>(delivered->view.arguments);
+  assert(arguments->handle == 9 && std::strcmp(arguments->request->requested_url, "custom://style.json") == 0);
+  delivered->claimed = true;
+  mln::capture::destroy_deferred(delivered);
+  assert(completions == 0 && releases == 0);
+
+  assert(provider(&context, &request, 9) == MLN_RESOURCE_PROVIDER_DECISION_HANDLE);
+  mln::capture::destroy_deferred(delivered);
+  assert(completions == 1 && completed_size == 0 && releases == 1);
+
+  request.prior_data_size = 1;
+  assert(provider(&context, &request, 9) == MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH);
+  assert(mln::capture::deferred_function(0) == nullptr);
+}
+"""
 
 
 CAPTURE_TEST = r"""
