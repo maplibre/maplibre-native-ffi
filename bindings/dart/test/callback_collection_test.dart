@@ -23,18 +23,20 @@ WeakReference<RuntimeHandle> _unreachableRuntime() {
 
 Future<WeakReference<RuntimeHandle>> _unreachableProvider() async {
   final runtime = runtimeCreate(runtimeOptionsDefault());
-  await runtime.setQueuedResourceProvider(
-    QueuedResourceProvider(
-      routes: [
-        AdapterQueuedResourceProviderRoute(
-          kind: ResourceKind.style.rawValue,
-          url: 'capture://style',
-        ),
-      ],
-      callback: (_, request) {
-        runtime.identity;
-        request.close();
-      },
+  await runtime.setResourceProvider(
+    ResourceProvider.routedResourceProvider(
+      AdapterRoutedResourceProvider(
+        routes: [
+          AdapterResourceRoute(
+            kind: ResourceKind.style.rawValue,
+            url: 'capture://style',
+          ),
+        ],
+        callback: (_, request) {
+          runtime.identity;
+          request.close();
+        },
+      ),
     ),
   );
   return WeakReference(runtime);

@@ -46,10 +46,6 @@ auto handle_kind_name(std::uint8_t kind) noexcept -> const char* {
       return "mln_resource_request_handle";
     case HandleKind::EventBatch:
       return "mln_event_batch";
-    case HandleKind::AdapterResourceRequestQueue:
-      return "mln_adapter_resource_request_queue";
-    case HandleKind::AdapterLogQueue:
-      return "mln_adapter_log_queue";
     case HandleKind::AcquiredFrame:
       return "mln_acquired_frame";
     case HandleKind::RenderFrameBatch:

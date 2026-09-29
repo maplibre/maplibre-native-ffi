@@ -1,6 +1,7 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 import 'dart:typed_data';
 import 'render/native_pointer.dart';
+import 'runtime/runtime.dart' show ResourceRequestHandle;
 
 final class AmbientCacheOperation {
   const AmbientCacheOperation.fromRawValue(this.rawValue);
@@ -1256,68 +1257,6 @@ final class WebglContextKind {
   int get hashCode => rawValue.hashCode;
 }
 
-final class ResourceRequest {
-  ResourceRequest({
-    this.requestedUrl,
-    this.resolvedUrl,
-    this.kind = const ResourceKind.fromRawValue(0),
-    this.loadingMethod = const ResourceLoadingMethod.fromRawValue(0),
-    this.priority = const ResourcePriority.fromRawValue(0),
-    this.usage = const ResourceUsage.fromRawValue(0),
-    this.storagePolicy = const ResourceStoragePolicy.fromRawValue(0),
-    this.range,
-    this.priorModifiedUnixMs,
-    this.priorExpiresUnixMs,
-    this.priorEtag,
-    Uint8List? priorData,
-  }) : priorData = Uint8List.fromList(
-         priorData ?? const <int>[],
-       ).asUnmodifiableView();
-  final String? requestedUrl;
-  final String? resolvedUrl;
-  final ResourceKind kind;
-  final ResourceLoadingMethod loadingMethod;
-  final ResourcePriority priority;
-  final ResourceUsage usage;
-  final ResourceStoragePolicy storagePolicy;
-  final ({BigInt rangeStart, BigInt rangeEnd})? range;
-  final int? priorModifiedUnixMs;
-  final int? priorExpiresUnixMs;
-  final String? priorEtag;
-  final Uint8List priorData;
-
-  @override
-  bool operator ==(Object other) =>
-      other is ResourceRequest &&
-      _generatedValueEquals(other.requestedUrl, requestedUrl) &&
-      _generatedValueEquals(other.resolvedUrl, resolvedUrl) &&
-      _generatedValueEquals(other.kind, kind) &&
-      _generatedValueEquals(other.loadingMethod, loadingMethod) &&
-      _generatedValueEquals(other.priority, priority) &&
-      _generatedValueEquals(other.usage, usage) &&
-      _generatedValueEquals(other.storagePolicy, storagePolicy) &&
-      _generatedValueEquals(other.range, range) &&
-      _generatedValueEquals(other.priorModifiedUnixMs, priorModifiedUnixMs) &&
-      _generatedValueEquals(other.priorExpiresUnixMs, priorExpiresUnixMs) &&
-      _generatedValueEquals(other.priorEtag, priorEtag) &&
-      _generatedValueEquals(other.priorData, priorData);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(requestedUrl),
-    _generatedValueHash(resolvedUrl),
-    _generatedValueHash(kind),
-    _generatedValueHash(loadingMethod),
-    _generatedValueHash(priority),
-    _generatedValueHash(usage),
-    _generatedValueHash(storagePolicy),
-    _generatedValueHash(range),
-    _generatedValueHash(priorModifiedUnixMs),
-    _generatedValueHash(priorExpiresUnixMs),
-    _generatedValueHash(priorEtag),
-    _generatedValueHash(priorData),
-  ]);
-}
-
 final class MetalOwnedTextureFrame {
   const MetalOwnedTextureFrame({
     required this.generation,
@@ -2441,6 +2380,8 @@ final class ProjectedMeters {
     _generatedValueHash(easting),
   ]);
 }
+
+typedef LogCallback = void Function(LogSeverity, LogEvent, int, String);
 
 final class PremultipliedRgba8Image {
   PremultipliedRgba8Image({
@@ -4105,49 +4046,6 @@ final class HttpHeaderTransformHttpHeaderTransformRules
   final AdapterHttpHeaderTransformRules value;
 }
 
-final class AdapterResourceRouteFlags {
-  const AdapterResourceRouteFlags.fromRawValue(this.rawValue);
-  final int rawValue;
-  static const flagsNone = AdapterResourceRouteFlags.fromRawValue(0);
-  static const matchGlob = AdapterResourceRouteFlags.fromRawValue(1);
-  static const useRequestedUrl = AdapterResourceRouteFlags.fromRawValue(2);
-  AdapterResourceRouteFlags operator |(AdapterResourceRouteFlags other) =>
-      AdapterResourceRouteFlags.fromRawValue(rawValue | other.rawValue);
-  AdapterResourceRouteFlags operator &(AdapterResourceRouteFlags other) =>
-      AdapterResourceRouteFlags.fromRawValue(rawValue & other.rawValue);
-  bool contains(AdapterResourceRouteFlags other) =>
-      (rawValue & other.rawValue) == other.rawValue;
-  @override
-  bool operator ==(Object other) =>
-      other is AdapterResourceRouteFlags && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
-}
-
-final class AdapterQueuedResourceProviderRoute {
-  const AdapterQueuedResourceProviderRoute({
-    this.kind = 0,
-    this.flags = const AdapterResourceRouteFlags.fromRawValue(0),
-    this.url,
-  });
-  final int kind;
-  final AdapterResourceRouteFlags flags;
-  final String? url;
-
-  @override
-  bool operator ==(Object other) =>
-      other is AdapterQueuedResourceProviderRoute &&
-      _generatedValueEquals(other.kind, kind) &&
-      _generatedValueEquals(other.flags, flags) &&
-      _generatedValueEquals(other.url, url);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(kind),
-    _generatedValueHash(flags),
-    _generatedValueHash(url),
-  ]);
-}
-
 final class AdapterResourceProviderRule {
   const AdapterResourceProviderRule({
     this.kind = 0,
@@ -4190,6 +4088,25 @@ final class AdapterResourceProviderRules {
   int get hashCode => Object.hashAll([_generatedValueHash(rules)]);
 }
 
+final class AdapterResourceRouteFlags {
+  const AdapterResourceRouteFlags.fromRawValue(this.rawValue);
+  final int rawValue;
+  static const flagsNone = AdapterResourceRouteFlags.fromRawValue(0);
+  static const matchGlob = AdapterResourceRouteFlags.fromRawValue(1);
+  static const useRequestedUrl = AdapterResourceRouteFlags.fromRawValue(2);
+  AdapterResourceRouteFlags operator |(AdapterResourceRouteFlags other) =>
+      AdapterResourceRouteFlags.fromRawValue(rawValue | other.rawValue);
+  AdapterResourceRouteFlags operator &(AdapterResourceRouteFlags other) =>
+      AdapterResourceRouteFlags.fromRawValue(rawValue & other.rawValue);
+  bool contains(AdapterResourceRouteFlags other) =>
+      (rawValue & other.rawValue) == other.rawValue;
+  @override
+  bool operator ==(Object other) =>
+      other is AdapterResourceRouteFlags && other.rawValue == rawValue;
+  @override
+  int get hashCode => rawValue.hashCode;
+}
+
 final class AdapterResourceRoute {
   const AdapterResourceRoute({
     this.kind = 0,
@@ -4214,12 +4131,100 @@ final class AdapterResourceRoute {
   ]);
 }
 
+final class ResourceRequest {
+  ResourceRequest({
+    this.requestedUrl,
+    this.resolvedUrl,
+    this.kind = const ResourceKind.fromRawValue(0),
+    this.loadingMethod = const ResourceLoadingMethod.fromRawValue(0),
+    this.priority = const ResourcePriority.fromRawValue(0),
+    this.usage = const ResourceUsage.fromRawValue(0),
+    this.storagePolicy = const ResourceStoragePolicy.fromRawValue(0),
+    this.range,
+    this.priorModifiedUnixMs,
+    this.priorExpiresUnixMs,
+    this.priorEtag,
+    Uint8List? priorData,
+  }) : priorData = Uint8List.fromList(
+         priorData ?? const <int>[],
+       ).asUnmodifiableView();
+  final String? requestedUrl;
+  final String? resolvedUrl;
+  final ResourceKind kind;
+  final ResourceLoadingMethod loadingMethod;
+  final ResourcePriority priority;
+  final ResourceUsage usage;
+  final ResourceStoragePolicy storagePolicy;
+  final ({BigInt rangeStart, BigInt rangeEnd})? range;
+  final int? priorModifiedUnixMs;
+  final int? priorExpiresUnixMs;
+  final String? priorEtag;
+  final Uint8List priorData;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ResourceRequest &&
+      _generatedValueEquals(other.requestedUrl, requestedUrl) &&
+      _generatedValueEquals(other.resolvedUrl, resolvedUrl) &&
+      _generatedValueEquals(other.kind, kind) &&
+      _generatedValueEquals(other.loadingMethod, loadingMethod) &&
+      _generatedValueEquals(other.priority, priority) &&
+      _generatedValueEquals(other.usage, usage) &&
+      _generatedValueEquals(other.storagePolicy, storagePolicy) &&
+      _generatedValueEquals(other.range, range) &&
+      _generatedValueEquals(other.priorModifiedUnixMs, priorModifiedUnixMs) &&
+      _generatedValueEquals(other.priorExpiresUnixMs, priorExpiresUnixMs) &&
+      _generatedValueEquals(other.priorEtag, priorEtag) &&
+      _generatedValueEquals(other.priorData, priorData);
+  @override
+  int get hashCode => Object.hashAll([
+    _generatedValueHash(requestedUrl),
+    _generatedValueHash(resolvedUrl),
+    _generatedValueHash(kind),
+    _generatedValueHash(loadingMethod),
+    _generatedValueHash(priority),
+    _generatedValueHash(usage),
+    _generatedValueHash(storagePolicy),
+    _generatedValueHash(range),
+    _generatedValueHash(priorModifiedUnixMs),
+    _generatedValueHash(priorExpiresUnixMs),
+    _generatedValueHash(priorEtag),
+    _generatedValueHash(priorData),
+  ]);
+}
+
+typedef ResourceProviderCallback =
+    void Function(ResourceRequest, ResourceRequestHandle);
+
+final class AdapterRoutedResourceProvider {
+  AdapterRoutedResourceProvider({
+    required List<AdapterResourceRoute> routes,
+    required this.callback,
+  }) : routes = List.unmodifiable(routes);
+  final List<AdapterResourceRoute> routes;
+  final ResourceProviderCallback callback;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AdapterRoutedResourceProvider &&
+      _generatedValueEquals(other.routes, routes) &&
+      _generatedValueEquals(other.callback, callback);
+  @override
+  int get hashCode => Object.hashAll([
+    _generatedValueHash(routes),
+    _generatedValueHash(callback),
+  ]);
+}
+
 sealed class ResourceProvider {
   const ResourceProvider._();
   const factory ResourceProvider.empty() = ResourceProviderEmpty;
   const factory ResourceProvider.resourceProviderRules(
     AdapterResourceProviderRules value,
   ) = ResourceProviderResourceProviderRules;
+  const factory ResourceProvider.routedResourceProvider(
+    AdapterRoutedResourceProvider value,
+  ) = ResourceProviderRoutedResourceProvider;
 }
 
 final class ResourceProviderEmpty extends ResourceProvider {
@@ -4229,6 +4234,11 @@ final class ResourceProviderEmpty extends ResourceProvider {
 final class ResourceProviderResourceProviderRules extends ResourceProvider {
   const ResourceProviderResourceProviderRules(this.value) : super._();
   final AdapterResourceProviderRules value;
+}
+
+final class ResourceProviderRoutedResourceProvider extends ResourceProvider {
+  const ResourceProviderRoutedResourceProvider(this.value) : super._();
+  final AdapterRoutedResourceProvider value;
 }
 
 final class AdapterResourceRewriteRule {

@@ -195,6 +195,29 @@ mln_status mln_measurement_change(mln_measurement measurement, const mln_complet
         self.assertIn("Future<CommandCompletion> change() => _startCommand(", source)
         self.assertNotIn("_startCommand(NativeCompletionStart", source)
 
+    def test_dart_registers_deferred_callbacks_through_the_generated_adapter(self):
+        source = """
+typedef void (*mln_notice_release)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
+typedef unsigned (*mln_notice_callback)(void *context BIND("kind=context;lifetime=owner"), int code, const char *text BIND("length=nul;encoding=utf8;lifetime=call")) BIND("thread=native;failure=0;deferred=1");
+BIND("execution=immediate;registration=callback;user_data=context;release_callback=release")
+mln_status mln_notice_set_callback(mln_notice_callback callback, void *context BIND("kind=context;ownership=borrowed"), mln_notice_release release);
+"""
+        api = self.parse(source)
+        self.assertIn("mln_notice_set_callback", dart.coverage(api)["generated"])
+        generated = dart.generate(api)
+        self.assertIn("void noticeSetCallback(NoticeCallback callback)", generated)
+        self.assertIn("_globalCallbackPorts.registerDeferred(", generated)
+        self.assertIn("mln_adapter_deferred_callback_function(", generated)
+        self.assertIn(
+            "arguments.text.cast<Utf8>().toDartString()",
+            generated,
+        )
+        # Without the annotation, Dart has no way to answer the callback.
+        synchronous = self.parse(source.replace(";deferred=1", ""))
+        self.assertIn(
+            "mln_notice_set_callback", dart.coverage(synchronous)["unsupported"]
+        )
+
     def test_dart_owners_come_from_handle_plans(self):
         api = self.parse("""
 typedef unsigned long long mln_measurement BIND("kind=handle;release=mln_measurement_close;dispose=mln_measurement_close;parent=none");

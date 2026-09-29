@@ -6,7 +6,6 @@ import 'package:maplibre_native_ffi/src/error/maplibre_exception.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
-import 'package:maplibre_native_ffi/src/internal/callback/callback_state.dart';
 import 'package:maplibre_native_ffi/src/internal/lifecycle/lifecycle.dart';
 import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
 import 'package:maplibre_native_ffi/src/internal/status/status.dart';
@@ -20,15 +19,6 @@ import 'package:maplibre_native_ffi/src/internal/lifecycle/native_handles.dart';
 extension type const _FakeNativeHandle(int raw) implements NativeHandle {}
 
 const _fakeHandle = _FakeNativeHandle(0x0200000000001234);
-
-final class _FakeCallbackState extends RetainedCallbackState {
-  var closes = 0;
-
-  @override
-  void closeResources() {
-    closes += 1;
-  }
-}
 
 void main() {
   group('status conversion', () {
@@ -152,35 +142,6 @@ void main() {
         expect(empty.size, 0);
         expect(empty.data, isNot(nullptr));
       });
-    });
-  });
-
-  group('callback state', () {
-    test('retired callback state waits until queued turn to close', () async {
-      final state = _FakeCallbackState();
-
-      state.close();
-      expect(state.closes, 0);
-      expect(state.runUpcall(() {}), isFalse);
-
-      await Future<void>.delayed(Duration.zero);
-      expect(state.closes, 1);
-    });
-
-    test('retired callback state waits for active upcalls', () async {
-      final state = _FakeCallbackState();
-      expect(
-        state.runUpcall(() {
-          state.close();
-          expect(state.closes, 0);
-        }),
-        isTrue,
-      );
-
-      expect(state.closes, 0);
-      await Future<void>.delayed(Duration.zero);
-      expect(state.closes, 1);
-      expect(state.runUpcall(() {}), isFalse);
     });
   });
 

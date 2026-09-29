@@ -351,7 +351,7 @@
     "src/c_api/callback_capture_generated.inc",
     "src/c_api/callback_port_generated.inc"
   ],
-  "function_count": 309,
+  "function_count": 298,
   "languages": {
     "dart": {
       "generated": [
@@ -386,6 +386,7 @@
         "mln_lat_lng_for_projected_meters",
         "mln_log_clear_callback",
         "mln_log_set_async_severity_mask",
+        "mln_log_set_callback",
         "mln_map_add_color_relief_layer",
         "mln_map_add_custom_geometry_source",
         "mln_map_add_custom_mvt_vector_source",
@@ -619,7 +620,6 @@
       ],
       "support": {
         "mln_http_header_transform_response_set": "native callback adapter mln_adapter_http_header_transform_callback for mln_http_header_transform",
-        "mln_log_set_callback": "hand-written logSetCallback in runtime_logging.dart through mln_adapter_log_callback and its native log queue",
         "mln_resource_transform_response_set_url": "native callback adapter mln_adapter_resource_transform_rewrite_callback for mln_resource_transform"
       },
       "unsupported": {}
@@ -2540,21 +2540,10 @@
     "mln_adapter_deferred_callback_release",
     "mln_adapter_http_header_transform_callback",
     "mln_adapter_http_header_validate",
-    "mln_adapter_log_callback",
-    "mln_adapter_log_queue_acquire",
-    "mln_adapter_log_queue_close",
-    "mln_adapter_log_queue_create",
-    "mln_adapter_log_record_destroy",
-    "mln_adapter_log_set_callback",
     "mln_adapter_owner_finalize",
     "mln_adapter_owner_token_create",
     "mln_adapter_owner_token_destroy",
-    "mln_adapter_queued_resource_provider_callback",
-    "mln_adapter_resource_provider_request_destroy",
     "mln_adapter_resource_provider_rules_callback",
-    "mln_adapter_resource_request_queue_acquire",
-    "mln_adapter_resource_request_queue_close",
-    "mln_adapter_resource_request_queue_create",
     "mln_adapter_resource_transform_rewrite_callback",
     "mln_adapter_routed_resource_provider_callback"
   ],

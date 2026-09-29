@@ -17,17 +17,10 @@ from tools.bindgen.semantic import BoundApi, OperationPlan
 from .dart_values import (
     Unsupported,
     Values,
+    deferred_key,
     owner_names,
     public_name,
 )
-
-# Values whose generated class and writer the hand-written queued resource
-# provider in runtime_resource_callbacks.dart consumes.
-HANDWRITTEN_VALUES = ("mln_adapter_queued_resource_provider_route",)
-
-
-class HandWritten(Exception):
-    """A verified operation whose adapter protocol a hand-written Dart file binds."""
 
 
 def adopt_owner(owned, expression, receiver, function, values):
@@ -145,28 +138,75 @@ def lower_port_registration(plan, registration, callback, values):
     )
 
 
+def lower_deferred_registration(plan, registration, callback, values):
+    """Lower a direct registration of a deferred callback through a native port.
+
+    The generated deferred adapter answers each call at once and posts a copy
+    to the port, which delivers it on this isolate. The receiver, or the
+    isolate for a global registration, roots the port until native release
+    retires it. A registration that native code does not accept releases the
+    port at once.
+    """
+    function = plan.function
+    receiver = type_name(function.parameters[0].type) if plan.receiver else None
+    if receiver and receiver not in values.bound.public_handles:
+        raise Unsupported("deferred registration requires an owned receiver")
+    if (
+        plan.execution != "immediate"
+        or plan.completion
+        or type_name(function.return_type) != "mln_status"
+    ):
+        raise Unsupported("deferred registration requires immediate admission status")
+    if not registration.release_callback or registration.accepted_unless:
+        raise Unsupported("deferred registration requires an unconditional release")
+    controls = {
+        registration.callback,
+        registration.user_data,
+        registration.release_callback,
+    } | ({function.parameters[0].name} if receiver else set())
+    if any(p.name not in controls for p in function.parameters):
+        raise Unsupported("deferred registration requires no other parameters")
+    inputs = {p.name: p.value for p in plan.inputs}
+    value = inputs[registration.callback]
+    values.check(value)
+    key = deferred_key(callback)
+    release = inputs[registration.release_callback].native
+    arguments = {
+        registration.callback: f"raw.mln_adapter_deferred_callback_function({key}).cast()",
+        registration.user_data: "port.context",
+        registration.release_callback: f"Native.addressOf<NativeFunction<raw.{release}Function>>(raw.mln_adapter_deferred_callback_release).cast()",
+    }
+    if receiver:
+        arguments[function.parameters[0].name] = "_handle.raw"
+        name = camel(function.name.removeprefix(receiver.removesuffix("_handle") + "_"))
+        roots = "_callbackPorts"
+    else:
+        name = camel(function.name.removeprefix("mln_"))
+        roots = "_globalCallbackPorts"
+    call = f"raw.{function.name}({', '.join(arguments[p.name] for p in function.parameters)})"
+    body = (
+        f"    final port = {roots}.registerDeferred({key}, (message) => _deliver{public_name(callback.native)}(callback, message));\n"
+        f"    var accepted = false;\n    try {{\n      _check({call});\n      accepted = true;\n    }} finally {{ if (!accepted) {{ port.reject(); }} }}"
+    )
+    return (
+        receiver or "Globals",
+        f"  void {name}({values.public(value)} callback) {{\n{body}\n  }}\n",
+    )
+
+
 def lower_direct_registration(plan, values):
-    """Lower a direct registration through a native port or its hand-written adapter."""
+    """Lower a direct registration through a native port."""
     if len(plan.direct_registrations) != 1:
         raise Unsupported("one direct registration required")
     registration = plan.direct_registrations[0]
     for port_plan, _, callback, _ in native_ports.direct_callbacks(values.bound):
         if port_plan.name == plan.name:
             return lower_port_registration(plan, registration, callback, values)
-    callback = next(p.value for p in plan.inputs if p.name == registration.callback)
-    adapters = [
-        a for a in values.bound.callback_adapters if a.callback == callback.native
-    ]
-    if (
-        not registration.release_callback
-        or len(adapters) != 1
-        or adapters[0].context != "mln_adapter_log_callback_state"
-    ):
-        raise Unsupported("direct callback requires a verified native queue adapter")
-    raise HandWritten(
-        f"hand-written logSetCallback in runtime_logging.dart through "
-        f"{adapters[0].function} and its native log queue"
-    )
+    value = next(p.value for p in plan.inputs if p.name == registration.callback)
+    callback = values.bound.callbacks.get(value.native)
+    if callback and callback.deferred:
+        return lower_deferred_registration(plan, registration, callback, values)
+    raise Unsupported("direct callback requires a native port or deferred adapter")
 
 
 def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
@@ -546,7 +586,7 @@ def attachment_name(owned):
 
 
 def lower(api: Api | BoundApi):
-    methods, generated, unsupported, handwritten = defaultdict(list), [], {}, {}
+    methods, generated, unsupported = defaultdict(list), [], {}
     bound = compile_api(api)
     values = Values(bound)
     unsupported.update(
@@ -564,14 +604,9 @@ def lower(api: Api | BoundApi):
             values.used.update(local_values.used)
             methods[owner].append(body)
             generated.append(plan.name)
-        except HandWritten as reason:
-            handwritten[plan.name] = str(reason)
         except Unsupported as error:
             unsupported[plan.name] = f"{plan.function.location}: {error}"
-    for native in HANDWRITTEN_VALUES:
-        if native in bound.values:
-            values.check(bound.values[native])
-    return methods, generated, unsupported, values, handwritten
+    return methods, generated, unsupported, values
 
 
 def render_scoped_views(bound, generated, values):
@@ -633,7 +668,13 @@ def registration_runtime(values):
     methods = []
     for value in descriptors:
         public = public_name(value.native)
-        roots = "ports" if values.port_callbacks(value) else "_callbackReleases"
+        roots = (
+            "ports"
+            if values.port_callbacks(value)
+            else "_callbackReleases, ports"
+            if values.registration_ports(value)
+            else "_callbackReleases"
+        )
         methods.append(
             f"  Pointer<raw.{value.native}> prepare{public}({public} value) {{ final registration = _prepare{public}(value, {roots}); _pending.add(registration); return registration.pointer; }}"
         )
@@ -712,35 +753,30 @@ def render_attachments(bound, generated):
 
 
 def generate(api: Api | BoundApi) -> str:
-    methods, generated, _, values, _ = lower(api)
+    methods, generated, _, values = lower(api)
     bound = values.bound
     _, conversions = values.render()
     parts = re.split(
-        r"(?m)(?=^(?:Pointer<raw\.\w+>|_NativeRegistration<raw\.\w+>|\w+) _(?:write|read|prepare)\w+\()",
+        r"(?m)(?=^(?:Pointer<raw\.\w+>|_NativeRegistration<raw\.\w+>|\w+) _(?:write|read|prepare|deliver)\w+\()",
         conversions,
     )
     conversion_map = {}
     for part in parts:
-        match = re.search(r"(_(?:write|read|prepare)\w+)\(", part)
+        match = re.search(r"(_(?:write|read|prepare|deliver)\w+)\(", part)
         if match:
             conversion_map[match[1]] = part
     needed = set(
         re.findall(
-            r"_(?:write|read|prepare)\w+",
+            r"_(?:write|read|prepare|deliver)\w+",
             "".join(body for bodies in methods.values() for body in bodies)
             + registration_runtime(values),
         )
     )
     needed.update("_read" + public_name(value.native) for value in values.projections)
-    needed.update(
-        "_write" + public_name(native)
-        for native in HANDWRITTEN_VALUES
-        if native in values.used
-    )
     while True:
         expanded = needed | set(
             re.findall(
-                r"_(?:write|read|prepare)\w+",
+                r"_(?:write|read|prepare|deliver)\w+",
                 "".join(conversion_map.get(name, "") for name in needed),
             )
         )
@@ -782,8 +818,8 @@ def generate(api: Api | BoundApi) -> str:
 
 
 def coverage(api: Api | BoundApi):
-    _, generated, unsupported, values, handwritten = lower(api)
-    support = dict(handwritten)
+    _, generated, unsupported, values = lower(api)
+    support = {}
     bound = values.bound
     for value in values.used.values():
         if value.registration:
@@ -798,10 +834,21 @@ def coverage(api: Api | BoundApi):
 
 
 def generate_values(api: Api | BoundApi) -> str:
-    _, _, _, values, _ = lower(api)
+    _, _, _, values = lower(api)
     declarations, _ = values.render()
+    # Callback types name the handle owners that the runtime library defines.
+    owners = sorted(
+        name
+        for name in (owner_names(native)[0] for native in values.bound.public_handles)
+        if re.search(rf"\b{name}\b", declarations)
+    )
+    runtime = (
+        f"import 'runtime/runtime.dart' show {', '.join(owners)};\n" if owners else ""
+    )
     return (
-        "// Generated from the C headers by tools/bindgen. Do not edit.\nimport 'dart:typed_data';\nimport 'render/native_pointer.dart';\n\n"
+        "// Generated from the C headers by tools/bindgen. Do not edit.\nimport 'dart:typed_data';\nimport 'render/native_pointer.dart';\n"
+        + runtime
+        + "\n"
         + declarations
         + """
 bool _generatedValueEquals(Object? left, Object? right) {

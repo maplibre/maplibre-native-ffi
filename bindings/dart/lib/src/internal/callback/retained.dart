@@ -49,8 +49,12 @@ final class NativeOwnedArena extends Arena {
     return result;
   }
 
-  void adoptHandle(int handle) => checkStatus(
-    raw.mln_adapter_arena_adopt_handle(_allocator.pointer, handle),
+  /// Runs [release] with [context] when native code destroys this arena.
+  void adoptRelease(
+    Pointer<NativeFunction<raw.mln_runtime_callback_releaseFunction>> release,
+    Pointer<Void> context,
+  ) => checkStatus(
+    raw.mln_adapter_arena_adopt_release(_allocator.pointer, release, context),
   );
   @override
   void releaseAll({bool reuse = false}) {

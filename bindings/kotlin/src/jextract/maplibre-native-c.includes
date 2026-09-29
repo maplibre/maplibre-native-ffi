@@ -21,8 +21,6 @@
 --include-constant MLN_STATUS_UNSUPPORTED
 --include-constant MLN_STATUS_WRONG_THREAD
 --include-typedef mln_acquired_frame
---include-typedef mln_adapter_log_queue
---include-typedef mln_adapter_resource_request_queue
 --include-typedef mln_event_batch
 --include-typedef mln_map
 --include-typedef mln_map_projection

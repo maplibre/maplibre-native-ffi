@@ -123,14 +123,6 @@ typedef uint64_t mln_event_batch MLN_BINDING(
   "kind=handle;release=mln_event_batch_release;parent=none;dispose=mln_event_"
   "batch_release"
 );
-typedef uint64_t mln_adapter_resource_request_queue MLN_BINDING(
-  "kind=handle;release=mln_adapter_resource_request_queue_close;parent=none;"
-  "dispose=mln_adapter_resource_request_queue_close"
-);
-typedef uint64_t mln_adapter_log_queue MLN_BINDING(
-  "kind=handle;release=mln_adapter_log_queue_close;parent=none;dispose=mln_"
-  "adapter_log_queue_close"
-);
 typedef uint64_t mln_acquired_frame MLN_BINDING(
   "kind=handle;release=mln_acquired_frame_release;parent=mln_render_session;"
   "dispose=mln_acquired_frame_dispose;dispose_invalidates=parent;"

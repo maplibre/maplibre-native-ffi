@@ -8,11 +8,8 @@ import 'package:ffi/ffi.dart';
 
 import '../error/maplibre_exception.dart';
 import '../log/log.dart';
-import '../internal/callback/callback_state.dart';
 import '../internal/callback/completion.dart';
-import '../internal/callback/wake.dart';
 import '../internal/callback/retained.dart';
-import '../internal/c/maplibre_native_c.dart';
 import '../internal/c/maplibre_native_c.g.dart' as raw;
 import '../internal/lifecycle/lifecycle.dart';
 import '../internal/lifecycle/native_handles.dart';
@@ -21,25 +18,21 @@ import '../internal/status/status.dart';
 import '../internal/value/uint64.dart';
 import '../render/native_pointer.dart';
 
-part 'runtime_resource_callbacks.dart';
-part 'runtime_logging.dart';
 part 'generated_operations.dart';
 part 'runtime_offline.dart';
 
-final MaplibreNativeCApi _c = MaplibreNativeCApi.open();
-
-/// Native release roots for the adapter rule contexts and the log callback.
+/// Native release roots for the adapter rule contexts.
 ///
 /// Native code retires each registration with a release message, which can
 /// arrive after the owner that registered it is closed or collected. Nothing
 /// here captures an owner, so one set serves the isolate.
 final _callbackReleases = NativeCallbackReleases();
 
-/// Native release roots for queued resource providers, one set per runtime.
+/// Port roots for process-global registrations, such as the log callback.
 ///
-/// A provider callback can capture its runtime, so these roots live only as
-/// long as that runtime and never keep it reachable.
-final _resourceProviderReleases = Expando<NativeCallbackReleases>();
+/// Native release retires each port, including from another isolate that
+/// replaces or clears the registration.
+final _globalCallbackPorts = _NativeCallbackPorts();
 
 final class CallbackPortLifecycleProbe {
   CallbackPortLifecycleProbe._(this._port);
@@ -58,93 +51,86 @@ CallbackPortLifecycleProbe? singleCallbackPortProbeForTesting(Object owner) {
   return pending.isEmpty ? null : CallbackPortLifecycleProbe._(pending.single);
 }
 
-/// Dart resource provider callback run asynchronously on its receiver isolate.
-typedef ResourceProviderCallback =
-    void Function(ResourceRequest request, ResourceRequestHandle handle);
-
-/// Receiver-isolate resource provider definition.
-final class QueuedResourceProvider {
-  /// Creates a resource provider with native-owned routing rules.
-  QueuedResourceProvider({
-    required List<AdapterQueuedResourceProviderRoute> routes,
-    required this.callback,
-  }) : routes = List.unmodifiable(routes);
-
-  /// Routes handled by this provider.
-  final List<AdapterQueuedResourceProviderRoute> routes;
-
-  /// Callback invoked on the receiver isolate for matching requests.
-  final ResourceProviderCallback callback;
-}
-
-/// Queued Dart resource provider registration on a runtime.
-///
-/// The provider copies each matching request into a native queue that its
-/// isolate drains, a protocol the generated operations do not express.
-extension RuntimeQueuedResourceProvider on RuntimeHandle {
-  /// Registers or replaces a queued Dart resource provider callback.
-  ///
-  /// Requests reach [QueuedResourceProvider.callback] on the isolate that
-  /// registered the provider, one event-loop turn after MapLibre queues them.
-  Future<CommandCompletion> setQueuedResourceProvider(
-    QueuedResourceProvider provider,
-  ) {
-    final state = _ResourceProviderCallbackState(provider);
-    final userData = state.pointer.cast<Void>();
-    final releases = _resourceProviderReleases[this] ??=
-        NativeCallbackReleases();
-    releases.register(userData, state.retire, arena: state.arena);
-    return _startCommand(
-      (completion) => withNativeArena((arena) {
-        final nativeProvider = arena<raw.mln_resource_provider>();
-        nativeProvider.ref.size = sizeOf<raw.mln_resource_provider>();
-        nativeProvider.ref.callback = _c
-            .adapterQueuedResourceProviderCallback();
-        nativeProvider.ref.user_data = userData;
-        nativeProvider.ref.release_user_data =
-            Native.addressOf<
-              NativeFunction<raw.mln_runtime_callback_releaseFunction>
-            >(raw.mln_adapter_dart_release);
-        return raw.mln_runtime_set_resource_provider(
-          _handle.raw,
-          nativeProvider,
-          completion,
-        );
-      }),
-      onRejected: () => releases.reject(userData),
-    );
-  }
-}
-
 final class _NativeCallbackPorts {
   final pending = <_NativeCallbackPort>{};
   _NativeCallbackPort register(
     Map<int, void Function(List<dynamic>)> callbacks,
   ) {
-    final port = _NativeCallbackPort(callbacks, (port) => pending.remove(port));
+    final port = _NativeCallbackPort(
+      callbacks,
+      (port) => pending.remove(port),
+      (nativePort) => raw.mln_adapter_dart_port_create(
+        NativeApi.postCObject.cast(),
+        nativePort,
+      ),
+      raw.mln_adapter_dart_port_release,
+    );
+    pending.add(port);
+    return port;
+  }
+
+  /// Registers a port that receives copied calls of one deferred callback.
+  ///
+  /// Each message carries a native record that [deliver] must destroy. A
+  /// message that arrives after this owner is collected is destroyed unread.
+  _NativeCallbackPort registerDeferred(
+    int callback,
+    void Function(List<dynamic>) deliver,
+  ) {
+    final port = _NativeCallbackPort(
+      {callback: deliver},
+      (port) => pending.remove(port),
+      (nativePort) => withNativeArena((arena) {
+        final context = arena<Pointer<Void>>();
+        _check(
+          raw.mln_adapter_dart_deferred_callback_create(
+            callback,
+            NativeApi.postCObject.cast(),
+            nativePort,
+            context,
+          ),
+        );
+        return context.value;
+      }),
+      raw.mln_adapter_deferred_callback_release,
+      _destroyDeferredMessage,
+    );
     pending.add(port);
     return port;
   }
 }
 
+void _destroyDeferredMessage(List<dynamic> message) =>
+    raw.mln_adapter_deferred_call_record_destroy(
+      Pointer<raw.mln_adapter_deferred_call_record>.fromAddress(
+        message[1] as int,
+      ),
+    );
+
 final class _NativeCallbackPort {
   _NativeCallbackPort(
     Map<int, void Function(List<dynamic>)> callbacks,
     this._onReleased,
-  ) {
+    Pointer<Void> Function(int nativePort) create,
+    this._release, [
+    void Function(List<dynamic>)? discard,
+  ]) {
     _callbacks = callbacks;
     _port = RawReceivePort();
-    _port.handler = _callbackPortHandler(WeakReference(this), _port);
-    context = raw.mln_adapter_dart_port_create(
-      NativeApi.postCObject.cast(),
-      _port.sendPort.nativePort,
-    );
+    _port.handler = _callbackPortHandler(WeakReference(this), _port, discard);
+    try {
+      context = create(_port.sendPort.nativePort);
+    } catch (_) {
+      _port.close();
+      rethrow;
+    }
     if (context == nullptr) {
       _port.close();
       throw StateError('native callback port allocation failed');
     }
   }
   final void Function(_NativeCallbackPort) _onReleased;
+  final void Function(Pointer<Void>) _release;
   final _zone = Zone.current;
   late final Map<int, void Function(List<dynamic>)> _callbacks;
   void _deliver(dynamic message) {
@@ -172,7 +158,7 @@ final class _NativeCallbackPort {
   }
 
   void reject() {
-    raw.mln_adapter_dart_port_release(context);
+    _release(context);
     _finish();
   }
 }
@@ -180,10 +166,15 @@ final class _NativeCallbackPort {
 void Function(dynamic) _callbackPortHandler(
   WeakReference<_NativeCallbackPort> reference,
   RawReceivePort port,
+  void Function(List<dynamic>)? discard,
 ) => (dynamic message) {
   final state = reference.target;
   if (state == null) {
-    if (message == 0) port.close();
+    if (message == 0) {
+      port.close();
+    } else if (message is List<dynamic>) {
+      discard?.call(message);
+    }
     return;
   }
   state._deliver(message);

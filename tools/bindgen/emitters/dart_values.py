@@ -7,6 +7,7 @@ from os.path import commonprefix
 
 from .. import native_ports
 from ..names import camel, pascal
+from ..native_capture import arguments_record, deferred_constant
 from ..semantic import BoundApi, ValuePlan
 
 POSITIONAL = {
@@ -47,6 +48,14 @@ SCALARS = {
     "unsigned short": ("int", "Uint16"),
     "short": ("int", "Int16"),
 }
+
+
+def deferred_key(callback) -> str:
+    """The Dart expression for a deferred callback's port message key."""
+    return (
+        "(raw.mln_adapter_deferred_callback."
+        f"{deferred_constant(callback.native)} & 0xffffffff)"
+    )
 
 
 def owner_names(native: str) -> tuple[str, str]:
@@ -124,6 +133,10 @@ class Values:
             return
         if value.kind == "callback":
             callback = self.bound.callbacks[value.native]
+            if callback.deferred:
+                self.check_deferred(callback)
+                self.used[value.native] = value
+                return
             if callback.result.native != "void" or not callback.context:
                 raise Unsupported("callback requires a synchronous native adapter")
             for parameter in callback.parameters:
@@ -203,8 +216,54 @@ class Values:
                     pass
         return result
 
-    @staticmethod
-    def fields(value):
+    def registration_ports(self, value):
+        """Whether an adapter variant of a registration binds a deferred port."""
+        return any(
+            self.deferred_field(self.bound.values[adapter.context])
+            for adapter in self.registration_adapters(value)
+        )
+
+    def check_deferred(self, callback):
+        """Accept a deferred callback whose copied arguments Dart can decode."""
+        for parameter in callback.parameters:
+            if parameter.name == callback.context:
+                continue
+            if callback.decision and parameter.name == callback.decision.parameter:
+                if parameter.value.native not in self.bound.public_handles:
+                    raise Unsupported("deferred decision requires a generated owner")
+                continue
+            if parameter.value.kind == "handle":
+                raise Unsupported("deferred handle argument requires an owner rule")
+            if parameter.value.kind == "reference" and (
+                not parameter.value.element or parameter.value.element.kind != "record"
+            ):
+                raise Unsupported("deferred reference argument requires a record")
+            self.check(parameter.value)
+
+    def deferred_field(self, value):
+        """The deferred callback field of a record and the context it pairs with.
+
+        A record that is not a registration descriptor names its callback's
+        context in its single context field.
+        """
+        if value.registration or value.kind != "record":
+            return None
+        callbacks = [
+            f
+            for f in value.fields
+            if f.value.kind == "callback"
+            and self.bound.callbacks[f.value.native].deferred
+        ]
+        if not callbacks:
+            return None
+        contexts = [f.name for f in value.fields if f.role == "context"]
+        if len(callbacks) != 1 or len(contexts) != 1:
+            raise Unsupported(
+                f"{value.native}: deferred callback field requires one paired context"
+            )
+        return callbacks[0], contexts[0]
+
+    def fields(self, value):
         controls = {
             f.name
             for f in value.fields
@@ -217,6 +276,9 @@ class Values:
         if value.registration:
             controls |= {value.registration.user_data, value.registration.release}
         controls |= {f.value.length for f in value.fields if f.value.kind == "array"}
+        deferred = self.deferred_field(value)
+        if deferred:
+            controls.add(deferred[1])
         return tuple(f for f in value.fields if f.name not in controls)
 
     def public(self, value):
@@ -538,6 +600,78 @@ class Values:
             return f"const {public_name(value.native)}({', '.join(args)})"
         return None
 
+    def write_deferred_field(self, field, context, expression):
+        """Bind a deferred callback field to a port the written arena retires.
+
+        The arena runs the context release when native code releases the
+        record that holds it, so the port closes after the final call.
+        """
+        callback = self.bound.callbacks[field.value.native]
+        key = deferred_key(callback)
+        local = "port" + pascal(field.name)
+        return [
+            f"  final {local} = ports.registerDeferred({key}, (message) => _deliver{public_name(callback.native)}({expression}, message));",
+            f"  arena.adoptRelease(Native.addressOf<NativeFunction<raw.mln_runtime_callback_releaseFunction>>(raw.mln_adapter_deferred_callback_release), {local}.context);",
+            f"  result.ref.{field.name} = raw.mln_adapter_deferred_callback_function({key}).cast();",
+            f"  result.ref.{context} = {local}.context;",
+        ]
+
+    def render_deferred_delivery(self, callback):
+        """Decode one deferred call record and run the host callback with it.
+
+        MapLibre already has the deferred answer, so a failed callback stays
+        contained. Destroying a record whose decision handle the callback did
+        not keep fails the request.
+        """
+        public = public_name(callback.native)
+        decision = callback.decision
+        lines = [
+            f"void _deliver{public}({public} callback, List<dynamic> message) {{",
+            "  final record = Pointer<raw.mln_adapter_deferred_call_record>.fromAddress(message[1] as int);",
+        ]
+        if decision:
+            owner, native = owner_names(decision.handle.native)
+            lines += [f"  {owner}? owner;", "  var failed = false;"]
+        lines += [
+            "  try {",
+            f"    final arguments = record.ref.arguments.cast<raw.{arguments_record(callback.native)}>().ref;",
+        ]
+        decoded = []
+        for parameter in callback.parameters:
+            if parameter.name == callback.context:
+                continue
+            if decision and parameter.name == decision.parameter:
+                lines.append(
+                    f"    final adopted = owner = {owner}._({native}(arguments.{parameter.name}));"
+                )
+                decoded.append("adopted")
+            else:
+                decoded.append(
+                    self.copy(parameter.value, f"arguments.{parameter.name}")
+                )
+        lines.append(f"    callback({', '.join(decoded)});")
+        if decision:
+            lines += [
+                "    raw.mln_adapter_deferred_call_record_adopt(record);",
+                "  } catch (_) {",
+                "    // The native answer is final, so the failure stays here.",
+                "    failed = true;",
+                "  } finally {",
+                "    raw.mln_adapter_deferred_call_record_destroy(record);",
+                "    if (failed) { owner?.close(); }",
+                "  }",
+            ]
+        else:
+            lines += [
+                "  } catch (_) {",
+                "    // The native answer is final, so the failure stays here.",
+                "  } finally {",
+                "    raw.mln_adapter_deferred_call_record_destroy(record);",
+                "  }",
+            ]
+        lines.append("}")
+        return "\n".join(lines) + "\n"
+
     def port_copy(self, value, offset):
         if value.kind == "record":
             args = []
@@ -693,13 +827,18 @@ class Values:
             children.append(
                 f"final class {variant} extends {public} {{\n  const {variant}(this.value) : super._();\n  final {context} value;\n}}"
             )
+            ports = (
+                ", ports"
+                if self.deferred_field(self.bound.values[adapter.context])
+                else ""
+            )
             cases.append(
-                f"    case {variant}():\n      final context = _write{context}(value.value, arena);\n      final descriptor = arena<raw.{value.native}>();\n      descriptor.ref.size = sizeOf<raw.{value.native}>();\n      descriptor.ref.{callback_field} = Native.addressOf<NativeFunction<raw.{adapter.callback}Function>>(raw.{adapter.function});\n      descriptor.ref.{value.registration.user_data} = context.cast();\n      descriptor.ref.{value.registration.release} = Native.addressOf<NativeFunction<raw.mln_runtime_callback_releaseFunction>>(raw.mln_adapter_dart_release);\n      transferred = true;\n      roots.register(context.cast(), arena.releaseAll, arena: arena);\n      return _NativeRegistration(descriptor, () => roots.reject(context.cast()));"
+                f"    case {variant}():\n      final context = _write{context}(value.value, arena{ports});\n      final descriptor = arena<raw.{value.native}>();\n      descriptor.ref.size = sizeOf<raw.{value.native}>();\n      descriptor.ref.{callback_field} = Native.addressOf<NativeFunction<raw.{adapter.callback}Function>>(raw.{adapter.function});\n      descriptor.ref.{value.registration.user_data} = context.cast();\n      descriptor.ref.{value.registration.release} = Native.addressOf<NativeFunction<raw.mln_runtime_callback_releaseFunction>>(raw.mln_adapter_dart_release);\n      transferred = true;\n      roots.register(context.cast(), arena.releaseAll, arena: arena);\n      return _NativeRegistration(descriptor, () => roots.reject(context.cast()));"
             )
         declarations.append("}")
         declarations.extend(children)
         conversion = (
-            f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value, NativeCallbackReleases roots) {{\n  final arena = NativeOwnedArena();\n  var transferred = false;\n  try {{\n    switch(value) {{\n"
+            f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value, NativeCallbackReleases roots{', _NativeCallbackPorts ports' if self.registration_ports(value) else ''}) {{\n  final arena = NativeOwnedArena();\n  var transferred = false;\n  try {{\n    switch(value) {{\n"
             + "\n".join(cases)
             + "\n    }\n  } catch (_) { if (!transferred) { arena.releaseAll(); } rethrow; }\n}\n"
         )
@@ -901,6 +1040,8 @@ class Values:
                     if p.name != callback.context
                 )
                 declarations.append(f"typedef {public} = void Function({parameters});")
+                if callback.deferred:
+                    conversions.append(self.render_deferred_delivery(callback))
                 continue
             if value.registration and self.port_callbacks(value):
                 declaration, conversion = self.render_port_registration(value)
@@ -981,8 +1122,14 @@ class Values:
             declarations.append(
                 f"final class {public} {{\n  {'const ' if not initializers else ''}{public}({signature}){' : ' + ', '.join(initializers) if initializers else ''};\n{fields}\n  @override bool operator ==(Object other) => other is {public} && {equality};\n  @override int get hashCode => Object.hashAll([{hashes}]);\n}}\n"
             )
+            deferred = self.deferred_field(value)
             write = [
-                f"Pointer<raw.{value.native}> _write{public}({public} value, Arena arena"
+                f"Pointer<raw.{value.native}> _write{public}({public} value, "
+                + (
+                    "NativeOwnedArena arena, _NativeCallbackPorts ports"
+                    if deferred
+                    else "Arena arena"
+                )
                 + (
                     ", _NativeRegistrations registrations"
                     if self.has_registrations(value)
@@ -1038,6 +1185,14 @@ class Values:
                             f"  result.ref.{field.value.length} = {expression}.length;",
                             f"  for (var index = 0; index < {expression}.length; index++) {{ {native_field}[index] = {self.native(child, expression + '[index]')}; }}",
                         ]
+                    elif deferred and field.name == deferred[0].name:
+                        write += self.write_deferred_field(
+                            field, deferred[1], expression
+                        )
+                        decoded.append(
+                            f"{identifier(field.name)}: throwInvalidState('cannot copy a registered native callback')"
+                        )
+                        continue
                     else:
                         write.append(
                             f"  {native_field} = {self.native(field.value, expression)};"

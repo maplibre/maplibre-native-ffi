@@ -12,18 +12,6 @@ internal readonly struct MlnAcquiredFrame(ulong value) : IMlnHandle
     public bool IsNull => Value == 0;
 }
 
-internal readonly struct MlnAdapterLogQueue(ulong value) : IMlnHandle
-{
-    public ulong Value { get; } = value;
-    public bool IsNull => Value == 0;
-}
-
-internal readonly struct MlnAdapterResourceRequestQueue(ulong value) : IMlnHandle
-{
-    public ulong Value { get; } = value;
-    public bool IsNull => Value == 0;
-}
-
 internal readonly struct MlnBuffer(ulong value) : IMlnHandle
 {
     public ulong Value { get; } = value;

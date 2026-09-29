@@ -625,16 +625,6 @@ inline auto dispose_owner(
   if (std::strcmp(native_type, "mln_acquired_frame") == 0) {
     return mln_acquired_frame_dispose(static_cast<mln_acquired_frame>(handle));
   }
-  if (std::strcmp(native_type, "mln_adapter_log_queue") == 0) {
-    mln_adapter_log_queue_close(static_cast<mln_adapter_log_queue>(handle));
-    return MLN_STATUS_OK;
-  }
-  if (std::strcmp(native_type, "mln_adapter_resource_request_queue") == 0) {
-    mln_adapter_resource_request_queue_close(
-      static_cast<mln_adapter_resource_request_queue>(handle)
-    );
-    return MLN_STATUS_OK;
-  }
   if (std::strcmp(native_type, "mln_buffer") == 0) {
     mln_buffer_destroy(static_cast<mln_buffer>(handle));
     return MLN_STATUS_OK;

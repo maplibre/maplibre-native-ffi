@@ -3,8 +3,8 @@
 // Adapts synchronous MapLibre callback contracts to hosts that can only receive
 // callbacks asynchronously through void listener functions.
 //
-// Native callbacks enqueue on MapLibre threads; hosts drain and close queues
-// from their own execution contexts.
+// Deferred callbacks answer on MapLibre threads and hand copied calls to a
+// listener or a Dart port; hosts run them on their own execution contexts.
 
 #include <algorithm>
 #include <array>
@@ -12,7 +12,6 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <deque>
 #include <limits>
 #include <map>
 #include <memory>
@@ -20,8 +19,6 @@
 #include <new>
 #include <optional>
 #include <span>
-#include <stdexcept>
-#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -33,106 +30,13 @@
 #include "diagnostics/diagnostics.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
-#include "resources/custom_resource_provider.hpp"
 #include "runtime/runtime.hpp"
-#include "wake/wake.hpp"
-
-namespace mln::core {
-
-struct AdapterQueuedResourceRequest {
-  mln_adapter_queued_resource_request view{};
-  std::string requested_url;
-  std::string resolved_url;
-  std::string prior_etag;
-  std::vector<std::uint8_t> prior_data;
-};
-
-struct AdapterLogRecord {
-  mln_adapter_log_record view{};
-  std::string message;
-};
-
-struct AdapterResourceRequestQueueObject {
-  std::mutex mutex;
-  std::mutex drain_mutex;
-  std::deque<std::unique_ptr<AdapterQueuedResourceRequest>> records;
-  std::shared_ptr<Wake> wake;
-  bool wake_pending = false;
-  bool closed = false;
-
-  auto close() noexcept -> void {
-    auto detached_wake = std::shared_ptr<Wake>{};
-    {
-      const std::scoped_lock lock(mutex);
-      if (closed) {
-        return;
-      }
-      closed = true;
-      detached_wake = std::move(wake);
-    }
-    detached_wake.reset();
-    // Closing excludes producers and drainers before releasing host-owned
-    // requests. Constructing an empty deque can allocate on Windows.
-    for (const auto& record : records) {
-      mln_resource_request_release(record->view.handle);
-    }
-    records.clear();
-  }
-
-  ~AdapterResourceRequestQueueObject() { close(); }
-};
-
-struct AdapterLogQueueObject {
-  std::mutex mutex;
-  std::mutex drain_mutex;
-  std::deque<std::unique_ptr<AdapterLogRecord>> records;
-  std::shared_ptr<Wake> wake;
-  bool wake_pending = false;
-  bool closed = false;
-
-  auto close() noexcept -> void {
-    auto detached_wake = std::shared_ptr<Wake>{};
-    {
-      const std::scoped_lock lock(mutex);
-      if (closed) {
-        return;
-      }
-      closed = true;
-      detached_wake = std::move(wake);
-    }
-    detached_wake.reset();
-    records.clear();
-  }
-
-  ~AdapterLogQueueObject() { close(); }
-};
-
-template <>
-struct HandleTraits<AdapterResourceRequestQueueObject> {
-  static constexpr auto kind = HandleKind::AdapterResourceRequestQueue;
-  static constexpr auto leasable = true;
-};
-
-template <>
-struct HandleTraits<AdapterLogQueueObject> {
-  static constexpr auto kind = HandleKind::AdapterLogQueue;
-  static constexpr auto leasable = true;
-};
-
-}  // namespace mln::core
 
 namespace {
 
 using AdapterResourceRewriteRules = mln_adapter_resource_rewrite_rules;
 using AdapterHttpHeaderTransformRules = mln_adapter_http_header_transform_rules;
 using AdapterResourceProviderRules = mln_adapter_resource_provider_rules;
-using AdapterQueuedResourceProviderRoute =
-  mln_adapter_queued_resource_provider_route;
-using AdapterQueuedResourceProvider = mln_adapter_queued_resource_provider;
-using AdapterQueuedResourceRequest = mln::core::AdapterQueuedResourceRequest;
-using AdapterQueuedResourceRequestView = mln_adapter_queued_resource_request;
-using AdapterLogCallbackState = mln_adapter_log_callback_state;
-using AdapterLogRecord = mln::core::AdapterLogRecord;
 using AdapterCompletionRecord = mln::capture::Record;
 
 // Dart native API major version 2 fixes this integer-message prefix. Only
@@ -258,9 +162,6 @@ std::map<void*, DartRelease> dart_releases;
 struct AdapterOwnerToken {
   std::uint64_t handle = 0;
 };
-using AdapterLogRecordView = mln_adapter_log_record;
-
-std::mutex log_setter_mutex;
 
 struct AdapterCompletionState {
   std::uint32_t copy_kind = MLN_ADAPTER_COMPLETION_COPY_FLAT;
@@ -470,7 +371,7 @@ constexpr auto KnownRouteFlags =
 static_assert(
   static_cast<std::uint32_t>(MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB) ==
     static_cast<std::uint32_t>(MLN_ADAPTER_URL_MATCH_GLOB),
-  "a queued provider route selects glob matching with the shared flag bit"
+  "a resource route selects glob matching with the shared flag bit"
 );
 
 // A null url, an absent candidate, or a flag bit outside known_flags matches
@@ -495,9 +396,9 @@ auto has_flag(std::uint32_t flags, mln_adapter_resource_route_flags flag)
   return (flags & static_cast<std::uint32_t>(flag)) != 0;
 }
 
-template <class Route>
-auto route_matches_url(const Route& route, const mln_resource_request& request)
-  -> bool {
+auto route_matches_url(
+  const mln_adapter_resource_route& route, const mln_resource_request& request
+) -> bool {
   const auto* candidate =
     has_flag(route.flags, MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL)
       ? request.requested_url
@@ -505,151 +406,14 @@ auto route_matches_url(const Route& route, const mln_resource_request& request)
   return url_matches(route.flags, KnownRouteFlags, route.url, candidate);
 }
 
-template <class Route>
 auto request_matches_route(
-  std::span<const Route> routes, const mln_resource_request& request
+  std::span<const mln_adapter_resource_route> routes,
+  const mln_resource_request& request
 ) -> bool {
   return std::ranges::any_of(routes, [&request](const auto& route) -> bool {
     return matches_rule(route.kind, request.kind) &&
            route_matches_url(route, request);
   });
-}
-
-auto copy_prior_data(const mln_resource_request& request)
-  -> std::vector<std::uint8_t> {
-  if (request.prior_data == nullptr || request.prior_data_size == 0) {
-    return {};
-  }
-  auto data = std::vector<std::uint8_t>{};
-  data.resize(request.prior_data_size);
-  std::ranges::copy(
-    std::span{request.prior_data, request.prior_data_size}, data.begin()
-  );
-  return data;
-}
-
-auto copy_request(
-  const mln_resource_request& request, mln_resource_request_handle handle
-) -> std::unique_ptr<AdapterQueuedResourceRequest> {
-  auto copy = std::make_unique<AdapterQueuedResourceRequest>();
-  copy->requested_url = request.requested_url == nullptr
-                          ? std::string{}
-                          : std::string{request.requested_url};
-  copy->resolved_url = request.resolved_url == nullptr
-                         ? std::string{}
-                         : std::string{request.resolved_url};
-  copy->prior_etag = request.prior_etag == nullptr
-                       ? std::string{}
-                       : std::string{request.prior_etag};
-  copy->prior_data = copy_prior_data(request);
-  copy->view = AdapterQueuedResourceRequestView{
-    .owner = copy.get(),
-    .handle = handle,
-    .requested_url = copy->requested_url.c_str(),
-    .resolved_url = copy->resolved_url.c_str(),
-    .kind = request.kind,
-    .loading_method = request.loading_method,
-    .priority = request.priority,
-    .usage = request.usage,
-    .storage_policy = request.storage_policy,
-    .has_range = request.has_range,
-    .range_start = request.range_start,
-    .range_end = request.range_end,
-    .has_prior_modified = request.has_prior_modified,
-    .prior_modified_unix_ms = request.prior_modified_unix_ms,
-    .has_prior_expires = request.has_prior_expires,
-    .prior_expires_unix_ms = request.prior_expires_unix_ms,
-    .prior_etag = copy->prior_etag.empty() ? nullptr : copy->prior_etag.c_str(),
-    .prior_data = copy->prior_data.empty() ? nullptr : copy->prior_data.data(),
-    .prior_data_size = copy->prior_data.size(),
-  };
-  return copy;
-}
-
-void destroy_queued_request(
-  AdapterQueuedResourceRequestView* request
-) noexcept {
-  if (request == nullptr) {
-    return;
-  }
-  auto* owner = static_cast<AdapterQueuedResourceRequest*>(request->owner);
-  static_cast<void>(std::unique_ptr<AdapterQueuedResourceRequest>{owner});
-}
-
-auto copy_log_record(
-  std::uint32_t severity, std::uint32_t event, std::int64_t code,
-  const char* message
-) -> std::unique_ptr<AdapterLogRecord> {
-  auto copy = std::make_unique<AdapterLogRecord>();
-  copy->message = message == nullptr ? std::string{} : std::string{message};
-  copy->view = AdapterLogRecordView{
-    .owner = copy.get(),
-    .severity = severity,
-    .event = event,
-    .code = code,
-    .message = copy->message.c_str(),
-  };
-  return copy;
-}
-
-void destroy_log_record(AdapterLogRecordView* record) noexcept {
-  if (record == nullptr) {
-    return;
-  }
-  auto* owner = static_cast<AdapterLogRecord*>(record->owner);
-  static_cast<void>(std::unique_ptr<AdapterLogRecord>{owner});
-}
-auto lease_resource_queue(mln_adapter_resource_request_queue queue)
-  -> std::shared_ptr<mln::core::AdapterResourceRequestQueueObject> {
-  return mln::core::handle_table<mln::core::AdapterResourceRequestQueueObject>()
-    .lease(queue);
-}
-
-auto lease_log_queue(mln_adapter_log_queue queue)
-  -> std::shared_ptr<mln::core::AdapterLogQueueObject> {
-  return mln::core::handle_table<mln::core::AdapterLogQueueObject>().lease(
-    queue
-  );
-}
-
-auto enqueue_request(
-  const std::shared_ptr<mln::core::AdapterResourceRequestQueueObject>& queue,
-  std::unique_ptr<AdapterQueuedResourceRequest> request
-) -> bool {
-  auto wake = std::shared_ptr<mln::core::Wake>{};
-  auto should_wake = false;
-  {
-    const std::scoped_lock lock(queue->mutex);
-    if (queue->closed) {
-      return false;
-    }
-    should_wake = queue->records.empty();
-    queue->records.push_back(std::move(request));
-    queue->wake_pending = true;
-    wake = queue->wake;
-  }
-  if (should_wake) wake->notify();
-  return true;
-}
-
-auto enqueue_log(
-  const std::shared_ptr<mln::core::AdapterLogQueueObject>& queue,
-  std::unique_ptr<AdapterLogRecord> record
-) -> bool {
-  auto wake = std::shared_ptr<mln::core::Wake>{};
-  auto should_wake = false;
-  {
-    const std::scoped_lock lock(queue->mutex);
-    if (queue->closed) {
-      return false;
-    }
-    should_wake = queue->records.empty();
-    queue->records.push_back(std::move(record));
-    queue->wake_pending = true;
-    wake = queue->wake;
-  }
-  if (should_wake) wake->notify();
-  return true;
 }
 
 void destroy_owner_token(void* token) noexcept {
@@ -1029,199 +793,6 @@ extern "C" MLN_API void mln_adapter_owner_finalize(void* token) noexcept {
   destroy_owner_token(token);
 }
 
-extern "C" MLN_API auto mln_adapter_resource_request_queue_create(
-  const mln_wake* wake, mln_adapter_resource_request_queue* out_queue
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (out_queue == nullptr || *out_queue != MLN_HANDLE_NULL) {
-      mln::core::set_thread_error("out_queue must point to the null handle");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    const auto wake_status = mln::core::validate_wake(wake);
-    if (wake_status != MLN_STATUS_OK) return wake_status;
-    auto owned =
-      std::make_shared<mln::core::AdapterResourceRequestQueueObject>();
-    owned->wake = std::make_shared<mln::core::Wake>(*wake);
-    const auto handle =
-      mln::core::handle_table<mln::core::AdapterResourceRequestQueueObject>()
-        .insert(owned);
-    owned->wake->accept();
-    *out_queue = handle;
-    return MLN_STATUS_OK;
-  });
-}
-
-extern "C" MLN_API auto mln_adapter_resource_request_queue_acquire(
-  mln_adapter_resource_request_queue queue,
-  mln_adapter_queued_resource_request** out_request
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (out_request == nullptr || *out_request != nullptr) {
-      mln::core::set_thread_error("out_request must point to null");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    const auto live = lease_resource_queue(queue);
-    if (live == nullptr) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto drain_lock = std::unique_lock{live->drain_mutex, std::try_to_lock};
-    if (!drain_lock.owns_lock()) {
-      mln::core::set_thread_error(
-        "resource request queue already has an active drain"
-      );
-      return MLN_STATUS_INVALID_STATE;
-    }
-    const auto queue_lock = std::scoped_lock{live->mutex};
-    if (live->closed) {
-      mln::core::set_thread_error("resource request queue is closed");
-      return MLN_STATUS_INVALID_STATE;
-    }
-    if (live->records.empty()) {
-      live->wake_pending = false;
-      return MLN_STATUS_OK;
-    }
-    auto record = std::move(live->records.front());
-    live->records.pop_front();
-    *out_request = &record.release()->view;
-    if (live->records.empty()) {
-      live->wake_pending = false;
-    }
-    return MLN_STATUS_OK;
-  });
-}
-
-extern "C" MLN_API void mln_adapter_resource_request_queue_close(
-  mln_adapter_resource_request_queue queue
-) noexcept {
-  const auto removed =
-    mln::core::handle_table<mln::core::AdapterResourceRequestQueueObject>()
-      .remove(queue);
-  if (removed != nullptr) {
-    removed->close();
-  }
-}
-
-extern "C" MLN_API auto mln_adapter_log_queue_create(
-  const mln_wake* wake, mln_adapter_log_queue* out_queue
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (out_queue == nullptr || *out_queue != MLN_HANDLE_NULL) {
-      mln::core::set_thread_error("out_queue must point to the null handle");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    const auto wake_status = mln::core::validate_wake(wake);
-    if (wake_status != MLN_STATUS_OK) return wake_status;
-    auto owned = std::make_shared<mln::core::AdapterLogQueueObject>();
-    owned->wake = std::make_shared<mln::core::Wake>(*wake);
-    const auto handle =
-      mln::core::handle_table<mln::core::AdapterLogQueueObject>().insert(owned);
-    owned->wake->accept();
-    *out_queue = handle;
-    return MLN_STATUS_OK;
-  });
-}
-
-extern "C" MLN_API auto mln_adapter_log_queue_acquire(
-  mln_adapter_log_queue queue, mln_adapter_log_record** out_record
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (out_record == nullptr || *out_record != nullptr) {
-      mln::core::set_thread_error("out_record must point to null");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    const auto live = lease_log_queue(queue);
-    if (live == nullptr) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto drain_lock = std::unique_lock{live->drain_mutex, std::try_to_lock};
-    if (!drain_lock.owns_lock()) {
-      mln::core::set_thread_error("log queue already has an active drain");
-      return MLN_STATUS_INVALID_STATE;
-    }
-    const auto queue_lock = std::scoped_lock{live->mutex};
-    if (live->closed) {
-      mln::core::set_thread_error("log queue is closed");
-      return MLN_STATUS_INVALID_STATE;
-    }
-    if (live->records.empty()) {
-      live->wake_pending = false;
-      return MLN_STATUS_OK;
-    }
-    auto record = std::move(live->records.front());
-    live->records.pop_front();
-    *out_record = &record.release()->view;
-    if (live->records.empty()) {
-      live->wake_pending = false;
-    }
-    return MLN_STATUS_OK;
-  });
-}
-
-extern "C" MLN_API void mln_adapter_log_queue_close(
-  mln_adapter_log_queue queue
-) noexcept {
-  const auto removed =
-    mln::core::handle_table<mln::core::AdapterLogQueueObject>().remove(queue);
-  if (removed != nullptr) {
-    removed->close();
-  }
-}
-
-extern "C" MLN_API auto mln_adapter_log_callback(
-  void* user_data, std::uint32_t severity, std::uint32_t event,
-  std::int64_t code, const char* message
-) noexcept -> std::uint32_t {
-  if (user_data == nullptr) {
-    return 0;
-  }
-  const auto& state = *static_cast<const AdapterLogCallbackState*>(user_data);
-  const auto queue = lease_log_queue(state.queue);
-  if (queue == nullptr) {
-    return 0;
-  }
-  try {
-    static_cast<void>(
-      enqueue_log(queue, copy_log_record(severity, event, code, message))
-    );
-  } catch (...) {
-    // Logging cannot report allocation failure through its callback contract.
-  }
-  return state.consume;
-}
-
-namespace {
-
-auto release_adapter_log_callback_state(void* user_data) noexcept -> void {
-  auto* state = static_cast<mln_adapter_log_callback_state*>(user_data);
-  if (state != nullptr && state->release_user_data != nullptr) {
-    const auto release = state->release_user_data;
-    const auto context = state->release_context;
-    release(context);
-  }
-}
-
-}  // namespace
-
-extern "C" MLN_API auto mln_adapter_log_set_callback(
-  mln_adapter_log_callback_state* state
-) noexcept -> mln_status {
-  const auto setter_lock = std::scoped_lock{log_setter_mutex};
-  if (state != nullptr && lease_log_queue(state->queue) == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return state == nullptr ? mln_log_clear_callback()
-                          : mln_log_set_callback(
-                              mln_adapter_log_callback, state,
-                              state->release_user_data == nullptr
-                                ? nullptr
-                                : release_adapter_log_callback_state
-                            );
-}
-
-extern "C" MLN_API void mln_adapter_log_record_destroy(void* record) noexcept {
-  destroy_log_record(static_cast<AdapterLogRecordView*>(record));
-}
-
 extern "C" MLN_API auto mln_adapter_resource_transform_rewrite_callback(
   void* user_data, std::uint32_t kind, const char* url,
   mln_resource_transform_response* out_response
@@ -1349,64 +920,6 @@ extern "C" MLN_API auto mln_adapter_routed_resource_provider_callback(
     return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
   }
   return provider.callback(provider.user_data, request, handle);
-}
-
-extern "C" MLN_API auto mln_adapter_queued_resource_provider_callback(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
-) noexcept -> std::uint32_t {
-  // Each route decides which URL it compares, so route matching handles an
-  // absent URL.
-  if (user_data == nullptr || request == nullptr || handle == MLN_HANDLE_NULL) {
-    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
-  }
-
-  const auto& provider =
-    *static_cast<const AdapterQueuedResourceProvider*>(user_data);
-  if (!request_matches_route(
-        std::span{provider.routes, provider.route_count}, *request
-      )) {
-    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
-  }
-
-  try {
-    const auto queue = lease_resource_queue(provider.queue);
-    if (queue == nullptr) {
-      throw std::runtime_error{"resource request queue is unavailable"};
-    }
-    if (!enqueue_request(queue, copy_request(*request, handle))) {
-      throw std::runtime_error{"resource request queue is closed"};
-    }
-    return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
-  } catch (...) {
-    auto response = mln_resource_response{
-      .size = sizeof(mln_resource_response),
-      .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
-      .error_reason = MLN_RESOURCE_ERROR_REASON_OTHER,
-      .bytes = nullptr,
-      .byte_count = 0,
-      .error_message = "resource provider request queue failed",
-      .must_revalidate = false,
-      .has_modified = false,
-      .modified_unix_ms = 0,
-      .has_expires = false,
-      .expires_unix_ms = 0,
-      .etag = nullptr,
-      .has_retry_after = false,
-      .retry_after_unix_ms = 0,
-    };
-    static_cast<void>(mln_resource_request_complete(handle, &response));
-    mln_resource_request_release(handle);
-    return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
-  }
-}
-
-extern "C" MLN_API void mln_adapter_resource_provider_request_destroy(
-  void* request
-) noexcept {
-  destroy_queued_request(
-    static_cast<AdapterQueuedResourceRequestView*>(request)
-  );
 }
 
 extern "C" MLN_API void mln_adapter_custom_geometry_callbacks_retire(

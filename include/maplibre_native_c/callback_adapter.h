@@ -386,7 +386,7 @@ typedef struct mln_adapter_resource_provider_rules {
 } mln_adapter_resource_provider_rules;
 
 /**
- * How a queued provider route compares its url against a request.
+ * How a resource route compares its url against a request.
  *
  * MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB reads the url as a glob pattern, in the
  * language mln_adapter_url_match_flags describes.
@@ -401,42 +401,6 @@ typedef enum MLN_BINDING(
   MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB = 1U << 0U,
   MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL = 1U << 1U,
 } mln_adapter_resource_route_flags;
-
-/**
- * One route a queued provider claims.
- *
- * The kind field matches mln_resource_kind values, or
- * MLN_ADAPTER_RESOURCE_KIND_ANY for every kind. The flags field is a bitwise OR
- * of mln_adapter_resource_route_flags values choosing which URL the route
- * compares and how; with no flags the route matches
- * mln_resource_request.resolved_url exactly.
- *
- * The url field is a comparison value, read literally or as a glob pattern
- * according to flags. A null url or an unknown flag bit makes the route match
- * nothing. The url pointer has the lifetime of its queued provider.
- */
-typedef struct mln_adapter_queued_resource_provider_route {
-  uint32_t kind;
-  uint32_t flags MLN_BINDING("enum=mln_adapter_resource_route_flags");
-  const char* url MLN_BINDING(
-    "length=nul;encoding=utf8;ownership=borrowed;"
-    "lifetime=owner;nullable=true"
-  );
-} mln_adapter_queued_resource_provider_route;
-
-/**
- * A provider that copies matching requests into a native queue.
- *
- * The routes pointer and every route URL stay valid through the terminal event
- * of the command that replaces or clears this provider. queue identifies the
- * queue that receives each copied request.
- */
-typedef struct mln_adapter_queued_resource_provider {
-  const mln_adapter_queued_resource_provider_route* routes
-    MLN_BINDING("length=route_count;ownership=borrowed;lifetime=owner");
-  size_t route_count;
-  mln_adapter_resource_request_queue queue;
-} mln_adapter_queued_resource_provider;
 
 /**
  * One route a routed resource provider claims.
@@ -477,91 +441,6 @@ typedef struct mln_adapter_routed_resource_provider {
   mln_resource_provider_callback callback;
   void* user_data MLN_BINDING("kind=context;ownership=borrowed");
 } mln_adapter_routed_resource_provider;
-
-/**
- * A native-owned copy of a resource request.
- *
- * Every pointer field is owned by this record and stays valid until
- * mln_adapter_resource_provider_request_destroy(). The handle field carries the
- * request handle the host completes; it is an ordinary handle value the host
- * moves between execution contexts and passes to mln_resource_request_*().
- */
-typedef struct mln_adapter_queued_resource_request {
-  void* owner MLN_BINDING("kind=context;lifetime=owner");
-  mln_resource_request_handle handle;
-  /**
-   * Copy of mln_resource_request.requested_url, or the empty string when the
-   * request carried none. Never null, unlike prior_etag.
-   */
-  const char* requested_url MLN_BINDING(
-    "length=nul;encoding=utf8;ownership=borrowed;"
-    "lifetime=owner;nullable=true"
-  );
-  /**
-   * Copy of mln_resource_request.resolved_url, or the empty string when the
-   * request carried none. Never null, unlike prior_etag.
-   */
-  const char* resolved_url MLN_BINDING(
-    "length=nul;encoding=utf8;ownership="
-    "borrowed;lifetime=owner;nullable=true"
-  );
-  uint32_t kind;
-  uint32_t loading_method;
-  uint32_t priority;
-  uint32_t usage;
-  uint32_t storage_policy;
-  bool has_range MLN_BINDING("kind=presence_mask");
-  uint64_t range_start MLN_BINDING("mask=has_range");
-  uint64_t range_end MLN_BINDING("mask=has_range");
-  bool has_prior_modified MLN_BINDING("kind=presence_mask");
-  int64_t prior_modified_unix_ms MLN_BINDING("mask=has_prior_modified");
-  bool has_prior_expires MLN_BINDING("kind=presence_mask");
-  int64_t prior_expires_unix_ms MLN_BINDING("mask=has_prior_expires");
-  const char* prior_etag MLN_BINDING(
-    "length=nul;encoding=utf8;ownership="
-    "borrowed;lifetime=owner;nullable=true"
-  );
-  const uint8_t* prior_data MLN_BINDING(
-    "length=prior_data_size;encoding=bytes;"
-    "ownership=borrowed;lifetime=owner"
-  );
-  size_t prior_data_size;
-} mln_adapter_queued_resource_request MLN_BINDING(
-  "projection=mln_resource_request"
-);
-
-/**
- * A native-owned copy of a log record.
- *
- * The message pointer is owned by this record and stays valid until
- * mln_adapter_log_record_destroy().
- */
-typedef struct mln_adapter_log_record {
-  void* owner MLN_BINDING("kind=context;lifetime=owner");
-  uint32_t severity;
-  uint32_t event;
-  int64_t code;
-  const char* message MLN_BINDING(
-    "length=nul;encoding=utf8;ownership=borrowed;"
-    "lifetime=owner;nullable=true"
-  );
-} mln_adapter_log_record;
-
-/**
- * Registration state for an adapted log callback.
- *
- * The callback copies records into queue and reports consume to MapLibre. The
- * address of this struct identifies the registration. When release_user_data is
- * non-null, a successful install transfers responsibility for release_context
- * to the adapter, which releases it after the registration is replaced or
- * cleared. The struct must remain valid until that release callback runs.
- */
-typedef struct mln_adapter_log_callback_state {
-  mln_adapter_log_queue queue;
-  uint32_t consume;
-  mln_log_callback_release release_user_data;
-  void* release_context MLN_BINDING("kind=context;lifetime=owner");
-} mln_adapter_log_callback_state;
 
 /**
  * Creates a wake that posts integer messages through Dart native API version 2.
@@ -691,146 +570,6 @@ MLN_API void mln_adapter_owner_finalize(
 ) MLN_NOEXCEPT;
 
 /**
- * Creates a resource-request queue with a wake for its receiver.
- *
- * out_queue must point to the null handle. The association remains immutable
- * until the queue is closed.
- *
- * Returns:
- * - MLN_STATUS_OK when out_queue receives an owned queue.
- * - MLN_STATUS_INVALID_ARGUMENT when out_queue is null or does not point to the
- *   null handle, or the wake descriptor is invalid.
- * - MLN_STATUS_NATIVE_ERROR when the queue could not be allocated.
- */
-MLN_BINDING("execution=immediate")
-MLN_API mln_status mln_adapter_resource_request_queue_create(
-  const mln_wake* wake MLN_BINDING("length=1"),
-  mln_adapter_resource_request_queue* out_queue
-    MLN_BINDING("direction=out;ownership=owned")
-) MLN_NOEXCEPT;
-
-/**
- * Acquires the oldest queued request, or null when the queue is empty.
- *
- * out_request must point to null. The caller owns a returned record and
- * releases it with mln_adapter_resource_provider_request_destroy(). The queue
- * remains ready until this drain confirms it is empty.
- *
- * Returns:
- * - MLN_STATUS_OK when out_request receives a record or the queue is empty.
- * - MLN_STATUS_INVALID_ARGUMENT when queue is null or not live, or out_request
- *   is null or does not point to null.
- * - MLN_STATUS_INVALID_STATE when the queue is closed or another drain is
- *   active.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_BINDING("execution=immediate")
-MLN_API mln_status mln_adapter_resource_request_queue_acquire(
-  mln_adapter_resource_request_queue queue,
-  mln_adapter_queued_resource_request** out_request
-    MLN_BINDING("direction=out;ownership=owned;length=1")
-) MLN_NOEXCEPT;
-
-/**
- * Closes a resource-request queue.
- *
- * Pending records and their request handles are released, and the wake is
- * detached before this function returns. A null or already released queue is
- * a no-op.
- */
-MLN_BINDING("execution=immediate")
-MLN_API void mln_adapter_resource_request_queue_close(
-  mln_adapter_resource_request_queue queue
-) MLN_NOEXCEPT;
-
-/**
- * Creates a log-record queue with a wake for its receiver.
- *
- * out_queue must point to the null handle. The association remains immutable
- * until the queue is closed.
- *
- * Returns:
- * - MLN_STATUS_OK when out_queue receives an owned queue.
- * - MLN_STATUS_INVALID_ARGUMENT when out_queue is null or does not point to the
- *   null handle, or the wake descriptor is invalid.
- * - MLN_STATUS_NATIVE_ERROR when the queue could not be allocated.
- */
-MLN_BINDING("execution=immediate")
-MLN_API mln_status mln_adapter_log_queue_create(
-  const mln_wake* wake MLN_BINDING("length=1"),
-  mln_adapter_log_queue* out_queue MLN_BINDING("direction=out;ownership=owned")
-) MLN_NOEXCEPT;
-
-/**
- * Acquires the oldest copied log record, or null when the queue is empty.
- *
- * out_record must point to null. The caller owns a returned record and releases
- * it with mln_adapter_log_record_destroy().
- *
- * Returns:
- * - MLN_STATUS_OK when out_record receives a record or the queue is empty.
- * - MLN_STATUS_INVALID_ARGUMENT when queue is null or not live, or out_record
- *   is null or does not point to null.
- * - MLN_STATUS_INVALID_STATE when the queue is closed or another drain is
- *   active.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_BINDING("execution=immediate")
-MLN_API mln_status mln_adapter_log_queue_acquire(
-  mln_adapter_log_queue queue,
-  mln_adapter_log_record** out_record
-    MLN_BINDING("direction=out;ownership=owned;length=1")
-) MLN_NOEXCEPT;
-
-/**
- * Closes a log queue.
- *
- * Pending records are released, and the wake is detached before this function
- * returns. A null or already released queue is a no-op.
- */
-MLN_BINDING("execution=immediate")
-MLN_API void mln_adapter_log_queue_close(
-  mln_adapter_log_queue queue
-) MLN_NOEXCEPT;
-
-/**
- * The mln_log_callback implementation for a log queue.
- *
- * user_data points to an mln_adapter_log_callback_state. Each record is copied
- * into its queue, and the callback reports the state's fixed consume value.
- */
-MLN_BINDING(
-  "execution=immediate;callback_adapter=mln_log_callback;context_"
-  "type=mln_adapter_log_callback_state"
-)
-MLN_API uint32_t mln_adapter_log_callback(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner"), uint32_t severity,
-  uint32_t event, int64_t code,
-  const char* message
-    MLN_BINDING("encoding=utf8;lifetime=call;length=nul;ownership=borrowed")
-) MLN_NOEXCEPT;
-
-/**
- * Installs state as the process-global log callback, or clears the current
- * callback when state is null.
- *
- * Returns:
- * - MLN_STATUS_OK when the registration was installed or cleared.
- * - MLN_STATUS_INVALID_ARGUMENT when state names a queue that is not live.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_BINDING("execution=immediate")
-MLN_API mln_status mln_adapter_log_set_callback(
-  mln_adapter_log_callback_state* state MLN_BINDING("length=1")
-) MLN_NOEXCEPT;
-
-/** Releases a log record acquired from a log queue. */
-MLN_BINDING("execution=immediate")
-MLN_API void mln_adapter_log_record_destroy(
-  void* record MLN_BINDING("kind=context;lifetime=owner")
-) MLN_NOEXCEPT;
-
-/**
  * The mln_resource_transform_callback implementation for rewrite rules.
  *
  * The user_data pointer is an mln_adapter_resource_rewrite_rules table. The
@@ -935,36 +674,6 @@ MLN_API uint32_t mln_adapter_routed_resource_provider_callback(
   void* user_data MLN_BINDING("kind=context;lifetime=owner"),
   const mln_resource_request* request MLN_BINDING("length=1"),
   mln_resource_request_handle handle
-) MLN_NOEXCEPT;
-
-/**
- * The mln_resource_provider_callback implementation for queued providers.
- *
- * user_data points to an mln_adapter_queued_resource_provider. A request
- * matching one route is copied into the provider's queue and reports
- * MLN_RESOURCE_PROVIDER_DECISION_HANDLE. Other requests pass through. A request
- * that cannot be copied is completed with an error response.
- */
-MLN_BINDING(
-  "execution=immediate;callback_adapter=mln_resource_provider_callback;"
-  "context_type=mln_adapter_queued_resource_provider;invokes=mln_resource_"
-  "request_complete,mln_resource_request_release"
-)
-MLN_API uint32_t mln_adapter_queued_resource_provider_callback(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner"),
-  const mln_resource_request* request MLN_BINDING("length=1"),
-  mln_resource_request_handle handle
-) MLN_NOEXCEPT;
-
-/**
- * Releases the copied payload of a resource request acquired from a queue.
- *
- * Acquiring the record transfers its request handle to the host. The host
- * completes or releases that handle independently.
- */
-MLN_BINDING("execution=immediate")
-MLN_API void mln_adapter_resource_provider_request_destroy(
-  void* request MLN_BINDING("kind=context;lifetime=owner")
 ) MLN_NOEXCEPT;
 
 /**

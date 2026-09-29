@@ -196,18 +196,6 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     public static final OfLong mln_event_batch = MapLibreNativeC.C_LONG;
     /**
      * {@snippet lang=c :
-     * typedef uint64_t mln_adapter_resource_request_queue
-     * }
-     */
-    public static final OfLong mln_adapter_resource_request_queue = MapLibreNativeC.C_LONG;
-    /**
-     * {@snippet lang=c :
-     * typedef uint64_t mln_adapter_log_queue
-     * }
-     */
-    public static final OfLong mln_adapter_log_queue = MapLibreNativeC.C_LONG;
-    /**
-     * {@snippet lang=c :
      * typedef uint64_t mln_acquired_frame
      * }
      */

@@ -27,8 +27,6 @@ enum class HandleKind : std::uint8_t {
   Buffer = 7,
   ResourceRequest = 12,
   EventBatch = 16,
-  AdapterResourceRequestQueue = 18,
-  AdapterLogQueue = 19,
   AcquiredFrame = 20,
   RenderFrameBatch = 21,
   GeoJsonSourceData = 22,

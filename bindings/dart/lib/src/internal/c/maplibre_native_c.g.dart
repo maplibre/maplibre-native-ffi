@@ -318,53 +318,6 @@ external int mln_adapter_http_header_validate(
   ffi.Pointer<ffi.Char> value,
 );
 
-@ffi.Native<
-  ffi.Uint32 Function(
-    ffi.Pointer<ffi.Void>,
-    ffi.Uint32,
-    ffi.Uint32,
-    ffi.Int64,
-    ffi.Pointer<ffi.Char>,
-  )
->()
-external int mln_adapter_log_callback(
-  ffi.Pointer<ffi.Void> user_data,
-  int severity,
-  int event,
-  int code,
-  ffi.Pointer<ffi.Char> message,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_adapter_log_queue,
-    ffi.Pointer<ffi.Pointer<mln_adapter_log_record>>,
-  )
->()
-external int mln_adapter_log_queue_acquire(
-  int queue,
-  ffi.Pointer<ffi.Pointer<mln_adapter_log_record>> out_record,
-);
-
-@ffi.Native<ffi.Void Function(mln_adapter_log_queue)>()
-external void mln_adapter_log_queue_close(int queue);
-
-@ffi.Native<
-  ffi.Int32 Function(ffi.Pointer<mln_wake>, ffi.Pointer<mln_adapter_log_queue>)
->()
-external int mln_adapter_log_queue_create(
-  ffi.Pointer<mln_wake> wake,
-  ffi.Pointer<mln_adapter_log_queue> out_queue,
-);
-
-@ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
-external void mln_adapter_log_record_destroy(ffi.Pointer<ffi.Void> record);
-
-@ffi.Native<ffi.Int32 Function(ffi.Pointer<mln_adapter_log_callback_state>)>()
-external int mln_adapter_log_set_callback(
-  ffi.Pointer<mln_adapter_log_callback_state> state,
-);
-
 @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
 external void mln_adapter_owner_finalize(ffi.Pointer<ffi.Void> token);
 
@@ -381,53 +334,10 @@ external void mln_adapter_owner_token_destroy(ffi.Pointer<ffi.Void> token);
     mln_resource_request_handle,
   )
 >()
-external int mln_adapter_queued_resource_provider_callback(
-  ffi.Pointer<ffi.Void> user_data,
-  ffi.Pointer<mln_resource_request> request,
-  int handle,
-);
-
-@ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
-external void mln_adapter_resource_provider_request_destroy(
-  ffi.Pointer<ffi.Void> request,
-);
-
-@ffi.Native<
-  ffi.Uint32 Function(
-    ffi.Pointer<ffi.Void>,
-    ffi.Pointer<mln_resource_request>,
-    mln_resource_request_handle,
-  )
->()
 external int mln_adapter_resource_provider_rules_callback(
   ffi.Pointer<ffi.Void> user_data,
   ffi.Pointer<mln_resource_request> request,
   int handle,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_adapter_resource_request_queue,
-    ffi.Pointer<ffi.Pointer<mln_adapter_queued_resource_request>>,
-  )
->()
-external int mln_adapter_resource_request_queue_acquire(
-  int queue,
-  ffi.Pointer<ffi.Pointer<mln_adapter_queued_resource_request>> out_request,
-);
-
-@ffi.Native<ffi.Void Function(mln_adapter_resource_request_queue)>()
-external void mln_adapter_resource_request_queue_close(int queue);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    ffi.Pointer<mln_wake>,
-    ffi.Pointer<mln_adapter_resource_request_queue>,
-  )
->()
-external int mln_adapter_resource_request_queue_create(
-  ffi.Pointer<mln_wake> wake,
-  ffi.Pointer<mln_adapter_resource_request_queue> out_queue,
 );
 
 @ffi.Native<
@@ -3206,198 +3116,6 @@ final class mln_adapter_log_callback_arguments extends ffi.Struct {
     ..ref.message = message;
 }
 
-final class mln_adapter_log_callback_state extends ffi.Struct {
-  @mln_adapter_log_queue()
-  external int queue;
-
-  @ffi.Uint32()
-  external int consume;
-
-  external mln_log_callback_release release_user_data;
-
-  external ffi.Pointer<ffi.Void> release_context;
-
-  static ffi.Pointer<mln_adapter_log_callback_state> $allocate(
-    ffi.Allocator $allocator, {
-    required int queue,
-    required int consume,
-    required mln_log_callback_release release_user_data,
-    required ffi.Pointer<ffi.Void> release_context,
-  }) => $allocator<mln_adapter_log_callback_state>()
-    ..ref.queue = queue
-    ..ref.consume = consume
-    ..ref.release_user_data = release_user_data
-    ..ref.release_context = release_context;
-}
-
-typedef mln_adapter_log_queue = ffi.Uint64;
-typedef Dartmln_adapter_log_queue = int;
-
-final class mln_adapter_log_record extends ffi.Struct {
-  external ffi.Pointer<ffi.Void> owner;
-
-  @ffi.Uint32()
-  external int severity;
-
-  @ffi.Uint32()
-  external int event;
-
-  @ffi.Int64()
-  external int code;
-
-  external ffi.Pointer<ffi.Char> message;
-
-  static ffi.Pointer<mln_adapter_log_record> $allocate(
-    ffi.Allocator $allocator, {
-    required ffi.Pointer<ffi.Void> owner,
-    required int severity,
-    required int event,
-    required int code,
-    required ffi.Pointer<ffi.Char> message,
-  }) => $allocator<mln_adapter_log_record>()
-    ..ref.owner = owner
-    ..ref.severity = severity
-    ..ref.event = event
-    ..ref.code = code
-    ..ref.message = message;
-}
-
-final class mln_adapter_queued_resource_provider extends ffi.Struct {
-  external ffi.Pointer<mln_adapter_queued_resource_provider_route> routes;
-
-  @ffi.Size()
-  external int route_count;
-
-  @mln_adapter_resource_request_queue()
-  external int queue;
-
-  static ffi.Pointer<mln_adapter_queued_resource_provider> $allocate(
-    ffi.Allocator $allocator, {
-    required ffi.Pointer<mln_adapter_queued_resource_provider_route> routes,
-    required int route_count,
-    required int queue,
-  }) => $allocator<mln_adapter_queued_resource_provider>()
-    ..ref.routes = routes
-    ..ref.route_count = route_count
-    ..ref.queue = queue;
-}
-
-final class mln_adapter_queued_resource_provider_route extends ffi.Struct {
-  @ffi.Uint32()
-  external int kind;
-
-  @ffi.Uint32()
-  external int flags;
-
-  external ffi.Pointer<ffi.Char> url;
-
-  static ffi.Pointer<mln_adapter_queued_resource_provider_route> $allocate(
-    ffi.Allocator $allocator, {
-    required int kind,
-    required int flags,
-    required ffi.Pointer<ffi.Char> url,
-  }) => $allocator<mln_adapter_queued_resource_provider_route>()
-    ..ref.kind = kind
-    ..ref.flags = flags
-    ..ref.url = url;
-}
-
-final class mln_adapter_queued_resource_request extends ffi.Struct {
-  external ffi.Pointer<ffi.Void> owner;
-
-  @mln_resource_request_handle()
-  external int handle;
-
-  external ffi.Pointer<ffi.Char> requested_url;
-
-  external ffi.Pointer<ffi.Char> resolved_url;
-
-  @ffi.Uint32()
-  external int kind;
-
-  @ffi.Uint32()
-  external int loading_method;
-
-  @ffi.Uint32()
-  external int priority;
-
-  @ffi.Uint32()
-  external int usage;
-
-  @ffi.Uint32()
-  external int storage_policy;
-
-  @ffi.Bool()
-  external bool has_range;
-
-  @ffi.Uint64()
-  external int range_start;
-
-  @ffi.Uint64()
-  external int range_end;
-
-  @ffi.Bool()
-  external bool has_prior_modified;
-
-  @ffi.Int64()
-  external int prior_modified_unix_ms;
-
-  @ffi.Bool()
-  external bool has_prior_expires;
-
-  @ffi.Int64()
-  external int prior_expires_unix_ms;
-
-  external ffi.Pointer<ffi.Char> prior_etag;
-
-  external ffi.Pointer<ffi.Uint8> prior_data;
-
-  @ffi.Size()
-  external int prior_data_size;
-
-  static ffi.Pointer<mln_adapter_queued_resource_request> $allocate(
-    ffi.Allocator $allocator, {
-    required ffi.Pointer<ffi.Void> owner,
-    required int handle,
-    required ffi.Pointer<ffi.Char> requested_url,
-    required ffi.Pointer<ffi.Char> resolved_url,
-    required int kind,
-    required int loading_method,
-    required int priority,
-    required int usage,
-    required int storage_policy,
-    required bool has_range,
-    required int range_start,
-    required int range_end,
-    required bool has_prior_modified,
-    required int prior_modified_unix_ms,
-    required bool has_prior_expires,
-    required int prior_expires_unix_ms,
-    required ffi.Pointer<ffi.Char> prior_etag,
-    required ffi.Pointer<ffi.Uint8> prior_data,
-    required int prior_data_size,
-  }) => $allocator<mln_adapter_queued_resource_request>()
-    ..ref.owner = owner
-    ..ref.handle = handle
-    ..ref.requested_url = requested_url
-    ..ref.resolved_url = resolved_url
-    ..ref.kind = kind
-    ..ref.loading_method = loading_method
-    ..ref.priority = priority
-    ..ref.usage = usage
-    ..ref.storage_policy = storage_policy
-    ..ref.has_range = has_range
-    ..ref.range_start = range_start
-    ..ref.range_end = range_end
-    ..ref.has_prior_modified = has_prior_modified
-    ..ref.prior_modified_unix_ms = prior_modified_unix_ms
-    ..ref.has_prior_expires = has_prior_expires
-    ..ref.prior_expires_unix_ms = prior_expires_unix_ms
-    ..ref.prior_etag = prior_etag
-    ..ref.prior_data = prior_data
-    ..ref.prior_data_size = prior_data_size;
-}
-
 final class mln_adapter_resource_provider_callback_arguments
     extends ffi.Struct {
   external ffi.Pointer<mln_resource_request> request;
@@ -3441,9 +3159,6 @@ final class mln_adapter_resource_provider_rules extends ffi.Struct {
     ..ref.rules = rules
     ..ref.count = count;
 }
-
-typedef mln_adapter_resource_request_queue = ffi.Uint64;
-typedef Dartmln_adapter_resource_request_queue = int;
 
 final class mln_adapter_resource_rewrite_rule extends ffi.Struct {
   @ffi.Uint32()

@@ -1,7 +1,5 @@
 {
   "mln_acquired_frame": "MlnAcquiredFrame",
-  "mln_adapter_log_queue": "MlnAdapterLogQueue",
-  "mln_adapter_resource_request_queue": "MlnAdapterResourceRequestQueue",
   "mln_buffer": "MlnBuffer",
   "mln_event_batch": "MlnEventBatch",
   "mln_geojson_source_data": "MlnGeoJsonSourceData",

@@ -58,7 +58,11 @@ final class _NativeRegistrations {
   Pointer<raw.mln_resource_provider> prepareResourceProvider(
     ResourceProvider value,
   ) {
-    final registration = _prepareResourceProvider(value, _callbackReleases);
+    final registration = _prepareResourceProvider(
+      value,
+      _callbackReleases,
+      ports,
+    );
     _pending.add(registration);
     return registration.pointer;
   }
@@ -71,40 +75,6 @@ final class _NativeRegistrations {
     return registration.pointer;
   }
 }
-
-ResourceRequest _readAdapterQueuedResourceRequest(
-  raw.mln_adapter_queued_resource_request source,
-) => ResourceRequest(
-  requestedUrl: source.requested_url == nullptr
-      ? null
-      : source.requested_url.cast<Utf8>().toDartString(),
-  resolvedUrl: source.resolved_url == nullptr
-      ? null
-      : source.resolved_url.cast<Utf8>().toDartString(),
-  kind: ResourceKind.fromRawValue(source.kind),
-  loadingMethod: ResourceLoadingMethod.fromRawValue(source.loading_method),
-  priority: ResourcePriority.fromRawValue(source.priority),
-  usage: ResourceUsage.fromRawValue(source.usage),
-  storagePolicy: ResourceStoragePolicy.fromRawValue(source.storage_policy),
-  range: source.has_range
-      ? (
-          rangeStart: uint64FromNative(source.range_start),
-          rangeEnd: uint64FromNative(source.range_end),
-        )
-      : null,
-  priorModifiedUnixMs: source.has_prior_modified
-      ? source.prior_modified_unix_ms
-      : null,
-  priorExpiresUnixMs: source.has_prior_expires
-      ? source.prior_expires_unix_ms
-      : null,
-  priorEtag: source.prior_etag == nullptr
-      ? null
-      : source.prior_etag.cast<Utf8>().toDartString(),
-  priorData: Uint8List.fromList(
-    source.prior_data.cast<Uint8>().asTypedList(source.prior_data_size),
-  ),
-);
 
 MetalOwnedTextureFrame _readMetalOwnedTextureFrame(
   raw.mln_metal_owned_texture_frame source,
@@ -1275,6 +1245,27 @@ Pointer<raw.mln_projected_meters> _writeProjectedMeters(
 
 ProjectedMeters _readProjectedMeters(raw.mln_projected_meters source) =>
     ProjectedMeters(northing: source.northing, easting: source.easting);
+
+void _deliverLogCallback(LogCallback callback, List<dynamic> message) {
+  final record = Pointer<raw.mln_adapter_deferred_call_record>.fromAddress(
+    message[1] as int,
+  );
+  try {
+    final arguments = record.ref.arguments
+        .cast<raw.mln_adapter_log_callback_arguments>()
+        .ref;
+    callback(
+      LogSeverity.fromRawValue(arguments.severity),
+      LogEvent.fromRawValue(arguments.event),
+      arguments.code,
+      arguments.message.cast<Utf8>().toDartString(),
+    );
+  } catch (_) {
+    // The native answer is final, so the failure stays here.
+  } finally {
+    raw.mln_adapter_deferred_call_record_destroy(record);
+  }
+}
 
 Pointer<raw.mln_premultiplied_rgba8_image> _writePremultipliedRgba8Image(
   PremultipliedRgba8Image value,
@@ -3032,20 +3023,6 @@ _NativeRegistration<raw.mln_http_header_transform> _prepareHttpHeaderTransform(
   }
 }
 
-Pointer<raw.mln_adapter_queued_resource_provider_route>
-_writeAdapterQueuedResourceProviderRoute(
-  AdapterQueuedResourceProviderRoute value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_adapter_queued_resource_provider_route>();
-  result.ref.kind = _generatedInteger(value.kind, 0, 4294967295);
-  result.ref.flags = value.flags.rawValue;
-  result.ref.url = value.url == null
-      ? nullptr
-      : nativeUtf8CString(value.url!, arena).pointer.cast<Char>();
-  return result;
-}
-
 Pointer<raw.mln_adapter_resource_provider_rule>
 _writeAdapterResourceProviderRule(
   AdapterResourceProviderRule value,
@@ -3080,9 +3057,127 @@ _writeAdapterResourceProviderRules(
   return result;
 }
 
+Pointer<raw.mln_adapter_resource_route> _writeAdapterResourceRoute(
+  AdapterResourceRoute value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_adapter_resource_route>();
+  result.ref.kind = _generatedInteger(value.kind, 0, 4294967295);
+  result.ref.flags = value.flags.rawValue;
+  result.ref.url = value.url == null
+      ? nullptr
+      : nativeUtf8CString(value.url!, arena).pointer.cast<Char>();
+  return result;
+}
+
+ResourceRequest _readResourceRequest(raw.mln_resource_request source) =>
+    ResourceRequest(
+      requestedUrl: source.requested_url == nullptr
+          ? null
+          : source.requested_url.cast<Utf8>().toDartString(),
+      resolvedUrl: source.resolved_url == nullptr
+          ? null
+          : source.resolved_url.cast<Utf8>().toDartString(),
+      kind: ResourceKind.fromRawValue(source.kind),
+      loadingMethod: ResourceLoadingMethod.fromRawValue(source.loading_method),
+      priority: ResourcePriority.fromRawValue(source.priority),
+      usage: ResourceUsage.fromRawValue(source.usage),
+      storagePolicy: ResourceStoragePolicy.fromRawValue(source.storage_policy),
+      range: source.has_range
+          ? (
+              rangeStart: uint64FromNative(source.range_start),
+              rangeEnd: uint64FromNative(source.range_end),
+            )
+          : null,
+      priorModifiedUnixMs: source.has_prior_modified
+          ? source.prior_modified_unix_ms
+          : null,
+      priorExpiresUnixMs: source.has_prior_expires
+          ? source.prior_expires_unix_ms
+          : null,
+      priorEtag: source.prior_etag == nullptr
+          ? null
+          : source.prior_etag.cast<Utf8>().toDartString(),
+      priorData: Uint8List.fromList(
+        source.prior_data.cast<Uint8>().asTypedList(source.prior_data_size),
+      ),
+    );
+
+void _deliverResourceProviderCallback(
+  ResourceProviderCallback callback,
+  List<dynamic> message,
+) {
+  final record = Pointer<raw.mln_adapter_deferred_call_record>.fromAddress(
+    message[1] as int,
+  );
+  ResourceRequestHandle? owner;
+  var failed = false;
+  try {
+    final arguments = record.ref.arguments
+        .cast<raw.mln_adapter_resource_provider_callback_arguments>()
+        .ref;
+    final adopted = owner = ResourceRequestHandle._(
+      NativeResourceRequest(arguments.handle),
+    );
+    callback(_readResourceRequest(arguments.request.ref), adopted);
+    raw.mln_adapter_deferred_call_record_adopt(record);
+  } catch (_) {
+    // The native answer is final, so the failure stays here.
+    failed = true;
+  } finally {
+    raw.mln_adapter_deferred_call_record_destroy(record);
+    if (failed) {
+      owner?.close();
+    }
+  }
+}
+
+Pointer<raw.mln_adapter_routed_resource_provider>
+_writeAdapterRoutedResourceProvider(
+  AdapterRoutedResourceProvider value,
+  NativeOwnedArena arena,
+  _NativeCallbackPorts ports,
+) {
+  final result = arena<raw.mln_adapter_routed_resource_provider>();
+  result.ref.routes = arena<raw.mln_adapter_resource_route>(
+    value.routes.isEmpty ? 1 : value.routes.length,
+  );
+  result.ref.route_count = value.routes.length;
+  for (var index = 0; index < value.routes.length; index++) {
+    result.ref.routes[index] = _writeAdapterResourceRoute(
+      value.routes[index],
+      arena,
+    ).ref;
+  }
+  final portCallback = ports.registerDeferred(
+    (raw
+            .mln_adapter_deferred_callback
+            .MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK &
+        0xffffffff),
+    (message) => _deliverResourceProviderCallback(value.callback, message),
+  );
+  arena.adoptRelease(
+    Native.addressOf<NativeFunction<raw.mln_runtime_callback_releaseFunction>>(
+      raw.mln_adapter_deferred_callback_release,
+    ),
+    portCallback.context,
+  );
+  result.ref.callback = raw
+      .mln_adapter_deferred_callback_function(
+        (raw
+                .mln_adapter_deferred_callback
+                .MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK &
+            0xffffffff),
+      )
+      .cast();
+  result.ref.user_data = portCallback.context;
+  return result;
+}
+
 _NativeRegistration<raw.mln_resource_provider> _prepareResourceProvider(
   ResourceProvider value,
   NativeCallbackReleases roots,
+  _NativeCallbackPorts ports,
 ) {
   final arena = NativeOwnedArena();
   var transferred = false;
@@ -3104,6 +3199,29 @@ _NativeRegistration<raw.mln_resource_provider> _prepareResourceProvider(
             Native.addressOf<
               NativeFunction<raw.mln_resource_provider_callbackFunction>
             >(raw.mln_adapter_resource_provider_rules_callback);
+        descriptor.ref.user_data = context.cast();
+        descriptor.ref.release_user_data =
+            Native.addressOf<
+              NativeFunction<raw.mln_runtime_callback_releaseFunction>
+            >(raw.mln_adapter_dart_release);
+        transferred = true;
+        roots.register(context.cast(), arena.releaseAll, arena: arena);
+        return _NativeRegistration(
+          descriptor,
+          () => roots.reject(context.cast()),
+        );
+      case ResourceProviderRoutedResourceProvider():
+        final context = _writeAdapterRoutedResourceProvider(
+          value.value,
+          arena,
+          ports,
+        );
+        final descriptor = arena<raw.mln_resource_provider>();
+        descriptor.ref.size = sizeOf<raw.mln_resource_provider>();
+        descriptor.ref.callback =
+            Native.addressOf<
+              NativeFunction<raw.mln_resource_provider_callbackFunction>
+            >(raw.mln_adapter_routed_resource_provider_callback);
         descriptor.ref.user_data = context.cast();
         descriptor.ref.release_user_data =
             Native.addressOf<
@@ -3594,6 +3712,38 @@ void logClearCallback() => withNativeArena((arena) {
 void logSetAsyncSeverityMask(LogSeverityMask mask) => withNativeArena((arena) {
   _check(raw.mln_log_set_async_severity_mask(mask.rawValue));
 });
+
+void logSetCallback(LogCallback callback) {
+  final port = _globalCallbackPorts.registerDeferred(
+    (raw.mln_adapter_deferred_callback.MLN_ADAPTER_DEFERRED_LOG_CALLBACK &
+        0xffffffff),
+    (message) => _deliverLogCallback(callback, message),
+  );
+  var accepted = false;
+  try {
+    _check(
+      raw.mln_log_set_callback(
+        raw
+            .mln_adapter_deferred_callback_function(
+              (raw
+                      .mln_adapter_deferred_callback
+                      .MLN_ADAPTER_DEFERRED_LOG_CALLBACK &
+                  0xffffffff),
+            )
+            .cast(),
+        port.context,
+        Native.addressOf<NativeFunction<raw.mln_log_callback_releaseFunction>>(
+          raw.mln_adapter_deferred_callback_release,
+        ).cast(),
+      ),
+    );
+    accepted = true;
+  } finally {
+    if (!accepted) {
+      port.reject();
+    }
+  }
+}
 
 MapOptions mapOptionsDefault() => withNativeArena((arena) {
   final nativeResult = raw.mln_map_options_default();

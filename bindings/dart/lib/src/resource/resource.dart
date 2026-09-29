@@ -2,8 +2,4 @@
 library;
 
 export '../generated_values.dart';
-export '../runtime/runtime.dart'
-    show
-        QueuedResourceProvider,
-        ResourceProviderCallback,
-        ResourceRequestHandle;
+export '../runtime/runtime.dart' show ResourceRequestHandle;

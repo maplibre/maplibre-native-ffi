@@ -5,14 +5,11 @@ import 'dart:ffi';
 import 'dart:isolate';
 import 'dart:typed_data';
 
-import 'package:ffi/ffi.dart';
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart'
     show expectedCAbiVersion;
-import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
-    show logCallbackStateForTesting;
 import 'package:test/test.dart';
 
 const _emptyStyleJson = '{"version":8,"sources":{},"layers":[]}';
@@ -35,28 +32,16 @@ Future<void> _expectCommandFailure(
   expect(completion.diagnostic, isNotEmpty);
 }
 
-/// Dispatches one record through the registered adapter log callback, the way
-/// MapLibre's logging threads do, and reports the consume value native code
-/// sees.
-int _dispatchLogRecord({
-  required int severity,
-  required int event,
-  required int code,
-  required String message,
-}) {
-  final nativeMessage = message.toNativeUtf8();
-  try {
-    return raw.mln_adapter_log_callback(
-      logCallbackStateForTesting().cast<Void>(),
-      severity,
-      event,
-      code,
-      nativeMessage.cast<Char>(),
-    );
-  } finally {
-    malloc.free(nativeMessage);
-  }
-}
+/// Whether a log message is one of the rules around a debug-log dump.
+bool _isDebugDump(String message) => message.startsWith('-----');
+
+/// Registers a provider that claims the requests its routes match.
+ResourceProvider _routed({
+  required List<AdapterResourceRoute> routes,
+  required ResourceProviderCallback callback,
+}) => ResourceProvider.routedResourceProvider(
+  AdapterRoutedResourceProvider(routes: routes, callback: callback),
+);
 
 void main() {
   test('global state uses style defaults and resets on replacement', () async {
@@ -297,8 +282,7 @@ void main() {
       isIn([NetworkStatus.online.rawValue, NetworkStatus.offline.rawValue]),
     );
     networkStatusSet(status);
-    final logRecords = <LogRecord>[];
-    logSetCallback(logRecords.add);
+    logSetCallback((_, _, _, _) {});
     logSetAsyncSeverityMask(LogSeverityMask.defaultValue);
     logSetAsyncSeverityMask(LogSeverityMask.defaultValue);
     logClearCallback();
@@ -313,71 +297,58 @@ void main() {
   });
 
   test('process-global log callbacks retire across isolates', () async {
-    logSetCallback((_) {}, consume: true);
+    final runtime = runtimeCreate(runtimeOptionsDefault());
+    addTearDown(runtime.close);
+    final map = await runtime.createMap();
+    addTearDown(map.close);
+
+    var retiredDumps = 0;
+    logSetCallback((_, _, _, message) {
+      if (_isDebugDump(message)) retiredDumps += 1;
+    });
     // The registration is process-global, so another isolate clears the one
     // this isolate installed.
     await Isolate.run(_clearLogCallback);
-    await Future<void>.delayed(Duration.zero);
+    await map.dumpDebugLogs();
 
-    // Native code dispatches to no callback, so it consumes nothing.
-    expect(
-      _dispatchLogRecord(
-        severity: LogSeverity.info.rawValue,
-        event: LogEvent.general.rawValue,
-        code: 404,
-        message: 'after cross-isolate clear',
-      ),
-      0,
-    );
-
-    logSetCallback((_) {});
+    // A later registration receives the dump the cleared one never sees.
+    final dumps = <String>[];
+    logSetCallback((_, _, _, message) {
+      if (_isDebugDump(message)) dumps.add(message);
+    });
+    await map.dumpDebugLogs();
+    await _waitUntil(() => dumps.length == 2);
     logClearCallback();
+    expect(retiredDumps, 0);
   });
 
   test('log callback replacement and clear change native delivery', () async {
-    final first = <LogRecord>[];
-    final replacement = <LogRecord>[];
+    final runtime = runtimeCreate(runtimeOptionsDefault());
+    addTearDown(runtime.close);
+    final map = await runtime.createMap();
+    addTearDown(map.close);
+    final first = <(LogSeverity, LogEvent, String)>[];
+    final replacement = <(LogSeverity, LogEvent, String)>[];
 
-    logSetCallback(first.add, consume: true);
-    expect(
-      _dispatchLogRecord(
-        severity: LogSeverity.info.rawValue,
-        event: LogEvent.general.rawValue,
-        code: 101,
-        message: 'first',
-      ),
-      1,
-    );
-    await _waitUntil(() => first.isNotEmpty);
-    expect(first.single.code, 101);
-    expect(first.single.message, 'first');
+    logSetCallback((severity, event, _, message) {
+      if (_isDebugDump(message)) first.add((severity, event, message));
+    });
+    await map.dumpDebugLogs();
+    await _waitUntil(() => first.length == 2);
+    expect(first.first.$1, LogSeverity.info);
+    expect(first.first.$2, LogEvent.general);
 
-    logSetCallback(replacement.add);
-    expect(
-      _dispatchLogRecord(
-        severity: LogSeverity.warning.rawValue,
-        event: LogEvent.setup.rawValue,
-        code: 202,
-        message: 'replacement',
-      ),
-      0,
-    );
-    await _waitUntil(() => replacement.isNotEmpty);
-    expect(first, hasLength(1));
-    expect(replacement.single.code, 202);
-    expect(replacement.single.message, 'replacement');
+    logSetCallback((severity, event, _, message) {
+      if (_isDebugDump(message)) replacement.add((severity, event, message));
+    });
+    await map.dumpDebugLogs();
+    await _waitUntil(() => replacement.length == 2);
+    expect(first, hasLength(2));
 
     logClearCallback();
-    expect(
-      _dispatchLogRecord(
-        severity: LogSeverity.error.rawValue,
-        event: LogEvent.render.rawValue,
-        code: 303,
-        message: 'cleared',
-      ),
-      0,
-    );
-    expect(replacement, hasLength(1));
+    await map.dumpDebugLogs();
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(replacement, hasLength(2));
   });
 
   test(
@@ -421,10 +392,10 @@ void main() {
     const unmatchedUrl = 'custom://dart-provider-pass-through.json';
     final runtime = runtimeCreate(runtimeOptionsDefault());
     var providerCalls = 0;
-    runtime.setQueuedResourceProvider(
-      QueuedResourceProvider(
+    runtime.setResourceProvider(
+      _routed(
         routes: [
-          AdapterQueuedResourceProviderRoute(
+          AdapterResourceRoute(
             kind: ResourceKind.style.rawValue,
             url: 'custom://different-style.json',
           ),
@@ -449,16 +420,16 @@ void main() {
     await runtime.close();
   });
 
-  test('queued resource provider callbacks cross the native C ABI', () async {
+  test('deferred resource provider callbacks cross the native C ABI', () async {
     const styleUrl = 'custom://dart-provider-style.json';
     final runtime = runtimeCreate(runtimeOptionsDefault());
     final requests = <ResourceRequest>[];
     late ResourceRequestHandle ownerToken;
 
-    runtime.setQueuedResourceProvider(
-      QueuedResourceProvider(
+    runtime.setResourceProvider(
+      _routed(
         routes: [
-          AdapterQueuedResourceProviderRoute(
+          AdapterResourceRoute(
             kind: ResourceKind.style.rawValue,
             url: styleUrl,
           ),
@@ -512,58 +483,61 @@ void main() {
 
   // a configured URI-scheme alias reaches the provider as the alias,
   // alongside the URL the built-in network path would have fetched.
-  test('queued resource provider sees scheme alias and resolved URL', () async {
-    const aliasUrl = 'maplibre://maps/style';
-    final runtime = runtimeCreate(runtimeOptionsDefault());
-    final requests = <ResourceRequest>[];
+  test(
+    'deferred resource provider sees scheme alias and resolved URL',
+    () async {
+      const aliasUrl = 'maplibre://maps/style';
+      final runtime = runtimeCreate(runtimeOptionsDefault());
+      final requests = <ResourceRequest>[];
 
-    runtime.setQueuedResourceProvider(
-      QueuedResourceProvider(
-        routes: [
-          AdapterQueuedResourceProviderRoute(
-            kind: ResourceKind.style.rawValue,
-            url: aliasUrl,
-            flags: AdapterResourceRouteFlags.useRequestedUrl,
-          ),
-        ],
-        callback: (request, handle) {
-          requests.add(request);
-          handle.complete(
-            ResourceResponse(
-              status: ResourceResponseStatus.ok,
-              bytes: Uint8List.fromList(_emptyStyleJson.codeUnits),
+      runtime.setResourceProvider(
+        _routed(
+          routes: [
+            AdapterResourceRoute(
+              kind: ResourceKind.style.rawValue,
+              url: aliasUrl,
+              flags: AdapterResourceRouteFlags.useRequestedUrl,
             ),
-          );
-          handle.close();
-        },
-      ),
-    );
+          ],
+          callback: (request, handle) {
+            requests.add(request);
+            handle.complete(
+              ResourceResponse(
+                status: ResourceResponseStatus.ok,
+                bytes: Uint8List.fromList(_emptyStyleJson.codeUnits),
+              ),
+            );
+            handle.close();
+          },
+        ),
+      );
 
-    final map = await runtime.createMap();
-    map.setStyleUrl(aliasUrl);
-    await _waitUntil(() => requests.isNotEmpty);
+      final map = await runtime.createMap();
+      map.setStyleUrl(aliasUrl);
+      await _waitUntil(() => requests.isNotEmpty);
 
-    expect(requests.first.requestedUrl, aliasUrl);
-    expect(
-      requests.first.resolvedUrl,
-      'https://demotiles.maplibre.org/style.json',
-    );
+      expect(requests.first.requestedUrl, aliasUrl);
+      expect(
+        requests.first.resolvedUrl,
+        'https://demotiles.maplibre.org/style.json',
+      );
 
-    await map.close();
-    await runtime.close();
-  });
+      await map.close();
+      await runtime.close();
+    },
+  );
 
   // a glob route claims a URL family whose members are known only
   // when they are requested.
-  test('queued resource provider glob routes claim a URL family', () async {
+  test('deferred resource provider glob routes claim a URL family', () async {
     const origin = 'custom://dart-provider-glob/';
     final runtime = runtimeCreate(runtimeOptionsDefault());
     final claimed = <String>[];
 
-    runtime.setQueuedResourceProvider(
-      QueuedResourceProvider(
+    runtime.setResourceProvider(
+      _routed(
         routes: [
-          AdapterQueuedResourceProviderRoute(
+          AdapterResourceRoute(
             kind: raw.MLN_ADAPTER_RESOURCE_KIND_ANY,
             url: '$origin**',
             flags: AdapterResourceRouteFlags.matchGlob,
@@ -607,18 +581,16 @@ void main() {
   // configured URI-scheme alias is reachable by the alias and by the URL the
   // built-in network path would have fetched.
   test(
-    'queued resource provider routes pick requested or resolved URL',
+    'deferred resource provider routes pick requested or resolved URL',
     () async {
       const aliasUrl = 'maplibre://maps/style';
       const normalizedUrl = 'https://demotiles.maplibre.org/style.json';
 
-      Future<ResourceRequest> claimedBy(
-        AdapterQueuedResourceProviderRoute route,
-      ) async {
+      Future<ResourceRequest> claimedBy(AdapterResourceRoute route) async {
         final runtime = runtimeCreate(runtimeOptionsDefault());
         final requests = <ResourceRequest>[];
-        runtime.setQueuedResourceProvider(
-          QueuedResourceProvider(
+        runtime.setResourceProvider(
+          _routed(
             routes: [route],
             callback: (request, handle) {
               requests.add(request);
@@ -641,7 +613,7 @@ void main() {
       }
 
       final byResolved = await claimedBy(
-        AdapterQueuedResourceProviderRoute(
+        AdapterResourceRoute(
           kind: ResourceKind.style.rawValue,
           url: normalizedUrl,
         ),
@@ -649,7 +621,7 @@ void main() {
       expect(byResolved.requestedUrl, aliasUrl);
 
       final byRequested = await claimedBy(
-        AdapterQueuedResourceProviderRoute(
+        AdapterResourceRoute(
           kind: ResourceKind.style.rawValue,
           url: aliasUrl,
           flags: AdapterResourceRouteFlags.useRequestedUrl,
@@ -664,10 +636,10 @@ void main() {
     final runtime = runtimeCreate(runtimeOptionsDefault());
     ResourceRequestHandle? token;
 
-    runtime.setQueuedResourceProvider(
-      QueuedResourceProvider(
+    runtime.setResourceProvider(
+      _routed(
         routes: [
-          AdapterQueuedResourceProviderRoute(
+          AdapterResourceRoute(
             kind: ResourceKind.style.rawValue,
             url: styleUrl,
           ),
@@ -701,10 +673,10 @@ void main() {
     final runtime = runtimeCreate(runtimeOptionsDefault());
     ResourceRequestHandle? token;
 
-    runtime.setQueuedResourceProvider(
-      QueuedResourceProvider(
+    runtime.setResourceProvider(
+      _routed(
         routes: [
-          AdapterQueuedResourceProviderRoute(
+          AdapterResourceRoute(
             kind: ResourceKind.style.rawValue,
             url: styleUrl,
           ),
@@ -747,41 +719,44 @@ void main() {
     await runtime.close();
   });
 
-  test('queued resource provider callback exceptions are contained', () async {
-    const styleUrl = 'custom://dart-provider-throws.json';
-    final runtime = runtimeCreate(runtimeOptionsDefault());
-    var calls = 0;
+  test(
+    'deferred resource provider callback exceptions are contained',
+    () async {
+      const styleUrl = 'custom://dart-provider-throws.json';
+      final runtime = runtimeCreate(runtimeOptionsDefault());
+      var calls = 0;
 
-    runtime.setQueuedResourceProvider(
-      QueuedResourceProvider(
-        routes: [
-          AdapterQueuedResourceProviderRoute(
-            kind: ResourceKind.style.rawValue,
-            url: styleUrl,
-          ),
-        ],
-        callback: (_, _) {
-          calls += 1;
-          throw StateError('provider failed');
-        },
-      ),
-    );
+      runtime.setResourceProvider(
+        _routed(
+          routes: [
+            AdapterResourceRoute(
+              kind: ResourceKind.style.rawValue,
+              url: styleUrl,
+            ),
+          ],
+          callback: (_, _) {
+            calls += 1;
+            throw StateError('provider failed');
+          },
+        ),
+      );
 
-    final map = await runtime.createMap();
-    map.setStyleUrl(styleUrl);
-    await _waitUntil(() => calls > 0);
+      final map = await runtime.createMap();
+      map.setStyleUrl(styleUrl);
+      await _waitUntil(() => calls > 0);
 
-    // The binding fails the request the throwing callback abandoned, so the
-    // style load reports its failure rather than hanging.
-    final failure = await _waitUntilEvent(
-      runtime,
-      (candidate) => candidate.type == RuntimeEventType.mapLoadingFailed,
-    );
-    expect(failure.message, isNotNull);
+      // The binding fails the request the throwing callback abandoned, so the
+      // style load reports its failure rather than hanging.
+      final failure = await _waitUntilEvent(
+        runtime,
+        (candidate) => candidate.type == RuntimeEventType.mapLoadingFailed,
+      );
+      expect(failure.message, isNotNull);
 
-    await map.close();
-    await runtime.close();
-  });
+      await map.close();
+      await runtime.close();
+    },
+  );
 
   test('closed resource request handles reject further use', () async {
     const styleUrl = 'custom://dart-provider-closed-handle.json';
@@ -791,10 +766,10 @@ void main() {
     var completionRejected = false;
     var repeatedCloseSucceeded = false;
 
-    runtime.setQueuedResourceProvider(
-      QueuedResourceProvider(
+    runtime.setResourceProvider(
+      _routed(
         routes: [
-          AdapterQueuedResourceProviderRoute(
+          AdapterResourceRoute(
             kind: ResourceKind.style.rawValue,
             url: styleUrl,
           ),
@@ -847,10 +822,10 @@ void main() {
       final zoneErrors = <Object>[];
 
       runZonedGuarded(
-        () => runtime.setQueuedResourceProvider(
-          QueuedResourceProvider(
+        () => runtime.setResourceProvider(
+          _routed(
             routes: [
-              AdapterQueuedResourceProviderRoute(
+              AdapterResourceRoute(
                 kind: ResourceKind.style.rawValue,
                 url: styleUrl,
               ),
@@ -913,10 +888,10 @@ void main() {
     CallbackPortLifecycleProbe? probe;
     var cancels = 0;
 
-    runtime.setQueuedResourceProvider(
-      QueuedResourceProvider(
+    runtime.setResourceProvider(
+      _routed(
         routes: [
-          AdapterQueuedResourceProviderRoute(
+          AdapterResourceRoute(
             kind: ResourceKind.style.rawValue,
             url: styleUrl,
           ),
@@ -958,10 +933,10 @@ void main() {
     ResourceRequestHandle? token;
     var cancels = 0;
 
-    runtime.setQueuedResourceProvider(
-      QueuedResourceProvider(
+    runtime.setResourceProvider(
+      _routed(
         routes: [
-          AdapterQueuedResourceProviderRoute(
+          AdapterResourceRoute(
             kind: ResourceKind.style.rawValue,
             url: styleUrl,
           ),
@@ -1740,10 +1715,10 @@ void main() {
         throwsA(isA<InvalidArgumentException>()),
       );
       expect(
-        () => runtime.setQueuedResourceProvider(
-          QueuedResourceProvider(
+        () => runtime.setResourceProvider(
+          _routed(
             routes: [
-              AdapterQueuedResourceProviderRoute(
+              AdapterResourceRoute(
                 kind: raw.MLN_ADAPTER_RESOURCE_KIND_ANY,
                 url: 'https://example.com/provider\u0000x',
               ),
@@ -1795,10 +1770,10 @@ void main() {
           ),
         ),
       );
-      runtime.setQueuedResourceProvider(
-        QueuedResourceProvider(
+      runtime.setResourceProvider(
+        _routed(
           routes: [
-            AdapterQueuedResourceProviderRoute(
+            AdapterResourceRoute(
               kind: ResourceKind.style.rawValue,
               url: 'https://example.com/provider-style.json',
             ),
@@ -1872,11 +1847,8 @@ void main() {
           AdapterResourceProviderRules(rules: const []),
         ),
       );
-      runtime.setQueuedResourceProvider(
-        QueuedResourceProvider(
-          routes: const [],
-          callback: (_, handle) => handle.close(),
-        ),
+      runtime.setResourceProvider(
+        _routed(routes: const [], callback: (_, handle) => handle.close()),
       );
       runtime.clearResourceProvider();
       final operationAfterClose = runtime.runAmbientCacheOperation(
@@ -1924,7 +1896,7 @@ void main() {
     );
 
     var throwingLogCalls = 0;
-    logSetCallback((_) {
+    logSetCallback((_, _, _, _) {
       throwingLogCalls += 1;
       throw StateError('log callback failure');
     });

@@ -808,23 +808,11 @@ void dart_ports_release_after_the_host_closes() {
       initial[i] == 0x5a, "callback arena growth invalidated earlier storage"
     );
 
-  auto queue = mln_adapter_resource_request_queue{};
-  auto queue_releases = unsigned{};
-  auto queue_wake = mln_wake{};
-  queue_wake.size = sizeof(queue_wake);
-  queue_wake.callback = [](void*) {};
-  queue_wake.user_data = &queue_releases;
-  queue_wake.release_user_data = [](void* value) {
-    ++*static_cast<unsigned*>(value);
-  };
+  auto runtime_releases = std::atomic_uint{};
+  const auto runtime = create_runtime(&runtime_releases);
   require(
-    mln_adapter_resource_request_queue_create(&queue_wake, &queue) ==
-      MLN_STATUS_OK,
-    "native callback queue creation failed"
-  );
-  require(
-    mln_adapter_arena_adopt_handle(arena, queue) == MLN_STATUS_OK,
-    "native callback queue adoption failed"
+    mln_adapter_arena_adopt_handle(arena, runtime) == MLN_STATUS_OK,
+    "native callback owner adoption failed"
   );
   static auto context_releases = unsigned{};
   require(
@@ -849,9 +837,7 @@ void dart_ports_release_after_the_host_closes() {
     deliveries == 3 && last_value == static_cast<std::int64_t>(registration),
     "Dart release did not retire exactly once"
   );
-  require(
-    queue_releases == 1, "closed isolate leaked its native callback queue"
-  );
+  wait([&] { return runtime_releases.load() == 1; });
   require(
     context_releases == 1, "closed isolate leaked an adopted context release"
   );
