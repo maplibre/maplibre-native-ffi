@@ -851,6 +851,10 @@ typedef struct mln_resource_response {
  * - The callback may call resource request handle functions for the provided
  *   handle.
  * - The C API invokes release_user_data after the final callback returns.
+ *
+ * A deferring adapter answers MLN_RESOURCE_PROVIDER_DECISION_HANDLE at once for
+ * a host that cannot run code on this thread, and delivers a copy of the
+ * request with the handle for the host to complete later.
  */
 typedef uint32_t (*mln_resource_provider_callback)(void* user_data MLN_BINDING("kind=context;lifetime=owner"), const mln_resource_request* request MLN_BINDING("ownership=borrowed;lifetime=call;direction=in;length=1"), mln_resource_request_handle handle) MLN_BINDING(
   "reentry=protocol;reentry_owner=handle;reentry_calls=mln_resource_request_"
@@ -864,7 +868,8 @@ typedef uint32_t (*mln_resource_provider_callback)(void* user_data MLN_BINDING("
   "complete=mln_resource_request_complete;cancelled=mln_resource_request_"
   "cancelled;"
   "cancel_registration=mln_resource_request_set_cancel_callback;"
-  "wait_retired=mln_resource_request_wait_until_retired"
+  "wait_retired=mln_resource_request_wait_until_retired;"
+  "deferred=MLN_RESOURCE_PROVIDER_DECISION_HANDLE"
 );
 
 /**

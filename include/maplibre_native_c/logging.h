@@ -60,6 +60,9 @@ typedef enum mln_log_event : uint32_t {
  * The message pointer is borrowed for the callback duration. Returning non-zero
  * consumes the record. Returning zero lets MapLibre Native's platform logger
  * handle it.
+ *
+ * A deferring adapter consumes each record at once for a host that cannot run
+ * code on a logging thread, and delivers a copy of the record later.
  */
 typedef uint32_t (*mln_log_callback)(
   void* user_data MLN_BINDING("kind=context;lifetime=owner"),
@@ -67,7 +70,7 @@ typedef uint32_t (*mln_log_callback)(
   uint32_t event MLN_BINDING("enum=mln_log_event"), int64_t code,
   const char* message
     MLN_BINDING("length=nul;encoding=utf8;ownership=borrowed;lifetime=call")
-) MLN_BINDING("thread=native;failure=0;reentry=forbid");
+) MLN_BINDING("thread=native;failure=0;reentry=forbid;deferred=1");
 
 /** Releases user_data from a log callback registration. */
 typedef void (*mln_log_callback_release)(

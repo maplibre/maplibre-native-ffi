@@ -61,6 +61,16 @@ it at native quiescence. Callback-scoped responses expire when their callback
 returns. A callback whose contract forbids native reentry also constrains
 cleanup that host finalizers initiate from that callback.
 
+Some hosts cannot run code on a MapLibre thread, yet a logging or resource
+provider callback must answer before it returns. A callback typedef marked
+`deferred=VALUE` names the result a native adapter may return at once for such a
+host. The adapter copies the call's arguments into a native-owned record and
+delivers the record to the host later. The compiler accepts the annotation only
+when the callback returns a value, VALUE is a value of the result's enum or an
+integer its scalar result holds, the callback has one context parameter, and
+every other parameter is an input borrowed for the call. A decision handle
+transfers to the record, so VALUE must be the decision's accept value.
+
 A borrowed GPU view holds a native scope through the host callback. The scope
 keeps session resources alive if another frame is finalized. Native retirement
 invalidates future views and waits for active scopes before releasing resources.

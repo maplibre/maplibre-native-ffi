@@ -642,6 +642,50 @@ BIND("execution=immediate") mln_status await_retirement(request value BIND("hand
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):
                 bind(self.parse(source.replace(before, after)), require_complete=True)
 
+    def test_deferred_callbacks_answer_early_and_copy_their_inputs(self):
+        source = """
+typedef enum decision : unsigned { DELEGATE = 0, CLAIM = 1 } decision;
+typedef unsigned long request BIND("kind=handle;release=release_request;parent=none");
+typedef void (*cancel)(void *context BIND("kind=context")) BIND("thread=native;failure=contain");
+typedef void (*release_cancel)(void *context BIND("kind=context")) BIND("thread=native;failure=contain");
+typedef unsigned (*provider)(void *context BIND("kind=context"), const char *url BIND("length=nul;encoding=utf8;lifetime=call"), request ticket) BIND("thread=native;enum=decision;failure=DELEGATE;deferred=CLAIM;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=answer;cancelled=is_cancelled;cancel_registration=on_cancel;wait_retired=await_retirement");
+typedef unsigned (*logger)(void *context BIND("kind=context"), int code) BIND("thread=native;failure=0;deferred=1");
+BIND("execution=immediate") mln_status answer(request value, unsigned response);
+BIND("execution=immediate") mln_status is_cancelled(request value, bool *result BIND("direction=out"));
+BIND("execution=immediate;registration=callback;user_data=context;release_callback=release;accepted_unless=cancelled") mln_status on_cancel(
+  request value, cancel callback, void *context BIND("kind=context"), release_cancel release, bool *cancelled BIND("direction=out"));
+BIND("execution=immediate") void release_request(request value);
+BIND("execution=immediate") mln_status await_retirement(request value BIND("handle_access=issued"));
+"""
+        model = bind(self.parse(source), require_complete=True)
+        self.assertEqual(model.callbacks["provider"].deferred, "CLAIM")
+        self.assertEqual(model.callbacks["logger"].deferred, "1")
+        for before, after, error in (
+            ("deferred=CLAIM", "deferred=OTHER", "value of decision"),
+            ("deferred=CLAIM", "deferred=DELEGATE", "requires the accept value"),
+            ("deferred=1", "deferred=-1", "integer the callback result"),
+            ("deferred=1", "deferred=yes", "integer the callback result"),
+            (
+                'void *context BIND("kind=context"), int code',
+                "int code",
+                "one context parameter",
+            ),
+            (
+                "int code) BIND",
+                'int *code BIND("direction=out")) BIND',
+                "copyable input",
+            ),
+            (
+                'typedef void (*cancel)(void *context BIND("kind=context")) BIND("thread=native;failure=contain");',
+                'typedef void (*cancel)(void *context BIND("kind=context")) BIND("thread=native;failure=contain;deferred=0");',
+                "callback with a result",
+            ),
+        ):
+            with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):
+                bind(
+                    self.parse(source.replace(before, after, 1)), require_complete=True
+                )
+
     def test_nullable_completion_array_has_optional_container(self):
         model = bind(
             self.parse("""

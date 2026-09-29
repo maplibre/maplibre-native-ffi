@@ -187,6 +187,9 @@ class CallbackPlan:
     context: str | None = None
     reentry: str = "allow"
     reentry_policy: CallbackReentryPlan | None = None
+    # The C result an adapter may return at once for a host that receives a
+    # copy of the call later.
+    deferred: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1152,6 +1155,7 @@ class Binder:
             contexts[0] if contexts else None,
             typedef.metadata.get("reentry", "allow"),
             self.callback_reentry(typedef),
+            typedef.metadata.get("deferred"),
         )
 
     def callback_reentry(self, typedef) -> CallbackReentryPlan | None:

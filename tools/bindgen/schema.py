@@ -105,9 +105,25 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "cancelled",
         "cancel_registration",
         "wait_retired",
+        "deferred",
     }
 )
 ENUM_KEYS = frozenset({"kind"})
+
+
+# Integer ranges of the scalar results a deferred callback can answer with.
+INTEGER_RANGES = {
+    "_Bool": (0, 1),
+    "bool": (0, 1),
+    "signed char": (-(2**7), 2**7 - 1),
+    "unsigned char": (0, 2**8 - 1),
+    "short": (-(2**15), 2**15 - 1),
+    "unsigned short": (0, 2**16 - 1),
+    "int": (-(2**31), 2**31 - 1),
+    "unsigned int": (0, 2**32 - 1),
+    "long long": (-(2**63), 2**63 - 1),
+    "unsigned long long": (0, 2**64 - 1),
+}
 
 
 def is_completion(type_: CType) -> bool:
@@ -911,6 +927,8 @@ def validate(api: Api) -> None:
             errors.append(
                 f"{context}: reentry owner and operations require protocol mode"
             )
+        if "deferred" in typedef.metadata:
+            errors.extend(deferred_errors(typedef, enum_constants, context))
         decision_keys = {
             "decision_handle",
             "decision_accept",
@@ -1013,3 +1031,62 @@ def validate(api: Api) -> None:
             )
     if errors:
         raise ModelError(errors)
+
+
+def deferred_errors(typedef, enum_constants, context: str) -> list[str]:
+    """Check that an adapter can answer a callback early and copy its call.
+
+    A deferred callback returns its declared value at once and delivers a copy
+    of its arguments later, so the value must be a result the callback can
+    return and every argument must outlive the call only as a copy.
+    """
+    value = typedef.metadata["deferred"]
+    signature = typedef.type.pointee
+    if (
+        signature is None
+        or signature.kind != "function"
+        or signature.result is None
+        or signature.result.kind == "void"
+    ):
+        return [f"{context}: deferred requires a callback with a result"]
+    errors = []
+    enum = typedef.metadata.get("enum")
+    if enum:
+        if enum_constants.get(value, (None,))[0] != enum:
+            errors.append(f"{context}: deferred must name a value of {enum}")
+    else:
+        bounds = INTEGER_RANGES.get(signature.result.canonical.removeprefix("const "))
+        try:
+            number = int(value, 0)
+        except ValueError:
+            number = None
+        if bounds is None or number is None or not bounds[0] <= number <= bounds[1]:
+            errors.append(
+                f"{context}: deferred must be an integer the callback result can hold"
+            )
+    contexts = [p for p in typedef.parameters if p.metadata.get("kind") == "context"]
+    if len(contexts) != 1:
+        errors.append(f"{context}: deferred requires one context parameter")
+    for parameter in typedef.parameters:
+        if parameter in contexts:
+            continue
+        if (
+            parameter.metadata.get("direction", "in") != "in"
+            or "consumes" in parameter.metadata
+        ):
+            errors.append(
+                f"{context}: deferred argument {parameter.name} must be a copyable input"
+            )
+        if parameter.type.kind == "pointer" and parameter.metadata.get(
+            "lifetime"
+        ) not in {None, "call"}:
+            errors.append(
+                f"{context}: deferred argument {parameter.name} must be borrowed for the call"
+            )
+    handle = typedef.metadata.get("decision_handle")
+    if handle and typedef.metadata.get("decision_accept") != value:
+        # A handle is only the adapter's to keep after an accepting answer.
+        errors.append(
+            f"{context}: deferred decision handle {handle} requires the accept value"
+        )
+    return errors
